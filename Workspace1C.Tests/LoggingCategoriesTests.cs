@@ -303,4 +303,37 @@ public sealed class LoggingCategoriesTests : IDisposable
         var app = ReadProjectFile(Path.Combine("Workspace1C", "App.axaml.cs"));
         Assert.Contains("LogCategory.MainWindow", app, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void InfoLogSites_UseCategoryGate_NotRawLogger()
+    {
+        // issue #80 (комментарии 7OH от 2026-10-29): INFO-записи направлений обязаны
+        // идти через категорийный гейт Log.Info(LogCategory.*, …), а не голый
+        // _logger.Info — иначе они «капают» в журнал при выключенном CM_ON/категории.
+        var launchWpf = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Launch.cs"));
+        Assert.Contains("Log.Info(LogCategory.BaseRun", launchWpf, StringComparison.Ordinal);
+        Assert.DoesNotContain("_logger.Info($\"Запущена база", launchWpf, StringComparison.Ordinal);
+
+        var launchVm = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "LaunchViewModel.cs"));
+        Assert.Contains("Log.Info(LogCategory.BaseRun", launchVm, StringComparison.Ordinal);
+        Assert.DoesNotContain("_logger.Info($\"Запущена база", launchVm, StringComparison.Ordinal);
+
+        var launchAvalonia = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "LaunchViewModel.Avalonia.cs"));
+        Assert.Contains("Log.Info(LogCategory.BaseRun", launchAvalonia, StringComparison.Ordinal);
+
+        var main = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.cs"));
+        Assert.Contains("Log.Info(LogCategory.Ibases", main, StringComparison.Ordinal);
+        Assert.DoesNotContain("_logger.Info($\"Создана резервная копия ibases.v8i", main, StringComparison.Ordinal);
+
+        // «Сессионная cookie» — INFO (а не WARN) и через диагностический флаг CM_UPDATES.
+        var updates = ReadProjectFile(Path.Combine("Workspace1C", "Services", "OneCUpdatesService.cs"));
+        Assert.DoesNotContain("_logger.Warn(\"[Updates] Вход: сессионная cookie", updates, StringComparison.Ordinal);
+        Assert.Contains("сессионная cookie", updates, StringComparison.Ordinal);
+        Assert.Contains("Log.Info(TraceFlags.UpdatesFlag", updates, StringComparison.Ordinal);
+
+        // RING-записи — через категорию CM_RAC (issue #80 + #83).
+        var ring = ReadProjectFile(Path.Combine("Workspace1C", "Services", "RingLicenseService.cs"));
+        Assert.Contains("Log.Info(LogCategory.Rac", ring, StringComparison.Ordinal);
+        Assert.DoesNotContain("_logger?.Info($\"RING:", ring, StringComparison.Ordinal);
+    }
 }

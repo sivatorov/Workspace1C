@@ -118,6 +118,11 @@ public sealed class Issue81NewBoxIconTests
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon(string.Empty));
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconFolder"));
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("Folder"));
+        // issue #81 (комментарий 7OH «при показе Утилиты — звезда»): сохранённая в старых
+        // layout «звезда» (Star/IconStar — старый дефолт «Новинок» до появления NewBox)
+        // тоже легаси — реальное меню должно показывать NewBox, а не звезду.
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("Star"));
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconStar"));
         Assert.False(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("NewBox"));
     }
 

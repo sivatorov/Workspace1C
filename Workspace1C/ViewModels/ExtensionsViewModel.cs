@@ -240,6 +240,16 @@ public sealed class ExtensionsViewModel : ViewModelBase
                 var result = UseIbcmd
                     ? await InstallViaIbcmdAsync(row.Infobase, token)
                     : await ConfigExtensionService.InstallAsync(row.Infobase, CfePath, ExtensionName, token);
+
+                // Issue #87 («Загрузка расширения конфигурации в клиент-серверную базу»):
+                // если конфигуратор не принял параметры («Error in command-line options»,
+                // код 1), а ibcmd-ветка не выбрана — автоматически повторяем установку
+                // утилитой ibcmd (config load --extension + config apply --force).
+                if (!UseIbcmd && !result.Success && ConfigExtensionService.IsCommandLineOptionsError(result))
+                {
+                    AppendLog(LocalizationManager.T("Extensions.LogDesignerFailedTryIbcmd"));
+                    result = await InstallViaIbcmdAsync(row.Infobase, token);
+                }
                 if (result.Success)
                 {
                     ok++;

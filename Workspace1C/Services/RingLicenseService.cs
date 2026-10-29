@@ -320,7 +320,9 @@ public sealed class RingLicenseService : IRingLicenseService
                 var licenses = RingLicenseParser.Parse(result.StdOut);
                 if (licenses.Count > 0)
                 {
-                    _logger?.Info(
+                    // issue #80: INFO-записи RING — через категорийный гейт CM_RAC + CM_ON
+                    // (не «капают» в журнал при выключенном логировании).
+                    Log.Info(LogCategory.Rac,
                         $"RING: распознано программных лицензий: {licenses.Count} (источник: {source}).");
                     return new RingLicenseResult { Licenses = licenses };
                 }
@@ -333,7 +335,8 @@ public sealed class RingLicenseService : IRingLicenseService
                 // причина, а не ошибка приложения: при автообновлении каждые ~5 с в общий
                 // журнал писать WARN-спам больше не нужно — уровень INFO/DEBUG; понятное
                 // сообщение для вкладки «Лицензии» формирует следующий блок.
-                _logger?.Info($"RING: {source} — утилита лицензий недоступна: {result.CombinedOutput}");
+                // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
+                Log.Info(LogCategory.Rac, $"RING: {source} — утилита лицензий недоступна: {result.CombinedOutput}");
             }
         }
 
@@ -345,7 +348,8 @@ public sealed class RingLicenseService : IRingLicenseService
                 "Не удалось получить список лицензий через утилиту ring (не найдена); показаны " +
                 "записи из каталога файлов лицензий платформы. Установите ring (обычно лежит " +
                 "в каталоге bin платформы рядом с rac) и нажмите «Обновить».";
-            _logger?.Info($"RING: {warning} Найдено файлов: {fallback.Count}.");
+            // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
+            Log.Info(LogCategory.Rac, $"RING: {warning} Найдено файлов: {fallback.Count}.");
             return new RingLicenseResult { Licenses = fallback, Warning = warning };
         }
 
@@ -373,25 +377,35 @@ public sealed class RingLicenseService : IRingLicenseService
 
     /// <summary>
     /// Кандидаты на выполнение (имя, аргументы, описание источника):
-    /// ring в PATH, ring.exe в каталоге bin платформы, licensetool платформы Linux.
+    /// ring из PATH (приоритет — issue #83: «просто вызывать ring, а не искать её рядом»),
+    /// затем ring.exe в каталоге bin платформы и licensetool платформы Linux как запасные.
     /// Internal — для юнит-тестов без запуска процессов.
     /// </summary>
     internal static IReadOnlyList<(string Command, string[] Arguments, string Source)> CommandCandidates()
     {
         var candidates = new List<(string, string[], string)>();
-        candidates.Add(("ring", new[] { "license", "list" }, "ring (PATH)"));
+
+        // issue #83 (комментарий 7OH): пользователь просит «просто вызывать ring» —
+        // приоритет у ring из PATH. Если полный путь резолвится явно (с учётом PATHEXT) —
+        // запускаем его; иначе пробуем голое имя «ring» (поиск снова выполнит ОС по PATH).
+        var ringInPath = ResolveRingInPath();
+        if (ringInPath is not null)
+            candidates.Add((ringInPath, new[] { "license", "list" }, $"ring (PATH: {ringInPath})"));
+        else
+            candidates.Add(("ring", new[] { "license", "list" }, "ring (PATH)"));
 
 #if WINDOWS
-        // WPF-сборка — Windows: imm каталог bin платформы (рядом с rac).
+        // Запасной источник — каталог bin платформы (рядом с rac): только когда ring
+        // в PATH не найден; больше НЕ ставится первым «вместо» PATH (issue #83).
         var rac = OneCPlatformLocator.FindRacExecutable();
         if (!string.IsNullOrWhiteSpace(rac))
         {
             var dir = Path.GetDirectoryName(rac);
             if (!string.IsNullOrWhiteSpace(dir))
             {
-                var ringExe = Path.Combine(dir, "ring.exe");
-                if (File.Exists(ringExe))
-                    candidates.Insert(0, (ringExe, new[] { "license", "list" }, "ring (bin платформы)"));
+                var ringExe = OneCPlatformLocator.FindInBinDir(dir, "ring");
+                if (!string.IsNullOrWhiteSpace(ringExe))
+                    candidates.Add((ringExe, new[] { "license", "list" }, "ring (bin платформы)"));
             }
         }
 #else
@@ -401,6 +415,65 @@ public sealed class RingLicenseService : IRingLicenseService
 #endif
 
         return candidates;
+    }
+
+    /// <summary>
+    /// Ищет <c>ring</c> в переменной окружения PATH с учётом PATHEXT (Windows):
+    /// перебирает каталоги PATH и расширения <c>.exe/.com/.cmd/.bat</c>, возвращает полный
+    /// путь первого существующего файла. Возвращает <c>null</c>, если ring в PATH нет.
+    /// Командные файлы (.cmd/.bat) не возвращаются: <see cref="ProcessRunner"/> запускает
+    /// процессы напрямую без оболочки. Internal — для юнит-тестов.
+    /// </summary>
+    internal static string? ResolveRingInPath()
+    {
+        var pathValue = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrWhiteSpace(pathValue))
+            return null;
+
+        foreach (var ext in RingPathExtensions())
+        {
+            foreach (var rawDir in pathValue.Split(Path.PathSeparator))
+            {
+                var dir = rawDir.Trim();
+                if (dir.Length == 0)
+                    continue;
+                string candidate;
+                try { candidate = Path.Combine(dir, "ring" + ext); }
+                catch { continue; }
+                if (File.Exists(candidate))
+                    return candidate;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>Расширения исполняемых файлов для поиска ring по PATH
+    /// (PATHEXT на Windows; Linux — без расширения). Internal — тесты.</summary>
+    internal static IReadOnlyList<string> RingPathExtensions()
+    {
+        var extensions = new List<string>();
+#if WINDOWS
+        var pathext = Environment.GetEnvironmentVariable("PATHEXT");
+        if (!string.IsNullOrWhiteSpace(pathext))
+        {
+            foreach (var raw in pathext.Split(';'))
+            {
+                var ext = raw.Trim();
+                if (ext.Length == 0)
+                    continue;
+                // Только запускаемые без оболочки расширения (issue #83): ProcessRunner
+                // стартует процесс напрямую; .cmd/.bat без cmd.exe не выполнить.
+                if (ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
+                    ext.Equals(".com", StringComparison.OrdinalIgnoreCase))
+                    extensions.Add(ext);
+            }
+        }
+        if (extensions.Count == 0)
+            extensions.Add(".exe"); // резерв, если PATHEXT не задан
+#else
+        extensions.Add(string.Empty);
+#endif
+        return extensions;
     }
 
     /// <summary>Ищет исполняемые файлы licensetool в каталогах /opt/1cv8 (Linux). Internal — тесты.</summary>

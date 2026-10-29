@@ -14,13 +14,22 @@ namespace Workspace1C.Services;
 /// </summary>
 public static class ConfigExtensionService
 {
-    /// <summary>Ключи загрузки расширения из файла и применения его к базе данных.</summary>
+    /// <summary>
+    /// Ключи загрузки расширения из файла и применения его к базе данных.
+    /// Issue #87 («Загрузка расширения конфигурации в клиент-серверную базу»):
+    /// у <c>/UpdateDBCfg</c> ключа <c>-Extension</c> НЕТ (он определен для
+    /// <c>/LoadCfg</c>/<c>/DumpCfg</c>) — повторный <c>-Extension</c> у операции
+    /// применения даёт «Error in command-line options» при запуске конфигуратора
+    /// на клиент-серверной базе. Расширение, загруженное через
+    /// <c>/LoadCfg "файл.cfe" -Extension "имя"</c>, применяется к базе данных
+    /// последующим <c>/UpdateDBCfg</c> (без повторения ключа).
+    /// </summary>
     public static string? BuildInstallArguments(string cfePath, string extensionName)
     {
         if (!DesignerCommandRunner.IsSafeValue(cfePath) || !DesignerCommandRunner.IsSafeValue(extensionName))
             return null;
         var name = extensionName.Trim();
-        return $"/LoadCfg\"{cfePath}\" -Extension \"{name}\" /UpdateDBCfg -Extension \"{name}\"";
+        return $"/LoadCfg\"{cfePath}\" -Extension \"{name}\" /UpdateDBCfg";
     }
 
     /// <summary>Ключи выгрузки расширения в файл .cfe.</summary>
@@ -90,6 +99,22 @@ public static class ConfigExtensionService
         if (args is null)
             return DesignerCommandResult.Fail(LocalizationManager.T("Extensions.BadName"));
         return await DesignerCommandRunner.RunAsync(infobase, args, null, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Признак отказа конфигуратора по причине «Error in command-line options» (issue #87):
+    /// конфигуратор не принял строку параметров (например, на клиент-серверной базе).
+    /// Возвращает <c>true</c>, если результат неуспешен и в тексте ошибки/вывода есть
+    /// признак ошибки параметров командной строки. Чистая функция — для юнит-тестов
+    /// и автоматического fallback'а на ibcmd-ветку.
+    /// </summary>
+    public static bool IsCommandLineOptionsError(DesignerCommandResult result)
+    {
+        if (result is null || result.Success || result.ExitCode == 0)
+            return false;
+        var text = (result.Error ?? string.Empty) + "\n" + (result.Log ?? string.Empty);
+        return text.IndexOf("command-line options", StringComparison.OrdinalIgnoreCase) >= 0 ||
+               text.IndexOf("command line options", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     public static async Task<DesignerCommandResult> DumpAsync(Infobase infobase, string cfePath, string extensionName,

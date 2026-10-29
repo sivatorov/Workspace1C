@@ -1669,8 +1669,11 @@ public partial class MainViewModel : ViewModelBase
                     try
                     {
                         var bak = IbasesBackupService.CreateBackup(filePath, _ibasesBackupKeepCount);
+                        // issue #80: INFO «резервная копия ibases.v8i» — через категорийный
+                        // гейт CM_IBASES + CM_ON (запись не должна «капать» при выключенном
+                        // логировании).
                         if (bak is not null)
-                            _logger.Info($"Создана резервная копия ibases.v8i: {bak}");
+                            Log.Info(LogCategory.Ibases, $"Создана резервная копия ibases.v8i: {bak}");
                     }
                     catch (Exception bakEx)
                     {

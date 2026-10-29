@@ -11,6 +11,88 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.3] — 2026-10-29
+
+### Исправлено / Добавлено
+
+- **Установка расширений (.cfe) в клиент-серверную базу снова работает (issue #87,
+  Windows и Linux).** Исправлены аргументы `/UpdateDBCfg` — убран лишний ключ
+  `-Extension` ([`ConfigExtensionService.BuildInstallArguments`](Workspace1C/Services/ConfigExtensionService.cs));
+  добавлена диагностика ошибки «command-line options»
+  ([`DesignerCommandRunner.RunAsync`](Workspace1C/Services/DesignerCommandRunner.cs))
+  и автоматический fallback на ibcmd-ветку (`config load --extension` +
+  `config apply --force`) в
+  [`ExtensionsViewModel.InstallToCheckedAsync`](Workspace1C/ViewModels/ExtensionsViewModel.cs) —
+  установка больше не падает с «Error in command-line options».
+
+- **Настройки, вкладка «Клавиши»: сочетания кнопок выровнены (issue #86, Windows и
+  Linux).** Колонке подписей задана фиксированная ширина **260 px** (WPF и Avalonia) —
+  все поля HotkeyBox начинаются с одной вертикали, «гребёнка» устранена.
+
+- **Вкладка «Лицензии»: утилита `ring` ищется в PATH (issue #83, Windows и Linux).**
+  `ring` теперь вызывается из PATH (через PATHEXT, только .exe/.com), каталог bin
+  платформы (рядом с rac) — запасной вариант, а не первый; RING-записи переведены
+  на категорийный лог (гейт вкладки «Логирование»).
+
+- **Иконка группы «Новинки программы» больше не подменяется на «звезду» (issue #81,
+  Windows и Linux).** В
+  [`UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon`](Workspace1C/Services/UtilitiesMenuCatalog.cs)
+  распознаётся легаси-иконка «звезда» (Star/IconStar) — меню «Утилиты» с таким
+  ключом корректно получает иконку NewBox; назначенная пользователем иконка
+  сохраняется.
+
+- **Настройка логирования приведена к категориям (issue #80, Windows и Linux).**
+  Записи «Запущена база…» → категория `BaseRun`, «Резервная копия ibases.v8i» →
+  `Ibases`, cookie обновлений → INFO (`UpdatesFlag`); RING-записи → `CM_RAC`;
+  INFO-спам при выключенном логировании устранён.
+
+- **Мастер «Развернуть тестовую копию» больше не падает при открытии (issue #79,
+  Windows и Linux).** Предпросмотр переведён в безопасный режим: при некорректных
+  данных базы показывается нейтральный текст `TestDeploy.PreviewUnavailable`
+  (локализация ru/en), а не исключение.
+
+- **Окно «Серверы 1С» — работа с колонками (issue #75, Windows и Linux).** Зона
+  кликов для перемещения/изменения колонок расширена (16 → 24 px) — перетаскивание
+  стало удобнее; подписки на заголовки колонок догружаются по `LayoutUpdated`
+  (WPF-версия) и не теряются при добавлении новых колонок.
+
+- **Окна «Настройки» и «Настройка информационной базы» нельзя сжать меньше минимума
+  (issue #71, Windows и Linux).** Добавлен программный зажим размеров к
+  `MinWidth`/`MinHeight` при любом способе ресайза (WPF — `SizeChanged`, Avalonia —
+  подписка на `ClientSizeProperty`); восстановление размеров из профиля тоже
+  зажимается к минимуму.
+
+- **Аудит форм (issue #55, Windows и Linux).** Правки форм включены в #71/#86:
+  минимальные размеры окон и выравнивание полей хоткеев; дополнительных жёстких
+  ширин, обрезающих содержимое при минимальных размерах, не выявлено.
+
+- **Тёмная тема: «зебра» строк переведена на тематические кисти (issue #26, Windows
+  и Linux).** В [`WpfUi.Grid`](Workspace1C/Views/WpfUi.cs) чередование строк
+  использует `RowBackground=CardBackgroundBrush` и
+  `AlternatingRowBackground=ZebraRowBrush` из активной темы; дополнительно проверен
+  контраст кнопок и тумблеров.
+
+### Тесты
+
+- [`ConfigExtensionServiceTests.cs`](Workspace1C.Tests/ConfigExtensionServiceTests.cs):
+  строки `/UpdateDBCfg` без лишнего `-Extension`, fallback на ibcmd — #87;
+- [`Issue83LicenseTabTests.cs`](Workspace1C.Tests/Issue83LicenseTabTests.cs):
+  поиск `ring` в PATH и категорийные RING-логи — #83;
+- [`Issue81NewBoxIconTests.cs`](Workspace1C.Tests/Issue81NewBoxIconTests.cs):
+  распознавание легаси-«звезды» и подстановка NewBox — #81;
+- [`LoggingCategoriesTests.cs`](Workspace1C.Tests/LoggingCategoriesTests.cs):
+  категории `BaseRun`/`Ibases`/`UpdatesFlag`/`CM_RAC`, INFO вместо WARN — #80;
+- [`Issue79TestDeployWindowTests.cs`](Workspace1C.Tests/Issue79TestDeployWindowTests.cs):
+  открытие мастера не бросает исключений при некорректных данных базы — #79;
+- [`Issue71SettingsWindowLayoutTests.cs`](Workspace1C.Tests/Issue71SettingsWindowLayoutTests.cs):
+  зажим размеров окна к `MinWidth`/`MinHeight` — #71;
+- [`Issue55AdaptiveLayoutTests.cs`](Workspace1C.Tests/Issue55AdaptiveLayoutTests.cs):
+  выравнивание полей хоткеев — #55/#86.
+
+Итого в проекте **~5 009 юнит-тестов**; Linux-сборка (Avalonia) также зелёная.
+
+---
+
 ## [1.0.1.2] — 2026-10-29
 
 ### Исправлено / Добавлено

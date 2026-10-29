@@ -16,8 +16,30 @@ public sealed class ConfigExtensionServiceTests
     [Fact]
     public void InstallArguments_LoadAndUpdateExtension()
     {
+        // issue #87 («Загрузка расширения конфигурации в клиент-серверную базу»): у
+        // /UpdateDBCfg ключа -Extension НЕТ — повторный ключ у операции применения давал
+        // «Error in command-line options» (код 1) на клиент-серверной базе. Расширение
+        // применяется последующим /UpdateDBCfg без повторения ключа.
         var args = ConfigExtensionService.BuildInstallArguments(@"C:\cfe\Доработки.cfe", " Доработки ");
-        Assert.Equal("/LoadCfg\"C:\\cfe\\Доработки.cfe\" -Extension \"Доработки\" /UpdateDBCfg -Extension \"Доработки\"", args);
+        Assert.Equal("/LoadCfg\"C:\\cfe\\Доработки.cfe\" -Extension \"Доработки\" /UpdateDBCfg", args);
+        Assert.DoesNotContain("-Extension",
+            args.Substring(args.IndexOf("/UpdateDBCfg", StringComparison.Ordinal)),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void IsCommandLineOptionsError_DetectsDesignerParameterFailure()
+    {
+        // issue #87: fallback на ibcmd при отказе конфигуратора «Error in command-line options».
+        Assert.True(ConfigExtensionService.IsCommandLineOptionsError(
+            new DesignerCommandResult { ExitCode = 1, Error = "Конфигуратор завершился с кодом 1: Error in command-line options" }));
+        Assert.True(ConfigExtensionService.IsCommandLineOptionsError(
+            new DesignerCommandResult { ExitCode = 1, Log = "… Error in command-line options …" }));
+        Assert.False(ConfigExtensionService.IsCommandLineOptionsError(
+            new DesignerCommandResult { Success = true, ExitCode = 0 }));
+        Assert.False(ConfigExtensionService.IsCommandLineOptionsError(
+            new DesignerCommandResult { ExitCode = 1, Error = "База занята" }));
+        Assert.False(ConfigExtensionService.IsCommandLineOptionsError(null!));
     }
 
     [Fact]

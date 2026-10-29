@@ -109,6 +109,19 @@ namespace Workspace1C
             MinHeight = 720;
             FontSize = 13;
 
+            // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
+            // гарантированный зажим размера окна к MinWidth/MinHeight при ЛЮБОМ способе
+            // изменения (ресайз мышью, растяжение оконным менеджером Linux) — не только
+            // при открытии. Подписка на ClientSize; повторные события после установки
+            // Width/Height уже удовлетворяют условию и не вызывают цикл.
+            this.GetObservable(ClientSizeProperty).Subscribe(new SettingsObserver<Size>(size =>
+            {
+                if (MinWidth > 0 && size.Width < MinWidth)
+                    Width = MinWidth;
+                if (MinHeight > 0 && size.Height < MinHeight)
+                    Height = MinHeight;
+            }));
+
             _viewModel = viewModel;
             // Без контекста привязки переключателей клиента и разрядности
             // не находили свойств и всегда стояли пустыми.

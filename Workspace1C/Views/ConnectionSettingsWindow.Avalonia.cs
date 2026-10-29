@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Avalonia.Reactive;
 using Avalonia.Controls.Primitives;
 using Avalonia;
 using Avalonia.Controls;
@@ -77,6 +78,17 @@ namespace Workspace1C
             MinWidth = 760;
             MinHeight = 780;
             FontSize = 13;
+
+            // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
+            // гарантированный зажим размера окна к MinWidth/MinHeight при ЛЮБОМ способе
+            // изменения — та же защита, что и у окна «Настройки».
+            this.GetObservable(ClientSizeProperty).Subscribe(new PropertyObserver<Size>(size =>
+            {
+                if (MinWidth > 0 && size.Width < MinWidth)
+                    Width = MinWidth;
+                if (MinHeight > 0 && size.Height < MinHeight)
+                    Height = MinHeight;
+            }));
 
             _dialogs = AppServices.GetRequiredService<IDialogService>();
             _linkRepository = AppServices.GetRequiredService<IInfobaseRepository>();
@@ -1797,6 +1809,16 @@ namespace Workspace1C
 
         /// <summary>Показывает окно модально (синхронно).</summary>
         public bool ShowSync(Window? owner = null) => ShowDialogSync(owner);
+
+        /// <summary>Наблюдатель за значением свойства (паттерн Avalonia-окон; без System.Reactive).</summary>
+        private sealed class PropertyObserver<T> : IObserver<T>
+        {
+            private readonly Action<T> _apply;
+            public PropertyObserver(Action<T> apply) => _apply = apply;
+            public void OnCompleted() { }
+            public void OnError(Exception error) { }
+            public void OnNext(T value) => _apply(value);
+        }
     }
 }
 #endif

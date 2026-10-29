@@ -57,14 +57,20 @@ public sealed class Issue83LicenseTabTests
         // сообщение в RingLicenseResult.Warning для вкладки.
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Services", "RingLicenseService.cs"));
 
-        // Стартовые ошибки/недоступность кандидатов логируются через Info…
-        Assert.True(source.Contains("_logger?.Info($\"RING: {source} — утилита лицензий недоступна: {result.CombinedOutput}\");", StringComparison.Ordinal),
-            "RingLicenseService: недоступность утилиты должна логироваться как INFO (issue #83).");
-        // …и в цикле кандидатов не осталось Warn-сообщений о неудаче получения лицензий.
+        // issue #80: записи направления RING идут через категорийный гейт
+        // Log.Info(LogCategory.Rac, …) — при выключенном CM_ON/CM_RAC в журнал не пишутся.
+        Assert.Contains("Log.Info(LogCategory.Rac", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_logger?.Info($\"RING:", source, StringComparison.Ordinal);
+        // В цикле кандидатов не осталось Warn-сообщений о неудаче получения лицензий.
         Assert.DoesNotContain("_logger?.Warn($\"RING: {source} — не удалось получить лицензии", source);
         // Понятное сообщение формируется единым методом (используется во вкладке).
         Assert.True(source.Contains("BuildUnavailableMessage()", StringComparison.Ordinal),
             "RingLicenseService: должен использоваться BuildUnavailableMessage() (issue #83).");
+        // issue #83 (комментарий 7OH «Давайте просто вызывать ring, а не искать её рядом»):
+        // ring резолвится по PATH с учётом PATHEXT и не подменяется первым кандидатом
+        // рядом с rac.
+        Assert.Contains("ResolveRingInPath", source, StringComparison.Ordinal);
+        Assert.Contains("RingPathExtensions", source, StringComparison.Ordinal);
     }
 
     // ===================== Порядок вкладок (issue #83) =====================

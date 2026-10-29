@@ -98,7 +98,8 @@ public sealed class LaunchViewModel : ViewModelBase
             if (ok)
             {
                 RunPostLaunchScript(selected);
-                _logger.Info($"Запущена база «{selected.Name}» ({kind})");
+                // issue #80: INFO «запущено баз» — через категорийный гейт CM_BASE_RUN + CM_ON.
+                Log.Info(LogCategory.BaseRun, $"Запущена база «{selected.Name}» ({kind})");
                 _onLaunched();
             }
             else

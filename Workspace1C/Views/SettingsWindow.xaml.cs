@@ -74,6 +74,20 @@ namespace Workspace1C
         public SettingsWindow(MainViewModel viewModel)
         {
             InitializeComponent();
+            // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
+            // гарантированный зажим размеров к MinWidth/MinHeight при ЛЮБОМ способе
+            // изменения размера (в т.ч. быстрый ресайз мышью, растяжение оконного
+            // менеджера Linux) — не только при открытии/восстановлении.
+            SizeChanged += (_, e) =>
+            {
+                if (MinWidth > 0 && e.NewSize.Width < MinWidth)
+                {
+                    Width = MinWidth;
+                    return;
+                }
+                if (MinHeight > 0 && e.NewSize.Height < MinHeight)
+                    Height = MinHeight;
+            };
             _viewModel = viewModel;
             // Шаблон имени COM-коннектора 1С (issue #175): показываем текущее значение.
             if (ComConnectorNameTemplateBox != null)

@@ -268,7 +268,8 @@ public partial class MainViewModel : ViewModelBase
                 ib.AddLaunchHistory(kind.ToString(), BuildLaunchDetails(sessionDetails, ib));
                 InfobasesView.Refresh();
                 Save();
-                _logger.Info($"Запущена база «{ib.Name}» ({kind}, клиент={_sessionClientMode}, арх={_sessionArchitecture})");
+                // issue #80: INFO направления «запуск баз» — через категорийный гейт CM_BASE_RUN + CM_ON.
+                Log.Info(LogCategory.BaseRun, $"Запущена база «{ib.Name}» ({kind}, клиент={_sessionClientMode}, арх={_sessionArchitecture})");
                 NotifyAfterLaunch();
             }
             else

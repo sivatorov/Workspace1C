@@ -2727,9 +2727,13 @@ public class OneCUpdatesService : IOneCUpdatesService
                 LogPortalCookieInventory(accountId);
                 return PortalLoginResult.Success;
             }
-
-            _logger.Warn("[Updates] Вход: сессионная cookie в контейнере, но пробный GET показал " +
-                         "мёртвую сессию — cookie портала удаляются, выполняется полный вход со свежей формой.");
+    
+            // issue #80 (комментарий 7OH от 2026-10-29): «мёртвая» сессионная cookie — это
+            // штатное поведение (INFO), а не WARN: уровень понижен, запись идёт через
+            // диагностический флаг CM_UPDATES (гейт CM_ON + категория).
+            Log.Info(TraceFlags.UpdatesFlag,
+                "[Updates] Вход: сессионная cookie в контейнере, но пробный GET показал " +
+                "мёртвую сессию — cookie портала удаляются, выполняется полный вход со свежей формой.");
             ClearPortalCookies(accountId);
         }
 

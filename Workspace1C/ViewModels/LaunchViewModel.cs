@@ -61,7 +61,10 @@ public sealed class LaunchViewModel : ViewModelBase
 
         if (ok)
         {
-            _logger.Info($"Запущена база «{selected.Name}» ({kind})");
+            // issue #80: INFO направления «запущено баз» пишется через категорийный
+            // гейт CM_BASE_RUN + CM_ON, а не голым _logger.Info (иначе запись
+            // «капает» в журнал при выключенном логировании).
+            Log.Info(LogCategory.BaseRun, $"Запущена база «{selected.Name}» ({kind})");
             _onLaunched();
         }
         else

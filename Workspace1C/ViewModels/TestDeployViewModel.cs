@@ -205,45 +205,71 @@ public sealed class TestDeployViewModel : ViewModelBase
         return TestDeployPlanner.Validate(scenario, _source, existing);
     }
 
-    /// <summary>Предпросмотр шагов плана (заголовки уже локализованы: ключи → текст).</summary>
+    /// <summary>
+    /// Предпросмотр шагов плана (заголовки уже локализованы: ключи → текст).
+    /// Issue #79 (комментарий 7OH от 2026-10-29 «ошибка при открытии»): построение
+    /// предпросмотра не должно ронять открытие мастера при некорректных данных базы
+    /// (пустое соединение, странные имена и т.п.) — при исключении возвращается
+    /// пустой список, а сбой фиксируется в журнале ERROR.
+    /// </summary>
     public IReadOnlyList<string> PreviewSteps
     {
         get
         {
-            var scenario = BuildScenario();
-            var existing = TestDeployPlanner.FindExistingTarget(
-                _infobases, scenario, TestDeployPlanner.ResolveTargetName(scenario, _source.Name));
-            var groupPlan = TestDeployPlanner.EnsureGroup(_groups, scenario);
-            return TestDeployPlanner.DescribeSteps(scenario, existing, groupPlan)
-                .Select(s =>
-                {
-                    var text = LocalizationManager.T(s.TitleKey);
-                    return s.Kind == TestDeployStepKind.Update && existing is not null
-                        ? string.Format(LocalizationManager.T("TestDeploy.PreviewUpdateFormat"), existing.Name, text)
-                        : text;
-                })
-                .ToList();
+            try
+            {
+                var scenario = BuildScenario();
+                var existing = TestDeployPlanner.FindExistingTarget(
+                    _infobases, scenario, TestDeployPlanner.ResolveTargetName(scenario, _source.Name));
+                var groupPlan = TestDeployPlanner.EnsureGroup(_groups, scenario);
+                return TestDeployPlanner.DescribeSteps(scenario, existing, groupPlan)
+                    .Select(s =>
+                    {
+                        var text = LocalizationManager.T(s.TitleKey);
+                        return s.Kind == TestDeployStepKind.Update && existing is not null
+                            ? string.Format(LocalizationManager.T("TestDeploy.PreviewUpdateFormat"), existing.Name, text)
+                            : text;
+                    })
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Log.Info(LogCategory.MainWindow, $"Предпросмотр шагов «Развернуть тестовую копию» недоступен: {ex.Message}");
+                return new List<string>();
+            }
         }
     }
 
-    /// <summary>Строка сводки для предпросмотра (целевая база, группа, признак создания/обновления).</summary>
+    /// <summary>
+    /// Строка сводки для предпросмотра (целевая база, группа, признак создания/обновления).
+    /// Issue #79: при исключении возвращается нейтральный текст, а не падение окна.
+    /// </summary>
     public string PreviewSummary
     {
         get
         {
-            var scenario = BuildScenario();
-            var targetName = TestDeployPlanner.ResolveTargetName(scenario, _source.Name);
-            var existing = TestDeployPlanner.FindExistingTarget(_infobases, scenario, targetName);
-            var modeText = LocalizationManager.T(
-                IsServerMode ? "TestDeploy.ModeServer" : "TestDeploy.ModeFile");
-            var actionText = existing is null
-                ? LocalizationManager.T("TestDeploy.ActionCreate")
-                : string.Format(LocalizationManager.T("TestDeploy.ActionUpdate"), existing.Name);
-            return string.Format(
-                LocalizationManager.T("TestDeploy.PreviewSummaryFormat"),
-                targetName,
-                modeText,
-                actionText);
+            try
+            {
+                var scenario = BuildScenario();
+                var targetName = TestDeployPlanner.ResolveTargetName(scenario, _source.Name);
+                var existing = TestDeployPlanner.FindExistingTarget(_infobases, scenario, targetName);
+                var modeText = LocalizationManager.T(
+                    IsServerMode ? "TestDeploy.ModeServer" : "TestDeploy.ModeFile");
+                var actionText = existing is null
+                    ? LocalizationManager.T("TestDeploy.ActionCreate")
+                    : string.Format(LocalizationManager.T("TestDeploy.ActionUpdate"), existing.Name);
+                return string.Format(
+                    LocalizationManager.T("TestDeploy.PreviewSummaryFormat"),
+                    targetName,
+                    modeText,
+                    actionText);
+            }
+            catch (Exception ex)
+            {
+                Log.Info(LogCategory.MainWindow,
+                    $"Сводка предпросмотра «Развернуть тестовую копию» недоступна: {ex.Message}");
+                return LocalizationManager.T("TestDeploy.PreviewUnavailable");
+            }
         }
     }
 

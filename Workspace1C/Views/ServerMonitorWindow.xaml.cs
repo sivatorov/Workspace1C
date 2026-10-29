@@ -71,11 +71,14 @@ namespace Workspace1C
         private bool _resizingActive;
         /// <summary>
         /// Ширина «зоны границы» заголовка колонки, px (issue #75): перетаскивание
-        /// начинается, когда курсор в правых ~2 зонах ширины Thumb
+        /// начинается, когда курсор в правой зоне ширины Thumb
         /// PART_RightHeaderGripper (7 px) + запас — клик в эту зону перехватывается
-        /// ДО внутреннего обработчика DataGridColumnHeader.
+        /// ДО внутреннего обработчика DataGridColumnHeader. Расширена с 16 до 24 px:
+        /// пользователи целятся в границу и по краю заголовка, узкая зона (16 px)
+        /// пропускала часть кликов в штатный resize/reorder DataGrid (комментарий 7OH
+        /// «Нет — не работает. Всё по-старому», issue #75).
         /// </summary>
-        private const double HeaderResizeHotZone = 16.0;
+        private const double HeaderResizeHotZone = 24.0;
 
         /// <summary>Фоновое обновление кэша статусов служб (5 с; issue #3, часть 2).</summary>
         private System.Threading.Timer? _servicesStatusTimer;
@@ -339,6 +342,18 @@ namespace Workspace1C
                 Dispatcher.BeginInvoke(
                     new Action(() => AttachHeaderWidthTracking(grid, tabKey)),
                     System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
+                // issue #75 (комментарий 7OH «Нет — не работает. Всё по-старому»):
+                // заголовки неактивных вкладок могут материализоваться ПОЗЖЕ первого
+                // Loaded (переключение вкладок, первое наполнение данными) — довешиваем
+                // подписки по LayoutUpdated, пока все заголовки не будут обслужены
+                // (повторные вызовы дедуплицируются HashSet-ом _trackedColumnHeaders).
+                void OnGridLayoutUpdated(object? _, EventArgs __)
+                {
+                    AttachHeaderWidthTracking(grid, tabKey);
+                }
+                grid.LayoutUpdated -= OnGridLayoutUpdated;
+                grid.LayoutUpdated += OnGridLayoutUpdated;
             };
         }
 

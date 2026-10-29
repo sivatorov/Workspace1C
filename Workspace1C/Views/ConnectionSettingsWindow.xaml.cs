@@ -62,6 +62,20 @@ namespace Workspace1C
             _onCustomLaunchParametersChanged = onCustomLaunchParametersChanged;
             InitializeComponent();
 
+            // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
+            // те же гарантии минимальных размеров, что и у окна «Настройки» — окно не
+            // сжимается мышью ниже MinWidth/MinHeight ни на одной платформе.
+            SizeChanged += (_, e) =>
+            {
+                if (MinWidth > 0 && e.NewSize.Width < MinWidth)
+                {
+                    Width = MinWidth;
+                    return;
+                }
+                if (MinHeight > 0 && e.NewSize.Height < MinHeight)
+                    Height = MinHeight;
+            };
+
             // ESC сначала закрывает открытые всплывающие подсказки, а только потом окно (issue #270).
             ToolTipCloser.Register();
             PreviewKeyDown += OnToolTipEscPreviewKeyDown;

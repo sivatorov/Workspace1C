@@ -92,6 +92,64 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Equal(string.Empty, vm.DbName);
     }
 
+    // ---------------- (4) Открытие мастера (регрессия «ошибка при открытии») ----------------
+
+    [Theory]
+    [InlineData(ConnectionType.ClientServer)]
+    [InlineData(ConnectionType.File)]
+    public void Preview_DoesNotThrow_ForAnyConnectionType(ConnectionType type)
+    {
+        // issue #79 (комментарий 7OH «Ну вот теперь просто ошибка при открытии»): построение
+        // предпросмотра мастера не должно ронять открытие окна ни для одного типа базы.
+        var source = new Infobase
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = "УТ",
+            PlatformVersion = "8.3.24",
+            Connection = new ConnectionSettings
+            {
+                Type = type,
+                DatabaseName = type == ConnectionType.File ? null : "ut_base",
+                FilePath = type == ConnectionType.File ? @"C:\bases\УТ" : null,
+                Server = type == ConnectionType.File ? null : "srv"
+            }
+        };
+        var vm = new TestDeployViewModel(
+            source, Array.Empty<Infobase>(), Array.Empty<Group>(),
+            proposedTargetName: "Тест: УТ",
+            proposedServerAddress: "srv",
+            proposedDatabaseName: "ut_base",
+            proposedFilePath: string.Empty);
+
+        Assert.NotNull(vm.PreviewSummary);      // не бросает
+        Assert.NotNull(vm.PreviewSteps);        // не бросает
+    }
+
+    [Fact]
+    public void Preview_DoesNotThrow_WhenSourceHasNoConnection()
+    {
+        // issue #79: база без соединения (null) не должна ронять предпросмотр/открытие.
+        var source = new Infobase { Id = Guid.NewGuid().ToString("N"), Name = "УТ", Connection = null };
+        var vm = new TestDeployViewModel(
+            source, Array.Empty<Infobase>(), Array.Empty<Group>(),
+            proposedTargetName: string.Empty,
+            proposedServerAddress: string.Empty,
+            proposedDatabaseName: string.Empty,
+            proposedFilePath: string.Empty);
+
+        Assert.NotNull(vm.PreviewSummary);
+        Assert.NotNull(vm.PreviewSteps);
+    }
+
+    [Fact]
+    public void PreviewUnavailable_KeyExistsInLocalization()
+    {
+        var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
+        var en = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "en.json"));
+        Assert.Contains("TestDeploy.PreviewUnavailable", ru, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.PreviewUnavailable", en, StringComparison.Ordinal);
+    }
+
     // ---------------- (1) Единое оформление полей ввода ----------------
 
     [Fact]

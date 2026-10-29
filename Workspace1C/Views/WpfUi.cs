@@ -308,7 +308,12 @@ namespace Workspace1C
             };
             VirtualizingPanel.SetIsVirtualizing(grid, true);
             VirtualizingPanel.SetVirtualizationMode(grid, VirtualizationMode.Recycling);
-            grid.SetResourceReference(DataGrid.AlternatingRowBackgroundProperty, "CardBackgroundBrush");
+            // issue #26 (комментарий 7OH «Ещё одна новинка с зеброй»): чередующаяся строка
+            // должна использовать тематическую кисть ZebraRowBrush (в тёмной теме #334155),
+            // а НЕ CardBackgroundBrush — иначе обе строки сливаются (или рождается «белая
+            // зебра», когда строка берёт системный White). RowBackground — карточка темы.
+            grid.SetResourceReference(DataGrid.RowBackgroundProperty, "CardBackgroundBrush");
+            grid.SetResourceReference(DataGrid.AlternatingRowBackgroundProperty, "ZebraRowBrush");
             grid.SetResourceReference(Control.BorderBrushProperty, "BorderBrush");
             return grid;
         }

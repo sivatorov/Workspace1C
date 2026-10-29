@@ -251,10 +251,13 @@ public static class UtilitiesMenuCatalog
     public const string LegacyFallbackIconKey = "IconFolder";
 
     /// <summary>
-    /// Является ли сохранённая иконка узла легаси-фолбэком «папки» (пустая, запасная
-    /// IconFolder либо PackIcon-имя Folder), который до появления NewBox записывался
-    /// старыми layout-файлами. Такие значения сбрасываются к стандартной иконке
-    /// каталога, чтобы иконка «Новинок программы» была везде одинакова (issue #81).
+    /// Является ли сохранённая иконка узла легаси-фолбэком (пустая, запасная
+    /// «папка» IconFolder/Folder ИЛИ старая «звезда» Star/IconStar — дефолт «Новинок»
+    /// до появления NewBox), который записывался старыми layout-файлами. Такие значения
+    /// сбрасываются к стандартной иконке каталога NewBox, чтобы иконка «Новинок
+    /// программы» была везде одинакова (issue #81, комментарий 7OH «при показе
+    /// Утилиты — звезда»: layout с сохранённой «звездой» продолжал показывать её
+    /// в реальном меню, тогда как редактор и контекстное меню уже отдавали NewBox).
     /// </summary>
     public static bool IsLegacyFallbackGroupIcon(string? iconKey)
     {
@@ -262,7 +265,9 @@ public static class UtilitiesMenuCatalog
             return true;
         var key = iconKey.Trim();
         return string.Equals(key, LegacyFallbackIconKey, StringComparison.Ordinal)
-            || string.Equals(key, "Folder", StringComparison.Ordinal);
+            || string.Equals(key, "Folder", StringComparison.Ordinal)
+            || string.Equals(key, "Star", StringComparison.Ordinal)
+            || string.Equals(key, "IconStar", StringComparison.Ordinal);
     }
 
     /// <summary>Ключ локализации заголовка стандартной группы.</summary>

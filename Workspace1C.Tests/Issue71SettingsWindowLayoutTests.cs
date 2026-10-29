@@ -148,6 +148,37 @@ public sealed class Issue71SettingsWindowLayoutTests
 
         // Общая обёртка вкладок (метод Tab) горизонтальной прокрутки не имеет.
         Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled", code, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------
+    // Issue #86 (комментарий 7OH): вкладка «Клавиши» — «гребёнка» полей
+    // HotkeyBox. Принято: фиксированная ширина колонки подписей (260 px,
+    // достаточно для самой длинной) — поля всех строк начинаются в одной
+    // позиции на обеих платформах.
+    // ------------------------------------------------------------------
+
+    private static int CountOccurrences(string text, string needle) =>
+        System.Text.RegularExpressions.Regex.Matches(text,
+            System.Text.RegularExpressions.Regex.Escape(needle)).Count;
+
+    [Fact]
+    public void Hotkeys_Wpf_HotkeyBoxColumnsAlignedFixedWidth()
+    {
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml"));
+        // Секция «Клавиши»: колонка подписей фиксирована (260) и одинаковa во всех строках
+        // (старый MinWidth=150 в ней не остался).
+        Assert.True(CountOccurrences(xaml, "<ColumnDefinition Width=\"260\"/>") >= 30,
+            "WPF: колонки подписей хоткеев должны иметь единую фиксированную ширину 260 (issue #86).");
+        // Легаси-колонка Auto/MinWidth=150 осталась только в блоке «Шрифт» (одно вхождение).
+        Assert.Equal(1, CountOccurrences(xaml, "<ColumnDefinition Width=\"Auto\" MinWidth=\"150\"/>"));
+    }
+
+    [Fact]
+    public void Hotkeys_Avalonia_HotkeyBoxColumnsAlignedFixedWidth()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.Hotkeys.cs"));
+        Assert.Contains("new ColumnDefinition(260)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinWidth = 150", code, StringComparison.Ordinal);
         Assert.DoesNotContain("HorizontalScrollBarVisibility = ScrollBarVisibility.Auto", code, StringComparison.Ordinal);
     }
 

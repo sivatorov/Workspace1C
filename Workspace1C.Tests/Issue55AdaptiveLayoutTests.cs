@@ -81,10 +81,11 @@ public sealed class Issue55AdaptiveLayoutTests
         var hard = Regex.Matches(xaml, @"(?<![A-Za-z])Width=""(230|240|280|220|200|120|90|70|60|50)""").Count;
         Assert.True(hard == 0, $"В SettingsWindow.xaml остались жёсткие ширины полей ввода: {hard}");
 
-        // Колонки подписей горячих клавиш: Auto + минимальная ширина (было жёсткое 170).
+        // Колонки подписей горячих клавиш: фиксированная ширина 260 (issue #86 —
+        // «гребёнка» полей HotkeyBox устранена выравниванием старта полей).
         Assert.True(
-            Count(xaml, "<ColumnDefinition Width=\"Auto\" MinWidth=\"150\"/>") >= 20,
-            "Колонки подписей горячих клавиш должны быть Auto+MinWidth=150.");
+            Count(xaml, "<ColumnDefinition Width=\"260\"/>") >= 30,
+            "Колонки подписей горячих клавиш должны иметь единую фиксированную ширину 260 (issue #86).");
     }
 
     [Fact]
@@ -117,10 +118,12 @@ public sealed class Issue55AdaptiveLayoutTests
     }
 
     [Fact]
-    public void SettingsWindow_Avalonia_HotkeyRows_LabelColumnAuto()
+    public void SettingsWindow_Avalonia_HotkeyRows_LabelColumnFixed()
     {
+        // issue #86: фиксированная ширина колонки подписей (260) — без Auto/MinWidth-«гребёнки».
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.Hotkeys.cs"));
-        Assert.Contains("new ColumnDefinition(GridLength.Auto) { MinWidth = 150 }", code, StringComparison.Ordinal);
+        Assert.Contains("new ColumnDefinition(260)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinWidth = 150", code, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------

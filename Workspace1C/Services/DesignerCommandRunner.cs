@@ -68,11 +68,18 @@ public static class DesignerCommandRunner
                 string.Format(LocalizationManager.T("Launcher.ConfiguratorBlockedFormat"), blockReason));
 
         var outLog = Path.Combine(Path.GetTempPath(), $"1c_cmd_{Guid.NewGuid():N}.log");
+        var connectionArg = OneCLauncher.BuildConnectionArgument(infobase);
         var arguments = BuildArguments(
-            OneCLauncher.BuildConnectionArgument(infobase),
+            connectionArg,
             OneCLauncher.BuildAuthArgument(infobase),
             operationArgs,
             outLog);
+
+        // Issue #87: диагностика «Error in command-line options» на клиент-серверной базе —
+        // полная строка запуска пишется под категорией CM_RAC (без учётных данных, чтобы
+        // пароли не попали в журнал; гейт CM_ON + CM_RAC выключен по умолчанию).
+        Log.Info(LogCategory.Rac,
+            $"DESIGNER {connectionArg} {operationArgs} (конфигуратор: {exePath}, out: {outLog})");
 
         Process? process = null;
         try
