@@ -33,7 +33,7 @@
 
         <!-- Поисковая строка: Enter — выполнить, Shift+Enter — Конфигуратор (для баз), Esc — закрыть -->
         <TextBox x:Name="SearchBox" Grid.Row="0" Padding="10,8" FontSize="14"
-                 KeyDown="OnSearchBox_KeyDown"
+                 PreviewKeyDown="OnSearchBox_KeyDown"
                  TextChanged="OnSearchBox_TextChanged"/>
 
         <ListBox x:Name="ItemList" Grid.Row="1" MaxHeight="380" Margin="0,8,0,0"
