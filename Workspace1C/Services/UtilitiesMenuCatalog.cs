@@ -75,6 +75,12 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Пакетное обновление конфигураций из хранилищ.</summary>
     RepositoryBatchUpdate,
 
+    /// <summary>Массовая выгрузка списка баз в файлы .dt (issue #91).</summary>
+    BatchDumpDt,
+
+    /// <summary>Массовая загрузка конфигурации из .cf по списку баз (issue #91).</summary>
+    BatchLoadCf,
+
     /// <summary>Обозреватель хранилища конфигурации.</summary>
     RepositoryBrowser,
 
@@ -550,6 +556,13 @@ public static class UtilitiesMenuCatalog
                 "SourceBranch", "IconCloudDownload", "#06B6D4", UtilitiesMenuCommandKind.RepositoryBatchUpdate),
             new("RepositoryBrowser", "RepositoryBrowser.Title", GroupOperations,
                 "SourceBranch", "IconCloudDownload", "#8B5CF6", UtilitiesMenuCommandKind.RepositoryBrowser),
+            // Массовые операции по списку баз (issue #91): выгрузка .dt и загрузка .cf.
+            new("BatchDumpDt", "BatchOps.DumpDtTitle", GroupOperations,
+                "DatabaseExport", "IconDatabaseExport", "#16A34A", UtilitiesMenuCommandKind.BatchDumpDt,
+                isNew: true),
+            new("BatchLoadCf", "BatchOps.LoadCfTitle", GroupOperations,
+                "DatabaseImport", "IconImport", "#F59E0B", UtilitiesMenuCommandKind.BatchLoadCf,
+                isNew: true),
             new("ExportCsv", "Utilities.ExportCsv", GroupOperations,
                 "FileDelimited", "IconFileExport", "#22C55E", UtilitiesMenuCommandKind.ExportBasesCsv),
             new("ExportHtml", "Utilities.ExportHtml", GroupOperations,
@@ -660,6 +673,10 @@ public static class UtilitiesMenuLayouts
                 Separator(),
                 Item("RepositoryBatchUpdate"),
                 Item("RepositoryBrowser"),
+                Separator(),
+                // Массовые операции по списку баз (issue #91).
+                Item("BatchDumpDt"),
+                Item("BatchLoadCf"),
                 Separator(),
                 Item("ExportCsv"),
                 Item("ExportHtml"),

@@ -318,4 +318,62 @@ public sealed class ServerMonitorColumnWidthsTests
         Assert.Equal(new[] { 165.0, 110.0, 130.0, 95.0 }, right);
         Assert.Equal(new[] { 70.0, 110.0, 130.0, 95.0 }, left);
     }
+
+    // ===================== Определение границы по координате X (issue #75) =====================
+
+    [Fact]
+    public void ResolveDragBoundary_ClickAtJointOfHeaders_ResolvesLeftColumn_NotOffByOne()
+    {
+        // issue #75 (репорт 7OH): ширины A=120, B=150, C=130. Граница A|B — x=120,
+        // граница B|C — x=270. Курсор «двойная стрелка» на стыке (где именно — на
+        // правой кромке A или на левой кромке B/выступе ручки) ДОЛЖЕН давать
+        // границу A|B (index=0) в ОБОИХ случаях — раньше левая кромка B давала
+        // off-by-one (index=1, двигалась граница B|C).
+        var widths = new[] { 120.0, 150.0, 130.0 };
+
+        Assert.Equal(0, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 120.0, tolerance: 12));
+        Assert.Equal(0, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 126.0, tolerance: 12)); // левая кромка B
+        Assert.Equal(0, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 114.0, tolerance: 12)); // правая зона A
+        Assert.Equal(1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 270.0, tolerance: 12));
+        Assert.Equal(1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 276.0, tolerance: 12)); // левая кромка C
+        // Выступ ручки за правый край последней колонки — граница B|C (index=1).
+        Assert.Equal(2, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 400.0, tolerance: 12));
+    }
+
+    [Fact]
+    public void ResolveDragBoundary_ClickInHeaderMiddle_DoesNotStartDrag()
+    {
+        // Поведение «палец» (issue #75): клик в центре заголовка — не у границы,
+        // драг не стартует (сортировка/без действия).
+        var widths = new[] { 120.0, 150.0, 130.0 };
+
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 60.0, tolerance: 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 195.0, tolerance: 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 340.0, tolerance: 12));
+    }
+
+    [Fact]
+    public void ResolveDragBoundary_NearestBoundaryWins_WhenBetweenTwo()
+    {
+        // Между границами ближе та, к которой клик; при равном расстоянии — левая
+        // (первая найденная). Нулевые ширины не участвуют в накоплении.
+        var widths = new[] { 100.0, 100.0, 100.0 };
+
+        // x=155: до границы 0 (x=100) — 55, до границы 1 (x=200) — 45 → граница 1.
+        Assert.Equal(1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 155.0, tolerance: 60));
+        // x=145: до границы 0 — 45, до границы 1 — 55 → граница 0.
+        Assert.Equal(0, ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x: 145.0, tolerance: 60));
+    }
+
+    [Fact]
+    public void ResolveDragBoundary_InvalidInput_ReturnsMinusOne()
+    {
+        // Ширины ещё не измерены (NaN/0) — определение по координате невозможно;
+        // пустой список и NaN-координата — тоже промах.
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(Array.Empty<double>(), 100.0, 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(new[] { 120.0, double.NaN, 130.0 }, 100.0, 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(new[] { 120.0, 0.0, 130.0 }, 100.0, 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(new[] { 120.0, 150.0 }, double.NaN, 12));
+        Assert.Equal(-1, ServerMonitorColumnWidthsStore.ResolveDragBoundary(new[] { 120.0, 150.0 }, double.PositiveInfinity, 12));
+    }
 }

@@ -324,6 +324,11 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
         Assert.Contains("UpdateIbcmdPanel", code, StringComparison.Ordinal);
+        // issue #79 (1.0.1.7): вторая кнопка «Профиль СУБД для ibcmd…» открывает окно
+        // «Резервные копии СУБД» (DbmsBackupWindow), а не свойства базы.
+        Assert.Contains("TestDeploy.OpenDbmsProfileWindow", code, StringComparison.Ordinal);
+        Assert.Contains("private void OpenDbmsProfile()", code, StringComparison.Ordinal);
+        Assert.Contains("new DbmsBackupWindow(", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -339,6 +344,10 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
         Assert.Contains("ApplyIbcmdPanel", code, StringComparison.Ordinal);
+        // issue #79 (1.0.1.7): Avalonia-паритет второй кнопки.
+        Assert.Contains("TestDeploy.OpenDbmsProfileWindow", code, StringComparison.Ordinal);
+        Assert.Contains("private void OpenDbmsProfile()", code, StringComparison.Ordinal);
+        Assert.Contains("new DbmsBackupWindow(", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -355,7 +364,11 @@ public sealed class Issue79TestDeployWindowTests
             "TestDeploy.FillFromBase",
             "TestDeploy.OpenCredentialsWindow",
             "TestDeploy.OpenCommonAuth",
-            "TestDeploy.IbcmdCredentialsHint"
+            "TestDeploy.IbcmdCredentialsHint",
+            // issue #79 (1.0.1.7): профиль СУБД для ibcmd.
+            "TestDeploy.OpenDbmsProfileWindow",
+            "TestDeploy.OpenDbmsProfileWindowHint",
+            "TestDeploy.NeedDbmsProfile"
         })
         {
             Assert.Contains(key, ru, StringComparison.Ordinal);

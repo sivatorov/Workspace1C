@@ -291,6 +291,11 @@ public partial class MainWindow
                 item.Command = _viewModel.RepositoryBatchUpdateCommand; break;
             case UtilitiesMenuCommandKind.RepositoryBrowser:
                 item.Command = _viewModel.RepositoryBrowserCommand; break;
+            // Массовые операции по списку баз (issue #91).
+            case UtilitiesMenuCommandKind.BatchDumpDt:
+                item.Command = _viewModel.BatchDumpDtCommand; break;
+            case UtilitiesMenuCommandKind.BatchLoadCf:
+                item.Command = _viewModel.BatchLoadCfCommand; break;
             case UtilitiesMenuCommandKind.ExportBasesCsv:
                 item.Command = _viewModel.ExportBasesCsvCommand; break;
             case UtilitiesMenuCommandKind.ExportBasesHtml:

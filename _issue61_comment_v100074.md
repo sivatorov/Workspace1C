@@ -1,0 +1,8 @@
+Исправлено в версии 1.0.0.74 (Windows и Linux) по последнему комментарию («Буквы как были темные у заголовков поле ввода - так и остались»):
+
+1. **Единая кисть подписи полей форм `FormLabelBrush`.** Введена и задействована во ВСЕХ темах обеих платформ ([`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml)/[`DarkTheme.xaml`](Workspace1C/Themes/DarkTheme.xaml), [`LightTheme.axaml`](Workspace1C/Themes/LightTheme.axaml)/[`DarkTheme.axaml`](Workspace1C/Themes/DarkTheme.axaml)) — подписи и заголовки полей ввода привязаны к первичному цвету текста темы и контрастны в тёмной теме, включая стенерированные/пользовательские схемы. Построители окон `WpfUi.Label`/`AvaloniaUi.Label` используют её вместо вторичной кисти ([`WpfUi.cs`](Workspace1C/Views/WpfUi.cs), [`AvaloniaUi.Avalonia.cs`](Workspace1C/Views/AvaloniaUi.Avalonia.cs)).
+2. **Проверка фактической сборки.** Прошу уточнить: «Ничего не изменилось» писалась спустя ~40 минут после фикса 1.0.0.73 — если тестировалась предыдущая сборка (e.g. 1.0.0.72), проверьте 1.0.0.74. Если конкретное окно по-прежнему осталось с тёмными заголовками — пришлите скриншот и номер версии из «О программе»: пройду его точечно.
+
+Добавлены тесты-стражи `ThemeFormLabelTests` (кисть во всех 4 темах + использование в `WpfUi`/`AvaloniaUi`); существующие `Issue61DarkPaletteAuditTests`/`Issue61TitleColorsTests` расширены и зелёные.
+
+Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.74

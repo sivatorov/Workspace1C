@@ -209,6 +209,48 @@ public static class ServerMonitorColumnWidthsStore
             : Math.Max(AbsoluteMinWidth, fallback);
 
     /// <summary>
+    /// Определяет границу колонок по координате X клика относительно грида (issue #75,
+    /// репорт 7OH от 2026-10-30: зона захвата была смещена — клик по выступу ручки/левой
+    /// кромке заголовка следующей колонки распознавался как граница СЛЕДУЮЩЕЙ пары,
+    /// off-by-one). Граница между колонками <c>i</c> и <c>i+1</c> — правый край колонки
+    /// <c>i</c> (накопленная ширина колонок 0..i); из всех границ выбирается БЛИЖАЙШАЯ
+    /// к <paramref name="x"/>, если она не дальше <paramref name="tolerance"/> px.
+    /// Возвращает индекс ЛЕВОЙ колонки границы (для <see cref="ApplyDragMoveBlock"/> /
+    /// <see cref="ApplyDragResizePair"/>) или −1, если клик не у границы (центр заголовка —
+    /// сортировка/без действия, драг не стартует). Чистая функция — обе платформы, тесты.
+    /// </summary>
+    /// <param name="widths">Фактические ширины колонок слева направо, px.</param>
+    /// <param name="x">Координата X клика относительно левого края грида, px.</param>
+    /// <param name="tolerance">Допуск расстояния до границы, px (±).</param>
+    public static int ResolveDragBoundary(IReadOnlyList<double> widths, double x, double tolerance)
+    {
+        if (widths is null || widths.Count == 0)
+            return -1;
+        if (double.IsNaN(x) || double.IsInfinity(x))
+            return -1;
+        if (double.IsNaN(tolerance) || tolerance < 0)
+            tolerance = 0;
+
+        var bestIndex = -1;
+        var bestDistance = double.MaxValue;
+        var cumulative = 0.0;
+        for (var i = 0; i < widths.Count; i++)
+        {
+            var width = widths[i];
+            if (!IsValid(width))
+                return -1; // ширины ещё не измерены — определение по координате невозможно.
+            cumulative += width;
+            var distance = Math.Abs(x - cumulative);
+            if (distance <= tolerance && distance < bestDistance)
+            {
+                bestDistance = distance;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
+    }
+
+    /// <summary>
     /// Сохраняет ширины колонок вкладки в настройки приложения (issue #75):
     /// запись по ключу вкладки заменяется целиком, остальные вкладки не затрагиваются.
     /// Некорректные значения (0 для гибких колонок, NaN) записываются как 0 — значит

@@ -23,6 +23,13 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
     /// <summary>Период автообновления данных кластера, миллисекунды (~5 секунд).</summary>
     public const int AutoRefreshIntervalMs = 5000;
 
+    /// <summary>
+    /// Тег источника rac-команд окна «Серверы 1С» в CM_RAC-логе (issue #90): по метке
+    /// «RAC [MONITOR]: …» в журнале видно, что вызов пришёл из монитора, а не из
+    /// фонового ServerAlertsService («RAC [ALERTS]: …»).
+    /// </summary>
+    internal const string MonitorLogSourceTag = "MONITOR";
+
     private readonly IRacClient _rac;
     private readonly IDialogService _dialogs;
     private readonly Action<Action>? _dispatchToUi;
@@ -62,6 +69,20 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
 
     private Timer? _autoRefreshTimer;
     private int _busy;
+
+    /// <summary>
+    /// Токен текущего цикла загрузки вкладок (issue #90, репорт 7OH «RAC-команды
+    /// продолжают сыпаться в лог после закрытия окна»): выключение автообновления и
+    /// закрытие окна отменяют выполняющийся цикл rac-вызовов, а не только таймер.
+    /// </summary>
+    private CancellationTokenSource? _refreshCts;
+
+    /// <summary>
+    /// Guard «окно закрыто» (issue #90): после <see cref="Dispose"/> таймер автообновления
+    /// не возрождается (защита от гонки «Refresh завершился после закрытия окна» — п.2089
+    /// прежнего кода), а обновления свойств UI пропускаются.
+    /// </summary>
+    private bool _disposed;
 
     private string _serverAddress = "localhost";
     private int _serverPort = IRacClient.DefaultPort;
@@ -1814,6 +1835,9 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         if (!TryEnterBusy())
             return;
 
+        // Диагностика источника rac-команд (issue #90): команда подключения — из монитора.
+        RacClient.LogSource.Value = MonitorLogSourceTag;
+
         Guid? initialClusterId = null;
         try
         {
@@ -1924,6 +1948,9 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
     /// </summary>
     public async Task LoadClusterDataAsync(Guid clusterId, CancellationToken cancellationToken = default)
     {
+        // issue #90: после закрытия окна (Dispose) циклы загрузки rac-команд не выполняются.
+        if (_disposed)
+            return;
         if (!TryEnterBusy())
             return;
 
@@ -2061,6 +2088,11 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
             var infobases = await infobasesTask.ConfigureAwait(false);
             var info = await infoTask.ConfigureAwait(false);
 
+            // issue #90: окно закрыто (Dispose) — данные по-прежнему получены, но UI
+            // обновлять не нужно (свойства и списки уже никому не видны).
+            if (_disposed)
+                return;
+
             ApplyClusterData(
                 processes, sessions, connections, locks, infobases, info,
                 licensedSessions, installedLicenses, licenseWarning);
@@ -2092,7 +2124,10 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         }
         catch (OperationCanceledException)
         {
-            StatusText = LocalizationManager.T("ServerMonitor.Status.Cancelled");
+            // issue #90: отмена цикла при закрытом окне не должна трогать UI
+            // (статус «Отменено» в закрытом окне никто не увидит).
+            if (!_disposed)
+                StatusText = LocalizationManager.T("ServerMonitor.Status.Cancelled");
         }
         catch (Exception ex)
         {
@@ -2101,6 +2136,9 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
             // «после ошибки продолжает пытаться получить данные»). Ручное «Обновить»
             // остаётся доступным; после успешной загрузки таймер возобновляется,
             // если переключатель включён.
+            // issue #90: после Dispose обновления свойств UI не выполняются.
+            if (_disposed)
+                return;
             ErrorMessage = BuildErrorMessage(ex);
             StatusText = LocalizationManager.T("ServerMonitor.Status.LoadFailed");
             StopAutoRefresh();
@@ -2111,12 +2149,21 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         }
     }
 
-    /// <summary>«Обновить»: перечитать данные выбранного кластера (без подключения — no-op).</summary>
+    /// <summary>
+    /// «Обновить»: перечитать данные выбранного кластера (без подключения — no-op).
+    /// Каждый цикл загрузки идёт под собственным <see cref="CancellationToken"/> (issue #90):
+    /// выключение автообновления и закрытие окна отменяют его сразу.
+    /// </summary>
     public void Refresh()
     {
-        if (!HasConnected || SelectedClusterId is not Guid id)
+        if (_disposed || !HasConnected || SelectedClusterId is not Guid id)
             return;
-        _ = LoadClusterDataAsync(id);
+        CancelRefreshCycle();
+        var cts = new CancellationTokenSource();
+        _refreshCts = cts;
+        // Диагностика источника rac-команд (issue #90): CM_RAC-лог помечается «MONITOR».
+        RacClient.LogSource.Value = MonitorLogSourceTag;
+        _ = LoadClusterDataAsync(id, cts.Token);
     }
 
     /// <summary>
@@ -2343,7 +2390,9 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void StartAutoRefresh()
     {
-        if (!IsAutoRefreshEnabled)
+        // issue #90: после закрытия окна таймер не возрождается (даже если гонка
+        // «Refresh завершился после Dispose» успела вызвать StartAutoRefresh).
+        if (_disposed || !IsAutoRefreshEnabled)
             return;
         var intervalMs = AutoRefreshIntervalSeconds * 1000;
         _autoRefreshTimer ??= new Timer(_ => Refresh(), null, intervalMs, intervalMs);
@@ -2352,19 +2401,49 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsAutoRefreshEnabled));
     }
 
-    /// <summary>Останавливает таймер автообновления (Dispose окна, ошибка подключения).</summary>
+    /// <summary>
+    /// Останавливает таймер автообновления (Dispose окна, ошибка подключения, выключение
+    /// переключателя) и ОТМЕНЯЕТ выполняющийся цикл загрузки вкладок (issue #90):
+    /// запущенные rac-команды завершаются, новые не стартуют.
+    /// </summary>
     private void StopAutoRefresh()
     {
         _autoRefreshTimer?.Dispose();
         _autoRefreshTimer = null;
+        CancelRefreshCycle();
         OnPropertyChanged(nameof(AutoRefreshActive));
         OnPropertyChanged(nameof(AutoRefreshText));
         OnPropertyChanged(nameof(IsAutoRefreshEnabled));
     }
 
+    /// <summary>Отменяет токен текущего цикла загрузки вкладок (issue #90).</summary>
+    private void CancelRefreshCycle()
+    {
+        var previous = _refreshCts;
+        _refreshCts = null;
+        if (previous is null)
+            return;
+        try
+        {
+            previous.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Токен уже отменён/освобождён — цель достигнута.
+        }
+        previous.Dispose();
+    }
+
     /// <inheritdoc />
-    /// <summary>Останавливает таймер автообновления (вызывается окном при закрытии).</summary>
-    public void Dispose() => StopAutoRefresh();
+    /// <summary>
+    /// Останавливает таймер автообновления и выполняющийся цикл rac-команд
+    /// (вызывается окном при закрытии, issue #90).
+    /// </summary>
+    public void Dispose()
+    {
+        _disposed = true;
+        StopAutoRefresh();
+    }
 
     /// <summary>
     /// Показывает предупреждение в UI-потоке (issue #3, 1.0.0.22; замечание 7OH 19.10):

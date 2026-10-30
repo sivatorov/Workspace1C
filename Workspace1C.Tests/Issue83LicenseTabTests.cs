@@ -159,6 +159,84 @@ public sealed class Issue83LicenseTabTests
             RingLicenseService.FirstNonEmptyLine("/usr/bin/ring\n/opt/ring"));
     }
 
+    // ===================== Модуль лицензий ring не установлен (issue #83) =====================
+
+    [Theory]
+    [InlineData("Module \"license\" is not registered in the command registry", true)]
+    [InlineData("1C:Enterprise: Module \"license\" is not registered in the command registry.", true)]
+    [InlineData("module \"license\" IS NOT REGISTERED in the command registry", true)]
+    [InlineData("ring --version\r\n8.0.10", false)]
+    [InlineData("Не удается найти указанный файл", false)]
+    [InlineData("", false)]
+    public void IsLicenseModuleNotRegisteredOutput_DetectsRingModuleMarker(string output, bool expected)
+    {
+        // issue #83 (репорт 7OH): ring отвечает «Module "license" is not registered in the
+        // command registry» — утилита есть, модуля лицензий нет; ответ распознаётся
+        // регистронезависимо по подстроке.
+        Assert.Equal(expected, RingLicenseService.IsLicenseModuleNotRegisteredOutput(output));
+        Assert.False(RingLicenseService.IsLicenseModuleNotRegisteredOutput(null));
+    }
+
+    [Fact]
+    public void ModuleNotRegisteredMessage_IsReadable_AndExplainsHowToInstallModule()
+    {
+        // issue #83: при «Module "license" is not registered» вкладка показывает
+        // понятное предупреждение про модуль (не вводящее в заблуждение «утилита не
+        // найдена»), с командой установки модуля и подсказкой про перезапуск.
+        var message = RingLicenseService.BuildModuleNotRegisteredMessage();
+
+        Assert.False(string.IsNullOrWhiteSpace(message));
+        Assert.Contains("ring", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("module install license", message, StringComparison.Ordinal);
+        Assert.Contains("Обновить", message, StringComparison.Ordinal);
+        Assert.Contains("перезапустите Workspace 1C", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PATH", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void UnavailableMessage_MentionsRestartHint_AfterFreshRingInstall()
+    {
+        // issue #83: «ring не найдена в PATH» после установки модуля — устаревший PATH
+        // процесса: сообщение содержит подсказку о перезапуске приложения.
+        var message = RingLicenseService.BuildUnavailableMessage();
+
+        Assert.Contains("перезапустите Workspace 1C", message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PATH, зафиксированный", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_LicenseWarning_IsVisibleOnlyWhenTextNonEmpty()
+    {
+        // issue #83: триггеры видимости предупреждения на вкладке «Лицензии» не должны
+        // быть инвертированы (раньше warning скрывался при непустом тексте) — по умолчанию
+        // Visible, при пустом/null-тексте Collapsed.
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.xaml"));
+
+        var statusIndex = xaml.IndexOf("Text=\"{Binding LicenseStatusText}\"", StringComparison.Ordinal);
+        Assert.True(statusIndex >= 0, "XAML: TextBlock предупреждения лицензий не найден.");
+        var styleEnd = xaml.IndexOf("</TextBlock.Style>", statusIndex, StringComparison.Ordinal);
+        Assert.True(styleEnd > statusIndex, "XAML: стиль предупреждения лицензий не найден.");
+        var style = xaml.Substring(statusIndex, styleEnd - statusIndex);
+
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Visible\"/>", style, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Collapsed\"/>", style, StringComparison.Ordinal);
+        var visiblePos = style.IndexOf("<Setter Property=\"Visibility\" Value=\"Visible\"/>", StringComparison.Ordinal);
+        var collapsedPos = style.IndexOf("<Setter Property=\"Visibility\" Value=\"Collapsed\"/>", StringComparison.Ordinal);
+        Assert.True(visiblePos < collapsedPos,
+            "XAML: предупреждение лицензий — по умолчанию Visible, при пустом тексте Collapsed (issue #83).");
+    }
+
+    [Fact]
+    public void Avalonia_LicenseWarning_IsVisibleOnlyWhenTextNonEmpty()
+    {
+        // issue #83: Avalonia-вкладка «Лицензии» — видимость предупреждения привязана
+        // к непустому LicenseStatusText.
+        var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.Avalonia.cs"));
+
+        Assert.Contains("TextBlock.IsVisibleProperty", source, StringComparison.Ordinal);
+        Assert.Contains("StringConverters.IsNotNullOrEmpty", source, StringComparison.Ordinal);
+    }
+
     // ===================== Порядок вкладок (issue #83) =====================
 
     [Fact]

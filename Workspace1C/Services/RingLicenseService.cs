@@ -342,7 +342,22 @@ public sealed class RingLicenseService : IRingLicenseService
                     return new RingLicenseResult { Licenses = licenses };
                 }
             }
-            else if (!string.IsNullOrWhiteSpace(result.CombinedOutput))
+
+            // issue #83 (репорт 7OH от 2026-10-30): ring отвечает «Module "license" is not
+            // registered in the command registry» — утилита ЕСТЬ, но без модуля лицензий.
+            // Перебирать остальных кандидатов бессмысленно (тот же ring, тот же ответ) —
+            // прекращаем перебор и показываем на вкладке понятное предупреждение про
+            // модуль, а не вводящее в заблуждение «утилита не найдена».
+            if (IsLicenseModuleNotRegisteredOutput(result.CombinedOutput))
+            {
+                var moduleWarning = BuildModuleNotRegisteredMessage();
+                // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
+                Log.Info(LogCategory.Rac,
+                    $"RING: {source} — модуль лицензий ring не установлен: {result.CombinedOutput}");
+                return new RingLicenseResult { Warning = moduleWarning };
+            }
+
+            if (!result.Success && !string.IsNullOrWhiteSpace(result.CombinedOutput))
             {
                 // issue #83 (комментарий 7OH от 2026-10-28): недоступность утилиты лицензий
                 // (ring не найден в PATH/рядом с rac — «An error occurred trying to start
@@ -388,11 +403,46 @@ public sealed class RingLicenseService : IRingLicenseService
         // issue #83 (последний комментарий 7OH): ring может быть установлен как .exe в
         // каталоге bin платформы либо добавлен в PATH — в том числе как командный файл
         // (.cmd/.bat); проверка доступности выполняется так же, как в командной строке.
+        // issue #83 (репорт 7OH от 2026-10-30): если ring был установлен недавно
+        // (например, модуль лицензий после репорта «Module license is not registered»),
+        // работающий процесс всё равно не видит его в PATH — PATH процесса фиксируется
+        // при запуске, нужно перезапустить приложение.
         return "Не удалось получить список лицензий: не найдена утилита ring (" + searched +
                "; каталог файлов лицензий платформы пуст). Установите ring (обычно лежит в " +
                "каталоге bin платформы рядом с rac) либо добавьте его в PATH (в т.ч. как " +
-               "командный файл .cmd/.bat; проверка выполняется так же, как в командной строке) " +
-               "и нажмите «Обновить».";
+               "командный файл .cmd/.bat; проверка выполняется так же, как в командной строке). " +
+               "Если утилита установлена недавно — перезапустите Workspace 1C: запущенное " +
+               "приложение видит PATH, зафиксированный при его старте. После установки " +
+               "нажмите «Обновить».";
+    }
+
+    /// <summary>
+    /// Маркер ответа ring «Module "license" is not registered in the command registry»
+    /// (issue #83): утилита доступна, но модуль лицензий в ней не установлен. Сравнение —
+    /// по инвариантной к регистру подстроке (префикс может локализоваться 1С).
+    /// Internal — тесты.
+    /// </summary>
+    internal const string LicenseModuleNotRegisteredMarker =
+        "is not registered in the command registry";
+
+    /// <summary>Определяет, отвечает ли вывод ring отсутствием модуля лицензий. Internal — тесты.</summary>
+    internal static bool IsLicenseModuleNotRegisteredOutput(string? output) =>
+        !string.IsNullOrWhiteSpace(output) &&
+        output.Contains(LicenseModuleNotRegisteredMarker, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Понятное сообщение вкладки «Лицензии» для случая «ring есть, модуля лицензий нет»
+    /// (issue #83): как установить модуль — вместо вводящего в заблуждение «утилита не
+    /// найдена». Internal — для юнит-тестов читаемого сообщения.
+    /// </summary>
+    internal static string BuildModuleNotRegisteredMessage()
+    {
+        return "Утилита ring найдена, но в ней не установлен модуль лицензий (ring ответил: " +
+               "Module \"license\" is not registered). Установите модуль лицензий ring — " +
+               "однократно, командой «ring module install license» (см. документацию 1С по " +
+               "утилите ring), затем нажмите «Обновить». Если после установки модуля " +
+               "утилита по-прежнему не находится — перезапустите Workspace 1C: запущенное " +
+               "приложение видит PATH, зафиксированный при его старте.";
     }
 
     /// <summary>

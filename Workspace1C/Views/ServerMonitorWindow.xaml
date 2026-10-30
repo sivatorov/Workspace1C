@@ -760,17 +760,21 @@
                     <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
                         <TextBlock Text="{Binding LicenseSummaryText}" FontWeight="SemiBold"
                                    FontSize="13" Margin="0,2,0,4"/>
+                        <!-- issue #83: предупреждение (в т.ч. «module license is not
+                             registered» / «ring не найдена в PATH») должно быть ВИДНО,
+                             когда текст непустой; при пустом — скрывается. Раньше
+                             триггеры были инвертированы (warning скрывался). -->
                         <TextBlock Text="{Binding LicenseStatusText}" FontSize="12"
                                    Foreground="#D97706" TextWrapping="Wrap" Margin="0,0,0,4">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Setter Property="Visibility" Value="Visible"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding LicenseStatusText}" Value="">
-                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding LicenseStatusText}" Value="{x:Null}">
-                                            <Setter Property="Visibility" Value="Visible"/>
+                                            <Setter Property="Visibility" Value="Collapsed"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

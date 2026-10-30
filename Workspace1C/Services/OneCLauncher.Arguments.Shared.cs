@@ -43,6 +43,46 @@ public static partial class OneCLauncher
     /// </summary>
     public static InfobaseAuthSettings? CommonConfiguratorAuthorization { get; set; }
 
+    // Синхронизация статиков с настройками (issue #57, 1.0.1.7 — гипотеза Г2 «статик
+    // не заполнен на момент запуска»): путь запуска в обход главного окна (CLI --run,
+    // проводник, скрипты в отдельном контексте) может резолвить учётные данные до того,
+    // как MainViewModel загрузит настройки и заполнит статики.
+    private static bool s_commonAuthLoaded;
+
+    /// <summary>
+    /// Помечает общие авторизации как установленные (MainViewModel загрузил настройки
+    /// либо пользователь изменил общие реквизиты в UI). Повторный вызов
+    /// <see cref="EnsureCommonAuthLoaded"/> после этого — no-op.
+    /// </summary>
+    public static void MarkCommonAuthLoaded() => s_commonAuthLoaded = true;
+
+    /// <summary>
+    /// Гарантирует заполнение статических Common*Authorization из настроек (issue #57):
+    /// при ещё не загруженных настройках читает их из хранилища и устанавливает статики.
+    /// При недоступных сервисах (юнит-тесты, прямой вызов) — no-op: используются текущие
+    /// значения статиков.
+    /// </summary>
+    public static void EnsureCommonAuthLoaded()
+    {
+        if (s_commonAuthLoaded)
+            return;
+        try
+        {
+            var repository = AppServices.TryGetService<IInfobaseRepository>();
+            if (repository is null)
+                return;
+            var settings = repository.LoadSettings();
+            CommonAuthorization = settings.CommonAuthorization;
+            CommonEnterpriseAuthorization = settings.CommonEnterpriseAuth;
+            CommonConfiguratorAuthorization = settings.CommonConfiguratorAuth;
+            s_commonAuthLoaded = true;
+        }
+        catch
+        {
+            // Настройки недоступны — используем текущие значения статиков.
+        }
+    }
+
     /// <summary>
     /// Проверяет, можно ли безопасно подставить значение внутрь кавычек ключа командной строки
     /// 1С вида /Key"value".
@@ -177,14 +217,24 @@ public static partial class OneCLauncher
         // а при незаданной — общая авторизация по режиму запуска (issue #57): раздельная
         // CommonEnterpriseAuthorization/CommonConfiguratorAuthorization, при незаданной —
         // legacy CommonAuthorization.
-        InfobaseAuthResolver.Resolve(infobase, mode, out var authMode, out var authUser, out var authPassword,
-            CommonEnterpriseAuthorization, CommonConfiguratorAuthorization, CommonAuthorization);
+        // Синхронизация статиков общих авторизаций (issue #57, 1.0.1.7): путь запуска
+        // в обход главного окна (CLI --run, проводник) не заполняет их через MainViewModel.
+        EnsureCommonAuthLoaded();
 
-        // Диагностика (issue #57, 1.0.1.6): режим и источник авторизации пишутся в журнал
-        // без пароля — чтобы следующий репорт «не подставляется общая авторизация» был
-        // диагностируемым с первого сообщения (направление CM_BASE_RUN).
+        // Источник учётных данных (issue #57, 1.0.1.7): какой шаг резолвера вернул
+        // авторизацию — видно по журналу без пароля.
+        InfobaseAuthResolver.Resolve(infobase, mode, out var authMode, out var authUser, out var authPassword,
+            CommonEnterpriseAuthorization, CommonConfiguratorAuthorization, CommonAuthorization,
+            out var authSource);
+
+        // Диагностика (issue #57, 1.0.1.6/1.0.1.7): режим авторизации базы, источник
+        // и наличие пользователя пишутся в журнал без пароля — чтобы следующий репорт
+        // «не подставляется общая авторизация» был диагностируемым с первого сообщения
+        // (направление CM_BASE_RUN).
         Log.Info(LogCategory.BaseRun,
             $"[{infobase.Name}] Авторизация запуска ({mode}): режим={authMode}, " +
+            $"источник={InfobaseAuthResolver.DescribeSource(authSource)}, " +
+            $"режим базы={infobase.Connection?.AuthenticationMode.ToString() ?? "—"}, " +
             $"пользователь={(string.IsNullOrWhiteSpace(authUser) ? "не задан" : "задан")}.");
 
         // Запуск с аутентификацией (issue #48): ни сохранённых имени/пароля, ни входа
@@ -437,6 +487,9 @@ public static partial class OneCLauncher
     /// </summary>
     public static string BuildAuthArgument(Infobase infobase)
     {
+        // Синхронизация статиков общих авторизаций (issue #57, 1.0.1.7) — пакетные
+        // операции конфигуратора идут в обход главного окна.
+        EnsureCommonAuthLoaded();
         InfobaseAuthResolver.Resolve(infobase, OneCLaunchMode.Configurator,
             out var authMode, out var authUser, out var authPassword,
             CommonEnterpriseAuthorization, CommonConfiguratorAuthorization, CommonAuthorization);

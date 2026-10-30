@@ -115,6 +115,9 @@ public partial class MainViewModel : ViewModelBase
         {
             _settings.CommonAuthorization = value;
             OneCLauncher.CommonAuthorization = value;
+            // Статики установлены явно — EnsureCommonAuthLoaded() больше не перечитывает
+            // настройки (issue #57, 1.0.1.7).
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -133,6 +136,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _settings.CommonEnterpriseAuth = value;
             OneCLauncher.CommonEnterpriseAuthorization = value;
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -151,6 +155,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _settings.CommonConfiguratorAuth = value;
             OneCLauncher.CommonConfiguratorAuthorization = value;
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -784,6 +789,9 @@ public partial class MainViewModel : ViewModelBase
             OneCLauncher.CommonAuthorization = _settings.CommonAuthorization;
             OneCLauncher.CommonEnterpriseAuthorization = _settings.CommonEnterpriseAuth;
             OneCLauncher.CommonConfiguratorAuthorization = _settings.CommonConfiguratorAuth;
+            // Настройки загружены, статики заполнены (issue #57, 1.0.1.7) — ленивое
+            // EnsureCommonAuthLoaded() для CLI/проводника больше не нужно.
+            OneCLauncher.MarkCommonAuthLoaded();
             ApplyDefaultArchitecture();
             ApplyAdditionalSearchPaths();
             ApplyTemplateCatalogPaths();

@@ -350,11 +350,19 @@ public class TestDeployWindow : ModalWindowBase
         _closeButton.Click += (_, _) => Close();
         // issue #79 (7OH: «Можно внизу кнопку добавить, которая откроет окно нужное
         // прямо тут?»): учётные данные выгрузки и общая авторизация — без выхода из мастера.
-        var ibcmdCredentialsButton = new Button { Content = T("TestDeploy.OpenCredentialsWindow"), Width = 185, Height = 32 };
+        // issue #79 (1.0.1.7): кнопок две — «Учётные данные ИБ для ibcmd…» (свойства
+        // исходной базы) и «Профиль СУБД для ibcmd…» (окно «Резервные копии СУБД»):
+        // ошибка «заполните профиль» относится к профилю СУБД, а не к кредам ИБ.
+        var ibcmdCredentialsButton = new Button { Content = T("TestDeploy.OpenCredentialsWindow"), Width = 210, Height = 32 };
         ibcmdCredentialsButton.Styled(ControlThemes.SecondaryButton);
         ToolTip.SetTip(ibcmdCredentialsButton, T("TestDeploy.OpenCredentialsWindowHint"));
         ibcmdCredentialsButton.Click += (_, _) => OpenBaseProperties();
         buttons.Children.Add(ibcmdCredentialsButton);
+        var dbmsProfileButton = new Button { Content = T("TestDeploy.OpenDbmsProfileWindow"), Width = 200, Height = 32 };
+        dbmsProfileButton.Styled(ControlThemes.SecondaryButton);
+        ToolTip.SetTip(dbmsProfileButton, T("TestDeploy.OpenDbmsProfileWindowHint"));
+        dbmsProfileButton.Click += (_, _) => OpenDbmsProfile();
+        buttons.Children.Add(dbmsProfileButton);
         var commonAuthButton = new Button { Content = T("TestDeploy.OpenCommonAuth"), Width = 175, Height = 32 };
         commonAuthButton.Styled(ControlThemes.SecondaryButton);
         ToolTip.SetTip(commonAuthButton, T("TestDeploy.OpenCommonAuthHint"));
@@ -551,6 +559,20 @@ public class TestDeployWindow : ModalWindowBase
             return;
         var dialog = new ConnectionSettingsWindow(ib, _groups);
         dialog.ShowSync(this);
+    }
+
+    /// <summary>
+    /// Открывает окно «Резервные копии СУБД» для исходной базы (issue #79, 1.0.1.7,
+    /// 7OH «То есть я должен закрыть окно со всеми введёнными данными и пойти найти где
+    /// это вводится?»): профиль СУБД нужен ibcmd для выгрузки клиент-серверной базы.
+    /// </summary>
+    private void OpenDbmsProfile()
+    {
+        if (_vm.Source is not { } ib)
+            return;
+        var vm = new DbmsBackupViewModel(_vm.AllInfobases, ib);
+        var dialog = new DbmsBackupWindow(vm);
+        dialog.ShowDialogSync(this);
     }
 
     /// <summary>Запускает Конфигуратор для исходной базы (issue #79).</summary>

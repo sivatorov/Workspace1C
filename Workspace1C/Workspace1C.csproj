@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.6</Version>
-    <AssemblyVersion>1.0.1.6</AssemblyVersion>
-    <FileVersion>1.0.1.6</FileVersion>
-    <InformationalVersion>1.0.1.6</InformationalVersion>
+    <Version>1.0.1.7</Version>
+    <AssemblyVersion>1.0.1.7</AssemblyVersion>
+    <FileVersion>1.0.1.7</FileVersion>
+    <InformationalVersion>1.0.1.7</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -268,6 +268,10 @@
     <!-- Окно пакетного обновления из хранилищ (0.3.9.88): WPF code-behind исключается,
          Avalonia-версия (RepositoryBatchUpdateWindow.Avalonia.cs) подключается глобом ниже. -->
     <Compile Remove="Views\RepositoryBatchUpdateWindow.xaml.cs" />
+    <!-- Окно массовых операций по списку баз (issue #91): WPF code-behind и разметка
+         исключаются, Avalonia-версия (BatchOperationsWindow.Avalonia.cs) подключается
+         глобом ниже. -->
+    <Compile Remove="Views\BatchOperationsWindow.xaml.cs" />
     <!-- Окно «Центр обслуживания» (0.3.9.89): WPF code-behind исключается,
          Avalonia-версия (MaintenanceCenterWindow.Avalonia.cs) подключается глобом ниже. -->
     <Compile Remove="Views\MaintenanceCenterWindow.xaml.cs" />
@@ -501,6 +505,10 @@
          платформенных зависимостей, используется обеими платформами — на Linux
          подключается явно (имя не совпадает с глобом *.Avalonia.cs). -->
     <Compile Include="ViewModels\RepositoryBatchUpdateViewModel.cs" />
+    <!-- ViewModel массовых операций по списку баз (issue #91): чистый .NET без
+         платформенных зависимостей, используется обеими платформами — на Linux
+         подключается явно (имя не совпадает с глобом *.Avalonia.cs). -->
+    <Compile Include="ViewModels\BatchOperationsViewModel.cs" />
     <!-- ViewModel окна «Центр обслуживания» (0.3.9.89): чистый .NET без
          платформенных зависимостей, используется обеими платформами — на Linux
          подключается явно (имя не совпадает с глобом *.Avalonia.cs). -->

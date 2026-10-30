@@ -61,6 +61,12 @@ public sealed class ServerAlertsService : IDisposable
 {
     public const string FileName = "server_alerts.json";
 
+    /// <summary>
+    /// Тег источника rac-команд фоновых проверок в CM_RAC-логе (issue #90):
+    /// по метке «RAC [ALERTS]: …» видно, что вызов пришёл из сервиса оповещений.
+    /// </summary>
+    internal const string AlertsLogSourceTag = "ALERTS";
+
     private readonly IRacClient _rac;
     private readonly IServerListStore _servers;
     private readonly INotificationService _notifications;
@@ -121,6 +127,9 @@ public sealed class ServerAlertsService : IDisposable
     {
         if (Interlocked.Exchange(ref _running, 1) == 1)
             return;
+        // Диагностика источника rac-команд (issue #90): фоновые проверки помечаются
+        // «ALERTS» — записи CM_RAC отличимы от вызовов окна «Серверы 1С» («MONITOR»).
+        RacClient.LogSource.Value = AlertsLogSourceTag;
         try
         {
             var settings = Load();

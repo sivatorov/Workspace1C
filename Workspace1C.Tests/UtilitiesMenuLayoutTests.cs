@@ -90,6 +90,9 @@ public sealed class UtilitiesMenuLayoutTests
             null,
             "RepositoryBatchUpdate", "RepositoryBrowser",
             null,
+            // Массовые операции по списку баз (issue #91).
+            "BatchDumpDt", "BatchLoadCf",
+            null,
             "ExportCsv", "ExportHtml", "ExportJson", "ImportJson", "ExportV8iFile", "ImportV8iFile",
             "ClusterImport", "ClusterMigration",
             null,

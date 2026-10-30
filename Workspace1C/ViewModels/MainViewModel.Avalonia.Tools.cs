@@ -1589,6 +1589,50 @@ public partial class MainViewModel : ViewModelBase
         window.ShowDialogSync(OwnerWindow());
     }
 
+    // ======================= Массовые операции по списку баз (issue #91) =======================
+
+    private System.Windows.Input.ICommand? _batchDumpDtCommand;
+
+    /// <summary>
+    /// Команда «Массовая выгрузка в .dt…» (issue #91): окно-чеклист баз и
+    /// последовательная выгрузка каждой выбранной базы в файл .dt через ibcmd.
+    /// </summary>
+    public System.Windows.Input.ICommand BatchDumpDtCommand =>
+        _batchDumpDtCommand ??= new RelayCommand(_ => ExecuteBatchOperations(BatchOperationKind.DumpDt),
+            _ => _allInfobases.Any());
+
+    private System.Windows.Input.ICommand? _batchLoadCfCommand;
+
+    /// <summary>
+    /// Команда «Загрузить конфигурацию из .cf по списку баз…» (issue #91): окно-чеклист
+    /// баз и последовательная загрузка .cf в каждую выбранную базу через ibcmd.
+    /// </summary>
+    public System.Windows.Input.ICommand BatchLoadCfCommand =>
+        _batchLoadCfCommand ??= new RelayCommand(_ => ExecuteBatchOperations(BatchOperationKind.LoadConfig),
+            _ => _allInfobases.Any());
+
+    private void ExecuteBatchOperations(BatchOperationKind kind)
+    {
+        if (!_allInfobases.Any())
+        {
+            _dialog.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
+                LocalizationManager.T("BatchOps.Title"));
+            return;
+        }
+
+        // Безопасность: подтверждение перед массовой операцией по нескольким базам.
+        if (!_dialog.Confirm(
+                string.Format(LocalizationManager.T("BatchOps.ConfirmFormat"),
+                    kind == BatchOperationKind.DumpDt
+                        ? LocalizationManager.T("BatchOps.KindDumpDt")
+                        : LocalizationManager.T("BatchOps.KindLoadCf")),
+                LocalizationManager.T("BatchOps.Title")))
+            return;
+
+        var window = new Workspace1C.BatchOperationsWindow(_allInfobases.ToList(), kind);
+        window.ShowDialogSync(OwnerWindow());
+    }
+
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================
 
     private System.Windows.Input.ICommand? _repositoryBrowserCommand;

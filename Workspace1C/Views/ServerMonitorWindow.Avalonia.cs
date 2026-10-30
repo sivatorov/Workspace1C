@@ -94,6 +94,12 @@ namespace Workspace1C
         /// </summary>
         private const double ColumnGripWidth = 21.0;
 
+        /// <summary>
+        /// Диагностика CM_COLUMNS (issue #75): первая попытка перетаскивания границы
+        /// колонок уже залогирована (лог под гейтом CM_RAC + CM_ON — без спама).
+        /// </summary>
+        private bool _columnDragDiagLogged;
+
         /// <param name="openClusterImport">
         /// Открытие окна импорта с сервером, текущим на момент нажатия «Импорт»
         /// (issue #27); null — кнопка «Импорт» под списком баз не показывает импорт.
@@ -537,6 +543,12 @@ namespace Workspace1C
                 Foreground = new SolidColorBrush(Color.Parse("#D97706"))
             };
             status.Bind(TextBlock.TextProperty, new Binding("LicenseStatusText"));
+            // issue #83: предупреждение о недоступности утилиты лицензий показывается,
+            // когда текст непустой (при пустом — не занимает место).
+            status.Bind(TextBlock.IsVisibleProperty, new Binding("LicenseStatusText")
+            {
+                Converter = Avalonia.Data.Converters.StringConverters.IsNotNullOrEmpty
+            });
 
             var headerPanel = new StackPanel { Spacing = 2, Margin = new Thickness(0, 0, 0, 8), Children = { summary, status } };
 
@@ -974,6 +986,10 @@ namespace Workspace1C
                 // в шапке и во всех строках. Ширина зоны — ColumnGripWidth (21 px) + выступ
                 // 3 px = 24 px, та же зона, что в WPF (HeaderResizeHotZone=24, issue #75, 1.0.1.4).
                 var index = i;
+                // Граница, рассчитанная по координате клика (issue #75): используется
+                // в PointerMoved (применение ширин) вместо «колонки грипа» — паритет
+                // с WPF, где граница определяется чистой функцией по координате.
+                var dragIndex = index;
                 var line = new Border
                 {
                     Width = 1,
@@ -1001,6 +1017,14 @@ namespace Workspace1C
                     startX = e.GetPosition(headerGrid).X;
                     startWidths = headerGrid.ColumnDefinitions.Select(d => d.ActualWidth).ToArray();
                     ctrlMode = e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control);
+                    // issue #75 (репорт 7OH от 2026-10-30): индекс границы определяется
+                    // ПО КООРДИНАТЕ X клика той же чистой функцией, что и в WPF
+                    // (ResolveDragBoundary) — паритет платформ: граница колонки i —
+                    // правый край колонки i; при промахе (ширины не измерены) —
+                    // колонка грипа, как раньше.
+                    var resolved = ServerMonitorColumnWidthsStore.ResolveDragBoundary(
+                        startWidths, startX, ColumnGripWidth);
+                    dragIndex = resolved >= 0 ? resolved : index;
                     // issue #75 (1.0.0.96): обычное перетаскивание — как в 1С: граница
                     // двигается, ВСЕ колонки справа едут как блок (ширины не меняются).
                     // «Заморозка» гибких (звёздных) колонок фактической шириной: иначе
@@ -1017,6 +1041,16 @@ namespace Workspace1C
                         ApplyWidths();
                     }
                     e.Pointer.Capture(grip);
+                    // Диагностика (issue #75, усиленная): какая граница определена —
+                    // под гейтом CM_RAC + CM_ON (выключен по умолчанию), первая попытка.
+                    if (!_columnDragDiagLogged)
+                    {
+                        Log.Info(LogCategory.Rac,
+                            $"CM_COLUMNS: старт перетаскивания границы колонки {dragIndex} " +
+                            $"(по координате x={Math.Round(startX, 1)}, грип колонки {index}, " +
+                            $"resolved={resolved}, Ctrl: {ctrlMode}).");
+                        _columnDragDiagLogged = true;
+                    }
                     e.Handled = true;
                 };
                 grip.PointerMoved += (_, e) =>
@@ -1030,9 +1064,9 @@ namespace Workspace1C
                     // появляется горизонтальная прокрутка), с Ctrl меняются только ДВЕ
                     // смежные колонки. Минимальные ширины колонок не дают сжать заголовок.
                     var minWidths = columns.Select(c => (double)Math.Max(30, c.MinWidth)).ToArray();
-                    var newWidths = ctrlMode && index + 1 < columns.Count
-                        ? ServerMonitorColumnWidthsStore.ApplyDragResizePair(startWidths, index, dx, minWidths)
-                        : ServerMonitorColumnWidthsStore.ApplyDragMoveBlock(startWidths, index, dx, minWidths);
+                    var newWidths = ctrlMode && dragIndex + 1 < columns.Count
+                        ? ServerMonitorColumnWidthsStore.ApplyDragResizePair(startWidths, dragIndex, dx, minWidths)
+                        : ServerMonitorColumnWidthsStore.ApplyDragMoveBlock(startWidths, dragIndex, dx, minWidths);
                     for (var j = 0; j < widths.Length; j++)
                         widths[j] = new GridLength(newWidths[j], GridUnitType.Pixel);
                     ApplyWidths();

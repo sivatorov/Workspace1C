@@ -297,9 +297,11 @@ public sealed class Issue75ServerMonitorColumnsTests
         Assert.True(wpf.Contains("Keyboard.Modifiers.HasFlag(ModifierKeys.Control)", StringComparison.Ordinal),
             "WPF: должен быть перехват Ctrl при перетаскивании (issue #75).");
 
-        Assert.True(avalonia.Contains("ServerMonitorColumnWidthsStore.ApplyDragMoveBlock(startWidths, index, dx, minWidths)", StringComparison.Ordinal),
+        // issue #75 (репорт 7OH от 2026-10-30): индекс границы рассчитывается по
+        // координате клика (dragIndex), а не «колонкой грипа».
+        Assert.True(avalonia.Contains("ServerMonitorColumnWidthsStore.ApplyDragMoveBlock(startWidths, dragIndex, dx, minWidths)", StringComparison.Ordinal),
             "Avalonia: обычный режим должен применять ApplyDragMoveBlock (issue #75).");
-        Assert.True(avalonia.Contains("ServerMonitorColumnWidthsStore.ApplyDragResizePair(startWidths, index, dx, minWidths)", StringComparison.Ordinal),
+        Assert.True(avalonia.Contains("ServerMonitorColumnWidthsStore.ApplyDragResizePair(startWidths, dragIndex, dx, minWidths)", StringComparison.Ordinal),
             "Avalonia: Ctrl-режим должен применять ApplyDragResizePair (issue #75).");
         Assert.True(avalonia.Contains("Avalonia.Input.KeyModifiers.Control", StringComparison.Ordinal),
             "Avalonia: должен быть перехват Ctrl при перетаскивании (issue #75).");
@@ -360,12 +362,19 @@ public sealed class Issue75ServerMonitorColumnsTests
         // Гашение штатного ресайза при движении по ручке (PART_RightHeaderGripper).
         Assert.True(source.Contains("FindAncestor<System.Windows.Controls.Primitives.Thumb>(d) is not null", StringComparison.Ordinal),
             "WPF: движение по штатной ручке должно гаситься (e.Handled) (issue #75).");
-        // Зона границы: правые 24 px + выступ за правый край (до ActualWidth + 8).
-        Assert.True(source.Contains("x > header.ActualWidth + 8", StringComparison.Ordinal),
-            "WPF: зона границы должна допускать выступ за правый край заголовка (issue #75).");
-        // Клик по штатной ручке (Thumb) — гарантированная граница без координатной зоны.
+        // issue #75 (репорт 7OH от 2026-10-30): граница определяется ПО КООРДИНАТЕ X
+        // клика относительно грида чистой функцией ResolveDragBoundary (ближайшая
+        // граница в допуске ±HeaderResizeHotZone/2) — клик по выступу ручки/левой
+        // кромке заголовка следующей колонки даёт ту же границу (без off-by-one),
+        // клик в центре заголовка драг не стартует.
+        Assert.True(source.Contains("ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x, tolerance)", StringComparison.Ordinal),
+            "WPF: граница должна определяться чистой функцией ResolveDragBoundary по координате X (issue #75).");
+        Assert.True(source.Contains("const double tolerance = HeaderResizeHotZone / 2.0;", StringComparison.Ordinal),
+            "WPF: допуск зоны границы — половина HeaderResizeHotZone (issue #75).");
+        // Клик по штатной ручке (Thumb) — гарантированный жест границы; индекс
+        // подтверждается координатой (с fallback на колонку заголовка).
         Assert.True(source.Contains("FindAncestor<System.Windows.Controls.Primitives.Thumb>(source) is not null", StringComparison.Ordinal),
-            "WPF: клик по Thumb-ручке должен считаться границей без проверки координат (issue #75).");
+            "WPF: клик по Thumb-ручке должен считаться границей (issue #75).");
         // Координаты движения — от грида (заголовок во время драга может пересоздаваться).
         Assert.True(source.Contains("UpdateColumnDrag(grid, e.GetPosition(grid).X)", StringComparison.Ordinal),
             "WPF: движение должно считать координаты от грида, а не заголовка (issue #75).");
@@ -391,7 +400,7 @@ public sealed class Issue75ServerMonitorColumnsTests
         // перетаскивания — иначе ширины «замирают» после PointerCaptureLost.
         Assert.True(source.Contains("PointerCaptureLost", StringComparison.Ordinal),
             "Avalonia: PointerCaptureLost должен закрывать цикл перетаскивания (issue #75).");
-        Assert.True(source.Contains("ApplyDragMoveBlock(startWidths, index, dx, minWidths)", StringComparison.Ordinal),
+        Assert.True(source.Contains("ApplyDragMoveBlock(startWidths, dragIndex, dx, minWidths)", StringComparison.Ordinal),
             "Avalonia: обычный режим должен применять общую математику Store (issue #75).");
     }
 

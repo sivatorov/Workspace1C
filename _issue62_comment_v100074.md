@@ -1,0 +1,8 @@
+Исправлено в версии 1.0.0.74 (Windows и Linux) по последнему комментарию:
+
+1. **Набор иконок как в редакторе «Утилиты».** «Иконок конечно маловато, намного меньше, чем в правке структуры Утилиты» — каталог иконок меню трея теперь строится из общего источника с редактором «Утилиты» ([`UtilitiesMenuEditorViewModel.BuildCatalogIcons`](Workspace1C/ViewModels/UtilitiesMenuEditorViewModel.cs) по [`UtilitiesMenuCatalog.All`](Workspace1C/Services/UtilitiesMenuCatalog.cs)), а не из 5 захардкоженных иконок ([`TrayMenuEditorViewModel.cs`](Workspace1C/ViewModels/TrayMenuEditorViewModel.cs)).
+2. **«Выбираем из того, что есть - сохраняем. Иконка совсем другая» исправлено.** Раньше пункт пользовательской группы в трее создавался ВСЕГДА со стандартной иконкой группы (`CreateTrayItem` не принимала ключ и цвет) — выбранная иконка терялась. Теперь WPF-адаптер передаёт выбранный ключ и цвет группы в пункт меню и рисует именно её: геометрия активного набора иконок (`IconKeyToGeometryConverter`) + цвет каталога ([`MainWindow.Tray.cs`](Workspace1C/Views/MainWindow.Tray.cs)); построитель доводит `IconKey`/`IconColor` группы до адаптеров ([`TrayMenuBuilder.cs`](Workspace1C/Services/TrayMenuBuilder.cs)). На Linux (Avalonia `NativeMenu`) пользовательские цветные иконки системное меню трея не поддерживает — там исправлен набор каталога в редакторе.
+
+Покрыто тестами `TrayMenuIconCatalogTests` (каталог = «Утилитам», ключи резолвятся в геометрию, построитель сохраняет цвет, WPF-адаптер передаёт иконку) и `TrayMenuNestedAdapterContractTests` (регресс вложенных блоков).
+
+Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.74

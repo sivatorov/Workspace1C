@@ -1,0 +1,394 @@
+[
+    {
+        "number":  67,
+        "title":  "Подстановки для сценариев",
+        "body":  "Просьба добавить в подстановки для пользовательских сценариев запуска несколько переменных\n%full_launch_config% - полная строка запуска, которую бы стартер подставил для текущей базы для режима Конфигуратор\n%full_launch_enterprise% - полная строка запуска, которую бы стартер подставил для текущей базы для режима Предприятие\n%full_exe_name% - полный путь к используемому файлу платформы\nнапример \"c:\\Program Files\\1cv8\\8.5.4.1878\\bin\\1cv8.exe\"\n%platform_version% - полная версия используемой платформы\nнапример 8.5.4.1878\n",
+        "comments":  [
+                         {
+                             "id":  6395951420,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T09:28:26Z",
+                             "body":  "Плюс сейчас подставляет далеко не всё\nДоговаривались на старте, что будет понимать ВСЕ свойства базы.\n\n\u003cimg width=\"830\" height=\"568\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/d5bbeddf-0418-447d-99a4-9167e7a90161\" /\u003e\n\nНо подставить логин оно пока не может.\n1. Доработать парсер параметров, чтобы понимал ВСЕ реквизиты - и текущие и которые будут когда либо добавлены.\n2. Добавить кнопку ниже списка подстановок, слева от поясняющей надписи - \"Выбрать\".\nПо клику на кнопке появится дерево всех параметров базы - в левой колонке итоговое имя переменной, справа её значение для базы. Сверху над деревом поле поиска (по обеим колонкам). Снизу под деревом 2 кнопки: Ок и Отмена. По Ок (и по двойному клику в дереве) вставляется имя переменной в параметры запуска"
+                         },
+                         {
+                             "id":  6398200241,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T13:24:13Z",
+                             "body":  "Исправлено в версии 1.0.0.72 (Windows и Linux) по комментариям:\r\n\r\n1. **Резолвер понимает ВСЕ реквизиты базы, включая логин.** Справочник подстановок окна сценария расширен: `%connection.user%` (логин), `%connection.type%`, `%connection.port%`, `%id%`, `%имягруппы%`; кроме того окно понимает все динамические ключи карты (рефлексия по свойствам базы). Логин/пароль теперь соответствуют фактическому запуску: когда у базы нет собственных учётных данных, в карту подставляются решённые для общей авторизации (issue #57) значения ([`ScriptParameterResolver.BuildValueMap`](Workspace1C/Services/ScriptParameterResolver.cs), [`InfobaseAuthResolver`](Workspace1C/Services/InfobaseAuthResolver.cs); запуск сценария и живое превью).\r\n2. **Кнопка «Выбрать» и диалог переменных.** Под списком подстановок добавлена кнопка **«Выбрать…»** (слева от поясняющей надписи): открывается окно со ВСЕМИ переменными базы — слева итоговое имя переменной, справа её значение для «Базы для примера»; сверху поле поиска по обеим колонкам; снизу «Ок»/«Отмена». По «Ок» и по двойному клику имя переменной вставляется в параметры запуска ([`ScriptTokenPickerViewModel.cs`](Workspace1C/ViewModels/ScriptTokenPickerViewModel.cs), [`ScriptTokenPickerWindow.xaml`](Workspace1C/Views/ScriptTokenPickerWindow.xaml) + [`ScriptTokenPickerWindow.Avalonia.cs`](Workspace1C/Views/ScriptTokenPickerWindow.Avalonia.cs)). Значения паролей маскируются («••••»).\r\n\r\nЛокализация ru/en; добавлены юнит-тесты `ScriptTokenPickerViewModelTests` и дополнены `ScriptParameterResolverTests`/`ScriptScenarioEditViewModelTests`.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72"
+                         },
+                         {
+                             "id":  6398806396,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:21:42Z",
+                             "body":  "Больше похоже на добавление в список 5 полей, а не ВСЕХ доступных полей структуры.\n\n\u003cimg width=\"1625\" height=\"1112\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/e489445c-12b8-40a2-bb5a-3fe43eaf13fd\" /\u003e\n\nРезультата нет.\n\nВот пример в выборе - нет того, что есть в файле настроек.\n\u003cimg width=\"958\" height=\"657\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/4a198aac-6bd1-4709-863d-60f1909d4230\" /\u003e\n\nЗапрошенных в первом сообщении полей тоже нет\n\n"
+                         }
+                     ]
+    },
+    {
+        "number":  63,
+        "title":  "Доработка публикации баз",
+        "body":  "Возможно ли доработать этот список ?\n\n\u003cimg width=\"457\" height=\"395\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/1b1e033d-d7d6-4b2f-9a5f-1dc7d69df591\" /\u003e\n\nНа компьютере может быть установлено несколько инстансов Апача\n\n\u003cimg width=\"402\" height=\"161\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/e8cbd32d-a863-4c4c-b75a-8ab8832180fe\" /\u003e\n\nОпределять по именам или описаниям служб, что это апач\nтам же определять корректно файл конфигурации и папку для публикации\nучесть возможность наличия include\n\n\u003cimg width=\"920\" height=\"942\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/2eac8b32-e0b9-4bdc-86de-76dd94b37910\" /\u003e\n",
+        "comments":  [
+                         {
+                             "id":  6381844005,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-24T08:11:45Z",
+                             "body":  "Сюда же - сейчас все поля залиты таким же цветом как и фон.\nОбычно так делают, когда поля ТолькоЧтение, но тут правка доступна.\nНадо поправить - изменить цвет"
+                         },
+                         {
+                             "id":  6394673246,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T07:03:43Z",
+                             "body":  "Исправлено в версии 1.0.0.71 (Windows и Linux).\r\n\r\n**Часть 1 — читаемые поля ввода.** Поля в карточках больше не сливаются с фоном: введена глобальная кисть `InputBackgroundBrush` (светлая тема — `#E8EDF3` на фоне карточки `#FFFFFF`, тёмная — `#273548` на `#1E293B`), объявленная в палитрах [`ColorScheme.cs`](Workspace1C/Models/ColorScheme.cs) (по умолчанию и в генерируемых схемах), в WPF-темах [`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml)/[`DarkTheme.xaml`](Workspace1C/Themes/DarkTheme.xaml) и в Avalonia [`LightTheme.axaml`](Workspace1C/Themes/LightTheme.axaml)/[`DarkTheme.axaml`](Workspace1C/Themes/DarkTheme.axaml)/[`Controls.axaml`](Workspace1C/Themes/Controls.axaml). Стили `ModernTextBox`, `ModernComboBox` и неявный `PasswordBox` (WPF Light+Dark), а также `ModernTextBox`/`ModernComboBox`/`ModernPasswordBox` (Avalonia) используют `InputBackgroundBrush` вместо `CardBackgroundBrush`; поля, собираемые кодом через [`WpfUi.BoundTextBox`](Workspace1C/Views/WpfUi.cs)/`BoundCombo`, тоже берут кисть ввода из темы. Пять полей окна публикации (имя, каталог, конфиг, строка соединения и список серверов) и остальные окна с `Card` теперь читаемы в обеих темах; поле поиска (`SearchTextBox`) намеренно не тронуто.\r\n\r\n**Часть 2 — инстансы Apache.** Окно «Публикация на веб-сервере» теперь обнаруживает установленные инстансы Apache вместо фиксированного {IIS, Apache 2.4, Apache 2.2}:\r\n- [`Models/ApacheInstance.cs`](Workspace1C/Models/ApacheInstance.cs) — модель инстанса (имя службы, описание, ServerRoot/Htdocs, вид 2.4/2.2, include-файлы и include-каталоги);\r\n- [`Services/ApacheConfIncludeParser.cs`](Workspace1C/Services/ApacheConfIncludeParser.cs) — чистый разбор директив `Include`/`IncludeOptional` (относительные пути резолвятся относительно каталога конфига, wildcard `*` помечается как каталог);\r\n- [`Services/ApacheInstanceDetector.cs`](Workspace1C/Services/ApacheInstanceDetector.cs) (+ `.Windows.cs`/`.Linux.cs`) — Windows: перебор служб httpd по реестру с разбором `ImagePath` (`-d ServerRoot`, `-f conf`, конфиг по умолчанию `ServerRoot\\conf\\httpd.conf`, htdocs `ServerRoot\\htdocs`); Linux: `apache2ctl -V`/`httpd -V` (HTTPD_ROOT/SERVER_CONFIG_FILE) + `-S` (DocumentRoot), fallback-пути `/etc/apache2/apache2.conf` и `/var/www`. Если инстансы не найдены — список пуст и окно использует прежние `SuggestApacheConf`/`SuggestPhysicalDirectory`;\r\n- [`WebPublishViewModel.cs`](Workspace1C/ViewModels/WebPublishViewModel.cs): список серверов строится из инстансов («IIS» на Windows + «Apache 2.4 — \u003cслужба\u003e», fallback-пункт «Apache 2.4» при пустом списке); выбор инстанса автозаполняет `ApacheConfPath` и каталог публикации; вторым ComboBox выбран конфиг-файл для webinst — основной конфиг или include-файл (`ConfTargets`/`ConfTargetIndex`). Логика публикации (`ServerIndex`/`IsApache`/`BuildRequest`) сохранена, `WebPublishService.Validate` по-прежнему принимает непустой путь, в том числе include-файл.\r\n\r\nЛокализация новых подписей — ru/en: `WebPublish.ApacheInstanceOption`, `WebPublish.ApacheDefaultOption`, `WebPublish.ConfTarget`, `WebPublish.ConfTargetMain`, `WebPublish.ConfTargetInclude`.\r\n\r\nДобавлены юнит-тесты: `Issue63InputBackgroundBrushTests` (разметочные проверки Controls.axaml/LightTheme/DarkTheme — поля используют `InputBackgroundBrush`, а не `CardBackgroundBrush`; палитра различает фон поля и фон карточки), `ApacheConfIncludeParserTests`, `ApacheInstanceDetectorTests` (Windows `-d`/`-f`, Linux `apache2ctl -V`), `WebPublishViewModelTests` (выбор инстанса подставляет конфиг/каталог, выбор include-файла, validate include-пути). Проект собран для Windows (WPF) и Linux (Avalonia); полный прогон тестов зелёный.\r\n\r\nРеализовано на обеих платформах.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.71"
+                         },
+                         {
+                             "id":  6395667643,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T08:58:12Z",
+                             "body":  "1. Мне кажется, но этот пункт больше подходит для Контекстного меню выбранной базы. Я бы переместил из Утилиты в контекстное. Например в подменю Администрирование, выше истории запусков с разделителем.\n2. Можно ли доработать парсер конфигов ?\nСейчас, похоже, определяется только каталог инстанса апача корректно по настройкам службы.\nКаталог публикации не до конца смогло соединить\n\n\u003cimg width=\"1153\" height=\"1160\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/107f55e7-71cb-4387-8ed3-3a7d2c310bb0\" /\u003e\n\nвот пример на картинке - должно выйти  \"c:\\Apache\\Apache24\\htdocs\\27\\demo_27\"\n\nЕсли LISTEN  в конфиге не 80, то надо наверное и надпись про это немного корректнее показывать\n\n\u003cimg width=\"810\" height=\"701\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/b798d08e-5730-4e6f-a2f8-6fee1ca96c6d\" /\u003e\n\nдолжно выйти http://localhost:8027/demo_27"
+                         },
+                         {
+                             "id":  6398201187,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T13:24:19Z",
+                             "body":  "Исправлено в версии 1.0.0.72 (Windows и Linux) по комментарию:\r\n\r\n1. **Пункт перенесён из «Утилиты» в контекстное меню базы.** «Публикация на веб-сервере» теперь в подменю **«Администрирование»** (над «Историей запусков», с разделителем): удалён из каталога «Утилиты» ([`UtilitiesMenuCatalog.cs`](Workspace1C/Services/UtilitiesMenuCatalog.cs); старые `utilities_menu_layout.json` с пунктом нормализуются) и добавлен в [`ContextMenuCatalog.cs`](Workspace1C/Services/ContextMenuCatalog.cs) (`GroupAdministration`, помечен новым — попадает в «Новинки программы»).\r\n2. **Парсер конфигов доработан: DocumentRoot и Listen.** Парсер ([`ApacheConfIncludeParser.cs`](Workspace1C/Services/ApacheConfIncludeParser.cs)) разбирает директиву **DocumentRoot** (относительные пути резолвятся; учитывается подкаталог сайта — в примере «c:\\Apache\\Apache24\\htdocs\\27\\demo_27») и порты **Listen** (`Listen 80`, `Listen 0.0.0.0:8027`, `[::]:8080`); у инстанса появились поля `DocumentRoot`/`ListenPorts` ([`ApacheInstance.cs`](Workspace1C/Models/ApacheInstance.cs)), детектор заполняет их из конфига ([`ApacheInstanceDetector.cs`](Workspace1C/Services/ApacheInstanceDetector.cs)). Каталог публикации окна использует DocumentRoot инстанса, а URL — порт: при Listen ≠ 80 адрес становится `http://localhost:8027/demo_27/` ([`WebPublishViewModel.cs`](Workspace1C/ViewModels/WebPublishViewModel.cs), [`WebPublishService.LocalUrl`](Workspace1C/Services/WebPublishService.cs)).\r\n\r\nЛокализация ru/en; добавлены юнит-тесты `WebPublishIssue63Tests` (каталоги меню, парсер DocumentRoot/Listen, URL с портом, VM) и обновлены регресс-тесты меню.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72"
+                         },
+                         {
+                             "id":  6398839540,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:24:46Z",
+                             "body":  "Я что-то не уверен, что программа на следующем шаге сможет создать сама файл в\nc:\\Apache\\Apache24\\conf\\${SRVROOT}\\htdocs\\${OneCPort}\\demo_27_file\nа переменные из файла кто подставлять будет сейчас ?\nПорт после имени публикации в подсказке - так и не подставлен"
+                         }
+                     ]
+    },
+    {
+        "number":  62,
+        "title":  "Правка меню трея",
+        "body":  "Не уверен, для чего нужно из трея синхронизировать базы - результат никто не увидит.\nЭто целесообразнее делать при открытом окне - просьба убрать этот пункт из трея.\n\nВ Настройки - Правка меню\nдобавляем ещё одну группу \"Меню в трее\"\nГалочка \"Правка структуры меню в трее\"\nКнопка \"Настроить структуру\"\nОписание сформировать по логике итоговой\n\nВ правке структуры мы по идее сможем жонглировать (видимость, порядок, группировка)\nтолько тремя пунктами-блоками:\nИзбранные базы - раздел целиком, так как он формируется на лету\nНедавние базы - аналогично\nСлужбы - аналогично, правятся в другом месте.\nНу и разделители с пользовательскими группами и иконками\nЕщё раз уточню - вложенных пунктов мы увидеть в структуре не сможем, так как они появляются в блоках динамически.\n\nПункты \"Открыть программу\", \"Настройки\", разделитель после \"Настройки\" и \"Выход\" - в настройку меню не попадают - они всегда в наличии и на своих местах.\nНастройке подвержены все остальные элементы с разделителями\n\nФорма правки структуры аналогична остальным правкам, но будут нюансы\nТолько для встроенных блоков : \"Избранные базы\", \"Недавние базы\", \"Службы\" \nбудет доступна опция настройки (расположить справа от списка):\n\"Блок меню\" - это поведение по-умолчанию для блоков \"Избранные базы\" и \"Недавние базы\", содержимое показывается под заголовком сверху вниз\n\"Подменю\" - это поведение по-умолчанию для блока \"Службы\", заголовок превращается в Имя для подменю, а пункты располагаются сверху вниз в созданном подменю\n\n",
+        "comments":  [
+                         {
+                             "id":  6394673819,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T07:03:47Z",
+                             "body":  "Исправлено в версии 1.0.0.71 (Windows и Linux), в два шага.\r\n\r\n**Шаг 1 — модель и настройка:** из меню трея убран пункт **«Синхронизировать базы»** (WPF: [`MainWindow.Tray.cs`](Workspace1C/Views/MainWindow.Tray.cs), Avalonia: [`MainWindow.Avalonia.Tray.cs`](Workspace1C/Views/MainWindow.Avalonia.Tray.cs) — удалены пункты и лишние разделители). Добавлен стек редактирования структуры меню трея: модель [`TrayMenuLayout.cs`](Workspace1C/Models/TrayMenuLayout.cs) (блоки `favorites`/`recent`/`services`/`user`, стиль «Блок меню»/«Подменю», видимость, порядок, пользовательские группы с иконками и разделители), хранилище [`ITrayMenuLayoutStore.cs`](Workspace1C/Services/ITrayMenuLayoutStore.cs) + [`TrayMenuLayoutStore.cs`](Workspace1C/Services/TrayMenuLayoutStore.cs) (файл `tray_menu_layout.json`, атомарная запись, нормализация, сброс), резолвер [`TrayMenuResolver.cs`](Workspace1C/Services/TrayMenuResolver.cs) (`Resolve` по настройке «Правка структуры меню в трее», `BuildEffective` — отбрасывает скрытые узлы), стандартная компоновка [`TrayMenuLayouts.cs`](Workspace1C/Services/TrayMenuLayouts.cs) и ViewModel редактора [`TrayMenuEditorViewModel.cs`](Workspace1C/ViewModels/TrayMenuEditorViewModel.cs). В настройках (вкладка «Правка меню») добавлена группа «Меню в трее» с галочкой `Settings.TrayMenu.EditingEnabled`.\r\n\r\n**Шаг 2 — окна редактора и построение по компоновке:**\r\n\r\n- **Окно редактора структуры меню трея** на обеих платформах: [`TrayMenuEditorWindow.xaml`](Workspace1C/Views/TrayMenuEditorWindow.xaml) (+[`.xaml.cs`](Workspace1C/Views/TrayMenuEditorWindow.xaml.cs)) и [`TrayMenuEditorWindow.Avalonia.cs`](Workspace1C/Views/TrayMenuEditorWindow.Avalonia.cs). Дерево блоков верхнего уровня с чекбоксами видимости, панель операций: «Вверх»/«Вниз», стиль блока («Блок меню»/«Подменю» через выпадающий список `SelectedBlockStyle`), «Добавить группу», «Добавить разделитель», «Переименовать» (для пользовательских групп — заголовок + иконка через диалог `UtilitiesGroupEditWindow`), «Удалить» (только пользовательская группа/разделитель), «Сброс», «Сохранить» (сохраняет компоновку и закрывает), «Отмена».\r\n- **Кнопка «Настроить структуру…»** в настройках: WPF [`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml) (`TrayMenuEditButton`, обработчик `OnTrayMenuEdit_Click` в [`SettingsWindow.xaml.cs`](Workspace1C/Views/SettingsWindow.xaml.cs)) и Avalonia [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs) (`OpenTrayMenuEditor`, `ShowDialogSync`). Окно открывает `TrayMenuEditorWindow` с `ITrayMenuLayoutStore`. Заглушка `MainViewModel.ShowTrayMenuEditor()` удалена — вызов идёт напрямую из настроек.\r\n- **Построение меню трея по компоновке:** чистый построитель [`TrayMenuBuilder.cs`](Workspace1C/Services/TrayMenuBuilder.cs) превращает компоновку в плоский список `TrayMenuItem` (`Open | Header | Item | Submenu | Separator | Settings | Exit`) с фиксированными пунктами «Открыть программу» первым и «разделитель → Настройки → разделитель → Выход» последними. Адаптеры WPF `RebuildTrayMenu` ([`MainWindow.Tray.cs`](Workspace1C/Views/MainWindow.Tray.cs)) и Avalonia `FillTrayMenu` ([`MainWindow.Avalonia.Tray.cs`](Workspace1C/Views/MainWindow.Avalonia.Tray.cs)) маппят его на WinForms/`NativeMenu`: стиль «Блок меню» → заголовок (`CreateTrayHeader`/`TrayHeader`) + динамическое содержимое (избранные базы, недавние базы, для «Службы» — плоские пункты меню служб; для пользовательских групп — дети компоновки); стиль «Подменю» → вложенное меню (как раньше у «Службы»). Пересборка после изменения настройки/компоновки: WPF — пересборка при каждом показе меню + `RebuildTrayMenuNow()` после закрытия настроек; Avalonia — отпечаток компоновки добавлен в `TrayMenuSignature` и `RefreshTrayMenuAfterSettings()` после закрытия настроек.\r\n- **Локализация ru/en:** ключи `Settings.TrayMenu.*` (добавлен `Settings.TrayMenu.Hint`) и `TrayMenu.*` (заголовки блоков, стили, операции окна редактора: `TreeHeader`, `MoveHeader`, `MoveUpTooltip`, `MoveDownTooltip`, `AddGroupTooltip`, `AddSeparatorTooltip`, `EditGroup`, `EditGroupTooltip`, `DeleteTooltip`, `BlockStyleHeader`, `StyleHint`, `GroupsHeader`, `Hint`, `VisibleTooltip`).\r\n\r\nДобавлены юнит-тесты: `TrayMenuBuilderTests` — стандартная компоновка с фиксированными пунктами и порядком блоков, смена стиля «Блок меню»/«Подменю» для «Службы» и пользовательских групп, скрытые узлы и разделители, отпечаток `LayoutSignature` для пересборки; `TrayMenuEditorWindowLayoutTests` — разметка WPF-окна (дерево `Roots`, привязки операций к `TrayMenuEditorViewModel`), Avalonia-версия, кнопка «Настроить структуру…» и обработчики в настройках, симметричность ключей `TrayMenu.*`/`Settings.TrayMenu.*` в словарях ru/en. Плюс тесты шага 1 (`TrayMenuLayoutTests`, `TrayMenuResolverTests`, `TrayMenuLayoutStoreTests`, `TrayMenuEditorViewModelTests`, `TrayMenuAppSettingsTests`). Полный прогон: 4217/4217 зелёные.\r\n\r\nРеализовано на обеих платформах (Windows/WPF и Linux/Avalonia).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.71"
+                         },
+                         {
+                             "id":  6395473439,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T08:36:11Z",
+                             "body":  "В целом работает.\nСоздал группу, но переместить туда 2 блока не смог.\nТут или кнопка создания группы лишняя, или надо доработать ранее запрошенную возможность перемещения блоков в созданную пользователем группу (подменю)"
+                         },
+                         {
+                             "id":  6398200669,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T13:24:16Z",
+                             "body":  "Исправлено в версии 1.0.0.72 (Windows и Linux) по замечанию: «Создал группу, но переместить туда 2 блока не смог».\r\n\r\nВ редакторе структуры меню трея добавлены кнопки:\r\n- **«В группу…»** — диалог выбора пользовательской группы (подменю); выбранный блок или разделитель переносится в её вложенное меню ([`TrayMenuGroupPickWindow.xaml`](Workspace1C/Views/TrayMenuGroupPickWindow.xaml) + [`TrayMenuGroupPickWindow.Avalonia.cs`](Workspace1C/Views/TrayMenuGroupPickWindow.Avalonia.cs));\r\n- **«В корень»** — возврат блока из группы в корень (сразу после группы).\r\n\r\nДерево редактора теперь двухуровневое (блоки внутри групп), операции «Вверх/Вниз/Удалить» работают на уровне текущей группы; резолвер [`TrayMenuResolver`](Workspace1C/Services/TrayMenuResolver.cs) учитывает дочерние узлы и отбрасывает скрытые, построитель [`TrayMenuBuilder`](Workspace1C/Services/TrayMenuBuilder.cs) строит группы как подменю с содержимым (адаптеры WPF/Avalonia уже умеют `Children`). Старые файлы `tray_menu_layout.json` (без вложенности) читаются нормализацией без потерь.\r\n\r\nЛокализация ru/en; добавлены юнит-тесты `TrayMenuGroupMoveTests` (перенос в группу/в корень, разделители, запрет вложения групп, фильтр скрытых детей, построение подменю).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72"
+                         },
+                         {
+                             "id":  6398711224,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:12:53Z",
+                             "body":  "Блоки, добавленные в группу, перестают функционировать\n\n\u003cimg width=\"607\" height=\"187\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/0aef2cd5-c3c2-43e3-8ee4-0c5b1fd321eb\" /\u003e\n"
+                         }
+                     ]
+    },
+    {
+        "number":  61,
+        "title":  "Цвета заголовков в темной версии",
+        "body":  "Пройти по всем формам и проверить, где некорректно указан цвет для заголовков\n\nкак тут для всех пяти полей\n\u003cimg width=\"605\" height=\"480\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/a91f4944-32b6-440e-8be6-15f4d3fb0070\" /\u003e\n\nили вот тут\n\u003cimg width=\"982\" height=\"551\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/3270c71e-de41-4714-9d2f-3e36b153e1c4\" /\u003e\n\nтяжело черное на тёмном читать",
+        "comments":  [
+                         {
+                             "id":  6394673451,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T07:03:44Z",
+                             "body":  "Исправлено в версии 1.0.0.71 (Windows и Linux).\r\n\r\nПройдены все формы; исправлены места, где тёмный/чёрный текст оставался нечитаемым в тёмной теме:\r\n\r\n1. **Кисть текста на плашках избранного — `FavoriteTextBrush`.** Введена новая динамическая кисть, контрастная к `FavoriteColor` (рассчитывается по WCAG в [`ThemeManager.cs`](Workspace1C/Themes/ThemeManager.cs) и [`ThemeManager.Avalonia.cs`](Workspace1C/Themes/ThemeManager.Avalonia.cs)), объявлена в палитрах [`ColorScheme.cs`](Workspace1C/Models/ColorScheme.cs) и в обеих темах WPF [`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml)/[`DarkTheme.xaml`](Workspace1C/Themes/DarkTheme.xaml) и Avalonia [`LightTheme.axaml`](Workspace1C/Themes/LightTheme.axaml)/[`DarkTheme.axaml`](Workspace1C/Themes/DarkTheme.axaml). Раньше текст на плашках был фиксированной константой `#1C1917`, нечитаемой у пользовательских схем с тёмным «янтарём».\r\n\r\n2. **Бейдж «Избранное» правой панели главного окна.** Текст красился кистью `FavoriteBrush` — в тёмной теме это «жёлтое на жёлтом» (`#FBBF24` на плашке `#FEF3C7`), нечитаемо. Теперь тёмный текст через `FavoriteTextBrush`: [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:2451) и [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs) (бейдж `themeBrushKey: \"FavoriteTextBrush\"`).\r\n\r\n3. **Номера слотов Alt+N** (строка базы и «Горячие клавиши» в настройках): фиксированный `#1C1917` заменён на `{DynamicResource FavoriteTextBrush}` — [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:1801), [`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml:1732), [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:565) и [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs:3201).\r\n\r\n4. **Тексты окон, собираемых кодом** (окно публикации «пять полей», технологический журнал, резервное копирование СУБД, журнал регистрации, телеграм-бот и др.): [`AvaloniaUi`](Workspace1C/Views/AvaloniaUi.Avalonia.cs) `Text`/`Header`/`Cell` теперь явно привязывают кисти темы (`TextPrimaryBrush`/`TextSecondaryBrush`) — раньше они полагались на глобальный стиль `TextBlock` и могли оставаться чёрными на тёмном фоне. WPF-версия (`WpfUi.Text`) так и делала.\r\n\r\n5. **Ревизия разметки.** Полный grep по `Views/*.xaml` и `Views/*.axaml`: фиксированных «почти чёрных» `Foreground` (`#1C1917`, `Black`, `#111827`, `#0F172A`, `#1E293B`) не осталось. Намеренно тёмные тексты (например подпись «Закреплено» `#5B21B6`) находятся только на постоянных светлых плашках (`#EDE9FE`) и читаемы в обеих темах.\r\n\r\nЛокализация не затронута — новых строк нет, ru/en не расходится.\r\n\r\nТесты-стражи (7 фактов): [`Issue61TitleColorsTests.cs`](Workspace1C.Tests/Issue61TitleColorsTests.cs) — бейджи избранного используют `FavoriteTextBrush`, в разметке обеих платформ нет фиксированных тёмных `Foreground`, кисть объявлена в палитрах и темах, `AvaloniaUi` привязывает кисти темы. Сборка успешна для Windows (WPF) и Linux (Avalonia).\r\n\r\nРеализовано на обеих платформах.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.71\r\n"
+                         },
+                         {
+                             "id":  6395418428,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T08:29:55Z",
+                             "body":  "\u003cimg width=\"597\" height=\"515\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/1464401b-f034-445c-9c96-36c0cdedcf16\" /\u003e\n\nЗаходим в первое окно (Изменение сервера) и заголовки полей по прежнему черные"
+                         },
+                         {
+                             "id":  6395436258,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T08:31:56Z",
+                             "body":  "\u003cimg width=\"658\" height=\"626\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/d1eaf5d7-9d19-4508-b485-d9629d5aecb0\" /\u003e\nЭта же проблема касается и управления сверткой групп в разных списках"
+                         },
+                         {
+                             "id":  6395852091,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T09:18:03Z",
+                             "body":  "\u003cimg width=\"838\" height=\"601\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/3c4d0c23-5754-438e-870f-9977403b5895\" /\u003e\nсюда же можно и такое добавить - текст в поле прочитать сложно"
+                         },
+                         {
+                             "id":  6398201692,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T13:24:21Z",
+                             "body":  "Исправлено в версии 1.0.0.72 (Windows и Linux) по последним комментариям:\r\n\r\n1. **Окно «Изменение сервера» — заголовки полей.** На Linux подписи полей и заголовок окна строились кодом без привязки кисти темы — теперь привязаны к `TextPrimaryBrush` ([`ServerEditWindow.Avalonia.cs`](Workspace1C/Views/ServerEditWindow.Avalonia.cs)); на Windows проверена разметка окна.\r\n2. **Текст в поле.** Поле показа пароля окна «Изменение сервера» переведено на стиль темы `ModernTextBox` — читаемый текст/фон в обеих темах ([`ServerEditWindow.xaml`](Workspace1C/Views/ServerEditWindow.xaml)).\r\n\r\nПроверка читаемости в тёмной теме закреплена расширенными тестами-стражами `Issue61TitleColorsTests` (привязки кистей в Avalonia-коде, стиль поля в WPF-разметке, отсутствие фиксированных тёмных текст-форграундов).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72\r\n"
+                         },
+                         {
+                             "id":  6398672178,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:09:12Z",
+                             "body":  "1.0.0.72\nПо всем (минимум четырём) конкретно указанным выше окнам - всё на месте - черное\n"
+                         },
+                         {
+                             "id":  6398735999,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:15:05Z",
+                             "body":  "\u003cimg width=\"900\" height=\"715\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/45a4b03b-9a64-4bff-8c63-eab8f009a46e\" /\u003e\nВот ещё добавка - и темные заголовки и светлое на светлом выделение"
+                         }
+                     ]
+    },
+    {
+        "number":  54,
+        "title":  "Массовые действия над выбранными базами в списке",
+        "body":  "Прошу добавить возможность задать платформу в действия для выделенных баз в списке.",
+        "comments":  [
+                         {
+                             "id":  6362794062,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T10:25:47Z",
+                             "body":  "Предложение\nДобавить галочку смены платформы и поле выбора в инструмент замены строк подключения и немного изменить название пункта\nДумаю чаще вместо со сменой строк (адрес и порт) меняется и сама платформа.\nБудет ли так лучше ?"
+                         },
+                         {
+                             "id":  6362939072,
+                             "author":  "ArtyoZ",
+                             "createdAt":  "2026-10-23T10:34:34Z",
+                             "body":  "\u003e    Будет ли так лучше ?\n\nДля меня нет - адрес и порт я практически не меняю с момента добавления, а вот платформу гораздо чаще.\nОпять же усложнение процесса (дополнительная галочка)..."
+                         },
+                         {
+                             "id":  6365895318,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T13:22:53Z",
+                             "body":  "Исправлено в версии 1.0.0.66 (Windows и Linux): в окно массовой операции для выделенных баз добавлена возможность смены платформы — галочка «Сменить платформу» и список установленных платформ (окно переименовано в «Замена строк подключения и платформы…», пункты меню обновлены).\r\n\r\nИзменение платформы применяется к выделенным базам вместе с заменой строки подключения (или отдельно), откат поддерживается через undo («Отменить последнюю замену»).\r\n\r\nЕдиная логика планировщика и модели ([`ConnectionReplacementPlanner.cs`](Workspace1C/Services/ConnectionReplacementPlanner.cs), [`ConnectionReplaceViewModel.cs`](Workspace1C/ViewModels/ConnectionReplaceViewModel.cs)) и представления ([`ConnectionReplaceWindow.xaml`](Workspace1C/Views/ConnectionReplaceWindow.xaml), [`ConnectionReplaceWindow.Avalonia.cs`](Workspace1C/Views/ConnectionReplaceWindow.Avalonia.cs)), локализация обновлена.\r\n\r\nДобавлены юнит-тесты `ConnectionReplacementPlannerTests`, `ConnectionReplaceViewModelTests`, `ConnectionReplaceLocalizationTests` (+15).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.66"
+                         },
+                         {
+                             "id":  6366299785,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T13:43:09Z",
+                             "body":  "Люди договорились - агент договор не понял )\nНе нужна смена платформы в этом инструменте - минимум, потому что отобрать нормально прошлые строки невозможно.\nВозвращаем как было - и функционал и название пункта меню.\n\nДелаем новый пункт в контекстном подменю \"Для выделенных\" - \"Сменить платформу\"\nВнутри выбираем новую платформу из списка\nПо Ок - заменяем."
+                         },
+                         {
+                             "id":  6370348472,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T17:04:24Z",
+                             "body":  "Исправлено в версии 1.0.0.68 (Windows и Linux) — по вашим замечаниям:\n\n- окно «Замена строк подключения…» возвращено к прежнему виду: опция «Сменить платформу» из него убрана, функционал и название пунктов меню — как раньше;\n- смена платформы вынесена в отдельный пункт «Сменить платформу» в контекстном подменю «Для выделенных»: открывается окно со списком установленных платформ, по «ОК» платформа заменяется у выделенных баз (той же логикой замены, поддерживается откат «Отменить последнюю замену»).\n\nИзменённые файлы: [`ConnectionReplaceViewModel.cs`](Workspace1C/ViewModels/ConnectionReplaceViewModel.cs), [`ConnectionReplaceWindow.xaml`](Workspace1C/Views/ConnectionReplaceWindow.xaml), [`PlatformChangeViewModel.cs`](Workspace1C/ViewModels/PlatformChangeViewModel.cs) (новый), [`PlatformChangeWindow.xaml`](Workspace1C/Views/PlatformChangeWindow.xaml) (новый), [`MainWindow.ContextMenu.cs`](Workspace1C/Views/MainWindow.ContextMenu.cs), локализация ru/en.\n\nДобавлены юнит-тесты `PlatformChangeViewModelTests` (+5), обновлены `ConnectionReplaceViewModelTests`, `ConnectionReplaceLocalizationTests`. Реализовано на обеих платформах (WPF и Avalonia).\n\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.68"
+                         },
+                         {
+                             "id":  6372616841,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T19:05:04Z",
+                             "body":  "Окошко отдельное есть\nЗакрытие по ESC бы ещё добавить.\nА можно это как правило добавить, чтобы для всех новых форм применялось ?"
+                         },
+                         {
+                             "id":  6374260284,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T20:38:00Z",
+                             "body":  "Исправлено в версии 1.0.0.69 (Windows и Linux): окно «Сменить платформу» (массовые действия для выделенных баз) теперь закрывается по Esc, как остальные диалоги.\r\n\r\nДля новых диалоговых окон WPF добавлено общее правило — базовый класс [`EscClosableWindow`](Workspace1C/Views/EscClosableWindow.cs): закрытие по Esc без модификаторов в `PreviewKeyDown`; инвариант «сначала подсказка, потом окно» сохраняет глобальный перехватчик [`ToolTipCloser`](Workspace1C/Views/ToolTipCloser.cs). Окно переведено на этот класс ([`PlatformChangeWindow.xaml.cs`](Workspace1C/Views/PlatformChangeWindow.xaml.cs)), кнопке «Отмена» добавлен штатный `IsCancel` ([`PlatformChangeWindow.xaml`](Workspace1C/Views/PlatformChangeWindow.xaml)).\r\n\r\nНа Linux (Avalonia) это правило уже даёт общий [`ModalWindowBase`](Workspace1C/Views/ModalWindowBase.cs), от которого окно наследуется ([`PlatformChangeWindow.Avalonia.cs`](Workspace1C/Views/PlatformChangeWindow.Avalonia.cs)) — правка не требовалась.\r\n\r\nДобавлены юнит-тесты `Issue54EscapeCloseTests` (наследование WPF, разметка `IsCancel`, Avalonia-наследование, подписка `PreviewKeyDown`).\r\n\r\nРеализовано на обеих платформах."
+                         },
+                         {
+                             "id":  6381325833,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-24T07:14:29Z",
+                             "body":  "Отлично. Решение за автором"
+                         }
+                     ]
+    },
+    {
+        "number":  53,
+        "title":  "Перемещать выбранную базу в группу через контекстное меню",
+        "body":  "Предлагаю добавить возможность перемещения выбранной базы (или нескольких) в группу через контекстное меню в списке баз. Да, это можно сделать через `Изменить настройки`, но получается дольше и для одной базы.\n\nPS: Нашёл такой пункт для выделенных баз, но когда их больше одной...",
+        "comments":  [
+                         {
+                             "id":  6362762004,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T10:23:54Z",
+                             "body":  "Может быть иначе поступить?\nНажатие с контролом контекстного меню - добавляет менюшку \"Для выделенных\" и для одной базы\nЕсть ли смысл видимости этого меню на постоянной основе, если всё таки для одного элемента каждое из действий можно сделать в окне правки базы ?\nЭто как предложение"
+                         },
+                         {
+                             "id":  6362879494,
+                             "author":  "ArtyoZ",
+                             "createdAt":  "2026-10-23T10:30:57Z",
+                             "body":  "Мне кажется, любые дополнительные действия (в данном случае, нажатие `Ctrl`) сводят на нет всю выгоду. Я же предложил это для ускорения и упрощения. И кстати, не вижу ничего плохого в том, что данный пункт меню будет виден и для одной выделенной базы. Он же так и называется `Для выделенных`, одна база ведь тоже выделенная..."
+                         },
+                         {
+                             "id":  6362920735,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T10:33:27Z",
+                             "body":  "Да - логично."
+                         },
+                         {
+                             "id":  6365890200,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T13:22:37Z",
+                             "body":  "Исправлено в версии 1.0.0.66 (Windows и Linux): пункт «Для выделенных» контекстного меню базы в списке теперь виден и для одной выделенной базы — без нажатия Ctrl (ранее — только при выделении нескольких баз).\r\n\r\nПри правом клике по базе блок «Для выделенных» (включая «Переместить в группу» и остальные массовые команды) показывается и работает по выделенной базе; мультивыделение по-прежнему имеет приоритет.\r\n\r\nДобавлена единая логика `BatchSelectionHelper.EffectiveBatchCount` ([`BatchSelectionHelper.cs`](Workspace1C/Services/BatchSelectionHelper.cs)); команды меню и подключения обновлены ([`MainViewModel.BatchCommands.cs`](Workspace1C/ViewModels/MainViewModel.BatchCommands.cs), [`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs)). WPF + Avalonia.\r\n\r\nДобавлены юнит-тесты `BatchSelectionHelperTests` (+4: только одна выделенная база, приоритет набора и др.).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.66"
+                         },
+                         {
+                             "id":  6372852667,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T19:18:21Z",
+                             "body":  "Да - теперь \"Для выделенных\" и для одной базы показывается"
+                         }
+                     ]
+    },
+    {
+        "number":  52,
+        "title":  "Запоминать выбранную вкладку Все / Избранное / Недавние / Запущенные",
+        "body":  "Предлагаю добавить запоминание выбранной вкладки `Все` / `Избранное` / `Недавние` / `Запущенные`. Например, мне было бы удобнее, если приложение при запуске переключалось бы на вкладку `Избранное`. Можно запоминать автоматически или указывать где-то в настройках.",
+        "comments":  [
+                         {
+                             "id":  6363111857,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T10:45:04Z",
+                             "body":  "Если будет опция, то просьба кое-что сделать будет.\nЕсли опция выключена - то при закрытии и потом открытии - запуск по-умолчанию - в списке баз.\nНо если закрытие произошло по причине автообновления программы - то вкладку запоминать насильно и после перезапуска восстанавливать."
+                         },
+                         {
+                             "id":  6365879975,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T13:22:07Z",
+                             "body":  "Исправлено в версии 1.0.0.66 (Windows и Linux): выбранная вкладка списка баз (Все/Избранное/Недавние/Запущенные) теперь автоматически запоминается и восстанавливается при следующем запуске приложения — отдельная галочка в настройках не требуется.\r\n\r\nДобавлено поле `AppSettings.ListMode` ([`AppSettings.cs`](Workspace1C/Models/AppSettings.cs), [`ListViewMode.cs`](Workspace1C/Models/ListViewMode.cs)); режим хранится канонической строкой в `settings.json` (не зависит от локали). Старые флаги настроек `ShowFavoritesOnly`/`ShowRunningOnly` автоматически мигрируют в единый режим при загрузке (`AppSettings.NormalizeListMode`).\r\n\r\nРеализовано на обеих платформах (WPF и Avalonia).\r\n\r\nДобавлены юнит-тесты `AppSettingsListModeTests` (25 шт.).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.66"
+                         },
+                         {
+                             "id":  6372835590,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T19:17:24Z",
+                             "body":  "Сохраняет"
+                         }
+                     ]
+    },
+    {
+        "number":  41,
+        "title":  "Миграция баз",
+        "body":  "В виду предстоящей многим операции перехода на 8.5.1 с 8.3.х - появилась необходимость переноса баз из одного кластера в другой.\nДумаю у многих это будет выглядеть так : подняли рядом на другом порту новый сервер и потихоньку туда базы перетаскивать.\nИ если одну две - можно и руками перенести (добавить в новом, а в старом удалить просто из кластера) - то в конце это будет массовая операция и надо подготовиться.\n\nЧтоб не делать копию на 90% подходящего уже работающего инструмента - предлагается следующее:\n\n1. Берём \"Импорт из кластера 1С\"\n2. Надпись под \"Сервер 1С\" сокращаем до \"Адрес, порт, логин и пароль берутся из записи справочника \"Серверы 1С\".  Остальное похоже больше на атавизм.\n3. После кнопки \"Импортировать\" добавляем кнопку \"Мигрировать\", можно таким же цветом и со стрелочкой, но вправо. Кнопка должна быть так же рядом с Импортировать, как рядом кнопки \"Выделить все\" и \"Снять все\".\n4. Кнопку \"Закрыть\" отодвинуть больше - сделать расстояние, как между \"Снять все\" и \"Импортировать\" и сделать красным шрифт и иконку (или подсветку красную.\n5. По кнопке \"Мигрировать\", если выбрана хоть одна база - открывается диалог. В диалоге выбираем и списка новый Сервер 1С и его Кластер. Если можно не показывать в списке выбора сервер, который выбран в форме импорта. Ниже ещё раз напоминание про количество баз к переносу и 2 поля: Пользователь СУБД и Пароль СУБД (для добавления в новый кластер)\nНиже галочка \"Не удалять в старом\" (иногда надо копию в другой кластер сделать - будет помощник).\nНиже 2 кнопки  : Перенести и Отмена.\nПо перенести для каждой выделенной базы: \n- сначала добавляем базу с тем же данными, что в старом кластере - в новый кластер, \n- если не отмечена галка \"Не удалять в старом\" - из старого удаляем без удаления файла\nЕсли можно - показывать фоново - какую базу обрабатывает и счетчик типа \"1 из 10\".\nПо окончании - если ошибок не было:\n- надо спросить \"Хотите заменить строку подключения ?\" и если пользователь ответил ДА - произвести замену сервера и порта в отмеченных базах, если они есть в списке баз. \nЕсли стояла галка \"Не удалять\" - тогда вопрос должен звучать \"Добавить копии в список ?\" и если Да - вместо замены подключений должны выполнить добавление баз в список , как при импорте в основном окне.\n- диалог закрывается и в окне импорта обновляется список баз.\n6. В окне \"Серверы 1С\" кнопку под базами \"Импорт\" можно переименовать \"Импорт \\ Миграция\"\n7. Возможно и пункт меню в Операции переименовать в \"Импорт \\ миграция из кластера 1С...\"",
+        "comments":  [
+                         {
+                             "id":  6340102170,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-22T11:54:28Z",
+                             "body":  "Исправлено в версии 1.0.0.51 (Windows и Linux): миграция баз между кластерами 1С.\r\n\r\nЧто реализовано по пунктам описания:\r\n\r\n1. **Кнопка «Мигрировать»** — в окне «Импорт из кластера 1С» появилась после «Импортировать» (тот же цвет, со стрелкой вправо; рядом, как «Выделить все» и «Снять все»). Подпись под «Сервер 1С» сокращена, кнопка «Закрыть» отодвинута дальше и получила красную подсветку.\r\n2. **Диалог миграции**: выбор сервера 1С назначения из справочника «Серверы 1С» (сервер-источник в списке не показывается) и его кластера (единственный — автовыбор), напоминание о количестве баз, поля «Пользователь СУБД» и «Пароль СУБД» (rac пароль СУБД не возвращает — вводятся для нового кластера), галочка «Не удалять в старом» (копия в другой кластер без удаления) и кнопки «Перенести»/«Отмена».\r\n3. **Перенос** по «Перенести» для каждой базы: сначала `infobase create` в новом кластере с теми же данными, что в старом (имя, описание, СУБД, сервер и имя БД, локаль, уровень безопасности + учётные данные СУБД), затем — если «Не удалять в старом» не отмечено — `infobase drop` из старого кластера **без** удаления БД на сервере СУБД (`--drop-database` не передаётся). Фоном показывается текущий прогресс «N из M: база».\r\n4. **После успешного переноса**: вопрос «Хотите заменить строку подключения?» — при ответе «Да» сервер и порт заменяются в отмеченных базах, если такие есть в списке приложения (совпадение по имени Ref, только клиент-серверные); окно импорта обновляет список баз кластера-источника.\r\n5. **Переименования**: кнопка «Импорт» под базами в окне «Серверы 1С» → «Импорт \\ Миграция»; пункт меню «Операции» → «Импорт \\ миграция из кластера 1С…».\r\n6. **Совместимость rac 8.3.x и 8.5.x**: используются существующие вызовы «cluster list», «infobase summary list», «infobase create/drop» (перебор форматов идентификатора кластера для 8.5.x — уже в RacClient). Добавлены юнит-тесты миграции (26 шт.; полный набор тестов 3770 — зелёные).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.51\r\n"
+                         },
+                         {
+                             "id":  6340456850,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-22T12:13:40Z",
+                             "body":  "Какая-то внутренняя проверка мешает нажать кнопку Мигрировать\nПодозреваю кнопки меняют доступность одновременно\nЕсли для Импортировать наличие уже существующей базы - это нормальная причина для отказа в доступности\nТо для миграции проверки не нужны.\nПроверять мы сможем только, когда выберем КУДА мигрировать.\nВот там уже надо будет на ходу проверять, что такая база в приемнике уже есть.\nБез доступной кнопки - пока проверить дальше нечего"
+                         },
+                         {
+                             "id":  6348521563,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-22T18:43:13Z",
+                             "body":  "@_issue41_comment_v10052.md"
+                         },
+                         {
+                             "id":  6348964760,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-22T19:05:20Z",
+                             "body":  "\u003cimg width=\"771\" height=\"536\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/a62ac0ba-67a3-4386-a2f9-df3414e73660\" /\u003e\n\nХотелось бы, наверное, чтобы если кнопка не активна - чуть выше была описана причина такого поведения.\nЕсли это не ошибка, конечно"
+                         },
+                         {
+                             "id":  6349013687,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-22T19:07:36Z",
+                             "body":  "Открываемый Импорт, а после него Окно миграции - похоже не совсем модальные\nЕсли в переключении окон выбрать открытое \"Серверы 1С\" - то оно выделяется, но сделать с ним ничего нельзя, так как указанные выше 2 окна вроде как и модальные, но они за окном \"Серверы 1С\" оказались каким-то образом.\nПомогает только нажатие ESC"
+                         },
+                         {
+                             "id":  6352167575,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-22T21:55:09Z",
+                             "body":  "Исправлено в версии **1.0.0.53** (Windows и Linux):\r\n\r\n- Окна «Импорт из кластера 1С» и «Миграция баз» теперь всегда поверх окна «Серверы 1С»: владельцем модального окна назначается активное видимое окно приложения (при открытии из монитора — само окно «Серверы 1С»), запасной вариант — главное окно. Раньше владельцем жёстко было главное окно, которое в момент вызова уже отключено модальным циклом «Серверы 1С», из-за чего окна импорта/миграции могли оказаться за окном серверов, а само серверное окно «выделялось», но было неактивно (помогал только Esc).\r\n- Цепочка «Импорт → Миграция» (владелец — окно импорта) сохранена.\r\n- Добавлен `WindowOwnerResolver` (Windows, WPF) и юнит-тесты `WindowOwnerResolverTests` (5 шт.).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.53\r\n"
+                         },
+                         {
+                             "id":  6357749538,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T04:58:33Z",
+                             "body":  "Окошки - ок\n\nВозвращаемся к неактивной кнопке Мигрировать (https://github.com/sivatorov/Workspace1C/issues/41#issuecomment-6348964760)"
+                         },
+                         {
+                             "id":  6359171850,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T06:45:19Z",
+                             "body":  "Исправлено в версии **1.0.0.61** (Windows и Linux) — по неактивной кнопке «Мигрировать»:\n\n- Причина: базы, которые уже есть в списке приложения, по умолчанию не отмечены, а «Выделить все» отмечала только **новые** базы. Если все базы кластера уже добавлены в список — отмеченных не оставалось, и «Мигрировать» была недоступна.\n- Теперь **«Выделить все» отмечает все базы кластера**, включая уже добавленные (импорт по-прежнему добавляет только новые, сводка «Будет добавлено баз» считает только их). Проверка «база уже есть в приёмнике» — по-прежнему в диалоге миграции после выбора кластера назначения.\n- **Над кнопками выводится причина недоступности**: «подключитесь и загрузите список баз»; «не отмечено ни одной базы (базы, которые уже есть в списке, по умолчанию не отмечены)»; «Импортировать недоступна: все отмеченные базы уже есть в списке — Мигрировать перенесёт их в другой кластер». Когда обе кнопки доступны — подсказка скрыта.\n- Добавлены юнит-тесты (+2 в `ClusterImportViewModelTests`).\n\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.62\n\n\n---\n_Generated by [Claude Code](https://claude.ai/code)_"
+                         },
+                         {
+                             "id":  6361012689,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T08:41:47Z",
+                             "body":  "Что-то пошло совсем не туда.\nПохоже мы в одной форме не уживёмся без коллизий постоянных.\n\nПопробуем иначе.\nУдалить в подсказке надпись \"Остальное похоже больше на атавизм\".\nУдаляем в этой форме кнопку Мигрировать и диалог, который она открывала.\nВозвращаем логику \"Выделить все\" на место - было корректно - выделяло нужные - для Импорта нужные.\n\nИмпорт оставим импортом\n\nВ окне Серверы 1С делим кнопку \"Импорт \\ Миграция\" на 2 отдельные кнопки \"Импорт\" и \"Миграция\", которые будут вызывать разные диалоги (см. ниже).\nКнопка импорта в Утилиты возвращает своё названия \"Импорт из кластера 1С\"\n\nМиграцию делаем отдельным окном\nНовое окно и команда в Утилиты - \"Миграция между кластерами 1С\" \nБез хоткея - это не частая операция.\n\nТакая же раскладка окна, как у Импорт из кластера\nКолонка \"Статус\" меняет название на \"Статус источника\" \nНовая колонка \"Статус приемника\"\n\"Загружено баз\" перемещаем под \"Кластер\"\n3 строки: \"Сервер 1С\" с Подключиться и Кластер с Получить базы и Загружено баз - выделить в группу с заголовком \"Источник\", чтобы видно было, что все элементы в этой группе.\nСправа делаем такую группу же \"Приемник\" - я такими же полями - но тут мы будем выбирать Сервер-приёмник и его кластер - так же с автовыбором.\nСервера не должны пересекаться - возможно просто проверять, но в списке не удалять, чтобы потом не было сложно вернуть обратно при выборе другого, хотя именно такой вариант был бы проще для понимания.\nКнопка \"Получить базы\" для приемника меняет название и суть. Название \"Получить статусы\". По нажатию - если загружены базы и из источника - проставляет статусы приемника - \"Есть в кластере\" или пустая строка - смотря есть ли база в сервере приемнике (по совпадению имени).\n\nПростановка галочек\nПосле получения базы источника - ставим ВСЕ галки.\nПосле получения статусов приемника - оставляем галки только там, где базы нет в приемнике.\n\nВот теперь доступность кнопки Мигрировать можно менять после изменения галочек.\nЕсли для отмеченной строки статус приемника \"Есть в кластере\" - то кнопка не доступна.\n\nрядом с \"Создавать группу по имени кластера\" в той же сторке появится галочка \"Не удалять в старом кластере (копия без удаления)\"\n\nНиже в одну линию выносим логин и пароль СУДБ (как в отдельном окне миграции было)\n\nКнопка Импортировать тут не нужна - она осталась в старом инструменте.\nНу и по кнопке \"Мигрировать\" произойдёт то, что должно было происходить в отдельном диалоге раньше, когда форма была 2 в одном - копирование базы в приемник и удаление, если удалось скопировать и если не стоит галка \"Не удалять\".\n\nБазы добавляются в новую группу, как в Импорте, но имя кластера берём из приемника."
+                         },
+                         {
+                             "id":  6365915901,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T13:23:58Z",
+                             "body":  "Исправлено в версии 1.0.0.66 (Windows и Linux) — переработка по вашему предложению:\r\n\r\n- форма «Импорт из кластера 1С» возвращена к исходному виду: кнопка «Мигрировать» и её диалог удалены, «Выделить все» снова отмечает только импортируемые базы, подсказка про «атавизм» убрана ([`ClusterImportViewModel.cs`](Workspace1C/ViewModels/ClusterImportViewModel.cs), [`ClusterImportWindow.xaml`](Workspace1C/Views/ClusterImportWindow.xaml));\r\n- в окне «Серверы 1С» кнопка «Импорт \\ Миграция» разделена на две: «Импорт» и «Миграция» ([`ServerMonitorWindow.xaml`](Workspace1C/Views/ServerMonitorWindow.xaml), [`ServerMonitorWindow.Avalonia.cs`](Workspace1C/Views/ServerMonitorWindow.Avalonia.cs));\r\n- команда в «Утилитах» снова называется «Импорт из кластера 1С»; добавлена новая команда «Миграция между кластерами 1С» (без хоткея) ([`UtilitiesMenuCatalog.cs`](Workspace1C/Services/UtilitiesMenuCatalog.cs));\r\n- новое отдельное окно миграции с раскладкой «Источник»/«Приёмник»: сервер 1С (с «Подключиться»), кластер («Получить базы»), «Загружено баз» под «Кластер»; колонки «Статус источника»/«Статус приёмника»; серверы источника и приёмника проверяются на совпадение, но из списков не удаляются ([`ClusterMigrationViewModel.cs`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs), [`ClusterMigrationRow.cs`](Workspace1C/ViewModels/ClusterMigrationRow.cs), [`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml), [`ClusterMigrationWindow.Avalonia.cs`](Workspace1C/Views/ClusterMigrationWindow.Avalonia.cs));\r\n- кнопка «Получить статусы» у приёмника проставляет «Есть в кластере»/пусто по совпадению имени базы; после загрузки баз источника ставятся все галочки, после получения статусов — только для баз, которых нет в приёмнике; кнопка «Мигрировать» недоступна, если отмечена строка со статусом «Есть в кластере»;\r\n- добавлена галочка «Не удалять в старом кластере (копия без удаления)» рядом с «Создавать группу по имени кластера»; логин и пароль СУБД — в одну линию;\r\n- по «Мигрировать» база копируется в приёмник и удаляется из источника, если копирование успешно и не стоит «Не удалять»; перенесённые базы добавляются в новую группу (имя кластера — приёмник), при желании заменяются строки подключения.\r\n\r\nРеализовано на обеих платформах (WPF и Avalonia). Юнит-тесты: `ClusterMigrationViewModelTests` (переписаны), `ClusterImportViewModelTests`, `UtilitiesMenuLayoutTests` (+1).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.66"
+                         },
+                         {
+                             "id":  6366640169,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T14:00:06Z",
+                             "body":  "\u003cimg width=\"331\" height=\"65\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/1a648efd-3b74-4948-83ab-cf560b41b3d1\" /\u003e\n\nСделать кнопки растягиваемыми - чтобы они с учетом отступа между ними поделили ширину колонки между собой пополам.\n\n\n\u003cimg width=\"748\" height=\"553\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/0a12fcf0-f626-46fa-9eee-52f1c21b814b\" /\u003e\n\nСервер источника не подставился в поле, хотя само подключение отработало и кластер тоже подставило.\n\nНе нахожу информацию, как в миграции - сколько я выделил и сколько будет импортировано.\nдумал после подключения к приемнику только покажет, но после подключения итогов не появилось\n\nПо кнопке Мигрировать вот такая ошибка\n\n\u003cimg width=\"908\" height=\"192\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/3f2f2049-a9e8-4486-aeea-6384c79b7a0a\" /\u003e\n\n2026-10-23 16:59:15.288 [ERROR] Ошибка миграции баз между кластерами 1С | InvalidOperationException: Вызывающий поток не может получить доступ к данному объекту, так как владельцем этого объекта является другой поток.\n"
+                         },
+                         {
+                             "id":  6370351032,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T17:04:32Z",
+                             "body":  "Исправлено в версии 1.0.0.68 (Windows и Linux) — по вашим замечаниям:\n\n1. Кнопки «Импорт» и «Миграция» в окне «Серверы 1С» стали растягиваемыми: с учётом отступа между ними делят ширину колонки пополам.\n2. Сервер источника/приёмника теперь подставляется в поле при выборе сервера (ComboBox с двусторонней привязкой) — раньше подставлялся только кластер.\n3. В окне миграции добавлена сводка «Выделено: N из M · будет перенесено: N» (обновляется при изменении галочек, с подсказкой про «Есть в кластере»).\n4. Устранена ошибка «InvalidOperationException: Вызывающий поток не может получить доступ к данному объекту» при запуске миграции — прогресс и финальный результат доставляются на UI-поток (`Dispatch`).\n\nИзменённые файлы: [`ServerMonitorWindow.xaml`](Workspace1C/Views/ServerMonitorWindow.xaml), [`ClusterMigrationViewModel.cs`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs), [`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml), ключи локализации.\n\nДобавлены юнит-тесты `ClusterMigrationViewModelTests` (+5) и новый `Issue41WindowLayoutTests` (+3). Реализовано на обеих платформах (WPF и Avalonia).\n\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.68"
+                         },
+                         {
+                             "id":  6372747726,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-23T19:12:27Z",
+                             "body":  "При запуске Миграции из Серверы 1С - текущий сервер, как в Импорте - не подставляется, хотя его кластер подставлен.\n\n\u003cimg width=\"727\" height=\"442\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/4f33e586-f5a1-45a1-afe2-fdc48844759b\" /\u003e\n\nСтранная ошибка\n\n\u003cimg width=\"447\" height=\"146\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/6ca49b89-45c0-47ed-b7e0-564b3fe66439\" /\u003e\n\nПо идее СУБД должна быть та же, но если этого требует создание базы - то наверное надо выносить это на форму (выше пользователя). Возможно нужны Тип субд и Сервер СУБД (можно в одну строку выше пользователя и пароля расположить)"
+                         },
+                         {
+                             "id":  6374260643,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-23T20:38:01Z",
+                             "body":  "Исправлено в версии 1.0.0.69 (Windows и Linux):\r\n\r\n1. При запуске миграции из окна «Серверы 1С» текущий сервер теперь подставляется в поле «Сервер 1С» источника — как в «Импорте»: выбранный сервер сопоставляется с записями справочника по идентификатору, а не по ссылке объекта ([`ClusterMigrationViewModel.SetInitialSource`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs), [`ClusterMigrationWindow.xaml.cs`](Workspace1C/Views/ClusterMigrationWindow.xaml.cs), [`ClusterMigrationWindow.Avalonia.cs`](Workspace1C/Views/ClusterMigrationWindow.Avalonia.cs)).\r\n\r\n2. На форму миграции вынесены поля **«Тип СУБД»** (ComboBox со значениями rac) и **«Сервер СУБД»** — одной строкой выше логина/пароля ([`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml), [`ClusterMigrationWindow.axaml`](Workspace1C/Views/ClusterMigrationWindow.axaml)). Они автозаполняются из первой загруженной базы источника (тип нормализуется регистронезависимо) и передаются в rac при создании базы в кластере-приёмнике с приоритетом над данными источника ([`ClusterMigrationService.BuildCreateRequest`](Workspace1C/Services/ClusterMigrationService.cs)) — миграция корректно работает, когда кластеры используют разный сервер СУБД (прежняя «странная ошибка» создания базы устранена).\r\n\r\nДобавлены юнит-тесты: `ClusterMigrationViewModelTests` (автоподстановка сервера, автозаполнение полей СУБД, передача в запрос создания), `ClusterMigrationServiceTests` (приоритет значений формы над данными источника), `Issue41WindowLayoutTests` (разметка полей).\r\n\r\nРеализовано на обеих платформах."
+                         },
+                         {
+                             "id":  6381401621,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-24T07:22:49Z",
+                             "body":  "\u003cimg width=\"1021\" height=\"271\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/a1771460-4594-455b-9669-cf230675ad37\" /\u003e\n\n2026-10-24 10:18:42.480 [ERROR] Ошибка миграции баз между кластерами 1С | ArgumentException: Не указано имя базы данных. (Parameter \u0027request\u0027)\n\nВот тут не знаю чем помочь.\nПо идее у нас всё есть.\n"
+                         },
+                         {
+                             "id":  6381956736,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-24T08:23:23Z",
+                             "body":  "Исправлено в версии 1.0.0.70 (Windows и Linux): на форму миграции добавлено поле **«Имя БД»** (db-name) — в группе с «Тип СУБД»/«Сервер СУБД», выше логина/пароля ([`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml), [`ClusterMigrationWindow.axaml`](Workspace1C/Views/ClusterMigrationWindow.axaml); привязка Avalonia — [`ClusterMigrationWindow.Avalonia.cs`](Workspace1C/Views/ClusterMigrationWindow.Avalonia.cs)).\r\n\r\nПоле автозаполняется из первой загруженной базы источника ([`ApplySourceBases`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs)) и не перезаписывается после ручного изменения (флаг touched — как у полей СУБД). При создании базы в кластере-приёмнике значение формы используется только для баз, где rac не вернул db-name (остальные переносятся со своими именами) — fallback-приоритет источника ([`ClusterMigrationService.BuildCreateRequest`](Workspace1C/Services/ClusterMigrationService.cs)).\r\n\r\nЕсли имя БД так и не указано — вместо прежней непонятной ошибки «ArgumentException: Не указано имя базы данных» показывается сообщение с именем базы и подсказкой заполнить поле; для такой базы вызов rac не производится, валидация выполняется до создания ([`MigrateAsync`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs)). Текст сообщения и подпись поля локализованы (ru/en: `ClusterMigration.DbName`, `ClusterMigration.Error.DbNameEmptyFormat`).\r\n\r\nДобавлены юнит-тесты: `ClusterMigrationServiceTests` (fallback db-name — значение формы при пустом имени источника и приоритет источника), `ClusterMigrationViewModelTests` (автозаполнение из первой базы, сохранение ручного ввода, передача значения в запрос создания, понятная ошибка без вызова rac), `Issue41WindowLayoutTests` (разметка поля на обеих платформах).\r\n\r\nРеализовано на обеих платформах."
+                         },
+                         {
+                             "id":  6382284972,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-24T09:00:33Z",
+                             "body":  "Просьба разместить надпись о количестве выделенных и кнопки выделения сразу под списком , над галочками.\nТяжело глазами бегать вниз и мышкой тоже.\n\nПо полю \"имя БД\" вообще не понял смысла.\nКак использовать ОДНО поле для СПИСКА БАЗ ?\nЭто поле для каждой базы нужно, так что на форме оно бессмысленно - удаляем.\nИ это поле для СУЩЕСТВУЮЩЕЙ базы (а именно такие мы и мигрируем) заполнено, оно не может быть не заполнено.\nИ оно должно было мигрировать в новый кластер без изменения - само."
+                         },
+                         {
+                             "id":  6394673635,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T07:03:46Z",
+                             "body":  "Исправлено в версии 1.0.0.71 (Windows и Linux) по замечаниям из комментария: (1) поле **«Имя БД»** убрано с формы миграции (добавлялось в 1.0.0.70) — [`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml) и [`ClusterMigrationWindow.axaml`](Workspace1C/Views/ClusterMigrationWindow.axaml); из VM удалены свойство `DbName`, автозаполнение из первой базы и значение поля из запроса ([`ClusterMigrationViewModel.cs`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs)); (2) имя БД переносится **автоматически** из источника: [`ClusterMigrationService.BuildCreateRequest`](Workspace1C/Services/ClusterMigrationService.cs) — приоритет у `DbName` базы из «infobase summary list»; если rac не вернул db-name (выяснено: отдельные версии rac не выводят колонку/ключ db-name в summary list, см. [`RacOutputParser.ToInfobaseSummaries`](Workspace1C/Services/RacOutputParser.cs)) — используется имя информационной базы (при создании ИБ сервер 1С по умолчанию именует БД в СУБД так же, как ИБ), поэтому fallback работает без лишних запросов; проверка/ошибка `DbNameEmptyFormat` удалена — DbName у запроса всегда непуст (иначе общая ошибка создания); (3) сводка «Выделено: N из M · будет перенесено: N» и кнопки «Выделить все»/«Снять все» перенесены в строку сразу под списком баз, над галочками-опциями ([`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml), [`ClusterMigrationWindow.axaml`](Workspace1C/Views/ClusterMigrationWindow.axaml); Avalonia-хост `BulkHost` — [`ClusterMigrationWindow.Avalonia.cs`](Workspace1C/Views/ClusterMigrationWindow.Avalonia.cs)). Ключи локализации `ClusterMigration.DbName` и `ClusterMigration.Error.DbNameEmptyFormat` удалены из ru/en (не используются).\r\n\r\nДобавлены юнит-тесты: `ClusterMigrationServiceTests` (fallback `db-name` = имя ИБ при пустом имени у rac; приоритет собственного db-name источника; крайний случай пустой записи), `ClusterMigrationViewModelTests` (успешный перенос без поля — в rac уходит имя ИБ, когда rac не вернул db-name; DbName запроса всегда непуст; регресс передачи Dbms/DbServer), `Issue41WindowLayoutTests` (в разметке обеих платформ нет поля «Имя БД», сводка и кнопки выделения расположены над опциями; ключи локализации удалены).\r\n\r\nРеализовано на обеих платформах.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.71"
+                         },
+                         {
+                             "id":  6396141659,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T09:49:16Z",
+                             "body":  "\u003cimg width=\"1072\" height=\"323\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/93164e56-d3dc-465e-99de-fc56fbc46506\" /\u003e\nДумаю и этот параметр можно брать из исходной базы\nЕсли таковой возможности нет, вот только тогда это поле можно добавить на форму, прям после логина и пароля - в той же строке - таким же списком выбора, как при добавлении базы."
+                         },
+                         {
+                             "id":  6398199140,
+                             "author":  "sivatorov",
+                             "createdAt":  "2026-10-25T13:24:07Z",
+                             "body":  "Исправлено в версии 1.0.0.72 (Windows и Linux) по замечанию из последнего комментария: параметр создания ИБ в новом кластере теперь берётся из исходной базы автоматически.\r\n\r\nВ раб «infobase summary list» передаётся пользователь СУБД (db-user), поэтому [`ClusterMigrationService.BuildCreateRequest`](Workspace1C/Services/ClusterMigrationService.cs) использует его с приоритетом (`DbUser = FirstNonEmpty(source.DbUser, dbUser)`); значение из диалога миграции — только fallback для баз, где rac db-user не отдал. Пароль СУБД rac по-прежнему не возвращает — он приходит только из диалога (поле на форме не добавлялось, как и в 1.0.0.71).\r\n\r\nДобавлены юнит-тесты: `ClusterMigrationServiceTests` (приоритет db-user источника, fallback на диалог, пароль всегда из формы).\r\n\r\nРеализовано на обеих платформах.\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72"
+                         },
+                         {
+                             "id":  6398855427,
+                             "author":  "7OH",
+                             "createdAt":  "2026-10-25T14:26:17Z",
+                             "body":  "Поле с локальлю на поле не замечено\nА ошибка пока всё та же\n\n\u003cimg width=\"1113\" height=\"267\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/53e1b555-8b49-4c76-9989-2ba3c9277e6f\" /\u003e\n"
+                         }
+                     ]
+    }
+]

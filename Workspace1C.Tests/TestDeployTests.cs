@@ -240,6 +240,116 @@ public sealed class TestDeployTests
         Assert.Contains("TestDeploy.EnterDbDetails", errors);
     }
 
+    // ---------- Пред-валидация профиля СУБД (issue #79, 1.0.1.7) ----------
+
+    private static Infobase ServerBase(string name) => new()
+    {
+        Id = Guid.NewGuid().ToString("N"),
+        Name = name,
+        PlatformVersion = "8.3.27",
+        Connection = new ConnectionSettings
+        {
+            Type = ConnectionType.ClientServer,
+            Server = "srv-1c",
+            DatabaseName = name + "_db"
+        }
+    };
+
+    [Fact]
+    public void Validate_IbcmdEngine_ServerSourceWithoutDbmsProfile_ReturnsErrorBeforeStart()
+    {
+        // Репорт 7OH «заполните профиль»: клиент-серверная база + движок ibcmd без
+        // профиля СУБД — ошибка должна приходить ДО старта операций (валидация),
+        // а не на шаге «Выгрузка».
+        var source = ServerBase("УТ");
+        var scenario = new TestDeployScenario
+        {
+            TargetName = "Тест: УТ",
+            TargetMode = TestDeployTargetMode.File,
+            FilePath = @"C:\bases\Тест",
+            DumpEngine = BackupEngine.Ibcmd
+        };
+
+        var errors = TestDeployPlanner.Validate(scenario, source, null, _ => null);
+
+        Assert.Contains("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_IbcmdEngine_ServerSourceWithDbmsProfile_Passes()
+    {
+        var source = ServerBase("УТ");
+        var scenario = new TestDeployScenario
+        {
+            TargetName = "Тест: УТ",
+            TargetMode = TestDeployTargetMode.File,
+            FilePath = @"C:\bases\Тест",
+            DumpEngine = BackupEngine.Ibcmd
+        };
+        var profile = new DbmsBackupProfile { Host = "pg", Database = "ut_db" };
+
+        var errors = TestDeployPlanner.Validate(scenario, source, null, _ => profile);
+
+        Assert.DoesNotContain("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_IbcmdEngine_ProfileWithoutDatabase_TreatedAsMissing()
+    {
+        // Профиль есть, но база данных СУБД не заполнена — ibcmd подключиться не сможет.
+        var source = ServerBase("УТ");
+        var scenario = new TestDeployScenario
+        {
+            TargetName = "Тест: УТ",
+            TargetMode = TestDeployTargetMode.File,
+            FilePath = @"C:\bases\Тест",
+            DumpEngine = BackupEngine.Ibcmd
+        };
+        var profile = new DbmsBackupProfile { Host = "pg", Database = " " };
+
+        var errors = TestDeployPlanner.Validate(scenario, source, null, _ => profile);
+
+        Assert.Contains("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_IbcmdEngine_FileSource_DoesNotRequireDbmsProfile()
+    {
+        // Файловая база выгружается через --db-path — профиль СУБД не нужен.
+        var source = Base("УТ");
+        source.PlatformVersion = "8.3.27";
+        var scenario = new TestDeployScenario
+        {
+            TargetName = "Тест: УТ",
+            TargetMode = TestDeployTargetMode.File,
+            FilePath = @"C:\bases\Тест",
+            DumpEngine = BackupEngine.Ibcmd
+        };
+
+        var errors = TestDeployPlanner.Validate(scenario, source, null, _ => null);
+
+        Assert.DoesNotContain("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_DesignerEngine_ServerSource_DoesNotRequireDbmsProfile()
+    {
+        // Движок «Конфигуратор» (DesignerBatch) выгружает без профиля СУБД — требование
+        // применяется только к ibcmd.
+        var source = ServerBase("УТ");
+        var scenario = new TestDeployScenario
+        {
+            TargetName = "Тест: УТ",
+            TargetMode = TestDeployTargetMode.File,
+            FilePath = @"C:\bases\Тест",
+            DumpEngine = BackupEngine.Designer
+        };
+
+        var errors = TestDeployPlanner.Validate(scenario, source, null, _ => null);
+
+        Assert.DoesNotContain("TestDeploy.NeedDbmsProfile", errors);
+    }
+
     [Fact]
     public void Validate_ExistingCopyWithoutUpdateEnabled_BlocksRun()
     {

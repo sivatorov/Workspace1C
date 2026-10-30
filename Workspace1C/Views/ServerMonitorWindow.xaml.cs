@@ -498,11 +498,13 @@ namespace Workspace1C
         /// (<see cref="AttachGridColumnDrag"/>), И презентером заголовков («второй пояс»,
         /// <see cref="AttachHeaderWidthTracking"/>) — дедупликация подписок наборами.
         /// <para>
-        /// Зона границы — правые ~24 px заголовка (<see cref="HeaderResizeHotZone"/>) + выступ
-        /// за правый край до 8 px (клик может прийти на Thumb-ручку, выступающую за край);
-        /// если источник клика — сама штатная ручка (Thumb PART_RightHeaderGripper), на
-        /// координаты не полагаемся — это гарантированная граница (issue #75, этап
-        /// диагностики: «клик в зоне 24 px мог не распознаться»).
+        /// issue #75 (репорт 7OH от 2026-10-30): граница определяется ПО КООРДИНАТЕ X клика
+        /// относительно грида — чистой функцией
+        /// <see cref="ServerMonitorColumnWidthsStore.ResolveDragBoundary"/> (ближайшая
+        /// граница колонок в допуске ±<see cref="HeaderResizeHotZone"/>/2): клик по выступу
+        /// ручки/левой кромке заголовка B — это граница A|B (index=A), а не B|C; клик в
+        /// центре заголовка драг не стартует. Thumb-ручка — гарантированный жест границы,
+        /// её индекс тоже подтверждается координатой.
         /// </para>
         /// </summary>
         private void OnColumnPreviewMouseLeftButtonDown(DataGrid grid, string tabKey, MouseButtonEventArgs e)
@@ -515,21 +517,58 @@ namespace Workspace1C
                 : FindAncestor<System.Windows.Controls.Primitives.DataGridColumnHeader>(source);
             if (header is null || header.Column is null)
                 return; // клик не по заголовку (ячейка, скроллбар и т.п.) — не трогаем
-            var columnIndex = grid.Columns.IndexOf(header.Column);
-            if (columnIndex < 0 || columnIndex >= grid.Columns.Count)
+            var headerIndex = grid.Columns.IndexOf(header.Column);
+            if (headerIndex < 0 || headerIndex >= grid.Columns.Count)
                 return;
-            // Штатная ручка ресайза — гарантированная граница, координаты не нужны.
-            if (FindAncestor<System.Windows.Controls.Primitives.Thumb>(source) is not null)
+
+            // issue #75 (репорт 7OH от 2026-10-30): индекс границы определяем ПО КООРДИНАТЕ
+            // X клика относительно грида (ближайшая граница колонок), а не по заголовку под
+            // курсором: клик по выступу ручки/левой кромке заголовка B — это граница A|B,
+            // а не B|C (off-by-one). Клик в центре заголовка (не у границы) — драг не
+            // стартует (сортировка/без действия).
+            var x = e.GetPosition(grid).X;
+            var widths = grid.Columns.Select(c => c.ActualWidth).ToArray();
+            const double tolerance = HeaderResizeHotZone / 2.0;
+            var boundaryIndex = ServerMonitorColumnWidthsStore.ResolveDragBoundary(widths, x, tolerance);
+
+            // Диагностика (issue #75, усиленная): какая граница/колонка определена и почему —
+            // под гейтом CM_RAC + CM_ON (выключен по умолчанию), первая попытка на вкладку.
+            if (!_columnDragDiagLogged)
             {
-                StartColumnDrag(grid, header, columnIndex, e.GetPosition(grid).X);
-                e.Handled = true;
-                return;
+                Log.Info(LogCategory.Rac,
+                    $"CM_COLUMNS: клик x={Math.Round(x, 1)}, заголовок #{headerIndex} " +
+                    $"(width={Math.Round(header.ActualWidth, 1)}), допуск=±{tolerance}, " +
+                    $"граница={boundaryIndex} " +
+                    (boundaryIndex < 0
+                        ? "— клик дальше допуска от любой границы: драг не стартует."
+                        : $"— ближайшая граница (правый край колонки #{boundaryIndex} = " +
+                          $"{Math.Round(widths.Take(boundaryIndex + 1).Sum(), 1)}), двигается колонка #{boundaryIndex}."));
             }
-            // Зона границы: правые ~24 px заголовка (+ выступ за правый край до 8 px).
-            var x = e.GetPosition(header).X;
-            if (x < header.ActualWidth - HeaderResizeHotZone || x > header.ActualWidth + 8)
-                return;
-            StartColumnDrag(grid, header, columnIndex, e.GetPosition(grid).X);
+
+            if (boundaryIndex < 0)
+                return; // не у границы — не трогаем (поведение «палец» в центре заголовка)
+
+            // Штатная ручка ресайза — гарантированный жест границы; при совпадении
+            // координатной и ручечной колонок запускаем драг, при расхождении доверяем
+            // координате (ручка выступает за край, курсор «двойная стрелка» у стыка).
+            var isThumb = FindAncestor<System.Windows.Controls.Primitives.Thumb>(source) is not null;
+            if (isThumb && boundaryIndex != headerIndex && boundaryIndex != headerIndex - 1)
+            {
+                // Координата не подтвердилась ручкой (редкий случай пересоздания заголовков):
+                // для Thumb-клика берём колонку заголовка как раньше — координата ненадёжна.
+                boundaryIndex = headerIndex;
+            }
+
+            if (!_columnDragDiagLogged)
+            {
+                Log.Info(LogCategory.Rac,
+                    $"CM_COLUMNS: старт перетаскивания границы колонки {boundaryIndex} " +
+                    $"(грид {grid.Name}, источник: {(isThumb ? "Thumb" : "зона по координате")}, " +
+                    $"Ctrl: {Keyboard.Modifiers.HasFlag(ModifierKeys.Control)}).");
+                _columnDragDiagLogged = true;
+            }
+
+            StartColumnDrag(grid, header, boundaryIndex, x);
             e.Handled = true;
         }
 

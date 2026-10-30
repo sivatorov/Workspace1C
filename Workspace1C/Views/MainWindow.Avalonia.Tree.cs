@@ -1989,6 +1989,11 @@ namespace Workspace1C
                     item.Command = _vm!.RepositoryBatchUpdateCommand; break;
                 case UtilitiesMenuCommandKind.RepositoryBrowser:
                     item.Command = _vm!.RepositoryBrowserCommand; break;
+                // Массовые операции по списку баз (issue #91).
+                case UtilitiesMenuCommandKind.BatchDumpDt:
+                    item.Command = _vm!.BatchDumpDtCommand; break;
+                case UtilitiesMenuCommandKind.BatchLoadCf:
+                    item.Command = _vm!.BatchLoadCfCommand; break;
                 case UtilitiesMenuCommandKind.ExportBasesCsv:
                     item.Command = _vm!.ExportBasesCsvCommand; break;
                 case UtilitiesMenuCommandKind.ExportBasesHtml:

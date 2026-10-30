@@ -3,6 +3,29 @@ using Workspace1C.Models;
 namespace Workspace1C.Services;
 
 /// <summary>
+/// Источник разрешённых учётных данных (диагностика CM_BASE_RUN, issue #57, 1.0.1.7):
+/// позволяет по журналу понять, какой шаг резолвера вернул авторизацию запуска —
+/// «не подставляется общая авторизация» диагностируется с первого сообщения.
+/// </summary>
+public enum InfobaseAuthSource
+{
+    /// <summary>Ничего не задано — платформа запросит имя и пароль («Запрос»).</summary>
+    Prompt,
+
+    /// <summary>Раздельная авторизация режима базы (EnterpriseAuth/ConfiguratorAuth).</summary>
+    ModeAuth,
+
+    /// <summary>Авторизация информационной базы (Connection).</summary>
+    InfobaseConnection,
+
+    /// <summary>Общая авторизация режима запуска (CommonEnterpriseAuth/CommonConfiguratorAuth).</summary>
+    CommonMode,
+
+    /// <summary>Прежняя общая авторизация без разделения по режимам (CommonAuthorization, legacy).</summary>
+    CommonLegacy,
+}
+
+/// <summary>
 /// Единый выбор учётных данных информационной базы по режиму (issue #236, #57).
 /// «1С:Предприятие» использует отдельную авторизацию (<see cref="Infobase.EnterpriseAuth"/>),
 /// если она задана; «Конфигуратор» — отдельную авторизацию (<see cref="Infobase.ConfiguratorAuth"/>),
@@ -74,6 +97,107 @@ public static class InfobaseAuthResolver
     }
 
     /// <summary>
+    /// Разрешает режим аутентификации, логин и пароль для заданного режима и возвращает
+    /// ИСТОЧНИК учётных данных (<paramref name="source"/>) — для диагностики CM_BASE_RUN
+    /// (issue #57, 1.0.1.7: «в логах — пусто», какой шаг резолвера сработал — не видно).
+    /// Порядок приоритета совпадает с перегрузкой без источника (см. ниже).
+    /// </summary>
+    public static void Resolve(Infobase infobase, OneCLaunchMode mode,
+        out AuthenticationMode authMode, out string authUser, out string authPassword,
+        InfobaseAuthSettings? commonEnterpriseAuth,
+        InfobaseAuthSettings? commonConfiguratorAuth,
+        InfobaseAuthSettings? legacyCommonAuth,
+        out InfobaseAuthSource source)
+    {
+        // Эффективная общая авторизация режима (шаг 3) вычисляется заранее: она участвует
+        // и в решениях шагов 1–2 (исправления issue #57), и в самом шаге 3.
+        var modeCommonSettings = mode == OneCLaunchMode.Enterprise
+            ? commonEnterpriseAuth
+            : commonConfiguratorAuth;
+        InfobaseAuthSettings? modeCommon =
+            modeCommonSettings is { } mc && !mc.IsDefault ? mc : legacyCommonAuth;
+
+        // Общая авторизация режима содержит явные учётные данные (Credentials).
+        var commonCredentials = modeCommon is { } a && !a.IsDefault
+            && a.AuthenticationMode == AuthenticationMode.Credentials;
+
+        source = InfobaseAuthSource.Prompt;
+
+        // 1) Раздельная авторизация режима. «Дефолтные» настройки (IsDefault — «Запрос»
+        // с пустыми реквизитами) считаются незаданными и переходят к следующим шагам.
+        // Исправление issue #57 (1.0.1.7, репорт 7OH «не подставляет ничего»): раздельная
+        // авторизация режима Windows с пустым пользователем («выключена насильственная
+        // авторизация» в свойствах базы выглядит именно так) не перекрывает явные общие
+        // учётные данные режима Credentials — то же правило, что и для авторизации ОС
+        // базы на шаге 2 (1.0.1.6). Явные Credentials режима/базы по-прежнему высший
+        // приоритет; без общих кредов Windows остаётся (платформа получит /WA+).
+        var modeAuth = mode == OneCLaunchMode.Enterprise
+            ? infobase.EnterpriseAuth
+            : infobase.ConfiguratorAuth;
+        if (modeAuth is { } ma && !ma.IsDefault
+            && !(ma.AuthenticationMode == AuthenticationMode.Windows
+                && string.IsNullOrWhiteSpace(ma.User)
+                && commonCredentials))
+        {
+            authMode = ma.AuthenticationMode;
+            authUser = ma.User;
+            authPassword = ma.Password;
+            source = InfobaseAuthSource.ModeAuth;
+            return;
+        }
+
+        // 2) Авторизация информационной базы (Connection). Дефолтная Connection («Запрос»
+        // с пустыми реквизитами) считается незаданной. Исправление issue #57 (1.0.1.6):
+        // Connection перекрывает общую только если она реально содержит учётные данные —
+        // Credentials с пользователем, — либо это режим ОС (Windows) без заданных общих
+        // кредов (общая Windows/«Запрос» не спорит с авторизацией ОС базы). Случай
+        // «база Windows + общая Credentials» больше не съедает общую авторизацию.
+        var conn = infobase.Connection;
+        if (conn is not null && (
+                (conn.AuthenticationMode == AuthenticationMode.Credentials
+                    && !string.IsNullOrWhiteSpace(conn.User))
+                || (conn.AuthenticationMode == AuthenticationMode.Windows
+                    && !commonCredentials)))
+        {
+            authMode = conn.AuthenticationMode;
+            authUser = conn.User ?? string.Empty;
+            authPassword = conn.Password ?? string.Empty;
+            source = InfobaseAuthSource.InfobaseConnection;
+            return;
+        }
+
+        // 3) Общая авторизация по режиму запуска (issue #57): раздельная для режима
+        // (Enterprise — commonEnterpriseAuth, Configurator — commonConfiguratorAuth),
+        // при незаданной (null или IsDefault — «Запрос» с пустыми реквизитами) —
+        // прежняя общая legacyCommonAuth (обратная совместимость), затем «Запрос».
+        if (modeCommon is { } a3 && !a3.IsDefault)
+        {
+            authMode = a3.AuthenticationMode;
+            authUser = a3.User;
+            authPassword = a3.Password;
+            source = modeCommonSettings is { } mcs && !mcs.IsDefault
+                ? InfobaseAuthSource.CommonMode
+                : InfobaseAuthSource.CommonLegacy;
+            return;
+        }
+
+        // 4) Прежнее поведение: платформа запросит имя и пароль.
+        authMode = AuthenticationMode.Prompt;
+        authUser = string.Empty;
+        authPassword = string.Empty;
+    }
+
+    /// <summary>Человекочитаемая метка источника для записи CM_BASE_RUN (issue #57, 1.0.1.7).</summary>
+    internal static string DescribeSource(InfobaseAuthSource source) => source switch
+    {
+        InfobaseAuthSource.ModeAuth => "режим базы",
+        InfobaseAuthSource.InfobaseConnection => "база",
+        InfobaseAuthSource.CommonMode => "общая режима",
+        InfobaseAuthSource.CommonLegacy => "общая legacy",
+        _ => "запрос"
+    };
+
+    /// <summary>
     /// Разрешает режим аутентификации, логин и пароль для заданного режима
     /// (раздельная общая авторизация по режимам запуска, issue #57). Порядок приоритета:
     /// 1) раздельная авторизация режима — <see cref="Infobase.EnterpriseAuth"/> для
@@ -113,73 +237,9 @@ public static class InfobaseAuthResolver
         InfobaseAuthSettings? commonConfiguratorAuth,
         InfobaseAuthSettings? legacyCommonAuth)
     {
-        // 1) Раздельная авторизация режима. «Дефолтные» настройки (IsDefault — «Запрос»
-        // с пустыми реквизитами) считаются незаданными и переходят к следующим шагам.
-        if (mode == OneCLaunchMode.Enterprise
-            && infobase.EnterpriseAuth is { } entAuth && !entAuth.IsDefault)
-        {
-            authMode = entAuth.AuthenticationMode;
-            authUser = entAuth.User;
-            authPassword = entAuth.Password;
-            return;
-        }
-
-        if (mode == OneCLaunchMode.Configurator
-            && infobase.ConfiguratorAuth is { } cfgAuth && !cfgAuth.IsDefault)
-        {
-            authMode = cfgAuth.AuthenticationMode;
-            authUser = cfgAuth.User;
-            authPassword = cfgAuth.Password;
-            return;
-        }
-
-        // Эффективная общая авторизация режима (шаг 3) вычисляется заранее: она участвует
-        // и в решении шага 2 (исправление issue #57), и в самом шаге 3. Состав правила
-        // не менялся: раздельная общая режима → legacy → незадана.
-        InfobaseAuthSettings? modeCommon =
-            mode == OneCLaunchMode.Enterprise
-                ? commonEnterpriseAuth is { } ent && !ent.IsDefault ? ent : legacyCommonAuth
-                : commonConfiguratorAuth is { } cfg && !cfg.IsDefault ? cfg : legacyCommonAuth;
-
-        // Общая авторизация режима содержит явные учётные данные (Credentials).
-        var commonCredentials = modeCommon is { } mc && !mc.IsDefault
-            && mc.AuthenticationMode == AuthenticationMode.Credentials;
-
-        // 2) Авторизация информационной базы (Connection). Дефолтная Connection («Запрос»
-        // с пустыми реквизитами) считается незаданной. Исправление issue #57 (1.0.1.6):
-        // Connection перекрывает общую только если она реально содержит учётные данные —
-        // Credentials с пользователем, — либо это режим ОС (Windows) без заданных общих
-        // кредов (общая Windows/«Запрос» не спорит с авторизацией ОС базы). Случай
-        // «база Windows + общая Credentials» больше не съедает общую авторизацию.
-        var conn = infobase.Connection;
-        if (conn is not null && (
-                (conn.AuthenticationMode == AuthenticationMode.Credentials
-                    && !string.IsNullOrWhiteSpace(conn.User))
-                || (conn.AuthenticationMode == AuthenticationMode.Windows
-                    && !commonCredentials)))
-        {
-            authMode = conn.AuthenticationMode;
-            authUser = conn.User ?? string.Empty;
-            authPassword = conn.Password ?? string.Empty;
-            return;
-        }
-
-        // 3) Общая авторизация по режиму запуска (issue #57): раздельная для режима
-        // (Enterprise — commonEnterpriseAuth, Configurator — commonConfiguratorAuth),
-        // при незаданной (null или IsDefault — «Запрос» с пустыми реквизитами) —
-        // прежняя общая legacyCommonAuth (обратная совместимость), затем «Запрос».
-        if (modeCommon is { } a && !a.IsDefault)
-        {
-            authMode = a.AuthenticationMode;
-            authUser = a.User;
-            authPassword = a.Password;
-            return;
-        }
-
-        // 4) Прежнее поведение: платформа запросит имя и пароль.
-        authMode = AuthenticationMode.Prompt;
-        authUser = string.Empty;
-        authPassword = string.Empty;
+        // Обратная совместимость: источник нужен только диагностике CM_BASE_RUN.
+        Resolve(infobase, mode, out authMode, out authUser, out authPassword,
+            commonEnterpriseAuth, commonConfiguratorAuth, legacyCommonAuth, out _);
     }
 
     /// <summary>

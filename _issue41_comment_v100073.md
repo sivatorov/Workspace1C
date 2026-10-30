@@ -1,0 +1,6 @@
+Исправлено в версии 1.0.0.73 (Windows и Linux) по замечанию: «Поле с локалью на поле не замечено. А ошибка пока всё та же».
+
+1. **На форму миграции добавлено поле «Локаль».** После строк «Пользователь СУБД»/«Пароль СУБД» появился список выбора локали (как при добавлении базы): WPF [`ClusterMigrationWindow.xaml`](Workspace1C/Views/ClusterMigrationWindow.xaml) и Avalonia [`ClusterMigrationWindow.axaml`](Workspace1C/Views/ClusterMigrationWindow.axaml), привязка `LocaleOptions`/`Locale` через VM ([`ClusterMigrationViewModel.cs`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs)).
+2. **Автозаполнение и приоритет формы.** Локаль автозаполняется из первой базы источника (rac 8.3 и частичные версии 8.5 её не отдают — остаётся «ru» по умолчанию); ручной выбор пользователя не перезаписывается. В [`ClusterMigrationService.BuildCreateRequest`](Workspace1C/Services/ClusterMigrationService.cs) значение формы имеет приоритет над локалью источника, нормализуется (`ru_RU` → `ru`), а `--locale` передаётся всегда (дефолт «ru») и больше не пропускается.
+
+Локализация ru/en (`ClusterMigration.Locale`); добавлены юнит-тесты `ClusterMigrationServiceTests`(+3), `ClusterMigrationViewModelTests`(+2) и `Issue41WindowLayoutTests`(+3) (разметка поля, автозаполнение, приоритет и нормализация локали).

@@ -292,6 +292,9 @@ public partial class MainViewModel : ViewModelBase
         {
             _commonAuthorization = value;
             OneCLauncher.CommonAuthorization = value;
+            // Статики установлены явно — EnsureCommonAuthLoaded() больше не перечитывает
+            // настройки (issue #57, 1.0.1.7).
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -315,6 +318,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _commonEnterpriseAuth = value;
             OneCLauncher.CommonEnterpriseAuthorization = value;
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -338,6 +342,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _commonConfiguratorAuth = value;
             OneCLauncher.CommonConfiguratorAuthorization = value;
+            OneCLauncher.MarkCommonAuthLoaded();
         }
     }
 
@@ -511,6 +516,9 @@ public partial class MainViewModel : ViewModelBase
         OneCLauncher.CommonEnterpriseAuthorization = settings.CommonEnterpriseAuth;
         _commonConfiguratorAuth = settings.CommonConfiguratorAuth;
         OneCLauncher.CommonConfiguratorAuthorization = settings.CommonConfiguratorAuth;
+        // Настройки загружены, статики заполнены (issue #57, 1.0.1.7) — ленивое
+        // EnsureCommonAuthLoaded() для CLI/проводника больше не нужно.
+        OneCLauncher.MarkCommonAuthLoaded();
         _comConnectorNameTemplate = settings.ComConnectorNameTemplate ?? "";
         // Кэш шаблона в коннекторе заполняем сразу, а не ленивым чтением файла (issue #175):
         // иначе результат зависел бы от того, случилось ли COM-чтение до смены активного

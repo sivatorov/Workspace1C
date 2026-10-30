@@ -2732,6 +2732,51 @@ public partial class MainViewModel : ViewModelBase
         window.ShowDialog();
     }
 
+    // ======================= Массовые операции по списку баз (issue #91) =======================
+
+    private ICommand? _batchDumpDtCommand;
+
+    /// <summary>
+    /// Команда «Массовая выгрузка в .dt…» (issue #91): окно-чеклист баз и
+    /// последовательная выгрузка каждой выбранной базы в файл .dt через ibcmd.
+    /// </summary>
+    public ICommand BatchDumpDtCommand =>
+        _batchDumpDtCommand ??= new RelayCommand(_ => ExecuteBatchOperations(BatchOperationKind.DumpDt), _ => Infobases.Any());
+
+    private ICommand? _batchLoadCfCommand;
+
+    /// <summary>
+    /// Команда «Загрузить конфигурацию из .cf по списку баз…» (issue #91): окно-чеклист
+    /// баз и последовательная загрузка .cf в каждую выбранную базу через ibcmd.
+    /// </summary>
+    public ICommand BatchLoadCfCommand =>
+        _batchLoadCfCommand ??= new RelayCommand(_ => ExecuteBatchOperations(BatchOperationKind.LoadConfig), _ => Infobases.Any());
+
+    private void ExecuteBatchOperations(BatchOperationKind kind)
+    {
+        if (!Infobases.Any())
+        {
+            _dialogs.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
+                LocalizationManager.T("BatchOps.Title"));
+            return;
+        }
+
+        // Безопасность: подтверждение перед массовой операцией по нескольким базам.
+        if (!_dialogs.Confirm(
+                string.Format(LocalizationManager.T("BatchOps.ConfirmFormat"),
+                    kind == BatchOperationKind.DumpDt
+                        ? LocalizationManager.T("BatchOps.KindDumpDt")
+                        : LocalizationManager.T("BatchOps.KindLoadCf")),
+                LocalizationManager.T("BatchOps.Title")))
+            return;
+
+        var window = new BatchOperationsWindow(Infobases.ToList(), kind)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        window.ShowDialog();
+    }
+
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================
 
     private ICommand? _repositoryBrowserCommand;

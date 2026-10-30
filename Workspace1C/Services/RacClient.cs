@@ -41,6 +41,18 @@ public sealed class RacClient : IRacClient
     /// <summary>Таймаут выполнения одной rac-команды (30 секунд).</summary>
     public static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// Источник rac-команд для диагностики CM_RAC-лога (issue #90): «MONITOR» — окно
+    /// «Серверы 1С» (<see cref="ViewModels.ServerMonitorViewModel.MonitorLogSourceTag"/>),
+    /// «ALERTS» — фоновые проверки <see cref="ServerAlertsService"/>. AsyncLocal — значение
+    /// течёт по async-цепочке и не смешивается между параллельными циклами.
+    /// </summary>
+    public static readonly AsyncLocal<string?> LogSource = new();
+
+    /// <summary>Метка источника для строк CM_RAC: «RAC [MONITOR]: …» / «RAC: …» (issue #90).</summary>
+    private static string SourcePrefix =>
+        LogSource.Value is { Length: > 0 } tag ? $" [{tag}]" : string.Empty;
+
     private readonly IAppLogger _logger;
 
     /// <summary>
@@ -1093,7 +1105,7 @@ public sealed class RacClient : IRacClient
         // «в терминале rac работает, а монитор данные кластера не видит» (issue #324).
         // issue #80: события RAC — направление CM_RAC (INFO при включённых категории и CM_ON).
         Log.Info(LogCategory.Rac,
-            $"RAC: rac={rac}, команда: {SensitiveDataMasker.MaskRacPassword(string.Join(" ", args))}");
+            $"RAC{SourcePrefix}: rac={rac}, команда: {SensitiveDataMasker.MaskRacPassword(string.Join(" ", args))}");
 
         try
         {
@@ -1176,7 +1188,7 @@ public sealed class RacClient : IRacClient
             // Код выхода/объём вывода полезны и при выключенной категории, поэтому WARN
             // и ERROR (выше в методе) остаются без фильтра — CM_RAC отключает только INFO.
             Log.Info(LogCategory.Rac,
-                $"RAC: {commandLabel} — выполнено, exit={process.ExitCode}, stdout={stdout.Length} симв., " +
+                $"RAC{SourcePrefix}: {commandLabel} — выполнено, exit={process.ExitCode}, stdout={stdout.Length} симв., " +
                 $"stderr={stderr.Length} симв., за {stopwatch.ElapsedMilliseconds} мс");
             return stdout;
         }

@@ -226,7 +226,8 @@ public static class TestDeployPlanner
     public static List<string> Validate(
         TestDeployScenario? scenario,
         Infobase? source,
-        Infobase? existingTarget)
+        Infobase? existingTarget,
+        Func<Infobase, DbmsBackupProfile?>? dbmsProfileResolver = null)
     {
         var errors = new List<string>();
         if (scenario is null)
@@ -273,6 +274,37 @@ public static class TestDeployPlanner
         if (scenario.AddToTestGroup && string.IsNullOrWhiteSpace(scenario.TestGroupName))
             errors.Add("TestDeploy.EnterTestGroup");
 
+        // issue #79 (1.0.1.7, репорт 7OH «заполните профиль»): выгрузка клиент-серверной
+        // базы движком ibcmd требует профиль СУБД — ibcmd подключается к СУБД напрямую
+        // (IbcmdService.BuildConnectionArguments), поэтому галки «авторизация ИБ» и
+        // «Подставить из базы» не помогают. Ошибка показывается ДО старта операций,
+        // а не на шаге «Выгрузка».
+        if (scenario.DumpEngine == BackupEngine.Ibcmd
+            && source.Connection?.Type == ConnectionType.ClientServer)
+        {
+            var dbmsProfile = dbmsProfileResolver is not null
+                ? dbmsProfileResolver(source)
+                : TryLoadDbmsProfile(source);
+            if (dbmsProfile is null || string.IsNullOrWhiteSpace(dbmsProfile.Database))
+                errors.Add("TestDeploy.NeedDbmsProfile");
+        }
+
         return errors;
+    }
+
+    /// <summary>
+    /// Профиль СУБД исходной базы из хранилища профилей (issue #79). Ошибка чтения
+    /// не роняет валидацию — считается, что профиля нет (ниже понятная ошибка).
+    /// </summary>
+    private static DbmsBackupProfile? TryLoadDbmsProfile(Infobase source)
+    {
+        try
+        {
+            return DbmsBackupService.Load().Find(source.Id);
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
