@@ -11,6 +11,105 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.4] — 2026-10-30
+
+### Исправлено / Добавлено
+
+- **Автообновление на Linux скачивает Linux-сборку, а не Windows-EXE (issue #89,
+  Windows и Linux).** В [`GitHubReleaseService`](Workspace1C/Services/GitHubReleaseService.cs)
+  имя Linux-ассета приведено к контракту публикации — `Workspace1C-linux-x64`
+  (см. `release.yml`); любые `.exe` на Linux отбрасываются как не платформенные.
+  Загрузчик больше не скачивает `Workspace1C.exe` и не «зависает» на обновлении.
+
+- **Вкладка «Лицензии»: утилита `ring` вызывается как есть, без ручного поиска
+  (issue #83, Windows и Linux).** В [`RingLicenseService`](Workspace1C/Services/RingLicenseService.cs)
+  доступность утилиты проверяется запуском `where.exe ring` / `which ring`
+  (запасной способ — `ring --version`), а сама команда выполняется как `ring`
+  без подмены полного пути — поиск по PATH выполняет ОС. Недоступность пишется
+  INFO-записью (не WARN-спам при автообновлении).
+
+- **Иконка группы «Новинки программы» в меню «Утилиты» — та же NewBox, что в
+  контекстном меню (issue #81, Windows и Linux).** Построители меню
+  ([`MainWindow.UtilitiesMenu.cs`](Workspace1C/Views/MainWindow.UtilitiesMenu.cs),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs))
+  всегда рисуют группе «Новинки программы» каталоговую иконку NEW (#22C55E);
+  в [`UtilitiesMenuCatalog`](Workspace1C/Services/UtilitiesMenuCatalog.cs) расширен
+  список легаси-«звёзд» (StarOutline/StarBorder и варианты), которые могли попасть
+  в layout пользователя. Назначенный пользователем внешний файл иконки сохраняется.
+
+- **Мастер «Развернуть тестовую копию» больше не падает при открытии (issue #79,
+  Windows и Linux).** В [`TestDeployWindow.ApplyModernStyles`](Workspace1C/Views/TestDeployWindow.cs)
+  полю `PasswordBox` больше не назначается стиль `ModernTextBox` с
+  `TargetType="TextBox"` (это бросало `InvalidOperationException` при открытии окна);
+  пароль получает темированный implicit-стиль `TargetType="PasswordBox"`.
+
+- **Окно «Серверы 1С»: перетаскивание колонок работает как в 1С (issue #75, Windows
+  и Linux).** WPF: перехват перетаскивания границ перенесён с заголовков на уровень
+  грида (`PreviewMouseLeftButtonDown` на гриде, захват мыши гридом) — обычный режим
+  двигает «блок» колонок, Ctrl-режим меняет две соседние; Avalonia: ширина «ручки»
+  захвата расширена до 24 px (как в WPF).
+
+- **Окна «Настройки» и «Настройка информационной базы» нельзя сжать ниже минимума
+  (issue #71, Windows и Linux).** Единый механизм гарантии минимального размера:
+  WPF — перехват `WM_GETMINMAXINFO` (`ptMinTrackSize` с учётом DPI)
+  ([`WindowChromeHelper`](Workspace1C/Views/WindowChromeHelper.cs)), Avalonia —
+  общий зажим по `ClientSizeProperty`
+  ([`ModalWindowBase.ClampWindowToMinSize`](Workspace1C/Views/ModalWindowBase.cs)) —
+  окна больше не «ужимаются до размера заголовка».
+
+- **Публикация на веб-сервере: Apache-службы с номерами получают собственный
+  конфиг (issue #63, Windows и Linux).** В [`ApacheInstanceDetector`](Workspace1C/Services/ApacheInstanceDetector.cs)
+  из строки запуска каждой службы (`ImagePath`) извлекается свой `-d`/`-f`
+  (например `conf\httpd27.conf`), включая случаи незакрытой кавычки; исходная
+  строка службы сохраняется в [`ApacheInstance.RawCommandLine`](Workspace1C/Models/ApacheInstance.cs)
+  и пишется в лог CM_PUBLISH; fallback-поиск файла алиасов находит
+  `1c8Aliases27.conf` по суффиксу из имени конфига службы
+  ([`WebPublishViewModel`](Workspace1C/ViewModels/WebPublishViewModel.cs)).
+
+- **Главное окно нельзя сжать меньше минимума (issue #55, Windows и Linux).**
+  Тот же общий механизм `ModalWindowBase.ClampWindowToMinSize`
+  ([`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)) и зажим
+  WPF через `WM_GETMINMAXINFO` применены к главному окну — живой ресайз мышью
+  больше не сжимает его ниже `MinWidth`/`MinHeight`.
+
+- **Тёмная тема: надписи окна «Синхронизация настроек» и кнопки управления окна
+  (issue #26, Windows и Linux).** Подписи полей привязаны к кисти `FormLabelBrush`,
+  значение «последняя синхронизация» — к `TextSecondaryBrush`
+  ([`SettingsSyncWindow.cs`](Workspace1C/Views/SettingsSyncWindow.cs)); для кнопок
+  управления окном при НЕактивном окне добавлена отдельная кисть подложки
+  `WindowButtonInactiveHoverBrush` (тёмная в тёмной теме) — белая «подсветка»
+  кнопок на тёмной шапке убрана (WPF — [`App.xaml`](Workspace1C/App.xaml),
+  [`ThemeFeatureMap.cs`](Workspace1C/Themes/ThemeFeatureMap.cs); Avalonia —
+  [`WindowButtonThemeMetrics.Avalonia.cs`](Workspace1C/Themes/WindowButtonThemeMetrics.Avalonia.cs),
+  [`MainWindow.Avalonia.Controls.cs`](Workspace1C/Views/MainWindow.Avalonia.Controls.cs)).
+
+### Тесты
+
+- [`GitHubReleaseServiceTests.cs`](Workspace1C.Tests/GitHubReleaseServiceTests.cs):
+  выбор точного Linux-ассета и отбрасывание `.exe` — #89;
+- [`Issue83LicenseTabTests.cs`](Workspace1C.Tests/Issue83LicenseTabTests.cs):
+  вызов `ring` как есть, проверка `where`/`which` — #83;
+- [`Issue81NewBoxIconTests.cs`](Workspace1C.Tests/Issue81NewBoxIconTests.cs):
+  легаси-«звёзды» и гарантия иконки NewBox — #81;
+- [`Issue79TestDeployWindowTests.cs`](Workspace1C.Tests/Issue79TestDeployWindowTests.cs):
+  `PasswordBox` не получает стиль `TargetType="TextBox"` — #79;
+- [`Issue75ServerMonitorColumnsTests.cs`](Workspace1C.Tests/Issue75ServerMonitorColumnsTests.cs):
+  грид-уровневый перехват и зона 24 px — #75;
+- [`Issue71SettingsWindowLayoutTests.cs`](Workspace1C.Tests/Issue71SettingsWindowLayoutTests.cs):
+  зажим минимума WPF/Avalonia — #71;
+- [`ApacheInstanceDetectorTests.cs`](Workspace1C.Tests/ApacheInstanceDetectorTests.cs)
+  и [`Apache27ConfRegressionTests.cs`](Workspace1C.Tests/Apache27ConfRegressionTests.cs):
+  службы с номерами, `-d`/`-f`, файл алиасов — #63;
+- [`Issue55AdaptiveLayoutTests.cs`](Workspace1C.Tests/Issue55AdaptiveLayoutTests.cs):
+  минимум главного окна — #55;
+- [`ThemeFeatureMapTests.cs`](Workspace1C.Tests/ThemeFeatureMapTests.cs)
+  и [`Issue26SyncWindowButtonsTests.cs`](Workspace1C.Tests/Issue26SyncWindowButtonsTests.cs):
+  контраст надписей и кнопок управления окна — #26.
+
+Итого в проекте **~5 048 юнит-тестов**; Linux-сборка (Avalonia) также зелёная.
+
+---
+
 ## [1.0.1.3] — 2026-10-29
 
 ### Исправлено / Добавлено
