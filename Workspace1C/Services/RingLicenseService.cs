@@ -309,8 +309,22 @@ public sealed class RingLicenseService : IRingLicenseService
     /// <inheritdoc />
     public async Task<RingLicenseResult> GetInstalledLicensesAsync(CancellationToken cancellationToken = default)
     {
-        // 1) ring license list (Windows и Linux — если ring установлен).
-        foreach (var (command, arguments, source) in CommandCandidates())
+        // issue #83 (последний комментарий 7OH от 2026-10-29): утилиту ring НЕ ищем
+        // ручным перебором PATH/PATHEXT с подменой полного пути — доступность проверяем
+        // запуском «where.exe ring»/«which ring» (запасной способ — «ring --version»),
+        // а вызываем «ring» как есть, поиск по PATH выполняет сама ОС.
+        var ringInPath = await FindRingInPathAsync(cancellationToken).ConfigureAwait(false);
+        if (ringInPath is null)
+        {
+            // issue #83: недоступность утилиты — прогнозируемая внешняя причина, пишем
+            // INFO (не WARN-спам при автообновлении каждые ~5 с).
+            // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
+            Log.Info(LogCategory.Rac,
+                "RING: утилита ring не найдена в PATH (where.exe ring / which ring) — переходим к запасным вариантам.");
+        }
+
+        // 1) ring license list (Windows и Linux — если ring доступен в PATH).
+        foreach (var (command, arguments, source) in CommandCandidates(includePathRing: ringInPath is not null))
         {
             var result = await ProcessRunner.RunAsync(
                     command, arguments, timeout: CommandTimeout, ct: cancellationToken)
@@ -358,17 +372,17 @@ public sealed class RingLicenseService : IRingLicenseService
 
     /// <summary>
     /// Понятное сообщение вкладки «Лицензии», когда утилита ring/licensetool недоступна
-    /// (issue #83): в тексте — где искалась утилита и что сделать, чтобы её найти, вместо
-    /// пустой вкладки. Internal — для юнит-тестов читаемого сообщения.
+    /// (issue #83): в тексте — где проверялась утилита и что сделать, чтобы её найти,
+    /// вместо пустой вкладки. Internal — для юнит-тестов читаемого сообщения.
     /// </summary>
     internal static string BuildUnavailableMessage()
     {
 #if WINDOWS
         const string searched =
-            "искал: ring в PATH, ring.exe в каталоге bin платформы рядом с rac";
+            "проверка: where.exe ring / ring --version, ring.exe в каталоге bin платформы рядом с rac";
 #else
         const string searched =
-            "искал: ring в PATH, licensetool в каталогах /opt/1cv8";
+            "проверка: which ring / ring --version, licensetool в каталогах /opt/1cv8";
 #endif
         return "Не удалось получить список лицензий: не найдена утилита ring (" + searched +
                "; каталог файлов лицензий платформы пуст). Установите ring (обычно лежит в " +
@@ -377,21 +391,22 @@ public sealed class RingLicenseService : IRingLicenseService
 
     /// <summary>
     /// Кандидаты на выполнение (имя, аргументы, описание источника):
-    /// ring из PATH (приоритет — issue #83: «просто вызывать ring, а не искать её рядом»),
-    /// затем ring.exe в каталоге bin платформы и licensetool платформы Linux как запасные.
-    /// Internal — для юнит-тестов без запуска процессов.
+    /// ring из PATH (приоритет — issue #83, комментарий 7OH: «просто вызывать ring как
+    /// есть», без подмены полного пути), затем ring.exe в каталоге bin платформы и
+    /// licensetool платформы Linux как запасные. Кандидат «ring (PATH)» добавляется
+    /// только если проверка доступности (<see cref="FindRingInPathAsync"/>) подтвердила,
+    /// что утилита есть в PATH. Internal — для юнит-тестов без запуска процессов.
     /// </summary>
-    internal static IReadOnlyList<(string Command, string[] Arguments, string Source)> CommandCandidates()
+    internal static IReadOnlyList<(string Command, string[] Arguments, string Source)> CommandCandidates(
+        bool includePathRing = true)
     {
         var candidates = new List<(string, string[], string)>();
 
-        // issue #83 (комментарий 7OH): пользователь просит «просто вызывать ring» —
-        // приоритет у ring из PATH. Если полный путь резолвится явно (с учётом PATHEXT) —
-        // запускаем его; иначе пробуем голое имя «ring» (поиск снова выполнит ОС по PATH).
-        var ringInPath = ResolveRingInPath();
-        if (ringInPath is not null)
-            candidates.Add((ringInPath, new[] { "license", "list" }, $"ring (PATH: {ringInPath})"));
-        else
+        // issue #83 (последний комментарий 7OH): вызываем «ring» КАК ЕСТЬ — без ручного
+        // резолва полного пути по PATH/PATHEXT (поиск по PATH выполняет сама ОС при
+        // Process.Start); доступность подтверждена заранее через where/which или
+        // «ring --version».
+        if (includePathRing)
             candidates.Add(("ring", new[] { "license", "list" }, "ring (PATH)"));
 
 #if WINDOWS
@@ -418,62 +433,56 @@ public sealed class RingLicenseService : IRingLicenseService
     }
 
     /// <summary>
-    /// Ищет <c>ring</c> в переменной окружения PATH с учётом PATHEXT (Windows):
-    /// перебирает каталоги PATH и расширения <c>.exe/.com/.cmd/.bat</c>, возвращает полный
-    /// путь первого существующего файла. Возвращает <c>null</c>, если ring в PATH нет.
-    /// Командные файлы (.cmd/.bat) не возвращаются: <see cref="ProcessRunner"/> запускает
-    /// процессы напрямую без оболочки. Internal — для юнит-тестов.
+    /// Проверяет доступность утилиты ring в PATH (issue #83, последний комментарий 7OH
+    /// от 2026-10-29 19:58:55): НЕ ручной перебор PATH/PATHEXT с подменой полного пути,
+    /// а запуск самой утилиты поиска — «where.exe ring» (Windows) / «which ring» (Linux);
+    /// запасной способ — прямой запуск «ring --version». Возвращает первый найденный
+    /// путь (маркер доступности; сам вызов ring выполняется «как есть») или null, если
+    /// утилита недоступна. Internal — для юнит-тестов.
     /// </summary>
-    internal static string? ResolveRingInPath()
+    internal static async Task<string?> FindRingInPathAsync(CancellationToken ct = default)
     {
-        var pathValue = Environment.GetEnvironmentVariable("PATH");
-        if (string.IsNullOrWhiteSpace(pathValue))
-            return null;
-
-        foreach (var ext in RingPathExtensions())
+#if WINDOWS
+        var probe = await ProcessRunner.RunAsync("where.exe", new[] { "ring" },
+                timeout: CommandTimeout, ct: ct)
+            .ConfigureAwait(false);
+        if (probe.Success)
         {
-            foreach (var rawDir in pathValue.Split(Path.PathSeparator))
-            {
-                var dir = rawDir.Trim();
-                if (dir.Length == 0)
-                    continue;
-                string candidate;
-                try { candidate = Path.Combine(dir, "ring" + ext); }
-                catch { continue; }
-                if (File.Exists(candidate))
-                    return candidate;
-            }
+            var line = FirstNonEmptyLine(probe.StdOut);
+            if (line is not null)
+                return line;
         }
-        return null;
+#else
+        var probe = await ProcessRunner.RunAsync("which", new[] { "ring" },
+                timeout: CommandTimeout, ct: ct)
+            .ConfigureAwait(false);
+        if (probe.Success)
+        {
+            var line = FirstNonEmptyLine(probe.StdOut);
+            if (line is not null)
+                return line;
+        }
+#endif
+
+        // Запасная проверка (если where/which нет в системе или не дала результата) —
+        // прямой запуск «ring --version»: работает — утилита доступна (issue #83,
+        // комментарий 7OH: «Запустили "ring --version" и посмотрели - ошибка или работает»).
+        var version = await ProcessRunner.RunAsync("ring", new[] { "--version" },
+                timeout: CommandTimeout, ct: ct)
+            .ConfigureAwait(false);
+        return version.Success ? "ring" : null;
     }
 
-    /// <summary>Расширения исполняемых файлов для поиска ring по PATH
-    /// (PATHEXT на Windows; Linux — без расширения). Internal — тесты.</summary>
-    internal static IReadOnlyList<string> RingPathExtensions()
+    /// <summary>Первая непустая строка вывода (путь, найденный where/which). Internal — тесты.</summary>
+    internal static string? FirstNonEmptyLine(string output)
     {
-        var extensions = new List<string>();
-#if WINDOWS
-        var pathext = Environment.GetEnvironmentVariable("PATHEXT");
-        if (!string.IsNullOrWhiteSpace(pathext))
+        foreach (var rawLine in output.Split('\n'))
         {
-            foreach (var raw in pathext.Split(';'))
-            {
-                var ext = raw.Trim();
-                if (ext.Length == 0)
-                    continue;
-                // Только запускаемые без оболочки расширения (issue #83): ProcessRunner
-                // стартует процесс напрямую; .cmd/.bat без cmd.exe не выполнить.
-                if (ext.Equals(".exe", StringComparison.OrdinalIgnoreCase) ||
-                    ext.Equals(".com", StringComparison.OrdinalIgnoreCase))
-                    extensions.Add(ext);
-            }
+            var line = rawLine.TrimEnd('\r').Trim();
+            if (line.Length > 0)
+                return line;
         }
-        if (extensions.Count == 0)
-            extensions.Add(".exe"); // резерв, если PATHEXT не задан
-#else
-        extensions.Add(string.Empty);
-#endif
-        return extensions;
+        return null;
     }
 
     /// <summary>Ищет исполняемые файлы licensetool в каталогах /opt/1cv8 (Linux). Internal — тесты.</summary>

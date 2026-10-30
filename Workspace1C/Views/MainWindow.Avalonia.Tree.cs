@@ -1819,14 +1819,22 @@ namespace Workspace1C
             if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
                 return CreateAvaloniaExternalIcon(node.ExternalIconPath!);
             var isNewItems = string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal);
-            // issue #81: легаси-«папка»/пустая иконка в группе «Новинки программы» (старые
-            // layout до 1.0.0.103) заменяется стандартной иконкой каталога — звезда NEW,
-            // та же, что в контекстном меню и редакторе. Пользовательская иконка сохраняется.
-            var forceCatalog = isNewItems && UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon(node.IconKey);
-            var iconKey = !forceCatalog && !string.IsNullOrWhiteSpace(node.IconKey)
+            // issue #81 (финальный фикс): у группы «Новинки программы» меню «Утилиты» — ТА ЖЕ
+            // иконка, что в контекстном меню (IconNewBox, #22C55E), всегда, независимо от
+            // сохранённых в старых layout легаси-иконок («папка», «звезда») — иначе реальное
+            // меню показывает звезду вместо NEW (комментарий 7OH). Внешний файл сохраняется.
+            if (isNewItems)
+            {
+                return MenuIcon(
+                    UtilitiesMenuCatalog.GroupAvaloniaIconKey(UtilitiesMenuCatalog.GroupNewItems),
+                    UtilitiesMenuCatalog.ResolveGroupIconColor(
+                        UtilitiesMenuCatalog.GroupNewItems, ThemeManager.CurrentScheme,
+                        ThemeManager.CurrentTheme == ThemeManager.DarkThemeName));
+            }
+            var iconKey = !string.IsNullOrWhiteSpace(node.IconKey)
                 ? node.IconKey!
                 : UtilitiesMenuCatalog.GroupAvaloniaIconKey(node.GroupId ?? string.Empty);
-            var color = !forceCatalog && !string.IsNullOrWhiteSpace(node.IconColor)
+            var color = !string.IsNullOrWhiteSpace(node.IconColor)
                 ? node.IconColor!
                 : UtilitiesMenuCatalog.ResolveGroupIconColor(
                     node.GroupId ?? string.Empty, ThemeManager.CurrentScheme,

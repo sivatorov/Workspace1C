@@ -210,6 +210,12 @@ namespace Workspace1C.Themes
             var dark = CurrentTheme == DarkThemeName;
             var metrics = ThemeFeatureMap.ButtonMetrics(CurrentWindowButtonStyle, dark);
             app.Resources[ThemeFeatureMap.WindowButtonHoverBrushKey] = ParseBrush(metrics.HoverHex);
+            // issue #26 (7OH, 2026-10-29): подложка наведения кнопок окна при НЕАКТИВНОМ
+            // окне — приглушённая (тёмный slate в тёмной теме), чтобы на тёмной шапке
+            // карточки кнопки не «светились белым». Активная шапка остаётся на
+            // полупрозрачном белом (WindowButtonHoverBrush / OnAccent-варианты).
+            app.Resources[ThemeFeatureMap.WindowButtonInactiveHoverBrushKey] =
+                ParseBrush(ThemeFeatureMap.InactiveHoverHex(CurrentWindowButtonStyle, dark));
             app.Resources[ThemeFeatureMap.WindowButtonCloseHoverBrushKey] = ParseBrush(metrics.CloseHoverHex);
             // Цвета «светофора» macOS (Задача 3): жёлтый круг «свернуть» и зелёный
             // «развернуть». У остальных стилей поля null — кнопки используют общую

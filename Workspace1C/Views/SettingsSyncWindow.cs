@@ -138,6 +138,9 @@ public partial class SettingsSyncWindow : Window
         var lastSyncRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 6) };
         lastSyncRow.Children.Add(MakeLabel("SettingsSync.LastSync"));
         _lastSyncText = new TextBlock { Text = _vm.LastSyncAtText, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+        // issue #26: значение «последняя синхронизация» привязано к вторичной кисти —
+        // без неё текст был чёрным в тёмной теме (как уже сделано в Avalonia-версии).
+        _lastSyncText.SetResourceReference(ForegroundProperty, "TextSecondaryBrush");
         lastSyncRow.Children.Add(_lastSyncText);
         panel.Children.Add(lastSyncRow);
 
@@ -217,11 +220,20 @@ public partial class SettingsSyncWindow : Window
         };
     }
 
-    private static TextBlock MakeLabel(string key) => new()
+    private static TextBlock MakeLabel(string key)
     {
-        Text = LocalizationManager.T(key),
-        FontWeight = System.Windows.FontWeights.SemiBold,
-        Margin = new Thickness(0, 2, 0, 0)
-    };
+        // issue #26 (7OH, 2026-10-29 «Синхронизация настроек - надписи в наличии
+        // черные на тёмном»): подписи полей обязаны брать кисть темы FormLabelBrush,
+        // а не дефолтный чёрный — в тёмной теме без привязки текст нечитаем
+        // (та же кисть, что у Avalonia-версии окна).
+        var label = new TextBlock
+        {
+            Text = LocalizationManager.T(key),
+            FontWeight = System.Windows.FontWeights.SemiBold,
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        label.SetResourceReference(ForegroundProperty, "FormLabelBrush");
+        return label;
+    }
 }
 #endif

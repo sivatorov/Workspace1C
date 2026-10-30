@@ -487,6 +487,11 @@ namespace Workspace1C
             private readonly IDisposable? _stateSub;
 
             private IBrush _hoverBg = Brushes.Transparent;
+
+            /// <summary>Подложка наведения при НЕАКТИВНОМ окне (issue #26): тёмная в тёмной
+            /// теме, чтобы кнопки окна не «светились белым» на тёмной шапке карточки.</summary>
+            private IBrush _inactiveHoverBg = Brushes.Transparent;
+
             private IBrush _closeHoverBg = Brushes.Transparent;
 
             /// <summary>Кисть подложки «свернуть» (Задача 3): у macOS-«светофора» жёлтый круг.</summary>
@@ -497,7 +502,6 @@ namespace Workspace1C
 
             private IBrush _pressedBg = Brushes.Transparent;
             private IBrush _restGlyphBrush = Brushes.Transparent;
-            private IBrush _hoverGlyphBrush = Brushes.Transparent;
             private IBrush _accentGlyphBrush = Brushes.Transparent;
             private IBrush _accentBrush = Brushes.Transparent;
             private bool _hovered;
@@ -641,7 +645,9 @@ namespace Workspace1C
                 // цвет подписи под курсором (App.xaml:94-97) и ButtonTextBrush
                 // на акцентной шапке (App.xaml:116-118).
                 ThemeBrushes.Observe(this, "TextSecondaryColorBrush", b => { _restGlyphBrush = b; ApplyState(); });
-                ThemeBrushes.Observe(this, "TextPrimaryColorBrush", b => { _hoverGlyphBrush = b; ApplyState(); });
+                // issue #26 (7OH, 2026-10-29): при неактивном окне глиф под курсором
+                // остаётся вторичным (не становится основным/белым — «белые элементы»).
+                // Только на акцентной шапке глиф красится контрастным акценту цветом.
                 // Глиф «на акценте» контрастен фактическому акценту (issue #26):
                 // при тёмном пользовательском акценте белый, при светлом — чёрный.
                 ThemeBrushes.Observe(this, "AccentTextBrush", b => { _accentGlyphBrush = b; ApplyState(); });
@@ -679,6 +685,10 @@ namespace Workspace1C
             {
                 var metrics = WindowButtonThemeMetrics.Current();
                 _hoverBg = metrics.Hover;
+                // issue #26 (7OH, 2026-10-29): при неактивном окне подложка наведения
+                // берётся из отдельной метрики (тёмная в тёмной теме) — белая подсветка
+                // кнопок управления окном на тёмной шапке карточки убрана.
+                _inactiveHoverBg = metrics.InactiveHover;
                 _closeHoverBg = metrics.CloseHover;
                 _minimizeHoverBg = metrics.MinimizeHover;
                 _maximizeHoverBg = metrics.MaximizeHover;
@@ -742,7 +752,9 @@ namespace Workspace1C
                 // На акцентной шапке hover-цвет остаётся светлым (ButtonTextBrush),
                 // иначе тёмный значок потерялся бы на акцентной заливке.
                 var restBrush = _onAccent ? _accentGlyphBrush : _restGlyphBrush;
-                var hoverBrush = _onAccent ? _accentGlyphBrush : _hoverGlyphBrush;
+                // issue #26: на акцентной шапке глиф под курсором остаётся контрастным
+                // акценту; при неактивном окне — вторичным (не белым, как TextPrimary).
+                var hoverBrush = _onAccent ? _accentGlyphBrush : _restGlyphBrush;
 
                 if (_kind == WindowControlKind.Close)
                 {
@@ -763,7 +775,11 @@ namespace Workspace1C
                 }
                 else
                 {
-                    Background = _pressed ? _pressedBg : (_hovered ? _hoverBg : Brushes.Transparent);
+                    // issue #26 (7OH, 2026-10-29): при неактивном окне подложка наведения
+                    // берётся из InactiveHover (тёмная в тёмной теме), чтобы кнопки окна
+                    // не «светились белым» на тёмной шапке карточки.
+                    var hoverBg = _onAccent ? _hoverBg : _inactiveHoverBg;
+                    Background = _pressed ? _pressedBg : (_hovered ? hoverBg : Brushes.Transparent);
                     SetGlyphBrush(_hovered || _pressed ? hoverBrush : restBrush);
                 }
 

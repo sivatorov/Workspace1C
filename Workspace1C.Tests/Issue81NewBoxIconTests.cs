@@ -120,10 +120,61 @@ public sealed class Issue81NewBoxIconTests
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("Folder"));
         // issue #81 (комментарий 7OH «при показе Утилиты — звезда»): сохранённая в старых
         // layout «звезда» (Star/IconStar — старый дефолт «Новинок» до появления NewBox)
-        // тоже легаси — реальное меню должно показывать NewBox, а не звезду.
+        // тоже легаси — реальное меню должно показывать NewBox, а не звезду. Учитываем и
+        // варианты наборов/обводки, которые могли попасть в layout пользователя.
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("Star"));
         Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconStar"));
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("StarOutline"));
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconStarOutline"));
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("StarBorder"));
+        Assert.True(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconStarBorder"));
         Assert.False(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("NewBox"));
+        Assert.False(UtilitiesMenuCatalog.IsLegacyFallbackGroupIcon("IconNewBox"));
+    }
+
+    [Fact]
+    public void ExistingNewItemsGroup_WithLegacyStarIcon_IsResetToCatalogNewBox()
+    {
+        // issue #81 (последний комментарий 7OH «в Утилиты по-прежнему звезда вместо New»):
+        // layout, сохранённый до появления NewBox, мог записать в группу «Новинки программы»
+        // «звезду» (Star/IconStar — старый дефолт «Новинок») — реальное меню показывало её,
+        // тогда как редактор и контекстное меню уже отдавали NewBox. Легаси-звезда обязана
+        // сбрасываться к стандартной иконке каталога.
+        var layout = new UtilitiesMenuLayout
+        {
+            Root = new System.Collections.Generic.List<UtilitiesMenuNode>
+            {
+                new()
+                {
+                    Kind = "group",
+                    GroupId = UtilitiesMenuCatalog.GroupNewItems,
+                    IconKey = "IconStar",
+                    IconColor = "#F59E0B",
+                    Visible = true,
+                    Children =
+                    {
+                        new UtilitiesMenuNode { Kind = "item", ItemId = "Services" }
+                    }
+                }
+            }
+        };
+
+        var result = UtilitiesMenuResolver.EnsureNewItemsGroup(layout);
+        Assert.NotNull(result);
+        var group = FindGroupRecursively(result!.Root, UtilitiesMenuCatalog.GroupNewItems);
+        Assert.NotNull(group);
+
+        // Легаси-звезда сброшена — построитель резолвит стандартную иконку каталога.
+        Assert.Null(group!.IconKey);
+        Assert.Null(group.IconColor);
+
+        // По обоим платформенным ключам это та же иконка NEW, что в контекстном меню.
+        Assert.Equal("NewBox", UtilitiesMenuCatalog.GroupWpfIconKind(group.GroupId!));
+        Assert.Equal("IconNewBox", UtilitiesMenuCatalog.GroupAvaloniaIconKey(group.GroupId!));
+        Assert.Equal("#22C55E", UtilitiesMenuCatalog.GroupIconColor(group.GroupId!));
+        Assert.Equal(
+            ContextMenuCatalog.GroupWpfIconKind(Workspace1C.Services.ContextMenuCatalog.GroupNewItems),
+            UtilitiesMenuCatalog.GroupWpfIconKind(group.GroupId!));
     }
 
     [Fact]

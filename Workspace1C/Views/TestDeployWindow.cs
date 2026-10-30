@@ -609,9 +609,12 @@ public class TestDeployWindow : Window
 
     /// <summary>
     /// Единое оформление полей ввода (issue #79): обходит логическое дерево окна и
-    /// назначает тематические стили полям (TextBox/PasswordBox — ModernTextBox,
-    /// ComboBox — ModernComboBox). Без явного стиля часть полей рисуется «серыми»
-    /// и без окантовки — «одни поля серые, вторые нормальные и с окантовкой».
+    /// назначает тематические стили полям (TextBox — ModernTextBox, ComboBox —
+    /// ModernComboBox). PasswordBox не стилизуется здесь: он получает темированный
+    /// implicit-стиль TargetType="PasswordBox" из LightTheme/DarkTheme (назначать
+    /// ему ModernTextBox с TargetType="TextBox" нельзя — см. ветку обхода ниже).
+    /// Без явного стиля часть полей рисуется «серыми» и без окантовки — «одни поля
+    /// серые, вторые нормальные и с окантовкой».
     /// </summary>
     private void ApplyModernStyles(System.Windows.DependencyObject root)
     {
@@ -623,8 +626,11 @@ public class TestDeployWindow : Window
         {
             if (child is TextBox tb && styleBox is not null)
                 tb.Style = styleBox;
-            else if (child is PasswordBox pb && styleBox is not null)
-                pb.Style = styleBox;
+            // PasswordBox стиль НЕ назначается (issue #79, 7OH 2026-10-29): ModernTextBox
+            // имеет TargetType="TextBox", а присваивание его PasswordBox бросает
+            // InvalidOperationException — «TargetType "TextBox" не соответствует типу
+            // элемента "PasswordBox"». Пароль получает темированный implicit-стиль
+            // TargetType="PasswordBox" из LightTheme/DarkTheme (см. ProfilesPanel.xaml).
             else if (child is ComboBox cb && styleCombo is not null)
                 cb.Style = styleCombo;
             if (child is System.Windows.DependencyObject d)

@@ -162,6 +162,13 @@ namespace Workspace1C
 
             ApplySavedWindowLayout();
 
+            // issue #55 (комментарий 7OH «окна сжимаются почти в ноль»): гарантированный
+            // минимум размера главного окна — тем же общим механизмом, что и у всех
+            // диалогов (ModalWindowBase.ClampWindowToMinSize). Главное окно не наследует
+            // ModalWindowBase, поэтому без этого вызова живой ресайз мышью сжимал бы
+            // его ниже MinWidth/MinHeight.
+            ModalWindowBase.ClampWindowToMinSize(this);
+
             DataContext = viewModel;
 
             Content = BuildRoot();

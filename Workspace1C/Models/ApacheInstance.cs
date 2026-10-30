@@ -68,4 +68,14 @@ public sealed class ApacheInstance
     /// </summary>
     public IReadOnlyDictionary<string, string> Defines { get; set; } =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Исходная строка запуска службы Apache (Windows: значение <c>ImagePath</c> из
+    /// реестра; Linux: пустая) — issue #63, комментарий 7OH от 2026-10-29: «Добавляем
+    /// в отладку исходные данные службы». Сохраняется как есть (без нормализации),
+    /// чтобы по логам CM_PUBLISH было видно, что реально записано в службе, и чтобы
+    /// VM-фаллбэк мог извлечь имя конфига (<c>-f conf\httpd27.conf</c>), даже если
+    /// <see cref="ConfPath"/> по какой-то причине не извлёкся.
+    /// </summary>
+    public string RawCommandLine { get; set; } = string.Empty;
 }

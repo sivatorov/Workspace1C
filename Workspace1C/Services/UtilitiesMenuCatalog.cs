@@ -266,8 +266,14 @@ public static class UtilitiesMenuCatalog
         var key = iconKey.Trim();
         return string.Equals(key, LegacyFallbackIconKey, StringComparison.Ordinal)
             || string.Equals(key, "Folder", StringComparison.Ordinal)
+            // «Звезда» — старый дефолт «Новинок» до появления NewBox; учитываем и варианты
+            // наборов/обводки, которые могли попасть в layout пользователя (issue #81).
             || string.Equals(key, "Star", StringComparison.Ordinal)
-            || string.Equals(key, "IconStar", StringComparison.Ordinal);
+            || string.Equals(key, "IconStar", StringComparison.Ordinal)
+            || string.Equals(key, "StarOutline", StringComparison.Ordinal)
+            || string.Equals(key, "IconStarOutline", StringComparison.Ordinal)
+            || string.Equals(key, "StarBorder", StringComparison.Ordinal)
+            || string.Equals(key, "IconStarBorder", StringComparison.Ordinal);
     }
 
     /// <summary>Ключ локализации заголовка стандартной группы.</summary>

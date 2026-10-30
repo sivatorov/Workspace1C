@@ -161,6 +161,25 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Contains("ApplyModernStyles", code, StringComparison.Ordinal);
         Assert.Contains("\"ModernTextBox\"", code, StringComparison.Ordinal);
         Assert.Contains("\"ModernComboBox\"", code, StringComparison.Ordinal);
+        // issue #79 (7OH, 2026-10-29 19:41): раньше ModernTextBox (TargetType="TextBox")
+        // присваивался PasswordBox — падение «Развернуть тестовую копию». PasswordBox
+        // не должен получать этот стиль.
+        Assert.DoesNotContain("pb.Style", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfWindow_ApplyModernStyles_DoesNotAssignTextBoxStyleToPasswordBox()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.cs"));
+        // issue #79, последний комментарий 7OH: «TargetType "TextBox" не соответствует
+        // типу элемента "PasswordBox"» (System.InvalidOperationException в stack-трейсе
+        // на строке ApplyModernStyles). Пароль оставлен на темированном implicit-стиле
+        // TargetType="PasswordBox" из LightTheme/DarkTheme — явное присваивание
+        // ModernTextBox этому контролу запрещено (см. ProfilesPanel.xaml).
+        Assert.Contains("ApplyModernStyles", code, StringComparison.Ordinal);
+        Assert.Contains("PasswordBox", code, StringComparison.Ordinal);
+        Assert.Contains("is ComboBox cb", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("pb.Style = styleBox", code, StringComparison.Ordinal);
     }
 
     [Fact]

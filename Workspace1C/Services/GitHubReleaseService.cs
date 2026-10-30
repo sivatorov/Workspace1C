@@ -7,8 +7,9 @@ namespace Workspace1C.Services;
 
 /// <summary>
 /// Проверка наличия новых версий приложения через GitHub Releases API.
-/// Кроссплатформенный: имя искомого asset выбирается по текущей ОС (Windows — exe,
-/// Linux — self-contained single-file бинарник без расширения).
+/// Кроссплатформенный: имя искомого asset выбирается по текущей ОС (Windows —
+/// self-contained single-file «Workspace1C.exe», Linux — «Workspace1C-linux-x64»,
+/// см. release.yml). Имена asset'ов согласованы с публикацией релизов (issue #89).
 /// </summary>
 public class GitHubReleaseService
 {
@@ -22,8 +23,8 @@ public class GitHubReleaseService
     /// <summary>Имя Windows-сборки (self-contained exe), на которую указывает прямая ссылка загрузки.</summary>
     private const string AssetName = "Workspace1C.exe";
 #else
-    /// <summary>Имя Linux-сборки (self-contained single-file бинарник без расширения, см. build-linux-single-file.sh).</summary>
-    private const string AssetName = "Workspace1C";
+    /// <summary>Имя Linux-сборки (self-contained single-file ELF, см. release.yml: Workspace1C-linux-x64).</summary>
+    private const string AssetName = "Workspace1C-linux-x64";
 #endif
 
     /// <summary>Шаблон прямой ссылки на asset release в GitHub Releases (без нормализации тега).</summary>
@@ -294,10 +295,11 @@ public class GitHubReleaseService
     /// (issue #302).
     /// <para>
     /// Поиск двухпроходный (issue #358): сначала ищется ассет с ТОЧНЫМ именем
-    /// <see cref="AssetName"/> (bare-exe «Workspace1C.exe» для Windows) —
-    /// он имеет жёсткий приоритет; лишь если его нет, принимаются прочие ассеты по
-    /// признакам <see cref="IsPlatformAsset"/> (но не ZIP-архивы: они не могут быть
-    /// поданы загрузчику напрямую и разрывали бы автообновление).
+    /// <see cref="AssetName"/> (для Windows — «Workspace1C.exe», для Linux —
+    /// «Workspace1C-linux-x64») — он имеет жёсткий приоритет; лишь если его нет,
+    /// принимаются прочие ассеты по признакам <see cref="IsPlatformAsset"/> (но не
+    /// ZIP-архивы: они не могут быть поданы загрузчику напрямую и разрывали бы
+    /// автообновление; на Linux также отбрасываются любые «.exe», issue #89).
     /// </para>
     /// </summary>
     internal static (string Url, long Size) FindAsset(JsonElement root)
@@ -380,14 +382,19 @@ public class GitHubReleaseService
 #else
     /// <summary>
     /// Признак Linux-ассета. ZIP-архивы исключены: загрузчик ставит скачанный файл
-    /// напрямую (issue #358). Linux-сборка — single-file исполняемый файл
-    /// «Workspace1C» без расширения (build-linux-single-file.sh),
-    /// либо AppImage/архив с признаком linux-x64.
+    /// напрямую (issue #358). Любые «.exe» (Windows-сборка) тоже исключены (issue #89):
+    /// на Linux автообновление должно получать ELF-бинарник, а не Windows-EXE.
+    /// Штатная Linux-сборка — single-file исполняемый файл «Workspace1C-linux-x64»
+    /// (см. release.yml); как запасные признаки принимаются «linux-x64» в имени,
+    /// старое имя «Workspace1C» без суффикса (build-linux-single-file.sh),
+    /// AppImage или архив .tar.gz.
     /// </summary>
     internal static bool IsPlatformAsset(string name)
     {
         var lower = name.ToLowerInvariant();
         if (lower.EndsWith(".zip", StringComparison.Ordinal))
+            return false;
+        if (lower.EndsWith(".exe", StringComparison.Ordinal))
             return false;
         return string.Equals(name.Trim(), "Workspace1C", StringComparison.OrdinalIgnoreCase)
             || lower.Contains("linux-x64", StringComparison.Ordinal)

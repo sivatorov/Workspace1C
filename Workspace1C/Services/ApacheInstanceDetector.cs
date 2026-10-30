@@ -88,8 +88,71 @@ public static partial class ApacheInstanceDetector
             ServerRoot = serverRoot ?? string.Empty,
             ConfPath = confPath ?? string.Empty,
             Htdocs = htdocs,
-            Kind = LooksLikeApache22(serverRoot) ? WebServerKind.Apache22 : WebServerKind.Apache24
+            Kind = LooksLikeApache22(serverRoot) ? WebServerKind.Apache22 : WebServerKind.Apache24,
+            // Issue #63, комментарий 7OH от 2026-10-29: «Добавляем в отладку исходные
+            // данные службы» — исходная строка ImagePath сохраняется для лога CM_PUBLISH
+            // и для VM-фаллбэка (имя конфига из -f, когда ConfPath не извлёкся).
+            RawCommandLine = imagePath ?? string.Empty
         };
+    }
+
+    /// <summary>
+    /// Имя основного конфиг-файла Apache из строки запуска службы (issue #63): для
+    /// <c>"-d c:\Apache\Apache24 -f conf\httpd27.conf"</c> возвращает «httpd27.conf».
+    /// Используется VM-фаллбэком при поиске файла алиасов, когда <see cref="ApacheInstance.ConfPath"/>
+    /// по какой-то причине не извлёкся (нестандартная запись <c>ImagePath</c>) — номер
+    /// инстанса из имени конфига службы всё равно позволяет найти <c>1c8Aliases27.conf</c>.
+    /// Возвращает null, если конфиг-файл в строке запуска не найден.
+    /// </summary>
+    public static string? ExtractConfFileNameFromCommandLine(string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return null;
+        var tokens = Tokenize(commandLine);
+
+        // Приоритет: токен сразу после ключа -f (/f) и с расширением .conf.
+        for (var i = 0; i + 1 < tokens.Count; i++)
+        {
+            if (!string.Equals(tokens[i], "-f", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(tokens[i], "/f", StringComparison.OrdinalIgnoreCase))
+                continue;
+            var candidate = tokens[i + 1];
+            if (candidate.StartsWith("-", StringComparison.Ordinal)
+                || candidate.StartsWith("/", StringComparison.Ordinal))
+                continue;
+            var name = SafeConfFileName(candidate);
+            if (name is not null)
+                return name;
+        }
+
+        // Сливная форма «-fconf\httpd27.conf» и любой токен-конфиг (кроме httpd.exe).
+        foreach (var token in tokens)
+        {
+            var name = SafeConfFileName(token);
+            if (name is not null)
+                return name;
+        }
+        return null;
+    }
+
+    private static string? SafeConfFileName(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)
+            || token.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            return null;
+        string extension;
+        try
+        {
+            extension = Path.GetExtension(token);
+        }
+        catch
+        {
+            return null;
+        }
+        if (!string.Equals(extension, ".conf", StringComparison.OrdinalIgnoreCase))
+            return null;
+        var fileName = Path.GetFileName(token.Trim().Trim('"'));
+        return string.IsNullOrWhiteSpace(fileName) ? null : fileName;
     }
 
     /// <summary>
@@ -410,13 +473,26 @@ public static partial class ApacheInstanceDetector
                 return value;
         }
 
+        // Слитная форма БЕЗ разделителя («-fconf\httpd27.conf», «/dC:/Apache») — реальные
+        // службы Apache создаются и сторонними обёртками, которые пишут ImagePath слитно
+        // (issue #63, последний комментарий 7OH: строка «-d c:\Apache\Apache24 -f
+        // conf\httpd27.conf» в логах отсутствовала, а конфиг всех служб вычислялся как
+        // дефолтный httpd.conf). Распознаётся только если остаток похож на путь/имя
+        // файла (содержит '\\', '/' или '.'), чтобы не спутать с посторонними ключами
+        // («-debug», «-d…» без пути).
+        foreach (var token in tokens)
+        {
+            var value = ExtractConcatenatedSwitch(token, key);
+            if (value is not null)
+                return value;
+        }
+
         return null;
     }
 
     /// <summary>
-    /// Значение слитного ключа вида «-f=value», «-f:value», «/f:value». Форма без
-    /// разделителя («-fvalue») намеренно не распознаётся — иначе посторонние ключи
-    /// вида «-debug» ошибочно приняли бы «ebug» за значение конфига.
+    /// Значение слитного ключа вида «-f=value», «-f:value», «/f:value» — конфиг службы
+    /// становится ConfPath инстанса, даже когда ImagePath записан без пробела (issue #63).
     /// </summary>
     private static string? ExtractInlineSwitch(string token, string key)
     {
@@ -433,6 +509,31 @@ public static partial class ApacheInstanceDetector
                 continue;
             value = value.Trim('"');
             return value.Length == 0 ? null : value;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Значение слитного ключа без разделителя: «-fconf\httpd27.conf», «/dC:/Apache».
+    /// Распознаётся ТОЛЬКО когда остаток похож на путь/имя файла — содержит разделитель
+    /// пути ('\\', '/') или точку (точка есть в «conf\httpd27.conf» и «httpd27.conf»).
+    /// Благодаря этому посторонние ключи вида «-debug» или «-D…» значением ключа не
+    /// становятся (в «ebug»/«…» нет разделителя пути и точки).
+    /// </summary>
+    private static string? ExtractConcatenatedSwitch(string token, string key)
+    {
+        foreach (var prefix in new[] { "-" + key, "/" + key })
+        {
+            if (string.Equals(token, prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!token.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var value = token.Substring(prefix.Length).Trim().Trim('"');
+            if (value.Length == 0)
+                continue;
+            if (value.IndexOf('\\') < 0 && value.IndexOf('/') < 0 && value.IndexOf('.') < 0)
+                continue;
+            return value;
         }
         return null;
     }
@@ -477,6 +578,28 @@ public static partial class ApacheInstanceDetector
         }
         if (current.Length > 0)
             tokens.Add(current.ToString());
+
+        // Незакрытая (непарная) кавычка в ImagePath — реальный сценарий сторонних
+        // обёрток служб (лишняя/оборванная кавычка вокруг пути httpd.exe или всей
+        // строки) — ломает токенизацию: остаток строки сливается в один токен, и
+        // ключи -d/-f перестают быть видимыми (конфиг всех служб сводится к
+        // дефолтному httpd.conf — именно это видно в логах комментария 7OH от
+        // 2026-10-29). При незакрытой кавычке делаем запасную разбивку по пробелам
+        // с очисткой кавычек с краёв токенов — ключи -d/-f снова извлекаются.
+        if (inQuotes)
+        {
+            var simple = new List<string>();
+            foreach (var raw in text.Split(
+                new[] { ' ', '\t', '\r', '\n' },
+                StringSplitOptions.RemoveEmptyEntries))
+            {
+                var token = raw.Trim().Trim('"');
+                if (token.Length > 0)
+                    simple.Add(token);
+            }
+            return simple.Count > 0 ? simple : tokens;
+        }
+
         return tokens;
     }
 

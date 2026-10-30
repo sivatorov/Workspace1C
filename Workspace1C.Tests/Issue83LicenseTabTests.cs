@@ -66,11 +66,48 @@ public sealed class Issue83LicenseTabTests
         // Понятное сообщение формируется единым методом (используется во вкладке).
         Assert.True(source.Contains("BuildUnavailableMessage()", StringComparison.Ordinal),
             "RingLicenseService: должен использоваться BuildUnavailableMessage() (issue #83).");
-        // issue #83 (комментарий 7OH «Давайте просто вызывать ring, а не искать её рядом»):
-        // ring резолвится по PATH с учётом PATHEXT и не подменяется первым кандидатом
-        // рядом с rac.
-        Assert.Contains("ResolveRingInPath", source, StringComparison.Ordinal);
-        Assert.Contains("RingPathExtensions", source, StringComparison.Ordinal);
+        // issue #83 (последний комментарий 7OH от 2026-10-29): утилита НЕ ищется ручным
+        // перебором PATH/PATHEXT с подменой полного пути — доступность проверяется запуском
+        // «where.exe ring»/«which ring» (запасной способ — «ring --version»), а вызывается
+        // «ring» как есть.
+        Assert.Contains("FindRingInPathAsync", source, StringComparison.Ordinal);
+        Assert.Contains("where.exe", source, StringComparison.Ordinal);
+        Assert.Contains("which", source, StringComparison.Ordinal);
+        Assert.Contains("--version", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveRingInPath", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("RingPathExtensions", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RingCandidate_IsInvokedAsIs_AndSkippedWhenPathProbeFailed()
+    {
+        // issue #83 (комментарий 7OH «Зачем её искать?»): команда «ring» вызывается как
+        // есть — без ручного резолва полного пути по PATH/PATHEXT.
+        var candidates = RingLicenseService.CommandCandidates(includePathRing: true);
+        Assert.Contains(candidates,
+            c => c.Command == "ring"
+                 && c.Arguments.Length == 2
+                 && c.Arguments[0] == "license"
+                 && c.Arguments[1] == "list"
+                 && c.Source == "ring (PATH)");
+
+        // Если проверка where/which показала, что ring в PATH нет — кандидат не добавляется
+        // (не порождает StartError «Не удается найти указанный файл» при каждом обновлении).
+        var skipped = RingLicenseService.CommandCandidates(includePathRing: false);
+        Assert.DoesNotContain(skipped, c => c.Source == "ring (PATH)");
+        Assert.DoesNotContain(skipped, c => c.Command == "ring");
+    }
+
+    [Fact]
+    public void FirstNonEmptyLine_ReturnsFirstMeaningfulLine()
+    {
+        // Разбор вывода where/which: первый найденный путь — маркер доступности ring.
+        Assert.Null(RingLicenseService.FirstNonEmptyLine(string.Empty));
+        Assert.Null(RingLicenseService.FirstNonEmptyLine("  \n\t\n"));
+        Assert.Equal("C:\\bin\\ring.exe",
+            RingLicenseService.FirstNonEmptyLine("\nC:\\bin\\ring.exe\r\nD:\\other\\ring.exe"));
+        Assert.Equal("/usr/bin/ring",
+            RingLicenseService.FirstNonEmptyLine("/usr/bin/ring\n/opt/ring"));
     }
 
     // ===================== Порядок вкладок (issue #83) =====================

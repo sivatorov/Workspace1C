@@ -36,11 +36,23 @@ public static class ThemeFeatureMap
     /// </summary>
     public const string WindowButtonMaximizeHoverBrushKey = "WindowButtonMaximizeHoverBrush";
 
+    /// <summary>
+    /// Ключ кисти подложки кнопок управления окном при НЕАКТИВНОМ окне (issue #26,
+    /// комментарий 7OH от 2026-10-29 «Подсветка кнопок управления основным окном
+    /// при неактивности - белая подсветка»): шапка неактивного окна залита тёмной
+    /// карточкой, и полупрозрачная белая <see cref="WindowButtonHoverBrushKey"/> на ней
+    /// выглядит «белой подсветкой с белыми элементами». В тёмной теме неактивная
+    /// подложка наведения — приглушённый тёмный slate (#334155), в светлой — прежние
+    /// «дневные» подложки стиля.
+    /// </summary>
+    public const string WindowButtonInactiveHoverBrushKey = "WindowButtonInactiveHoverBrush";
+
     /// <summary>Все ключи ресурсов полноценной темы (в порядке выдачи).</summary>
     public static readonly string[] AllResourceKeys =
     {
         WindowButtonHoverBrushKey, WindowButtonCloseHoverBrushKey,
         WindowButtonMinimizeHoverBrushKey, WindowButtonMaximizeHoverBrushKey,
+        WindowButtonInactiveHoverBrushKey,
         WindowButtonCornerRadiusKey, WindowButtonSizeKey, IconSetNameKey
     };
 
@@ -125,6 +137,24 @@ public static class ThemeFeatureMap
         if (dark && style is not WindowButtonStyle.MacOS and not WindowButtonStyle.Glass)
             metrics = metrics with { HoverHex = DarkThemeWindowButtonHoverHex };
         return metrics;
+    }
+
+    /// <summary>
+    /// Подложка наведения кнопок управления окном при НЕАКТИВНОМ окне (issue #26,
+    /// комментарий 7OH от 2026-10-29): шапка неактивного окна залита тёмной карточкой,
+    /// и полупрозрачная белая <see cref="DarkThemeWindowButtonHoverHex"/> на ней смотрится
+    /// «белой подсветкой с белыми элементами». В тёмной теме неактивная подложка —
+    /// приглушённый тёмный slate (как «зебра»/ItemHover), в светлой теме — прежние
+    /// «дневные» подложки стиля. «Светофор» macOS и полупрозрачный Glass сохраняют
+    /// собственные подложки (круг светофора всегда цветной, Glass — полупрозрачный).
+    /// </summary>
+    public const string DarkThemeInactiveWindowButtonHoverHex = "#334155";
+
+    public static string InactiveHoverHex(WindowButtonStyle style, bool dark)
+    {
+        if (!dark || style is WindowButtonStyle.MacOS or WindowButtonStyle.Glass)
+            return ButtonMetrics(style, dark: false).HoverHex;
+        return DarkThemeInactiveWindowButtonHoverHex;
     }
 
     /// <summary>

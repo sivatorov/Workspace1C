@@ -153,9 +153,12 @@
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                 <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>
-                <!-- Подложка наведения — из темы. На акцентной шапке (WindowControlButtonOnAccent)
-                     переопределяется полупрозрачным белым, чтобы оставаться читаемой. -->
-                <Setter Property="local:WindowChromeHelper.HoverBrush" Value="{DynamicResource WindowButtonHoverBrush}"/>
+                <!-- Подложка наведения — из темы. Активный заголовок (WindowControlButtonOnAccent)
+                     переопределяет её полупрозрачным белым, чтобы оставаться читаемой; обычный
+                     стиль (неактивное главное окно, шапка карточки) использует приглушённую
+                     кисть WindowButtonInactiveHoverBrush — в тёмной теме она тёмная, и кнопки
+                     не «светятся белым» (issue #26, комментарий 7OH от 2026-10-29). -->
+                <Setter Property="local:WindowChromeHelper.HoverBrush" Value="{DynamicResource WindowButtonInactiveHoverBrush}"/>
                 <Setter Property="local:WindowChromeHelper.PressedBrush" Value="{DynamicResource AccentPressedBrush}"/>
                 <Setter Property="local:WindowChromeHelper.FocusBrush" Value="{DynamicResource AccentBrush}"/>
                 <Setter Property="Template">
@@ -207,7 +210,12 @@
                                             </Storyboard>
                                         </BeginStoryboard>
                                     </Trigger.ExitActions>
-                                    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                    <!-- Значок под курсором: вторичный, а не основной/белый — при
+                                         неактивном окне (шапка карточки) «белые элементы» больше
+                                         не появляются (issue #26). OnAccent-вариант переопределяет
+                                         Foreground в стиле, но триггер шаблона возвращает вторичный
+                                         цвет; на акцентной шапке вторичный светлый читается. -->
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
                                     <Trigger.EnterActions>

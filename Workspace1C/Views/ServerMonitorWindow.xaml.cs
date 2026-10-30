@@ -53,21 +53,34 @@ namespace Workspace1C
         private readonly Dictionary<string, double[]> _columnWidths = new();
 
         /// <summary>
-        /// Заголовки, к которым уже привязано отслеживание ширины и «ручки» изменения
-        /// размера (issue #75): заголовки пересоздаются при переключении вкладок, повторные
-        /// подписки на один экземпляр не нужны.
+        /// Заголовки, к которым уже привязано отслеживание ширины (issue #75): заголовки
+        /// пересоздаются при переключении вкладок, повторные подписки на один экземпляр не нужны.
         /// </summary>
         private readonly HashSet<System.Windows.Controls.Primitives.DataGridColumnHeader> _trackedColumnHeaders = new();
 
+        /// <summary>
+        /// Гриды, на которых уже установлен ОБЩИЙ перехват перетаскивания границ колонок
+        /// (issue #75, 1.0.1.4): перехват висит на гриде (PreviewMouseLeftButtonDown), а не на
+        /// заголовках — заголовки пересоздаются при переключении вкладок, и их перехват через
+        /// генератор контейнеров в прежних версиях не срабатывал у пользователя (комментарий
+        /// 7OH: «вообще ничего не меняется»), грид же стабилен на весь срок жизни окна.
+        /// </summary>
+        private readonly HashSet<DataGrid> _dragInterceptedGrids = new();
+
         /// <summary>Состояние перетаскивания границы колонки (issue #75; 1.0.0.96+).</summary>
         private DataGrid? _resizingGrid;
+        /// <summary>
+        /// Заголовок, границу которого перетаскивают (issue #75, 1.0.1.4): нужен для пересчёта
+        /// координат мыши в локальную систему заголовка во время захвата гридом.
+        /// </summary>
+        private System.Windows.Controls.Primitives.DataGridColumnHeader? _resizingHeader;
         private int _resizingColumnIndex = -1;
         private bool _resizingWithCtrl;
         private double[] _resizeStartWidths = Array.Empty<double>();
         private double _resizeTotalDelta;
         /// <summary>Начальная горизонтальная позиция мыши в заголовке (перетаскивание, issue #75).</summary>
         private double _resizeStartX;
-        /// <summary>Идёт ли собственный цикл перетаскивания (захват мыши заголовком, issue #75).</summary>
+        /// <summary>Идёт ли собственный цикл перетаскивания (захват мыши гридом, issue #75).</summary>
         private bool _resizingActive;
         /// <summary>
         /// Ширина «зоны границы» заголовка колонки, px (issue #75): перетаскивание
@@ -335,6 +348,12 @@ namespace Workspace1C
 
         private void AttachColumnWidthTracking(DataGrid grid, string tabKey)
         {
+            // issue #75 (1.0.1.4): общий перехват перетаскивания границ колонок вешается
+            // на ГРИД сразу (грид существует и стабилен с момента создания окна), тогда
+            // как сами заголовки материализуются позже и пересоздаются при переключении
+            // вкладок — прежний перехват на заголовках через генератор контейнеров
+            // в реальном приложении не срабатывал (см. AttachGridColumnDrag).
+            AttachGridColumnDrag(grid, tabKey);
             grid.Loaded += (_, _) =>
             {
                 // Заголовки материализуются после первичной компоновки — обрабатываем
@@ -383,58 +402,92 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Привязывает к заголовку отслеживание ширины и переопределённое перетаскивание
-        /// границы (issue #75): обычное перетаскивание двигает ВСЕ колонки справа без
-        /// изменения их ширины (при переполнении области появляется горизонтальная
-        /// прокрутка), с зажатым Ctrl меняется ширина только двух смежных колонок.
+        /// Общий перехват перетаскивания границ колонок НА УРОВНЕ ГРИДА (issue #75, 1.0.1.4):
+        /// обычное перетаскивание двигает ВСЕ колонки справа как блок (их ширины не меняются,
+        /// при переполнении области появляется горизонтальная прокрутка), с зажатым Ctrl
+        /// меняется ширина только двух смежных колонок.
         /// <para>
-        /// В 1.0.0.96 семантика вешалась на события Thumb «ручки» (<c>PART_RightHeaderGripper</c>,
-        /// найденной через FindName шаблона заголовка), рассчитывая перекрыть внутренний
-        /// обработчик DataGridColumnHeader — на практике перехват не срабатывал (ручка
-        /// не всегда находилась по имени шаблона, а внутренний обработчик успевал применить
-        /// штатную ширину), и пользователь не замечал изменений (issue #75, комментарий
-        /// 7OH от 2026-10-28 «изменений по работе с шириной колонок — не замечено»).
-        /// Теперь перетаскивание ведётся САМИМ заголовком через захват мыши:
-        /// <c>PreviewMouseLeftButtonDown</c> перехватывает клик в зоне границы ДО
-        /// внутренних обработчиков (e.Handled), <c>MouseMove</c> применяет ту же семантику
-        /// «как в 1С» из <see cref="ServerMonitorColumnWidthsStore"/>.
+        /// Почему на гриде, а не на заголовках. Штатный ресайз колонок WPF-DataGrid обрабатывает
+        /// сам DataGridColumnHeader: при перетаскивании границы «звёздные» колонки справа
+        /// перераспределяют ширину на себя и ужимаются до минимума — ровно то, что видел
+        /// пользователь в прежних версиях (комментарий 7OH от 2026-10-29: «вообще ничего не
+        /// меняется… ужимает 2 справа до определённого предела и всё», «вместо изменения
+        /// размера двух соседних»). Прежние фиксы вешали перехват на сами заголовки
+        /// (<c>PART_RightHeaderGripper</c> через FindName шаблона в 1.0.0.96, затем
+        /// <c>PreviewMouseLeftButtonDown</c> заголовка в 1.0.1.1/1.0.1.3) — в реальном
+        /// приложении он не срабатывал: заголовки материализуются и пересоздаются при
+        /// переключении вкладок, и перехват через генератор контейнеров либо не успевал
+        /// навеситься, либо внутренний обработчик заголовка срабатывал раньше.
+        /// </para>
+        /// <para>
+        /// Здесь перехват висит на самом гриде: <c>PreviewMouseLeftButtonDown</c> грида
+        /// срабатывает ДО любого обработчика заголовка (tunnel-фаза идёт от корня вниз),
+        /// не зависит от материализации заголовков, а <c>e.Handled</c> останавливает доставку
+        /// события штатному ресайзу DataGrid. Заголовок под курсором находится в момент клика
+        /// подъёмом от источника события, зона границы — те же 24 px (<see cref="HeaderResizeHotZone"/>).
+        /// Мышь на время перетаскивания захватывается гридом (<c>CaptureMouse</c>), движение
+        /// применяет единую семантику «как в 1С» из <see cref="ServerMonitorColumnWidthsStore"/>.
         /// </para>
         /// </summary>
-        private void AttachHeaderTracking(DataGrid grid, string tabKey, System.Windows.Controls.Primitives.DataGridColumnHeader header)
+        private void AttachGridColumnDrag(DataGrid grid, string tabKey)
         {
-            if (!_trackedColumnHeaders.Add(header))
+            if (!_dragInterceptedGrids.Add(grid))
                 return;
-            header.SizeChanged += (_, _) => CaptureColumnWidths(grid, tabKey);
-            header.PreviewMouseLeftButtonDown += (_, e) =>
+            grid.PreviewMouseLeftButtonDown += (_, e) =>
             {
-                var columnIndex = header.Column is null ? -1 : grid.Columns.IndexOf(header.Column);
+                if (_resizingActive)
+                    return;
+                var source = e.OriginalSource as DependencyObject;
+                var header = source is null
+                    ? null
+                    : FindAncestor<System.Windows.Controls.Primitives.DataGridColumnHeader>(source);
+                if (header is null || header.Column is null)
+                    return; // клик не по заголовку (ячейка, скроллбар и т.п.) — не трогаем
+                var columnIndex = grid.Columns.IndexOf(header.Column);
                 if (columnIndex < 0 || columnIndex >= grid.Columns.Count)
                     return;
-                // Зона границы: правые ~16 px заголовка (ширина «ручки» + запас).
+                // Зона границы: правые ~24 px заголовка (ширина «ручки» + запас).
                 var x = e.GetPosition(header).X;
                 if (x < header.ActualWidth - HeaderResizeHotZone)
                     return;
                 StartColumnDrag(grid, header, columnIndex, x);
                 e.Handled = true;
             };
-            header.MouseMove += (_, e) =>
+            grid.MouseMove += (_, e) =>
+            {
+                if (_resizingGrid == grid && _resizingActive && _resizingHeader is not null)
+                    UpdateColumnDrag(grid, e.GetPosition(_resizingHeader).X);
+            };
+            grid.MouseLeftButtonUp += (_, _) =>
             {
                 if (_resizingGrid == grid && _resizingActive)
-                    UpdateColumnDrag(grid, e.GetPosition(header).X);
+                {
+                    FinishColumnDrag(grid, tabKey);
+                    // Освобождаем захват после завершения перетаскивания (LostMouseCapture
+                    // при этом вызовет FinishColumnDrag повторно — защищено сбросом состояния).
+                    grid.ReleaseMouseCapture();
+                }
             };
-            header.MouseLeftButtonUp += (_, e) =>
+            grid.LostMouseCapture += (_, _) =>
             {
                 if (_resizingGrid == grid && _resizingActive)
                     FinishColumnDrag(grid, tabKey);
-                // Освобождаем захват после завершения перетаскивания (LostMouseCapture
-                // при этом вызовет FinishColumnDrag повторно — защищено сбросом состояния).
-                header.ReleaseMouseCapture();
             };
-            header.LostMouseCapture += (_, _) =>
-            {
-                if (_resizingGrid == grid && _resizingActive)
-                    FinishColumnDrag(grid, tabKey);
-            };
+        }
+
+        /// <summary>
+        /// Привязывает к заголовку отслеживание ширины (issue #75): при изменении ширины
+        /// колонки (в т.ч. нашим перетаскиванием) фиксируются фактические ширины вкладки.
+        /// Заголовки пересоздаются при переключении вкладок, поэтому подписка ставится на
+        /// каждый материализованный экземпляр (дедупликация — <see cref="_trackedColumnHeaders"/>).
+        /// Само перетаскивание перехватывается на гриде (<see cref="AttachGridColumnDrag"/>),
+        /// здесь оно не дублируется.
+        /// </summary>
+        private void AttachHeaderTracking(DataGrid grid, string tabKey, System.Windows.Controls.Primitives.DataGridColumnHeader header)
+        {
+            if (!_trackedColumnHeaders.Add(header))
+                return;
+            header.SizeChanged += (_, _) => CaptureColumnWidths(grid, tabKey);
         }
 
         /// <summary>
@@ -443,6 +496,11 @@ namespace Workspace1C
         /// гибкие (звёздные) колонки в пиксели: иначе при обычном перетаскивании звёздные
         /// колонки справа перераспределяли бы ширину на себя («двигает одну-две,
         /// упираются в третью» — и граница дальше не идёт).
+        /// <para>
+        /// Мышь захватывается ГРИДОМ (а не заголовком): грид стабилен, а заголовки
+        /// пересоздаются при переключении вкладок — захват заголовка мог обрываться.
+        /// Движение и отпускание обрабатываются на гриде (см. <see cref="AttachGridColumnDrag"/>).
+        /// </para>
         /// </summary>
         private void StartColumnDrag(DataGrid grid, System.Windows.Controls.Primitives.DataGridColumnHeader header, int columnIndex, double startX)
         {
@@ -453,14 +511,15 @@ namespace Workspace1C
                     grid.Columns[j].Width = new DataGridLength(grid.Columns[j].ActualWidth);
             }
             _resizingGrid = grid;
+            _resizingHeader = header;
             _resizingColumnIndex = columnIndex;
             _resizingWithCtrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
             _resizeTotalDelta = 0;
             _resizeStartX = startX;
             _resizingActive = true;
-            // Захват мыши заголовком: MouseMove продолжает приходить, даже когда курсор
-            // выходит за пределы заголовка (drag границы за пределы окна не обрывается).
-            header.CaptureMouse();
+            // Захват мыши гридом: MouseMove продолжает приходить, даже когда курсор
+            // выходит за пределы заголовка/грида (drag границы за пределы окна не обрывается).
+            grid.CaptureMouse();
         }
 
         /// <summary>
@@ -498,6 +557,7 @@ namespace Workspace1C
             // в настройки (переживают закрытие программы).
             CaptureColumnWidths(grid, tabKey);
             _resizingGrid = null;
+            _resizingHeader = null;
             _resizingColumnIndex = -1;
             _resizeStartWidths = Array.Empty<double>();
             _resizeTotalDelta = 0;
@@ -540,6 +600,23 @@ namespace Workspace1C
                 var result = FindVisualChild<T>(child);
                 if (result is not null)
                     return result;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Ищет предка заданного типа в визуальном дереве (включая сам узел): по источнику
+        /// события клика поднимается до <see cref="System.Windows.Controls.Primitives.DataGridColumnHeader"/>
+        /// (клик может прийти в Thumb «ручки» PART_RightHeaderGripper или внутренний элемент
+        /// шаблона заголовка). Та же схема, что в MainWindow (issue #75, 1.0.1.4).
+        /// </summary>
+        private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+        {
+            while (current is not null)
+            {
+                if (current is T typed)
+                    return typed;
+                current = VisualTreeHelper.GetParent(current);
             }
             return null;
         }

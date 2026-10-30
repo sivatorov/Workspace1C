@@ -20,6 +20,14 @@ namespace Workspace1C.Themes
         public IBrush Hover { get; private set; } = Brushes.Transparent;
         public IBrush CloseHover { get; private set; } = Brushes.Transparent;
 
+        /// <summary>
+        /// Кисть подложки наведения при НЕАКТИВНОМ окне (issue #26, комментарий 7OH
+        /// от 2026-10-29 «подсветка кнопок управления основным окном при неактивности —
+        /// белая»): шапка неактивного окна тёмная, поэтому в тёмной теме подложка —
+        /// приглушённый тёмный slate, а не полупрозрачный белый (Hover).
+        /// </summary>
+        public IBrush InactiveHover { get; private set; } = Brushes.Transparent;
+
         /// <summary>Кисть подложки кнопки «свернуть» (Задача 3): у macOS-«светофора» жёлтый круг.</summary>
         public IBrush MinimizeHover { get; private set; } = Brushes.Transparent;
 
@@ -42,6 +50,8 @@ namespace Workspace1C.Themes
             {
                 Hover = Parse(fallback.HoverHex),
                 CloseHover = Parse(fallback.CloseHoverHex),
+                InactiveHover = Parse(ThemeFeatureMap.InactiveHoverHex(
+                    ThemeManager.CurrentWindowButtonStyle, dark: false)),
                 MinimizeHover = Parse(fallback.MinimizeHoverHex ?? fallback.HoverHex),
                 MaximizeHover = Parse(fallback.MaximizeHoverHex ?? fallback.HoverHex),
                 CornerRadius = fallback.CornerRadius,
@@ -57,6 +67,9 @@ namespace Workspace1C.Themes
             if (resources.TryGetResource(ThemeFeatureMap.WindowButtonCloseHoverBrushKey, null, out var closeHover)
                 && closeHover is IBrush closeHoverBrush)
                 result.CloseHover = closeHoverBrush;
+            if (resources.TryGetResource(ThemeFeatureMap.WindowButtonInactiveHoverBrushKey, null, out var inactiveHover)
+                && inactiveHover is IBrush inactiveHoverBrush)
+                result.InactiveHover = inactiveHoverBrush;
             if (resources.TryGetResource(ThemeFeatureMap.WindowButtonMinimizeHoverBrushKey, null, out var minHover)
                 && minHover is IBrush minHoverBrush)
                 result.MinimizeHover = minHoverBrush;

@@ -177,7 +177,9 @@ public sealed class Issue71SettingsWindowLayoutTests
     public void Hotkeys_Avalonia_HotkeyBoxColumnsAlignedFixedWidth()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.Hotkeys.cs"));
-        Assert.Contains("new ColumnDefinition(260)", code, StringComparison.Ordinal);
+        // Avalonia 11 не имеет неявного преобразования double → GridLength, поэтому
+        // фиксированная колонка подписей 260 записывается как new GridLength(260).
+        Assert.Contains("new ColumnDefinition(new GridLength(260))", code, StringComparison.Ordinal);
         Assert.DoesNotContain("MinWidth = 150", code, StringComparison.Ordinal);
         Assert.DoesNotContain("HorizontalScrollBarVisibility = ScrollBarVisibility.Auto", code, StringComparison.Ordinal);
     }
@@ -204,5 +206,62 @@ public sealed class Issue71SettingsWindowLayoutTests
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
         Assert.Contains("Math.Max(settings.WindowWidth, MinWidth)", code, StringComparison.Ordinal);
         Assert.Contains("Math.Max(settings.WindowHeight, MinHeight)", code, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------
+    // Гарантия минимума на уровне ОС/общей базы окон (issue #71, последний
+    // комментарий 7OH «окно спокойно ужимается до размера заголовка»):
+    // зажим на SizeChanged/ClientSize не успевает, когда ресайз идёт мышью
+    // (а при кастомном WindowChrome WPF может не перевести MinWidth/MinHeight
+    // в системный трек-размер). WPF-хук WM_GETMINMAXINFO зажимает ptMinTrackSize,
+    // Avalonia-окна получают общий зажим ClientSize в ModalWindowBase.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void WindowChromeHelper_Wpf_EnforcesMinTrackSizeInGetMinMaxInfo()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        Assert.Contains("MinTrackSize", code, StringComparison.Ordinal);
+        Assert.Contains("window.MinWidth", code, StringComparison.Ordinal);
+        Assert.Contains("window.MinHeight", code, StringComparison.Ordinal);
+        Assert.Contains("HookMinTrackAndMaximize", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ModalWindowBase_Avalonia_ClampsAllDialogsToMinSizes()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ModalWindowBase.cs"));
+        // Общий механизм зажима (issues #71/#55): публичный статический метод вызывается
+        // базовым классом для всех диалогов и окнами вне иерархии (главное окно).
+        Assert.Contains("ClampWindowToMinSize", code, StringComparison.Ordinal);
+        Assert.Contains("GetObservable(ClientSizeProperty)", code, StringComparison.Ordinal);
+        Assert.Contains("window.Width = window.MinWidth;", code, StringComparison.Ordinal);
+        Assert.Contains("window.Height = window.MinHeight;", code, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------
+    // Issue #55 (комментарий 7OH «окна сжимаются почти в ноль»): гарантия
+    // минимума распространяется на ВСЕ изменяемые окна, включая главное.
+    // WPF: главное окно оформляется собственными средствами, но хук
+    // WM_GETMINMAXINFO получает тем же общим механизмом. Avalonia: главное
+    // окно не наследует ModalWindowBase, поэтому вызывает общий
+    // ClampWindowToMinSize в конструкторе.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void MainWindow_Wpf_GetsMinTrackHookViaCommonHelper()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        // OnWindowLoaded: для главного окна оформление не применяется, но хук минимума
+        // ставится (HookMinTrackAndMaximize), иначе ресайз сжимал бы окно «почти в ноль».
+        Assert.Contains("if (window is MainWindow)", code, StringComparison.Ordinal);
+        Assert.Contains("HookMinTrackAndMaximize(window);", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainWindow_Avalonia_GetsCommonMinSizeClamp()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("ModalWindowBase.ClampWindowToMinSize(this);", code, StringComparison.Ordinal);
     }
 }

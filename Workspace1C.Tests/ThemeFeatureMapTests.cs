@@ -184,6 +184,7 @@ public sealed class ThemeFeatureMapTests
         Assert.Equal("WindowButtonCloseHoverBrush", ThemeFeatureMap.WindowButtonCloseHoverBrushKey);
         Assert.Equal("WindowButtonMinimizeHoverBrush", ThemeFeatureMap.WindowButtonMinimizeHoverBrushKey);
         Assert.Equal("WindowButtonMaximizeHoverBrush", ThemeFeatureMap.WindowButtonMaximizeHoverBrushKey);
+        Assert.Equal("WindowButtonInactiveHoverBrush", ThemeFeatureMap.WindowButtonInactiveHoverBrushKey);
         Assert.Equal("WindowButtonCornerRadius", ThemeFeatureMap.WindowButtonCornerRadiusKey);
         Assert.Equal("WindowButtonSize", ThemeFeatureMap.WindowButtonSizeKey);
         Assert.Equal("IconSetName", ThemeFeatureMap.IconSetNameKey);
@@ -198,6 +199,7 @@ public sealed class ThemeFeatureMapTests
             "WindowButtonCloseHoverBrush",
             "WindowButtonMinimizeHoverBrush",
             "WindowButtonMaximizeHoverBrush",
+            "WindowButtonInactiveHoverBrush",
             "WindowButtonCornerRadius",
             "WindowButtonSize",
             "IconSetName"

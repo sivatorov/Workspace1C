@@ -462,8 +462,14 @@ public sealed class WebPublishViewModel : ViewModelBase
         }
         foreach (var instance in found)
         {
+            // Issue #63, комментарий 7OH от 2026-10-29: «Добавляем в отладку исходные
+            // данные службы» — пишем и исходную строку ImagePath: по ней видно, что
+            // реально записано в службе (в т.ч. -d/-f), и почему конфиг тот или иной.
+            var imagePath = string.IsNullOrWhiteSpace(instance.RawCommandLine)
+                ? "(пусто)"
+                : instance.RawCommandLine.Replace("\r", "\\r").Replace("\n", "\\n");
             TracePublish($"инстанс Apache найден: служба={instance.Name}, " +
-                         $"конфиг={instance.ConfPath}, ServerRoot={instance.ServerRoot}");
+                         $"конфиг={instance.ConfPath}, ServerRoot={instance.ServerRoot}, ImagePath={imagePath}");
         }
     }
 
@@ -630,6 +636,26 @@ public sealed class WebPublishViewModel : ViewModelBase
             catch
             {
                 // Невалидное имя — пропускаем кандидат.
+            }
+        }
+
+        // Имя конфига из строки запуска службы («-f conf\httpd27.conf» → «httpd27.conf» →
+        // «27») — issue #63, последний комментарий 7OH: у пользователя все службы Apache
+        // (2.4_51/_54/_55 и др.) определялись с дефолтным httpd.conf, т.к. -f из ImagePath
+        // не извлекался. Даже в этом случае номер инстанса из строки запуска обязан
+        // дать суффикс для fallback-поиска файла алиасов 1c8Aliases27.conf.
+        if (!string.IsNullOrWhiteSpace(instance.RawCommandLine))
+        {
+            var rawConfName = ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(instance.RawCommandLine);
+            if (!string.IsNullOrWhiteSpace(rawConfName))
+            {
+                var rawName = Path.GetFileNameWithoutExtension(rawConfName);
+                if (!string.IsNullOrWhiteSpace(rawName))
+                {
+                    var digitStart = rawName.IndexOfAny(new[] { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' });
+                    if (digitStart >= 0)
+                        Add(rawName.Substring(digitStart));
+                }
             }
         }
 

@@ -85,6 +85,15 @@ namespace Workspace1C
 
         private static readonly TimeSpan ServicesStatusRefreshInterval = TimeSpan.FromSeconds(5);
 
+        /// <summary>
+        /// Ширина «ручки»-зоны захвата границы колонки, px (issue #75, 1.0.1.4): 21 px + выступ
+        /// 3 px за правый край колонки (Margin 0,0,-3,0) = 24 px — та же зона перетаскивания,
+        /// что в WPF-версии (<c>HeaderResizeHotZone</c>=24). Прежняя ручка 7 px была слишком
+        /// узкой: пользователи целятся в границу и по краю заголовка, узкая зона пропускала
+        /// часть кликов в сортировку вместо перетаскивания (комментарий 7OH, issue #75).
+        /// </summary>
+        private const double ColumnGripWidth = 21.0;
+
         /// <param name="openClusterImport">
         /// Открытие окна импорта с сервером, текущим на момент нажатия «Импорт»
         /// (issue #27); null — кнопка «Импорт» под списком баз не показывает импорт.
@@ -961,8 +970,9 @@ namespace Workspace1C
                 headerGrid.Children.Add(button);
 
                 // Граница колонки в заголовке (issue #3, 7OH 17.10): видимая вертикальная
-                // линия + «ручка» шириной 7 px — перетаскиванием меняется ширина колонки
-                // в шапке и во всех строках.
+                // линия + «ручка»-зона захвата — перетаскиванием меняется ширина колонки
+                // в шапке и во всех строках. Ширина зоны — ColumnGripWidth (21 px) + выступ
+                // 3 px = 24 px, та же зона, что в WPF (HeaderResizeHotZone=24, issue #75, 1.0.1.4).
                 var index = i;
                 var line = new Border
                 {
@@ -973,7 +983,7 @@ namespace Workspace1C
                 ThemeBrushes.Bind(line, Border.BackgroundProperty, "BorderColorBrush");
                 var grip = new Border
                 {
-                    Width = 7,
+                    Width = ColumnGripWidth,
                     Background = Brushes.Transparent,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     Margin = new Thickness(0, 0, -3, 0),

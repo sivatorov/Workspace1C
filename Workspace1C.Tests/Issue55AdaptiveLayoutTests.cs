@@ -121,8 +121,10 @@ public sealed class Issue55AdaptiveLayoutTests
     public void SettingsWindow_Avalonia_HotkeyRows_LabelColumnFixed()
     {
         // issue #86: фиксированная ширина колонки подписей (260) — без Auto/MinWidth-«гребёнки».
+        // Avalonia 11 не имеет неявного преобразования double → GridLength, поэтому
+        // фиксированная колонка 260 записывается как new GridLength(260).
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.Hotkeys.cs"));
-        Assert.Contains("new ColumnDefinition(260)", code, StringComparison.Ordinal);
+        Assert.Contains("new ColumnDefinition(new GridLength(260))", code, StringComparison.Ordinal);
         Assert.DoesNotContain("MinWidth = 150", code, StringComparison.Ordinal);
     }
 
@@ -262,5 +264,35 @@ public sealed class Issue55AdaptiveLayoutTests
         Assert.Contains("MinHeight = 560;", code, StringComparison.Ordinal);
         // Заголовок и строки лежат в общем горизонтальном ScrollViewer (issue #75).
         Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Auto", code, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------
+    // Гарантированный минимум ВСЕХ изменяемых окон (issue #55, последний
+    // комментарий 7OH «окна сжимаются почти в ноль»): главное окно на обеих
+    // платформах получает минимум тем же общим механизмом, что и диалоги —
+    // WPF: хук WM_GETMINMAXINFO (WindowChromeHelper), Avalonia: зажим ClientSize
+    // (ModalWindowBase.ClampWindowToMinSize).
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void MainWindow_MinSizesGuaranteed_OnBothPlatforms()
+    {
+        // WPF: главное окно объявляет минимумы и подключено к общему хуку
+        // минимума (оформление у него собственное, поэтому хук ставится
+        // отдельной веткой OnWindowLoaded).
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
+        Assert.Contains("MinWidth=\"900\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"600\"", xaml, StringComparison.Ordinal);
+
+        var helper = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        Assert.Contains("if (window is MainWindow)", helper, StringComparison.Ordinal);
+        Assert.Contains("HookMinTrackAndMaximize(window);", helper, StringComparison.Ordinal);
+
+        // Avalonia: минимумы объявлены, окно вызывает общий зажим базы диалогов
+        // (MainWindow не наследует ModalWindowBase — без вызова минимум не гарантирован).
+        var mainAvalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("MinWidth = 900;", mainAvalonia, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = 600;", mainAvalonia, StringComparison.Ordinal);
+        Assert.Contains("ModalWindowBase.ClampWindowToMinSize(this);", mainAvalonia, StringComparison.Ordinal);
     }
 }

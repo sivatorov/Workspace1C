@@ -1,3 +1,4 @@
+using System.Linq;
 using Workspace1C.Models;
 using Workspace1C.Services;
 using Xunit;
@@ -305,5 +306,132 @@ Main DocumentRoot: ""/var/www/html""
             p.EndsWith("1c8Aliases27.conf", System.StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(instance.AliasTargetPatterns, p =>
             p.Contains("${", System.StringComparison.Ordinal));
+    }
+
+    // ---------- Issue #63 (последний комментарий 7OH от 2026-10-29) ----------
+    // У пользователя несколько служб Apache (Apache2.4, Apache2.4_51, Apache2.4_54,
+    // Apache2.4_55) определялись с ОДНИМ конфигом httpd.conf — строка параметров
+    // службы «-d c:\Apache\Apache24 -f conf\httpd27.conf» игнорировалась. Ниже —
+    // устойчивое определение конфига из ImagePath для всех форм записи.
+
+    [Fact]
+    public void Windows_ServicesWithNumberSuffixes_EachGetsOwnConf_Issue63()
+    {
+        // Службы с номерами версий Apache в имени: каждая служба должна получить
+        // СВОЙ конфиг из -f, а не общий дефолтный httpd.conf (issue #63).
+        var c51 = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server 2.4.51", "Apache/2.4.51",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd27.conf");
+        var c54 = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_54", "Apache HTTP Server 2.4.54", "Apache/2.4.54",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd54.conf");
+        var c55 = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_55", "Apache HTTP Server 2.4.55", "Apache/2.4.55",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd55.conf");
+
+        Assert.NotNull(c51);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd27.conf", c51!.ConfPath, ignoreCase: true);
+        Assert.NotNull(c54);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd54.conf", c54!.ConfPath, ignoreCase: true);
+        Assert.NotNull(c55);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd55.conf", c55!.ConfPath, ignoreCase: true);
+
+        // Не все службы вырождаются в один «конфиг по умолчанию».
+        var confs = new[] { c51.ConfPath, c54.ConfPath, c55.ConfPath }
+            .Select(p => p.ToUpperInvariant()).Distinct().ToList();
+        Assert.Equal(3, confs.Count);
+    }
+
+    [Fact]
+    public void Windows_ImagePath_WithLineBreaks_ParsesDAndF_Issue63()
+    {
+        // Строка параметров службы из комментария 7OH записана с переносами строк
+        // («-d\nc:\Apache\Apache24\n-f\nconf\httpd27.conf») — переносы являются
+        // разделителями токенов, конфиг обязан извлечься.
+        var instance = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d\r\nc:\\Apache\\Apache24\r\n-f\r\nconf\\httpd27.conf");
+
+        Assert.NotNull(instance);
+        Assert.Equal(@"C:\Apache\Apache24", instance!.ServerRoot, ignoreCase: true);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd27.conf", instance.ConfPath, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Windows_ImagePath_UnbalancedQuote_StillParsesDAndF_Issue63()
+    {
+        // Непарная (оборванная) кавычка в ImagePath ломала токенизацию — вся строка
+        // сливалась в один токен, -d/-f не извлекались и все службы получали дефолтный
+        // httpd.conf (ровно это видно в логах 7OH от 2026-10-29). Запасная разбивка
+        // по пробелам обязана восстановить ключи.
+        // Строка начинается с открывающей кавычки, которую обёртка службы не закрыла.
+        var instance = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe -d c:\\Apache\\Apache24 -f conf\\httpd27.conf");
+
+        Assert.NotNull(instance);
+        Assert.Equal(@"C:\Apache\Apache24", instance!.ServerRoot, ignoreCase: true);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd27.conf", instance.ConfPath, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Windows_ImagePath_ConcatenatedF_ResolvesConf_Issue63()
+    {
+        // Сливная форма без разделителя «-fconf\httpd27.conf» (сторонние обёртки служб):
+        // конфиг из строки запуска обязан стать ConfPath, а не дефолтный httpd.conf.
+        var instance = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -fconf\\httpd27.conf");
+
+        Assert.NotNull(instance);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd27.conf", instance!.ConfPath, ignoreCase: true);
+
+        // Контроль «-debug» не принимается за значение -d: «ebug» без пути/точки.
+        var guard = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4", "Apache HTTP Server", "Apache/2.4",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -debug -k runservice");
+        Assert.NotNull(guard);
+        Assert.Equal(@"C:\Apache\Apache24", guard!.ServerRoot, ignoreCase: true);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd.conf", guard.ConfPath, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Windows_ServiceImagePath_KeepsRawCommandLine_Issue63()
+    {
+        // «Добавляем в отладку исходные данные службы» (7OH): исходная строка ImagePath
+        // сохраняется в инстансе для лога CM_PUBLISH и fallback-поиска файла алиасов.
+        const string imagePath =
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd27.conf";
+        var instance = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51", imagePath);
+
+        Assert.NotNull(instance);
+        Assert.Equal(imagePath, instance!.RawCommandLine);
+    }
+
+    [Fact]
+    public void ExtractConfFileNameFromCommandLine_ConfAfterF_Issue63()
+    {
+        // Имя конфига из строки запуска службы: «-d c:\Apache\Apache24 -f conf\httpd27.conf»
+        // → «httpd27.conf» — используется fallback-поиском файла алиасов (1c8Aliases27.conf),
+        // когда ConfPath по какой-то причине не извлёкся (ситуация из логов 7OH).
+        const string imagePath =
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd27.conf";
+        Assert.Equal("httpd27.conf",
+            ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(imagePath));
+
+        // Сливная форма тоже распознаётся.
+        Assert.Equal("httpd27.conf",
+            ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(
+                "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -fconf\\httpd27.conf"));
+    }
+
+    [Fact]
+    public void ExtractConfFileNameFromCommandLine_NoConf_ReturnsNull()
+    {
+        Assert.Null(ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(null));
+        Assert.Null(ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(string.Empty));
+        Assert.Null(ApacheInstanceDetector.ExtractConfFileNameFromCommandLine(
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -k runservice"));
     }
 }

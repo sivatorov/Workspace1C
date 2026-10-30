@@ -575,6 +575,172 @@ public sealed class Apache27ConfRegressionTests
         }
     }
 
+    // ---------- Issue #63, последний комментарий 7OH от 2026-10-29 (собственные конфиги служб) ----------
+
+    /// <summary>
+    /// Сценарий из логов 7OH: на машине службы Apache2.4, Apache2.4_51, Apache2.4_54,
+    /// Apache2.4_55 определялись с ОДНИМ конфигом httpd.conf. Ожидание: конфиг БЕРЁТСЯ
+    /// из строки параметров службы (-f conf\httpd27.conf) для каждого инстанса, а не
+    /// подставляется дефолтный httpd.conf; у служб с разными -f — разные конфиги.
+    /// </summary>
+    [Fact]
+    public void Windows_MultipleServices_WithNumbers_ResolveOwnConfigs_Issue63()
+    {
+        var plain = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4", "Apache HTTP Server", "Apache/2.4.62",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24");
+        var v51 = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd27.conf");
+        var v54 = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+            "Apache2.4_54", "Apache HTTP Server", "Apache/2.4.54",
+            "\"C:\\Apache\\Apache24\\bin\\httpd.exe\" -d c:\\Apache\\Apache24 -f conf\\httpd27.conf");
+
+        Assert.NotNull(plain);
+        Assert.NotNull(v51);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd.conf", plain!.ConfPath, ignoreCase: true);
+        Assert.Equal(@"C:\Apache\Apache24\conf\httpd27.conf", v51!.ConfPath, ignoreCase: true);
+
+        // Одна и та же строка запуска («-f conf\httpd27.conf») у РАЗНЫХ служб даёт
+        // один конфиг httpd27.conf (а не общий дефолтный httpd.conf), при этом
+        // служба без -f остаётся на обычном httpd.conf.
+        Assert.Equal(v51.ConfPath, v54!.ConfPath, ignoreCase: true);
+        Assert.NotEqual(plain.ConfPath, v51.ConfPath, StringComparer.OrdinalIgnoreCase);
+        Assert.EndsWith("httpd27.conf", v51.ConfPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// End-to-end по реальным конфигам (фикстуры TestData/Apache27Conf — файлы из
+    /// 27_conf.zip / _27conf_extracted): служба Apache2.4_51 со строкой параметров
+    /// «-d <temp> -f conf\httpd27.conf» → конфиг httpd27.conf → include-граф прочитан
+    /// (включая 1c8Aliases27.conf) → в окне каталог «…\htdocs\27\demo_27» и URL 8027.
+    /// </summary>
+    [Fact]
+    public void Windows_ServiceWithF_Httpd27Conf_EndToEnd_Issue63()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "W1C_Issue63_ServiceF_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var confDir = Path.Combine(tempDir, "conf");
+            Directory.CreateDirectory(confDir);
+            // SRVROOT в фикстурах → tempDir, чтобы include-цели резолвились в реальные
+            // файлы на диске (как на машине пользователя), иначе as-включаемый
+            // 1c8Aliases27.conf не прочитается.
+            var srvRoot = tempDir.Replace("\\", "/");
+            File.WriteAllText(Path.Combine(confDir, "httpd27.conf"), ReadFixture("httpd27.conf"));
+            File.WriteAllText(Path.Combine(confDir, "httpd.conf"),
+                ReadFixture("httpd.conf").Replace("c:/Apache/Apache24", srvRoot));
+            File.WriteAllText(Path.Combine(confDir, "1c8Aliases27.conf"),
+                ReadFixture("1c8Aliases27.conf").Replace("c:/Apache/Apache24", srvRoot));
+
+            // Строка параметров службы из комментария 7OH: -d <temp> -f conf\httpd27.conf.
+            var instance = ApacheInstanceDetector.ParseWindowsServiceImagePath(
+                "Apache2.4_51", "Apache HTTP Server", "Apache/2.4.51",
+                "\"" + Path.Combine(tempDir, "bin", "httpd.exe") + "\" -d " + tempDir + " -f conf\\httpd27.conf");
+
+            Assert.NotNull(instance);
+            Assert.Equal(Path.Combine(tempDir, "conf", "httpd27.conf"), instance!.ConfPath, ignoreCase: true);
+            Assert.Equal(tempDir, instance.ServerRoot, ignoreCase: true);
+
+            ApacheInstanceDetector.PopulateIncludes(instance,
+                File.ReadAllText(instance.ConfPath), confDir);
+
+            Assert.Equal(Path.GetFullPath(Path.Combine(tempDir, "htdocs", "27")),
+                instance.DocumentRoot, ignoreCase: true);
+            Assert.Equal(new[] { 8027 }, instance.ListenPorts);
+            Assert.Contains(instance.IncludeFiles, p =>
+                p.EndsWith("1c8Aliases27.conf", StringComparison.OrdinalIgnoreCase));
+
+            var infobase = new Infobase
+            {
+                Name = "Тестовая база",
+                Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = @"D:\1C\test" }
+            };
+            var vm = new WebPublishViewModel(new[] { infobase }, infobase, new[] { instance });
+            vm.ServerIndex = vm.ServerIndexFor(instance);
+            vm.VirtualDirectory = "demo_27";
+
+            Assert.Contains(vm.ConfTargetPaths, p =>
+                p.EndsWith("1c8Aliases27.conf", StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(Path.GetFullPath(Path.Combine(tempDir, "htdocs", "27", "demo_27")),
+                vm.PhysicalDirectory, ignoreCase: true);
+            Assert.Equal("http://localhost:8027/demo_27/", vm.Url);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); }
+            catch { /* временный каталог не влияет на результат теста */ }
+        }
+    }
+
+    /// <summary>
+    /// Сценарий из логов 7OH (2026-10-29): даже когда детектор по какой-то причине
+    /// выдал дефолтный ConfPath=httpd.conf (а реальная строка параметров службы
+    /// содержит «-f conf\httpd27.conf»), fallback-поиск файла алиасов обязан найти
+    /// 1c8Aliases27.conf — номер инстанса берётся из исходной строки ImagePath
+    /// (суффикс «27» из «httpd27.conf»).
+    /// </summary>
+    [Fact]
+    public void Fallback_AliasSuffixFromServiceImagePath_FindsAliasNearConf_Issue63()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), "W1C_Issue63_ImagePath_" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var confDir = Path.Combine(tempDir, "conf");
+            Directory.CreateDirectory(confDir);
+
+            // Из фиксируемого httpd.conf: Define SRVROOT есть, Define OneCPort — НЕТ
+            // (он в httpd27.conf, который детектор не прочитал) → include-строка
+            // «Include "${SRVROOT}/conf/1c8Aliases${OneCPort}.conf"» не раскрывается,
+            // файл алиасов в IncludeFiles не попадает.
+            File.WriteAllText(Path.Combine(confDir, "httpd.conf"), ReadFixture("httpd.conf"));
+            // Сам файл алиасов лежит рядом с конфигом (как на машине пользователя).
+            File.WriteAllText(Path.Combine(confDir, "1c8Aliases27.conf"),
+                ReadFixture("1c8Aliases27.conf"));
+
+            var instance = new ApacheInstance
+            {
+                Id = "Apache2.4_51",
+                Name = "Apache 2.4_51",
+                ConfPath = Path.Combine(confDir, "httpd.conf"),
+                ServerRoot = tempDir,
+                Htdocs = Path.Combine(tempDir, "htdocs"),
+                Kind = WebServerKind.Apache24,
+                // Строка параметров службы (как в комментарии 7OH) — конфиг обязан
+                // быть httpd27.conf, но моделируем не извлечённый -f: ConfPath остался
+                // дефолтным httpd.conf, а ImagePath реальный.
+                RawCommandLine = "\"" + Path.Combine(tempDir, "bin", "httpd.exe") + "\" -d " + tempDir + " -f conf\\httpd27.conf"
+            };
+            ApacheInstanceDetector.PopulateIncludes(instance,
+                File.ReadAllText(instance.ConfPath), confDir);
+
+            // Include-граф httpd.conf НЕ дал файл алиасов (OneCPort не определён)...
+            Assert.DoesNotContain(instance.IncludeFiles, p =>
+                p.EndsWith("1c8Aliases27.conf", StringComparison.OrdinalIgnoreCase));
+
+            var infobase = new Infobase
+            {
+                Name = "Тестовая база",
+                Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = @"D:\1C\test" }
+            };
+            var vm = new WebPublishViewModel(new[] { infobase }, infobase, new[] { instance });
+            vm.ServerIndex = vm.ServerIndexFor(instance);
+
+            // ...но fallback-поиск по суффиксу из ImagePath («-f conf\httpd27.conf» →
+            // «27») находит 1c8Aliases27.conf рядом с конфигом (ровно один файл).
+            var aliasTargets = vm.ConfTargetPaths
+                .Where(p => Path.GetFileName(p).StartsWith("1c8Aliases", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            Assert.Single(aliasTargets);
+            Assert.EndsWith("1c8Aliases27.conf", aliasTargets[0], StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try { Directory.Delete(tempDir, recursive: true); }
+            catch { /* временный каталог не влияет на результат теста */ }
+        }
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

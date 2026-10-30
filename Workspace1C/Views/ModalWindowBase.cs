@@ -140,6 +140,35 @@ namespace Workspace1C
             // даже когда главное окно на втором (issue #151). CenterOwner при отсутствии
             // владельца даёт центр экрана, так что ухудшения нет.
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+            // issue #71 (комментарий 7OH «окно спокойно ужимается до размера заголовка»):
+            // гарантированный зажим размера диалога к MinWidth/MinHeight при ЛЮБОМ способе
+            // изменения (ресайз мышью, растяжение оконным менеджером Linux) — единый
+            // механизм для всех окон приложения (см. <see cref="ClampWindowToMinSize"/>),
+            // а не дублирование в каждом окне («Настройки», «Настройка ИБ», вкладки
+            // «Общие»/«Клавиши» и т.п.). Окна без заданных минимумов (MinWidth/MinHeight
+            // по умолчанию) условие не трогает.
+            ClampWindowToMinSize(this);
+        }
+
+        /// <summary>
+        /// Единый механизм гарантии минимального размера окна (issues #71, #55): подписка
+        /// на <c>ClientSizeProperty</c> зажимает размер к <c>MinWidth</c>/<c>MinHeight</c>
+        /// при ЛЮБОМ способе изменения (ресайз мышью, растяжение оконным менеджером Linux).
+        /// Вызывается базовым классом для всех диалогов и окнами вне иерархии
+        /// <see cref="ModalWindowBase"/> (главное окно — MainWindow.Avalonia.cs), чтобы
+        /// гарантия минимума не дублировалась в каждом окне. Окна без заданных минимумов
+        /// (MinWidth/MinHeight по умолчанию) условие не трогает.
+        /// </summary>
+        public static void ClampWindowToMinSize(Window window)
+        {
+            window.GetObservable(ClientSizeProperty).Subscribe(new SizeObserver(size =>
+            {
+                if (window.MinWidth > 0 && size.Width < window.MinWidth)
+                    window.Width = window.MinWidth;
+                if (window.MinHeight > 0 && size.Height < window.MinHeight)
+                    window.Height = window.MinHeight;
+            }));
         }
 
         // Кэш настройки «Системный заголовок окна» на время жизни процесса.
@@ -1117,6 +1146,16 @@ namespace Workspace1C
             public void OnCompleted() { }
             public void OnError(Exception error) { }
             public void OnNext(WindowState value) => _action();
+        }
+
+        /// <summary>Простой наблюдатель Size (зажим размера к минимумам окна, issue #71).</summary>
+        private sealed class SizeObserver : IObserver<Size>
+        {
+            private readonly Action<Size> _action;
+            public SizeObserver(Action<Size> action) => _action = action;
+            public void OnCompleted() { }
+            public void OnError(Exception error) { }
+            public void OnNext(Size value) => _action(value);
         }
 
         /// <summary>Вид кнопки управления окном диалога: свернуть, развернуть или закрыть.</summary>

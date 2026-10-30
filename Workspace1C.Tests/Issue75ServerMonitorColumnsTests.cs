@@ -306,24 +306,36 @@ public sealed class Issue75ServerMonitorColumnsTests
     }
 
     [Fact]
-    public void Wpf_DragIsCapturedByHeader_NotDependentOnTemplateGripperLookup()
+    public void Wpf_ColumnDrag_InterceptedAtGridLevel_NotOnFragileHeaderTracking()
     {
-        // issue #75 (комментарий 7OH 2026-10-28: «изменений по работе с шириной
-        // колонок — не замечено»): в 1.0.0.96 перехват вешался на Thumb «ручки»,
-        // найденной по имени шаблона (PART_RightHeaderGripper), и не срабатывал.
-        // Перетаскивание ведётся самим заголовком: клик в зоне границы перехватывается
-        // в PreviewMouseLeftButtonDown (ДО внутреннего обработчика DataGridColumnHeader),
-        // мышь захватывается заголовком, движение применяет ширины по правилам 1С.
+        // issue #75 (комментарий 7OH 2026-10-29: «вообще ничего не меняется… ужимает 2 справа
+        // до определённого предела и всё»): прежние фиксы вешали перехват на Thumb «ручки»
+        // (PART_RightHeaderGripper, 1.0.0.96) и на PreviewMouseLeftButtonDown самих заголовков
+        // (1.0.1.1/1.0.1.3) — в реальном приложении срабатывал штатный ресайз DataGrid
+        // («звёздные» колонки справа ужимались до минимума), потому что заголовки
+        // материализуются/пересоздаются при переключении вкладок и перехват на них
+        // не успевал навеситься либо внутренний обработчик заголовка срабатывал раньше.
+        // Перехват должен висеть НА ГРИДЕ: PreviewMouseLeftButtonDown грида срабатывает ДО
+        // любого обработчика заголовка (tunnel-фаза), не зависит от материализации заголовков,
+        // заголовок под курсором находится подъёмом от источника события (FindAncestor),
+        // мышь на время перетаскивания захватывается гридом.
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.xaml.cs"));
 
-        Assert.True(source.Contains("header.PreviewMouseLeftButtonDown += ", StringComparison.Ordinal),
-            "WPF: клик в зоне границы должен перехватываться PreviewMouseLeftButtonDown (issue #75).");
-        Assert.True(source.Contains("CaptureMouse", StringComparison.Ordinal),
-            "WPF: заголовок должен захватывать мышь на время перетаскивания (issue #75).");
+        Assert.True(source.Contains("grid.PreviewMouseLeftButtonDown += ", StringComparison.Ordinal),
+            "WPF: перехват должен висеть на гриде (grid.PreviewMouseLeftButtonDown), а не на заголовке (issue #75).");
+        Assert.True(source.Contains("AttachGridColumnDrag", StringComparison.Ordinal),
+            "WPF: должна быть привязка общего перехвата на гриде AttachGridColumnDrag (issue #75).");
+        Assert.True(source.Contains("FindAncestor<System.Windows.Controls.Primitives.DataGridColumnHeader>", StringComparison.Ordinal),
+            "WPF: заголовок под курсором должен определяться подъёмом от источника клика (issue #75).");
+        Assert.True(source.Contains("grid.CaptureMouse()", StringComparison.Ordinal),
+            "WPF: мышь на время перетаскивания должна захватываться гридом (issue #75).");
         Assert.True(source.Contains("LostMouseCapture", StringComparison.Ordinal),
             "WPF: потеря захвата должна корректно завершать перетаскивание (issue #75).");
         Assert.True(source.Contains("HeaderResizeHotZone", StringComparison.Ordinal),
             "WPF: должна быть «зона границы» начала перетаскивания (issue #75).");
+        // Перехват на отдельных заголовках больше НЕ используется — он и был причиной поломки.
+        Assert.False(source.Contains("header.PreviewMouseLeftButtonDown += ", StringComparison.Ordinal),
+            "WPF: перехват на заголовках должен быть удалён — только грид-уровневый перехват (issue #75).");
     }
 
     [Fact]
@@ -337,6 +349,21 @@ public sealed class Issue75ServerMonitorColumnsTests
             "Avalonia: PointerCaptureLost должен закрывать цикл перетаскивания (issue #75).");
         Assert.True(source.Contains("ApplyDragMoveBlock(startWidths, index, dx, minWidths)", StringComparison.Ordinal),
             "Avalonia: обычный режим должен применять общую математику Store (issue #75).");
+    }
+
+    [Fact]
+    public void Avalonia_ColumnGripHitZone_AlignedWithWpfHotZone()
+    {
+        // issue #75 (комментарий 7OH: «вообще ничего не меняется», целятся в границу и по
+        // краю заголовка): прежняя «ручка» 7 px пропускала часть кликов в сортировку вместо
+        // перетаскивания. Зона захвата расширена до 24 px (21 px + выступ 3 px за правый
+        // край колонки) — та же зона, что в WPF-версии (HeaderResizeHotZone = 24).
+        var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.Avalonia.cs"));
+
+        Assert.True(source.Contains("ColumnGripWidth", StringComparison.Ordinal),
+            "Avalonia: ширина зоны захвата границы должна быть константой ColumnGripWidth (issue #75).");
+        Assert.True(source.Contains("Width = ColumnGripWidth,", StringComparison.Ordinal),
+            "Avalonia: «ручка» должна использовать константу ColumnGripWidth (issue #75).");
     }
 
     [Fact]

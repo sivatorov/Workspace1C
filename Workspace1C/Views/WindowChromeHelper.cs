@@ -209,9 +209,16 @@ namespace Workspace1C
         private static void OnWindowLoaded(object sender, RoutedEventArgs e)
         {
             var window = (Window)sender;
-            // Главное окно уже оформлено собственными средствами (WindowChrome, свои кнопки).
+            // Главное окно оформлено собственными средствами (WindowChrome, свои кнопки),
+            // поэтому общий «стеклянный» стиль ему не нужен. Но гарантию минимального
+            // размера (issue #55) оно получает тем же общим механизмом WM_GETMINMAXINFO,
+            // что и все диалоги: иначе живой ресайз мышью сжимал бы главное окно ниже
+            // MinWidth/MinHeight «почти в ноль».
             if (window is MainWindow)
+            {
+                HookMinTrackAndMaximize(window);
                 return;
+            }
             if (IsApplied(window))
                 return;
             try
@@ -286,8 +293,11 @@ namespace Workspace1C
                 HookSuppressMaximize(window);
 
             // Максимизация — строго на рабочую область монитора (без панели задач) + Win+Up
-            // снова работает: WS_MAXIMIZEBOX сохранён (issue #368).
-            HookMaximizeToWorkArea(window);
+            // снова работает: WS_MAXIMIZEBOX сохранён (issue #368). Параллельно тот же
+            // WM_GETMINMAXINFO зажимает ptMinTrackSize из MinWidth/MinHeight окна (issue #71):
+            // система физически не даёт ужать диалог мышью ниже минимума даже при кастомном
+            // WindowChrome/DPI, когда зажим на SizeChanged не успевает.
+            HookMinTrackAndMaximize(window);
 
             // В развёрнутом виде скругление убираем и сбрасываем толщину стеклянной рамки.
             window.StateChanged += (_, _) =>
@@ -305,45 +315,78 @@ namespace Workspace1C
         /// Перехватывает WM_GETMINMAXINFO: при максимизации подставляет границы рабочей
         /// области ближайшего монитора (см. <see cref="WindowSizeMath.ComputeMaximizedBounds"/>),
         /// поэтому окно никогда не перекрывает панель задач — даже если системный стиль
-        /// урезан или DWM ведёт себя нестандартно (issue #368).
+        /// урезан или DWM ведёт себя нестандартно (issue #368). Параллельно зажимает
+        /// ptMinTrackSize из MinWidth/MinHeight окна (issue #71): ОС физически не даёт
+        /// ужать окно мышью ниже минимума, что не гарантирует зажим на SizeChanged
+        /// (при кастомном WindowChrome или нестандартном DPI WPF может не перевести
+        /// минимумы в трек-размер, и окно «ужимается до размера заголовка»).
         /// </summary>
-        private static IntPtr MaximizeToWorkAreaWndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        private static IntPtr MinTrackAndMaximizeWndProc(Window window, IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
             if (msg != WmGetMinMaxInfo)
                 return IntPtr.Zero;
 
             try
             {
-                var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
-                if (monitor == IntPtr.Zero)
-                    return IntPtr.Zero;
-
-                var mi = new MonitorInfo { CbSize = Marshal.SizeOf<MonitorInfo>() };
-                if (!GetMonitorInfo(monitor, ref mi))
-                    return IntPtr.Zero;
-
                 var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-                WindowSizeMath.ComputeMaximizedBounds(
-                    (mi.RcMonitor.Left, mi.RcMonitor.Top, mi.RcMonitor.Right, mi.RcMonitor.Bottom),
-                    (mi.RcWork.Left, mi.RcWork.Top, mi.RcWork.Right, mi.RcWork.Bottom),
-                    out mmi.MaxPosition.X, out mmi.MaxPosition.Y,
-                    out mmi.MaxSize.X, out mmi.MaxSize.Y);
+
+                // Максимум — рабочая область ближайшего монитора (issue #368).
+                var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+                if (monitor != IntPtr.Zero)
+                {
+                    var mi = new MonitorInfo { CbSize = Marshal.SizeOf<MonitorInfo>() };
+                    if (GetMonitorInfo(monitor, ref mi))
+                    {
+                        WindowSizeMath.ComputeMaximizedBounds(
+                            (mi.RcMonitor.Left, mi.RcMonitor.Top, mi.RcMonitor.Right, mi.RcMonitor.Bottom),
+                            (mi.RcWork.Left, mi.RcWork.Top, mi.RcWork.Right, mi.RcWork.Bottom),
+                            out mmi.MaxPosition.X, out mmi.MaxPosition.Y,
+                            out mmi.MaxSize.X, out mmi.MaxSize.Y);
+                    }
+                }
+
+                // Минимум — из MinWidth/MinHeight окна (issue #71): DIP → физические пиксели.
+                var scale = GetWindowDpiScale(window);
+                var minTrackX = window.MinWidth > 0 ? (int)Math.Ceiling(window.MinWidth * scale.X) : 0;
+                var minTrackY = window.MinHeight > 0 ? (int)Math.Ceiling(window.MinHeight * scale.Y) : 0;
+                if (minTrackX > 0 && mmi.MinTrackSize.X < minTrackX)
+                    mmi.MinTrackSize.X = minTrackX;
+                if (minTrackY > 0 && mmi.MinTrackSize.Y < minTrackY)
+                    mmi.MinTrackSize.Y = minTrackY;
+
                 Marshal.StructureToPtr(mmi, lParam, true);
                 handled = true;
             }
             catch
             {
-                // Не критично: останется системное поведение максимизации.
+                // Не критично: останется системное поведение ресайза/максимизации.
             }
 
             return IntPtr.Zero;
         }
 
         /// <summary>
-        /// Ставит хук <see cref="MaximizeToWorkAreaWndProc"/> на окно (идемпотентно,
+        /// Масштаб DPI окна (WPF DIP → физические пиксели) для пересчёта MinWidth/MinHeight
+        /// в ptMinTrackSize WM_GETMINMAXINFO (issue #71). До показа окна возвращает 1.0.
+        /// </summary>
+        private static (double X, double Y) GetWindowDpiScale(Window window)
+        {
+            try
+            {
+                var dpi = VisualTreeHelper.GetDpi(window);
+                return (dpi.DpiScaleX, dpi.DpiScaleY);
+            }
+            catch
+            {
+                return (1.0, 1.0);
+            }
+        }
+
+        /// <summary>
+        /// Ставит хук <see cref="MinTrackAndMaximizeWndProc"/> на окно (идемпотентно,
         /// безопасно до создания HWND — в этом случае просто не ставится).
         /// </summary>
-        private static void HookMaximizeToWorkArea(Window window)
+        private static void HookMinTrackAndMaximize(Window window)
         {
             try
             {
@@ -351,7 +394,7 @@ namespace Workspace1C
                 if (hwnd == IntPtr.Zero)
                     return;
                 System.Windows.Interop.HwndSource.FromHwnd(hwnd)
-                    ?.AddHook(MaximizeToWorkAreaWndProc);
+                    ?.AddHook((h, m, w, l, ref handled) => MinTrackAndMaximizeWndProc(window, h, m, w, l, ref handled));
             }
             catch
             {
