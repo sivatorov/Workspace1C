@@ -115,11 +115,14 @@ public sealed class Issue26SyncWindowButtonsTests
     }
 
     [Fact]
-    public void InactiveHover_MacOSAndGlass_DoNotChange()
+    public void InactiveHover_MacOSKeepsTrafficLight_GlassGetsDarkSlate()
     {
-        // «Светофор» macOS и полупрозрачный Glass сохраняют собственные подложки.
+        // «Светофор» macOS сохраняет цветные подложки (круги всегда цветные — это не
+        // «белая подсветка»). Glass: исключение убрано (issue #26, 1.0.1.6) —
+        // полупрозрачно-белая подложка Glass на тёмной неактивной шапке и была той
+        // «белой подсветкой», на которую жаловался 7OH; теперь тёмный slate #334155.
         Assert.Equal("#FF5F57", ThemeFeatureMap.InactiveHoverHex(WindowButtonStyle.MacOS, dark: true));
-        Assert.Equal("#40FFFFFF", ThemeFeatureMap.InactiveHoverHex(WindowButtonStyle.Glass, dark: true));
+        Assert.Equal("#334155", ThemeFeatureMap.InactiveHoverHex(WindowButtonStyle.Glass, dark: true));
     }
 
     [Fact]

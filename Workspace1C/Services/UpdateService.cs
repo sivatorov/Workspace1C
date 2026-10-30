@@ -776,6 +776,13 @@ public sealed class UpdateService : IAppUpdateService
     /// (<see cref="DownloadAndInstallAutoAsync"/>), и диалог
     /// <see cref="UpdateAvailableWindow"/> (перед ApplyRestartNow/ApplyAfterClose).
     /// </para>
+    /// <para>
+    /// Windows-путь валидации платформы (issue #89): <see cref="UpdatePayload.EnsureExecutablePayload"/>
+    /// принимает только PE («MZ») и ZIP с exe внутри; скачанный ELF-файл (иный формат)
+    /// отклоняется тем же механизмом, что и на Linux-пути
+    /// (<see cref="UpdatePayload.ValidatePlatformMagic(ReadOnlySpan{byte}, bool)"/>),
+    /// поэтому отдельная проверка магических байт здесь не требуется.
+    /// </para>
     /// </summary>
     internal async Task<(string? Path, bool JoinedExisting)> DownloadNewExeCoreAsync(ReleaseInfo release)
     {

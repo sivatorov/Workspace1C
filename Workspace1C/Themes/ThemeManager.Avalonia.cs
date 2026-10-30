@@ -94,6 +94,11 @@ namespace Workspace1C.Themes
             if (Application.Current is { } app)
                 app.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
             ApplyScheme(CurrentScheme);
+            // issue #26 (1.0.1.6): ресурсы кнопок окна должны обновляться при КАЖДОМ
+            // применении темы, иначе после переключения Light/Dark остаётся подложка
+            // от прошлой темы (ApplyWindowButtonStyle вызывался только из ApplyFullTheme
+            // и ReapplyThemeFeatures).
+            ApplyWindowButtonStyle();
             if (changed)
                 ThemeChanged?.Invoke(null, EventArgs.Empty);
         }

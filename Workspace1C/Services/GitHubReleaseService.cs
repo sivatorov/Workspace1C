@@ -318,7 +318,10 @@ public class GitHubReleaseService
                 continue;
 
             if (TryGetAssetDownload(asset, out var result))
+            {
+                LogSelectedAsset(asset, name, exact: true);
                 return result;
+            }
         }
 
         // Проход 2: прочие ассеты по признакам платформы (ZIP-архивы исключены —
@@ -333,10 +336,30 @@ public class GitHubReleaseService
                 continue;
 
             if (TryGetAssetDownload(asset, out var result))
+            {
+                LogSelectedAsset(asset, name, exact: false);
                 return result;
+            }
         }
 
         return (string.Empty, 0);
+    }
+
+    /// <summary>
+    /// Диагностика выбора ассета (issue #89): пишет в журнал приложения имя выбранного
+    /// ассета и его размер — чтобы по логу пользователя было видно, какой файл выбрал
+    /// загрузчик и на какой платформе. Пишется только результат выбора, без спама;
+    /// гейт — диагностический флаг CM_UPDATES (trace.json, как у проверки обновлений
+    /// конфигураций), включается во вкладке «Логирование».
+    /// </summary>
+    private static void LogSelectedAsset(JsonElement asset, string name, bool exact)
+    {
+        var size = asset.TryGetProperty("size", out var sizeEl) && sizeEl.ValueKind == JsonValueKind.Number
+            && sizeEl.TryGetInt64(out var parsed)
+            ? parsed
+            : 0;
+        Log.Info(TraceFlags.UpdatesFlag,
+            $"Выбран {(exact ? "точный" : "запасной")} ассет для обновления: {name} ({size} байт).");
     }
 
     /// <summary>Проверяет, совпадает ли имя ассета с точным именем сборки текущей платформы.</summary>

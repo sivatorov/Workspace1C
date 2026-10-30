@@ -180,6 +180,13 @@ public static partial class OneCLauncher
         InfobaseAuthResolver.Resolve(infobase, mode, out var authMode, out var authUser, out var authPassword,
             CommonEnterpriseAuthorization, CommonConfiguratorAuthorization, CommonAuthorization);
 
+        // Диагностика (issue #57, 1.0.1.6): режим и источник авторизации пишутся в журнал
+        // без пароля — чтобы следующий репорт «не подставляется общая авторизация» был
+        // диагностируемым с первого сообщения (направление CM_BASE_RUN).
+        Log.Info(LogCategory.BaseRun,
+            $"[{infobase.Name}] Авторизация запуска ({mode}): режим={authMode}, " +
+            $"пользователь={(string.IsNullOrWhiteSpace(authUser) ? "не задан" : "задан")}.");
+
         // Запуск с аутентификацией (issue #48): ни сохранённых имени/пароля, ни входа
         // по учётной записи ОС — /WA- заставляет платформу спросить имя и пароль, даже
         // если у пользователя ИБ включена аутентификация операционной системы.

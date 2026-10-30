@@ -41,7 +41,15 @@ namespace Workspace1C.Services
                             continue;
 
                         var imagePath = key.GetValue("ImagePath") as string;
-                        var instance = ParseWindowsServiceImagePath(serviceName, displayName, description, imagePath);
+
+                        // Issue #63 (1.0.1.6): ключи -d/-f у служб, созданных обёрткой
+                        // 1С/Apache monitor, лежат не в ImagePath, а в подразделе параметров
+                        // службы — Parameters\ConfigArgs (REG_MULTI_SZ). Без них все службы
+                        // сводились к дефолтному httpd.conf. Отсутствие подраздела/значения —
+                        // прежнее поведение (читается только ImagePath).
+                        var configArgs = ReadConfigArgs(key);
+                        var instance = ParseWindowsServiceImagePath(
+                            serviceName, displayName, description, imagePath, configArgs);
                         if (instance is null)
                             continue;
 
@@ -62,6 +70,34 @@ namespace Workspace1C.Services
             // Хотя бы один инстанс с реальным конфигом — рекурсивно не требуется: fallback
             // выполняется в WebPublishViewModel, если список пуст.
             return result;
+        }
+
+        /// <summary>
+        /// Читает <c>Parameters\ConfigArgs</c> службы (REG_MULTI_SZ или REG_SZ) и склеивает
+        /// элементы через пробел: оба формата (массив «-d», «c:\Apache\Apache24», … и одна
+        /// строка «-d c:\Apache\Apache24 -f conf\httpd27.conf») покрыты склейкой (issue #63).
+        /// Отсутствие подраздела/значения/ошибка чтения — null (прежнее поведение).
+        /// </summary>
+        private static string? ReadConfigArgs(RegistryKey key)
+        {
+            try
+            {
+                using var parameters = key.OpenSubKey("Parameters");
+                if (parameters is null)
+                    return null;
+                var value = parameters.GetValue("ConfigArgs");
+                return value switch
+                {
+                    string[] args when args.Length > 0 => string.Join(" ", args),
+                    string single when single.Trim().Length > 0 => single,
+                    _ => null
+                };
+            }
+            catch
+            {
+                // Подраздел/значение недоступны — работаем только по ImagePath.
+                return null;
+            }
         }
 
         private static void LoadConfIncludes(ApacheInstance instance)

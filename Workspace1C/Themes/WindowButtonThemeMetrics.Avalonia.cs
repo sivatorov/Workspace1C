@@ -46,12 +46,17 @@ namespace Workspace1C.Themes
         public static WindowButtonThemeMetrics Current()
         {
             var fallback = ThemeFeatureMap.ButtonMetrics(ThemeManager.CurrentWindowButtonStyle);
+            // issue #26 (1.0.1.6): fallback-подложка НЕАКТИВНОГО окна обязана считаться
+            // с фактическим вариантом темы. Ранее «тёмность» была захардкожена в false —
+            // Avalonia-кнопки, читающие метрики кодом, всегда получали светлую «дневную»
+            // подложку, пока ресурс WindowButtonInactiveHoverBrushKey не выставлен.
+            var dark = ThemeManager.CurrentTheme == ThemeManager.DarkThemeName;
             var result = new WindowButtonThemeMetrics
             {
                 Hover = Parse(fallback.HoverHex),
                 CloseHover = Parse(fallback.CloseHoverHex),
                 InactiveHover = Parse(ThemeFeatureMap.InactiveHoverHex(
-                    ThemeManager.CurrentWindowButtonStyle, dark: false)),
+                    ThemeManager.CurrentWindowButtonStyle, dark)),
                 MinimizeHover = Parse(fallback.MinimizeHoverHex ?? fallback.HoverHex),
                 MaximizeHover = Parse(fallback.MaximizeHoverHex ?? fallback.HoverHex),
                 CornerRadius = fallback.CornerRadius,

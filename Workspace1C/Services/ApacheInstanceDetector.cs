@@ -97,6 +97,106 @@ public static partial class ApacheInstanceDetector
     }
 
     /// <summary>
+    /// Windows: инстанс Apache из параметров службы httpd с учётом
+    /// <c>Parameters\ConfigArgs</c> (issue #63, 1.0.1.6). У служб, созданных обёрткой
+    /// 1С/Apache monitor, ключи <c>-d</c>/<c>-f</c> в <c>ImagePath</c> ОТСУТСТВУЮТ
+    /// (<c>"c:\Apache\Apache24\bin\httpd.exe" -k runservice</c>) — они лежат в
+    /// реестровом параметре <c>HKLM\SYSTEM\CurrentControlSet\Services\<служба>\Parameters\ConfigArgs</c>
+    /// (REG_MULTI_SZ), предварительно склеенном в одну строку пробелами вызывающим
+    /// кодом. Оба источника не исключают друг друга:
+    /// <list type="bullet">
+    /// <item><paramref name="configArgs"/> пуст/задан null — поведение идентично прежней
+    /// перегрузке (регресс-защита);</item>
+    /// <item><paramref name="configArgs"/> содержит <c>-d</c>/<c>-f</c> — они ПЕРЕКРЫВАЮТ
+    /// одноимённые ключи <paramref name="imagePath"/> (конфликт приоритета задокументирован:
+    /// ConfigArgs — фактические аргументы запуска службы, ImagePath может содержать
+    /// устаревшие значения у сторонних обёрток);</item>
+    /// <item><paramref name="configArgs"/> без <c>-d</c>/<c>-f</c> — ключи ImagePath
+    /// сохраняются, дополняя аргументы.</item>
+    /// </list>
+    /// <paramref name="imagePath"/> может быть пустым/null (теоретическая служба с
+    /// пустым ImagePath): тогда командная строка строится только из <paramref name="configArgs"/>.
+    /// </summary>
+    public static ApacheInstance? ParseWindowsServiceImagePath(
+        string serviceName, string displayName, string description,
+        string? imagePath, string? configArgs)
+    {
+        var configArgsLine = (configArgs ?? string.Empty).Trim();
+
+        // ConfigArgs нет — прежнее поведение (регресс-защита тестов).
+        if (configArgsLine.Length == 0)
+            return ParseWindowsServiceImagePath(serviceName, displayName, description, imagePath);
+
+        // Приоритет ConfigArgs (issue #63): если в ConfigArgs задан -d/-f, одноимённые
+        // ключи ImagePath удаляются перед склейкой — иначе ExtractSwitch взял бы первое
+        // вхождение (из ImagePath) и приоритет ConfigArgs не сработал бы.
+        var effectiveImagePath = imagePath;
+        if (ExtractSwitch(configArgsLine, "d") is not null)
+            effectiveImagePath = RemoveSwitch(effectiveImagePath, "d");
+        if (ExtractSwitch(configArgsLine, "f") is not null)
+            effectiveImagePath = RemoveSwitch(effectiveImagePath, "f");
+
+        var combined = string.IsNullOrWhiteSpace(effectiveImagePath)
+            ? configArgsLine
+            : effectiveImagePath!.TrimEnd() + " " + configArgsLine;
+
+        var instance = ParseWindowsServiceImagePath(serviceName, displayName, description, combined);
+        if (instance is null)
+            return null;
+
+        // Лог CM_PUBLISH (issue #63, «Добавляем в отладку исходные данные службы»):
+        // пользователь видит ОБА источника параметров службы — откуда пришёл -d/-f.
+        instance.RawCommandLine =
+            $"ImagePath=\"{imagePath ?? string.Empty}\"; ConfigArgs={configArgsLine}";
+        return instance;
+    }
+
+    /// <summary>
+    /// Удаляет ключ <paramref name="key"/> (в формах «-k значение», «/k значение»,
+    /// «-k=значение», «-kзначение») из командной строки службы. Используется для
+    /// реализации приоритета ConfigArgs над ImagePath (issue #63); токены,
+    /// содержащие пробелы, при обратной сборке берутся в кавычки.
+    /// </summary>
+    private static string? RemoveSwitch(string? commandLine, string key)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return commandLine;
+
+        var tokens = Tokenize(commandLine);
+        var result = new List<string>();
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            var isSwitch = string.Equals(token, "-" + key, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(token, "/" + key, StringComparison.OrdinalIgnoreCase);
+            var isInline = ExtractInlineSwitch(token, key) is not null
+                || ExtractConcatenatedSwitch(token, key) is not null;
+            if (isSwitch)
+            {
+                // Пропускаем и значение ключа (если оно похоже на значение, а не на
+                // следующий ключ — как в ExtractSwitch).
+                if (i + 1 < tokens.Count
+                    && tokens[i + 1].Length > 0
+                    && !tokens[i + 1].StartsWith("-", StringComparison.Ordinal)
+                    && !tokens[i + 1].StartsWith("/", StringComparison.Ordinal))
+                {
+                    i++;
+                }
+                continue;
+            }
+            if (isInline)
+                continue;
+            result.Add(QuoteIfNeeded(token));
+        }
+
+        return result.Count == 0 ? string.Empty : string.Join(" ", result);
+    }
+
+    /// <summary>Берёт токен в кавычки, если он содержит пробел (обратная сборка команды).</summary>
+    private static string QuoteIfNeeded(string token) =>
+        token.IndexOf(' ') >= 0 || token.IndexOf('\t') >= 0 ? "\"" + token + "\"" : token;
+
+    /// <summary>
     /// Имя основного конфиг-файла Apache из строки запуска службы (issue #63): для
     /// <c>"-d c:\Apache\Apache24 -f conf\httpd27.conf"</c> возвращает «httpd27.conf».
     /// Используется VM-фаллбэком при поиске файла алиасов, когда <see cref="ApacheInstance.ConfPath"/>

@@ -107,6 +107,202 @@ public static class UpdatePayload
         }
     }
 
+    // ===== Валидация платформы скачанного файла (issue #89) =====
+
+    /// <summary>Результат проверки скачанного файла обновления на соответствие платформе.</summary>
+    public enum UpdatePlatformValidation
+    {
+        /// <summary>Магические байты соответствуют платформе: файл можно применять.</summary>
+        Valid,
+        /// <summary>Скачан файл для другой операционной системы (например, EXE на Linux).
+        /// Применять нельзя — платформа исполняемого формата не совпадает.</summary>
+        WrongPlatform,
+        /// <summary>Ни ELF, ни MZ — HTML-страница, обрезок или иной формат. Применять нельзя.</summary>
+        Unknown,
+    }
+
+    /// <summary>Сигнатура Linux-исполняемого файла (ELF): 7F 45 4C 46.</summary>
+    public static bool HasElfMagic(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 4
+        && bytes[0] == 0x7F && bytes[1] == (byte)'E' && bytes[2] == (byte)'L' && bytes[3] == (byte)'F';
+
+    /// <summary>Сигнатура Windows-исполняемого файла (PE): 4D 5A («MZ»).</summary>
+    public static bool HasPeMagic(ReadOnlySpan<byte> bytes) =>
+        bytes.Length >= 2 && bytes[0] == (byte)'M' && bytes[1] == (byte)'Z';
+
+    /// <summary>
+    /// Чистая проверка первых байт файла на соответствие платформе (issue #89).
+    /// На Linux ожидается ELF (7F 45 4C 46), на Windows — PE (MZ). Попадание
+    /// «чужой» сигнатуры означает, что был скачан файл другой платформы (например,
+    /// EXE на Linux — старыми версиями приложения, где выбор ассета был иным):
+    /// применять такой бинарник нельзя.
+    /// </summary>
+    public static UpdatePlatformValidation ValidatePlatformMagic(ReadOnlySpan<byte> bytes, bool linux)
+    {
+        if (linux)
+        {
+            if (HasElfMagic(bytes))
+                return UpdatePlatformValidation.Valid;
+            return HasPeMagic(bytes)
+                ? UpdatePlatformValidation.WrongPlatform
+                : UpdatePlatformValidation.Unknown;
+        }
+
+        if (HasPeMagic(bytes))
+            return UpdatePlatformValidation.Valid;
+        return HasElfMagic(bytes)
+            ? UpdatePlatformValidation.WrongPlatform
+            : UpdatePlatformValidation.Unknown;
+    }
+
+    /// <summary>
+    /// Файловая обёртка над <see cref="ValidatePlatformMagic(ReadOnlySpan{byte}, bool)"/>:
+    /// читает первые байты файла и дополнительно сверяет его размер с
+    /// <paramref name="expectedSize"/> (если > 0). При любой ошибке чтения возвращает
+    /// <see cref="UpdatePlatformValidation.Unknown"/>. Размер файла сверяется с заявленным
+    /// размером ассета: расхождение означает недокачанный/посторонний файл.
+    /// </summary>
+    public static UpdatePlatformValidation ValidatePlatformMagic(string filePath, bool linux, long expectedSize = 0)
+    {
+        try
+        {
+            var info = new FileInfo(filePath);
+            if (expectedSize > 0 && info.Exists && info.Length != expectedSize)
+                return UpdatePlatformValidation.Unknown;
+
+            using var stream = File.OpenRead(filePath);
+            Span<byte> buffer = stackalloc byte[4];
+            var read = 0;
+            while (read < buffer.Length)
+            {
+                var n = stream.Read(buffer[read..]);
+                if (n == 0)
+                    break;
+                read += n;
+            }
+
+            return ValidatePlatformMagic(buffer[..read], linux);
+        }
+        catch
+        {
+            return UpdatePlatformValidation.Unknown;
+        }
+    }
+
+    /// <summary>
+    /// Имя журнала валидации платформы (рядом с журналами обновления).
+    /// </summary>
+    private const string PlatformValidationLogFileName = "update-platform-validation.log";
+
+    /// <summary>
+    /// Валидирует скачанный файл обновления по магическим байтам платформы (issue #89)
+    /// и «карантинит» неподходящий. При <see cref="UpdatePlatformValidation.Valid"/> возвращает
+    /// <c>null</c> (файл пригоден). Иначе файл переименовывается в <c>*.wrong-platform</c>
+    /// (сохраняется для диагностики), решение пишется в журнал <paramref name="logDir"/>,
+    /// и возвращается текст понятной ошибки с подсказкой установить обновление вручную.
+    /// </summary>
+    public static string? RejectWrongPlatformFile(
+        string downloadedFile, bool linux, string? htmlUrl, string? logDir = null)
+    {
+        var validation = ValidatePlatformMagic(downloadedFile, linux);
+        if (validation == UpdatePlatformValidation.Valid)
+            return null;
+
+        // Карантин: переименовываем, чтобы файл не был принят повторно и остался
+        // доступным для диагностики (лог URL и первых байт — ниже и в журнале).
+        var quarantined = TryQuarantine(downloadedFile);
+        var firstBytes = TryReadFirstBytesHex(quarantined);
+
+        var kind = validation == UpdatePlatformValidation.WrongPlatform
+            ? "файл для другой ОС"
+            : "файл нераспознанного формата";
+        LogLine(
+            logDir,
+            PlatformValidationLogFileName,
+            $"Обновление отклонено ({kind}): {Path.GetFileName(quarantined)}, первые байты: {firstBytes}.");
+
+        // Понятная ошибка пользователю с подсказкой ручной установки (issue #89).
+        var message = linux
+            ? "Скачан файл для другой операционной системы (Windows EXE). " +
+              "Обновление отменено: неподходящий бинарник не будет применён. " +
+              "Скачайте сборку «Workspace1C-linux-x64» со страницы выпуска и установите вручную."
+            : "Скачан файл для другой операционной системы. " +
+              "Обновление отменено: неподходящий бинарник не будет применён. " +
+              "Скачайте сборку «Workspace1C.exe» со страницы выпуска и установите вручную.";
+
+        if (!string.IsNullOrWhiteSpace(htmlUrl))
+            message += Environment.NewLine + htmlUrl;
+
+        return message;
+    }
+
+    /// <summary>Переименовывает файл в <c>*.wrong-platform</c>; возвращает путь после переименования.</summary>
+    private static string TryQuarantine(string filePath)
+    {
+        try
+        {
+            if (!File.Exists(filePath))
+                return filePath;
+            var target = filePath + ".wrong-platform";
+            File.Move(filePath, target, overwrite: true);
+            return target;
+        }
+        catch
+        {
+            return filePath;
+        }
+    }
+
+    /// <summary>Первые 8 байт файла в hex — для журнала; при ошибке чтения — пустая строка.</summary>
+    private static string TryReadFirstBytesHex(string filePath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(filePath);
+            Span<byte> buffer = stackalloc byte[8];
+            var read = 0;
+            while (read < buffer.Length)
+            {
+                var n = stream.Read(buffer[read..]);
+                if (n == 0)
+                    break;
+                read += n;
+            }
+
+            var sb = new StringBuilder(read * 3);
+            for (var i = 0; i < read; i++)
+            {
+                if (i > 0)
+                    sb.Append(' ');
+                sb.Append(buffer[i].ToString("X2"));
+            }
+            return sb.ToString();
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    /// <summary>Пишет строку в журнал валидации (каталог рядом с логами обновления).</summary>
+    private static void LogLine(string? logDir, string fileName, string message)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(logDir))
+                return;
+            Directory.CreateDirectory(logDir);
+            File.AppendAllText(
+                Path.Combine(logDir, fileName),
+                $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}",
+                new UTF8Encoding(false));
+        }
+        catch
+        {
+            // Журнал не критичен: решение уже принято.
+        }
+    }
+
     /// <summary>
     /// Ищет в ZIP-архиве запись <c>Workspace1C.exe</c> (точное имя файла,
     /// возможно в подкаталоге) и извлекает её рядом с архивом. Если точной записи нет,

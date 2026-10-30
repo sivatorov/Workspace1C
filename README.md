@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.5-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.6-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.5**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.6**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,28 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Автообновление: валидация скачанного файла по платформе (1.0.1.6, issue #89,
+  Linux)** — Linux-сборка больше не применяет скачанный Windows-EXE («Обновление не
+  может завершиться» у «застрявших» старых версий): файл проверяется по магическим
+  байтам (ELF `7F 45 4C 46` / PE `MZ`), неподходящий уходит в карантин
+  `*.wrong-platform`, пользователь получает понятную ошибку с ссылкой на релиз для
+  ручной установки; добавлен журнал выбора ассета по флагу `CM_UPDATES`
+  (покрыто `Issue89PlatformValidationTests`).
+- **«Общая авторизация» перекрывает авторизацию ОС базы (1.0.1.6, issue #57, Windows
+  и Linux)** — база с «выключенной насильной авторизацией» (`/WA+`) больше не блокирует
+  общие учётные данные режима: общая `Credentials` подставляется в Предприятие,
+  Конфигуратор и COM-подключение; собственные данные базы и режимов сохраняют
+  приоритет; после резолва в журнал пишется режим и источник авторизации без пароля
+  (покрыто `Issue57WindowsAuthOverrideTests`).
+- **Публикация баз: конфиги Apache-служб из `Parameters\ConfigArgs` (1.0.1.6, issue #63,
+  Windows)** — `-d`/`-f` читаются из реестра службы (REG_MULTI_SZ), а не только из
+  ImagePath; при конфликте приоритет у `ConfigArgs`; в логе CM_PUBLISH показаны оба
+  источника (`ImagePath="…"; ConfigArgs=…`) (покрыто `Issue63ConfigArgsTests`).
+- **Тёмная тема: «Синхронизация настроек» и кнопки неактивного окна (1.0.1.6, issue #26,
+  Windows и Linux)** — поля «Интервал автозапуска» и «Файлы для синхронизации» получают
+  стили `ModernTextBox`/`ModernComboBox`/`ModernListBoxItem`; белая подсветка кнопок
+  управления неактивного главного окна заменена на тёмный slate `#334155` для всех
+  стилей, кроме macOS-«светофора» (покрыто `Issue26WindowButtonTests`).
 - **Окна «Настройки» и «Настройка информационной базы» запоминают размеры (1.0.1.5,
   issue #71, Windows и Linux)** — при закрытии сохраняются фактические размеры окон,
   при открытии они восстанавливаются (с зажимом к минимуму): общий хелпер

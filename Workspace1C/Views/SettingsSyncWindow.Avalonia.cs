@@ -21,13 +21,18 @@ namespace Workspace1C;
 public sealed class SettingsSyncWindow : ModalWindowBase
 {
     private readonly SettingsSyncViewModel _vm;
-    private readonly ComboBox _kindCombo = new();
-    private readonly TextBox _urlBox = new();
-    private readonly TextBox _folderBox = new();
-    private readonly TextBox _userBox = new();
-    private readonly TextBox _passwordBox = new();
-    private readonly TextBox _intervalBox = new();
-    private readonly TextBox _patternsBox = new();
+
+    // Поля ввода получают тематические ModernTextBox/ModernComboBox (issue #26, 1.0.1.6):
+    // без явной темы Fluent-фон полей не меняется в тёмной теме, и «Интервал
+    // автозапуска»/«Файлы для синхронизации» выглядят иначе остальных окон.
+    // Журнал (_logList) уже темируется неявным стилем ListBox (ControlDefaults.axaml).
+    private readonly ComboBox _kindCombo = new ComboBox().Styled(ControlThemes.ModernComboBox);
+    private readonly TextBox _urlBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly TextBox _folderBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly TextBox _userBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly TextBox _passwordBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly TextBox _intervalBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly TextBox _patternsBox = new TextBox().Styled(ControlThemes.ModernTextBox);
     private readonly TextBlock _lastSyncText = new();
     private readonly TextBlock _statusText = new();
     private readonly ListBox _logList = new();

@@ -208,6 +208,12 @@ public partial class SettingsSyncWindow : Window
         grid.Children.Add(buttons);
         Grid.SetRow(buttons, 3);
 
+        // Единое оформление полей ввода (issue #26, 1.0.1.6, 7OH: поля «Интервал
+        // автозапуска» и «Файлы для синхронизации» чёрные на тёмном): все редактируемые
+        // поля получают тематические ModernTextBox/ModernComboBox, журнал —
+        // ModernListBoxItem и кисти темы. По образцу TestDeployWindow.ApplyModernStyles.
+        ApplyModernStyles(grid);
+
         Content = grid;
         Loaded += (_, _) =>
         {
@@ -234,6 +240,46 @@ public partial class SettingsSyncWindow : Window
         };
         label.SetResourceReference(ForegroundProperty, "FormLabelBrush");
         return label;
+    }
+
+    /// <summary>
+    /// Единое оформление полей ввода (issue #26, 1.0.1.6): обходит логическое дерево
+    /// окна и назначает тематические стили контролам (TextBox — ModernTextBox,
+    /// ComboBox — ModernComboBox, ListBox — ModernListBoxItem + кисти темы).
+    /// PasswordBox не стилизуется: ModernTextBox имеет TargetType="TextBox", а
+    /// присваивание его PasswordBox бросает InvalidOperationException — пароль
+    /// получает темированный implicit-стиль TargetType="PasswordBox" из
+    /// LightTheme/DarkTheme (см. TestDeployWindow.ApplyModernStyles).
+    /// Без явного стиля поля ввода в тёмной теме рисуются чёрными (белый текст
+    /// на чёрном фоне отсутствует) — «Интервал автозапуска»/«Файлы для синхронизации»
+    /// нечитаемы.
+    /// </summary>
+    private void ApplyModernStyles(System.Windows.DependencyObject root)
+    {
+        var styleBox = TryFindResource("ModernTextBox") as Style;
+        var styleCombo = TryFindResource("ModernComboBox") as Style;
+        var styleItem = TryFindResource("ModernListBoxItem") as Style;
+        if (styleBox is null && styleCombo is null && styleItem is null)
+            return;
+        foreach (var child in System.Windows.LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is TextBox tb && styleBox is not null)
+                tb.Style = styleBox;
+            else if (child is ComboBox cb && styleCombo is not null)
+                cb.Style = styleCombo;
+            else if (child is ListBox list)
+            {
+                // Журнал операций (issue #26): фон/текст — кисти темы (иначе список
+                // остаётся с дефолтным белым фоном), строки — ModernListBoxItem.
+                list.SetResourceReference(ListBox.BackgroundProperty, "InputBackgroundBrush");
+                list.SetResourceReference(ListBox.ForegroundProperty, "TextPrimaryBrush");
+                if (styleItem is not null)
+                    list.ItemContainerStyle = styleItem;
+            }
+
+            if (child is System.Windows.DependencyObject d)
+                ApplyModernStyles(d);
+        }
     }
 }
 #endif

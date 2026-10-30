@@ -145,14 +145,18 @@ public static class ThemeFeatureMap
     /// и полупрозрачная белая <see cref="DarkThemeWindowButtonHoverHex"/> на ней смотрится
     /// «белой подсветкой с белыми элементами». В тёмной теме неактивная подложка —
     /// приглушённый тёмный slate (как «зебра»/ItemHover), в светлой теме — прежние
-    /// «дневные» подложки стиля. «Светофор» macOS и полупрозрачный Glass сохраняют
-    /// собственные подложки (круг светофора всегда цветной, Glass — полупрозрачный).
+    /// «дневные» подложки стиля. <para>
+    /// Исправление issue #26 (1.0.1.6): исключение для Glass убрано — полупрозрачно-белая
+    /// подложка Glass-кнопок на тёмной неактивной шапке выглядела именно той «белой
+    /// подсветкой», на которую жаловался 7OH; тёмный slate применяется и к Glass.
+    /// «Светофор» macOS сохраняет собственные цветные подложки (круги всегда цветные —
+    /// это не «белая подсветка»).</para>
     /// </summary>
     public const string DarkThemeInactiveWindowButtonHoverHex = "#334155";
 
     public static string InactiveHoverHex(WindowButtonStyle style, bool dark)
     {
-        if (!dark || style is WindowButtonStyle.MacOS or WindowButtonStyle.Glass)
+        if (!dark || style is WindowButtonStyle.MacOS)
             return ButtonMetrics(style, dark: false).HoverHex;
         return DarkThemeInactiveWindowButtonHoverHex;
     }

@@ -35,6 +35,15 @@ namespace Workspace1C.Services
         /// <summary>Признак того, что цепочка диалогов обновления уже идёт.</summary>
         private int _updateInProgress;
 
+        /// <summary>
+        /// Текст ошибки последней валидации скачанного файла (issue #89): null — файл
+        /// валиден либо последняя загрузка не доходила до валидации. Используется
+        /// вызывающими точками, чтобы вместо общей «не удалось скачать обновление»
+        /// показать понятную ошибку «скачан файл для другой ОС» с подсказкой ручной
+        /// установки и ссылкой на страницу выпуска.
+        /// </summary>
+        private string? _downloadValidationMessage;
+
         /// <summary>Ключ локализации заголовка окна результата проверки обновлений (issue #23):
         /// «Проверка обновлений», единый для всех исходов (ошибка/актуально/сбой загрузки).</summary>
         private const string CheckResultTitleKey = "Updates.CheckTitle";
@@ -376,6 +385,15 @@ namespace Workspace1C.Services
 
             if (newBinary is null)
             {
+                // issue #89: при провале валидации платформы показываем понятную ошибку
+                // с ссылкой на страницу выпуска (ручная установка).
+                var selfValidationMessage = _downloadValidationMessage;
+                if (selfValidationMessage is not null)
+                {
+                    ShowManualUpdateDialog(selfValidationMessage, release.HtmlUrl);
+                    return;
+                }
+
                 ShowOnUi(() => _dialogs.ShowError(
                     LocalizationManager.T("Update.DownloadFailed"),
                     LocalizationManager.T("Update.NewVersionAvailable")));
@@ -464,6 +482,15 @@ namespace Workspace1C.Services
 
             if (newBinary is null)
             {
+                // issue #89: при провале валидации платформы показываем понятную ошибку
+                // с ссылкой на страницу выпуска (ручная установка).
+                var privValidationMessage = _downloadValidationMessage;
+                if (privValidationMessage is not null)
+                {
+                    ShowManualUpdateDialog(privValidationMessage, release.HtmlUrl);
+                    return;
+                }
+
                 ShowOnUi(() => _dialogs.ShowError(
                     LocalizationManager.T("Update.DownloadFailed"),
                     LocalizationManager.T("Update.NewVersionAvailable")));
@@ -624,6 +651,16 @@ namespace Workspace1C.Services
 
             if (newBinary is null)
             {
+                // issue #89: если скачанный файл не прошёл валидацию платформы — показываем
+                // понятную ошибку с ссылкой на страницу выпуска (ручная установка), а не
+                // общую «не удалось скачать обновление».
+                var autoValidationMessage = _downloadValidationMessage;
+                if (autoValidationMessage is not null)
+                {
+                    ShowManualUpdateDialog(autoValidationMessage, release.HtmlUrl);
+                    return false;
+                }
+
                 ShowOnUi(() => _dialogs.ShowError(
                     LocalizationManager.T("Update.DownloadFailed"),
                     LocalizationManager.T("Update.NewVersionAvailable")));
@@ -815,6 +852,8 @@ namespace Workspace1C.Services
 
             try
             {
+                _downloadValidationMessage = null;
+
                 // Многопоточная загрузка по HTTP Range (N сегментов): файл делится на части,
                 // каждая скачивается отдельным соединением, затем части склеиваются. Прогресс
                 // агрегированный (сумма по сегментам / общий размер), публикуется не чаще раза
@@ -890,6 +929,21 @@ namespace Workspace1C.Services
                 if (size <= 0 || (accepted > 0 && size != accepted))
                 {
                     TryDelete(dest);
+                    BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
+                    return (null, false);
+                }
+
+                // Валидация скачанного файла по магическим байтам платформы (issue #89):
+                // Linux-сборка обязана быть ELF (7F 45 4C 46). Попавший сюда EXE («MZ») —
+                // например, от старой версии приложения, выбиравшей Windows-ассет, —
+                // не применяется: файл переименовывается в *.wrong-platform (карантин),
+                // пользователь получает понятную ошибку с подсказкой ручной установки.
+                // Размер уже сверён выше (issue #302), поэтому здесь важна только сигнатура.
+                _downloadValidationMessage = UpdatePayload.RejectWrongPlatformFile(
+                    dest, linux: true, htmlUrl: null,
+                    logDir: Workspace1C.Services.PlatformPaths.AppDataDirectory);
+                if (_downloadValidationMessage is not null)
+                {
                     BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
                     return (null, false);
                 }
