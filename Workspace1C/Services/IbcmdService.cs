@@ -192,9 +192,15 @@ public static class IbcmdService
 
     // ---------------- Операции ----------------
 
+    /// <summary>
+    /// Выгрузка .dt. <paramref name="dbmsProfileOverride"/> — переопределение профиля СУБД
+    /// (issue #79, 1.0.1.9: мастер «Развернуть тестовую копию» передаёт значения полей
+    /// формы — «либо из профиля, либо вручную»; null — сохранённый профиль базы, как раньше).
+    /// </summary>
     public static Task<IbcmdResult> DumpAsync(Infobase infobase, string dtPath, BackupCredential? credential = null,
-        CancellationToken ct = default) =>
-        RunForInfobaseAsync(infobase, DumpCommand, new[] { dtPath }, credential, ct, ensureDirOf: dtPath);
+        CancellationToken ct = default, DbmsBackupProfile? dbmsProfileOverride = null) =>
+        RunForInfobaseAsync(infobase, DumpCommand, new[] { dtPath }, credential, ct, ensureDirOf: dtPath,
+            dbmsProfileOverride: dbmsProfileOverride);
 
     public static Task<IbcmdResult> RestoreAsync(Infobase infobase, string dtPath, BackupCredential? credential = null,
         CancellationToken ct = default) =>
@@ -237,7 +243,8 @@ public static class IbcmdService
     };
 
     private static async Task<IbcmdResult> RunForInfobaseAsync(Infobase infobase, string[] command, string[] tail,
-        BackupCredential? credential, CancellationToken ct, string? ensureDirOf = null)
+        BackupCredential? credential, CancellationToken ct, string? ensureDirOf = null,
+        DbmsBackupProfile? dbmsProfileOverride = null)
     {
         if (infobase is null)
             return IbcmdResult.Fail(LocalizationManager.T("Designer.NoInfobase"));
@@ -245,8 +252,11 @@ public static class IbcmdService
         if (exe is null)
             return IbcmdResult.Fail(LocalizationManager.T("Ibcmd.NotFound"));
 
-        DbmsBackupProfile? dbms = null;
-        if (infobase.Connection?.Type == ConnectionType.ClientServer)
+        // issue #79 (1.0.1.9): явное переопределение профиля СУБД имеет приоритет над
+        // сохранённым профилем базы (мастер «Развернуть тестовую копию» выполняет операцию
+        // по значениям на форме).
+        DbmsBackupProfile? dbms = dbmsProfileOverride;
+        if (infobase.Connection?.Type == ConnectionType.ClientServer && dbms is null)
         {
             try { dbms = DbmsBackupService.Load().Find(infobase.Id); }
             catch { /* профиль недоступен — ниже понятная ошибка */ }

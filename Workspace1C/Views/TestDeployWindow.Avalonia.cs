@@ -203,6 +203,30 @@ public class TestDeployWindow : ModalWindowBase
         _serverPanel.Children.Add(Field(T("TestDeploy.DbPassword"), _dbPwdBox));
         _dbPwdBox.PasswordChanged += (_, _) => _vm.DbPassword = _dbPwdBox.Password;
 
+        // issue #79 (1.0.1.9, 7OH: «Логичнее иметь кнопку "Подставить из профиля" … либо
+        // данные из профиля, либо вручную. А выполнять работу по тому, что на форме»):
+        // поля СУБД остаются редактируемыми; кнопка подставляет их из профиля исходной
+        // базы (окно «Резервные копии СУБД») — по аналогии с «Подставить из базы».
+        var fillDbmsProfileButton = new Button { Content = T("TestDeploy.FillFromDbmsProfile"), Height = 32 };
+        fillDbmsProfileButton.Styled(ControlThemes.SecondaryButton);
+        ToolTip.SetTip(fillDbmsProfileButton, T("TestDeploy.FillFromDbmsProfileHint"));
+        fillDbmsProfileButton.Click += (_, _) =>
+        {
+            if (_vm.AutofillDbmsFromProfile())
+            {
+                _dbmsBox.SelectedItem = _vm.Dbms;
+                _dbServerBox.Text = _vm.DbServer;
+                _dbNameBox.Text = _vm.DbName;
+                _dbUserBox.Text = _vm.DbUser;
+                _dbPwdBox.Password = _vm.DbPassword;
+            }
+            else
+            {
+                _dialogs.ShowInfo(T("TestDeploy.NoDbmsProfile"), T("TestDeploy.Title"));
+            }
+        };
+        _serverPanel.Children.Add(fillDbmsProfileButton);
+
         _createDbCheck.Content = T("TestDeploy.CreateDb");
         _createDbCheck.IsCheckedChanged += (_, _) => _vm.CreateSqlDatabase = _createDbCheck.IsChecked == true;
         _serverPanel.Children.Add(_createDbCheck);
@@ -349,15 +373,11 @@ public class TestDeployWindow : ModalWindowBase
         _closeButton.Styled(ControlThemes.SecondaryButton);
         _closeButton.Click += (_, _) => Close();
         // issue #79 (7OH: «Можно внизу кнопку добавить, которая откроет окно нужное
-        // прямо тут?»): учётные данные выгрузки и общая авторизация — без выхода из мастера.
-        // issue #79 (1.0.1.7): кнопок две — «Учётные данные ИБ для ibcmd…» (свойства
-        // исходной базы) и «Профиль СУБД для ibcmd…» (окно «Резервные копии СУБД»):
-        // ошибка «заполните профиль» относится к профилю СУБД, а не к кредам ИБ.
-        var ibcmdCredentialsButton = new Button { Content = T("TestDeploy.OpenCredentialsWindow"), Width = 210, Height = 32 };
-        ibcmdCredentialsButton.Styled(ControlThemes.SecondaryButton);
-        ToolTip.SetTip(ibcmdCredentialsButton, T("TestDeploy.OpenCredentialsWindowHint"));
-        ibcmdCredentialsButton.Click += (_, _) => OpenBaseProperties();
-        buttons.Children.Add(ibcmdCredentialsButton);
+        // прямо тут?»): общая авторизация — без выхода из мастера. Issue #79 (1.0.1.9,
+        // 7OH: кнопка «Учётные данные ИБ для ibcmd…» — дубль и не нужна): кнопка
+        // удалена — учётные данные ИБ задаются в блоке «Данные для выгрузки через
+        // ibcmd» (кнопка «Подставить из базы») и в свойствах исходной базы (кнопка
+        // вверху окна). Оставлены «Профиль СУБД для ibcmd…» и «Общая авторизация…».
         var dbmsProfileButton = new Button { Content = T("TestDeploy.OpenDbmsProfileWindow"), Width = 200, Height = 32 };
         dbmsProfileButton.Styled(ControlThemes.SecondaryButton);
         ToolTip.SetTip(dbmsProfileButton, T("TestDeploy.OpenDbmsProfileWindowHint"));

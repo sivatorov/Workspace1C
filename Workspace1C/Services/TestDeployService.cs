@@ -284,7 +284,11 @@ public sealed class TestDeployService
                 return T("Ibcmd.NotFound");
             // issue #79: явные учётные данные из мастера (блок «Данные для ibcmd») или
             // null — резолвер (авторизация базы + общая авторизация приложения).
-            var res = await IbcmdService.DumpAsync(source, dtPath, scenario.Credential, ct).ConfigureAwait(false);
+            // issue #79 (1.0.1.9): параметры СУБД для подключения ibcmd — по значениям
+            // на форме мастера (BuildDbmsProfileOverride); при пустых полях формы
+            // используется сохранённый профиль базы (как раньше, внутри IbcmdService).
+            var dbmsOverride = BuildDbmsProfileOverride(scenario, source);
+            var res = await IbcmdService.DumpAsync(source, dtPath, scenario.Credential, ct, dbmsOverride).ConfigureAwait(false);
             if (!res.Success)
                 return res.Error ?? T("Backup.Failed");
             if (!File.Exists(dtPath) || new FileInfo(dtPath).Length == 0)
@@ -393,6 +397,33 @@ public sealed class TestDeployService
         {
             OneCLauncher.DesignerBatchCompleted -= handler;
         }
+    }
+
+    /// <summary>
+    /// Профиль СУБД, собранный из полей формы мастера (issue #79, 1.0.1.9, 7OH: «либо
+    /// данные из профиля, либо вручную. А выполнять работу по тому, что на форме»).
+    /// Передаётся в <see cref="IbcmdService.DumpAsync"/> как переопределение — выгрузка
+    /// выполняется по значениям на форме, без требования сохранённого профиля. Для
+    /// файловой базы или незаполненных полей возвращается null (работает прежняя логика
+    /// с сохранённым профилем).
+    /// </summary>
+    private static DbmsBackupProfile? BuildDbmsProfileOverride(TestDeployScenario scenario, Infobase source)
+    {
+        if (source.Connection?.Type != ConnectionType.ClientServer)
+            return null;
+        if (string.IsNullOrWhiteSpace(scenario.DbServer) || string.IsNullOrWhiteSpace(scenario.DbName))
+            return null;
+        return new DbmsBackupProfile
+        {
+            InfobaseId = scenario.SourceInfobaseId,
+            Dbms = string.Equals(scenario.Dbms?.Trim(), "PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                ? DbmsKind.PostgreSql
+                : DbmsKind.MsSql,
+            Host = scenario.DbServer.Trim(),
+            Database = scenario.DbName.Trim(),
+            User = scenario.DbUser?.Trim() ?? string.Empty,
+            Password = scenario.DbPassword ?? string.Empty
+        };
     }
 
     /// <summary>Текст ошибки шага: «Шаг: …» + понятная причина.</summary>

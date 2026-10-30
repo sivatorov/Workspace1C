@@ -275,17 +275,23 @@ public static class TestDeployPlanner
             errors.Add("TestDeploy.EnterTestGroup");
 
         // issue #79 (1.0.1.7, репорт 7OH «заполните профиль»): выгрузка клиент-серверной
-        // базы движком ibcmd требует профиль СУБД — ibcmd подключается к СУБД напрямую
+        // базы движком ibcmd требует параметры СУБД — ibcmd подключается к СУБД напрямую
         // (IbcmdService.BuildConnectionArguments), поэтому галки «авторизация ИБ» и
         // «Подставить из базы» не помогают. Ошибка показывается ДО старта операций,
         // а не на шаге «Выгрузка».
+        // issue #79 (1.0.1.9, 7OH: «либо данные из профиля, либо вручную. А выполнять
+        // работу по тому, что на форме»): достаточно ЛИБО сохранённого профиля СУБД
+        // (окно «Резервные копии СУБД»), ЛИБО заполненных полей СУБД на форме мастера —
+        // разовый сценарий без постоянного профиля проходит валидацию.
         if (scenario.DumpEngine == BackupEngine.Ibcmd
             && source.Connection?.Type == ConnectionType.ClientServer)
         {
             var dbmsProfile = dbmsProfileResolver is not null
                 ? dbmsProfileResolver(source)
                 : TryLoadDbmsProfile(source);
-            if (dbmsProfile is null || string.IsNullOrWhiteSpace(dbmsProfile.Database))
+            var hasFormDbms = !string.IsNullOrWhiteSpace(scenario.DbServer)
+                && !string.IsNullOrWhiteSpace(scenario.DbName);
+            if ((dbmsProfile is null || string.IsNullOrWhiteSpace(dbmsProfile.Database)) && !hasFormDbms)
                 errors.Add("TestDeploy.NeedDbmsProfile");
         }
 

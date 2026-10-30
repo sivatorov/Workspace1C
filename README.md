@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.8-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.9-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.8**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.9**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,12 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Мастер «Развернуть тестовую копию»: подстановка СУБД из профиля и разовый сценарий
+  без профиля (1.0.1.9, issue #79, Windows и Linux)** — убрана кнопка-дубль «Учётные
+  данные ИБ для ibcmd…» внизу окна; вместо дублирующих профиль полей добавлена кнопка
+  «Подставить из профиля СУБД» (по аналогии с «Подставить из базы»); поля остаются
+  редактируемыми, операция выполняется по значениям на форме; разовая копия без
+  сохранённого профиля СУБД проходит пред-валидацию (покрыто `Issue79TestDeployWindowTests`).
 - **Массовая выгрузка в DT/CF «Для выделенных…» с шаблоном имени файла (1.0.1.8,
   issue #92, Windows и Linux)** — в подменю «Для выделенных (N)…» добавлен пункт
   «Выгрузить в DT\CF…»: единое окно с шаблоном имени файла (токены `{Имя}`, `{Дата}`),

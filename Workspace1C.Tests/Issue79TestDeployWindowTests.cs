@@ -8,11 +8,16 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Issue #79 «Развернуть тестовую копию» (последний комментарий 7OH, 2026-10-28):
-/// (1) единое оформление полей ввода — тематический ModernTextBox вместо дефолтных
-/// «серых» полей без окантовки; (2) автоподстановка «Имя базы данных СУБД» из
-/// «Имя базы на сервере»; (3) кнопки «Свойства исходной базы» и «Конфигуратор»,
-/// чтобы админ мог открыть свойства базы или конфигуратор, не выходя из мастера.
+/// Issue #79 «Развернуть тестовую копию» (последний комментарий 7OH): (1) единое
+/// оформление полей ввода — тематический ModernTextBox вместо дефолтных «серых» полей
+/// без окантовки; (2) автоподстановка «Имя базы данных СУБД» из «Имя базы на сервере»;
+/// (3) кнопки «Свойства исходной базы» и «Конфигуратор», чтобы админ мог открыть
+/// свойства базы или конфигуратор, не выходя из мастера.
+/// 1.0.1.9 (последний комментарий 7OH, 2026-10-30): (4) кнопка-дубль «Учётные данные
+/// ИБ для ibcmd…» внизу окна удалена; (5) добавлена кнопка «Подставить из профиля
+/// СУБД» (поля остаются редактируемыми, операция — по значениям на форме);
+/// (6) пред-валидация проходит без сохранённого профиля СУБД, если поля СУБД заполнены
+/// на форме (разовый сценарий).
 /// Чистая логика (автоподстановка) проверяется на ViewModel; разметочные части —
 /// чтением исходников обеих платформ (как Issue71SettingsWindowLayoutTests).
 /// </summary>
@@ -320,15 +325,21 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Contains("TestDeploy.CredentialsUser", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.CredentialsPassword", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.FillFromBase", code, StringComparison.Ordinal);
-        Assert.Contains("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
         Assert.Contains("UpdateIbcmdPanel", code, StringComparison.Ordinal);
-        // issue #79 (1.0.1.7): вторая кнопка «Профиль СУБД для ibcmd…» открывает окно
+        // issue #79 (1.0.1.7): кнопка «Профиль СУБД для ibcmd…» открывает окно
         // «Резервные копии СУБД» (DbmsBackupWindow), а не свойства базы.
         Assert.Contains("TestDeploy.OpenDbmsProfileWindow", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenDbmsProfile()", code, StringComparison.Ordinal);
         Assert.Contains("new DbmsBackupWindow(", code, StringComparison.Ordinal);
+        // issue #79 (1.0.1.9, 7OH: «Учётные данные ИБ для ibcmd» — дубль и не нужна):
+        // кнопка удалена из окна; вместо дублирующих профиль полей — кнопка
+        // «Подставить из профиля СУБД» (поля остаются редактируемыми).
+        Assert.DoesNotContain("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.FillFromDbmsProfile", code, StringComparison.Ordinal);
+        Assert.Contains("AutofillDbmsFromProfile", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.NoDbmsProfile", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -340,14 +351,18 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Contains("TestDeploy.CredentialsUser", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.CredentialsPassword", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.FillFromBase", code, StringComparison.Ordinal);
-        Assert.Contains("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
         Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
         Assert.Contains("ApplyIbcmdPanel", code, StringComparison.Ordinal);
-        // issue #79 (1.0.1.7): Avalonia-паритет второй кнопки.
+        // issue #79 (1.0.1.7): Avalonia-паритет кнопки «Профиль СУБД для ibcmd…».
         Assert.Contains("TestDeploy.OpenDbmsProfileWindow", code, StringComparison.Ordinal);
         Assert.Contains("private void OpenDbmsProfile()", code, StringComparison.Ordinal);
         Assert.Contains("new DbmsBackupWindow(", code, StringComparison.Ordinal);
+        // issue #79 (1.0.1.9): Avalonia-паритет — дубль удалён, кнопка подстановки есть.
+        Assert.DoesNotContain("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.FillFromDbmsProfile", code, StringComparison.Ordinal);
+        Assert.Contains("AutofillDbmsFromProfile", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.NoDbmsProfile", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -362,17 +377,116 @@ public sealed class Issue79TestDeployWindowTests
             "TestDeploy.CredentialsUser",
             "TestDeploy.CredentialsPassword",
             "TestDeploy.FillFromBase",
-            "TestDeploy.OpenCredentialsWindow",
             "TestDeploy.OpenCommonAuth",
             "TestDeploy.IbcmdCredentialsHint",
             // issue #79 (1.0.1.7): профиль СУБД для ibcmd.
             "TestDeploy.OpenDbmsProfileWindow",
             "TestDeploy.OpenDbmsProfileWindowHint",
-            "TestDeploy.NeedDbmsProfile"
+            "TestDeploy.NeedDbmsProfile",
+            // issue #79 (1.0.1.9): подстановка из профиля СУБД вместо дублирующих полей.
+            "TestDeploy.FillFromDbmsProfile",
+            "TestDeploy.FillFromDbmsProfileHint",
+            "TestDeploy.NoDbmsProfile"
         })
         {
             Assert.Contains(key, ru, StringComparison.Ordinal);
             Assert.Contains(key, en, StringComparison.Ordinal);
         }
+
+        // Ключи удалённой кнопки-дубля вычищены из локализации (1.0.1.9).
+        Assert.DoesNotContain("TestDeploy.OpenCredentialsWindow", ru, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestDeploy.OpenCredentialsWindow", en, StringComparison.Ordinal);
+    }
+
+    // ---------------- (6) Разовый сценарий без сохранённого профиля СУБД (1.0.1.9) ----------------
+
+    private static TestDeployScenario BuildIbcmdScenario(TestDeployViewModel vm, string dbServer, string dbName)
+    {
+        vm.EngineIndex = 1; // ibcmd
+        vm.DbServer = dbServer;
+        vm.DbName = dbName;
+        return vm.BuildScenario();
+    }
+
+    [Fact]
+    public void Validate_IbcmdClientServer_NoSavedProfile_PassesWithFormDbmsValues()
+    {
+        // Разовый сценарий 7OH: «хочу просто копию без постоянного профиля» — заполненные
+        // на форме поля СУБД удовлетворяют пред-валидацию без сохранённого профиля.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        vm.Dbms = "MSSQLServer";
+        var scenario = BuildIbcmdScenario(vm, dbServer: "sqlsrv", dbName: "ut_base");
+        var source = vm.Source;
+
+        var errors = TestDeployPlanner.Validate(scenario, source, existingTarget: null,
+            dbmsProfileResolver: _ => null);
+
+        Assert.DoesNotContain("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_IbcmdClientServer_NoProfileAndEmptyFormDbms_Fails()
+    {
+        // Без профиля И без заполненных полей СУБД на форме — понятная ошибка до старта.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        var scenario = BuildIbcmdScenario(vm, dbServer: string.Empty, dbName: string.Empty);
+        var source = vm.Source;
+
+        var errors = TestDeployPlanner.Validate(scenario, source, existingTarget: null,
+            dbmsProfileResolver: _ => null);
+
+        Assert.Contains("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void AutofillDbmsFromProfile_FillsFormFieldsFromProfile()
+    {
+        // «Логичнее иметь кнопку "Подставить из профиля" … либо данные из профиля,
+        // либо вручную. А выполнять работу по тому, что на форме».
+        var vm = MakeVm(databaseName: "ut_base", dbName: string.Empty);
+        var profile = new DbmsBackupProfile
+        {
+            InfobaseId = vm.Source.Id,
+            Dbms = DbmsKind.PostgreSql,
+            Host = "pgsrv",
+            Port = 5432,
+            Database = "ut_base",
+            User = "postgres",
+            Password = "secret"
+        };
+
+        var filled = vm.AutofillDbmsFromProfile(_ => profile);
+
+        Assert.True(filled);
+        Assert.Equal("PostgreSQL", vm.Dbms);
+        Assert.Equal("pgsrv port=5432", vm.DbServer);
+        Assert.Equal("ut_base", vm.DbName);
+        Assert.Equal("postgres", vm.DbUser);
+        Assert.Equal("secret", vm.DbPassword);
+    }
+
+    [Fact]
+    public void AutofillDbmsFromProfile_NoProfile_ReturnsFalse()
+    {
+        var vm = MakeVm(databaseName: "ut_base", dbName: string.Empty);
+        vm.DbServer = "keep-me";
+
+        var filled = vm.AutofillDbmsFromProfile(_ => null);
+
+        Assert.False(filled);
+        Assert.Equal("keep-me", vm.DbServer); // поля не тронуты
+    }
+
+    [Fact]
+    public void BuildScenario_IbcmdKeepsFormDbmsValues_UsedAsOverride()
+    {
+        // Операция выполняется по значениям на форме: поля СУБД формы попадают
+        // в сценарий и передаются в ibcmd как переопределение профиля.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        var scenario = BuildIbcmdScenario(vm, dbServer: "sqlsrv", dbName: "ut_base");
+
+        Assert.Equal(BackupEngine.Ibcmd, scenario.DumpEngine);
+        Assert.Equal("sqlsrv", scenario.DbServer);
+        Assert.Equal("ut_base", scenario.DbName);
     }
 }

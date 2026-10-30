@@ -166,6 +166,40 @@ public sealed class TestDeployViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Подстановка параметров СУБД из профиля исходной базы (issue #79, 1.0.1.9, 7OH:
+    /// «Логичнее иметь кнопку "Подставить из профиля" … либо данные из профиля, либо
+    /// вручную. А выполнять работу по тому, что на форме») — по аналогии с
+    /// <see cref="AutofillCredentialFromSource"/>. Заполняет поля СУБД формы (тип,
+    /// сервер, база, пользователь, пароль) из профиля окна «Резервные копии СУБД»;
+    /// поля остаются редактируемыми вручную, операция выполняется по значениям на форме.
+    /// Возвращает true, если профиль найден и подставлен.
+    /// </summary>
+    public bool AutofillDbmsFromProfile(Func<Infobase, DbmsBackupProfile?>? profileResolver = null)
+    {
+        DbmsBackupProfile? profile;
+        try
+        {
+            profile = profileResolver is not null
+                ? profileResolver(_source)
+                : DbmsBackupService.Load().Find(_source.Id);
+        }
+        catch
+        {
+            return false;
+        }
+        if (profile is null || string.IsNullOrWhiteSpace(profile.Database))
+            return false;
+
+        Dbms = profile.Dbms == DbmsKind.PostgreSql ? "PostgreSQL" : "MSSQLServer";
+        // Формат 1С: MS SQL «host,port», PostgreSQL «host port=N» (как в --db-server).
+        DbServer = IbcmdService.DbServer(profile);
+        DbName = profile.Database ?? string.Empty;
+        DbUser = profile.User ?? string.Empty;
+        DbPassword = profile.Password ?? string.Empty;
+        return true;
+    }
+
     public bool DisableScheduledJobs { get; set; } = true;
     public bool ChangeTitle { get; set; } = true;
     public bool ChangeColor { get; set; } = true;
