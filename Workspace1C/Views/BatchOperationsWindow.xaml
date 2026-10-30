@@ -64,22 +64,37 @@
                     Click="OnSelectNone_Click"/>
         </StackPanel>
 
-        <!-- Путь: каталог выгрузки .dt или файл конфигурации .cf -->
-        <Grid Grid.Row="3" Margin="0,10,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <TextBlock x:Name="PathLabel" Grid.Column="0" VerticalAlignment="Center"
-                       Margin="0,0,8,0"/>
-            <TextBox x:Name="PathBox" Grid.Column="1" VerticalContentAlignment="Center"
-                     Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}"/>
-            <Button x:Name="BrowseButton" Grid.Column="2" Content="…" Width="34" Margin="6,0,0,0"
-                    Style="{StaticResource ModernButton}"
-                    Background="{DynamicResource ItemHoverBrush}"
-                    Click="OnBrowse_Click"/>
-        </Grid>
+        <!-- Путь: каталог выгрузки .dt/.cf или файл конфигурации .cf.
+             Ниже — опции массовой выгрузки (issue #92): шаблон имени файла
+             с токенами {Имя} и {Дата} и переключатель формата DT/CF. -->
+        <StackPanel Grid.Row="3" Margin="0,10,0,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="PathLabel" Grid.Column="0" VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+                <TextBox x:Name="PathBox" Grid.Column="1" VerticalContentAlignment="Center"
+                         Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}"/>
+                <Button x:Name="BrowseButton" Grid.Column="2" Content="…" Width="34" Margin="6,0,0,0"
+                        Style="{StaticResource ModernButton}"
+                        Background="{DynamicResource ItemHoverBrush}"
+                        Click="OnBrowse_Click"/>
+            </Grid>
+            <StackPanel x:Name="DumpOptionsPanel" Orientation="Horizontal" Margin="0,8,0,0"
+                        Visibility="Collapsed">
+                <TextBlock x:Name="TemplateLabel" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBox x:Name="TemplateBox" Width="260" VerticalContentAlignment="Center"
+                         Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="{loc:Loc BatchOps.TemplateHint}"/>
+                <RadioButton x:Name="KindDtRadio" GroupName="BatchDumpKind" Margin="16,0,0,0"
+                             VerticalAlignment="Center" Checked="OnKindDt_Checked"/>
+                <RadioButton x:Name="KindCfRadio" GroupName="BatchDumpKind" Margin="12,0,0,0"
+                             VerticalAlignment="Center" Checked="OnKindCf_Checked"/>
+            </StackPanel>
+        </StackPanel>
 
         <TextBlock x:Name="LogHeader" Grid.Row="4" Margin="0,14,0,6" FontWeight="SemiBold"
                    Text="{loc:Loc BatchOps.Log}"/>

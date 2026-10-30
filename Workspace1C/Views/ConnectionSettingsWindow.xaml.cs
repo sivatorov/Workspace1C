@@ -214,6 +214,9 @@ namespace Workspace1C
             var settings = _linkRepository.LoadSettings();
             var width = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth);
             var height = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight);
+            // issue #93: старые сохранённые высоты (окно было 800/минимум 780)
+            // зажимаются к новой стартовой высоте — окно Свойств откроется компактным.
+            if (height > 680) height = 680;
             if (width > 0) Width = width;
             if (height > 0) Height = height;
         }

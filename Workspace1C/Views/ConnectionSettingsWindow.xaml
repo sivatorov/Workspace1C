@@ -10,8 +10,8 @@
         mc:Ignorable="d"
         Icon="{StaticResource AppIcon}"
         Width="900"
-        MinHeight="780" MinWidth="760"
-        Height="800"
+        MinHeight="640" MinWidth="760"
+        Height="680"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         FontFamily="Segoe UI"
@@ -61,6 +61,84 @@
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Горизонтальные под-вкладки внутри вкладки (issue #93): по образцу
+             SettingsSubTabControl/SettingsSubTabItem окна настроек. -->
+        <Style x:Key="ConnSubTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="TabStripPlacement" Value="Top"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0"
+                                    BorderBrush="{DynamicResource BorderBrushColor}"
+                                    BorderThickness="0,0,0,1"
+                                    Margin="0,0,0,10">
+                                <UniformGrid Rows="1" IsItemsHost="True"/>
+                            </Border>
+                            <ContentPresenter Grid.Row="1"
+                                              ContentSource="SelectedContent"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ConnSubTabItem" TargetType="TabItem">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0,0,0,3"
+                                Margin="0,0,0,-1"
+                                SnapsToDevicePixels="True"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </MultiTrigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -837,7 +915,7 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- Запуск -->
+            <!-- Запуск (issue #93): две под-вкладки — «Режим запуска клиента» и «События» -->
             <TabItem Style="{StaticResource ConnTabItem}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
@@ -845,178 +923,201 @@
                         <TextBlock Text="{loc:Loc Connection.Tab.Launch}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
-                <GroupBox Margin="4,6,4,4" VerticalAlignment="Top">
-                    <GroupBox.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
-                            <TextBlock Text="{loc:Loc Connection.GroupLaunchMode}" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </GroupBox.Header>
-                    <StackPanel>
-                    <TextBlock Text="{loc:Loc Connection.DblClickActionLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
-                    <ComboBox x:Name="DoubleClickActionCombo" MinWidth="220" HorizontalAlignment="Left" Margin="0,0,0,4"
-                              SelectionChanged="OnDoubleClickActionCombo_SelectionChanged"/>
+                <TabControl Margin="4,6,4,0" Style="{StaticResource ConnSubTabControl}">
 
-                    <TextBlock Text="{loc:Loc Connection.ExternalProcessingLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,4"/>
-                    <Grid Margin="0,0,0,4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox x:Name="ExternalProcessingPathBox" Grid.Column="0"
-                                 Text="{Binding ExternalProcessingPath, UpdateSourceTrigger=PropertyChanged}"
-                                 Padding="8,6" VerticalContentAlignment="Center"/>
-                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="8,3" Style="{DynamicResource SecondaryButton}"
-                                Click="OnBrowseExternalProcessing_Click">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Common.Browse}"/>
-                            </StackPanel>
-                        </Button>
-                    </Grid>
-                    <TextBlock Text="{loc:Loc Connection.ExternalProcessingDataLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,4"/>
-                    <TextBox Text="{Binding ExternalProcessingData, UpdateSourceTrigger=PropertyChanged}"
-                             Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4"/>
-
-                    <TextBlock Text="{loc:Loc Launch.PreCommand}" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,4"/>
-                    <TextBox Text="{Binding PreLaunchCommand, UpdateSourceTrigger=PropertyChanged}"
-                             Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4">
-                        <TextBox.ToolTip>
-                            <TextBlock Text="{loc:Loc Launch.PreCommandTooltip}" TextWrapping="Wrap" MaxWidth="380"/>
-                        </TextBox.ToolTip>
-                    </TextBox>
-                    <TextBlock Text="{loc:Loc Launch.PostCommand}" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,4"/>
-                    <TextBox Text="{Binding PostLaunchCommand, UpdateSourceTrigger=PropertyChanged}"
-                             Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4">
-                        <TextBox.ToolTip>
-                            <TextBlock Text="{loc:Loc Launch.PostCommandTooltip}" TextWrapping="Wrap" MaxWidth="380"/>
-                        </TextBox.ToolTip>
-                    </TextBox>
-                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
-                            BorderThickness="1.5" Cursor="Hand"
-                            Background="{DynamicResource CardBackgroundBrush}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsAutoMode}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <RadioButton GroupName="LaunchMode" Cursor="Hand"
-                                     IsChecked="{Binding IsAutoMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    <!-- Под-вкладка «Режим запуска клиента»: выбор режима запуска -->
+                    <TabItem Style="{StaticResource ConnSubTabItem}" Header="{loc:Loc Connection.LaunchSubtab.Mode}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                        <GroupBox Margin="0,0,0,4" VerticalAlignment="Top">
+                            <GroupBox.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="{loc:Loc Connection.GroupLaunchMode}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </GroupBox.Header>
                             <StackPanel>
-                                <TextBlock Text="{loc:Loc Connection.LaunchAuto}" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="{loc:Loc Connection.LaunchAutoHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </RadioButton>
-                    </Border>
+                            <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
+                                    BorderThickness="1.5" Cursor="Hand"
+                                    Background="{DynamicResource CardBackgroundBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsAutoMode}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <RadioButton GroupName="LaunchMode" Cursor="Hand"
+                                             IsChecked="{Binding IsAutoMode, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchAuto}" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchAutoHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
 
-                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
-                            BorderThickness="1.5" Cursor="Hand"
-                            Background="{DynamicResource CardBackgroundBrush}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsThinClient}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <RadioButton GroupName="LaunchMode" Cursor="Hand"
-                                     IsChecked="{Binding IsThinClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                            <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
+                                    BorderThickness="1.5" Cursor="Hand"
+                                    Background="{DynamicResource CardBackgroundBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsThinClient}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <RadioButton GroupName="LaunchMode" Cursor="Hand"
+                                             IsChecked="{Binding IsThinClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThin}" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThinHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+
+                            <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
+                                    BorderThickness="1.5" Cursor="Hand"
+                                    Background="{DynamicResource CardBackgroundBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsThickClient}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <RadioButton GroupName="LaunchMode" Cursor="Hand"
+                                             IsChecked="{Binding IsThickClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThickManaged}" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThickManagedHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+
+                            <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
+                                    BorderThickness="1.5" Cursor="Hand"
+                                    Background="{DynamicResource CardBackgroundBrush}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsThickOrdinaryClient}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <RadioButton GroupName="LaunchMode" Cursor="Hand"
+                                             IsChecked="{Binding IsThickOrdinaryClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThickOrdinary}" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchThickOrdinaryHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+
+                            <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
+                                    BorderThickness="1.5" Cursor="Hand"
+                                    Background="{DynamicResource CardBackgroundBrush}"
+                                    IsEnabled="{Binding IsWebClientAllowed}">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsWebClient}" Value="True">
+                                                <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </DataTrigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter Property="Opacity" Value="0.45"/>
+                                            </Trigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+                                <RadioButton GroupName="LaunchMode" Cursor="Hand"
+                                             IsEnabled="{Binding IsWebClientAllowed}"
+                                             IsChecked="{Binding IsWebClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchWeb}" FontWeight="SemiBold" FontSize="12"/>
+                                        <TextBlock Text="{loc:Loc Connection.LaunchWebHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                                    </StackPanel>
+                                </RadioButton>
+                            </Border>
+
+                            <TextBlock Text="{Binding LaunchModeHint}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="2,6,0,0"/>
+                            </StackPanel>
+                        </GroupBox>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Под-вкладка «События»: двойной щелчок, внешняя обработка,
+                         команды до/после запуска -->
+                    <TabItem Style="{StaticResource ConnSubTabItem}" Header="{loc:Loc Connection.LaunchSubtab.Events}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,4,0">
+                        <GroupBox Margin="0,0,0,4" VerticalAlignment="Top">
+                            <GroupBox.Header>
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="{loc:Loc Connection.LaunchSubtab.Events}" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </GroupBox.Header>
                             <StackPanel>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThin}" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThinHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </RadioButton>
-                    </Border>
+                            <TextBlock Text="{loc:Loc Connection.DblClickActionLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,0,0,4"/>
+                            <ComboBox x:Name="DoubleClickActionCombo" MinWidth="220" HorizontalAlignment="Left" Margin="0,0,0,4"
+                                      SelectionChanged="OnDoubleClickActionCombo_SelectionChanged"/>
 
-                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
-                            BorderThickness="1.5" Cursor="Hand"
-                            Background="{DynamicResource CardBackgroundBrush}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsThickClient}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <RadioButton GroupName="LaunchMode" Cursor="Hand"
-                                     IsChecked="{Binding IsThickClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThickManaged}" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThickManagedHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </RadioButton>
-                    </Border>
+                            <TextBlock Text="{loc:Loc Connection.ExternalProcessingLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,4"/>
+                            <Grid Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="ExternalProcessingPathBox" Grid.Column="0"
+                                         Text="{Binding ExternalProcessingPath, UpdateSourceTrigger=PropertyChanged}"
+                                         Padding="8,6" VerticalContentAlignment="Center"/>
+                                <Button Grid.Column="1" Margin="6,0,0,0" Padding="8,3" Style="{DynamicResource SecondaryButton}"
+                                        Click="OnBrowseExternalProcessing_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Common.Browse}"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                            <TextBlock Text="{loc:Loc Connection.ExternalProcessingDataLabel}" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,4"/>
+                            <TextBox Text="{Binding ExternalProcessingData, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4"/>
 
-                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
-                            BorderThickness="1.5" Cursor="Hand"
-                            Background="{DynamicResource CardBackgroundBrush}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsThickOrdinaryClient}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <RadioButton GroupName="LaunchMode" Cursor="Hand"
-                                     IsChecked="{Binding IsThickOrdinaryClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThickOrdinary}" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="{loc:Loc Connection.LaunchThickOrdinaryHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
+                            <TextBlock Text="{loc:Loc Launch.PreCommand}" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,4"/>
+                            <TextBox Text="{Binding PreLaunchCommand, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4">
+                                <TextBox.ToolTip>
+                                    <TextBlock Text="{loc:Loc Launch.PreCommandTooltip}" TextWrapping="Wrap" MaxWidth="380"/>
+                                </TextBox.ToolTip>
+                            </TextBox>
+                            <TextBlock Text="{loc:Loc Launch.PostCommand}" FontWeight="SemiBold" FontSize="12" Margin="0,4,0,4"/>
+                            <TextBox Text="{Binding PostLaunchCommand, UpdateSourceTrigger=PropertyChanged}"
+                                     Padding="8,6" VerticalContentAlignment="Center" Margin="0,0,0,4">
+                                <TextBox.ToolTip>
+                                    <TextBlock Text="{loc:Loc Launch.PostCommandTooltip}" TextWrapping="Wrap" MaxWidth="380"/>
+                                </TextBox.ToolTip>
+                            </TextBox>
                             </StackPanel>
-                        </RadioButton>
-                    </Border>
-
-                    <Border Margin="0,0,0,4" Padding="8,6" CornerRadius="6"
-                            BorderThickness="1.5" Cursor="Hand"
-                            Background="{DynamicResource CardBackgroundBrush}"
-                            IsEnabled="{Binding IsWebClientAllowed}">
-                        <Border.Style>
-                            <Style TargetType="Border">
-                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsWebClient}" Value="True">
-                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                                    </DataTrigger>
-                                    <Trigger Property="IsEnabled" Value="False">
-                                        <Setter Property="Opacity" Value="0.45"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
-                        </Border.Style>
-                        <RadioButton GroupName="LaunchMode" Cursor="Hand"
-                                     IsEnabled="{Binding IsWebClientAllowed}"
-                                     IsChecked="{Binding IsWebClient, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Connection.LaunchWeb}" FontWeight="SemiBold" FontSize="12"/>
-                                <TextBlock Text="{loc:Loc Connection.LaunchWebHint}" FontSize="11" TextWrapping="Wrap" Opacity="0.75" Margin="0,2,0,0"/>
-                            </StackPanel>
-                        </RadioButton>
-                    </Border>
-
-                    <TextBlock Text="{Binding LaunchModeHint}" FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="2,6,0,0"/>
-                    </StackPanel>
-                </GroupBox>
-                </ScrollViewer>
+                        </GroupBox>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </TabItem>
 
             <!-- Разрядность -->

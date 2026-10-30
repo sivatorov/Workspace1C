@@ -28,8 +28,15 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Тег существующего релиза (например v1.0.0.0)'
+        description: 'Тег релиза: существующего для пересборки или нового (например v1.0.1.7-test1)'
         required: true
+      prerelease:
+        description: 'Тестовая сборка: пометить релиз как prerelease (не попадёт в /releases/latest)'
+        type: boolean
+        default: false
+      ref:
+        description: 'Необязательно: ветка/коммит для сборки (по умолчанию — ветка запуска)'
+        required: false
 
 # Создание/обновление release и загрузка asset требуют записи в репозиторий.
 permissions:
@@ -42,6 +49,12 @@ concurrency:
 
 env:
   RELEASE_TAG: ${{ github.event.inputs.tag || github.event.release.tag_name || github.ref_name }}
+  # Источник checkout: явный ref из workflow_dispatch (тестовая сборка из ветки),
+  # иначе тег релиза, иначе ref запуска (push тега).
+  CHECKOUT_REF: ${{ github.event.inputs.ref || github.event.release.tag_name || github.ref }}
+  # Тестовая сборка (workflow_dispatch + prerelease=true) публикуется как prerelease:
+  # GitHub /releases/latest не отдаёт prerelease, обычные пользователи не затронуты.
+  IS_PRERELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease == true }}
 
 jobs:
   windows:
@@ -51,7 +64,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
@@ -83,7 +96,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ env.CHECKOUT_REF }}
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
@@ -161,7 +174,10 @@ jobs:
             dist/release/Workspace1C-linux-x64
           # Перезаписываем одноимённые asset'ы при повторном прогоне.
           overwrite: true
-          make_latest: true
+          # Тестовый workflow_dispatch (prerelease=true) — prerelease и не latest:
+          # обычные пользователи автообновления его не видят (issue #89, запрос 7OH).
+          prerelease: ${{ env.IS_PRERELEASE }}
+          make_latest: ${{ env.IS_PRERELEASE == 'true' && 'false' || 'true' }}
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -170,8 +186,9 @@ jobs:
       # репозитории задан секрет TELEGRAM_BOT_TOKEN (бот — администратор канала).
       # Канал по умолчанию -1004425443528, переопределяется секретом TELEGRAM_CHAT_ID.
       # Текст — из _telegram_msg_v1000NN.txt (1.0.0.NN), иначе первые строки заметок.
+      # Тестовые prerelease-сборки в Telegram не анонсируются.
       - name: Новость в Telegram
-        if: github.event_name != 'release'
+        if: github.event_name != 'release' && env.IS_PRERELEASE != 'true'
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}

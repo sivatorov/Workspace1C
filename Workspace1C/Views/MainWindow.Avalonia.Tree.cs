@@ -2354,6 +2354,8 @@ namespace Workspace1C
             batchMenu.Items.Add(BatchMenuAction("Main.BatchMoveToGroup", OnBatchMoveToGroupClick, "IconFolder", "#0EA5E9"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchAddFavorites", OnBatchAddFavoritesClick, "IconStar", "#FBBF24"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchRunBackup", OnBatchRunBackupClick, "IconDatabaseExport", "#22C55E"));
+            // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "#16A34A"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "#3B82F6"));
             // Массовая замена строк подключения (0.3.9.191, функция 6): окно с правилом
             // «найти → заменить на» по полям строк подключения выделенных баз.
@@ -2495,6 +2497,15 @@ namespace Workspace1C
             if (_vm is null || _vm.BatchOperationTargetCount == 0)
                 return;
             await _vm.RunBatchBackupAsync();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).</summary>
+        private void OnBatchDumpDtCfClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+                return;
+            _vm.ExecuteBatchDumpForSelected();
             _vm.ClearBatchSelection();
         }
 

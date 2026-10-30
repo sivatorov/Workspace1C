@@ -335,6 +335,8 @@ public partial class MainWindow
         batchMenu.Items.Add(CreateBatchAction("Main.BatchMoveToGroup", "FolderMove", "#0EA5E9", OnBatchMoveToGroup_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchAddFavorites", "Star", "#FBBF24", OnBatchAddFavorites_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchRunBackup", "DatabaseExport", "#22C55E", OnBatchRunBackup_Click));
+        // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchDumpDtCf", "DatabaseExport", "#16A34A", OnBatchDumpDtCf_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchCheckAvailability", "CloudCheck", "#3B82F6", OnBatchCheckAvailability_Click));
         // Массовая замена строк подключения (0.3.9.191, функция 6).
         batchMenu.Items.Add(CreateBatchAction("Main.BatchConnectionReplace", "FindReplace", "#F59E0B", OnBatchConnectionReplace_Click));

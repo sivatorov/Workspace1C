@@ -167,7 +167,7 @@ public static class GitVersioningService
             args.AddRange(new[] { "-c", "user.name=Workspace 1C", "-c", "user.email=workspace1c@localhost" });
         }
         args.AddRange(new[] { "commit", "-m", message });
-        var commit = await ProcessRunner.RunAsync("git", args, settings.RepoPath, TimeSpan.FromMinutes(10), null, ct)
+        var commit = await ProcessRunner.RunAsync("git", args, settings.RepoPath, TimeSpan.FromMinutes(10), null, ct: ct)
             .ConfigureAwait(false);
         if (!commit.Success)
             return new GitVersioningResult { Message = commit.CombinedOutput };
@@ -194,5 +194,5 @@ public static class GitVersioningService
     }
 
     private static Task<ProcessRunResult> Git(string repo, CancellationToken ct, params string[] args) =>
-        ProcessRunner.RunAsync("git", args, repo, TimeSpan.FromMinutes(10), null, ct);
+        ProcessRunner.RunAsync("git", args, repo, TimeSpan.FromMinutes(10), null, ct: ct);
 }

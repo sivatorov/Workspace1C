@@ -27,6 +27,15 @@ public class GitHubReleaseService
     private const string AssetName = "Workspace1C-linux-x64";
 #endif
 
+    /// <summary>
+    /// Отображаемое имя скачиваемого ассета текущей платформы (issue #89): используется
+    /// сервисом обновления для записи в менеджер фоновых загрузок, чтобы в индикаторе
+    /// главного окна пользователь видел реальное имя файла своей платформы
+    /// («Workspace1C-linux-x64» на Linux), а не захардкоженное «Workspace1C.exe»,
+    /// которое выглядело как загрузка Windows-версии.
+    /// </summary>
+    internal static string AssetDisplayName => AssetName;
+
     /// <summary>Шаблон прямой ссылки на asset release в GitHub Releases (без нормализации тега).</summary>
     private const string DownloadUrlTemplate =
         "https://github.com/sivatorov/Workspace1C/releases/download/{0}/" + AssetName;

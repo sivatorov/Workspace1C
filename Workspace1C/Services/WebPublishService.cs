@@ -217,6 +217,28 @@ public static class WebPublishService
         return File.Exists(path) ? path : null;
     }
 
+    /// <summary>
+    /// Кодировка чтения вывода webinst (issue #63, «каракули»): на русской Windows
+    /// webinst пишет в консольную OEM-кодировку (cp866) — читаем её; на Linux и при
+    /// недоступной кодовой странице — null (UTF-8 по умолчанию). Поставщик кодовых
+    /// страниц регистрируется однократно (идемпотентно).
+    /// </summary>
+    public static Encoding? WebinstOutputEncoding()
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+        try
+        {
+            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(866);
+        }
+        catch
+        {
+            // Провайдер/кодовая страница недоступны — читаем как UTF-8.
+            return null;
+        }
+    }
+
     public static async Task<ProcessRunResult> RunAsync(Infobase infobase, IEnumerable<string> arguments,
         CancellationToken ct = default)
     {
@@ -224,7 +246,7 @@ public static class WebPublishService
         if (webinst is null)
             return new ProcessRunResult { StartError = LocalizationManager.T("WebPublish.WebinstNotFound") };
         return await ProcessRunner.RunAsync(webinst, arguments, Path.GetDirectoryName(webinst),
-            TimeSpan.FromMinutes(5), null, ct).ConfigureAwait(false);
+            TimeSpan.FromMinutes(5), null, WebinstOutputEncoding(), ct).ConfigureAwait(false);
     }
 
     /// <summary>

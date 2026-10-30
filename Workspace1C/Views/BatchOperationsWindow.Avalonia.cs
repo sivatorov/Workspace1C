@@ -41,10 +41,12 @@ namespace Workspace1C
         private readonly Button _stopButton = new() { IsEnabled = false };
         private CancellationTokenSource? _cts;
 
-        public BatchOperationsWindow(System.Collections.Generic.IEnumerable<Infobase> infobases, BatchOperationKind kind)
+        /// <summary>ViewModel окна — для чтения шаблона/пути/вида после закрытия (issue #92).</summary>
+        public BatchOperationsViewModel ViewModel => _vm;
+
+        public BatchOperationsWindow(System.Collections.Generic.IEnumerable<Infobase> infobases, BatchOperationKind kind,
+            string? initialDirectory = null, string? template = null)
         {
-            Title = LocalizationManager.T(kind == BatchOperationKind.DumpDt
-                ? "BatchOps.TitleDumpDt" : "BatchOps.TitleLoadCf");
             Width = 700;
             Height = 620;
             MinWidth = 580;
@@ -52,6 +54,17 @@ namespace Workspace1C
             FontSize = 13;
             CanResize = true;
             DataContext = _vm = new BatchOperationsViewModel(infobases, kind);
+            // Сохранённые каталог и шаблон массовой выгрузки (issue #92).
+            if (!string.IsNullOrWhiteSpace(initialDirectory) && _vm.IsDumpKind)
+                _vm.PathText = initialDirectory!.Trim();
+            if (!string.IsNullOrWhiteSpace(template) && _vm.IsDumpKind)
+                _vm.Template = template!.Trim();
+            Title = LocalizationManager.T(_vm.Kind switch
+            {
+                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
+                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
+                _ => "BatchOps.TitleLoadCf"
+            });
 
             ScrollViewer.SetHorizontalScrollBarVisibility(_itemsList, ScrollBarVisibility.Disabled);
             ScrollViewer.SetHorizontalScrollBarVisibility(_logList, ScrollBarVisibility.Disabled);
@@ -80,6 +93,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
+            _pathLabel = pathLabel;
             _pathBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("PathText") { Mode = Avalonia.Data.BindingMode.TwoWay });
             _browseButton.Content = "…";
             _browseButton.MinWidth = 34;
@@ -101,6 +115,42 @@ namespace Workspace1C
             pathRow.Children.Add(pathLabel);
             pathRow.Children.Add(_pathBox);
             pathRow.Children.Add(_browseButton);
+
+            // Опции массовой выгрузки (issue #92): шаблон имени файла и DT/CF.
+            // Видны только у выгрузок; панель пересобирается при смене вида.
+            var templateLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.TemplateLabel"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            var templateBox = new TextBox { Width = 260, VerticalContentAlignment = VerticalAlignment.Center };
+            ToolTip.SetTip(templateBox, LocalizationManager.T("BatchOps.TemplateHint"));
+            templateBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("Template") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            _kindDtRadio = new RadioButton
+            {
+                Content = LocalizationManager.T("BatchOps.KindDtRadio"),
+                GroupName = "BatchDumpKind",
+                Margin = new Thickness(16, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _kindCfRadio = new RadioButton
+            {
+                Content = LocalizationManager.T("BatchOps.KindCfRadio"),
+                GroupName = "BatchDumpKind",
+                Margin = new Thickness(12, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            _kindDtRadio.IsCheckedChanged += (_, _) => OnKindChecked(BatchOperationKind.DumpDt);
+            _kindCfRadio.IsCheckedChanged += (_, _) => OnKindChecked(BatchOperationKind.DumpCf);
+            var dumpOptionsRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 8, 0, 0),
+                Children = { templateLabel, templateBox, _kindDtRadio, _kindCfRadio }
+            };
+            _dumpOptionsRow = dumpOptionsRow;
+            var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow } };
 
             var logHeader = new TextBlock
             {
@@ -174,15 +224,58 @@ namespace Workspace1C
             Place(grid, _hint, 0);
             Place(grid, _itemsList, 1);
             Place(grid, bulk, 2);
-            Place(grid, pathRow, 3);
+            Place(grid, pathStack, 3);
             Place(grid, logHeader, 4);
             Place(grid, _logList, 5);
             Place(grid, _summary, 6);
             Place(grid, buttons, 7);
             Content = grid;
 
+            UpdateKindDependentUi();
             _vm.PropertyChanged += OnVmPropertyChanged;
             ((INotifyCollectionChanged)_vm.LogLines).CollectionChanged += OnLogLinesChanged;
+        }
+
+        private readonly TextBlock? _pathLabel;
+        private StackPanel? _dumpOptionsRow;
+        private RadioButton? _kindDtRadio;
+        private RadioButton? _kindCfRadio;
+        private bool _suppressKindEvents;
+
+        /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
+        private void UpdateKindDependentUi()
+        {
+            Title = LocalizationManager.T(_vm.Kind switch
+            {
+                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
+                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
+                _ => "BatchOps.TitleLoadCf"
+            });
+            _hint.Text = LocalizationManager.T(_vm.Kind switch
+            {
+                BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
+                BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
+                _ => "BatchOps.HintLoadCf"
+            });
+            if (_pathLabel is not null)
+                _pathLabel.Text = _vm.PathLabel;
+            // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
+            if (_dumpOptionsRow is not null)
+                _dumpOptionsRow.IsVisible = _vm.IsDumpKind;
+            _suppressKindEvents = true;
+            if (_kindDtRadio is not null)
+                _kindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
+            if (_kindCfRadio is not null)
+                _kindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;
+            _suppressKindEvents = false;
+        }
+
+        private void OnKindChecked(BatchOperationKind kind)
+        {
+            if (_suppressKindEvents || _vm is null || _vm.Kind == kind)
+                return;
+            _vm.Kind = kind;
+            UpdateKindDependentUi();
         }
 
         private static void Place(Grid grid, Control control, int row)
@@ -240,7 +333,7 @@ namespace Workspace1C
         {
             if (StorageProvider is null)
                 return;
-            if (_vm.Kind == BatchOperationKind.DumpDt)
+            if (_vm.IsDumpKind)
             {
                 var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
                 {
@@ -297,6 +390,10 @@ namespace Workspace1C
                 _stopButton.IsEnabled = _vm.IsRunning;
                 foreach (var item in _vm.Items)
                     item.IsBusy = _vm.IsRunning;
+            }
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel) && _pathLabel is not null)
+            {
+                _pathLabel.Text = _vm.PathLabel;
             }
         }
 

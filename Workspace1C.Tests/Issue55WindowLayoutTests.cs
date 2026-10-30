@@ -141,7 +141,8 @@ public sealed class Issue55WindowLayoutTests
 
         Assert.Contains("ResizeMode=\"CanResizeWithGrip\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MinWidth=\"760\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"780\"", xaml, StringComparison.Ordinal);
+        // issue #93: минимум окна снижен с 780 до 640 — окно стало компактным.
+        Assert.Contains("MinHeight=\"640\"", xaml, StringComparison.Ordinal);
 
         // Колонка подписей Auto с минимумом 120 (чекбоксы «Размер вручную» и
         // «Приватная база» в ней не обрезаются при узком окне).
@@ -166,7 +167,8 @@ public sealed class Issue55WindowLayoutTests
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ConnectionSettingsWindow.Avalonia.cs"));
 
         Assert.Contains("MinWidth = 760;", code, StringComparison.Ordinal);
-        Assert.Contains("MinHeight = 780;", code, StringComparison.Ordinal);
+        // issue #93: минимум окна снижен с 780 до 640 — окно стало компактным.
+        Assert.Contains("MinHeight = 640;", code, StringComparison.Ordinal);
 
         // FieldsGrid: колонка подписей Auto с минимумом LabelColumn.
         Assert.Contains("Width = GridLength.Auto, MinWidth = LabelColumn", code, StringComparison.Ordinal);

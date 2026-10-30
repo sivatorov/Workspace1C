@@ -11,6 +11,109 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.8] — 2026-10-30
+
+### Исправлено / Добавлено
+
+- **Автообновление: платформо-зависимое имя скачиваемого файла и диагностика (issue #89,
+  Linux).** Отображаемое имя загрузки в индикаторе больше не захардкожено как
+  `Workspace1C.exe` — на Linux показывается `Workspace1C-linux-x64` (раньше создавалось
+  впечатление, что качается EXE). Перед загрузкой в журнал `CM_UPDATES` пишутся полный
+  URL и ожидаемый размер; сообщение карантина «wrong-platform» дополнено текущей
+  версией приложения и подсказкой для «застрявших» старых версий обновиться вручную.
+  Для тестовых проверок в [`release.yml`](.github/workflows/release.yml) добавлен
+  `workflow_dispatch` с параметром prerelease — можно собрать и опубликовать тестовую
+  prerelease-сборку, не затрагивая обычных пользователей (`/releases/latest` prerelease
+  не отдаёт).
+
+- **Общая авторизация: передача общих логина/пароля в командную строку запуска
+  (issue #57, Windows и Linux).** Исправлена причина «пустого пользователя» в командной
+  строке: раздельная авторизация режима `Credentials` с пустым пользователем считалась
+  «заданной» и блокировала шаг общих учётных данных режима — теперь она считается
+  незаданной (симметрично правилу для режима `Windows`), и резолвер переходит к общим
+  кредам ([`InfobaseAuthResolver.Resolve`](Workspace1C/Services/InfobaseAuthResolver.cs)).
+  Дополнительно защитная ветка в
+  [`OneCLauncher.Arguments.Shared.cs`](Workspace1C/Services/OneCLauncher.Arguments.Shared.cs):
+  `Credentials` без пользователя больше не даёт пустой `/N`. Проведён аудит синхронизации
+  трёх статиков общей авторизации при старте и после сохранения настроек (WPF, Avalonia,
+  CLI/проводник).
+
+- **Окно Свойств (Linux): трассировка закрытия модальных окон (issue #94, Linux).**
+  Для диагностики зависания кнопки «Отмена» после посещения вкладки «Идентификатор»
+  добавлена трассировка закрытия модальных окон: включается переменной окружения
+  `CM_MODAL_TRACE=1`, лог пишется в `/tmp/cm_modal_trace.log` (клик «Отмена» → вызов
+  `Close()` → получение `Closed` → завершение кадра, а также выборы вкладок).
+
+- **Серверы 1С / лицензии: поиск `ring` по PATH из реестра и известным каталогам
+  (issue #83, Windows).** Новый подход после «ring есть в консоли, но не находится
+  приложением»: построитель кандидатов ищет `ring` по PATH процесса (как раньше), по
+  **свежему PATH из реестра** (`HKCU\Environment\Path` + `HKLM\...\Session Manager\Environment\Path`
+  с разворачиванием `REG_EXPAND_SZ`) и по известным каталогам 1С (`bin` платформы рядом
+  с `rac`, `%LOCALAPPDATA%\1C\1cv8\`, `C:\Program Files\1cv8\<ver>\bin`). Найденный
+  `ring` запускается по **полному пути** (`.cmd`/`.bat` — через `cmd.exe /c`) — без
+  перезапуска приложения. В диагностике `CM_RAC` логируются проверенные каталоги и
+  размеры PATH процесса и реестра.
+
+- **Публикация баз: кодировка вывода webinst, дубли `LoadModule _1cws_module`,
+  пути через переменные, `1c8Aliases*` по умолчанию (issue #63, Windows).**
+  1) Вывод `webinst` читается в консольной кодировке (cp866 на русской Windows) —
+  вместо «каракулей» понятные сообщения; на Linux — UTF-8 как раньше. 2) После успешной
+  публикации дубликаты строки `LoadModule _1cws_module` в конфиге схлопываются (остаётся
+  первая), с записью в журнал `CM_PUBLISH`. 3) Пути нового блока алиаса записываются
+  через `${переменные}` Apache (`${myDocumentRoot}`), если существующие записи используют
+  переменную с совпадающим префиксом — как в существующих записях конфига. 4) При наличии
+  файла алиаса (`1c8Aliases*.conf`) он выбирается в списке конфигов **по умолчанию**,
+  а не основной `httpd.conf`. Перед каждой записью в конфиг создаётся `.bak`-копия.
+  ([`WebPublishService.cs`](Workspace1C/Services/WebPublishService.cs),
+  [`WebPublishViewModel.cs`](Workspace1C/ViewModels/WebPublishViewModel.cs)).
+
+### Реорганизация интерфейса
+
+- **Окно настроек: вкладка «Настройки» разбита на под-вкладки (issue #95, Windows
+  и Linux).** Разросшаяся вкладка разделена на горизонтальные под-вкладки
+  **«Поведение и язык» / «Функциональность» / «COM-Коннектор» / «Общая авторизация»**.
+  Вкладка «Настройки» стала **первой** в окне (открывается по умолчанию), «Платформы»
+  перенесены перед «ibases.v8i». Имена контролов не менялись — все привязки сохранены
+  ([`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml),
+  [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs)).
+
+- **Свойства базы: вкладка «Запуск» разделена (issue #93, Windows и Linux).**
+  Вкладка разделена на под-вкладки **«Режим запуска клиента»** (карточки режимов) и
+  **«События»** (двойной щелчок, внешняя обработка, команды до/после запуска).
+  Окно стало компактнее: стартовая высота 680 (минимум 640) вместо 800/780 — кнопки
+  доступны на экранах 1366×768
+  ([`ConnectionSettingsWindow.xaml`](Workspace1C/Views/ConnectionSettingsWindow.xaml),
+  [`ConnectionSettingsWindow.Avalonia.cs`](Workspace1C/Views/ConnectionSettingsWindow.Avalonia.cs)).
+
+- **Массовая выгрузка в DT/CF «Для выделенных…» (issue #92, Windows и Linux).**
+  В подменю «Для выделенных (N)…» добавлен пункт **«Выгрузить в DT\CF…»**: единое окно
+  с шаблоном имени файла (токены `{Имя}`, `{Дата}` по умолчанию `yyyy-MM-dd_HH-mm`),
+  выбором папки и переключателем DT / CF; шаблон и папка сохраняются между сессиями.
+  Выгрузка `.cf` выполняется движком ibcmd (`config dump`), прогресс — по базам
+  ([`BatchOperationsService.cs`](Workspace1C/Services/BatchOperationsService.cs),
+  [`BatchOperationsViewModel.cs`](Workspace1C/ViewModels/BatchOperationsViewModel.cs)).
+
+### Тесты
+
+- [`Issue89PlatformValidationTests.cs`](Workspace1C.Tests/Issue89PlatformValidationTests.cs):
+  выбор ассета по платформе и отображаемое имя загрузки — #89;
+- [`Issue57EmptyModeUserTests.cs`](Workspace1C.Tests/Issue57EmptyModeUserTests.cs):
+  режим `Credentials` с пустым пользователем не блокирует общую авторизацию — #57;
+- [`Issue93And95SubtabsTests.cs`](Workspace1C.Tests/Issue93And95SubtabsTests.cs):
+  порядок вкладок и под-вкладки окон настроек и свойств базы — #95, #93;
+- [`Issue92BatchDumpTests.cs`](Workspace1C.Tests/Issue92BatchDumpTests.cs):
+  шаблон имени файла (`{Имя}`, `{Дата}`), санитизация, `DumpCf` — #92;
+- [`Issue83RingPathRegistryTests.cs`](Workspace1C.Tests/Issue83RingPathRegistryTests.cs):
+  кандидаты поиска `ring` (PATH процесса, реестр, известные каталоги) — #83;
+- [`WebPublishConfPostProcessTests.cs`](Workspace1C.Tests/WebPublishConfPostProcessTests.cs),
+  [`WebPublishIssue63Tests.cs`](Workspace1C.Tests/WebPublishIssue63Tests.cs):
+  дедупликация `LoadModule`, `${переменные}` в блоке алиаса, `.bak`-копия,
+  `1c8Aliases*` по умолчанию — #63.
+
+Итого в проекте **5 245 юнит-тестов** (было 5 175); Linux-сборка (Avalonia) также зелёная.
+
+---
+
 ## [1.0.1.7] — 2026-10-30
 
 ### Исправлено / Добавлено

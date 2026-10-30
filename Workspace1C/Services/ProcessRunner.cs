@@ -45,14 +45,22 @@ public sealed class ProcessRunResult
 /// </summary>
 public static class ProcessRunner
 {
+    /// <summary>
+    /// Запускает внешнюю программу с захватом вывода (выпуск 1.0.0.69). Необязательный
+    /// <paramref name="outputEncoding"/> задаёт кодировку чтения stdout/stderr
+    /// (issue #63: консольные утилиты вроде webinst на русской Windows пишут вывод
+    /// в OEM-кодировке cp866 — чтение как UTF-8 даёт «каракули»); null — UTF-8.
+    /// </summary>
     public static async Task<ProcessRunResult> RunAsync(
         string fileName,
         IEnumerable<string> arguments,
         string? workingDirectory = null,
         TimeSpan? timeout = null,
         IDictionary<string, string>? environment = null,
+        Encoding? outputEncoding = null,
         CancellationToken ct = default)
     {
+        var encoding = outputEncoding ?? Encoding.UTF8;
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
@@ -60,8 +68,8 @@ public static class ProcessRunner
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8
+            StandardOutputEncoding = encoding,
+            StandardErrorEncoding = encoding
         };
         foreach (var arg in arguments)
             psi.ArgumentList.Add(arg);

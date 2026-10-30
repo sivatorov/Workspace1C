@@ -50,7 +50,8 @@ public sealed class Issue71SettingsWindowLayoutTests
 
     [Theory]
     [InlineData("SettingsWindow.xaml", "960", "720")]
-    [InlineData("ConnectionSettingsWindow.xaml", "760", "780")]
+    // issue #93: минимум окна Свойств снижен с 780 до 640 — окно стало компактным.
+    [InlineData("ConnectionSettingsWindow.xaml", "760", "640")]
     public void WpfSettingsWindows_HaveMinSizesPreventingShrink(string fileName, string minWidth, string minHeight)
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
@@ -62,7 +63,7 @@ public sealed class Issue71SettingsWindowLayoutTests
 
     [Theory]
     [InlineData("SettingsWindow.Avalonia.cs", "960", "720")]
-    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "760", "780")]
+    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "760", "640")]
     public void AvaloniaSettingsWindows_HaveMinSizesPreventingShrink(string fileName, string minWidth, string minHeight)
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
@@ -80,7 +81,8 @@ public sealed class Issue71SettingsWindowLayoutTests
 
     [Theory]
     [InlineData("SettingsWindow.xaml", "1100", "760")]
-    [InlineData("ConnectionSettingsWindow.xaml", "900", "800")]
+    // issue #93: стартовая высота окна Свойств снижена с 800 до 680.
+    [InlineData("ConnectionSettingsWindow.xaml", "900", "680")]
     public void WpfSettingsWindows_HaveComfortableStartSizes(string fileName, string width, string height)
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
@@ -91,7 +93,7 @@ public sealed class Issue71SettingsWindowLayoutTests
 
     [Theory]
     [InlineData("SettingsWindow.Avalonia.cs", "1100", "760")]
-    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "900", "800")]
+    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "900", "680")]
     public void AvaloniaSettingsWindows_HaveComfortableStartSizes(string fileName, string width, string height)
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
@@ -137,9 +139,11 @@ public sealed class Issue71SettingsWindowLayoutTests
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ConnectionSettingsWindow.xaml"));
 
-        // 8 вкладок, каждая обёрнута в собственный ScrollViewer без горизонтальной полосы.
-        Assert.Equal(8, Count(xaml, "<ScrollViewer"));
-        Assert.Equal(8, Count(xaml, "HorizontalScrollBarVisibility=\"Disabled\""));
+        // 8 вкладок, каждая обёрнута в собственный ScrollViewer без горизонтальной полосы;
+        // issue #93: вкладка «Запуск» разложена на 2 под-вкладки со своими
+        // ScrollViewer (−1 вкладка +2 под-вкладки = 9).
+        Assert.Equal(9, Count(xaml, "<ScrollViewer"));
+        Assert.Equal(9, Count(xaml, "HorizontalScrollBarVisibility=\"Disabled\""));
         Assert.Equal(0, Count(xaml, "HorizontalScrollBarVisibility=\"Auto\""));
     }
 

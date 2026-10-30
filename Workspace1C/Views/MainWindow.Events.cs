@@ -1126,6 +1126,15 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
+        /// <summary>Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).</summary>
+        private void OnBatchDumpDtCf_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+                return;
+            _viewModel.ExecuteBatchDumpForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
         /// <summary>Проверить доступность баз мультивыделения.</summary>
         private void OnBatchCheckAvailability_Click(object sender, RoutedEventArgs e)
         {

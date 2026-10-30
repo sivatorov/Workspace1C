@@ -839,6 +839,20 @@ namespace Workspace1C.Services
             var dir = EnsureUpdateDirectory();
             var dest = Path.Combine(dir, $"Workspace1C.{SanitizeKey(versionKey)}.new");
 
+            // issue #89: имя ассета в индикаторе загрузок — по платформе. Ранее было
+            // захардкожено «Workspace1C.exe», из-за чего на Linux пользователь видел
+            // в индикаторе загрузку Windows-версии, даже когда качался корректный
+            // ELF-бинарник. Имя берётся из GitHubReleaseService — единая точка,
+            // согласована с выбором ассета при проверке обновлений.
+            var assetDisplayName = GitHubReleaseService.AssetDisplayName;
+
+            // Диагностика выбора ассета (CM_UPDATES, issue #89): полный URL и ожидаемый
+            // размер до начала загрузки — чтобы по журналу пользователя сразу было видно,
+            // какой файл (какой платформы) и какого размера качает загрузчик.
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Загрузка обновления {versionKey}: URL={url}; ожидаемый размер=" +
+                $"{(expectedSize > 0 ? $"{expectedSize} байт" : "неизвестен")}; ассет={assetDisplayName}.");
+
             // issue #22 (1.0.0.28): StartIfNew сообщает, создана ли НОВАЯ запись. Если загрузка
             // того же целевого файла уже идёт (фоновая проверка + ручная кнопка + задание
             // UpdateApp) — вторую реальную загрузку НЕ начинаем (single-writer): файл уже
@@ -846,7 +860,7 @@ namespace Workspace1C.Services
             // дубликата записи, ни второго индикатора. Прогресс публикуется через ReportProgress,
             // исход фиксируется Complete/Fail ниже.
             var (entry, isNew) = BackgroundDownloadManager.Default.StartIfNew(
-                $"app-update:{versionKey}", "Workspace1C.exe", dest);
+                $"app-update:{versionKey}", assetDisplayName, dest);
             if (!isNew)
                 return (null, true);
 

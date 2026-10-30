@@ -1612,25 +1612,58 @@ public partial class MainViewModel : ViewModelBase
             _ => _allInfobases.Any());
 
     private void ExecuteBatchOperations(BatchOperationKind kind)
+        => ExecuteBatchDumpCore(_allInfobases.ToList(), kind);
+
+    /// <summary>
+    /// Массовая выгрузка выделенных баз в DT/CF с шаблоном имени файла (issue #92):
+    /// пункт «Выгрузить в DT\CF…» блока «Для выделенных (N)…». Вид операции,
+    /// каталог и шаблон читаются из настроек и сохраняются обратно после окна.
+    /// </summary>
+    public void ExecuteBatchDumpForSelected()
+        => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: null);
+
+    /// <summary>
+    /// Общая точка открытия окна массовых операций: подтверждение, подстановка
+    /// сохранённых каталога/шаблона/вида выгрузки (issue #92) и сохранение их
+    /// после закрытия окна.
+    /// </summary>
+    private void ExecuteBatchDumpCore(IReadOnlyList<Infobase> bases, BatchOperationKind? kind)
     {
-        if (!_allInfobases.Any())
+        if (bases.Count == 0)
         {
             _dialog.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
                 LocalizationManager.T("BatchOps.Title"));
             return;
         }
 
+        var effectiveKind = kind ?? BatchOperationsService.ParseDumpKind(_settings.BatchDumpKind);
+
         // Безопасность: подтверждение перед массовой операцией по нескольким базам.
         if (!_dialog.Confirm(
                 string.Format(LocalizationManager.T("BatchOps.ConfirmFormat"),
-                    kind == BatchOperationKind.DumpDt
-                        ? LocalizationManager.T("BatchOps.KindDumpDt")
-                        : LocalizationManager.T("BatchOps.KindLoadCf")),
+                    effectiveKind switch
+                    {
+                        BatchOperationKind.DumpDt => LocalizationManager.T("BatchOps.KindDumpDt"),
+                        BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
+                        _ => LocalizationManager.T("BatchOps.KindLoadCf")
+                    }),
                 LocalizationManager.T("BatchOps.Title")))
             return;
 
-        var window = new Workspace1C.BatchOperationsWindow(_allInfobases.ToList(), kind);
+        var window = new Workspace1C.BatchOperationsWindow(bases, effectiveKind,
+            _settings.BatchDumpDirectory, _settings.BatchDumpTemplate);
         window.ShowDialogSync(OwnerWindow());
+
+        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).
+        var vm = window.ViewModel;
+        _settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.Template)
+            ? BatchOperationsService.DefaultDumpTemplate : vm.Template.Trim();
+        if (vm.IsDumpKind)
+        {
+            _settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
+            _settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
+        }
+        SaveSettingsSilently();
     }
 
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================

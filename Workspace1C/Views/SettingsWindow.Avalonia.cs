@@ -229,7 +229,13 @@ namespace Workspace1C
             // Общего зазора у панели нет: в Avalonia он складывается с полями
             // соседей, а поля взяты из разметки поштучно (SettingsWindow.xaml:1106
             // и далее), поэтому иначе каждый промежуток вырос бы на 6.
-            var settings = new StackPanel();
+            // issue #95: содержимое вкладки «Настройки» разложено на четыре
+            // под-вкладки («Поведение и язык», «Функциональность», «COM-Коннектор»,
+            // «Общая авторизация») — по одной панели на каждую под-вкладку.
+            var settingsBehavior = new StackPanel();
+            var settingsFunctionality = new StackPanel();
+            var settingsCom = new StackPanel();
+            var settingsCommonAuth = new StackPanel();
 
             // Тема оформления. Редактируемая схема и колбэк обновления редактора объявляются
             // здесь, чтобы выбор полноценной темы (Светлая/Тёмная/Синяя/Зелёная) показывал
@@ -288,7 +294,7 @@ namespace Workspace1C
             ThemeBrushes.Bind(langHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
             langContent.Children.Add(langHint);
 
-            settings.Children.Add(Controls.GroupBoxPanel.Build(
+            settingsBehavior.Children.Add(Controls.GroupBoxPanel.Build(
                 "Settings.Language", langContent,
                 margin: new Thickness(0, 0, 0, 12),
                 padding: new Thickness(8)));
@@ -371,7 +377,7 @@ namespace Workspace1C
 
             UpdateFunctionalModeHints();
 
-            settings.Children.Add(Controls.GroupBoxPanel.Build(
+            settingsFunctionality.Children.Add(Controls.GroupBoxPanel.Build(
                 "FunctionalMode.Label", functionalModeContent,
                 margin: new Thickness(0, 14, 0, 0),
                 padding: new Thickness(8)));
@@ -379,7 +385,7 @@ namespace Workspace1C
             // Раздел поведения приложения: в разметке WPF (SettingsWindow.xaml:1104)
             // он начинается своим заголовком, а первым в нём идёт разрешение
             // нескольких экземпляров.
-            settings.Children.Add(new TextBlock
+            settingsBehavior.Children.Add(new TextBlock
             {
                 Text = LocalizationManager.T("Settings.General.Behavior"),
                 FontWeight = FontWeight.SemiBold,
@@ -391,7 +397,7 @@ namespace Workspace1C
             // но в Linux-сборке её нечем было изменить.
             var multipleInstancesCheck = SettingsSwitch("Settings.General.AllowMultipleInstances", _viewModel.AllowMultipleInstances, "IconApplicationOutline", "#3B82F6");
             multipleInstancesCheck.Margin = new Thickness(0, 0, 0, 6);
-            settings.Children.Add(multipleInstancesCheck);
+            settingsBehavior.Children.Add(multipleInstancesCheck);
 
             // Обновление приложения: обе настройки учитываются при запуске
             // (App.axaml.cs), но в Linux-сборке их нечем было изменить. Цвет значка
@@ -401,8 +407,8 @@ namespace Workspace1C
             var autoUpdateCheck = SettingsSwitch("Settings.General.AutoUpdate", _viewModel.AutoUpdateEnabled, "IconRefresh", "#22C55E", "Settings.General.AutoUpdateTooltip");
             checkUpdatesCheck.Margin = new Thickness(0, 0, 0, 6);
             autoUpdateCheck.Margin = new Thickness(0, 0, 0, 6);
-            settings.Children.Add(checkUpdatesCheck);
-            settings.Children.Add(autoUpdateCheck);
+            settingsBehavior.Children.Add(checkUpdatesCheck);
+            settingsBehavior.Children.Add(autoUpdateCheck);
 
             // Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
             // (первый пункт — «Основная») + кнопка открытия окна справочника.
@@ -452,7 +458,7 @@ namespace Workspace1C
 
             itsAccountsContent.Children.Add(itsAccountsRow);
 
-            settings.Children.Add(Controls.GroupBoxPanel.Build(
+            settingsFunctionality.Children.Add(Controls.GroupBoxPanel.Build(
                 "ItsAccounts.Title", itsAccountsContent,
                 margin: new Thickness(0, 14, 0, 0),
                 padding: new Thickness(8)));
@@ -477,33 +483,33 @@ namespace Workspace1C
             escapeToTrayCheck.Margin = new Thickness(0, 0, 0, 6);
             notificationsCheck.Margin = new Thickness(0, 0, 0, 6);
             catchUpCheck.Margin = new Thickness(0, 0, 0, 6);
-            settings.Children.Add(trayIconCheck);
-            settings.Children.Add(closeToTrayCheck);
-            settings.Children.Add(escapeToTrayCheck);
-            settings.Children.Add(notificationsCheck);
-            settings.Children.Add(catchUpCheck);
+            settingsBehavior.Children.Add(trayIconCheck);
+            settingsBehavior.Children.Add(closeToTrayCheck);
+            settingsBehavior.Children.Add(escapeToTrayCheck);
+            settingsBehavior.Children.Add(notificationsCheck);
+            settingsBehavior.Children.Add(catchUpCheck);
 
 
             // Параметры текущей сессии
             var defaultClientLabel = new TextBlock { Text = LocalizationManager.T("Settings.DefaultClientLabel"), FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
             ThemeBrushes.Bind(defaultClientLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
-            settings.Children.Add(defaultClientLabel);
+            settingsBehavior.Children.Add(defaultClientLabel);
             // Пять вариантов клиента в строку не помещаются в окно, поэтому переносятся.
             var clientPanel = new WrapPanel { Orientation = Orientation.Horizontal };
             clientPanel.Children.Add(Radio("SessionClient", "IsSessionClientAuto", LocalizationManager.T("Main.SessionClientAuto")));
             clientPanel.Children.Add(Radio("SessionClient", "IsSessionClientThin", LocalizationManager.T("Main.SessionClientThin")));
             clientPanel.Children.Add(Radio("SessionClient", "IsSessionClientThick", LocalizationManager.T("Main.SessionClientThickManaged")));
             clientPanel.Children.Add(Radio("SessionClient", "IsSessionClientOrdinary", LocalizationManager.T("Main.SessionClientOrdinary")));
-            settings.Children.Add(clientPanel);
+            settingsBehavior.Children.Add(clientPanel);
 
             var defaultArchLabel = new TextBlock { Text = LocalizationManager.T("Settings.DefaultArch"), FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
             ThemeBrushes.Bind(defaultArchLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
-            settings.Children.Add(defaultArchLabel);
+            settingsBehavior.Children.Add(defaultArchLabel);
             var archPanel = new WrapPanel { Orientation = Orientation.Horizontal };
             archPanel.Children.Add(Radio("SessionArch", "IsSessionArchAuto", LocalizationManager.T("Main.SessionClientAuto")));
             archPanel.Children.Add(Radio("SessionArch", "IsSessionArch32", "32"));
             archPanel.Children.Add(Radio("SessionArch", "IsSessionArch64", "64"));
-            settings.Children.Add(archPanel);
+            settingsBehavior.Children.Add(archPanel);
 
             // Действие после запуска идёт одной строкой: значок, подпись
             // с полем 10 и список 230 на 30 (SettingsWindow.xaml:1131-1136).
@@ -532,14 +538,14 @@ namespace Workspace1C
             };
             afterLaunchBox.SelectedIndex = (int)Models.AfterLaunchActionHelper.Parse(_viewModel.AfterLaunchAction);
             afterLaunchRow.Children.Add(afterLaunchBox);
-            settings.Children.Add(afterLaunchRow);
+            settingsBehavior.Children.Add(afterLaunchRow);
 
             // Запоминание геометрии окна. Значения лежали в общем файле настроек,
             // но Linux-сборка их не читала и не писала вовсе.
             var rememberLayoutCheck = SettingsSwitch("Settings.General.RememberWindowLayout", _viewModel.RememberWindowLayout, "IconMonitor", "#EC4899");
             // У автора у этой строки своего отступа нет (SettingsWindow.xaml:1139).
             rememberLayoutCheck.Margin = new Thickness(0);
-            settings.Children.Add(rememberLayoutCheck);
+            settingsBehavior.Children.Add(rememberLayoutCheck);
 
             // Компактный режим интерфейса.
             var compactToggle = SettingsSwitch("Settings.CompactMode", _viewModel.CompactMode, "IconCompress", "#22C55E");
@@ -551,7 +557,7 @@ namespace Workspace1C
                 _viewModel.CompactMode = value;
                 _viewModel.ApplyCompactMode(value);
             };
-            settings.Children.Add(compactToggle);
+            settingsBehavior.Children.Add(compactToggle);
 
             // Имя COM-коннектора 1С по шаблону версии платформы (issue #175).
             var comTemplateHint = new TextBlock
@@ -562,7 +568,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 10, 0, 6)
             };
             ThemeBrushes.Bind(comTemplateHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            settings.Children.Add(comTemplateHint);
+            settingsCom.Children.Add(comTemplateHint);
 
             var comTemplateRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             comTemplateRow.Children.Add(new TextBlock
@@ -592,7 +598,7 @@ namespace Workspace1C
                 Watermark = "V%V12%.ComConnector"
             }.Styled(ControlThemes.ModernTextBox);
             comTemplateRow.Children.Add(comTemplateBox);
-            settings.Children.Add(comTemplateRow);
+            settingsCom.Children.Add(comTemplateRow);
 
             // Интерактивный предпросмотр имени COM-коннектора (issue #175):
             // редактируемая версия + результат разворота шаблона. Поле версии
@@ -627,7 +633,7 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap
             };
             comPreviewRow.Children.Add(previewResultBox);
-            settings.Children.Add(comPreviewRow);
+            settingsCom.Children.Add(comPreviewRow);
 
             void UpdateComConnectorPreview()
             {
@@ -648,7 +654,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 10, 0, 6)
             };
             ThemeBrushes.Bind(detectTimeoutHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            settings.Children.Add(detectTimeoutHint);
+            settingsCom.Children.Add(detectTimeoutHint);
 
             var detectTimeoutRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             detectTimeoutRow.Children.Add(new TextBlock
@@ -679,7 +685,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0, 0, 0)
             });
-            settings.Children.Add(detectTimeoutRow);
+            settingsCom.Children.Add(detectTimeoutRow);
 
             // Быстрая TCP-проверка порта кластера перед COM (функция 12, 0.3.9.233).
             var precheckBox = new CheckBox
@@ -688,7 +694,7 @@ namespace Workspace1C
                 IsChecked = _viewModel.AvailabilityTcpPrecheckEnabled,
                 Margin = new Thickness(0, 8, 0, 0)
             };
-            settings.Children.Add(precheckBox);
+            settingsCom.Children.Add(precheckBox);
 
             // Управление учётными записями (профилями).
             // Кнопка учётных записей: значок и тема из разметки
@@ -724,7 +730,7 @@ namespace Workspace1C
                 var profiles = AppServices.GetRequiredService<IProfileService>();
                 new ProfilesWindow(profiles).ShowDialogSync(this);
             };
-            settings.Children.Add(manageProfilesButton);
+            settingsFunctionality.Children.Add(manageProfilesButton);
 
             // ----- Общая авторизация для всех ИБ (issue #57) -----
             // Раздельная по режимам запуска: для «1С:Предприятия» и «Конфигуратора» свои
@@ -736,8 +742,8 @@ namespace Workspace1C
             var entCommonAuth = _viewModel.CommonEnterpriseAuth;
             var entCommonAuthMode = entCommonAuth?.AuthenticationMode ?? AuthenticationMode.Prompt;
 
-            settings.Children.Add(GroupSectionHeader("Settings.CommonAuth.GroupTitleEnterprise"));
-            settings.Children.Add(Hint(LocalizationManager.T("Settings.CommonAuth.Hint"), bottom: 10));
+            settingsCommonAuth.Children.Add(GroupSectionHeader("Settings.CommonAuth.GroupTitleEnterprise"));
+            settingsCommonAuth.Children.Add(Hint(LocalizationManager.T("Settings.CommonAuth.Hint"), bottom: 10));
 
             var entCommonAuthPromptRadio = new RadioButton
             {
@@ -766,7 +772,7 @@ namespace Workspace1C
             entCommonAuthModes.Children.Add(entCommonAuthPromptRadio);
             entCommonAuthModes.Children.Add(entCommonAuthCredentialsRadio);
             entCommonAuthModes.Children.Add(entCommonAuthOsRadio);
-            settings.Children.Add(entCommonAuthModes);
+            settingsCommonAuth.Children.Add(entCommonAuthModes);
 
             var entCommonAuthUserRow = new StackPanel
             {
@@ -787,7 +793,7 @@ namespace Workspace1C
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernTextBox);
             entCommonAuthUserRow.Children.Add(entCommonAuthUserBox);
-            settings.Children.Add(entCommonAuthUserRow);
+            settingsCommonAuth.Children.Add(entCommonAuthUserRow);
 
             var entCommonAuthPasswordRow = new StackPanel
             {
@@ -808,14 +814,14 @@ namespace Workspace1C
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernPasswordBox);
             entCommonAuthPasswordRow.Children.Add(entCommonAuthPasswordBox);
-            settings.Children.Add(entCommonAuthPasswordRow);
+            settingsCommonAuth.Children.Add(entCommonAuthPasswordRow);
 
             // --- «Конфигуратор» ---
             var cfgCommonAuth = _viewModel.CommonConfiguratorAuth;
             var cfgCommonAuthMode = cfgCommonAuth?.AuthenticationMode ?? AuthenticationMode.Prompt;
 
-            settings.Children.Add(GroupSectionHeader("Settings.CommonAuth.GroupTitleConfigurator"));
-            settings.Children.Add(Hint(LocalizationManager.T("Settings.CommonAuth.Hint"), bottom: 10));
+            settingsCommonAuth.Children.Add(GroupSectionHeader("Settings.CommonAuth.GroupTitleConfigurator"));
+            settingsCommonAuth.Children.Add(Hint(LocalizationManager.T("Settings.CommonAuth.Hint"), bottom: 10));
 
             var cfgCommonAuthPromptRadio = new RadioButton
             {
@@ -844,7 +850,7 @@ namespace Workspace1C
             cfgCommonAuthModes.Children.Add(cfgCommonAuthPromptRadio);
             cfgCommonAuthModes.Children.Add(cfgCommonAuthCredentialsRadio);
             cfgCommonAuthModes.Children.Add(cfgCommonAuthOsRadio);
-            settings.Children.Add(cfgCommonAuthModes);
+            settingsCommonAuth.Children.Add(cfgCommonAuthModes);
 
             var cfgCommonAuthUserRow = new StackPanel
             {
@@ -865,7 +871,7 @@ namespace Workspace1C
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernTextBox);
             cfgCommonAuthUserRow.Children.Add(cfgCommonAuthUserBox);
-            settings.Children.Add(cfgCommonAuthUserRow);
+            settingsCommonAuth.Children.Add(cfgCommonAuthUserRow);
 
             var cfgCommonAuthPasswordRow = new StackPanel
             {
@@ -886,7 +892,7 @@ namespace Workspace1C
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernPasswordBox);
             cfgCommonAuthPasswordRow.Children.Add(cfgCommonAuthPasswordBox);
-            settings.Children.Add(cfgCommonAuthPasswordRow);
+            settingsCommonAuth.Children.Add(cfgCommonAuthPasswordRow);
 
             void UpdateCommonAuthFieldsVisibility()
             {
@@ -904,16 +910,17 @@ namespace Workspace1C
             cfgCommonAuthOsRadio.IsCheckedChanged += (_, _) => UpdateCommonAuthFieldsVisibility();
             UpdateCommonAuthFieldsVisibility();
 
-            var tabGeneral = MainTab("IconApplicationCog", "Settings.TabGeneral",
-                new ScrollViewer
-                {
-                    Content = settings,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    // Отступы прокрутки из разметки (SettingsWindow.xaml:1085).
-                    Margin = new Thickness(4, 12, 4, 0),
-                    Padding = new Thickness(0, 0, 4, 0)
-                });
+            // issue #95: содержимое «Настроек» разложено на четыре под-вкладки,
+            // как во вкладке «Отображение» (displayTabs). SubTab сам заворачивает
+            // содержимое в прокрутку, отдельный ScrollViewer не нужен.
+            var generalTabs = new TabControl { Margin = new Thickness(0, 4, 0, 0) };
+            generalTabs.Styled(ControlThemes.SettingsSubTabControl);
+            generalTabs.Items.Add(SubTab("Settings.General.Subtab.Behavior", "Settings.General.Subtab.BehaviorTooltip", "IconSettings", settingsBehavior));
+            generalTabs.Items.Add(SubTab("Settings.General.Subtab.Functionality", "Settings.General.Subtab.FunctionalityTooltip", "IconTune", settingsFunctionality));
+            generalTabs.Items.Add(SubTab("Settings.General.Subtab.ComConnector", "Settings.General.Subtab.ComConnectorTooltip", "IconLink", settingsCom));
+            generalTabs.Items.Add(SubTab("Settings.General.Subtab.CommonAuth", "Settings.General.Subtab.CommonAuthTooltip", "IconAccountKey", settingsCommonAuth));
+
+            var tabGeneral = MainTab("IconApplicationCog", "Settings.TabGeneral", generalTabs);
 
             // ===== Платформы =====
             // Раздел собран гридом из пяти строк, как в разметке
@@ -3396,15 +3403,17 @@ namespace Workspace1C
             // резервное копирование профиля, логирование, о программе. Девятой
             // вкладки «ibases.v8i» (xaml:1164) здесь нет: её содержимое лежит
             // разделом внутри «Баз», это расхождение старше правки и не закрыто.
-            tabs.Items.Add(tabPlatforms);
+            // issue #95: «Настройки» — первая вкладка; «Платформы» — перед блоком
+            // ibases.v8i, который вложен во вкладку «Базы».
+            tabs.Items.Add(tabGeneral);
             tabs.Items.Add(tabDisplay);
             tabs.Items.Add(tabThemes);
             tabs.Items.Add(tabAppearance);
             tabs.Items.Add(tabHotkeys);
-            tabs.Items.Add(tabGeneral);
+            tabs.Items.Add(tabUtilitiesMenu);
+            tabs.Items.Add(tabPlatforms);
             tabs.Items.Add(tabBases);
             tabs.Items.Add(tabProfile);
-            tabs.Items.Add(tabUtilitiesMenu);
             tabs.Items.Add(tabLogging);
             tabs.Items.Add(tabAbout);
 

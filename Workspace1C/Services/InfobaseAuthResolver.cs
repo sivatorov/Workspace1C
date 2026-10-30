@@ -131,13 +131,20 @@ public static class InfobaseAuthResolver
         // учётные данные режима Credentials — то же правило, что и для авторизации ОС
         // базы на шаге 2 (1.0.1.6). Явные Credentials режима/базы по-прежнему высший
         // приоритет; без общих кредов Windows остаётся (платформа получит /WA+).
+        // Исправление issue #57 (1.0.1.8): раздельная авторизация режима Credentials с
+        // ПУСТЫМ пользователем при наличии общих кредов режима тоже считается незаданной
+        // и переходит к шагу 3 — иначе она возвращалась как есть, BuildArguments получал
+        // пустой /N, и общий логин/пароль не попадал в командную строку (репорт «откуда
+        // пустой пользователь взялся»). Без общих кредов Credentials с пустым
+        // пользователем остаётся как есть — платформа покажет окно логина.
         var modeAuth = mode == OneCLaunchMode.Enterprise
             ? infobase.EnterpriseAuth
             : infobase.ConfiguratorAuth;
         if (modeAuth is { } ma && !ma.IsDefault
-            && !(ma.AuthenticationMode == AuthenticationMode.Windows
-                && string.IsNullOrWhiteSpace(ma.User)
-                && commonCredentials))
+            && !(string.IsNullOrWhiteSpace(ma.User)
+                && commonCredentials
+                && (ma.AuthenticationMode == AuthenticationMode.Windows
+                    || ma.AuthenticationMode == AuthenticationMode.Credentials)))
         {
             authMode = ma.AuthenticationMode;
             authUser = ma.User;

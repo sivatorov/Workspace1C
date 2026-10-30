@@ -199,7 +199,7 @@ public static class DbmsBackupService
                 env["PGPASSWORD"] = profile.Password;
             log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
             run = await ProcessRunner.RunAsync(ToolPath(profile), BuildPgDumpArguments(profile, target), null,
-                TimeSpan.FromHours(6), env, ct).ConfigureAwait(false);
+                TimeSpan.FromHours(6), env, ct: ct).ConfigureAwait(false);
         }
         else
         {
@@ -208,7 +208,7 @@ public static class DbmsBackupService
             try { Directory.CreateDirectory(profile.OutputDirectory.Trim()); } catch { /* путь сервера */ }
             log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
             run = await ProcessRunner.RunAsync(ToolPath(profile), BuildSqlCmdArguments(profile, target), null,
-                TimeSpan.FromHours(6), null, ct).ConfigureAwait(false);
+                TimeSpan.FromHours(6), null, ct: ct).ConfigureAwait(false);
         }
 
         if (!run.Success)

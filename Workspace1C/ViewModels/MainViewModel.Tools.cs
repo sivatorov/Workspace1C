@@ -2753,28 +2753,68 @@ public partial class MainViewModel : ViewModelBase
         _batchLoadCfCommand ??= new RelayCommand(_ => ExecuteBatchOperations(BatchOperationKind.LoadConfig), _ => Infobases.Any());
 
     private void ExecuteBatchOperations(BatchOperationKind kind)
+        => ExecuteBatchDumpCore(Infobases.ToList(), kind);
+
+    /// <summary>
+    /// Массовая выгрузка выделенных баз в DT/CF с шаблоном имени файла (issue #92):
+    /// пункт «Выгрузить в DT\CF…» блока «Для выделенных (N)…». Вид операции,
+    /// каталог и шаблон читаются из настроек и сохраняются обратно после окна.
+    /// </summary>
+    public void ExecuteBatchDumpForSelected()
+        => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: null);
+
+    /// <summary>
+    /// Общая точка открытия окна массовых операций: подтверждение, подстановка
+    /// сохранённых каталога/шаблона/вида выгрузки (issue #92) и сохранение их
+    /// после закрытия окна.
+    /// </summary>
+    private void ExecuteBatchDumpCore(IReadOnlyList<Infobase> bases, BatchOperationKind? kind)
     {
-        if (!Infobases.Any())
+        if (bases.Count == 0)
         {
             _dialogs.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
                 LocalizationManager.T("BatchOps.Title"));
             return;
         }
 
+        // Настройки читаются из файла: у этой партиальной модели нет кэша AppSettings
+        // (как у Avalonia-версии), прямое чтение/запись через репозиторий.
+        var settings = _repository.LoadSettings() ?? new AppSettings();
+        var effectiveKind = kind ?? BatchOperationsService.ParseDumpKind(settings.BatchDumpKind);
+
         // Безопасность: подтверждение перед массовой операцией по нескольким базам.
         if (!_dialogs.Confirm(
                 string.Format(LocalizationManager.T("BatchOps.ConfirmFormat"),
-                    kind == BatchOperationKind.DumpDt
-                        ? LocalizationManager.T("BatchOps.KindDumpDt")
-                        : LocalizationManager.T("BatchOps.KindLoadCf")),
+                    effectiveKind switch
+                    {
+                        BatchOperationKind.DumpDt => LocalizationManager.T("BatchOps.KindDumpDt"),
+                        BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
+                        _ => LocalizationManager.T("BatchOps.KindLoadCf")
+                    }),
                 LocalizationManager.T("BatchOps.Title")))
             return;
 
-        var window = new BatchOperationsWindow(Infobases.ToList(), kind)
+        var window = new BatchOperationsWindow(bases, effectiveKind,
+            settings.BatchDumpDirectory, settings.BatchDumpTemplate)
         {
             Owner = System.Windows.Application.Current.MainWindow
         };
         window.ShowDialog();
+
+        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).
+        var vm = window.ViewModel;
+        settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.Template)
+            ? BatchOperationsService.DefaultDumpTemplate : vm.Template.Trim();
+        if (vm.IsDumpKind)
+        {
+            settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
+            settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
+        }
+        try { _repository.SaveSettings(settings); }
+        catch
+        {
+            // Ошибка записи настроек не должна ронять окно после успешного прогона.
+        }
     }
 
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================

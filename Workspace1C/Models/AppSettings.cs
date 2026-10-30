@@ -744,6 +744,21 @@ public class AppSettings
     /// </summary>
     public string ExportTimestampFormat { get; set; } = "yyyyMMdd_HHmmss";
 
+    /// <summary>
+    /// Шаблон имени файла массовой выгрузки в DT/CF «Для выделенных…» (issue #92):
+    /// токены {Имя} и {Дата}. По умолчанию — «{Имя}_{Дата}».
+    /// </summary>
+    public string BatchDumpTemplate { get; set; } = "{Имя}_{Дата}";
+
+    /// <summary>Каталог назначения массовой выгрузки в DT/CF (issue #92); пусто — не задан.</summary>
+    public string BatchDumpDirectory { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Вид последней массовой выгрузки (issue #92): «DT» или «CF»;
+    /// пусто/«DT» — выгрузка в .dt.
+    /// </summary>
+    public string BatchDumpKind { get; set; } = "DT";
+
     /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
     public string FontFamily { get; set; } = "Segoe UI";
 

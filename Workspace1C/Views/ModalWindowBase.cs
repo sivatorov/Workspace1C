@@ -1,5 +1,6 @@
 #if LINUX
 using System;
+using System.IO;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
@@ -284,6 +285,7 @@ namespace Workspace1C
 
         protected override void OnClosed(EventArgs e)
         {
+            ModalCloseTrace.Log($"OnClosed: окно {GetType().Name}");
             // Событие живёт у синглтона локализации, а обработчик это метод
             // экземпляра: без отписки закрытое окно оставалось бы достижимым.
             // Кисти темы отписывать не нужно, их привязку держит сам элемент.
@@ -310,6 +312,10 @@ namespace Workspace1C
         /// <returns>True, если пользователь подтвердил действие (DialogResult == true).</returns>
         public bool ShowDialogSync(Window? owner = null)
         {
+            // Диагностика зависаний закрытия (issue #94): вход в синхронный показ —
+            // по логу видно, что кадр вообще запущен и для какого окна.
+            ModalCloseTrace.Log($"ShowDialogSync: вход, окно {GetType().Name}, owner={(owner is null ? "нет" : "задан")}");
+
             // Повторный вход при уже открытом окне недопустим: вложенный PushFrame
             // никогда бы не завершился, так как Closed не сработает повторно.
             if (IsVisible)
@@ -337,6 +343,7 @@ namespace Workspace1C
             void OnOpened(object? sender, EventArgs e) => opened = true;
             void OnClosedHandler(object? sender, EventArgs e)
             {
+                ModalCloseTrace.Log($"ShowDialogSync.OnClosed: окно {GetType().Name} — снимаю кадр");
                 closed = true;
                 StopFrame();
             }
@@ -351,6 +358,7 @@ namespace Workspace1C
                 // держит процесс живым и не отпускает блокировку единственного
                 // экземпляра. Поэтому скрытие доводится до закрытия, но уже после
                 // выхода из кадра, чтобы не закрывать окно изнутри его же события.
+                ModalCloseTrace.Log($"ShowDialogSync.OnVisibilityChanged: окно {GetType().Name} скрыто без закрытия — снимаю кадр");
                 hiddenWithoutClose = true;
                 StopFrame();
             }
@@ -439,6 +447,15 @@ namespace Workspace1C
                 Closed -= OnClosedHandler;
                 PropertyChanged -= OnVisibilityChanged;
             }
+
+            // Диагностика зависаний закрытия (issue #94): выход из кадра с причиной.
+            // Если пользователь жалуется на зависание и этой записи в логе НЕТ — кадр
+            // не завершился вовсе (Close не дошёл до Closed/IsVisible=false), и надо
+            // смотреть, что случилось между «клик Отмена» и «OnClosed».
+            ModalCloseTrace.Log(
+                $"ShowDialogSync: выход, окно {GetType().Name}, closed={closed}, " +
+                $"hiddenWithoutClose={hiddenWithoutClose}, DialogResult={DialogResult}, " +
+                $"IsVisible={IsVisible}");
 
             return DialogResult;
         }
@@ -645,7 +662,11 @@ namespace Workspace1C
 
             var close = new DialogWindowControlButton(DialogWindowControlKind.Close);
             ToolTip.SetTip(close, LocalizationManager.T("Common.Close"));
-            close.Click += (_, _) => Close();
+            close.Click += (_, _) =>
+            {
+                ModalCloseTrace.Log($"Кнопка окна «Закрыть».Click: окно {GetType().Name} — Close()");
+                Close();
+            };
             buttons.Children.Add(close);
 
             Grid.SetColumn(title, 0);
@@ -771,8 +792,21 @@ namespace Workspace1C
         /// </summary>
         internal void CloseAsCancel()
         {
+            ModalCloseTrace.Log($"CloseAsCancel: окно {GetType().Name} (Esc)");
             DialogResult = false;
             Close();
+        }
+
+        /// <summary>
+        /// Диагностика пути закрытия (issue #94): начало штатного закрытия окна.
+        /// Если событие Closing пришло, а OnClosed — нет, значит закрытие было
+        /// отменено или прервано между началом и завершением.
+        /// </summary>
+        protected override void OnClosing(WindowClosingEventArgs e)
+        {
+            ModalCloseTrace.Log($"OnClosing: окно {GetType().Name}, Cancel={e.Cancel}");
+            base.OnClosing(e);
+            ModalCloseTrace.Log($"OnClosing: окно {GetType().Name}, после base — Cancel={e.Cancel}");
         }
 
         /// <summary>
@@ -911,7 +945,13 @@ namespace Workspace1C
             }
 
             SetButtonWidth(button, width, minimumWidth);
-            button.Click += (_, _) => Close();
+            button.Click += (_, _) =>
+            {
+                // Диагностика зависания «Отмена» (issue #94): клик получен — далее
+                // должно прийти OnClosing и OnClosed (см. ModalCloseTrace).
+                ModalCloseTrace.Log($"BuildCancelButton.Click: окно {GetType().Name} — Close()");
+                Close();
+            };
 
             _lastCancelText = caption;
             EnsureLanguageSubscription();
@@ -1069,7 +1109,13 @@ namespace Workspace1C
             };
 
             button.Styled(ControlThemes.DialogCancelButton);
-            button.Click += (_, _) => Close();
+            button.Click += (_, _) =>
+            {
+                // Диагностика зависания «Отмена» (issue #94): клик получен — далее
+                // должно прийти OnClosing и OnClosed (см. ModalCloseTrace).
+                ModalCloseTrace.Log($"BuildCancelActionButton.Click: окно {GetType().Name} — Close()");
+                Close();
+            };
 
             _lastCancelText = caption;
             EnsureLanguageSubscription();
@@ -1456,6 +1502,47 @@ namespace Workspace1C
                     _glyphScale.ScaleX = g;
                     _glyphScale.ScaleY = g;
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Диагностический трейс пути закрытия модальных окон Avalonia (issue #94):
+    /// «клик Отмена → Close() → OnClosing → OnClosed → кадр снят». Гейт — переменная
+    /// окружения <c>CM_MODAL_TRACE=1</c> (включается перед запуском тестовой сборки),
+    /// лог — <c>/tmp/cm_modal_trace.log</c> (Path.GetTempPath(), уважает TMPDIR),
+    /// формат тот же, что у ToolTipCloserAvalonia.TraceLog. Файл append-ится,
+    /// поэтому собирает историю всех диалогов сеанса: на Linux-тестовом билде
+    /// достаточно воспроизвести зависание и прислать лог.
+    /// </summary>
+    internal static class ModalCloseTrace
+    {
+        /// <summary>Гейт: трейс включён только при CM_MODAL_TRACE=1.</summary>
+        private static readonly bool Enabled = string.Equals(
+            Environment.GetEnvironmentVariable("CM_MODAL_TRACE"), "1", StringComparison.OrdinalIgnoreCase);
+
+        /// <summary>Файл лога: /tmp/cm_modal_trace.log (или TMPDIR).</summary>
+        private static readonly string Path = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "cm_modal_trace.log");
+
+        private static readonly object Lock = new();
+
+        /// <summary>Пишет строку в лог; при выключенном гейте — no-op, при ошибке — молчит.</summary>
+        public static void Log(string message)
+        {
+            if (!Enabled)
+                return;
+            try
+            {
+                lock (Lock)
+                {
+                    File.AppendAllText(Path,
+                        $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} [{Environment.CurrentManagedThreadId}] {message}{Environment.NewLine}");
+                }
+            }
+            catch
+            {
+                // Лог не должен влиять на поведение: любая ошибка записи игнорируется.
             }
         }
     }

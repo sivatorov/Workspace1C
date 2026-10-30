@@ -23,24 +23,71 @@ namespace Workspace1C
         private readonly BatchOperationsViewModel _vm;
         private CancellationTokenSource? _cts;
 
-        public BatchOperationsWindow(IEnumerable<Infobase> infobases, BatchOperationKind kind)
+        /// <summary>ViewModel окна — для чтения шаблона/пути/вида после закрытия (issue #92).</summary>
+        public BatchOperationsViewModel ViewModel => _vm;
+
+        public BatchOperationsWindow(IEnumerable<Infobase> infobases, BatchOperationKind kind,
+            string? initialDirectory = null, string? template = null)
         {
             InitializeComponent();
             _vm = new BatchOperationsViewModel(infobases, kind);
+            // Сохранённые каталог и шаблон массовой выгрузки (issue #92).
+            if (!string.IsNullOrWhiteSpace(initialDirectory) && _vm.IsDumpKind)
+                _vm.PathText = initialDirectory!.Trim();
+            if (!string.IsNullOrWhiteSpace(template) && _vm.IsDumpKind)
+                _vm.Template = template!.Trim();
             DataContext = _vm;
 
-            Title = LocalizationManager.T(kind == BatchOperationKind.DumpDt
-                ? "BatchOps.TitleDumpDt" : "BatchOps.TitleLoadCf");
-            HintText.Text = LocalizationManager.T(kind == BatchOperationKind.DumpDt
-                ? "BatchOps.HintDumpDt" : "BatchOps.HintLoadCf");
-            PathLabel.Text = _vm.PathLabel;
+            TemplateLabel.Text = LocalizationManager.T("BatchOps.TemplateLabel");
+            KindDtRadio.Content = LocalizationManager.T("BatchOps.KindDtRadio");
+            KindCfRadio.Content = LocalizationManager.T("BatchOps.KindCfRadio");
             LogHeader.Text = LocalizationManager.T("BatchOps.Log");
             RunButtonText.Text = LocalizationManager.T("BatchOps.Execute");
 
+            UpdateKindDependentUi();
             ItemsList.ItemsSource = _vm.Items;
             LogList.ItemsSource = _vm.LogLines;
             _vm.PropertyChanged += OnVmPropertyChanged;
             ((INotifyCollectionChanged)_vm.LogLines).CollectionChanged += OnLogLinesChanged;
+        }
+
+        /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
+        private void UpdateKindDependentUi()
+        {
+            Title = LocalizationManager.T(_vm.Kind switch
+            {
+                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
+                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
+                _ => "BatchOps.TitleLoadCf"
+            });
+            HintText.Text = LocalizationManager.T(_vm.Kind switch
+            {
+                BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
+                BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
+                _ => "BatchOps.HintLoadCf"
+            });
+            PathLabel.Text = _vm.PathLabel;
+            // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
+            DumpOptionsPanel.Visibility = _vm.IsDumpKind
+                ? Visibility.Visible : Visibility.Collapsed;
+            _suppressKindEvents = true;
+            KindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
+            KindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;
+            _suppressKindEvents = false;
+        }
+
+        private bool _suppressKindEvents;
+
+        private void OnKindDt_Checked(object sender, RoutedEventArgs e) => OnKindChecked(BatchOperationKind.DumpDt);
+
+        private void OnKindCf_Checked(object sender, RoutedEventArgs e) => OnKindChecked(BatchOperationKind.DumpCf);
+
+        private void OnKindChecked(BatchOperationKind kind)
+        {
+            if (_suppressKindEvents || _vm.Kind == kind || _vm is null)
+                return;
+            _vm.Kind = kind;
+            UpdateKindDependentUi();
         }
 
         private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -53,6 +100,10 @@ namespace Workspace1C
                 // Пока идёт прогон, нельзя менять состав выбранных баз.
                 foreach (var item in _vm.Items)
                     item.IsBusy = _vm.IsRunning;
+            }
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel))
+            {
+                PathLabel.Text = _vm.PathLabel;
             }
         }
 
@@ -71,7 +122,7 @@ namespace Workspace1C
 
         private void OnBrowse_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm.Kind == BatchOperationKind.DumpDt)
+            if (_vm.IsDumpKind)
             {
                 // Каталог выгрузки .dt (OpenFolderDialog — net8+/WPF).
                 var dialog = new OpenFolderDialog

@@ -73,10 +73,12 @@ namespace Workspace1C
             _initialTab = initialTab;
             // Размеры и базовый кегль по разметке (ConnectionSettingsWindow.xaml:13).
             Title = LocalizationManager.T("ConnectionSettings.Title");
+            // issue #93: окно стало ниже — вкладка «Запуск» разложена на две
+            // под-вкладки, прежняя высота 800/минимум 780 была избыточной.
             Width = 900;
-            Height = 800;
+            Height = 680;
             MinWidth = 760;
-            MinHeight = 780;
+            MinHeight = 640;
             FontSize = 13;
 
             // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
@@ -200,6 +202,9 @@ namespace Workspace1C
             var settings = _linkRepository.LoadSettings();
             var width = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth);
             var height = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight);
+            // issue #93: старые сохранённые высоты (окно было 800) зажимаются
+            // к новой стартовой высоте — окно Свойств откроется компактным.
+            if (height > 680) height = 680;
             if (width > 0) Width = width;
             if (height > 0) Height = height;
         }
@@ -684,6 +689,25 @@ namespace Workspace1C
             var tabs = new TabControl { TabStripPlacement = Dock.Left };
             tabs.Styled(ControlThemes.ConnTabControl);
 
+            // Диагностика issue #94: зависание «Отмена» возникает только после
+            // посещения вкладки «Идентификатор» — логируем выбор вкладок, чтобы по
+            // трейсу /tmp/cm_modal_trace.log (гейт CM_MODAL_TRACE=1) было видно,
+            // какая вкладка посещалась перед зависанием.
+            tabs.SelectionChanged += (_, _) =>
+            {
+                if (tabs.SelectedItem is TabItem selected &&
+                    selected.Header is StackPanel header &&
+                    header.Children.Count > 1 &&
+                    header.Children[1] is TextBlock headerText)
+                {
+                    ModalCloseTrace.Log($"ConnectionSettings: выбрана вкладка «{headerText.Text}»");
+                }
+                else
+                {
+                    ModalCloseTrace.Log($"ConnectionSettings: выбрана вкладка #{tabs.SelectedIndex}");
+                }
+            };
+
             // Значков MaterialDesign в Linux-сборке нет, поэтому взяты ближайшие
             // из словаря автора: LanConnect это IconNetwork, SourceBranch это
             // IconMerge, PlayCircleOutline это IconPlay, Chip это IconMonitor,
@@ -1128,7 +1152,10 @@ namespace Workspace1C
             postCmd.Padding = new Thickness(8, 6);
             ToolTip.SetTip(postCmd, LocalizationManager.T("Launch.PostCommandTooltip"));
 
-            var content = new StackPanel
+            // issue #93: содержимое вкладки «Запуск» разделено на две под-вкладки:
+            // «Режим запуска клиента» (карточки выбора режима) и «События»
+            // (двойной щелчок, внешняя обработка, команды до/после запуска).
+            var eventsContent = new StackPanel
             {
                 Children =
                 {
@@ -1141,7 +1168,14 @@ namespace Workspace1C
                     preLabel,
                     preCmd,
                     postLabel,
-                    postCmd,
+                    postCmd
+                }
+            };
+
+            var modeContent = new StackPanel
+            {
+                Children =
+                {
                     OptionCard("LaunchMode", "IsAutoMode", "Connection.LaunchAuto", "Connection.LaunchAutoHint", wrapHint: true),
                     OptionCard("LaunchMode", "IsThinClient", "Connection.LaunchThin", "Connection.LaunchThinHint", wrapHint: true),
                     OptionCard("LaunchMode", "IsThickClient", "Connection.LaunchThickManaged", "Connection.LaunchThickManagedHint", wrapHint: true),
@@ -1152,7 +1186,32 @@ namespace Workspace1C
                     Hint(bindingPath: "LaunchModeHint")
                 }
             };
-            return Group("IconApplication", "Connection.GroupLaunchMode", content);
+
+            var launchTabs = new TabControl { Margin = new Thickness(0, 4, 0, 0) };
+            launchTabs.Styled(ControlThemes.SettingsSubTabControl);
+            launchTabs.Items.Add(LaunchSubTab("Connection.LaunchSubtab.Mode", modeContent));
+            launchTabs.Items.Add(LaunchSubTab("Connection.LaunchSubtab.Events", eventsContent));
+            return launchTabs;
+        }
+
+        /// <summary>
+        /// Под-вкладка внутри вкладки «Запуск» (issue #93): заголовок из локализации,
+        /// содержимое в собственной прокрутке — как у SubTab окна настроек.
+        /// </summary>
+        private static TabItem LaunchSubTab(string titleKey, Control content)
+        {
+            var tab = new TabItem
+            {
+                Header = new TextBlock { Text = LocalizationManager.T(titleKey) },
+                Content = new ScrollViewer
+                {
+                    Content = content,
+                    Padding = new Thickness(8, 4, 4, 4),
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                }
+            };
+            tab.Styled(ControlThemes.SettingsSubTabItem);
+            return tab;
         }
 
         private Control BuildBitnessTab()
@@ -1805,6 +1864,9 @@ namespace Workspace1C
         /// <summary>«Добавить»: модальное окно ввода значения (ESC закрывает, фокус в поле).</summary>
         private void OnAddAdditionalField_Click()
         {
+            // Диагностика issue #94: вложенный синхронный диалог из вкладки «Идентификатор» —
+            // кандидат на «висящий» внутренний PushFrame при закрытии окна.
+            ModalCloseTrace.Log("ConnectionSettings: открываю вложенный NameInputWindow (Добавить произвольное поле)");
             var dialog = new NameInputWindow(
                 LocalizationManager.T("Connection.AdditionalFieldEditTitle"),
                 LocalizationManager.T("Connection.AdditionalFieldEditLabel"),
@@ -1825,12 +1887,16 @@ namespace Workspace1C
                     LocalizationManager.T("Connection.AdditionalFieldsTitle"));
                 return;
             }
+            // Диагностика issue #94: вложенный синхронный диалог из вкладки «Идентификатор» —
+            // кандидат на «висящий» внутренний PushFrame при закрытии окна.
+            ModalCloseTrace.Log("ConnectionSettings: открываю вложенный NameInputWindow (Изменить произвольное поле)");
             var dialog = new NameInputWindow(
                 LocalizationManager.T("Connection.AdditionalFieldEditTitle"),
                 LocalizationManager.T("Connection.AdditionalFieldEditLabel"),
                 LocalizationManager.T("Common.Ok"),
                 row.Value);
             dialog.ShowDialogSync(this);
+            ModalCloseTrace.Log("ConnectionSettings: вложенный NameInputWindow закрыт");
             if (dialog.Result is not null)
                 _viewModel.ReplaceAdditionalField(row, dialog.Result);
         }

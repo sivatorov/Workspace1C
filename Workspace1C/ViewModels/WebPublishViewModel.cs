@@ -436,8 +436,30 @@ public sealed class WebPublishViewModel : ViewModelBase
             }
         }
 
-        _confTargetIndex = _confTargetPaths.Count > 0 ? 0 : -1;
-        _apacheConfPath = _confTargetPaths.Count > 0 ? _confTargetPaths[0] : string.Empty;
+        // issue #63 (комментарий 7OH 2026-10-30): при наличии в списке файла алиасов
+        // 1c8Aliases*.conf — выбирать ЕГО по умолчанию (webinst пишет блок публикации
+        // именно туда, как уже сделано в остальных записях файла).
+        _confTargetIndex = DefaultConfTargetIndex();
+        _apacheConfPath = _confTargetIndex >= 0 && _confTargetIndex < _confTargetPaths.Count
+            ? _confTargetPaths[_confTargetIndex]
+            : string.Empty;
+    }
+
+    /// <summary>
+    /// Индекс файла webinst по умолчанию (issue #63): существующий конфиг-файл алиасов
+    /// «1c8Aliases*» (в т.ч. добавленный fallback-поиском), иначе — основной conf.
+    /// </summary>
+    private int DefaultConfTargetIndex()
+    {
+        for (var i = 0; i < _confTargetPaths.Count; i++)
+        {
+            if (IsAliasFileName(_confTargetPaths[i]))
+            {
+                TracePublish("файл webinst по умолчанию — конфиг алиасов 1С: " + _confTargetPaths[i]);
+                return i;
+            }
+        }
+        return _confTargetPaths.Count > 0 ? 0 : -1;
     }
 
     /// <summary>INFO-запись направления «Публикация на веб-сервере» (issue #63, комментарий
@@ -831,12 +853,101 @@ public sealed class WebPublishViewModel : ViewModelBase
                 ? (publish ? "WebPublish.Published" : "WebPublish.Deleted")
                 : "WebPublish.Failed"));
             if (result.Success && publish)
+            {
                 AppendLog(Url);
+                // issue #63 (комментарий 7OH 2026-10-30): пост-обработка конфига Apache
+                // после успешной публикации — .bak-копия, дедупликация
+                // LoadModule _1cws_module, подстановка ${…}-переменных в новом блоке.
+                PostProcessApacheConfAfterPublish(request);
+            }
             return result.Success;
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Пост-обработка конфига Apache после успешной публикации (issue #63, комментарий
+    /// 7OH от 2026-10-30): .bak-копия исходного файла, дедупликация строк
+    /// <c>LoadModule _1cws_module</c> (webinst дописывает её, хотя в основном конфиге
+    /// она уже есть) и подстановка путей нового блока алиаса через ${…}-переменные —
+    /// как в существующих записях файла. Только для Apache (не IIS); ошибки пост-
+    /// обработки не отменяют успешную публикацию — пишутся в журнал окна и CM_PUBLISH.
+    /// </summary>
+    internal void PostProcessApacheConfAfterPublish(WebPublishRequest request)
+    {
+        if (request.Server == WebServerKind.Iis)
+            return;
+        var confPath = (request.ApacheConfPath ?? string.Empty).Trim();
+        if (confPath.Length == 0)
+            return;
+
+        try
+        {
+            if (!File.Exists(confPath))
+            {
+                TracePublish("пост-обработка: конфиг webinst не найден на диске: «" + confPath + "»");
+                return;
+            }
+
+            var original = File.ReadAllText(confPath);
+
+            // 1) Не дублировать LoadModule _1cws_module: схлопываем повторы (оставляем первую).
+            var (deduped, removedDuplicates) = WebPublishConfPostProcessor.DeduplicateLoadModule(original);
+            if (removedDuplicates > 0)
+                TracePublish($"пост-обработка: удалено дубликатов LoadModule _1cws_module: {removedDuplicates}");
+
+            // 2) Подстановка путей через переменные (${myDocumentRoot} и т.п.) — только
+            //    при однозначном совпадении с префиксом и наличии существующих записей
+            //    с этой переменной; иначе обычные пути остаются как есть.
+            var (rewritten, pathsRewritten) = WebPublishConfPostProcessor.RewriteAliasBlockWithVariables(
+                deduped, request.VirtualDirectory, MergeDefinesWith(deduped));
+            if (pathsRewritten)
+                TracePublish("пост-обработка: пути нового блока алиаса переписаны через ${…}-переменную (как в существующих записях файла)");
+
+            if (removedDuplicates == 0 && !pathsRewritten)
+            {
+                TracePublish("пост-обработка: правки конфига не требуются (дубликатов нет, переменная не однозначна или не используется)");
+                return;
+            }
+
+            // .bak-копия исходного конфига перед первой записью (issue #63).
+            var backupPath = confPath + ".bak";
+            File.Copy(confPath, backupPath, overwrite: true);
+            TracePublish("пост-обработка: создана резервная копия конфига: " + backupPath);
+
+            File.WriteAllText(confPath, rewritten);
+
+            var changes = new List<string>();
+            if (removedDuplicates > 0)
+                changes.Add($"удалено дубликатов LoadModule _1cws_module: {removedDuplicates}");
+            if (pathsRewritten)
+                changes.Add("пути нового блока переписаны через ${…}-переменные");
+            AppendLog("Конфиг Apache обновлён после публикации (" + string.Join("; ", changes) + ").");
+        }
+        catch (Exception ex)
+        {
+            // Публикация уже успешна — пост-обработка не должна её «отменить».
+            TracePublish("пост-обработка конфига не выполнена: " + ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Словарь Define для пост-обработки: значения из include-графа выбранного инстанса
+    /// + директивы Define самого конфига webinst (поздние переопределяют ранние).
+    /// </summary>
+    private IReadOnlyDictionary<string, string> MergeDefinesWith(string confText)
+    {
+        var defines = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (EffectiveInstance?.Defines is { Count: > 0 } instanceDefines)
+        {
+            foreach (var pair in instanceDefines)
+                defines[pair.Key] = pair.Value;
+        }
+        foreach (var pair in ApacheConfIncludeParser.ParseDefines(confText))
+            defines[pair.Key] = pair.Value;
+        return defines;
     }
 }

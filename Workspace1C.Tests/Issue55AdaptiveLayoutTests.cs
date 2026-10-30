@@ -141,12 +141,15 @@ public sealed class Issue55AdaptiveLayoutTests
         // Минимальные размеры окна (issue #71): сужение ниже MinWidth запрещено.
         Assert.Contains("ResizeMode=\"CanResizeWithGrip\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MinWidth=\"760\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"780\"", xaml, StringComparison.Ordinal);
+        // issue #93: минимум окна снижен с 780 до 640 — окно стало компактным.
+        Assert.Contains("MinHeight=\"640\"", xaml, StringComparison.Ordinal);
 
-        // Все 8 вкладок обёрнуты в ScrollViewer с вертикальной прокруткой и БЕЗ
-        // горизонтальной (полоса Disabled, «размахивание» #55 устранено).
-        Assert.Equal(8, Count(xaml, "<ScrollViewer"));
-        Assert.Equal(8, Count(xaml, "HorizontalScrollBarVisibility=\"Disabled\""));
+        // Все вкладки обёрнуты в ScrollViewer с вертикальной прокруткой и БЕЗ
+        // горизонтальной (полоса Disabled, «размахивание» #55 устранено);
+        // issue #93: вкладка «Запуск» разложена на 2 под-вкладки со своими
+        // ScrollViewer (−1 вкладка +2 под-вкладки = 9).
+        Assert.Equal(9, Count(xaml, "<ScrollViewer"));
+        Assert.Equal(9, Count(xaml, "HorizontalScrollBarVisibility=\"Disabled\""));
         Assert.Equal(0, Count(xaml, "HorizontalScrollBarVisibility=\"Auto\""));
         Assert.Contains("x:Name=\"DoubleClickActionCombo\" MinWidth=\"220\"", xaml, StringComparison.Ordinal);
     }
@@ -155,9 +158,9 @@ public sealed class Issue55AdaptiveLayoutTests
     public void ConnectionSettingsWindow_Avalonia_TabsNoHorizontalScroll_And_ComboMinWidth()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ConnectionSettingsWindow.Avalonia.cs"));
-        // Минимальные размеры окна (issue #71).
+        // Минимальные размеры окна (issue #71); issue #93 — минимум 640.
         Assert.Contains("MinWidth = 760;", code, StringComparison.Ordinal);
-        Assert.Contains("MinHeight = 780;", code, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = 640;", code, StringComparison.Ordinal);
         // Общая обёртка вкладок (метод Tab) горизонтальной прокрутки не имеет.
         Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled", code, StringComparison.Ordinal);
         Assert.DoesNotContain("HorizontalScrollBarVisibility = ScrollBarVisibility.Auto", code, StringComparison.Ordinal);

@@ -312,205 +312,391 @@
                 </ItemsPanelTemplate>
             </TabControl.ItemsPanel>
 
-            <!-- ============ Вкладка «Платформы» ============ -->
+            <!-- ============ Вкладка «Настройки» (issue #95): первая вкладка окна,
+                 содержимое разложено на четыре горизонтальные под-вкладки:
+                 «Поведение и язык», «Функциональность», «COM-Коннектор»,
+                 «Общая авторизация». ============ -->
             <TabItem Style="{StaticResource SettingsTabItem}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Server" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
+                        <materialDesign:PackIcon Kind="ApplicationCog" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
                                                  Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
-                        <TextBlock Text="{loc:Loc Settings.TabPlatforms}" VerticalAlignment="Center"
+                        <TextBlock Text="{loc:Loc Settings.TabGeneral}" VerticalAlignment="Center"
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
                     </StackPanel>
                 </TabItem.Header>
-                <Grid Margin="4,12,4,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="*"/>
-                    </Grid.RowDefinitions>
+                <TabControl Margin="0,4,0,0" Style="{StaticResource SettingsSubTabControl}">
 
-                    <TextBlock Grid.Row="0" Text="{loc:Loc Settings.Platforms.Intro}"
-                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
-                               TextWrapping="Wrap"/>
+                    <!-- Под-вкладка «Поведение и язык»: язык интерфейса и галочки поведения -->
+                    <TabItem Style="{StaticResource SettingsSubTabItem}">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Cog" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                                <TextBlock Text="{loc:Loc Settings.General.Subtab.Behavior}" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8,4,4,4">
+                            <StackPanel>
+                                <GroupBox Header="{loc:Loc Settings.Language}" Padding="8" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{loc:Loc Settings.LanguageLabel}" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <ComboBox x:Name="LanguageComboBox" MinWidth="280" Height="34" Margin="10,0,0,0"
+                                                      VerticalAlignment="Center"
+                                                      Style="{StaticResource ModernComboBox}"
+                                                      SelectionChanged="OnLanguage_Changed"/>
+                                        </StackPanel>
+                                        <TextBlock Text="{loc:Loc Settings.Language.AppliedHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
 
-                    <Grid Grid.Row="1" Margin="0,0,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TreeView x:Name="PlatformsTree" Grid.Column="0" MinHeight="180"
-                                  Background="{DynamicResource CardBackgroundBrush}"
-                                  BorderBrush="{DynamicResource BorderBrushColor}"
-                                  BorderThickness="1"
-                                  Padding="6,4"
-                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                  ToolTip="{loc:Loc Settings.Platforms.TreeTooltip}">
-                            <TreeView.ItemTemplate>
-                                <HierarchicalDataTemplate DataType="{x:Type models:PlatformVersionGroup}"
-                                                          ItemsSource="{Binding Children}">
-                                    <Border Margin="0,2" Padding="6,4" CornerRadius="4"
-                                            Background="{DynamicResource ItemHoverBrush}"
-                                            ToolTip="{Binding Path}">
+                                <TextBlock Text="{loc:Loc Settings.General.Behavior}"
+                                           FontWeight="SemiBold" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AllowMultipleInstancesCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.AllowMultipleInstances}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CheckForUpdatesOnStartupCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.CheckForUpdatesOnStartup}" VerticalAlignment="Center"/>
+                                        <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                           HelpText="{loc:Loc Settings.General.CheckForUpdatesOnStartupTooltip}"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AutoUpdateEnabledCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.AutoUpdate}" VerticalAlignment="Center"/>
+                                        <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                           HelpText="{loc:Loc Settings.General.AutoUpdateTooltip}"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.ShowTrayIcon}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CloseToTrayCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="WindowMinimize" Width="16" Height="16" Foreground="#F59E0B" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.CloseToTray}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="EscapeToTrayCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Keyboard" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.EscapeToTray}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSystemNotificationsCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.ShowSystemNotifications}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CatchUpMissedTasksCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="History" Width="16" Height="16" Foreground="#6366F1" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.CatchUpMissedTasks}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,6">
+                                    <materialDesign:PackIcon Kind="RocketLaunch" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Settings.General.AfterLaunchAction}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="AfterLaunchActionCombo" MinWidth="230" Height="30"
+                                              VerticalAlignment="Center"
+                                              Style="{StaticResource ModernComboBox}"/>
+                                </StackPanel>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="RememberWindowLayoutCheck">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.General.RememberWindowLayout}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CompactModeCheck" Margin="0,12,0,0"
+                                              Checked="OnCompactMode_Toggled" Unchecked="OnCompactMode_Toggled">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Compress" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.CompactMode}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Под-вкладка «Функциональность»: режим функциональности и учётные данные ИТС -->
+                    <TabItem Style="{StaticResource SettingsSubTabItem}">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Tune" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                                <TextBlock Text="{loc:Loc Settings.General.Subtab.Functionality}" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8,4,4,4">
+                            <StackPanel>
+                                <!-- Режим функциональности (Этап 10 StartManager): Пользователь/Специалист/Разработчик.
+                                     В режиме «Пользователь» ограничивается доступ к системному меню. -->
+                                <GroupBox Header="{loc:Loc FunctionalMode.Label}" Padding="8" Margin="0,0,0,12">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Settings.General.FunctionalModeHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <ComboBox x:Name="FunctionalModeComboBox" Height="34"
+                                                  VerticalContentAlignment="Center"
+                                                  Style="{StaticResource ModernComboBox}" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="{loc:Loc FunctionalMode.User}" Tag="User"/>
+                                            <ComboBoxItem Content="{loc:Loc FunctionalMode.Specialist}" Tag="Specialist"/>
+                                            <ComboBoxItem Content="{loc:Loc FunctionalMode.Developer}" Tag="Developer"/>
+                                        </ComboBox>
+                                        <TextBlock x:Name="FunctionalModeHintText"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="LaunchConfigHintText"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
+
+                                <!-- Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
+                                     вместо двух полей логин/пароль; «Основная» — первым пунктом списка. -->
+                                <GroupBox Header="{loc:Loc ItsAccounts.Title}" Padding="8">
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc ItsAccounts.SettingsHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <materialDesign:PackIcon Grid.Column="0" Width="14" Height="14"
-                                                                     Margin="0,2,8,0" VerticalAlignment="Top">
-                                                <materialDesign:PackIcon.Style>
-                                                    <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                        <Setter Property="Kind" Value="Folder"/>
-                                                        <Setter Property="Foreground" Value="#F59E0B"/>
-                                                        <Style.Triggers>
-                                                            <DataTrigger Binding="{Binding Kind}" Value="Line">
-                                                                <Setter Property="Kind" Value="Folder"/>
-                                                                <Setter Property="Foreground" Value="#F59E0B"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}" Value="BuildGroup">
-                                                                <Setter Property="Kind" Value="FolderOpen"/>
-                                                                <Setter Property="Foreground" Value="#3B82F6"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}" Value="LeafX64">
-                                                                <Setter Property="Kind" Value="CubeOutline"/>
-                                                                <Setter Property="Foreground" Value="#22C55E"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}" Value="LeafX32">
-                                                                <Setter Property="Kind" Value="Cube"/>
-                                                                <Setter Property="Foreground" Value="#8B5CF6"/>
-                                                            </DataTrigger>
-                                                            <DataTrigger Binding="{Binding Kind}" Value="Leaf">
-                                                                <Setter Property="Kind" Value="Application"/>
-                                                                <Setter Property="Foreground" Value="#0EA5E9"/>
-                                                            </DataTrigger>
-                                                        </Style.Triggers>
-                                                    </Style>
-                                                </materialDesign:PackIcon.Style>
-                                            </materialDesign:PackIcon>
-                                            <StackPanel Grid.Column="1">
-                                                <!-- DisplayName включает локализованный суффикс «(тонкий клиент)»
-                                                     (единый форматтер, issue #33); подсветка оранжевым задаётся
-                                                     DataTrigger-ом из Style — не локальным Foreground, иначе
-                                                     триггер в WPF не сработает (см. фикс диалога выбора). -->
-                                                <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold"
-                                                           TextTrimming="CharacterEllipsis">
-                                                    <TextBlock.Style>
-                                                        <Style TargetType="TextBlock">
-                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IsThinClient}" Value="True">
-                                                                    <Setter Property="Foreground" Value="#F59E0B"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </TextBlock.Style>
-                                                </TextBlock>
-                                                <TextBlock Text="{Binding Path}" FontSize="11"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           ToolTip="{Binding Path}"/>
-                                            </StackPanel>
+                                            <TextBlock Grid.Column="0" Text="{loc:Loc ItsAccounts.AccountLabel}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <ComboBox x:Name="ItsAccountsCombo" Grid.Column="1" Height="30"
+                                                      Margin="0,0,8,0" Style="{StaticResource ModernComboBox}"
+                                                      DisplayMemberPath="Name"
+                                                      ToolTip="{loc:Loc ItsAccounts.SettingsHint}"/>
+                                            <Button x:Name="ItsAccountsManageButton" Grid.Column="2" Height="30"
+                                                    Style="{StaticResource OutlineButtonStyle}" Click="OnItsAccountsManageClick">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <materialDesign:PackIcon Kind="AccountKey" Width="16" Height="16"
+                                                                             Foreground="{DynamicResource AccentBrush}"/>
+                                                    <TextBlock Text="{loc:Loc ItsAccounts.OpenStore}" Margin="6,0,0,0"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
                                         </Grid>
-                                    </Border>
-                                </HierarchicalDataTemplate>
-                            </TreeView.ItemTemplate>
-                            <TreeView.ItemContainerStyle>
-                                <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
-                                    <Setter Property="IsExpanded" Value="True"/>
-                                </Style>
-                            </TreeView.ItemContainerStyle>
-                        </TreeView>
-                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,6"
-                                VerticalAlignment="Top"
-                                Style="{DynamicResource SecondaryButton}"
-                                Click="OnRefreshPlatforms_Click"
-                                ToolTip="{loc:Loc Settings.Platforms.RefreshTooltip}">
+                                    </StackPanel>
+                                </GroupBox>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+
+                    <!-- Под-вкладка «COM-Коннектор»: шаблон имени и таймаут -->
+                    <TabItem Style="{StaticResource SettingsSubTabItem}">
+                        <TabItem.Header>
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.Platforms.Refresh}" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="Link" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                                <TextBlock Text="{loc:Loc Settings.General.Subtab.ComConnector}" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
                             </StackPanel>
-                        </Button>
-                    </Grid>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8,4,4,4">
+                            <StackPanel>
+                                <!-- Имя COM-коннектора 1С по шаблону версии платформы (issue #175) -->
+                                <GroupBox Padding="8" Margin="0,0,0,12">
+                                    <GroupBox.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{loc:Loc Settings.General.ComConnectorTemplate}" VerticalAlignment="Center"/>
+                                            <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               HelpText="{loc:Loc Settings.General.ComConnectorTemplateTooltip}"/>
+                                        </StackPanel>
+                                    </GroupBox.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Settings.General.ComConnectorTemplateHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <TextBox x:Name="ComConnectorNameTemplateBox" Height="32"
+                                                 VerticalContentAlignment="Center"
+                                                 Style="{StaticResource ModernTextBox}"/>
+                                        <!-- Интерактивный предпросмотр имени COM-коннектора (issue #175):
+                                             версия + результат разворота шаблона. Поле версии
+                                             исключительно для предпросмотра, в настройки не сохраняется. -->
+                                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                            <TextBlock Text="{loc:Loc Settings.General.ComConnectorPreviewVersionLabel}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                            <TextBox x:Name="ComConnectorPreviewVersionBox" Text="8.3.45.6789" Height="32" MinWidth="120"
+                                                     VerticalContentAlignment="Center"
+                                                     Style="{StaticResource ModernTextBox}"/>
+                                            <TextBlock Text="{loc:Loc Settings.General.ComConnectorPreviewResultLabel}"
+                                                       VerticalAlignment="Center" Margin="12,0,10,0"/>
+                                            <TextBox x:Name="ComConnectorPreviewResultBox" Height="32" MinWidth="220"
+                                                     VerticalContentAlignment="Center" IsReadOnly="True"
+                                                     Style="{StaticResource ModernTextBox}"
+                                                     Text="{loc:Loc Settings.General.ComConnectorPreviewEmpty}"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </GroupBox>
 
-                    <!-- Нижний блок: статус, доп. пути поиска и разрядность обёрнуты
-                         в ScrollViewer (issue #55) — при уменьшении высоты окна контент
-                         прокручивается, а не обрезается; дерево версий осталось
-                         в гибкой строке сверху. -->
-                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel>
-                    <TextBlock x:Name="StatusText"
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                               TextWrapping="Wrap" Margin="0,0,0,12"/>
-
-                    <!-- Дополнительные пути поиска -->
-                    <GroupBox Header="{loc:Loc Settings.AdditionalPaths}" Padding="10,8" Margin="0,0,0,8">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Grid.Row="0"
-                                       Text="{loc:Loc Settings.AdditionalPaths.Hint}"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                            <ListBox x:Name="AdditionalPathsList" Grid.Row="1"
-                                     MinHeight="80" MaxHeight="140"
-                                     Background="{DynamicResource CardBackgroundBrush}"
-                                     BorderBrush="{DynamicResource BorderBrushColor}"
-                                     BorderThickness="1"
-                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
-                                     SelectionMode="Single"
-                                     ToolTip="{loc:Loc Settings.AdditionalPaths.ListTooltip}"/>
-                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-                                <Button Padding="10,6" Margin="0,0,8,0"
-                                        Style="{DynamicResource SecondaryButton}"
-                                        Click="OnAddPlatformPath_Click"
-                                        ToolTip="{loc:Loc Settings.AdditionalPaths.AddTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderPlus" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.AdditionalPaths.Add}" VerticalAlignment="Center"/>
+                                <!-- Таймаут определения свойств конфигурации через COM (issue #174) -->
+                                <GroupBox Padding="8">
+                                    <GroupBox.Header>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeout}" VerticalAlignment="Center"/>
+                                            <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                               HelpText="{loc:Loc Settings.General.ComDetectTimeoutTooltip}"/>
+                                        </StackPanel>
+                                    </GroupBox.Header>
+                                    <StackPanel>
+                                        <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeoutHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBox x:Name="ComDetectTimeoutMsBox" Height="32" MinWidth="120"
+                                                     VerticalContentAlignment="Center"
+                                                     Style="{StaticResource ModernTextBox}"/>
+                                            <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeoutUnit}"
+                                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                        </StackPanel>
+                                        <!-- Быстрая TCP-проверка порта кластера перед COM (функция 12,
+                                             0.3.9.233): закрытый порт — мгновенно «недоступно» без
+                                             ожидания COM-таймаута; открытый порт — продолжает COM. -->
+                                        <CheckBox x:Name="AvailabilityTcpPrecheckCheckBox" Margin="0,8,0,0"
+                                                  Content="{loc:Loc Settings.General.AvailabilityTcpPrecheck}"
+                                                  VerticalAlignment="Center"/>
                                     </StackPanel>
-                                </Button>
-                                <Button Padding="10,6" Margin="0,0,8,0"
-                                        Style="{DynamicResource SecondaryButton}"
-                                        Click="OnEditPlatformPath_Click"
-                                        ToolTip="{loc:Loc Settings.AdditionalPaths.EditTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderEdit" Width="16" Height="16" Foreground="#F59E0B" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Common.Edit}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <Button Padding="10,6"
-                                        Style="{DynamicResource SecondaryButton}"
-                                        Click="OnRemovePlatformPath_Click"
-                                        ToolTip="{loc:Loc Settings.AdditionalPaths.RemoveTooltip}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Foreground="#EF4444" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
+                                </GroupBox>
                             </StackPanel>
-                        </Grid>
-                    </GroupBox>
+                        </ScrollViewer>
+                    </TabItem>
 
-                    <!-- Разрядность по умолчанию -->
-                    <GroupBox Header="{loc:Loc Settings.DefaultArch}" Padding="10,8" Margin="0,0,0,8">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
-                                       Text="{loc:Loc Settings.DefaultArch.Hint}"/>
-                            <ComboBox x:Name="DefaultArchComboBox" Grid.Column="1" MinWidth="200"
-                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                        </Grid>
-                    </GroupBox>
-                    </StackPanel>
-                    </ScrollViewer>
-                </Grid>
+                    <!-- Под-вкладка «Общая авторизация»: общие логин/пароль для всех ИБ -->
+                    <TabItem Style="{StaticResource SettingsSubTabItem}">
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="AccountKey" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
+                                                         Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                                <TextBlock Text="{loc:Loc Settings.General.Subtab.CommonAuth}" VerticalAlignment="Center"
+                                           Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="8,4,4,4">
+                            <StackPanel>
+                                <!-- Общая авторизация для всех ИБ (issue #57): раздельная по режимам
+                                     запуска — для «1С:Предприятия» и для «Конфигуратора» свои учётные
+                                     данные. Если раздельная для режима не задана — используется прежняя
+                                     общая (legacy, fallback в InfobaseAuthResolver). Поля логина/пароля
+                                     видны только в режиме «Автоматический вход». -->
+                                <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitle}" Padding="8">
+                                    <StackPanel>
+                                        <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitleEnterprise}" Padding="8">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <RadioButton x:Name="CommonEnterprisePromptRadio" GroupName="CommonEnterpriseAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModePrompt}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                                    <RadioButton x:Name="CommonEnterpriseCredentialsRadio" GroupName="CommonEnterpriseAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModeCredentials}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                                    <RadioButton x:Name="CommonEnterpriseOsRadio" GroupName="CommonEnterpriseAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModeOs}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Grid x:Name="CommonEnterpriseCredentialsGrid" Margin="0,6,0,0">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Login}"
+                                                               VerticalAlignment="Center" Margin="0,3"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBox x:Name="CommonEnterpriseUserBox" Grid.Row="0" Grid.Column="1"
+                                                             Margin="10,3,0,3" Padding="6,4"
+                                                             VerticalContentAlignment="Center"
+                                                             Style="{StaticResource ModernTextBox}"/>
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Password}"
+                                                               VerticalAlignment="Center" Margin="0,3"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <PasswordBox x:Name="CommonEnterprisePasswordBox" Grid.Row="1" Grid.Column="1"
+                                                                 Margin="10,3,0,3" Padding="6,4"
+                                                                 VerticalContentAlignment="Center"/>
+                                                </Grid>
+                                                <TextBlock Text="{loc:Loc Settings.CommonAuth.Hint}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                           TextWrapping="Wrap" Margin="0,6,12,0"/>
+                                            </StackPanel>
+                                        </GroupBox>
+                                        <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitleConfigurator}" Padding="8" Margin="0,10,0,0">
+                                            <StackPanel>
+                                                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                                    <RadioButton x:Name="CommonConfiguratorPromptRadio" GroupName="CommonConfiguratorAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModePrompt}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                                    <RadioButton x:Name="CommonConfiguratorCredentialsRadio" GroupName="CommonConfiguratorAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModeCredentials}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                                    <RadioButton x:Name="CommonConfiguratorOsRadio" GroupName="CommonConfiguratorAuth"
+                                                                 Content="{loc:Loc Settings.CommonAuth.ModeOs}"
+                                                                 Checked="OnCommonAuthMode_Checked"
+                                                                 VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                                <Grid x:Name="CommonConfiguratorCredentialsGrid" Margin="0,6,0,0">
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="Auto"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Login}"
+                                                               VerticalAlignment="Center" Margin="0,3"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <TextBox x:Name="CommonConfiguratorUserBox" Grid.Row="0" Grid.Column="1"
+                                                             Margin="10,3,0,3" Padding="6,4"
+                                                             VerticalContentAlignment="Center"
+                                                             Style="{StaticResource ModernTextBox}"/>
+                                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Password}"
+                                                               VerticalAlignment="Center" Margin="0,3"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                    <PasswordBox x:Name="CommonConfiguratorPasswordBox" Grid.Row="1" Grid.Column="1"
+                                                                 Margin="10,3,0,3" Padding="6,4"
+                                                                 VerticalContentAlignment="Center"/>
+                                                </Grid>
+                                                <TextBlock Text="{loc:Loc Settings.CommonAuth.Hint}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                           TextWrapping="Wrap" Margin="0,6,12,0"/>
+                                            </StackPanel>
+                                        </GroupBox>
+                                    </StackPanel>
+                                </GroupBox>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </TabItem>
+                </TabControl>
             </TabItem>
 
             <!-- ============ Вкладка «Отображение» ============ -->
@@ -1758,332 +1944,6 @@
                 </ScrollViewer>
             </TabItem>
 
-            <!-- ============ Вкладка «Настройки» ============ -->
-            <TabItem Style="{StaticResource SettingsTabItem}">
-                <TabItem.Header>
-                    <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ApplicationCog" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
-                                                 Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
-                        <TextBlock Text="{loc:Loc Settings.TabGeneral}" VerticalAlignment="Center"
-                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
-                    </StackPanel>
-                </TabItem.Header>
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              Margin="4,12,4,0" Padding="0,0,4,0">
-                    <StackPanel>
-                        <GroupBox Header="{loc:Loc Settings.Language}" Padding="8" Margin="0,0,0,12">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{loc:Loc Settings.LanguageLabel}" VerticalAlignment="Center"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <ComboBox x:Name="LanguageComboBox" MinWidth="280" Height="34" Margin="10,0,0,0"
-                                              VerticalAlignment="Center"
-                                              Style="{StaticResource ModernComboBox}"
-                                              SelectionChanged="OnLanguage_Changed"/>
-                                </StackPanel>
-                                <TextBlock Text="{loc:Loc Settings.Language.AppliedHint}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,8,0,0"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <TextBlock Text="{loc:Loc Settings.General.Behavior}"
-                                   FontWeight="SemiBold" Margin="0,0,0,8"
-                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AllowMultipleInstancesCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.AllowMultipleInstances}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CheckForUpdatesOnStartupCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.CheckForUpdatesOnStartup}" VerticalAlignment="Center"/>
-                                <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                   HelpText="{loc:Loc Settings.General.CheckForUpdatesOnStartupTooltip}"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AutoUpdateEnabledCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.AutoUpdate}" VerticalAlignment="Center"/>
-                                <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                   HelpText="{loc:Loc Settings.General.AutoUpdateTooltip}"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.ShowTrayIcon}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CloseToTrayCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="WindowMinimize" Width="16" Height="16" Foreground="#F59E0B" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.CloseToTray}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="EscapeToTrayCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Keyboard" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.EscapeToTray}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSystemNotificationsCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.ShowSystemNotifications}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CatchUpMissedTasksCheck" Margin="0,0,0,6">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="History" Width="16" Height="16" Foreground="#6366F1" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.CatchUpMissedTasks}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <StackPanel Orientation="Horizontal" Margin="0,6,0,6">
-                            <materialDesign:PackIcon Kind="RocketLaunch" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                            <TextBlock Text="{loc:Loc Settings.General.AfterLaunchAction}" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <ComboBox x:Name="AfterLaunchActionCombo" MinWidth="230" Height="30"
-                                      VerticalAlignment="Center"
-                                      Style="{StaticResource ModernComboBox}"/>
-                        </StackPanel>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="RememberWindowLayoutCheck">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.General.RememberWindowLayout}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-                        <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CompactModeCheck" Margin="0,12,0,0"
-                                      Checked="OnCompactMode_Toggled" Unchecked="OnCompactMode_Toggled">
-                            <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Compress" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{loc:Loc Settings.CompactMode}" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </ToggleButton>
-
-                        <!-- Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
-                             вместо двух полей логин/пароль; «Основная» — первым пунктом списка. -->
-                        <GroupBox Header="{loc:Loc ItsAccounts.Title}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc ItsAccounts.SettingsHint}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{loc:Loc ItsAccounts.AccountLabel}"
-                                               VerticalAlignment="Center" Margin="0,0,10,0"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    <ComboBox x:Name="ItsAccountsCombo" Grid.Column="1" Height="30"
-                                              Margin="0,0,8,0" Style="{StaticResource ModernComboBox}"
-                                              DisplayMemberPath="Name"
-                                              ToolTip="{loc:Loc ItsAccounts.SettingsHint}"/>
-                                    <Button x:Name="ItsAccountsManageButton" Grid.Column="2" Height="30"
-                                            Style="{StaticResource OutlineButtonStyle}" Click="OnItsAccountsManageClick">
-                                        <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="AccountKey" Width="16" Height="16"
-                                                                     Foreground="{DynamicResource AccentBrush}"/>
-                                            <TextBlock Text="{loc:Loc ItsAccounts.OpenStore}" Margin="6,0,0,0"
-                                                       VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Button>
-                                </Grid>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Имя COM-коннектора 1С по шаблону версии платформы (issue #175) -->
-                        <GroupBox Padding="8" Margin="0,14,0,0">
-                            <GroupBox.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{loc:Loc Settings.General.ComConnectorTemplate}" VerticalAlignment="Center"/>
-                                    <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                       HelpText="{loc:Loc Settings.General.ComConnectorTemplateTooltip}"/>
-                                </StackPanel>
-                            </GroupBox.Header>
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Settings.General.ComConnectorTemplateHint}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <TextBox x:Name="ComConnectorNameTemplateBox" Height="32"
-                                         VerticalContentAlignment="Center"
-                                         Style="{StaticResource ModernTextBox}"/>
-                                <!-- Интерактивный предпросмотр имени COM-коннектора (issue #175):
-                                     версия + результат разворота шаблона. Поле версии
-                                     исключительно для предпросмотра, в настройки не сохраняется. -->
-                                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                                    <TextBlock Text="{loc:Loc Settings.General.ComConnectorPreviewVersionLabel}"
-                                               VerticalAlignment="Center" Margin="0,0,10,0"/>
-                                    <TextBox x:Name="ComConnectorPreviewVersionBox" Text="8.3.45.6789" Height="32" MinWidth="120"
-                                             VerticalContentAlignment="Center"
-                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="{loc:Loc Settings.General.ComConnectorPreviewResultLabel}"
-                                               VerticalAlignment="Center" Margin="12,0,10,0"/>
-                                    <TextBox x:Name="ComConnectorPreviewResultBox" Height="32" MinWidth="220"
-                                             VerticalContentAlignment="Center" IsReadOnly="True"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="{loc:Loc Settings.General.ComConnectorPreviewEmpty}"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Таймаут определения свойств конфигурации через COM (issue #174) -->
-                        <GroupBox Padding="8" Margin="0,14,0,0">
-                            <GroupBox.Header>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeout}" VerticalAlignment="Center"/>
-                                    <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                       HelpText="{loc:Loc Settings.General.ComDetectTimeoutTooltip}"/>
-                                </StackPanel>
-                            </GroupBox.Header>
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeoutHint}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBox x:Name="ComDetectTimeoutMsBox" Height="32" MinWidth="120"
-                                             VerticalContentAlignment="Center"
-                                             Style="{StaticResource ModernTextBox}"/>
-                                    <TextBlock Text="{loc:Loc Settings.General.ComDetectTimeoutUnit}"
-                                               VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                </StackPanel>
-                                <!-- Быстрая TCP-проверка порта кластера перед COM (функция 12,
-                                     0.3.9.233): закрытый порт — мгновенно «недоступно» без
-                                     ожидания COM-таймаута; открытый порт — продолжает COM. -->
-                                <CheckBox x:Name="AvailabilityTcpPrecheckCheckBox" Margin="0,8,0,0"
-                                          Content="{loc:Loc Settings.General.AvailabilityTcpPrecheck}"
-                                          VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Режим функциональности (Этап 10 StartManager): Пользователь/Специалист/Разработчик.
-                             В режиме «Пользователь» ограничивается доступ к системному меню. -->
-                        <GroupBox Header="{loc:Loc FunctionalMode.Label}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Settings.General.FunctionalModeHint}"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                <ComboBox x:Name="FunctionalModeComboBox" Height="34"
-                                          VerticalContentAlignment="Center"
-                                          Style="{StaticResource ModernComboBox}" Margin="0,0,0,8">
-                                    <ComboBoxItem Content="{loc:Loc FunctionalMode.User}" Tag="User"/>
-                                    <ComboBoxItem Content="{loc:Loc FunctionalMode.Specialist}" Tag="Specialist"/>
-                                    <ComboBoxItem Content="{loc:Loc FunctionalMode.Developer}" Tag="Developer"/>
-                                </ComboBox>
-                                <TextBlock x:Name="FunctionalModeHintText"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap"/>
-                                <TextBlock x:Name="LaunchConfigHintText"
-                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,6,0,0"/>
-                            </StackPanel>
-                        </GroupBox>
-
-                        <!-- Общая авторизация для всех ИБ (issue #57): раздельная по режимам
-                             запуска — для «1С:Предприятия» и для «Конфигуратора» свои учётные
-                             данные. Если раздельная для режима не задана — используется прежняя
-                             общая (legacy, fallback в InfobaseAuthResolver). Поля логина/пароля
-                             видны только в режиме «Автоматический вход». -->
-                        <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitle}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitleEnterprise}" Padding="8">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                            <RadioButton x:Name="CommonEnterprisePromptRadio" GroupName="CommonEnterpriseAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModePrompt}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                            <RadioButton x:Name="CommonEnterpriseCredentialsRadio" GroupName="CommonEnterpriseAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModeCredentials}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                            <RadioButton x:Name="CommonEnterpriseOsRadio" GroupName="CommonEnterpriseAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModeOs}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <Grid x:Name="CommonEnterpriseCredentialsGrid" Margin="0,6,0,0">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Login}"
-                                                       VerticalAlignment="Center" Margin="0,3"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <TextBox x:Name="CommonEnterpriseUserBox" Grid.Row="0" Grid.Column="1"
-                                                     Margin="10,3,0,3" Padding="6,4"
-                                                     VerticalContentAlignment="Center"
-                                                     Style="{StaticResource ModernTextBox}"/>
-                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Password}"
-                                                       VerticalAlignment="Center" Margin="0,3"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <PasswordBox x:Name="CommonEnterprisePasswordBox" Grid.Row="1" Grid.Column="1"
-                                                         Margin="10,3,0,3" Padding="6,4"
-                                                         VerticalContentAlignment="Center"/>
-                                        </Grid>
-                                        <TextBlock Text="{loc:Loc Settings.CommonAuth.Hint}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                                   TextWrapping="Wrap" Margin="0,6,12,0"/>
-                                    </StackPanel>
-                                </GroupBox>
-                                <GroupBox Header="{loc:Loc Settings.CommonAuth.GroupTitleConfigurator}" Padding="8" Margin="0,10,0,0">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                            <RadioButton x:Name="CommonConfiguratorPromptRadio" GroupName="CommonConfiguratorAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModePrompt}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                            <RadioButton x:Name="CommonConfiguratorCredentialsRadio" GroupName="CommonConfiguratorAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModeCredentials}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                            <RadioButton x:Name="CommonConfiguratorOsRadio" GroupName="CommonConfiguratorAuth"
-                                                         Content="{loc:Loc Settings.CommonAuth.ModeOs}"
-                                                         Checked="OnCommonAuthMode_Checked"
-                                                         VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <Grid x:Name="CommonConfiguratorCredentialsGrid" Margin="0,6,0,0">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Login}"
-                                                       VerticalAlignment="Center" Margin="0,3"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <TextBox x:Name="CommonConfiguratorUserBox" Grid.Row="0" Grid.Column="1"
-                                                     Margin="10,3,0,3" Padding="6,4"
-                                                     VerticalContentAlignment="Center"
-                                                     Style="{StaticResource ModernTextBox}"/>
-                                            <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc Settings.CommonAuth.Password}"
-                                                       VerticalAlignment="Center" Margin="0,3"
-                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                            <PasswordBox x:Name="CommonConfiguratorPasswordBox" Grid.Row="1" Grid.Column="1"
-                                                         Margin="10,3,0,3" Padding="6,4"
-                                                         VerticalContentAlignment="Center"/>
-                                        </Grid>
-                                        <TextBlock Text="{loc:Loc Settings.CommonAuth.Hint}"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                                   TextWrapping="Wrap" Margin="0,6,12,0"/>
-                                    </StackPanel>
-                                </GroupBox>
-                            </StackPanel>
-                        </GroupBox>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
-
             <!-- ============ Вкладка «Меню „Утилиты“» (issue #374) ============ -->
             <TabItem Style="{StaticResource SettingsTabItem}">
                 <TabItem.Header>
@@ -2160,6 +2020,207 @@
                         </GroupBox>
                     </StackPanel>
                 </ScrollViewer>
+            </TabItem>
+
+            <!-- ============ Вкладка «Платформы» (issue #95): перед «ibases.v8i» ============ -->
+            <TabItem Style="{StaticResource SettingsTabItem}">
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <materialDesign:PackIcon Kind="Server" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"
+                                                 Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                        <TextBlock Text="{loc:Loc Settings.TabPlatforms}" VerticalAlignment="Center"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
+                    </StackPanel>
+                </TabItem.Header>
+                <Grid Margin="4,12,4,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="{loc:Loc Settings.Platforms.Intro}"
+                               Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
+                               TextWrapping="Wrap"/>
+
+                    <Grid Grid.Row="1" Margin="0,0,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TreeView x:Name="PlatformsTree" Grid.Column="0" MinHeight="180"
+                                  Background="{DynamicResource CardBackgroundBrush}"
+                                  BorderBrush="{DynamicResource BorderBrushColor}"
+                                  BorderThickness="1"
+                                  Padding="6,4"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ToolTip="{loc:Loc Settings.Platforms.TreeTooltip}">
+                            <TreeView.ItemTemplate>
+                                <HierarchicalDataTemplate DataType="{x:Type models:PlatformVersionGroup}"
+                                                          ItemsSource="{Binding Children}">
+                                    <Border Margin="0,2" Padding="6,4" CornerRadius="4"
+                                            Background="{DynamicResource ItemHoverBrush}"
+                                            ToolTip="{Binding Path}">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <materialDesign:PackIcon Grid.Column="0" Width="14" Height="14"
+                                                                     Margin="0,2,8,0" VerticalAlignment="Top">
+                                                <materialDesign:PackIcon.Style>
+                                                    <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                        <Setter Property="Kind" Value="Folder"/>
+                                                        <Setter Property="Foreground" Value="#F59E0B"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="Line">
+                                                                <Setter Property="Kind" Value="Folder"/>
+                                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="BuildGroup">
+                                                                <Setter Property="Kind" Value="FolderOpen"/>
+                                                                <Setter Property="Foreground" Value="#3B82F6"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="LeafX64">
+                                                                <Setter Property="Kind" Value="CubeOutline"/>
+                                                                <Setter Property="Foreground" Value="#22C55E"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="LeafX32">
+                                                                <Setter Property="Kind" Value="Cube"/>
+                                                                <Setter Property="Foreground" Value="#8B5CF6"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="Leaf">
+                                                                <Setter Property="Kind" Value="Application"/>
+                                                                <Setter Property="Foreground" Value="#0EA5E9"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </materialDesign:PackIcon.Style>
+                                            </materialDesign:PackIcon>
+                                            <StackPanel Grid.Column="1">
+                                                <!-- DisplayName включает локализованный суффикс «(тонкий клиент)»
+                                                     (единый форматтер, issue #33); подсветка оранжевым задаётся
+                                                     DataTrigger-ом из Style — не локальным Foreground, иначе
+                                                     триггер в WPF не сработает (см. фикс диалога выбора). -->
+                                                <TextBlock Text="{Binding DisplayName}" FontSize="12" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IsThinClient}" Value="True">
+                                                                    <Setter Property="Foreground" Value="#F59E0B"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                                <TextBlock Text="{Binding Path}" FontSize="11"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip="{Binding Path}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </HierarchicalDataTemplate>
+                            </TreeView.ItemTemplate>
+                            <TreeView.ItemContainerStyle>
+                                <Style TargetType="TreeViewItem" BasedOn="{StaticResource ModernTreeViewItem}">
+                                    <Setter Property="IsExpanded" Value="True"/>
+                                </Style>
+                            </TreeView.ItemContainerStyle>
+                        </TreeView>
+                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,6"
+                                VerticalAlignment="Top"
+                                Style="{DynamicResource SecondaryButton}"
+                                Click="OnRefreshPlatforms_Click"
+                                ToolTip="{loc:Loc Settings.Platforms.RefreshTooltip}">
+                            <StackPanel Orientation="Horizontal">
+                                <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="{loc:Loc Settings.Platforms.Refresh}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <!-- Нижний блок: статус, доп. пути поиска и разрядность обёрнуты
+                         в ScrollViewer (issue #55) — при уменьшении высоты окна контент
+                         прокручивается, а не обрезается; дерево версий осталось
+                         в гибкой строке сверху. -->
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
+                    <TextBlock x:Name="StatusText"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                               TextWrapping="Wrap" Margin="0,0,0,12"/>
+
+                    <!-- Дополнительные пути поиска -->
+                    <GroupBox Header="{loc:Loc Settings.AdditionalPaths}" Padding="10,8" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0"
+                                       Text="{loc:Loc Settings.AdditionalPaths.Hint}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <ListBox x:Name="AdditionalPathsList" Grid.Row="1"
+                                     MinHeight="80" MaxHeight="140"
+                                     Background="{DynamicResource CardBackgroundBrush}"
+                                     BorderBrush="{DynamicResource BorderBrushColor}"
+                                     BorderThickness="1"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     SelectionMode="Single"
+                                     ToolTip="{loc:Loc Settings.AdditionalPaths.ListTooltip}"/>
+                            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                                <Button Padding="10,6" Margin="0,0,8,0"
+                                        Style="{DynamicResource SecondaryButton}"
+                                        Click="OnAddPlatformPath_Click"
+                                        ToolTip="{loc:Loc Settings.AdditionalPaths.AddTooltip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderPlus" Width="16" Height="16" Foreground="#22C55E" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.AdditionalPaths.Add}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="10,6" Margin="0,0,8,0"
+                                        Style="{DynamicResource SecondaryButton}"
+                                        Click="OnEditPlatformPath_Click"
+                                        ToolTip="{loc:Loc Settings.AdditionalPaths.EditTooltip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderEdit" Width="16" Height="16" Foreground="#F59E0B" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Common.Edit}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="10,6"
+                                        Style="{DynamicResource SecondaryButton}"
+                                        Click="OnRemovePlatformPath_Click"
+                                        ToolTip="{loc:Loc Settings.AdditionalPaths.RemoveTooltip}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Foreground="#EF4444" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Разрядность по умолчанию -->
+                    <GroupBox Header="{loc:Loc Settings.DefaultArch}" Padding="10,8" Margin="0,0,0,8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0"
+                                       Text="{loc:Loc Settings.DefaultArch.Hint}"/>
+                            <ComboBox x:Name="DefaultArchComboBox" Grid.Column="1" MinWidth="200"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                        </Grid>
+                    </GroupBox>
+                    </StackPanel>
+                    </ScrollViewer>
+                </Grid>
             </TabItem>
 
             <!-- ============ Вкладка «ibases.v8i» ============ -->

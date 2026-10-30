@@ -142,6 +142,8 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     private bool _isRunning;
     private string _summary = string.Empty;
     private string _pathText = string.Empty;
+    private string _template = BatchOperationsService.DefaultDumpTemplate;
+    private BatchOperationKind _kind;
 
     /// <summary>
     /// Подмена исполнителя операции для юнит-тестов (без запуска ibcmd):
@@ -149,13 +151,25 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     /// </summary>
     internal Func<Infobase, string, CancellationToken, Task<IbcmdResult>>? ExecutorOverride { get; set; }
 
-    /// <summary>Вид операции окна (выгрузка .dt / загрузка .cf).</summary>
-    public BatchOperationKind Kind { get; }
+    /// <summary>
+    /// Вид операции окна (issue #92): выгрузка в .dt, выгрузка конфигурации в .cf
+    /// или загрузка .cf. Переключатель DT/CF в окне меняет его на лету
+    /// (для выгрузок), поэтому свойство — с публичным сеттером.
+    /// </summary>
+    public BatchOperationKind Kind
+    {
+        get => _kind;
+        set
+        {
+            if (SetProperty(ref _kind, value))
+                OnPropertyChanged(nameof(PathLabel));
+        }
+    }
 
     public BatchOperationsViewModel(IEnumerable<Infobase> infobases, BatchOperationKind kind)
     {
         _syncContext = SynchronizationContext.Current;
-        Kind = kind;
+        _kind = kind;
         foreach (var ib in infobases ?? Enumerable.Empty<Infobase>())
         {
             if (ib is not null)
@@ -183,17 +197,27 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         private set => SetProperty(ref _summary, value);
     }
 
-    /// <summary>Каталог для .dt (DumpDt) или файл .cf (LoadConfig) — задаётся в окне.</summary>
+    /// <summary>Каталог для .dt/.cf (выгрузка) или файл .cf (загрузка) — задаётся в окне.</summary>
     public string PathText
     {
         get => _pathText;
         set => SetProperty(ref _pathText, value);
     }
 
+    /// <summary>Шаблон имени файла выгрузки с токенами {Имя} и {Дата} (issue #92).</summary>
+    public string Template
+    {
+        get => _template;
+        set => SetProperty(ref _template, value ?? string.Empty);
+    }
+
+    /// <summary>Это операция выгрузки (в .dt или .cf) — в окне показывается шаблон имени.</summary>
+    public bool IsDumpKind => Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf;
+
     /// <summary>Заголовок поля пути (каталог выгрузки / файл конфигурации).</summary>
-    public string PathLabel => Kind == BatchOperationKind.DumpDt
-        ? LocalizationManager.T("BatchOps.PathLabelDumpDt")
-        : LocalizationManager.T("BatchOps.PathLabelLoadCf");
+    public string PathLabel => Kind == BatchOperationKind.LoadConfig
+        ? LocalizationManager.T("BatchOps.PathLabelLoadCf")
+        : LocalizationManager.T("BatchOps.PathLabelDumpDt");
 
     /// <summary>Отметить/снять все строки (занятые операции не трогаются).</summary>
     public void SetAll(bool value)
@@ -252,9 +276,12 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         int ok = 0, failed = 0;
         AppendLog(string.Format(
             LocalizationManager.T("BatchOps.StartedFormat"), selected.Count,
-            Kind == BatchOperationKind.DumpDt
-                ? LocalizationManager.T("BatchOps.KindDumpDt")
-                : LocalizationManager.T("BatchOps.KindLoadCf")));
+            Kind switch
+            {
+                BatchOperationKind.DumpDt => LocalizationManager.T("BatchOps.KindDumpDt"),
+                BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
+                _ => LocalizationManager.T("BatchOps.KindLoadCf")
+            }));
 
         foreach (var item in selected)
         {
@@ -275,12 +302,17 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 continue;
             }
 
-            // Целевой путь: для выгрузки — свой файл на каждую базу; для загрузки .cf — общий файл.
-            var targetPath = Kind == BatchOperationKind.DumpDt
-                ? BatchOperationsService.BuildDtFilePath(PathText, ib.Name)
-                : PathText.Trim();
-
             var startedAt = DateTime.Now;
+            // Целевой путь: для выгрузки — свой файл на каждую базу по шаблону
+            // имени (issue #92); для загрузки .cf — общий файл.
+            var targetPath = Kind switch
+            {
+                BatchOperationKind.DumpDt => BatchOperationsService.BuildDumpFilePath(
+                    PathText, ib.Name, Kind, Template, startedAt),
+                BatchOperationKind.DumpCf => BatchOperationsService.BuildDumpFilePath(
+                    PathText, ib.Name, Kind, Template, startedAt),
+                _ => PathText.Trim()
+            };
             AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
 
             IbcmdResult result;
@@ -331,9 +363,13 @@ public sealed class BatchOperationsViewModel : ViewModelBase
 
     /// <summary>Реальный исполнитель через ibcmd (обе платформы, без Конфигуратора).</summary>
     private Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath, CancellationToken ct)
-        => Kind == BatchOperationKind.DumpDt
-            ? IbcmdService.DumpAsync(infobase, targetPath, credential: null, ct)
-            : IbcmdService.LoadConfigAsync(infobase, targetPath, ct);
+        => Kind switch
+        {
+            BatchOperationKind.DumpDt => IbcmdService.DumpAsync(infobase, targetPath, credential: null, ct),
+            // Выгрузка конфигурации в .cf (issue #92): ibcmd config dump.
+            BatchOperationKind.DumpCf => IbcmdService.SaveConfigAsync(infobase, targetPath, credential: null, ct),
+            _ => IbcmdService.LoadConfigAsync(infobase, targetPath, ct)
+        };
 
     /// <summary>Добавляет строку в лог потокобезопасно (через захваченный контекст синхронизации).</summary>
     private void AppendLog(string line)

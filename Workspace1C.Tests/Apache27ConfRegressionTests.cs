@@ -185,9 +185,20 @@ public sealed class Apache27ConfRegressionTests
             .ToList();
         Assert.Single(aliasTargets);
         Assert.EndsWith("1c8Aliases27.conf", aliasTargets[0], System.StringComparison.OrdinalIgnoreCase);
-        // По умолчанию выбран основной конфиг — конфиг, указанный в службе.
-        Assert.Equal(0, vm.ConfTargetIndex);
-        Assert.Equal(Path.GetFullPath(Path.Combine(ServerRootDir, "conf", "httpd27.conf")),
+        // Issue #63 (комментарий 7OH 2026-10-30): при наличии файла алиасов 1c8Aliases* —
+        // он выбирается в списке webinst ПО УМОЛЧАНИЮ.
+        var aliasIndex = -1;
+        for (var i = 0; i < vm.ConfTargetPaths.Count; i++)
+        {
+            if (Path.GetFileName(vm.ConfTargetPaths[i]).StartsWith("1c8Aliases", System.StringComparison.OrdinalIgnoreCase))
+            {
+                aliasIndex = i;
+                break;
+            }
+        }
+        Assert.True(aliasIndex >= 0, "файл алиасов должен быть в списке");
+        Assert.Equal(aliasIndex, vm.ConfTargetIndex);
+        Assert.Equal(Path.GetFullPath(Path.Combine(ServerRootDir, "conf", "1c8Aliases27.conf")),
             vm.ApacheConfPath, ignoreCase: true);
     }
 

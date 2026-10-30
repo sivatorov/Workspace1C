@@ -201,7 +201,7 @@ public sealed class Issue83LicenseTabTests
         var message = RingLicenseService.BuildUnavailableMessage();
 
         Assert.Contains("перезапустите Workspace 1C", message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("PATH, зафиксированный", message, StringComparison.Ordinal);
+        Assert.Contains("PATH процесса приложения фиксируется при его старте", message, StringComparison.Ordinal);
     }
 
     [Fact]

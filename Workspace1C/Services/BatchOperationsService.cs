@@ -17,6 +17,9 @@ public enum BatchOperationKind
     /// <summary>Выгрузка списка баз в файлы .dt (ibcmd infobase dump).</summary>
     DumpDt,
 
+    /// <summary>Выгрузка конфигурации каждой базы в файл .cf (ibcmd config dump, issue #92).</summary>
+    DumpCf,
+
     /// <summary>Загрузка конфигурации из .cf по списку баз (ibcmd config load + apply).</summary>
     LoadConfig
 }
@@ -39,6 +42,64 @@ public static class BatchOperationsService
     {
         var dir = string.IsNullOrWhiteSpace(directory) ? "." : directory.Trim();
         return Path.Combine(dir, SanitizeFileName(infobaseName) + ".dt");
+    }
+
+    /// <summary>Шаблон имени файла массовой выгрузки по умолчанию (issue #92).</summary>
+    public const string DefaultDumpTemplate = "{Имя}_{Дата}";
+
+    /// <summary>Формат метки времени токена {Дата} в шаблоне имени файла (issue #92).</summary>
+    public const string DumpTimestampFormat = "yyyy-MM-dd_HH-mm";
+
+    /// <summary>
+    /// Разбирает вид пакетной операции из сохранённой строки настроек (issue #92):
+    /// «DT»/«dt» → DumpDt, «CF»/«cf» → DumpCf, остальное (в т.ч. пусто) → DumpDt.
+    /// </summary>
+    public static BatchOperationKind ParseDumpKind(string? value)
+        => string.Equals(value?.Trim(), "CF", StringComparison.OrdinalIgnoreCase)
+            ? BatchOperationKind.DumpCf
+            : BatchOperationKind.DumpDt;
+
+    /// <summary>Строка настроек для вида выгрузки: «DT» или «CF».</summary>
+    public static string DumpKindToString(BatchOperationKind kind)
+        => kind == BatchOperationKind.DumpCf ? "CF" : "DT";
+
+    /// <summary>
+    /// Строит целевое имя файла массовой выгрузки по шаблону (issue #92):
+    /// токены <c>{Имя}</c>/<c>{Name}</c> заменяются на имя базы, <c>{Дата}</c>/<c>{Date}</c> —
+    /// на метку времени. Пустой шаблон эквивалентен <c>{Имя}</c>. Результат
+    /// очищается от недопустимых символов (кроме расширения) и не перезаписывает
+    /// существующий файл — при коллизии добавляется «_2», «_3» и т.д.
+    /// </summary>
+    public static string BuildDumpFilePath(string directory, string infobaseName,
+        BatchOperationKind kind, string? template, DateTime? timestamp = null)
+    {
+        var dir = string.IsNullOrWhiteSpace(directory) ? "." : directory.Trim();
+        var extension = kind == BatchOperationKind.DumpCf ? ".cf" : ".dt";
+        var stamp = (timestamp ?? DateTime.Now).ToString(DumpTimestampFormat);
+        var body = string.IsNullOrWhiteSpace(template)
+            ? SanitizeFileName(infobaseName)
+            : template!.Trim()
+                .Replace("{Имя}", SanitizeFileName(infobaseName))
+                .Replace("{Name}", SanitizeFileName(infobaseName))
+                .Replace("{Дата}", stamp)
+                .Replace("{Date}", stamp);
+        // Имя файла целиком (без расширения) чистим от недопустимых символов:
+        // в шаблоне могут остаться «/», «:» и т.п.
+        var fileName = SanitizeFileName(body) + extension;
+
+        // Коллизии: две базы могут дать одинаковое имя (шаблон без {Имя} и/или
+        // с одним {Дата}), существующий файл не перезаписываем.
+        var candidate = Path.Combine(dir, fileName);
+        if (!File.Exists(candidate))
+            return candidate;
+        var stem = fileName[..^extension.Length];
+        for (var i = 2; i < 1000; i++)
+        {
+            candidate = Path.Combine(dir, $"{stem}_{i}{extension}");
+            if (!File.Exists(candidate))
+                return candidate;
+        }
+        return candidate;
     }
 
     /// <summary>Убирает из имени файла недопустимые символы и обрезает длину.</summary>
@@ -68,7 +129,7 @@ public static class BatchOperationsService
         var errors = new List<string>();
         var list = targets?.Where(b => b is not null).ToList() ?? new List<Infobase>();
 
-        if (kind == BatchOperationKind.DumpDt)
+        if (kind == BatchOperationKind.DumpDt || kind == BatchOperationKind.DumpCf)
         {
             if (string.IsNullOrWhiteSpace(path))
                 errors.Add(LocalizationManager.T("BatchOps.NeedDirectory"));

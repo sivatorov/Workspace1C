@@ -279,9 +279,13 @@ public sealed class WebPublishIssue63Tests
         Assert.Contains(vm.ConfTargetPaths, p => p.EndsWith("httpd27.conf", System.StringComparison.OrdinalIgnoreCase));
         Assert.Contains(vm.ConfTargetPaths, p => p.EndsWith("1c8Aliases27.conf", System.StringComparison.OrdinalIgnoreCase));
         Assert.True(vm.ConfTargets.Count >= 2, "В списке webinst должны быть основной конфиг и include-файлы");
-        Assert.Equal(0, vm.ConfTargetIndex);
+        // Issue #63 (комментарий 7OH 2026-10-30): при наличии файла алиасов 1c8Aliases* —
+        // он выбирается в списке ПО УМОЛЧАНИЮ (webinst пишет блок публикации туда).
+        var aliasIndex = IndexOfAlias(vm.ConfTargetPaths);
+        Assert.True(aliasIndex >= 0, "файл алиасов должен быть в списке");
+        Assert.Equal(aliasIndex, vm.ConfTargetIndex);
         Assert.True(string.Equals(vm.ApacheConfPath,
-            Path.GetFullPath(@"C:\Apache\Apache24\conf\httpd27.conf"),
+            vm.ConfTargetPaths[aliasIndex],
             System.StringComparison.OrdinalIgnoreCase));
     }
 
@@ -322,8 +326,11 @@ public sealed class WebPublishIssue63Tests
         Assert.Single(vm.ConfTargetPaths, p =>
             Path.GetFileName(p).StartsWith("1c8Aliases", System.StringComparison.OrdinalIgnoreCase));
         Assert.True(vm.ConfTargets.Count >= 2, "В списке webinst должны быть основной конфиг и include-файл алиасов");
-        // Основной конфиг службы — первый пункт (значения по умолчанию из него).
-        Assert.Equal(0, vm.ConfTargetIndex);
+        // Issue #63 (комментарий 7OH 2026-10-30): файл алиасов 1c8Aliases* выбирается
+        // по умолчанию (основной конфиг остаётся первым пунктом списка).
+        Assert.Equal(0, IndexOfMain(vm.ConfTargetPaths));
+        Assert.Equal(IndexOfAlias(vm.ConfTargetPaths), vm.ConfTargetIndex);
+        Assert.EndsWith("1c8Aliases27.conf", vm.ApacheConfPath, System.StringComparison.OrdinalIgnoreCase);
     }
 
     // ---------- Issue #63 (комментарий 7OH 2026-10-26): в списке ровно один файл
@@ -620,7 +627,9 @@ public sealed class WebPublishIssue63Tests
 
             Assert.True(vm.HasConfTargets);
             Assert.EndsWith("httpd27.conf", vm.ConfTargetPaths[0], StringComparison.OrdinalIgnoreCase);
-            Assert.Equal(0, vm.ConfTargetIndex);
+            // Issue #63 (комментарий 7OH 2026-10-30): файл алиасов выбирается по умолчанию.
+            Assert.Equal(1, vm.ConfTargetIndex);
+            Assert.EndsWith("1c8Aliases27.conf", vm.ApacheConfPath, StringComparison.OrdinalIgnoreCase);
         }
         finally
         {
@@ -688,6 +697,28 @@ public sealed class WebPublishIssue63Tests
 
     private static string AliasContent(string htdocs, int n)
         => "# 1c publication\nAlias \"/Demo\" \"" + htdocs.Replace('\\', '/') + "/" + n + "/Demo/\"\n";
+
+    /// <summary>Индекс файла алиасов 1c8Aliases* в списке файлов webinst (-1 — нет).</summary>
+    private static int IndexOfAlias(IReadOnlyList<string> paths)
+    {
+        for (var i = 0; i < paths.Count; i++)
+        {
+            if (Path.GetFileName(paths[i]).StartsWith("1c8Aliases", StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>Индекс основного конфига httpd27.conf в списке файлов webinst (-1 — нет).</summary>
+    private static int IndexOfMain(IReadOnlyList<string> paths)
+    {
+        for (var i = 0; i < paths.Count; i++)
+        {
+            if (paths[i].EndsWith("httpd27.conf", StringComparison.OrdinalIgnoreCase))
+                return i;
+        }
+        return -1;
+    }
 
     private static string FindRepoRoot()
     {

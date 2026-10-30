@@ -7,6 +7,9 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Models;
+#if WINDOWS
+using Microsoft.Win32;
+#endif
 
 namespace Workspace1C.Services;
 
@@ -321,6 +324,14 @@ public sealed class RingLicenseService : IRingLicenseService
             // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
             Log.Info(LogCategory.Rac,
                 "RING: утилита ring не найдена в PATH (where.exe ring / which ring) — переходим к запасным вариантам.");
+
+            // issue #83 (репорт 7OH от 2026-10-30 «в окне - не найдено, в командной строке
+            // работает»): PATH процесса приложения может отличаться от PATH консоли
+            // пользователя (запуск из ярлыка/планировщика не наследует свежий
+            // пользовательский PATH). Пробуем найти ring по СВЕЖЕМУ PATH из реестра и
+            // известным каталогам установки 1С — при находке запускаем по полному пути
+            // без перезапуска приложения.
+            ringInPath = await FindRingViaRegistryAndKnownDirsAsync(cancellationToken).ConfigureAwait(false);
         }
 
         // 1) ring license list (Windows и Linux — если ring доступен в PATH).
@@ -395,7 +406,9 @@ public sealed class RingLicenseService : IRingLicenseService
     {
 #if WINDOWS
         const string searched =
-            "проверка: where.exe ring / ring --version, ring.exe в каталоге bin платформы рядом с rac";
+            "проверка: PATH процесса (where.exe ring / ring --version), PATH из реестра " +
+            "(HKCU\\Environment и HKLM\\…\\Session Manager\\Environment), каталог bin платформы " +
+            "рядом с rac, известные каталоги 1С (Program Files\\1cv8\\<версия>\\bin, %LOCALAPPDATA%\\1C\\1cv8)";
 #else
         const string searched =
             "проверка: which ring / ring --version, licensetool в каталогах /opt/1cv8";
@@ -411,9 +424,9 @@ public sealed class RingLicenseService : IRingLicenseService
                "; каталог файлов лицензий платформы пуст). Установите ring (обычно лежит в " +
                "каталоге bin платформы рядом с rac) либо добавьте его в PATH (в т.ч. как " +
                "командный файл .cmd/.bat; проверка выполняется так же, как в командной строке). " +
-               "Если утилита установлена недавно — перезапустите Workspace 1C: запущенное " +
-               "приложение видит PATH, зафиксированный при его старте. После установки " +
-               "нажмите «Обновить».";
+               "Если утилита установлена недавно и в командной строке работает — перезапустите " +
+               "Workspace 1C: PATH процесса приложения фиксируется при его старте. После " +
+               "установки нажмите «Обновить».";
     }
 
     /// <summary>
@@ -572,6 +585,212 @@ public sealed class RingLicenseService : IRingLicenseService
                 return line;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Разбивает строку PATH на каталоги (разделитель «;», пустые элементы отбрасываются).
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal static IReadOnlyList<string> SplitPathDirectories(string? pathValue) =>
+        (pathValue ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+    /// <summary>
+    /// Разворачивает переменные окружения в значении реестрового PATH типа
+    /// REG_EXPAND_SZ («%SystemRoot%\...»). Функция-расширитель инъектится —
+    /// юнит-тесты не зависят от машины. Internal — юнит-тесты.
+    /// </summary>
+    internal static string ExpandRegistryPath(string raw, Func<string, string>? expander = null) =>
+        (expander ?? Environment.ExpandEnvironmentVariables)(raw);
+
+    /// <summary>
+    /// Чистая функция «список каталогов → единый список поиска ring» (issue #83):
+    /// PATH процесса → свежий PATH из реестра → известные каталоги. Пустые элементы
+    /// отбрасываются, дубликаты (регистронезависимо) схлопываются с сохранением порядка.
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal static IReadOnlyList<string> BuildRingSearchDirectories(
+        string? processPath, string? registryPath, IEnumerable<string>? knownDirs)
+    {
+        var dirs = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var source in new[] { SplitPathDirectories(processPath), SplitPathDirectories(registryPath) })
+        {
+            foreach (var dir in source)
+            {
+                if (seen.Add(dir))
+                    dirs.Add(dir);
+            }
+        }
+        foreach (var dir in knownDirs ?? Array.Empty<string>())
+        {
+            if (!string.IsNullOrWhiteSpace(dir) && seen.Add(dir))
+                dirs.Add(dir);
+        }
+        return dirs;
+    }
+
+    /// <summary>
+    /// Ищет утилиту ring в переданных каталогах (issue #83): первый существующий файл
+    /// <c>ring.exe</c> / <c>ring.cmd</c> / <c>ring.bat</c> (Windows) или <c>ring</c>
+    /// (Linux). Проверка существования файла инъектится — юнит-тесты без файловой системы.
+    /// Возвращает полный путь или null. Internal — юнит-тесты.
+    /// </summary>
+    internal static string? FindRingInDirectories(
+        IEnumerable<string> directories, Func<string, bool>? fileExists = null)
+    {
+        var exists = fileExists ?? (path => File.Exists(path));
+#if WINDOWS
+        string[] fileNames = { "ring.exe", "ring.cmd", "ring.bat" };
+#else
+        string[] fileNames = { "ring" };
+#endif
+        foreach (var dir in directories)
+        {
+            if (string.IsNullOrWhiteSpace(dir))
+                continue;
+            foreach (var fileName in fileNames)
+            {
+                try
+                {
+                    var candidate = Path.Combine(dir, fileName);
+                    if (exists(candidate))
+                        return candidate;
+                }
+                catch
+                {
+                    // Невалидный путь — пробуем следующий каталог.
+                }
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Свежий PATH из реестра Windows (issue #83): HKCU\Environment + HKLM\SYSTEM\...
+    /// Session Manager\Environment — PATH «будущей» консоли пользователя. Значения типа
+    /// REG_EXPAND_SZ разворачиваются. Ошибки чтения не бросаются (возвращается null).
+    /// Internal — юнит-тесты вызывают <see cref="ExpandRegistryPath"/> на фикстурах,
+    /// сам доступ к реестру тестируется только на Windows-машине разработчика.
+    /// </summary>
+    internal static string? ReadRegistryPathValue()
+    {
+#if WINDOWS
+        try
+        {
+            const string machineKeyPath = @"SYSTEM\CurrentControlSet\Control\Session Manager\Environment";
+            var parts = new List<string>();
+            foreach (var (hive, keyPath) in new[] { (Registry.CurrentUser, "Environment"), (Registry.LocalMachine, machineKeyPath) })
+            {
+                using var key = hive.OpenSubKey(keyPath, writable: false);
+                if (key is null)
+                    continue;
+                // DoNotExpandEnvironmentNames: разворачиваем сами через
+                // ExpandRegistryPath (REG_EXPAND_SZ; REG_SZ разворачивается без изменений).
+                if (key.GetValue("Path", null, RegistryValueOptions.DoNotExpandEnvironmentNames) is not string value
+                    || string.IsNullOrWhiteSpace(value))
+                    continue;
+                var expanded = ExpandRegistryPath(value);
+                if (!string.IsNullOrWhiteSpace(expanded))
+                    parts.Add(expanded);
+            }
+            return parts.Count > 0 ? string.Join(";", parts) : null;
+        }
+        catch (Exception ex)
+        {
+            // Реестр недоступен (ограничения среды) — поиск продолжается без него.
+            Log.Info(LogCategory.Rac, $"RING: PATH из реестра недоступен: {ex.Message}");
+            return null;
+        }
+#else
+        return null;
+#endif
+    }
+
+    /// <summary>
+    /// Известные каталоги установки 1С, где может лежать ring (issue #83): каталог bin
+    /// платформы рядом с rac, %LOCALAPPDATA%\1C\1cv8 и C:\Program Files[ (x86)]\1cv8\
+    /// <версия>\bin (последняя установленная версия). Internal — юнит-тесты.
+    /// </summary>
+    internal static IReadOnlyList<string> KnownRingDirectories()
+    {
+        var dirs = new List<string>();
+        try
+        {
+            var rac = OneCPlatformLocator.FindRacExecutable();
+            if (!string.IsNullOrWhiteSpace(rac))
+            {
+                var dir = Path.GetDirectoryName(rac);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    dirs.Add(dir);
+            }
+        }
+        catch
+        {
+            // Локатор платформ недоступен — пропускаем кандидат.
+        }
+
+#if WINDOWS
+        try
+        {
+            var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(localAppData))
+                dirs.Add(Path.Combine(localAppData, "1C", "1cv8"));
+
+            foreach (var root in new[] { @"C:\Program Files\1cv8", @"C:\Program Files (x86)\1cv8" })
+            {
+                if (!Directory.Exists(root))
+                    continue;
+                foreach (var versionDir in Directory.EnumerateDirectories(root).OrderByDescending(d => d))
+                {
+                    var bin = Path.Combine(versionDir, "bin");
+                    if (Directory.Exists(bin))
+                    {
+                        dirs.Add(bin);
+                        break; // последняя установленная версия платформы.
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Каталоги платформ недоступны — пропускаем кандидатов.
+        }
+#endif
+        return dirs;
+    }
+
+    /// <summary>
+    /// Поиск ring вне PATH процесса (issue #83, пятая итерация): свежий PATH из реестра
+    /// (HKCU + HKLM) и известные каталоги установки 1С. Пишет диагностику CM_RAC: размеры
+    /// обоих PATH, каталоги поиска и результат. Возвращает полный путь к утилите или null.
+    /// Internal — вызывается из <see cref="GetInstalledLicensesAsync"/> после неудачи
+    /// <see cref="FindRingInPathAsync"/>.
+    /// </summary>
+    internal static async Task<string?> FindRingViaRegistryAndKnownDirsAsync(CancellationToken ct = default)
+    {
+        var processPath = Environment.GetEnvironmentVariable("PATH");
+        var registryPath = ReadRegistryPathValue();
+        var knownDirs = KnownRingDirectories();
+        var directories = BuildRingSearchDirectories(processPath, registryPath, knownDirs);
+
+        // issue #83: диагностика — где искали и чем PATH процесса отличается от
+        // реестрового (отличие окружения должно быть видно из журнала сразу).
+        Log.Info(LogCategory.Rac,
+            $"RING: поиск ring вне PATH процесса: PATH процесса: {SplitPathDirectories(processPath).Count} элементов, " +
+            $"PATH реестра: {SplitPathDirectories(registryPath).Count} элементов, " +
+            $"известных каталогов 1С: {knownDirs.Count}, всего каталогов к проверке: {directories.Count}.");
+        Log.Info(LogCategory.Rac,
+            "RING: каталоги поиска ring: " +
+            (directories.Count > 0 ? string.Join("; ", directories) : "(нет доступных каталогов)") +
+            (string.IsNullOrWhiteSpace(registryPath) ? "; PATH реестра: (пусто/недоступен)" : string.Empty));
+
+        var found = await Task.Run(() => FindRingInDirectories(directories), ct).ConfigureAwait(false);
+        if (found is not null)
+            Log.Info(LogCategory.Rac, $"RING: ring найден вне PATH процесса — запуск по полному пути: {found}");
+        else
+            Log.Info(LogCategory.Rac, "RING: ring не найден вне PATH процесса (реестровый PATH и известные каталоги 1С проверены).");
+        return found;
     }
 
     /// <summary>Ищет исполняемые файлы licensetool в каталогах /opt/1cv8 (Linux). Internal — тесты.</summary>

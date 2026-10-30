@@ -116,9 +116,12 @@ public sealed class BatchOperationsTests
     {
         var a = FileBase("Альфа");
         var b = FileBase("Бета");
+        // issue #92: имя файла выгрузки строится по шаблону; для сохранения прежнего
+        // поведения «ИмяБазы.dt» задаём шаблон из одного токена {Имя}.
         var vm = new BatchOperationsViewModel(new[] { a, b }, BatchOperationKind.DumpDt)
         {
-            PathText = Path.GetTempPath()
+            PathText = Path.GetTempPath(),
+            Template = "{Имя}"
         };
 
         var calls = new System.Collections.Generic.List<(string Base, string Path)>();

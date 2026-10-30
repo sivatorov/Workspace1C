@@ -1,0 +1,49 @@
+Release 1.0.1.8: исправления по issues #89, #57, #94, #83, #63, #95, #93, #92
+
+- #89: автообновление на Linux — платформо-зависимое отображаемое имя
+  скачиваемого файла (Workspace1C-linux-x64, а не Workspace1C.exe), в журнал
+  CM_UPDATES перед загрузкой пишутся полный URL и ожидаемый размер, сообщение
+  карантина «wrong-platform» дополнено версией приложения и подсказкой;
+  в release.yml добавлен workflow_dispatch с параметром prerelease для
+  тестовых сборок;
+- #57: общая авторизация при раздельной авторизации базы — режим Credentials
+  с пустым пользователем больше не считается «заданным» и не блокирует общие
+  учётные данные (InfobaseAuthResolver), защитная ветка против пустого /N в
+  аргументах запуска, аудит синхронизации статиков общей авторизации
+  (WPF, Avalonia, CLI/проводник);
+- #94: окно Свойств (Linux) — трассировка закрытия модальных окон для
+  диагностики зависания «Отмена» после вкладки «Идентификатор»
+  (CM_MODAL_TRACE=1, лог /tmp/cm_modal_trace.log);
+- #83: Серверы 1С / лицензии — поиск ring по PATH процесса, свежему PATH из
+  реестра (HKCU\Environment\Path + HKLM\...\Session Manager\Environment\Path
+  с разворачиванием REG_EXPAND_SZ) и известным каталогам 1С; найденный ring
+  запускается по полному пути без перезапуска приложения, диагностика CM_RAC;
+- #63: публикация баз — вывод webinst читается в консольной кодировке
+  (cp866), дедупликация LoadModule _1cws_module, пути нового блока алиаса
+  через ${переменные} Apache как в существующих записях, .bak-копия конфига
+  перед записью, 1c8Aliases* выбирается по умолчанию
+  (WebPublishService, WebPublishConfPostProcessor, WebPublishViewModel);
+- #95: окно настроек — вкладка «Настройки» разбита на под-вкладки
+  «Поведение и язык» / «Функциональность» / «COM-Коннектор» /
+  «Общая авторизация»; «Настройки» — первая вкладка, «Платформы» — перед
+  «ibases.v8i»;
+- #93: свойства базы — вкладка «Запуск» разделена на «Режим запуска клиента»
+  и «События»; окно компактнее (высота 680, минимум 640 — кнопки доступны
+  на 1366x768);
+- #92: массовая выгрузка в DT/CF — пункт «Выгрузить в DT\CF…» в подменю
+  «Для выделенных (N)…»: шаблон имени файла ({Имя}, {Дата}), выбор папки,
+  переключатель DT / CF; шаблон и папка сохраняются между сессиями.
+
+Код Workspace1C/, тесты Workspace1C.Tests/ (новые Issue57EmptyModeUserTests,
+Issue83RingPathRegistryTests, Issue92BatchDumpTests, Issue93And95SubtabsTests,
+WebPublishConfPostProcessTests, обновлённые Apache27ConfRegressionTests,
+BatchOperationsTests, Issue55AdaptiveLayoutTests, Issue55WindowLayoutTests,
+Issue71SettingsWindowLayoutTests, Issue83LicenseTabTests,
+WebPublishIssue63Tests), локализация ru/en, версия в Workspace1C.csproj,
+CHANGELOG, README, .github/workflows/release.yml, release notes
+(_rel_notes_v10018.md), build-скрипты (_build_v10018.ps1, _publish_v10018.cmd),
+план релиза (plan-issues-v10018.md), отчёт по issues (_issues_report.md),
+черновики комментариев к issues (_issue*_comment_v10018.md),
+_commit_msg_v10018.txt.
+
+Итого в проекте 5 245 юнит-тестов (было 5 175); Linux-сборка (Avalonia) зелёная.
