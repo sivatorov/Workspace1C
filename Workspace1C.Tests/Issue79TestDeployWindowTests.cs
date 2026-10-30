@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Workspace1C.Models;
+using Workspace1C.Services;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -15,6 +16,9 @@ namespace Workspace1C.Tests;
 /// Чистая логика (автоподстановка) проверяется на ViewModel; разметочные части —
 /// чтением исходников обеих платформ (как Issue71SettingsWindowLayoutTests).
 /// </summary>
+// Статики OneCLauncher.Common*Authorization (AutofillCredentialFromSource) сбрасываются
+// в finally; коллекция сериализует класс с остальными тестами статиков (issue #57).
+[Collection("CommonAuthStatics")]
 public sealed class Issue79TestDeployWindowTests
 {
     private static string FindRepoRoot()
@@ -225,6 +229,133 @@ public sealed class Issue79TestDeployWindowTests
             "TestDeploy.OpenBasePropertiesHint",
             "TestDeploy.LaunchConfigurator",
             "TestDeploy.LaunchConfiguratorHint"
+        })
+        {
+            Assert.Contains(key, ru, StringComparison.Ordinal);
+            Assert.Contains(key, en, StringComparison.Ordinal);
+        }
+    }
+
+    // ---------------- (5) Учётные данные для выгрузки через ibcmd (issue #79, 2026-10-30) ----------------
+
+    [Fact]
+    public void BuildScenario_ContainsCredential_WithDefaultsAndExplicit()
+    {
+        // По умолчанию — «авторизация информационной базы» (поведение не меняется).
+        var vm = MakeVm(databaseName: "ut_base", dbName: string.Empty);
+        var s1 = vm.BuildScenario();
+        Assert.NotNull(s1.Credential);
+        Assert.True(s1.Credential!.UseInfobaseAuth);
+        Assert.Equal(string.Empty, s1.Credential.User);
+        Assert.Equal(string.Empty, s1.Credential.Password);
+
+        // Явные логин/пароль из мастера попадают в сценарий.
+        vm.UseInfobaseAuth = false;
+        vm.User = " ivan ";
+        vm.Password = "secret";
+        var s2 = vm.BuildScenario();
+        Assert.False(s2.Credential!.UseInfobaseAuth);
+        Assert.Equal("ivan", s2.Credential.User);
+        Assert.Equal("secret", s2.Credential.Password);
+    }
+
+    [Fact]
+    public void AutofillCredentialFromSource_FillsFromResolver_AndSkipsWhenInfobaseAuthOn()
+    {
+        var source = new Infobase
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = "УТ",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "srv",
+                DatabaseName = "ut_base"
+            }
+        };
+        var vm = new TestDeployViewModel(
+            source, Array.Empty<Infobase>(), Array.Empty<Group>(),
+            proposedTargetName: "Тест: УТ",
+            proposedServerAddress: "srv",
+            proposedDatabaseName: "ut_base",
+            proposedFilePath: string.Empty);
+        try
+        {
+            OneCLauncher.CommonConfiguratorAuthorization = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "commonUser",
+                Password = "commonPass"
+            };
+
+            // Авторизация ИБ включена (по умолчанию) — резолвер и так подставит общие:
+            // автоподстановка не перезаписывает уже введённые пользователем данные.
+            vm.UseInfobaseAuth = true;
+            vm.User = "manual";
+            vm.AutofillCredentialFromSource();
+            Assert.Equal("manual", vm.User);
+
+            // Авторизация ИБ выключена — автоподстановка из резолвера (общая «Конфигуратора»).
+            vm.UseInfobaseAuth = false;
+            vm.User = string.Empty;
+            vm.Password = string.Empty;
+            vm.AutofillCredentialFromSource();
+            Assert.Equal("commonUser", vm.User);
+            Assert.Equal("commonPass", vm.Password);
+        }
+        finally
+        {
+            OneCLauncher.CommonAuthorization = null;
+            OneCLauncher.CommonEnterpriseAuthorization = null;
+            OneCLauncher.CommonConfiguratorAuthorization = null;
+        }
+    }
+
+    [Fact]
+    public void WpfWindow_HasIbcmdCredentialsPanelAndButtons()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.cs"));
+        Assert.Contains("TestDeploy.IbcmdCredentials", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.UseInfobaseAuth", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.CredentialsUser", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.CredentialsPassword", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.FillFromBase", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
+        Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateIbcmdPanel", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaWindow_HasIbcmdCredentialsPanelAndButtons()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.Avalonia.cs"));
+        Assert.Contains("TestDeploy.IbcmdCredentials", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.UseInfobaseAuth", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.CredentialsUser", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.CredentialsPassword", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.FillFromBase", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.OpenCredentialsWindow", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.OpenCommonAuth", code, StringComparison.Ordinal);
+        Assert.Contains("private void OpenCommonAuthSettings()", code, StringComparison.Ordinal);
+        Assert.Contains("ApplyIbcmdPanel", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Localization_HasIbcmdKeysInRuAndEn()
+    {
+        var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
+        var en = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "en.json"));
+        foreach (var key in new[]
+        {
+            "TestDeploy.IbcmdCredentials",
+            "TestDeploy.UseInfobaseAuth",
+            "TestDeploy.CredentialsUser",
+            "TestDeploy.CredentialsPassword",
+            "TestDeploy.FillFromBase",
+            "TestDeploy.OpenCredentialsWindow",
+            "TestDeploy.OpenCommonAuth",
+            "TestDeploy.IbcmdCredentialsHint"
         })
         {
             Assert.Contains(key, ru, StringComparison.Ordinal);

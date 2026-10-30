@@ -324,7 +324,8 @@ public sealed class RingLicenseService : IRingLicenseService
         }
 
         // 1) ring license list (Windows и Linux — если ring доступен в PATH).
-        foreach (var (command, arguments, source) in CommandCandidates(includePathRing: ringInPath is not null))
+        foreach (var (command, arguments, source) in CommandCandidates(
+            includePathRing: ringInPath is not null, ringPath: ringInPath))
         {
             var result = await ProcessRunner.RunAsync(
                     command, arguments, timeout: CommandTimeout, ct: cancellationToken)
@@ -384,30 +385,68 @@ public sealed class RingLicenseService : IRingLicenseService
         const string searched =
             "проверка: which ring / ring --version, licensetool в каталогах /opt/1cv8";
 #endif
+        // issue #83 (последний комментарий 7OH): ring может быть установлен как .exe в
+        // каталоге bin платформы либо добавлен в PATH — в том числе как командный файл
+        // (.cmd/.bat); проверка доступности выполняется так же, как в командной строке.
         return "Не удалось получить список лицензий: не найдена утилита ring (" + searched +
                "; каталог файлов лицензий платформы пуст). Установите ring (обычно лежит в " +
-               "каталоге bin платформы рядом с rac) либо добавьте его в PATH и нажмите «Обновить».";
+               "каталоге bin платформы рядом с rac) либо добавьте его в PATH (в т.ч. как " +
+               "командный файл .cmd/.bat; проверка выполняется так же, как в командной строке) " +
+               "и нажмите «Обновить».";
+    }
+
+    /// <summary>
+    /// Разлагает найденный путь к утилите ring на «исполняемый вызов» (issue #83):
+    /// командные файлы Windows (.cmd/.bat) запускаются через <c>cmd.exe /c</c> — именно
+    /// так их выполняет командная строка пользователя, а прямой <c>CreateProcess</c>
+    /// (UseShellExecute=false) не находит их по PATHEXT — «Не удается найти указанный
+    /// файл». Всё остальное (.exe/.com, без расширения на Linux) запускается напрямую
+    /// по полному пути. Internal — для юнит-тестов без запуска процессов.
+    /// </summary>
+    internal static (string Command, string[] Arguments) ToLaunchCommand(string ringPath, params string[] toolArgs)
+    {
+#if WINDOWS
+        var extension = Path.GetExtension(ringPath);
+        if (string.Equals(extension, ".cmd", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(extension, ".bat", StringComparison.OrdinalIgnoreCase))
+        {
+            return ("cmd.exe", new[] { "/c", ringPath }.Concat(toolArgs).ToArray());
+        }
+#endif
+        return (ringPath, (toolArgs ?? Array.Empty<string>()).ToArray());
     }
 
     /// <summary>
     /// Кандидаты на выполнение (имя, аргументы, описание источника):
     /// ring из PATH (приоритет — issue #83, комментарий 7OH: «просто вызывать ring как
-    /// есть», без подмены полного пути), затем ring.exe в каталоге bin платформы и
-    /// licensetool платформы Linux как запасные. Кандидат «ring (PATH)» добавляется
-    /// только если проверка доступности (<see cref="FindRingInPathAsync"/>) подтвердила,
-    /// что утилита есть в PATH. Internal — для юнит-тестов без запуска процессов.
+    /// есть»), затем ring.exe в каталоге bin платформы и licensetool платформы Linux
+    /// как запасные. Кандидат «ring (PATH)» добавляется только если проверка доступности
+    /// (<see cref="FindRingInPathAsync"/>) подтвердила, что утилита есть в PATH; при
+    /// переданном полном пути <paramref name="ringPath"/> строится «исполняемый вызов»
+    /// через <see cref="ToLaunchCommand"/> (командные файлы .cmd/.bat — через cmd.exe /c).
+    /// Internal — для юнит-тестов без запуска процессов.
     /// </summary>
     internal static IReadOnlyList<(string Command, string[] Arguments, string Source)> CommandCandidates(
-        bool includePathRing = true)
+        bool includePathRing = true, string? ringPath = null)
     {
         var candidates = new List<(string, string[], string)>();
 
-        // issue #83 (последний комментарий 7OH): вызываем «ring» КАК ЕСТЬ — без ручного
-        // резолва полного пути по PATH/PATHEXT (поиск по PATH выполняет сама ОС при
-        // Process.Start); доступность подтверждена заранее через where/which или
-        // «ring --version».
+        // issue #83 (последний комментарий 7OH): вызываем «ring» — поиск по PATH выполняет
+        // сама ОС; доступность подтверждена заранее через where/which или «ring --version».
+        // Если where/which вернули полный путь (в т.ч. командный файл .cmd/.bat) — запускаем
+        // именно его в виде, который может выполнить ОС (см. ToLaunchCommand).
         if (includePathRing)
-            candidates.Add(("ring", new[] { "license", "list" }, "ring (PATH)"));
+        {
+            if (!string.IsNullOrWhiteSpace(ringPath))
+            {
+                var (command, args) = ToLaunchCommand(ringPath!, "license", "list");
+                candidates.Add((command, args, "ring (PATH)"));
+            }
+            else
+            {
+                candidates.Add(("ring", new[] { "license", "list" }, "ring (PATH)"));
+            }
+        }
 
 #if WINDOWS
         // Запасной источник — каталог bin платформы (рядом с rac): только когда ring

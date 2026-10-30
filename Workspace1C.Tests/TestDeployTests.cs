@@ -327,6 +327,50 @@ public sealed class TestDeployTests
         }
     }
 
+    [Fact]
+    public void Store_RoundTrip_WithIbcmdCredential()
+    {
+        // issue #79: явные учётные данные для выгрузки через ibcmd переживают
+        // сериализацию сценария (как и пароли сценариев резервирования).
+        var tempDir = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(), "cm_testdeploy_cred_" + Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(tempDir);
+        var oldOverride = FeatureDataStore.DirectoryOverride;
+        FeatureDataStore.DirectoryOverride = tempDir;
+        try
+        {
+            var scenario = new TestDeployScenario
+            {
+                Name = "Тест: УТ",
+                SourceInfobaseId = "src-1",
+                DumpEngine = BackupEngine.Ibcmd,
+                Credential = new BackupCredential
+                {
+                    UseInfobaseAuth = false,
+                    User = "ibUser",
+                    Password = "ibPass"
+                }
+            };
+            TestDeployStore.Upsert(scenario);
+
+            var loaded = TestDeployStore.Get(scenario.Id);
+            Assert.NotNull(loaded);
+            Assert.Equal(BackupEngine.Ibcmd, loaded!.DumpEngine);
+            Assert.NotNull(loaded.Credential);
+            Assert.False(loaded.Credential!.UseInfobaseAuth);
+            Assert.Equal("ibUser", loaded.Credential.User);
+            Assert.Equal("ibPass", loaded.Credential.Password);
+
+            TestDeployStore.Delete(scenario.Id);
+            Assert.Null(TestDeployStore.Get(scenario.Id));
+        }
+        finally
+        {
+            FeatureDataStore.DirectoryOverride = oldOverride;
+            try { System.IO.Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+    }
+
     // ---------- ViewModel: сборка сценария ----------
 
     [Fact]

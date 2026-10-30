@@ -121,6 +121,51 @@ public sealed class TestDeployViewModel : ViewModelBase
         set => SetPropertyV2(ref _engineIndex, value);
     }
 
+    // ---- Учётные данные для выгрузки .dt (issue #79) ----
+
+    private bool _useInfobaseAuth = true;
+
+    /// <summary>
+    /// Использовать авторизацию информационной базы при выгрузке (по умолчанию да):
+    /// резолвер берёт авторизацию базы/общую авторизацию приложения. Иначе применяются
+    /// явные <see cref="User"/>/<see cref="Password"/> из мастера (issue #79).
+    /// </summary>
+    public bool UseInfobaseAuth
+    {
+        get => _useInfobaseAuth;
+        set => SetPropertyV2(ref _useInfobaseAuth, value);
+    }
+
+    /// <summary>Логин для выгрузки, когда <see cref="UseInfobaseAuth"/> выключен.</summary>
+    public string User { get; set; } = string.Empty;
+
+    /// <summary>Пароль для выгрузки, когда <see cref="UseInfobaseAuth"/> выключен (только в памяти/JSON сценария).</summary>
+    public string Password { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Автоподстановка логина/пароля выгрузки из источника (issue #79, 7OH: «А зачем мне
+    /// отдельно вводить, если все данные вот они — уже введены выше?»): единый резолвинг
+    /// учётных данных «Конфигуратора» (авторизация базы → раздельная общая авторизация
+    /// Конфигуратора → legacy общая, см. <see cref="InfobaseAuthResolver"/>). Заполняет
+    /// поля только когда <see cref="UseInfobaseAuth"/> выключен (при включённом авторизация
+    /// и так берётся резолвером).
+    /// </summary>
+    public void AutofillCredentialFromSource()
+    {
+        if (_useInfobaseAuth)
+            return;
+        InfobaseAuthResolver.Resolve(_source, OneCLaunchMode.Configurator,
+            out var mode, out var user, out var password,
+            OneCLauncher.CommonEnterpriseAuthorization,
+            OneCLauncher.CommonConfiguratorAuthorization,
+            OneCLauncher.CommonAuthorization);
+        if (mode == AuthenticationMode.Credentials)
+        {
+            User = user ?? string.Empty;
+            Password = password ?? string.Empty;
+        }
+    }
+
     public bool DisableScheduledJobs { get; set; } = true;
     public bool ChangeTitle { get; set; } = true;
     public bool ChangeColor { get; set; } = true;
@@ -157,6 +202,13 @@ public sealed class TestDeployViewModel : ViewModelBase
             DbUser = (DbUser ?? string.Empty).Trim(),
             DbPassword = DbPassword ?? string.Empty,
             CreateSqlDatabase = CreateSqlDatabase,
+            // issue #79: учётные данные для выгрузки .dt (явные или «авторизация базы»).
+            Credential = new BackupCredential
+            {
+                UseInfobaseAuth = UseInfobaseAuth,
+                User = (User ?? string.Empty).Trim(),
+                Password = Password ?? string.Empty
+            },
             FilePath = (FilePath ?? string.Empty).Trim(),
             DumpEngine = EngineIndex == 1 ? BackupEngine.Ibcmd : BackupEngine.Designer,
             DisableScheduledJobs = DisableScheduledJobs,

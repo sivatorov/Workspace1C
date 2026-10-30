@@ -89,6 +89,10 @@ public sealed class TestDeployService
                 if (dumpError is not null)
                 {
                     result.ErrorMessage = Fail(T("TestDeploy.Step.Dump"), dumpError);
+                    // issue #79 (последний комментарий 7OH «То есть я должен закрыть окно
+                    // со всеми введёнными данными и пойти найти где это вводится?»): текст
+                    // подсказки, где задать учётные данные для выгрузки через ibcmd.
+                    result.ErrorMessage += "\n" + T("TestDeploy.IbcmdCredentialsHint");
                     return result;
                 }
 
@@ -278,7 +282,9 @@ public sealed class TestDeployService
             var exe = IbcmdService.ResolveExecutable(source);
             if (exe is null)
                 return T("Ibcmd.NotFound");
-            var res = await IbcmdService.DumpAsync(source, dtPath, credential: null, ct).ConfigureAwait(false);
+            // issue #79: явные учётные данные из мастера (блок «Данные для ibcmd») или
+            // null — резолвер (авторизация базы + общая авторизация приложения).
+            var res = await IbcmdService.DumpAsync(source, dtPath, scenario.Credential, ct).ConfigureAwait(false);
             if (!res.Success)
                 return res.Error ?? T("Backup.Failed");
             if (!File.Exists(dtPath) || new FileInfo(dtPath).Length == 0)

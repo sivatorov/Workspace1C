@@ -123,6 +123,12 @@ namespace Workspace1C
             }));
 
             _viewModel = viewModel;
+            // issue #71 (последний комментарий RizvanShikhammatov «нельзя ли запоминать
+            // размеры этого окна?»): восстановление сохранённых размеров окна (до показа,
+            // чтобы не «мигало») и сохранение фактических размеров при закрытии. Размер
+            // зажимается к MinWidth/MinHeight; 0 в настройках — стартовый размер ниже.
+            RestoreSavedWindowSize();
+            Closed += (_, _) => SaveWindowSize();
             // Без контекста привязки переключателей клиента и разрядности
             // не находили свойств и всегда стояли пустыми.
             DataContext = viewModel;
@@ -130,6 +136,40 @@ namespace Workspace1C
             // Кнопки окно строит само, поэтому подписку на смену языка
             // базовый класс не включает: включаем явно.
             EnsureLanguageSubscription();
+        }
+
+        // ---- Запоминание размеров окна «Настройки» (issue #71) ----
+
+        /// <summary>
+        /// Восстанавливает сохранённые размеры окна (issue #71): 0 в настройках —
+        /// «не задано», остаётся стартовый размер (1100×760); иначе размер зажимается
+        /// к MinWidth/MinHeight. Источник — кэш <see cref="MainViewModel.Settings"/>.
+        /// </summary>
+        private void RestoreSavedWindowSize()
+        {
+            var settings = _viewModel.Settings;
+            var width = WindowSizeStore.ApplyMin(settings.SettingsWindowWidth, MinWidth);
+            var height = WindowSizeStore.ApplyMin(settings.SettingsWindowHeight, MinHeight);
+            if (width > 0) Width = width;
+            if (height > 0) Height = height;
+        }
+
+        /// <summary>
+        /// Сохраняет фактические размеры окна при закрытии (issue #71): только в обычном
+        /// состоянии окна и не ниже минимумов. Размеры пишутся в кэш
+        /// <see cref="MainViewModel.Settings"/> и персистятся общим механизмом
+        /// <see cref="MainViewModel.PersistSettings"/> — единый путь сохранения
+        /// (риск «размер перезапишется при следующем сохранении» исключён).
+        /// </summary>
+        private void SaveWindowSize()
+        {
+            if (WindowState != Avalonia.Controls.WindowState.Normal)
+                return;
+            if (!(Bounds.Width >= MinWidth && Bounds.Height >= MinHeight))
+                return;
+            WindowSizeStore.SaveSize(_viewModel.Settings, WindowSizeStore.StoredWindowKind.Settings,
+                Bounds.Width, Bounds.Height);
+            _viewModel.PersistSettings();
         }
 
         /// <summary>Наблюдатель за значением свойства контрола.</summary>

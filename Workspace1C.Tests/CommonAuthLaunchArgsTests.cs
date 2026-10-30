@@ -246,4 +246,109 @@ public sealed class CommonAuthLaunchArgsTests
             OneCLauncher.CommonConfiguratorAuthorization = null;
         }
     }
+
+    // ---- BuildAuthArgument (пакетные операции конфигуратора, issue #87) ----
+
+    [Fact]
+    public void BuildAuthArgument_WithCommonConfiguratorAuth_ReturnsCredentialArgs()
+    {
+        // issue #87: база без собственной авторизации + заданная раздельная общая
+        // авторизация «Конфигуратора» → пакетный запуск получает /N /P.
+        var ib = FileBase(AuthenticationMode.Prompt);
+        try
+        {
+            OneCLauncher.CommonConfiguratorAuthorization = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "cfgUser",
+                Password = "cfgPass"
+            };
+
+            var auth = OneCLauncher.BuildAuthArgument(ib);
+
+            Assert.Equal(" /N\"cfgUser\" /P\"cfgPass\"", auth);
+        }
+        finally
+        {
+            OneCLauncher.CommonAuthorization = null;
+            OneCLauncher.CommonEnterpriseAuthorization = null;
+            OneCLauncher.CommonConfiguratorAuthorization = null;
+        }
+    }
+
+    [Fact]
+    public void BuildAuthArgument_WithOwnConfiguratorAuth_PrefersBaseAuth()
+    {
+        // База с собственной авторизацией Конфигуратора → её креды, общая не перекрывает.
+        var ib = FileBase(AuthenticationMode.Prompt);
+        ib.ConfiguratorAuth = new InfobaseAuthSettings
+        {
+            AuthenticationMode = AuthenticationMode.Credentials,
+            User = "own",
+            Password = "ownPass"
+        };
+        try
+        {
+            OneCLauncher.CommonConfiguratorAuthorization = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "common",
+                Password = "commonPass"
+            };
+
+            var auth = OneCLauncher.BuildAuthArgument(ib);
+
+            Assert.Equal(" /N\"own\" /P\"ownPass\"", auth);
+            Assert.DoesNotContain("common", auth);
+        }
+        finally
+        {
+            OneCLauncher.CommonAuthorization = null;
+            OneCLauncher.CommonEnterpriseAuthorization = null;
+            OneCLauncher.CommonConfiguratorAuthorization = null;
+        }
+    }
+
+    [Fact]
+    public void BuildAuthArgument_WithLegacyCommonAuth_ReturnsCredentialArgs()
+    {
+        // issue #87: при незаданной раздельной общей авторизации «Конфигуратора»
+        // подставляется legacy CommonAuthorization.
+        var ib = FileBase(AuthenticationMode.Prompt);
+        try
+        {
+            OneCLauncher.CommonAuthorization = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "legacyUser",
+                Password = "legacyPass"
+            };
+
+            var auth = OneCLauncher.BuildAuthArgument(ib);
+
+            Assert.Equal(" /N\"legacyUser\" /P\"legacyPass\"", auth);
+        }
+        finally
+        {
+            OneCLauncher.CommonAuthorization = null;
+            OneCLauncher.CommonEnterpriseAuthorization = null;
+            OneCLauncher.CommonConfiguratorAuthorization = null;
+        }
+    }
+
+    [Fact]
+    public void BuildAuthArgument_NoAuth_ReturnsEmpty()
+    {
+        var ib = FileBase(AuthenticationMode.Prompt);
+        try
+        {
+            Assert.Equal(string.Empty, OneCLauncher.BuildAuthArgument(ib));
+        }
+        finally
+        {
+            OneCLauncher.CommonAuthorization = null;
+            OneCLauncher.CommonEnterpriseAuthorization = null;
+            OneCLauncher.CommonConfiguratorAuthorization = null;
+        }
+    }
 }

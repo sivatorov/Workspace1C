@@ -62,6 +62,12 @@ namespace Workspace1C
             _onCustomLaunchParametersChanged = onCustomLaunchParametersChanged;
             InitializeComponent();
 
+            // issue #71 (последний комментарий RizvanShikhammatov «нельзя ли запоминать
+            // размеры этого окна?»): восстановление сохранённых размеров окна (до показа);
+            // сохранение — при закрытии (OnWindowClosed). Зажим к MinWidth/MinHeight —
+            // ниже и общий (WM_GETMINMAXINFO/WindowChromeHelper).
+            RestoreSavedWindowSize();
+
             // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
             // те же гарантии минимальных размеров, что и у окна «Настройки» — окно не
             // сжимается мышью ниже MinWidth/MinHeight ни на одной платформе.
@@ -189,9 +195,45 @@ namespace Workspace1C
         /// <summary>Отписка от событий при закрытии окна — не держать ссылки (issue #36).</summary>
         private void OnWindowClosed(object? sender, EventArgs e)
         {
+            // issue #71: запоминание размера окна «Настройка информационной базы».
+            SaveWindowSize();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
             Closed -= OnWindowClosed;
+        }
+
+        // ---- Запоминание размеров окна «Настройка информационной базы» (issue #71) ----
+
+        /// <summary>
+        /// Восстанавливает сохранённые размеры окна: 0 в настройках — стартовый размер
+        /// из XAML; иначе зажим к MinWidth/MinHeight. Чтение через репозиторий настроек
+        /// (окно не имеет MainViewModel).
+        /// </summary>
+        private void RestoreSavedWindowSize()
+        {
+            var settings = _linkRepository.LoadSettings();
+            var width = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth);
+            var height = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight);
+            if (width > 0) Width = width;
+            if (height > 0) Height = height;
+        }
+
+        /// <summary>
+        /// Сохраняет фактические размеры окна при закрытии (issue #71): только в обычном
+        /// состоянии окна и не ниже минимумов. Пишется через репозиторий (мутация
+        /// LoadSettings → SaveSettings): сохранение настроек главным окном эти поля
+        /// не перезаписывает (кэш размеров — файл настроек).
+        /// </summary>
+        private void SaveWindowSize()
+        {
+            if (WindowState != WindowState.Normal)
+                return;
+            if (!(ActualWidth >= MinWidth && ActualHeight >= MinHeight))
+                return;
+            var settings = _linkRepository.LoadSettings();
+            WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.ConnectionSettings,
+                ActualWidth, ActualHeight);
+            _linkRepository.SaveSettings(settings);
         }
 
         /// <summary>Добавляет тег из поля ввода (кнопка «Добавить») — issue #283.</summary>

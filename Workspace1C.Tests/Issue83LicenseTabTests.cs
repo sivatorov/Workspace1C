@@ -99,6 +99,55 @@ public sealed class Issue83LicenseTabTests
     }
 
     [Fact]
+    public void ToLaunchCommand_Exe_IsInvokedDirectly()
+    {
+        // issue #83: .exe-утилита запускается напрямую по полному пути из where.exe.
+        var (command, arguments) = RingLicenseService.ToLaunchCommand("C:\\bin\\ring.exe", "license", "list");
+
+        Assert.Equal("C:\\bin\\ring.exe", command);
+        Assert.Equal(new[] { "license", "list" }, arguments);
+    }
+
+#if !LINUX
+    [Fact]
+    public void ToLaunchCommand_CmdFile_IsInvokedViaCmdExe()
+    {
+        // issue #83: командные файлы (.cmd/.bat) прямому CreateProcess недоступны
+        // (поиск по PATHEXT не выполняется — «Не удается найти указанный файл»),
+        // поэтому запускаются через cmd.exe /c — как в командной строке пользователя.
+        var (command, arguments) = RingLicenseService.ToLaunchCommand("C:\\bin\\ring.cmd", "license", "list");
+
+        Assert.Equal("cmd.exe", command);
+        Assert.Equal(new[] { "/c", "C:\\bin\\ring.cmd", "license", "list" }, arguments);
+    }
+#endif
+
+    [Fact]
+    public void ToLaunchCommand_NativeLinux_IsInvokedDirectly()
+    {
+        // Без расширения (нативные бинарники) запускаются напрямую по полному пути.
+        var (command, arguments) = RingLicenseService.ToLaunchCommand("/usr/bin/ring", "license", "list");
+
+        Assert.Equal("/usr/bin/ring", command);
+        Assert.Equal(new[] { "license", "list" }, arguments);
+    }
+
+    [Fact]
+    public void RingCandidate_FromWherePath_UsesResolvedCommand()
+    {
+        // issue #83: найденный where.exe/which полный путь попадает в кандидата
+        // «ring (PATH)» как «исполняемый вызов», а не константная команда «ring».
+        var candidates = RingLicenseService.CommandCandidates(
+            includePathRing: true, ringPath: "C:\\bin\\ring.exe");
+        Assert.Contains(candidates,
+            c => c.Command == "C:\\bin\\ring.exe"
+                 && c.Arguments.Length == 2
+                 && c.Arguments[0] == "license"
+                 && c.Arguments[1] == "list"
+                 && c.Source == "ring (PATH)");
+    }
+
+    [Fact]
     public void FirstNonEmptyLine_ReturnsFirstMeaningfulLine()
     {
         // Разбор вывода where/which: первый найденный путь — маркер доступности ring.

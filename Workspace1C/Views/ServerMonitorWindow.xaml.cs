@@ -67,6 +67,25 @@ namespace Workspace1C
         /// </summary>
         private readonly HashSet<DataGrid> _dragInterceptedGrids = new();
 
+        /// <summary>
+        /// Презентеры заголовков, на которые уже установлен «второй пояс» перехвата
+        /// (issue #75, 1.0.1.5): тот же обработчик, что и на гриде, но ближе к заголовкам —
+        /// страхует случай, когда клик приходит по штатной ручке (Thumb) и грид-уровневый
+        /// Preview успевает «потенциально» обработать его раньше внутреннего Thumb.
+        /// Презентер стабилен на вкладке, заголовки внутри него пересоздаются — подписка
+        /// дедуплицируется набором.
+        /// </summary>
+        private readonly HashSet<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter> _dragInterceptedPresenters = new();
+
+        /// <summary>
+        /// Диагностика перетаскивания колонок (issue #75, этап диагностики): первая попытка
+        /// drag на грид логируется под гейтом CM_RAC + CM_ON (выключен по умолчанию), чтобы
+        /// в поле можно было проверить, что перетаскивание вообще стартует, и итоговые
+        /// ширины после <see cref="FinishColumnDrag"/>. Более одного INFO-сообщения о старте
+        /// на окно не пишется — «не спамить».
+        /// </summary>
+        private bool _columnDragDiagLogged;
+
         /// <summary>Состояние перетаскивания границы колонки (issue #75; 1.0.0.96+).</summary>
         private DataGrid? _resizingGrid;
         /// <summary>
@@ -381,6 +400,12 @@ namespace Workspace1C
             var presenter = FindVisualChild<System.Windows.Controls.Primitives.DataGridColumnHeadersPresenter>(grid);
             if (presenter is null)
                 return;
+            // «Второй пояс» перехвата (issue #75, 1.0.1.5): тот же обработчик клика, что
+            // и на гриде, но ближе к заголовкам — страхует клики по штатной ручке Thumb,
+            // когда tunnel-доставка от грида уже прошла, а внутренний обработчик заголовка
+            // ещё не начал штатный ресайз. Презентер стабилен, подписка дедуплицируется.
+            if (_dragInterceptedPresenters.Add(presenter))
+                presenter.PreviewMouseLeftButtonDown += (_, e) => OnColumnPreviewMouseLeftButtonDown(grid, tabKey, e);
             // issue #75 (1.0.0.96; в 1.0.0.95 — InvalidCastException при открытии окна):
             // коллекция Items презентера заголовков на момент применения (ApplicationIdle)
             // может содержать НЕ только DataGridColumnHeader, но и сырые колонки
@@ -433,30 +458,22 @@ namespace Workspace1C
         {
             if (!_dragInterceptedGrids.Add(grid))
                 return;
-            grid.PreviewMouseLeftButtonDown += (_, e) =>
-            {
-                if (_resizingActive)
-                    return;
-                var source = e.OriginalSource as DependencyObject;
-                var header = source is null
-                    ? null
-                    : FindAncestor<System.Windows.Controls.Primitives.DataGridColumnHeader>(source);
-                if (header is null || header.Column is null)
-                    return; // клик не по заголовку (ячейка, скроллбар и т.п.) — не трогаем
-                var columnIndex = grid.Columns.IndexOf(header.Column);
-                if (columnIndex < 0 || columnIndex >= grid.Columns.Count)
-                    return;
-                // Зона границы: правые ~24 px заголовка (ширина «ручки» + запас).
-                var x = e.GetPosition(header).X;
-                if (x < header.ActualWidth - HeaderResizeHotZone)
-                    return;
-                StartColumnDrag(grid, header, columnIndex, x);
-                e.Handled = true;
-            };
+            grid.PreviewMouseLeftButtonDown += (_, e) => OnColumnPreviewMouseLeftButtonDown(grid, tabKey, e);
             grid.MouseMove += (_, e) =>
             {
-                if (_resizingGrid == grid && _resizingActive && _resizingHeader is not null)
-                    UpdateColumnDrag(grid, e.GetPosition(_resizingHeader).X);
+                if (_resizingGrid != grid || !_resizingActive || _resizingHeader is null)
+                    return;
+                // Гасим штатный ресайз DataGrid (issue #75, 1.0.1.5): если движение идёт по
+                // штатной ручке (Thumb PART_RightHeaderGripper), её внутренний обработчик
+                // не должен после нашего захвата перехватывать событие и перезаписывать
+                // ширины. Координаты берём от грида (заголовок во время драга может быть
+                // пересоздан/сдвинут — грид стабилен).
+                if (e.OriginalSource is DependencyObject d &&
+                    FindAncestor<System.Windows.Controls.Primitives.Thumb>(d) is not null)
+                {
+                    e.Handled = true;
+                }
+                UpdateColumnDrag(grid, e.GetPosition(grid).X);
             };
             grid.MouseLeftButtonUp += (_, _) =>
             {
@@ -473,6 +490,47 @@ namespace Workspace1C
                 if (_resizingGrid == grid && _resizingActive)
                     FinishColumnDrag(grid, tabKey);
             };
+        }
+
+        /// <summary>
+        /// Обработчик клика по заголовку колонки (issue #75, 1.0.1.5): определяет границу
+        /// и запускает перетаскивание «как в 1С». Используется И гридом
+        /// (<see cref="AttachGridColumnDrag"/>), И презентером заголовков («второй пояс»,
+        /// <see cref="AttachHeaderWidthTracking"/>) — дедупликация подписок наборами.
+        /// <para>
+        /// Зона границы — правые ~24 px заголовка (<see cref="HeaderResizeHotZone"/>) + выступ
+        /// за правый край до 8 px (клик может прийти на Thumb-ручку, выступающую за край);
+        /// если источник клика — сама штатная ручка (Thumb PART_RightHeaderGripper), на
+        /// координаты не полагаемся — это гарантированная граница (issue #75, этап
+        /// диагностики: «клик в зоне 24 px мог не распознаться»).
+        /// </para>
+        /// </summary>
+        private void OnColumnPreviewMouseLeftButtonDown(DataGrid grid, string tabKey, MouseButtonEventArgs e)
+        {
+            if (_resizingActive)
+                return;
+            var source = e.OriginalSource as DependencyObject;
+            var header = source is null
+                ? null
+                : FindAncestor<System.Windows.Controls.Primitives.DataGridColumnHeader>(source);
+            if (header is null || header.Column is null)
+                return; // клик не по заголовку (ячейка, скроллбар и т.п.) — не трогаем
+            var columnIndex = grid.Columns.IndexOf(header.Column);
+            if (columnIndex < 0 || columnIndex >= grid.Columns.Count)
+                return;
+            // Штатная ручка ресайза — гарантированная граница, координаты не нужны.
+            if (FindAncestor<System.Windows.Controls.Primitives.Thumb>(source) is not null)
+            {
+                StartColumnDrag(grid, header, columnIndex, e.GetPosition(grid).X);
+                e.Handled = true;
+                return;
+            }
+            // Зона границы: правые ~24 px заголовка (+ выступ за правый край до 8 px).
+            var x = e.GetPosition(header).X;
+            if (x < header.ActualWidth - HeaderResizeHotZone || x > header.ActualWidth + 8)
+                return;
+            StartColumnDrag(grid, header, columnIndex, e.GetPosition(grid).X);
+            e.Handled = true;
         }
 
         /// <summary>
@@ -519,7 +577,19 @@ namespace Workspace1C
             _resizingActive = true;
             // Захват мыши гридом: MouseMove продолжает приходить, даже когда курсор
             // выходит за пределы заголовка/грида (drag границы за пределы окна не обрывается).
+            // Перед захватом форсированно сбрасываем возможный захват штатного механизма
+            // DataGrid (Thumb заголовка мог успеть захватить мышь) — иначе наш грид-захват
+            // не вступит в силу и ширины продолжит перезаписывать штатный ресайз (issue #75).
+            grid.ReleaseMouseCapture();
             grid.CaptureMouse();
+            // Диагностика (issue #75, этап 0): первая попытка перетаскивания логируется под
+            // гейтом CM_RAC + CM_ON (выключен по умолчанию) — проверить, что драг стартует.
+            if (!_columnDragDiagLogged)
+            {
+                Log.Info(LogCategory.Rac,
+                    $"CM_COLUMNS: старт перетаскивания границы колонки {columnIndex} (грид {grid.Name}, Ctrl: {_resizingWithCtrl}).");
+                _columnDragDiagLogged = true;
+            }
         }
 
         /// <summary>
@@ -556,6 +626,11 @@ namespace Workspace1C
             // Фиксируем фактические ширины вкладки — при закрытии окна они сохранятся
             // в настройки (переживают закрытие программы).
             CaptureColumnWidths(grid, tabKey);
+            // Диагностика (issue #75, этап 0): итоговые фактические ширины вкладки после
+            // перетаскивания — под гейтом CM_RAC + CM_ON (выключен по умолчанию).
+            Log.Info(LogCategory.Rac,
+                $"CM_COLUMNS: итоговые ширины вкладки {tabKey}: " +
+                string.Join(", ", grid.Columns.Select(c => Math.Round(c.ActualWidth, 0))) + ".");
             _resizingGrid = null;
             _resizingHeader = null;
             _resizingColumnIndex = -1;

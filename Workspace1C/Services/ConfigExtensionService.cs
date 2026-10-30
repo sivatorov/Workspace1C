@@ -117,6 +117,29 @@ public static class ConfigExtensionService
                text.IndexOf("command line options", StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
+    /// <summary>
+    /// Признак отказа конфигуратора по причине сбоя аутентификации (issue #87): база без
+    /// собственных учётных данных при незаданной авторизации запуска — конфигуратор падает
+    /// с «The infobase user is not authenticated». Чистая функция — для юнит-тестов
+    /// и автоматического fallback'а на ibcmd-ветку.
+    /// </summary>
+    public static bool IsAuthenticationError(DesignerCommandResult result)
+    {
+        if (result is null || result.Success || result.ExitCode == 0)
+            return false;
+        var text = (result.Error ?? string.Empty) + "\n" + (result.Log ?? string.Empty);
+        return text.IndexOf("infobase user is not authenticated", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    /// <summary>
+    /// Нужен ли автоматический переход на ibcmd-ветку после отказа конфигуратора (issue #87):
+    /// либо конфигуратор не принял параметры командной строки, либо произошёл сбой
+    /// аутентификации пользователя ИБ. Чистая функция — для юнит-тестов и fallback'а в
+    /// <see cref="Workspace1C.ViewModels.ExtensionsViewModel"/>.
+    /// </summary>
+    public static bool ShouldFallbackToIbcmd(DesignerCommandResult result)
+        => IsCommandLineOptionsError(result) || IsAuthenticationError(result);
+
     public static async Task<DesignerCommandResult> DumpAsync(Infobase infobase, string cfePath, string extensionName,
         CancellationToken ct = default)
     {

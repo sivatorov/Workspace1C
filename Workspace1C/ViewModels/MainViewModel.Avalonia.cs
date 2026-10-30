@@ -2529,8 +2529,42 @@ public partial class MainViewModel : ViewModelBase
 
     private void SaveSettingsSilently()
     {
-        try { _repository.SaveSettings(_settings); }
+        try
+        {
+            // issue #71 (запоминание размеров окон настроек): размеры окон «Настройки»
+            // и «Настройка информационной базы» окна пишут напрямую в файл настроек
+            // (репозиторий) — кэш главного VM их не видит. Подхватываем сохранённые
+            // значения в кэш, чтобы очередное сохранение кэша не затирало запомненные
+            // пользователем размеры (единый источник — файл настроек).
+            SyncSettingsWindowSizesFromStore();
+            _repository.SaveSettings(_settings);
+        }
         catch (Exception ex) { _logger.Error("Не удалось сохранить настройки", ex); }
+    }
+
+    /// <summary>
+    /// Синхронизирует сохранённые размеры окон настроек из файла в кэш
+    /// <see cref="_settings"/> (issue #71): окна пишут размеры через репозиторий
+    /// (своего кэша MainViewModel у них нет), а сохранение кэша целиком иначе
+    /// возвращало бы старые (стартовые/нулевые) значения.
+    /// </summary>
+    private void SyncSettingsWindowSizesFromStore()
+    {
+        try
+        {
+            var stored = _repository.LoadSettings();
+            if (stored is null)
+                return;
+            _settings.SettingsWindowWidth = stored.SettingsWindowWidth;
+            _settings.SettingsWindowHeight = stored.SettingsWindowHeight;
+            _settings.ConnectionSettingsWindowWidth = stored.ConnectionSettingsWindowWidth;
+            _settings.ConnectionSettingsWindowHeight = stored.ConnectionSettingsWindowHeight;
+        }
+        catch (Exception)
+        {
+            // Размеры окон не критичны для сохранения остальных настроек: сбой чтения
+            // файла не должен ронять сохранение.
+        }
     }
 }
 #endif

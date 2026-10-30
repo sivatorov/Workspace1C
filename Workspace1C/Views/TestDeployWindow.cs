@@ -54,6 +54,12 @@ public class TestDeployWindow : Window
     private readonly ListBox _logList;
     private readonly Button _runButton;
     private readonly Button _cancelButton;
+    // Панель «Данные для выгрузки через ibcmd» (issue #79).
+    private readonly StackPanel _ibcmdPanel;
+    private readonly CheckBox _useInfobaseAuthCheck;
+    private readonly TextBox _ibcmdUserBox;
+    private readonly PasswordBox _ibcmdPwdBox;
+    private readonly Button _fillCredentialsButton;
 
     private bool _busy;
 
@@ -263,8 +269,48 @@ public class TestDeployWindow : Window
             SelectedIndex = _vm.EngineIndex,
             Margin = new Thickness(0, 2, 0, 10)
         };
-        _engineCombo.SelectionChanged += (_, _) => _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+        _engineCombo.SelectionChanged += (_, _) =>
+        {
+            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+            UpdateIbcmdPanel();
+        };
         panel.Children.Add(_engineCombo);
+
+        // --- Данные для выгрузки через ibcmd (issue #79, 7OH: «То есть я должен закрыть
+        // окно со всеми введёнными данными и пойти найти где это вводится?», «А зачем мне
+        // отдельно вводить, если все данные вот они — уже введены выше?») ---
+        _ibcmdPanel = new StackPanel();
+        _ibcmdPanel.Children.Add(MakeLabel("TestDeploy.IbcmdCredentials"));
+        _useInfobaseAuthCheck = MakeCheckBox("TestDeploy.UseInfobaseAuth", _vm.UseInfobaseAuth);
+        _useInfobaseAuthCheck.Checked += (_, _) => { _vm.UseInfobaseAuth = true; UpdateIbcmdPanel(); };
+        _useInfobaseAuthCheck.Unchecked += (_, _) => { _vm.UseInfobaseAuth = false; UpdateIbcmdPanel(); };
+        _ibcmdPanel.Children.Add(_useInfobaseAuthCheck);
+
+        _ibcmdPanel.Children.Add(MakeLabel("TestDeploy.CredentialsUser"));
+        _ibcmdUserBox = new TextBox { Text = _vm.User, Margin = new Thickness(0, 2, 0, 8) };
+        _ibcmdUserBox.TextChanged += (_, _) => _vm.User = _ibcmdUserBox.Text;
+        _ibcmdPanel.Children.Add(_ibcmdUserBox);
+
+        _ibcmdPanel.Children.Add(MakeLabel("TestDeploy.CredentialsPassword"));
+        _ibcmdPwdBox = new PasswordBox { Margin = new Thickness(0, 2, 0, 8) };
+        _ibcmdPwdBox.PasswordChanged += (_, _) => _vm.Password = _ibcmdPwdBox.Password;
+        _ibcmdPanel.Children.Add(_ibcmdPwdBox);
+
+        _fillCredentialsButton = new Button
+        {
+            Content = LocalizationManager.T("TestDeploy.FillFromBase"),
+            Height = 32,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        _fillCredentialsButton.SetResourceReference(StyleProperty, "SecondaryButton");
+        _fillCredentialsButton.Click += (_, _) =>
+        {
+            _vm.AutofillCredentialFromSource();
+            _ibcmdUserBox.Text = _vm.User;
+            _ibcmdPwdBox.Password = _vm.Password;
+        };
+        _ibcmdPanel.Children.Add(_fillCredentialsButton);
+        panel.Children.Add(_ibcmdPanel);
 
         // --- Отключаемые регламенты ---
         _disableJobsCheck = MakeCheckBox("TestDeploy.DisableJobs", _vm.DisableScheduledJobs);
@@ -377,6 +423,28 @@ public class TestDeployWindow : Window
             IsCancel = true
         };
         _cancelButton.Click += (_, _) => DialogResult = false;
+        // issue #79 (7OH: «Можно внизу кнопку добавить, которая откроет окно нужное
+        // прямо тут?»): учётные данные выгрузки и общая авторизация — без выхода из мастера.
+        var ibcmdCredentialsButton = new Button
+        {
+            Content = LocalizationManager.T("TestDeploy.OpenCredentialsWindow"),
+            Width = 185,
+            Margin = new Thickness(0, 0, 8, 0),
+            ToolTip = LocalizationManager.T("TestDeploy.OpenCredentialsWindowHint")
+        };
+        ibcmdCredentialsButton.SetResourceReference(StyleProperty, "SecondaryButton");
+        ibcmdCredentialsButton.Click += (_, _) => OpenBaseProperties();
+        buttons.Children.Add(ibcmdCredentialsButton);
+        var commonAuthButton = new Button
+        {
+            Content = LocalizationManager.T("TestDeploy.OpenCommonAuth"),
+            Width = 175,
+            Margin = new Thickness(0, 0, 8, 0),
+            ToolTip = LocalizationManager.T("TestDeploy.OpenCommonAuthHint")
+        };
+        commonAuthButton.SetResourceReference(StyleProperty, "SecondaryButton");
+        commonAuthButton.Click += (_, _) => OpenCommonAuthSettings();
+        buttons.Children.Add(commonAuthButton);
         buttons.Children.Add(_runButton);
         buttons.Children.Add(_cancelButton);
         grid.Children.Add(buttons);
@@ -396,6 +464,21 @@ public class TestDeployWindow : Window
         Content = grid;
         UpdateModePanels();
         UpdateScheduleVisibility();
+        UpdateIbcmdPanel();
+    }
+
+    /// <summary>
+    /// Показывает панель «Данные для выгрузки через ibcmd» только для движка ibcmd
+    /// (issue #79); поля логина/пароля активны только при выключенной авторизации ИБ.
+    /// </summary>
+    private void UpdateIbcmdPanel()
+    {
+        var visible = _engineCombo.SelectedIndex == 1;
+        _ibcmdPanel.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        var explicitAuth = !_vm.UseInfobaseAuth;
+        _ibcmdUserBox.IsEnabled = explicitAuth;
+        _ibcmdPwdBox.IsEnabled = explicitAuth;
+        _fillCredentialsButton.IsEnabled = explicitAuth;
     }
 
     private readonly TextBlock _previewText;
@@ -591,6 +674,19 @@ public class TestDeployWindow : Window
             return;
         var dialog = new ConnectionSettingsWindow(ib, _groups) { Owner = this };
         dialog.ShowDialog();
+    }
+
+    /// <summary>
+    /// Открывает настройки приложения — раздел «Общая авторизация» (issue #79,
+    /// 7OH: «пойти найти где это вводится?»), не закрывая мастер.
+    /// </summary>
+    private void OpenCommonAuthSettings()
+    {
+        if (Owner is MainWindow main && main.DataContext is MainViewModel mainVm)
+        {
+            var dialog = new SettingsWindow(mainVm) { Owner = this };
+            dialog.ShowDialog();
+        }
     }
 
     /// <summary>Запускает Конфигуратор для исходной базы (issue #79).</summary>

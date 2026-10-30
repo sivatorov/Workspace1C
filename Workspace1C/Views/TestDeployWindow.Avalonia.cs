@@ -60,6 +60,12 @@ public class TestDeployWindow : ModalWindowBase
     private readonly ListBox _logList = new() { Height = 140 };
     private readonly Button _runButton = new();
     private readonly Button _closeButton = new();
+    // Панель «Данные для выгрузки через ibcmd» (issue #79).
+    private readonly StackPanel _ibcmdPanel = new() { Spacing = 4 };
+    private readonly CheckBox _useInfobaseAuthCheck = new() { IsChecked = true };
+    private readonly TextBox _ibcmdUserBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+    private readonly PasswordBox _ibcmdPwdBox = new PasswordBox().Styled(ControlThemes.ModernPasswordBox);
+    private readonly Button _fillCredentialsButton = new();
 
     private bool _busy;
 
@@ -103,6 +109,7 @@ public class TestDeployWindow : ModalWindowBase
             _dbNameBox.Text = _vm.DbName;
         ApplyModePanels();
         ApplyScheduleState();
+        ApplyIbcmdPanel();
     }
 
     private Control BuildRoot()
@@ -214,8 +221,43 @@ public class TestDeployWindow : ModalWindowBase
             new TestDeployEngineOption("Ibcmd", T("TestDeploy.EngineIbcmd"))
         };
         _engineCombo.SelectedIndex = _vm.EngineIndex;
-        _engineCombo.SelectionChanged += (_, _) => _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+        _engineCombo.SelectionChanged += (_, _) =>
+        {
+            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+            ApplyIbcmdPanel();
+        };
         fields.Children.Add(Field(T("TestDeploy.Engine"), _engineCombo));
+
+        // --- Данные для выгрузки через ibcmd (issue #79) ---
+        var ibcmdTitle = new TextBlock { Text = T("TestDeploy.IbcmdCredentials"), FontWeight = FontWeight.SemiBold };
+        _ibcmdPanel.Children.Add(ibcmdTitle);
+        _useInfobaseAuthCheck.Content = T("TestDeploy.UseInfobaseAuth");
+        _useInfobaseAuthCheck.IsChecked = _vm.UseInfobaseAuth;
+        _useInfobaseAuthCheck.IsCheckedChanged += (_, _) =>
+        {
+            _vm.UseInfobaseAuth = _useInfobaseAuthCheck.IsChecked == true;
+            ApplyIbcmdPanel();
+        };
+        _ibcmdPanel.Children.Add(_useInfobaseAuthCheck);
+
+        _ibcmdUserBox.Text = _vm.User;
+        _ibcmdUserBox.TextChanged += (_, _) => _vm.User = _ibcmdUserBox.Text ?? string.Empty;
+        _ibcmdPanel.Children.Add(Field(T("TestDeploy.CredentialsUser"), _ibcmdUserBox));
+
+        _ibcmdPwdBox.PasswordChanged += (_, _) => _vm.Password = _ibcmdPwdBox.Password ?? string.Empty;
+        _ibcmdPanel.Children.Add(Field(T("TestDeploy.CredentialsPassword"), _ibcmdPwdBox));
+
+        _fillCredentialsButton.Content = T("TestDeploy.FillFromBase");
+        _fillCredentialsButton.Height = 32;
+        _fillCredentialsButton.Styled(ControlThemes.SecondaryButton);
+        _fillCredentialsButton.Click += (_, _) =>
+        {
+            _vm.AutofillCredentialFromSource();
+            _ibcmdUserBox.Text = _vm.User;
+            _ibcmdPwdBox.Password = _vm.Password;
+        };
+        _ibcmdPanel.Children.Add(Wrap(_fillCredentialsButton));
+        fields.Children.Add(_ibcmdPanel);
 
         // --- Опции ---
         _disableJobsCheck.Content = T("TestDeploy.DisableJobs");
@@ -306,6 +348,18 @@ public class TestDeployWindow : ModalWindowBase
         _closeButton.Width = 110;
         _closeButton.Styled(ControlThemes.SecondaryButton);
         _closeButton.Click += (_, _) => Close();
+        // issue #79 (7OH: «Можно внизу кнопку добавить, которая откроет окно нужное
+        // прямо тут?»): учётные данные выгрузки и общая авторизация — без выхода из мастера.
+        var ibcmdCredentialsButton = new Button { Content = T("TestDeploy.OpenCredentialsWindow"), Width = 185, Height = 32 };
+        ibcmdCredentialsButton.Styled(ControlThemes.SecondaryButton);
+        ToolTip.SetTip(ibcmdCredentialsButton, T("TestDeploy.OpenCredentialsWindowHint"));
+        ibcmdCredentialsButton.Click += (_, _) => OpenBaseProperties();
+        buttons.Children.Add(ibcmdCredentialsButton);
+        var commonAuthButton = new Button { Content = T("TestDeploy.OpenCommonAuth"), Width = 175, Height = 32 };
+        commonAuthButton.Styled(ControlThemes.SecondaryButton);
+        ToolTip.SetTip(commonAuthButton, T("TestDeploy.OpenCommonAuthHint"));
+        commonAuthButton.Click += (_, _) => OpenCommonAuthSettings();
+        buttons.Children.Add(commonAuthButton);
         buttons.Children.Add(_runButton);
         buttons.Children.Add(_closeButton);
         Grid.SetRow(buttons, 3);
@@ -333,6 +387,33 @@ public class TestDeployWindow : ModalWindowBase
         _scheduleTimeBox.IsEnabled = _vm.UseSchedule;
         foreach (var check in _dayChecks)
             check.IsEnabled = _vm.UseSchedule;
+    }
+
+    /// <summary>
+    /// Показывает панель «Данные для выгрузки через ibcmd» только для движка ibcmd
+    /// (issue #79); поля логина/пароля активны только при выключенной авторизации ИБ.
+    /// </summary>
+    private void ApplyIbcmdPanel()
+    {
+        var visible = _engineCombo.SelectedIndex == 1;
+        _ibcmdPanel.IsVisible = visible;
+        var explicitAuth = !_vm.UseInfobaseAuth;
+        _ibcmdUserBox.IsEnabled = explicitAuth;
+        _ibcmdPwdBox.IsEnabled = explicitAuth;
+        _fillCredentialsButton.IsEnabled = explicitAuth;
+    }
+
+    /// <summary>
+    /// Открывает настройки приложения — раздел «Общая авторизация» (issue #79,
+    /// 7OH: «пойти найти где это вводится?»), не закрывая мастер.
+    /// </summary>
+    private void OpenCommonAuthSettings()
+    {
+        if (Owner is MainWindow main && main.DataContext is MainViewModel mainVm)
+        {
+            var dialog = new SettingsWindow(mainVm);
+            dialog.ShowDialogSync(this);
+        }
     }
 
     private void SetScheduleDay(int index, bool value)

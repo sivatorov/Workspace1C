@@ -168,6 +168,16 @@ public class TestDeployScenario
     /// </summary>
     public string DbPassword { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Учётные данные пользователя ИБ для выгрузки .dt (issue #79, последний комментарий
+    /// 7OH: «А зачем мне отдельно вводить, если все данные вот они — уже введены выше?»).
+    /// При <see cref="BackupCredential.UseInfobaseAuth"/> (по умолчанию) используется
+    /// авторизация базы/общая авторизация приложения (как раньше); иначе — явные
+    /// логин/пароль из мастера. Пароль хранится в JSON сценария (как DbPassword и пароли
+    /// сценариев резервирования); в журнал никогда не выводится.
+    /// </summary>
+    public BackupCredential? Credential { get; set; }
+
     /// <summary>Создавать базу данных на сервере СУБД (CrSQLDB="Y").</summary>
     public bool CreateSqlDatabase { get; set; } = true;
 

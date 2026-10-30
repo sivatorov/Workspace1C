@@ -11,6 +11,74 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.5] — 2026-10-30
+
+### Исправлено / Добавлено
+
+- **Загрузка расширений конфигурации учитывает «общую авторизацию» приложения
+  (issue #87, Windows и Linux).** Пакетные операции конфигуратора (установка/выгрузка
+  расширений) теперь резолвят учётные данные через полный резолвер с общими
+  авторизациями: [`OneCLauncher.BuildAuthArgument`](Workspace1C/Services/OneCLauncher.Arguments.Shared.cs)
+  передаёт `CommonConfiguratorAuthorization`/`CommonAuthorization` в
+  `InfobaseAuthResolver.Resolve` — база без собственного логина/пароля больше не
+  падает с «The infobase user is not authenticated»; при ошибке аутентификации
+  конфигуратора добавлен автоматический fallback на ibcmd-ветку
+  ([`ConfigExtensionService.IsAuthenticationError`](Workspace1C/Services/ConfigExtensionService.cs),
+  [`ShouldFallbackToIbcmd`](Workspace1C/Services/ConfigExtensionService.cs)).
+
+- **Утилита `ring` во вкладке «Лицензии» запускается, если установлена как командный
+  файл (issue #83, Windows и Linux).** В [`RingLicenseService.ToLaunchCommand`](Workspace1C/Services/RingLicenseService.cs)
+  найденный путь разлагается на «исполняемый вызов»: `.cmd`/`.bat` запускаются через
+  `cmd.exe /c` (как в командной строке пользователя), `.exe`/нативные — напрямую по
+  полному пути; улучшен текст подсказки `BuildUnavailableMessage` (утилита может быть
+  в PATH, в т.ч. как командный файл).
+
+- **Окна «Настройки» и «Настройка информационной базы» запоминают размеры
+  (issue #71, Windows и Linux).** Общий хелпер [`WindowSizeStore`](Workspace1C/Services/WindowSizeStore.cs)
+  + 4 новых поля в [`AppSettings`](Workspace1C/Models/AppSettings.cs): размеры
+  сохраняются при закрытии и восстанавливаются при открытии с зажимом к
+  `MinWidth`/`MinHeight` (WPF — [`SettingsWindow.xaml.cs`](Workspace1C/Views/SettingsWindow.xaml.cs),
+  [`ConnectionSettingsWindow.xaml.cs`](Workspace1C/Views/ConnectionSettingsWindow.xaml.cs);
+  Avalonia — [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs),
+  [`ConnectionSettingsWindow.Avalonia.cs`](Workspace1C/Views/ConnectionSettingsWindow.Avalonia.cs)).
+
+- **Мастер «Развернуть тестовую копию»: автоподстановка учётных данных и кнопки
+  перехода (issue #79, Windows и Linux).** В мастер добавлен блок «Данные для выгрузки
+  через ibcmd» ([`TestDeployWindow.cs`](Workspace1C/Views/TestDeployWindow.cs),
+  [`TestDeployWindow.Avalonia.cs`](Workspace1C/Views/TestDeployWindow.Avalonia.cs)):
+  автоподстановка логина/пароля из исходной базы (`AutofillCredentialFromSource`),
+  кнопки «Учётные данные для ibcmd…» (свойства исходной базы) и «Общая авторизация…»
+  без закрытия мастера; сценарий хранит `Credential`
+  ([`TestDeployScenario`](Workspace1C/Models/TestDeployScenario.cs)) и передаёт его в
+  выгрузку ([`TestDeployService`](Workspace1C/Services/TestDeployService.cs)); при
+  ошибке выгрузки добавлена подсказка, где задать учётные данные.
+
+- **Окно «Серверы 1С»: усилен механизм перетаскивания колонок (issue #75, Windows
+  и Linux).** Второй пояс перехвата на презентере заголовков
+  (`DataGridColumnHeadersPresenter`), стабильный старт перетаскивания (координаты от
+  грида, гашение штатного ресайза через `Thumb`/`e.Handled`), добавлена диагностика
+  ([`ServerMonitorWindow.xaml.cs`](Workspace1C/Views/ServerMonitorWindow.xaml.cs),
+  [`ServerMonitorWindow.Avalonia.cs`](Workspace1C/Views/ServerMonitorWindow.Avalonia.cs)).
+
+### Тесты
+
+- [`CommonAuthLaunchArgsTests.cs`](Workspace1C.Tests/CommonAuthLaunchArgsTests.cs):
+  `BuildAuthArgument` с общей авторизацией Конфигуратора и приоритет собственной — #87;
+- [`ConfigExtensionServiceTests.cs`](Workspace1C.Tests/ConfigExtensionServiceTests.cs):
+  `IsAuthenticationError` и `ShouldFallbackToIbcmd` — #87;
+- [`Issue83LicenseTabTests.cs`](Workspace1C.Tests/Issue83LicenseTabTests.cs):
+  `ToLaunchCommand` для `.exe`/`.cmd`/нативных и кандидат из `where`-пути — #83;
+- [`Issue71SettingsWindowLayoutTests.cs`](Workspace1C.Tests/Issue71SettingsWindowLayoutTests.cs):
+  `WindowSizeStore` (`ApplyMin`/`IsValid`/`SaveSize`), восстановление и зажим размеров — #71;
+- [`Issue79TestDeployWindowTests.cs`](Workspace1C.Tests/Issue79TestDeployWindowTests.cs):
+  панель ibcmd, `BuildScenario` с `Credential`, `AutofillCredentialFromSource` — #79;
+- [`Issue75ServerMonitorColumnsTests.cs`](Workspace1C.Tests/Issue75ServerMonitorColumnsTests.cs):
+  event-level перехват, второй пояс, блок-семантика — #75.
+
+Итого в проекте **более 5 000 юнит-тестов**; Linux-сборка (Avalonia) также зелёная.
+
+---
+
 ## [1.0.1.4] — 2026-10-30
 
 ### Исправлено / Добавлено

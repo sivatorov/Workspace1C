@@ -43,6 +43,38 @@ public sealed class ConfigExtensionServiceTests
     }
 
     [Fact]
+    public void IsAuthenticationError_DetectsInfobaseUserNotAuthenticated()
+    {
+        // issue #87: база без собственных учётных данных при незаданной авторизации
+        // запуска — конфигуратор падает с «The infobase user is not authenticated».
+        Assert.True(ConfigExtensionService.IsAuthenticationError(
+            new DesignerCommandResult { ExitCode = 1, Error = "РД_001 3.0 (агенты): Конфигуратор завершился с кодом 1: The infobase user is not authenticated" }));
+        Assert.True(ConfigExtensionService.IsAuthenticationError(
+            new DesignerCommandResult { ExitCode = 1, Log = "… The infobase user is not authenticated …" }));
+        Assert.False(ConfigExtensionService.IsAuthenticationError(
+            new DesignerCommandResult { Success = true, ExitCode = 0 }));
+        Assert.False(ConfigExtensionService.IsAuthenticationError(
+            new DesignerCommandResult { ExitCode = 1, Error = "Error in command-line options" }));
+        Assert.False(ConfigExtensionService.IsAuthenticationError(null!));
+    }
+
+    [Fact]
+    public void ShouldFallbackToIbcmd_CoversBothFailureReasons()
+    {
+        // issue #87: переход на ibcmd-ветку нужен и при «command-line options», и при
+        // сбое аутентификации пользователя ИБ.
+        Assert.True(ConfigExtensionService.ShouldFallbackToIbcmd(
+            new DesignerCommandResult { ExitCode = 1, Error = "Error in command-line options" }));
+        Assert.True(ConfigExtensionService.ShouldFallbackToIbcmd(
+            new DesignerCommandResult { ExitCode = 1, Error = "The infobase user is not authenticated" }));
+        Assert.False(ConfigExtensionService.ShouldFallbackToIbcmd(
+            new DesignerCommandResult { Success = true, ExitCode = 0 }));
+        Assert.False(ConfigExtensionService.ShouldFallbackToIbcmd(
+            new DesignerCommandResult { ExitCode = 1, Error = "База занята" }));
+        Assert.False(ConfigExtensionService.ShouldFallbackToIbcmd(null!));
+    }
+
+    [Fact]
     public void DumpAndDeleteArguments()
     {
         Assert.Equal("/DumpCfg\"/tmp/x.cfe\" -Extension \"Ext\"", ConfigExtensionService.BuildDumpArguments("/tmp/x.cfe", "Ext"));

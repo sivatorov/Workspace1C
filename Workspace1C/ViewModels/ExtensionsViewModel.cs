@@ -243,9 +243,10 @@ public sealed class ExtensionsViewModel : ViewModelBase
 
                 // Issue #87 («Загрузка расширения конфигурации в клиент-серверную базу»):
                 // если конфигуратор не принял параметры («Error in command-line options»,
-                // код 1), а ibcmd-ветка не выбрана — автоматически повторяем установку
-                // утилитой ibcmd (config load --extension + config apply --force).
-                if (!UseIbcmd && !result.Success && ConfigExtensionService.IsCommandLineOptionsError(result))
+                // код 1) или не смог аутентифицировать пользователя («The infobase user is
+                // not authenticated»), а ibcmd-ветка не выбрана — автоматически повторяем
+                // установку утилитой ibcmd (config load --extension + config apply --force).
+                if (!UseIbcmd && !result.Success && ConfigExtensionService.ShouldFallbackToIbcmd(result))
                 {
                     AppendLog(LocalizationManager.T("Extensions.LogDesignerFailedTryIbcmd"));
                     result = await InstallViaIbcmdAsync(row.Infobase, token);

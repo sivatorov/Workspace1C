@@ -89,6 +89,12 @@ namespace Workspace1C
                     Height = MinHeight;
             };
             _viewModel = viewModel;
+            // issue #71 (последний комментарий RizvanShikhammatov «нельзя ли запоминать
+            // размеры этого окна?»): восстановление сохранённых размеров окна (до показа,
+            // чтобы не «мигало») и сохранение фактические размеров при закрытии. Размер
+            // зажимается к MinWidth/MinHeight; 0 в настройках — стартовый размер из XAML.
+            RestoreSavedWindowSize();
+            Closed += (_, _) => SaveWindowSize();
             // Шаблон имени COM-коннектора 1С (issue #175): показываем текущее значение.
             if (ComConnectorNameTemplateBox != null)
                 ComConnectorNameTemplateBox.Text = viewModel.ComConnectorNameTemplate;
@@ -227,6 +233,42 @@ namespace Workspace1C
             // при клике в другое окно/приложение открытый тултип исчезает, а не «висит» поверх.
             // Application.Deactivated покрывает все окна приложения целиком.
             Deactivated += (_, _) => ToolTipCloser.CloseAll();
+        }
+
+        // ---- Запоминание размеров окна «Настройки» (issue #71) ----
+
+        /// <summary>
+        /// Восстанавливает сохранённые размеры окна (issue #71): 0 в настройках —
+        /// «не задано», остаётся стартовый размер из XAML; иначе размер зажимается
+        /// к MinWidth/MinHeight. Читается из настроек через репозиторий: WPF-версия
+        /// MainViewModel не ведёт кэш AppSettings-полей размеров окон.
+        /// </summary>
+        private void RestoreSavedWindowSize()
+        {
+            var settings = AppServices.GetRequiredService<IInfobaseRepository>().LoadSettings();
+            var width = WindowSizeStore.ApplyMin(settings.SettingsWindowWidth, MinWidth);
+            var height = WindowSizeStore.ApplyMin(settings.SettingsWindowHeight, MinHeight);
+            if (width > 0) Width = width;
+            if (height > 0) Height = height;
+        }
+
+        /// <summary>
+        /// Сохраняет фактические размеры окна при закрытии (issue #71): только в обычном
+        /// состоянии (не свёрнуто/развёрнуто) и не ниже минимумов. Пишется через репозиторий
+        /// (мутация LoadSettings → SaveSettings): сохранение <see cref="MainViewModel.SaveSettings"/>
+        /// не перезаписывает эти поля (свежезагруженный экземпляр их не трогает).
+        /// </summary>
+        private void SaveWindowSize()
+        {
+            if (WindowState != WindowState.Normal)
+                return;
+            if (!(ActualWidth >= MinWidth && ActualHeight >= MinHeight))
+                return;
+            var repository = AppServices.GetRequiredService<IInfobaseRepository>();
+            var settings = repository.LoadSettings();
+            WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.Settings,
+                ActualWidth, ActualHeight);
+            repository.SaveSettings(settings);
         }
 
         // ---- Общая авторизация для всех ИБ (issue #57) ----

@@ -339,6 +339,50 @@ public sealed class Issue75ServerMonitorColumnsTests
     }
 
     [Fact]
+    public void Wpf_ColumnDrag_ReinforcedInterception_SecondBeltAndRobustStart()
+    {
+        // issue #75 (1.0.1.5, этап 1 — «гарантированное перехватывание штатного ресайза»):
+        // у пользователя перехват на гриде (1.0.1.4) всё равно не срабатывал («поведение
+        // всё то же»), поэтому перехват усилен: второй пояс на презентере заголовков,
+        // форсированный сброс захвата штатного Thumb, гашение штатного ресайза при
+        // движении по ручке, расширенная зона границы, координаты от грида и
+        // диагностика под гейтом CM_RAC.
+        var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.xaml.cs"));
+
+        // Второй пояс перехвата — тот же обработчик на презентере заголовков.
+        Assert.True(source.Contains("_dragInterceptedPresenters.Add(presenter)", StringComparison.Ordinal),
+            "WPF: должен быть второй пояс перехвата на презентере заголовков (issue #75).");
+        Assert.True(source.Contains("presenter.PreviewMouseLeftButtonDown += (_, e) => OnColumnPreviewMouseLeftButtonDown(grid, tabKey, e)", StringComparison.Ordinal),
+            "WPF: презентер заголовков должен получать тот же обработчик клика (issue #75).");
+        // Форсированный сброс возможного захвата штатного механизма перед захватом гридом.
+        Assert.True(source.Contains("grid.ReleaseMouseCapture();", StringComparison.Ordinal),
+            "WPF: перед захватом мыши должен быть сброс возможного захвата штатного Thumb (issue #75).");
+        // Гашение штатного ресайза при движении по ручке (PART_RightHeaderGripper).
+        Assert.True(source.Contains("FindAncestor<System.Windows.Controls.Primitives.Thumb>(d) is not null", StringComparison.Ordinal),
+            "WPF: движение по штатной ручке должно гаситься (e.Handled) (issue #75).");
+        // Зона границы: правые 24 px + выступ за правый край (до ActualWidth + 8).
+        Assert.True(source.Contains("x > header.ActualWidth + 8", StringComparison.Ordinal),
+            "WPF: зона границы должна допускать выступ за правый край заголовка (issue #75).");
+        // Клик по штатной ручке (Thumb) — гарантированная граница без координатной зоны.
+        Assert.True(source.Contains("FindAncestor<System.Windows.Controls.Primitives.Thumb>(source) is not null", StringComparison.Ordinal),
+            "WPF: клик по Thumb-ручке должен считаться границей без проверки координат (issue #75).");
+        // Координаты движения — от грида (заголовок во время драга может пересоздаваться).
+        Assert.True(source.Contains("UpdateColumnDrag(grid, e.GetPosition(grid).X)", StringComparison.Ordinal),
+            "WPF: движение должно считать координаты от грида, а не заголовка (issue #75).");
+        // Диагностика старта и итогов под гейтом CM_RAC (выключена по умолчанию).
+        Assert.True(source.Contains("CM_COLUMNS: старт перетаскивания границы колонки", StringComparison.Ordinal),
+            "WPF: должна быть диагностика старта перетаскивания (issue #75, этап 0).");
+        Assert.True(source.Contains("CM_COLUMNS: итоговые ширины вкладки", StringComparison.Ordinal),
+            "WPF: должна быть диагностика итоговых ширин (issue #75, этап 0).");
+        // Оба пояса дедуплицируются наборами — повторная материализация заголовков
+        // (переключение вкладок) не плодит обработчики.
+        Assert.True(source.Contains("_dragInterceptedGrids.Add(grid)", StringComparison.Ordinal),
+            "WPF: дедупликация подписки грида набором (issue #75).");
+        Assert.True(source.Contains("_dragInterceptedPresenters.Add(presenter)", StringComparison.Ordinal),
+            "WPF: дедупликация подписки презентера набором (issue #75).");
+    }
+
+    [Fact]
     public void Avalonia_DragHandlesCaptureLoss_AndUsesSharedMath()
     {
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.Avalonia.cs"));

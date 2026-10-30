@@ -473,6 +473,25 @@ public class AppSettings
     /// <summary>Сохранённая высота окна приложения (0 — по умолчанию).</summary>
     public double WindowHeight { get; set; }
 
+    /// <summary>
+    /// Сохранённая ширина окна «Настройки» (issue #71, последний комментарий
+    /// RizvanShikhammatov «нельзя ли запоминать размеры этого окна?»; 0 — не задано:
+    /// при открытии используется стартовый размер из разметки).
+    /// </summary>
+    public double SettingsWindowWidth { get; set; }
+
+    /// <summary>Сохранённая высота окна «Настройки» (0 — не задано).</summary>
+    public double SettingsWindowHeight { get; set; }
+
+    /// <summary>
+    /// Сохранённая ширина окна «Настройка информационной базы» (issue #71;
+    /// 0 — не задано).
+    /// </summary>
+    public double ConnectionSettingsWindowWidth { get; set; }
+
+    /// <summary>Сохранённая высота окна «Настройка информационной базы» (0 — не задано).</summary>
+    public double ConnectionSettingsWindowHeight { get; set; }
+
     /// <summary>Сохранённая позиция окна по горизонтали (0 — по центру экрана).</summary>
     public double WindowLeft { get; set; }
 

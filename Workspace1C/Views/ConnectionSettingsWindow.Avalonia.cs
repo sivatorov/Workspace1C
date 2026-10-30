@@ -96,6 +96,11 @@ namespace Workspace1C
             _updatesService = AppServices.GetRequiredService<IOneCUpdatesService>();
             _logger = AppServices.GetRequiredService<IAppLogger>();
 
+            // issue #71 (последний комментарий RizvanShikhammatov «нельзя ли запоминать
+            // размеры этого окна?»): восстановление сохранённых размеров окна (до показа);
+            // сохранение — при закрытии (OnWindowClosed). Зажим к MinWidth/MinHeight — выше.
+            RestoreSavedWindowSize();
+
             _viewModel = new ConnectionSettingsViewModel(groups);
             _viewModel.SetInstalledPlatformVersions(installedPlatformVersions ?? new List<string>());
             _viewModel.SetAvailableServers(availableServers);
@@ -177,8 +182,44 @@ namespace Workspace1C
         /// <summary>Отписка от событий при закрытии окна — не держать ссылки (issue #36).</summary>
         private void OnWindowClosed(object? sender, EventArgs e)
         {
+            // issue #71: запоминание размера окна «Настройка информационной базы».
+            SaveWindowSize();
             _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
             Closed -= OnWindowClosed;
+        }
+
+        // ---- Запоминание размеров окна «Настройка информационной базы» (issue #71) ----
+
+        /// <summary>
+        /// Восстанавливает сохранённые размеры окна: 0 в настройках — стартовый размер
+        /// из разметки; иначе зажим к MinWidth/MinHeight. Чтение через репозиторий
+        /// настроек (окно не имеет MainViewModel).
+        /// </summary>
+        private void RestoreSavedWindowSize()
+        {
+            var settings = _linkRepository.LoadSettings();
+            var width = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth);
+            var height = WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight);
+            if (width > 0) Width = width;
+            if (height > 0) Height = height;
+        }
+
+        /// <summary>
+        /// Сохраняет фактические размеры окна при закрытии (issue #71): только в обычном
+        /// состоянии окна и не ниже минимумов. Пишется через репозиторий (мутация
+        /// LoadSettings → SaveSettings); чтобы очередь сохранений кэша главного VM не
+        /// затирала эти поля, кэш синхронизируется в MainViewModel.SaveSettingsSilently.
+        /// </summary>
+        private void SaveWindowSize()
+        {
+            if (WindowState != Avalonia.Controls.WindowState.Normal)
+                return;
+            if (!(Bounds.Width >= MinWidth && Bounds.Height >= MinHeight))
+                return;
+            var settings = _linkRepository.LoadSettings();
+            WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.ConnectionSettings,
+                Bounds.Width, Bounds.Height);
+            _linkRepository.SaveSettings(settings);
         }
 
         /// <summary>Возвращает отредактированную информационную базу.</summary>

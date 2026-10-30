@@ -419,14 +419,20 @@ public static partial class OneCLauncher
         return arg;
     }
 
-    /// <summary>Аргументы /N /P при режиме Credentials.</summary>
+    /// <summary>
+    /// Аргументы /N /P при режиме Credentials.
+    /// Пакетные операции конфигуратора (выгрузка .dt/.cf, установка расширений) выполняются
+    /// в режиме «Конфигуратор»: единый резолвинг учётных данных (issue #236, #57) сам возьмёт
+    /// ConfiguratorAuth, если она задана, иначе авторизацию информационной базы, а при
+    /// незаданной — общую авторизацию «Конфигуратора» (CommonConfiguratorAuthorization),
+    /// затем legacy <see cref="CommonAuthorization"/> (issue #87: «The infobase user is not
+    /// authenticated», когда логин/пароль заданы только в общей авторизации приложения).
+    /// </summary>
     public static string BuildAuthArgument(Infobase infobase)
     {
-        // Пакетные операции конфигуратора (выгрузка .dt/.cf) выполняются в режиме
-        // «Конфигуратор»: единый резолвинг учётных данных (issue #236) сам возьмёт
-        // ConfiguratorAuth, если она задана, иначе авторизацию информационной базы.
         InfobaseAuthResolver.Resolve(infobase, OneCLaunchMode.Configurator,
-            out var authMode, out var authUser, out var authPassword);
+            out var authMode, out var authUser, out var authPassword,
+            CommonEnterpriseAuthorization, CommonConfiguratorAuthorization, CommonAuthorization);
         if (authMode != AuthenticationMode.Credentials || string.IsNullOrWhiteSpace(authUser))
             return "";
         return BuildCredentialsArg(authUser, authPassword);

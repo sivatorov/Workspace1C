@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.4-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.5-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.4**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.5**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -201,6 +201,33 @@
 
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
+
+- **Окна «Настройки» и «Настройка информационной базы» запоминают размеры (1.0.1.5,
+  issue #71, Windows и Linux)** — при закрытии сохраняются фактические размеры окон,
+  при открытии они восстанавливаются (с зажимом к минимуму): общий хелпер
+  `WindowSizeStore` + поля `AppSettings`, одинаково в WPF и Avalonia
+  (покрыто `Issue71SettingsWindowLayoutTests`).
+- **«Серверы 1С»: перетаскивание колонок усилено (1.0.1.5, issue #75, Windows и
+  Linux)** — добавлен второй пояс перехвата на презентере заголовков
+  (`DataGridColumnHeadersPresenter`), стабильный старт перетаскивания от грида
+  (координаты от грида, гашение штатного ресайза через `Thumb`/`e.Handled`) и
+  диагностика; обычный режим двигает колонки справа блоком, Ctrl — ширину двух
+  смежных (покрыто `Issue75ServerMonitorColumnsTests`).
+- **Мастер «Развернуть тестовую копию»: учётные данные для ibcmd и кнопки перехода
+  (1.0.1.5, issue #79, Windows и Linux)** — блок «Данные для выгрузки через ibcmd»
+  с автоподстановкой логина/пароля из исходной базы («Подставить из базы…») и
+  кнопками «Учётные данные для ibcmd…»/«Общая авторизация…» без закрытия мастера;
+  при ошибке выгрузки — подсказка, где задать учётные данные (покрыто
+  `Issue79TestDeployWindowTests`).
+- **Утилита `ring` во вкладке «Лицензии»: запуск командных файлов (1.0.1.5, issue #83,
+  Windows и Linux)** — если `ring` установлен как `.cmd`/`.bat` в PATH, он запускается
+  через `cmd.exe /c` (как в командной строке пользователя), `.exe`/нативные — напрямую
+  по полному пути; улучшен текст подсказки (покрыто `Issue83LicenseTabTests`).
+- **Загрузка расширений с «общей авторизацией» приложения (1.0.1.5, issue #87, Windows
+  и Linux)** — пакетный конфигуратор (установка/выгрузка `.cfe`) теперь учитывает
+  «Общую авторизацию → Конфигуратор» и legacy-общую авторизацию; при ошибке
+  аутентификации — автоматический fallback на ibcmd-ветку (покрыто
+  `CommonAuthLaunchArgsTests`, `ConfigExtensionServiceTests`).
 
 - **Анализ технологического журнала (1.0.0.86, Windows и Linux)** — в окне
   «Технологический журнал» кнопка **«Анализировать»**: разбор уже собранных логов

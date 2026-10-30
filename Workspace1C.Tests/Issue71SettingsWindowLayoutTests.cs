@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.Text.RegularExpressions;
+using Workspace1C.Models;
+using Workspace1C.Services;
 using Xunit;
 
 namespace Workspace1C.Tests;
@@ -263,5 +265,134 @@ public sealed class Issue71SettingsWindowLayoutTests
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
         Assert.Contains("ModalWindowBase.ClampWindowToMinSize(this);", code, StringComparison.Ordinal);
+    }
+
+    // ------------------------------------------------------------------
+    // Запоминание размеров окон настроек (issue #71, последний комментарий
+    // RizvanShikhammatov «нельзя ли запоминать размеры этого окна?»):
+    // 0 в AppSettings — «не задано» (стартовый размер из разметки);
+    // сохранённый размер зажимается к MinWidth/MinHeight при восстановлении.
+    // ------------------------------------------------------------------
+
+    [Fact]
+    public void AppSettings_HasSettingsWindowSizeFields()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Models", "AppSettings.cs"));
+
+        Assert.Contains("SettingsWindowWidth", code, StringComparison.Ordinal);
+        Assert.Contains("SettingsWindowHeight", code, StringComparison.Ordinal);
+        Assert.Contains("ConnectionSettingsWindowWidth", code, StringComparison.Ordinal);
+        Assert.Contains("ConnectionSettingsWindowHeight", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowSizeStore_ApplyMin_RestoresClampedAndZeroAsNotSet()
+    {
+        // 1234×800 при минимуме 960×720 восстанавливается как есть.
+        Assert.Equal(1234, WindowSizeStore.ApplyMin(1234, 960));
+        Assert.Equal(800, WindowSizeStore.ApplyMin(800, 720));
+        // Сохранённый «маленький» размер 500×500 зажимается к минимуму (как главное окно).
+        Assert.Equal(960, WindowSizeStore.ApplyMin(500, 960));
+        Assert.Equal(720, WindowSizeStore.ApplyMin(500, 720));
+        // 0 («не задано») не восстанавливается — окно откроется со стартовым размером.
+        Assert.Equal(0, WindowSizeStore.ApplyMin(0, 960));
+        Assert.Equal(0, WindowSizeStore.ApplyMin(-5, 720));
+    }
+
+    [Fact]
+    public void WindowSizeStore_IsValid_RejectsZeroNaNInfinity()
+    {
+        Assert.True(WindowSizeStore.IsValid(1));
+        Assert.True(WindowSizeStore.IsValid(1234.5));
+        Assert.False(WindowSizeStore.IsValid(0));
+        Assert.False(WindowSizeStore.IsValid(-2));
+        Assert.False(WindowSizeStore.IsValid(double.NaN));
+        Assert.False(WindowSizeStore.IsValid(double.PositiveInfinity));
+        Assert.False(WindowSizeStore.IsValid(double.NegativeInfinity));
+    }
+
+    [Fact]
+    public void WindowSizeStore_SaveSize_RoundTripsThroughAppSettings()
+    {
+        var settings = new AppSettings();
+        // «Не задано» изначально: стартовые размеры не перезаписаны.
+        Assert.Equal(0, WindowSizeStore.SavedWidth(settings, WindowSizeStore.StoredWindowKind.Settings));
+        Assert.Equal(0, WindowSizeStore.SavedHeight(settings, WindowSizeStore.StoredWindowKind.ConnectionSettings));
+
+        WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.Settings, 1234, 800);
+        Assert.Equal(1234, settings.SettingsWindowWidth);
+        Assert.Equal(800, settings.SettingsWindowHeight);
+        Assert.Equal(1234, WindowSizeStore.SavedWidth(settings, WindowSizeStore.StoredWindowKind.Settings));
+        Assert.Equal(800, WindowSizeStore.SavedHeight(settings, WindowSizeStore.StoredWindowKind.Settings));
+
+        WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.ConnectionSettings, 900, 820);
+        Assert.Equal(900, settings.ConnectionSettingsWindowWidth);
+        Assert.Equal(820, settings.ConnectionSettingsWindowHeight);
+
+        // Невалидные значения не трогают сохранённое («не задано» остаётся «не задано»).
+        WindowSizeStore.SaveSize(settings, WindowSizeStore.StoredWindowKind.Settings, double.NaN, 0);
+        Assert.Equal(1234, settings.SettingsWindowWidth);
+        Assert.Equal(800, settings.SettingsWindowHeight);
+    }
+
+    [Fact]
+    public void SettingsWindow_Wpf_RestoresAndSavesSavedSize()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml.cs"));
+
+        // Восстановление: «0 → стартовый из XAML», иначе зажим к MinWidth/MinHeight.
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.SettingsWindowWidth, MinWidth)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.SettingsWindowHeight, MinHeight)", code, StringComparison.Ordinal);
+        // Сохранение фактических размеров при закрытии (только в нормальном состоянии).
+        Assert.Contains("Closed += (_, _) => SaveWindowSize();", code, StringComparison.Ordinal);
+        Assert.Contains("WindowState != WindowState.Normal", code, StringComparison.Ordinal);
+        Assert.Contains("ActualWidth", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SettingsWindow_Avalonia_RestoresAndSavesSavedSize()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.cs"));
+
+        // Восстановление из кэша MainViewModel.Settings + зажим к минимумам.
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.SettingsWindowWidth, MinWidth)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.SettingsWindowHeight, MinHeight)", code, StringComparison.Ordinal);
+        Assert.Contains("Closed += (_, _) => SaveWindowSize();", code, StringComparison.Ordinal);
+        // Сохранение через единый механизм персистентности (PersistSettings).
+        Assert.Contains("_viewModel.PersistSettings();", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConnectionSettingsWindow_Wpf_RestoresAndSavesSavedSize()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ConnectionSettingsWindow.xaml.cs"));
+
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight)", code, StringComparison.Ordinal);
+        Assert.Contains("RestoreSavedWindowSize();", code, StringComparison.Ordinal);
+        Assert.Contains("SaveWindowSize();", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ConnectionSettingsWindow_Avalonia_RestoresAndSavesSavedSize()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ConnectionSettingsWindow.Avalonia.cs"));
+
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowWidth, MinWidth)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowSizeStore.ApplyMin(settings.ConnectionSettingsWindowHeight, MinHeight)", code, StringComparison.Ordinal);
+        Assert.Contains("RestoreSavedWindowSize();", code, StringComparison.Ordinal);
+        Assert.Contains("SaveWindowSize();", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaMainViewModel_SyncsSettingsWindowSizesFromStore()
+    {
+        // Риск (см. план #71): окно «Настройка информационной базы» пишет размеры через
+        // репозиторий, а сохранение кэша MainViewModel целиком могло бы их затирать —
+        // кэш подхватывает сохранённые размеры перед записью.
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Avalonia.cs"));
+        Assert.Contains("SyncSettingsWindowSizesFromStore();", code, StringComparison.Ordinal);
+        Assert.Contains("settings.SettingsWindowWidth = stored.SettingsWindowWidth;", code, StringComparison.Ordinal);
+        Assert.Contains("settings.ConnectionSettingsWindowWidth = stored.ConnectionSettingsWindowWidth;", code, StringComparison.Ordinal);
     }
 }
