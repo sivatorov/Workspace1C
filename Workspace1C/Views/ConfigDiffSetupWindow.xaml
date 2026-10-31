@@ -10,7 +10,6 @@
         Width="560" MinHeight="440" MaxHeight="680"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -89,7 +88,7 @@
                    Margin="0,0,0,10" Foreground="{DynamicResource TextSecondaryBrush}"/>
 
         <!-- ============ Ошибка ============ -->
-        <TextBlock x:Name="ErrorText" Foreground="#EF4444" TextWrapping="Wrap" FontSize="12"
+        <TextBlock x:Name="ErrorText" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap" FontSize="12"
                    MaxHeight="120" Visibility="Collapsed" Margin="0,0,0,10"/>
 
         <!-- ============ Кнопки ============ -->

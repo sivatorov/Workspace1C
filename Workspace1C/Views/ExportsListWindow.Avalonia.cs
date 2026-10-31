@@ -104,16 +104,22 @@ public sealed class ExportsListWindow : ModalWindowBase
         var panel = new StackPanel { Margin = new Avalonia.Thickness(4), Spacing = 2 };
         var header = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
         header.Children.Add(new TextBlock { Text = item.FileName, FontWeight = FontWeight.SemiBold });
-        header.Children.Add(new TextBlock { Text = item.SizeText, Foreground = Brushes.Gray });
-        header.Children.Add(new TextBlock { Text = item.LastWriteText, Foreground = Brushes.Gray });
+        // Вторичный текст — на кисти темы (аудит UI, п. 2.9) вместо Brushes.Gray.
+        var sizeText = new TextBlock { Text = item.SizeText };
+        ThemeBrushes.Bind(sizeText, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        header.Children.Add(sizeText);
+        var writeText = new TextBlock { Text = item.LastWriteText };
+        ThemeBrushes.Bind(writeText, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        header.Children.Add(writeText);
         panel.Children.Add(header);
-        panel.Children.Add(new TextBlock
+        var directoryText = new TextBlock
         {
             Text = item.Directory,
-            Foreground = Brushes.Gray,
             FontSize = 11,
             TextTrimming = Avalonia.Media.TextTrimming.CharacterEllipsis
-        });
+        };
+        ThemeBrushes.Bind(directoryText, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+        panel.Children.Add(directoryText);
         return panel;
     }
 

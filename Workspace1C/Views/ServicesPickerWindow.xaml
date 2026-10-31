@@ -22,14 +22,14 @@
                     Padding="16,6" Margin="0,0,8,0"
                     MinWidth="90">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}"
                     Padding="16,6" MinWidth="90">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

@@ -1,6 +1,7 @@
 <Window x:Class="Workspace1C.ScriptScenariosWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Workspace1C.Localization"
         Title="Сценарии"
         Width="720" Height="540" MinWidth="580" MinHeight="430"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13"
@@ -24,11 +25,12 @@
     </Window.Resources>
 
     <DockPanel Margin="14">
+        <!-- Футер диалога (аудит UI, пп. 3.3 и 5.4): единые MinWidth/Padding и ключи локализации. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="AddButton" Content="Добавить" Width="96" Margin="0,0,8,0" Padding="6,4" Click="Add_Click"/>
-            <Button x:Name="EditButton" Content="Изменить" Width="96" Margin="0,0,8,0" Padding="6,4" IsEnabled="False" Click="Edit_Click"/>
-            <Button x:Name="DeleteButton" Content="Удалить" Width="92" Margin="0,0,8,0" Padding="6,4" IsEnabled="False" Click="Delete_Click"/>
-            <Button Content="Закрыть" Width="90" Padding="6,4" IsCancel="True" Click="Close_Click"/>
+            <Button x:Name="AddButton" Content="{loc:Loc Common.Add}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" Click="Add_Click"/>
+            <Button x:Name="EditButton" Content="{loc:Loc Common.Edit}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Edit_Click"/>
+            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Delete_Click"/>
+            <Button Content="{loc:Loc Common.Close}" MinWidth="96" Padding="12,5" IsCancel="True" Click="Close_Click"/>
         </StackPanel>
 
         <ListBox x:Name="ScenariosList" SelectionChanged="ScenariosList_SelectionChanged"

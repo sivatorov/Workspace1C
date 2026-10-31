@@ -28,6 +28,22 @@
     <!-- Опасная кнопка (issue #26): единый красный и белый текст (WCAG ≥ 4.5). -->
     <Color x:Key="DangerColor">#DC2626</Color>
     <Color x:Key="DangerHoverColor">#B91C1C</Color>
+    <!-- Семантические статусы (аудит UI 1.0.1.10, п. 2.1): осветлённые варианты
+         для контраста на тёмном фоне. -->
+    <Color x:Key="SuccessColor">#22C55E</Color>
+    <Color x:Key="WarningColor">#F59E0B</Color>
+    <Color x:Key="ErrorColor">#EF4444</Color>
+    <Color x:Key="InfoColor">#38BDF8</Color>
+    <!-- Мягкая красная плашка (аудит UI, п. 2.4): тёмный красноватый фон вместо
+         светлых фиксированных #FEF2F2/#FECACA. -->
+    <Color x:Key="DangerSoftColor">#3F1D1D</Color>
+    <Color x:Key="DangerSoftBorderColor">#7F1D1D</Color>
+    <!-- Плашка «Закреплено» (аудит UI, п. 2.5): тёмно-сиреневый фон со светлым текстом. -->
+    <Color x:Key="PinnedBadgeColor">#4C1D95</Color>
+    <Color x:Key="PinnedBadgeTextColor">#DDD6FE</Color>
+    <!-- Пикер иконок (аудит UI, п. 2.6): тёмные плитки, как раньше, но из темы. -->
+    <Color x:Key="IconPickerBaseColor">#374151</Color>
+    <Color x:Key="IconPickerHoverColor">#4B5563</Color>
     <Color x:Key="DangerPressedColor">#991B1B</Color>
     <Color x:Key="DangerTextColor">#FFFFFF</Color>
     <!-- Дорожка переключателя в выключенном положении (issue #26): тёмная #475569
@@ -78,4 +94,17 @@
     <SolidColorBrush x:Key="ZebraRowBrush" Color="{DynamicResource ZebraRowColor}"/>
     <SolidColorBrush x:Key="TreeHoverBrush" Color="{DynamicResource TreeHoverColor}"/>
     <SolidColorBrush x:Key="TreeSelectedBrush" Color="{DynamicResource TreeSelectedColor}"/>
+    <!-- Семантические статусы (аудит UI, п. 2.1). -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    <!-- Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5). -->
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="{DynamicResource DangerSoftColor}"/>
+    <SolidColorBrush x:Key="DangerSoftBorderBrush" Color="{DynamicResource DangerSoftBorderColor}"/>
+    <SolidColorBrush x:Key="PinnedBadgeBrush" Color="{DynamicResource PinnedBadgeColor}"/>
+    <SolidColorBrush x:Key="PinnedBadgeTextBrush" Color="{DynamicResource PinnedBadgeTextColor}"/>
+    <!-- Пикер иконок (аудит UI, п. 2.6). -->
+    <SolidColorBrush x:Key="IconPickerBaseBrush" Color="{DynamicResource IconPickerBaseColor}"/>
+    <SolidColorBrush x:Key="IconPickerHoverBrush" Color="{DynamicResource IconPickerHoverColor}"/>
 </ResourceDictionary>

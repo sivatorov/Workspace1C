@@ -21,10 +21,10 @@
              (DeleteInfobaseWindow.xaml:37-41). -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
             <Path Data="{DynamicResource IconAlertCircleOutline}" Width="28" Height="28"
-                  Stretch="Uniform" Fill="#EF4444" VerticalAlignment="Center"
+                  Stretch="Uniform" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"
                   Margin="0,0,12,0"/>
             <TextBlock Text="{loc:Loc DeleteInfobase.Title}"
-                       FontSize="16" FontWeight="SemiBold"
+                       FontSize="15" FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
         </StackPanel>
 
@@ -79,7 +79,7 @@
         <!-- Панель физического удаления выделена красным, как у автора:
              это необратимое действие, и оно не должно выглядеть рядовой галочкой. -->
         <Border Grid.Row="3" x:Name="PhysicalPanel"
-                Background="#FEF2F2" BorderBrush="#FECACA"
+                Background="{DynamicResource DangerSoftBrush}" BorderBrush="{DynamicResource DangerSoftBorderBrush}"
                 BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -92,7 +92,7 @@
                                        HelpText="{loc:Loc DeleteInfobase.PhysicalHelp}"/>
                 </StackPanel>
                 <TextBlock x:Name="PhysicalHint" Margin="24,6,0,0" FontSize="12"
-                           Foreground="#B91C1C" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"
                            Text="{loc:Loc DeleteInfobase.PhysicalHint}"/>
             </StackPanel>
         </Border>

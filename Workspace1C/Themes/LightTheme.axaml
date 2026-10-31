@@ -29,6 +29,25 @@
     <!-- Опасная кнопка (issue #26): единый красный и белый текст (WCAG ≥ 4.5). -->
     <Color x:Key="DangerColor">#DC2626</Color>
     <Color x:Key="DangerHoverColor">#B91C1C</Color>
+    <!-- Семантические статусы (аудит UI 1.0.1.10, п. 2.1): единые цвета успеха,
+         предупреждения, ошибки и информации вместо 80+ хардкодов в окнах. -->
+    <Color x:Key="SuccessColor">#16A34A</Color>
+    <Color x:Key="WarningColor">#D97706</Color>
+    <Color x:Key="ErrorColor">#DC2626</Color>
+    <Color x:Key="InfoColor">#0EA5E9</Color>
+    <!-- Мягкая красная плашка (аудит UI, п. 2.4): фон/рамка предупреждения о
+         физическом удалении — вместо фиксированных #FEF2F2/#FECACA, которые
+         ярко светились в тёмной теме. -->
+    <Color x:Key="DangerSoftColor">#FEF2F2</Color>
+    <Color x:Key="DangerSoftBorderColor">#FECACA</Color>
+    <!-- Плашка «Закреплено» (аудит UI, п. 2.5): светло-сиреневый фон с тёмным
+         текстом (по образцу Favorite*, issue #61). -->
+    <Color x:Key="PinnedBadgeColor">#EDE9FE</Color>
+    <Color x:Key="PinnedBadgeTextColor">#5B21B6</Color>
+    <!-- Пикер иконок (аудит UI, п. 2.6): фон плитки и её наведение — вместо
+         фиксированных тёмно-серых #374151/#4B5563. -->
+    <Color x:Key="IconPickerBaseColor">#FFFFFF</Color>
+    <Color x:Key="IconPickerHoverColor">#E2E8F0</Color>
     <Color x:Key="DangerPressedColor">#991B1B</Color>
     <Color x:Key="DangerTextColor">#FFFFFF</Color>
     <!-- Дорожка переключателя в выключенном положении (issue #26): в светлой теме
@@ -79,4 +98,17 @@
     <SolidColorBrush x:Key="ZebraRowBrush" Color="{DynamicResource ZebraRowColor}"/>
     <SolidColorBrush x:Key="TreeHoverBrush" Color="{DynamicResource TreeHoverColor}"/>
     <SolidColorBrush x:Key="TreeSelectedBrush" Color="{DynamicResource TreeSelectedColor}"/>
+    <!-- Семантические статусы (аудит UI, п. 2.1). -->
+    <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
+    <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    <!-- Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5). -->
+    <SolidColorBrush x:Key="DangerSoftBrush" Color="{DynamicResource DangerSoftColor}"/>
+    <SolidColorBrush x:Key="DangerSoftBorderBrush" Color="{DynamicResource DangerSoftBorderColor}"/>
+    <SolidColorBrush x:Key="PinnedBadgeBrush" Color="{DynamicResource PinnedBadgeColor}"/>
+    <SolidColorBrush x:Key="PinnedBadgeTextBrush" Color="{DynamicResource PinnedBadgeTextColor}"/>
+    <!-- Пикер иконок (аудит UI, п. 2.6). -->
+    <SolidColorBrush x:Key="IconPickerBaseBrush" Color="{DynamicResource IconPickerBaseColor}"/>
+    <SolidColorBrush x:Key="IconPickerHoverBrush" Color="{DynamicResource IconPickerHoverColor}"/>
 </ResourceDictionary>

@@ -259,8 +259,15 @@ namespace Workspace1C
             }
         }
 
-        private static readonly Brush IconPickBaseBackground =
-            new SolidColorBrush(Color.FromRgb(0x37, 0x41, 0x51)); // #374151
+        // Плитки пикера на кистях темы (аудит UI, п. 2.6): с фиксированных
+        // #374151/#4B5563 уходим на IconPickerBaseBrush/IconPickerHoverBrush.
+        private Brush IconPickBaseBrush =>
+            (TryFindResource("IconPickerBaseBrush") as Brush)
+            ?? new SolidColorBrush(Color.FromRgb(0x37, 0x41, 0x51)); // #374151 — запасной
+
+        private Brush IconPickHoverBrush =>
+            (TryFindResource("IconPickerHoverBrush") as Brush)
+            ?? new SolidColorBrush(Color.FromRgb(0x4B, 0x55, 0x63)); // #4B5563 — запасной
 
         private void HighlightSelectedIcon()
         {
@@ -276,9 +283,9 @@ namespace Workspace1C
                         ? (isLightIcon
                             ? new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24)) // янтарь
                             : new SolidColorBrush(c))
-                        : new SolidColorBrush(Color.FromRgb(0x4B, 0x55, 0x63));
+                        : IconPickHoverBrush;
                     button.BorderThickness = new Thickness(isSelected ? 2.5 : 1);
-                    button.Background = IconPickBaseBackground;
+                    button.Background = IconPickBaseBrush;
                 }
             }
         }

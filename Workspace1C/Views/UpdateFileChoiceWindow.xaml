@@ -7,7 +7,7 @@
         MaxWidth="680" WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize" ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}"
-        FontFamily="Segoe UI" FontSize="13">
+        FontSize="13">
 
     <Window.Resources>
         <Style TargetType="TextBlock">

@@ -1370,7 +1370,8 @@ namespace Workspace1C
                 extra.FontSize = 12;
                 extra.FontWeight = FontWeight.SemiBold;
                 extra.TextWrapping = TextWrapping.Wrap;
-                extra.Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#DC2626"));
+                // Ошибка — на семантической кисти темы (аудит UI, п. 2.9).
+                ThemeBrushes.Bind(extra, Avalonia.Controls.TextBlock.ForegroundProperty, "ErrorBrush");
                 Grid.SetRow(extra, 2);
                 grid.Children.Add(extra);
             }

@@ -25,7 +25,8 @@
     <!-- Горизонтальная полоса - fallback (issue #55): при узком окне контент не
          обрезается правым краем, а прокручивается. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-        <StackPanel Margin="16">
+        <!-- Единый отступ каркаса диалога 14 (аудит UI, п. 3.2). -->
+        <StackPanel Margin="14">
             <TextBlock x:Name="EditorTitle" FontSize="15" FontWeight="SemiBold" Margin="0,0,0,12"/>
 
             <Grid Margin="0,4">

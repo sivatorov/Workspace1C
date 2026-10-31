@@ -9,7 +9,6 @@
         MinHeight="480" MinWidth="700"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -87,7 +86,7 @@
                                 Margin="16,0,0,0" ToolTip="{loc:Loc FindLostBases.Drive.NoneTooltip}" Click="OnDriveCheckNone">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"
-                                                         Foreground="#EF4444" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc FindLostBases.Drive.None}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -168,7 +167,7 @@
                             Margin="16,0,0,0" ToolTip="{loc:Loc FindLostBases.FoundNoneTooltip}" Click="OnFoundCheckNone">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"
-                                                     Foreground="#EF4444" VerticalAlignment="Center"/>
+                                                     Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc FindLostBases.FoundNone}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -213,7 +212,7 @@
                                            ToolTip="{loc:Loc FindLostBases.AlreadyInAppHint}">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="#94A3B8"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding InApp}" Value="True">
                                                     <Setter Property="Foreground" Value="#16A34A"/>
@@ -233,7 +232,7 @@
                                 <TextBlock Text="●" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="#94A3B8"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding InIbasesV8i}" Value="True">
                                                     <Setter Property="Foreground" Value="#8B5CF6"/>

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.9-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.10-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.9**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.10**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,18 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Единый стиль интерфейса: тематизация цветов, шрифтов и типографики (1.0.1.10,
+  Windows и Linux)** — по итогам аудита UI введены семантические кисти
+  `SuccessBrush`/`WarningBrush`/`ErrorBrush`/`InfoBrush` во все темы (Light/Dark,
+  WPF и Avalonia) и пользовательские схемы цветов; ~90 хардкод-цветов в 28+ окнах
+  заменены на тематизированные кисти; убраны литералы `Segoe UI` из 49 WPF-окон —
+  применён глобальный шрифт (`WindowChromeHelper.GlobalFontApplier`, Avalonia:
+  `UiFontFamily` + `ThemeManager.ApplyFontToAllWindows`); унифицирована типографика
+  (заголовки 15pt SemiBold, Bold → SemiBold, шкала размеров 12/13/15); радиусы
+  скруглений выровнены по шкале 4/6/8/10; кнопки футеров переведены на
+  `MinWidth=96`; символы ✔/✖, плашка «Закреплено» и danger-подсказки тематизированы;
+  локализовано ~70 литералов в окнах сценариев и списков (покрыто
+  `SemanticPaletteAuditTests`).
 - **Мастер «Развернуть тестовую копию»: подстановка СУБД из профиля и разовый сценарий
   без профиля (1.0.1.9, issue #79, Windows и Linux)** — убрана кнопка-дубль «Учётные
   данные ИБ для ibcmd…» внизу окна; вместо дублирующих профиль полей добавлена кнопка

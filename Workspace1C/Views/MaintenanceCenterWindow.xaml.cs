@@ -99,9 +99,14 @@ namespace Workspace1C
             if (plotW <= 20 || plotH <= 20)
                 return;
 
-            var lineBrush = new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
-            var textBrush = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
-            var accentBrush = new SolidColorBrush(Color.FromRgb(0x2D, 0x6C, 0xDF));
+            // График на кистях темы (аудит UI, п. 2.7): сетка/подписи — TextSecondaryBrush,
+            // столбцы — AccentBrush; паритет с Avalonia-версией.
+            var lineBrush = TryFindResource("TextSecondaryBrush") as Brush
+                ?? new SolidColorBrush(Color.FromRgb(0xB0, 0xB0, 0xB0));
+            var textBrush = TryFindResource("TextSecondaryBrush") as Brush
+                ?? new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88));
+            var accentBrush = TryFindResource("AccentBrush") as Brush
+                ?? new SolidColorBrush(Color.FromRgb(0x2D, 0x6C, 0xDF));
 
             // Горизонтальная сетка + подписи минимума/максимума Y.
             foreach (var (f, label) in new[] { (0.0, chart.YMinLabel), (1.0, chart.YMaxLabel) })

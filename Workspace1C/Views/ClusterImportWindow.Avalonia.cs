@@ -337,7 +337,8 @@ namespace Workspace1C
         {
             var button = BuildActionButton(LocalizationManager.T("Common.Close"), "✖", () => Close());
             ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
-            button.Foreground = new SolidColorBrush(Color.Parse("#DC2626"));
+            // Красный шрифт — на семантической кисти темы (аудит UI, п. 2.9).
+            ThemeBrushes.Bind(button, Button.ForegroundProperty, "ErrorBrush");
             return button;
         }
 

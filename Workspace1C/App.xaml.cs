@@ -288,6 +288,12 @@ namespace Workspace1C
                 ThemeManager.ApplyFont(mainWindow,
                     settings.FontFamily, settings.FontSize, settings.FontWeight, settings.FontStyle);
 
+                // Диалоги открываются с пользовательским шрифтом (аудит UI 1.0.1.10, п. 1.9):
+                // литералы FontFamily="Segoe UI" убраны из разметки окон, значение приходит
+                // из настроек при каждой загрузке окна.
+                WindowChromeHelper.GlobalFontApplier = w => ThemeManager.ApplyFont(
+                    w, settings.FontFamily, settings.FontSize, settings.FontWeight, settings.FontStyle);
+
                 // Применяем индивидуальные настройки шрифта отдельных областей.
                 ThemeManager.ApplyElementFonts(mainWindow, settings.ElementFonts);
 

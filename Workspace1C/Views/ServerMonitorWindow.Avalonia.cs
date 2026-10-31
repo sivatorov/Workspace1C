@@ -375,7 +375,9 @@ namespace Workspace1C
 
             var status = new TextBlock { FontSize = 12, Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
             status.Bind(TextBlock.TextProperty, new Binding("StatusText"));
-            var error = new TextBlock { FontSize = 12, Foreground = new SolidColorBrush(Color.Parse("#DC2626")), TextWrapping = TextWrapping.Wrap };
+            // Ошибка — на семантической кисти темы (аудит UI, п. 2.9).
+            var error = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap };
+            ThemeBrushes.Bind(error, TextBlock.ForegroundProperty, "ErrorBrush");
             error.Bind(TextBlock.TextProperty, new Binding("ErrorMessage"));
 
             var clusterPanel = new StackPanel
@@ -1546,10 +1548,11 @@ namespace Workspace1C
             _infobasesList.Bind(ListBox.SelectedItemProperty, new Binding("SelectedInfobase", BindingMode.TwoWay));
 
             // Сортировка списка баз (issue #3, 7OH 17.10): по алфавиту и обратная — иконки.
+            // Языконезависимые глифы сортировки (аудит UI, п. 4.4): «А↓/Я↓» → «A↓/Z↓».
             var sortAscButton = BuildIconButton(
-                "А↓", LocalizationManager.T("ServerMonitor.Infobase.SortAsc"), () => _vm.SortInfobases(false));
+                "A↓", LocalizationManager.T("ServerMonitor.Infobase.SortAsc"), () => _vm.SortInfobases(false));
             var sortDescButton = BuildIconButton(
-                "Я↓", LocalizationManager.T("ServerMonitor.Infobase.SortDesc"), () => _vm.SortInfobases(true));
+                "Z↓", LocalizationManager.T("ServerMonitor.Infobase.SortDesc"), () => _vm.SortInfobases(true));
 
             // Порядок кнопок (issue #3): Добавить, Правка | А→Я, Я→А | Удалить.
             var toolbar = new StackPanel

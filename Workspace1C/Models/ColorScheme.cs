@@ -357,6 +357,17 @@ public class ColorScheme
         // гарантирует, что ApplyColors пересоздаёт кисть для ВСЕХ схем (в т.ч. пользовательских
         // и генерируемых), а не только для тем по умолчанию.
         ["FormLabelBrush"] = "#000000",
+        // Семантические статусы (аудит UI 1.0.1.10, п. 2.1): единые цвета
+        // успеха/предупреждения/ошибки/информации для всех схем и генератора.
+        ["SuccessColor"] = "#16A34A",
+        ["WarningColor"] = "#D97706",
+        ["ErrorColor"] = "#DC2626",
+        ["InfoColor"] = "#0EA5E9",
+        // Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5).
+        ["DangerSoftBrush"] = "#FEF2F2",
+        ["DangerSoftBorderBrush"] = "#FECACA",
+        ["PinnedBadgeBrush"] = "#EDE9FE",
+        ["PinnedBadgeTextBrush"] = "#5B21B6",
         ["FavoriteColor"] = "#F59E0B",
         // Текст на плашке избранного: тёмный (плашка всегда яркая). Реальный контраст
         // к палитре схемы добирает ThemeManager (SetContrastBrush FavoriteTextBrush).
@@ -401,6 +412,17 @@ public class ColorScheme
         ["ButtonTextColor"] = "#000000",
         // Подпись поля формы (issue #61): равна первичному тексту тёмной темы.
         ["FormLabelBrush"] = "#F1F5F9",
+        // Семантические статусы (аудит UI 1.0.1.10, п. 2.1): осветлённые варианты
+        // для контраста на тёмном фоне.
+        ["SuccessColor"] = "#22C55E",
+        ["WarningColor"] = "#F59E0B",
+        ["ErrorColor"] = "#EF4444",
+        ["InfoColor"] = "#38BDF8",
+        // Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5).
+        ["DangerSoftBrush"] = "#3F1D1D",
+        ["DangerSoftBorderBrush"] = "#7F1D1D",
+        ["PinnedBadgeBrush"] = "#4C1D95",
+        ["PinnedBadgeTextBrush"] = "#DDD6FE",
         ["FavoriteColor"] = "#FBBF24",
         ["FavoriteTextColor"] = "#1C1917",
         ["FolderColor"] = "#3B82F6",
@@ -464,6 +486,16 @@ public class ColorScheme
                 // Подпись поля формы (issue #61): в генерируемых схемах тоже присутствует
                 // и повторяет первичный текст — контрастна и на карточке, и на поле ввода.
                 ["FormLabelBrush"] = "#F1F5F9",
+                // Семантические статусы (аудит UI, п. 2.1): фиксированные значения,
+                // чтобы генератор не смешивал статусы с оттенком акцента схемы.
+                ["SuccessColor"] = "#22C55E",
+                ["WarningColor"] = "#F59E0B",
+                ["ErrorColor"] = "#EF4444",
+                ["InfoColor"] = "#38BDF8",
+                ["DangerSoftBrush"] = "#3F1D1D",
+                ["DangerSoftBorderBrush"] = "#7F1D1D",
+                ["PinnedBadgeBrush"] = "#4C1D95",
+                ["PinnedBadgeTextBrush"] = "#DDD6FE",
                 ["TextSecondaryColor"] = C(0.80, 0.30),
                 ["TextOnAccentColor"] = "#000000",
                 ["ButtonTextColor"] = "#000000",
@@ -502,6 +534,16 @@ public class ColorScheme
             ["TextPrimaryColor"] = "#000000",
             // Подпись поля формы (issue #61): в генерируемых схемах повторяет первичный текст.
             ["FormLabelBrush"] = "#000000",
+            // Семантические статусы (аудит UI, п. 2.1): фиксированные значения,
+            // чтобы генератор не смешивал статусы с оттенком акцента схемы.
+            ["SuccessColor"] = "#16A34A",
+            ["WarningColor"] = "#D97706",
+            ["ErrorColor"] = "#DC2626",
+            ["InfoColor"] = "#0EA5E9",
+            ["DangerSoftBrush"] = "#FEF2F2",
+            ["DangerSoftBorderBrush"] = "#FECACA",
+            ["PinnedBadgeBrush"] = "#EDE9FE",
+            ["PinnedBadgeTextBrush"] = "#5B21B6",
             ["TextSecondaryColor"] = C(0.45, 0.40),
             ["TextOnAccentColor"] = "#FFFFFF",
             ["ButtonTextColor"] = "#000000",

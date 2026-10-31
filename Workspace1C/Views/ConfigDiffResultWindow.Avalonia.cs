@@ -196,11 +196,19 @@ namespace Workspace1C
         // с подложкой (issue #316). Значения синхронны с WPF StatusTextStyle.
         private static IBrush StatusBrush(DiffChangeKind kind) => kind switch
         {
-            DiffChangeKind.Added => new SolidColorBrush(Color.Parse("#16A34A")),
-            DiffChangeKind.Changed => new SolidColorBrush(Color.Parse("#D97706")),
-            DiffChangeKind.Removed => new SolidColorBrush(Color.Parse("#DC2626")),
-            _ => new SolidColorBrush(Color.Parse("#64748B"))
+            // Статусы — на семантических кистях темы (аудит UI, п. 2.9).
+            DiffChangeKind.Added => ThemeBrush("SuccessBrush", "#16A34A"),
+            DiffChangeKind.Changed => ThemeBrush("WarningBrush", "#D97706"),
+            DiffChangeKind.Removed => ThemeBrush("ErrorBrush", "#DC2626"),
+            _ => ThemeBrush("TextSecondaryBrush", "#64748B")
         };
+
+        /// <summary>Читает кисть темы по ключу; при отсутствии — запасной HEX (аудит UI, п. 2.9).</summary>
+        private static IBrush ThemeBrush(string key, string fallbackHex)
+            => Avalonia.Application.Current?.TryGetResource(key, Avalonia.Styling.ThemeVariant.Default, out var value) == true
+                && value is IBrush brush
+                    ? brush
+                    : new SolidColorBrush(Color.Parse(fallbackHex));
 
         /// <summary>
         /// «Обозреватель метаданных…» (этап 5 цикла 0.3.9.132–0.3.9.136): открывает

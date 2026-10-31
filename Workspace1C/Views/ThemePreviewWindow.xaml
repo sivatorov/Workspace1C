@@ -10,7 +10,6 @@
         Height="640" Width="560"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">

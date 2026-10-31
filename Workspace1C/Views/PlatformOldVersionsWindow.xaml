@@ -7,7 +7,7 @@
         Width="520" Height="420" MinWidth="440" MinHeight="300"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI" FontSize="13"
+        FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
 
@@ -26,7 +26,7 @@
         </Grid.RowDefinitions>
 
         <!-- Заголовок + пояснение: пользователь выбирает, что удалить (issue #334). -->
-        <TextBlock Grid.Row="0" FontSize="14" FontWeight="SemiBold"
+        <TextBlock Grid.Row="0" FontSize="15" FontWeight="SemiBold"
                    Text="{loc:Loc PlatformUpdate.OldVersions.Title}"/>
         <TextBlock Grid.Row="1" FontSize="12" Margin="0,4,0,10" TextWrapping="Wrap"
                    Foreground="{DynamicResource TextSecondaryBrush}"

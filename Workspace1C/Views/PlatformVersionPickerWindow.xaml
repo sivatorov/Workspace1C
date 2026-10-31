@@ -13,7 +13,6 @@
         MinHeight="400" MinWidth="400"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -199,12 +198,12 @@
                                 <materialDesign:PackIcon.Style>
                                     <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                         <Setter Property="Kind" Value="Folder"/>
-                                        <Setter Property="Foreground" Value="#F59E0B"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         <Style.Triggers>
                                             <!-- Линия 8.3 — папка-акцент -->
                                             <DataTrigger Binding="{Binding Kind}" Value="Line">
                                                 <Setter Property="Kind" Value="Folder"/>
-                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                             </DataTrigger>
                                             <!-- Группа сборок 8.3.27 — открытая папка -->
                                             <DataTrigger Binding="{Binding Kind}" Value="BuildGroup">
@@ -214,7 +213,7 @@
                                             <!-- Сборка x64 -->
                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX64">
                                                 <Setter Property="Kind" Value="CubeOutline"/>
-                                                <Setter Property="Foreground" Value="#22C55E"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
                                             </DataTrigger>
                                             <!-- Сборка x32 -->
                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX32">
@@ -252,7 +251,7 @@
                                             <!-- Тонкий клиент (issue #33): подсветка оранжевым —
                                                  видно, что полные возможности недоступны. -->
                                             <DataTrigger Binding="{Binding IsThinClient}" Value="True">
-                                                <Setter Property="Foreground" Value="#F59E0B"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

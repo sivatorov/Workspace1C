@@ -322,6 +322,14 @@ namespace Workspace1C
                     // (дерево групп, кнопки, поля ввода, правая панель, статус-бар).
                     ThemeManager.ApplyFont(mainWindow,
                         settings.FontFamily, settings.FontSize, settings.FontWeight, settings.FontStyle);
+
+                    // Ресурс UiFontFamily (аудит UI 1.0.1.10, п. 1.9): все окна следуют
+                    // ему через стиль в App.axaml, поэтому диалоги открываются с
+                    // пользовательским шрифтом без литералов в разметке.
+                    var uiFamily = string.IsNullOrWhiteSpace(settings.FontFamily)
+                        ? ThemeManager.DefaultFontFamily
+                        : settings.FontFamily;
+                    Application.Current.Resources["UiFontFamily"] = new Avalonia.Media.FontFamily(uiFamily);
                     // Меню, подсказки и выпадающие списки живут в отдельных корнях
                     // и шрифт окна не наследуют, поэтому им он ставится стилем.
                     ThemeManager.ApplyFontToPopups(

@@ -454,6 +454,12 @@ namespace Workspace1C
         {
             var c = ParseColor(_iconColor);
             var isLightIcon = (c.R + c.G + c.B) / 3.0 > 200;
+            // Плитки пикера на кистях темы (аудит UI, п. 2.6) вместо фиксированных
+            // тёмно-серых #374151/#4B5563.
+            var baseBrush = ThemeResourceBrush("IconPickerBaseBrush",
+                Color.FromRgb(0x37, 0x41, 0x51));
+            var hoverBrush = ThemeResourceBrush("IconPickerHoverBrush",
+                Color.FromRgb(0x4B, 0x55, 0x63));
             foreach (var child in _iconPickerPanel.Children)
             {
                 if (child is Button { Tag: string key } button)
@@ -463,12 +469,19 @@ namespace Workspace1C
                         ? (isLightIcon
                             ? new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24))
                             : new SolidColorBrush(c))
-                        : new SolidColorBrush(Color.FromRgb(0x4B, 0x55, 0x63));
+                        : hoverBrush;
                     button.BorderThickness = new Thickness(isSelected ? 2.5 : 1);
-                    button.Background = new SolidColorBrush(Color.FromRgb(0x37, 0x41, 0x51));
+                    button.Background = baseBrush;
                 }
             }
         }
+
+        /// <summary>Читает кисть темы по ключу; при отсутствии — запасной цвет.</summary>
+        private static Avalonia.Media.IBrush ThemeResourceBrush(string key, Color fallback)
+            => Avalonia.Application.Current?.TryGetResource(key, Avalonia.Styling.ThemeVariant.Default, out var value) == true
+                && value is Avalonia.Media.IBrush brush
+                    ? brush
+                    : new SolidColorBrush(fallback);
 
         private void OnSelectParent_Click()
         {

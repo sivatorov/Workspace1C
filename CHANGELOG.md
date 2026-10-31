@@ -11,6 +11,77 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.10] — 2026-10-31
+
+### Единый стиль интерфейса (аудит UI)
+
+- **Семантические кисти статусов во всех темах (Windows и Linux).** В темы
+  Light/Dark добавлены семантические кисти `SuccessBrush` / `WarningBrush` /
+  `ErrorBrush` / `InfoBrush` — как в WPF-словарях
+  ([`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml),
+  [`DarkTheme.xaml`](Workspace1C/Themes/DarkTheme.xaml)), так и в Avalonia-темах
+  ([`LightTheme.axaml`](Workspace1C/Themes/LightTheme.axaml),
+  [`DarkTheme.axaml`](Workspace1C/Themes/DarkTheme.axaml)); поддержаны в
+  пользовательских схемах цветов ([`ColorScheme.cs`](Workspace1C/Models/ColorScheme.cs)).
+  Успех/ошибка/предупреждение/информация теперь перекрашиваются вместе с темой.
+
+- **~90 хардкод-цветов заменены на тематизированные кисти в 28+ окнах (Windows
+  и Linux).** Локальные `Brushes.*`, HEX-литералы и «пальцевые» цвета статусов,
+  индикаторов, плашек и текстов заменены на семантические/тематизированные кисти —
+  интерфейс остаётся корректным в тёмной теме и при пользовательских цветах.
+
+- **Символы ✔/✖ тематизированы в 25 окнах (Windows и Linux).** «Галочки» используют
+  `SuccessBrush`, «крестики» — приглушённый цвет вторичного текста, вместо жёстко
+  заданных зелёного/красного.
+
+- **Мягкая danger-плашка и плашка «Закреплено».** В
+  [`DeleteInfobaseWindow`](Workspace1C/Views/DeleteInfobaseWindow.xaml) предупреждение
+  об удалении базы переведено на мягкую плашку `DangerSoftBrush`; индикатор
+  «Закреплено» использует отдельную кисть `PinnedBadgeBrush` — без «вырвиглазных»
+  цветов в тёмной теме.
+
+### Типографика и геометрия
+
+- **Единый шрифт без литералов (Windows и Linux).** Из 49 WPF-окон убраны
+  `FontFamily="Segoe UI"` — шрифт приложения задаётся глобально
+  ([`WindowChromeHelper.GlobalFontApplier`](Workspace1C/Views/WindowChromeHelper.cs:202));
+  в Avalonia шрифт управляется через `UiFontFamily` +
+  [`ThemeManager.ApplyFontToAllWindows`](Workspace1C/Themes/ThemeManager.cs:390) —
+  смена шрифта в настройках работает согласованно на обеих платформах.
+
+- **Унифицированная типографика.** Заголовки окон/разделов — 15pt SemiBold,
+  `Bold` → `SemiBold`, размеры текста выровнены по шкале 12/13/15.
+
+- **Радиусы скруглений — по шкале 4/6/8/10.** Произвольные `CornerRadius` в окнах
+  и карточках приведены к единой шкале; кнопки футеров переведены с фикс-Width на
+  `MinWidth=96` + `Padding` — подписи не обрезаются при локализации.
+
+- **«А↓/Я↓» → «A↓/Z↓».** Подписи сортировки приведены к латинице, чтобы не
+  зависеть от языка интерфейса.
+
+### Локализация
+
+- **~70 литералов переведены в ресурсы (Windows и Linux).** Окна
+  [`ScheduledTaskEditWindow`](Workspace1C/Views/ScheduledTaskEditWindow.xaml),
+  [`BackupScenarioEditWindow`](Workspace1C/Views/BackupScenarioEditWindow.xaml),
+  [`ScriptScenarioEditWindow`](Workspace1C/Views/ScriptScenarioEditWindow.xaml),
+  [`ScriptPickWindow`](Workspace1C/Views/ScriptPickWindow.xaml) и футеры списков
+  «Резервные сценарии», «Сценарии-скрипты», «Пользовательские команды», «Экспорт»,
+  «Планировщик» — подписи вынесены в локализацию; в
+  [`ru.json`](Workspace1C/Localization/Languages/ru.json) и
+  [`en.json`](Workspace1C/Localization/Languages/en.json)
+  новые ключи добавлены синхронно, в т.ч. `Common.Run`, `Common.Restore`,
+  `Common.OpenFolder`.
+
+### Тесты
+
+- [`SemanticPaletteAuditTests.cs`](Workspace1C.Tests/SemanticPaletteAuditTests.cs):
+  новый тест аудита семантических кистей — наличие Success/Warning/Error/Info во всех
+  четырёх файлах тем и в `ColorScheme`; отсутствие захардкоженных цветов статусов.
+- [`Issue54ThinClientHighlightTests.cs`](Workspace1C.Tests/Issue54ThinClientHighlightTests.cs),
+  [`Issue61TitleColorsTests.cs`](Workspace1C.Tests/Issue61TitleColorsTests.cs):
+  обновлены под тематизированные кисти. Полный набор — 5264 теста.
+
 ## [1.0.1.9] — 2026-10-30
 
 ### Исправлено / Добавлено

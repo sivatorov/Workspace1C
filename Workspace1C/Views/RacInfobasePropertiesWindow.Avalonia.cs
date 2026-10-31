@@ -146,9 +146,20 @@ namespace Workspace1C
                 Margin = new Thickness(0, 8, 0, 0),
                 [!TextBlock.TextProperty] = new Binding(nameof(RacInfobasePropertiesViewModel.StatusText))
             };
-            void UpdateStatusColor() => status.Foreground = _vm.StatusIsError
-                ? new SolidColorBrush(Color.Parse("#DC2626"))
-                : null;
+            // Ошибка — на семантической кисти темы (аудит UI, п. 2.9).
+            void UpdateStatusColor()
+            {
+                if (!_vm.StatusIsError)
+                {
+                    status.Foreground = null;
+                    return;
+                }
+                status.Foreground = Avalonia.Application.Current?
+                        .TryGetResource("ErrorBrush", Avalonia.Styling.ThemeVariant.Default, out var resource) == true
+                    && resource is Avalonia.Media.IBrush errorBrush
+                        ? errorBrush
+                        : new SolidColorBrush(Color.Parse("#DC2626"));
+            }
             _vm.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(RacInfobasePropertiesViewModel.StatusIsError))

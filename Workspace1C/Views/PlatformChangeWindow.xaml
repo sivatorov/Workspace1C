@@ -55,7 +55,7 @@
                                         <!-- Тонкий клиент (issue #54): подсветка оранжевым —
                                              видно, что полные возможности недоступны. -->
                                         <DataTrigger Binding="{Binding IsThinClient}" Value="True">
-                                            <Setter Property="Foreground" Value="#F59E0B"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>

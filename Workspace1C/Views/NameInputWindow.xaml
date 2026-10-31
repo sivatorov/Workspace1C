@@ -10,7 +10,6 @@
         Height="200" Width="440"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -47,7 +46,7 @@
                     Background="{DynamicResource ItemHoverBrush}"
                     Foreground="{DynamicResource TextPrimaryBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

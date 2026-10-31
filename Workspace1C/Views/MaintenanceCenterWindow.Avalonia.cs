@@ -455,9 +455,11 @@ namespace Workspace1C
             if (plotW <= 20 || plotH <= 20)
                 return;
 
-            var lineBrush = new SolidColorBrush(Color.Parse("#B0B0B0"));
-            var textBrush = new SolidColorBrush(Color.Parse("#888888"));
-            var accentBrush = new SolidColorBrush(Color.Parse("#2D6CDF"));
+            // График на кистях темы (аудит UI, п. 2.7): сетка/подписи — TextSecondaryBrush,
+            // столбцы — AccentBrush; паритет с WPF-версией.
+            var lineBrush = ThemeResource("TextSecondaryBrush", new SolidColorBrush(Color.Parse("#B0B0B0")));
+            var textBrush = ThemeResource("TextSecondaryBrush", new SolidColorBrush(Color.Parse("#888888")));
+            var accentBrush = ThemeResource("AccentBrush", new SolidColorBrush(Color.Parse("#2D6CDF")));
 
             foreach (var (f, label) in new[] { (0.0, chart.YMinLabel), (1.0, chart.YMaxLabel) })
             {
@@ -520,6 +522,13 @@ namespace Workspace1C
             Canvas.SetTop(dot, top + (1 - last.Y) * plotH - 3);
             _historyChartCanvas.Children.Add(dot);
         }
+
+        /// <summary>Читает кисть темы по ключу; при отсутствии — запасное значение (аудит UI, п. 2.7).</summary>
+        private static Avalonia.Media.IBrush ThemeResource(string key, Avalonia.Media.IBrush fallback)
+            => Avalonia.Application.Current?.TryGetResource(key, ThemeVariant.Default, out var value) == true
+                && value is Avalonia.Media.IBrush brush
+                    ? brush
+                    : fallback;
 
         private void OnGrid_DoubleTapped(object? sender, TappedEventArgs e)
         {

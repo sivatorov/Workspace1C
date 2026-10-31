@@ -194,6 +194,14 @@ namespace Workspace1C
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MonitorInfo lpmi);
 
         /// <summary>
+        /// Колбэк применения пользовательского шрифта интерфейса к окну (аудит UI
+        /// 1.0.1.10, п. 1.9). Устанавливается из <c>App.OnStartup</c>: литералы
+        /// <c>FontFamily="Segoe UI"</c> убраны из разметки окон, диалоги открываются
+        /// с <c>FontSettings.FontFamily</c> из настроек, а не с фиксированным значением.
+        /// </summary>
+        public static Action<Window>? GlobalFontApplier { get; set; }
+
+        /// <summary>
         /// Регистрирует обработчик класса <c>Window.Loaded</c>, который применяет
         /// «стеклянный» стиль ко всем окнам приложения. Вызывается один раз из
         /// <c>App.OnStartup</c> до показа первого окна.
@@ -219,6 +227,10 @@ namespace Workspace1C
                 HookMinTrackAndMaximize(window);
                 return;
             }
+            // Пользовательский шрифт интерфейса применяется к каждому диалогу
+            // (аудит UI, п. 1.9); сбой не должен ломать показ окна.
+            try { GlobalFontApplier?.Invoke(window); }
+            catch { /* шрифт не критичен для показа диалога */ }
             if (IsApplied(window))
                 return;
             try

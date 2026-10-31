@@ -11,7 +11,6 @@
         Height="560" Width="470"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -29,13 +28,13 @@
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button MinWidth="90" Style="{DynamicResource ModernButton}" Margin="0,0,8,0" IsDefault="True" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button MinWidth="110" Style="{DynamicResource SecondaryButton}" IsCancel="True">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

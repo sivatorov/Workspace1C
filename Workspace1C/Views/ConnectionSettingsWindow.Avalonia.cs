@@ -1222,7 +1222,7 @@ namespace Workspace1C
                 ? "Connection.OsLinux64Text"
                 : "Connection.OsLinux32Text", margin: new Thickness(2, 2, 0, 0));
             if (!Environment.Is64BitOperatingSystem)
-                osHint.Foreground = new SolidColorBrush(Color.Parse("#DC2626"));
+                ThemeBrushes.Bind(osHint, TextBlock.ForegroundProperty, "ErrorBrush");
 
             var content = new StackPanel
             {

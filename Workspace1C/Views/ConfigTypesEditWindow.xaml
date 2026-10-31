@@ -9,7 +9,6 @@
         MinHeight="460" MinWidth="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -294,7 +293,7 @@
                                         Command="{Binding DeleteCommand}"
                                         ToolTip="{loc:Loc Updates.Delete}">
                                     <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16"
-                                                             Foreground="#EF4444"/>
+                                                             Foreground="{DynamicResource ErrorBrush}"/>
                                 </Button>
                                 <!-- Предопределённые конфигурации не удаляются (issue #321):
                                      их можно только дополнить правкой или восстановить кнопкой

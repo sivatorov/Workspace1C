@@ -914,9 +914,12 @@ namespace Workspace1C
             favoriteBadge.Bind(Control.IsVisibleProperty, new Binding("SelectedInfobase.IsFavorite"));
             badges.Children.Add(favoriteBadge);
 
+            // Плашка закрепления (аудит UI, п. 2.5): фон и текст берутся из темы
+            // (PinnedBadgeBrush/PinnedBadgeTextBrush), а не из фиксированных светлых цветов.
             var pinnedBadge = Badge("#EDE9FE");
-            pinnedBadge.Child = BadgeContent("IconPin", "#8B5CF6", "#5B21B6",
-                new Binding { Source = LocalizationManager.T("Main.PinnedLabel") });
+            ThemeBrushes.Bind(pinnedBadge, Border.BackgroundProperty, "PinnedBadgeBrush");
+            pinnedBadge.Child = BadgeContent("IconPin", "#8B5CF6", null,
+                new Binding { Source = LocalizationManager.T("Main.PinnedLabel") }, "PinnedBadgeTextBrush");
             pinnedBadge.Bind(Control.IsVisibleProperty, new Binding("SelectedInfobase.IsPinned"));
             badges.Children.Add(pinnedBadge);
 

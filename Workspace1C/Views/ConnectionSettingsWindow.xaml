@@ -14,7 +14,6 @@
         Height="680"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -396,7 +395,8 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Border Background="{DynamicResource ItemHoverBrush}" CornerRadius="10" Padding="8,3" Margin="0,0,6,4">
+                                    <!-- Единый радиус плашки-настройки 8 по шкале 3.1 (аудит UI, п. 3.5). -->
+                                    <Border Background="{DynamicResource ItemHoverBrush}" CornerRadius="8" Padding="8,3" Margin="0,0,6,4">
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="0,0,4,0"/>
                                             <Button Content="×" Tag="{Binding}" Click="OnRemoveTag_Click" Style="{DynamicResource IconButton}"
@@ -1418,7 +1418,7 @@
                                 Click="OnGenerateId_Click" ToolTip="{loc:Loc Connection.GenerateIdTooltip}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Refresh" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
-                                                         Foreground="#22C55E"/>
+                                                         Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock Text="{loc:Loc Connection.GenerateId}" VerticalAlignment="Center" FontSize="12"/>
                             </StackPanel>
                         </Button>
@@ -1455,7 +1455,7 @@
                                 Click="OnAddAdditionalField_Click" ToolTip="{loc:Loc Connection.AdditionalFieldsAddTooltip}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Plus" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
-                                                         Foreground="#22C55E"/>
+                                                         Foreground="{DynamicResource SuccessBrush}"/>
                                 <TextBlock Text="{loc:Loc Connection.AdditionalFieldsAdd}" VerticalAlignment="Center" FontSize="12"/>
                             </StackPanel>
                         </Button>
@@ -1470,7 +1470,7 @@
                                 Click="OnRemoveAdditionalField_Click" ToolTip="{loc:Loc Connection.AdditionalFieldsDeleteTooltip}">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Delete" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"
-                                                         Foreground="#EF4444"/>
+                                                         Foreground="{DynamicResource ErrorBrush}"/>
                                 <TextBlock Text="{loc:Loc Connection.AdditionalFieldsDelete}" VerticalAlignment="Center" FontSize="12"/>
                             </StackPanel>
                         </Button>

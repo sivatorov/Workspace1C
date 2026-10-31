@@ -9,7 +9,6 @@
         MinHeight="440" MinWidth="600"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -103,7 +102,7 @@
                                 Click="OnUncheckAllClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"
-                                                         Foreground="#EF4444" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc DetectConfigs.Button.UncheckAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -181,7 +180,7 @@
                                                ToolTip="{loc:Loc DetectConfigs.CredentialsMissingTooltip}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="#EF4444"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding HasCredentials}" Value="True">
                                                         <Setter Property="Foreground" Value="#16A34A"/>

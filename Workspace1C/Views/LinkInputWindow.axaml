@@ -54,7 +54,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Viewbox Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center">
                         <Canvas Width="24" Height="24">
-                            <Path Data="{DynamicResource IconClose}" Fill="#EF4444"/>
+                            <Path Data="{DynamicResource IconClose}" Fill="{DynamicResource ErrorBrush}"/>
                         </Canvas>
                     </Viewbox>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>

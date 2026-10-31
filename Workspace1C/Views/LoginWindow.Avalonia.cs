@@ -138,13 +138,14 @@ namespace Workspace1C
             _passwordPanel.Children.Add(_passwordInput);
             Grid.SetRow(_passwordPanel, 2);
 
+            // Ошибка на семантической кисти темы (аудит UI, п. 2.2) вместо Brushes.IndianRed.
             _errorLabel = new TextBlock
             {
-                Foreground = Brushes.IndianRed,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 12),
                 IsVisible = false
             };
+            ThemeBrushes.Bind(_errorLabel, TextBlock.ForegroundProperty, "ErrorBrush");
             Grid.SetRow(_errorLabel, 3);
 
             var buttons = BuildLoginButtons();

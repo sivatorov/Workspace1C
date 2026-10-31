@@ -9,7 +9,6 @@
         Width="520" MinWidth="460" Height="Auto" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -36,8 +35,8 @@
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
             <materialDesign:PackIcon Kind="AlertCircleOutline" Width="28" Height="28"
-                                     Foreground="#EF4444" VerticalAlignment="Center" Margin="0,0,12,0"/>
-            <TextBlock Text="{loc:Loc DeleteInfobase.Title}" FontSize="16" FontWeight="SemiBold"
+                                     Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center" Margin="0,0,12,0"/>
+            <TextBlock Text="{loc:Loc DeleteInfobase.Title}" FontSize="15" FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
         </StackPanel>
 
@@ -87,8 +86,8 @@
         <TextBlock Grid.Row="2" Text="{loc:Loc DeleteInfobase.Note}"
                    Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
-        <Border Grid.Row="3" x:Name="PhysicalPanel" Background="#FEF2F2"
-                BorderBrush="#FECACA" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
+        <Border Grid.Row="3" x:Name="PhysicalPanel" Background="{DynamicResource DangerSoftBrush}"
+                BorderBrush="{DynamicResource DangerSoftBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <CheckBox x:Name="PhysicalDeleteCheck"
@@ -98,7 +97,7 @@
                                        HelpText="{loc:Loc DeleteInfobase.PhysicalHelp}"/>
                 </StackPanel>
                 <TextBlock x:Name="PhysicalHint" Margin="24,6,0,0" FontSize="12"
-                           Foreground="#B91C1C" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"
                            Text="{loc:Loc DeleteInfobase.PhysicalHint}"/>
             </StackPanel>
         </Border>

@@ -53,7 +53,7 @@
                     Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,6,0"
                     Click="OnConfigure_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⚙" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#6B7280"/>
+                    <TextBlock Text="⚙" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <TextBlock Text="{loc:Loc Services.Configure}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -167,7 +167,7 @@
             <Button x:Name="PauseButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Pause}"
                     IsEnabled="{Binding CanPause}" Click="OnPause_Click">
-                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.PauseGlyph}" VerticalAlignment="Center" Foreground="#D97706"/>
+                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.PauseGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}"/>
             </Button>
             <Button x:Name="ContinueButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Continue}"

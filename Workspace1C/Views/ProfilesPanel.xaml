@@ -66,7 +66,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc Profiles.Active}" Margin="8,0,0,0"
-                                       Foreground="#2E7D32" FontWeight="Bold" FontSize="11"
+                                       Foreground="{DynamicResource SuccessBrush}" FontWeight="SemiBold" FontSize="11"
                                        VerticalAlignment="Center">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
@@ -137,7 +137,7 @@
         <TextBlock Grid.Row="3" x:Name="ErrorLabel" TextWrapping="Wrap" Margin="0,0,0,12" Text="{Binding ErrorMessage}">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
-                    <Setter Property="Foreground" Value="#E53935"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                     <Setter Property="Visibility" Value="Collapsed"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding HasError}" Value="True">
@@ -173,7 +173,7 @@
                     Style="{StaticResource ModernButton}"
                     Command="{Binding SaveCommand}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Profiles.Save}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

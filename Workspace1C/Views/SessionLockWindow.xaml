@@ -12,7 +12,6 @@
         Height="680" Width="520"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -95,7 +94,7 @@
             <Button x:Name="UnlockButton" Width="180" Margin="0,0,8,0"
                     Click="OnUnlock_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="UnlockTextBlock" Text="{loc:Loc SessionLock.Unlock}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

@@ -15,7 +15,6 @@
         MinHeight="480" MinWidth="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -50,7 +49,7 @@
                                         <ToggleButton.Template>
                                             <ControlTemplate TargetType="ToggleButton">
                                                 <TextBlock x:Name="ExpanderSymbol" Text="+"
-                                                           FontSize="16" FontWeight="Bold"
+                                                           FontSize="16" FontWeight="SemiBold"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                 <ControlTemplate.Triggers>
@@ -153,9 +152,9 @@
             <StackPanel Grid.Column="1">
                 <!-- Перенос заголовка/подзаголовка (issue #55): при уменьшении ширины
                      окна текст переносится, а не обрезается правым краем. -->
-                <TextBlock x:Name="TitleText" Text="" FontSize="17" FontWeight="SemiBold"
+                <TextBlock x:Name="TitleText" Text="" FontSize="15" FontWeight="SemiBold"
                            TextWrapping="Wrap"/>
-                <TextBlock x:Name="SubtitleText" Text="" FontSize="12.5"
+                <TextBlock x:Name="SubtitleText" Text="" FontSize="12"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            TextWrapping="Wrap"/>
             </StackPanel>
@@ -241,7 +240,7 @@
                                         </Path.Data>
                                     </Path>
                                 </Border>
-                                <TextBlock Text="{Binding DisplayName}" FontSize="14" VerticalAlignment="Center"
+                                <TextBlock Text="{Binding DisplayName}" FontSize="13" VerticalAlignment="Center"
                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextTrimming="CharacterEllipsis"/>
                             </StackPanel>
@@ -263,7 +262,7 @@
             <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                 <materialDesign:PackIcon Kind="ChevronRight" Width="15" Height="15"
                                          Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0"/>
-                <TextBlock x:Name="PathLabel" FontSize="12.5" MaxWidth="260"
+                <TextBlock x:Name="PathLabel" FontSize="12" MaxWidth="260"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
             </StackPanel>

@@ -10,7 +10,6 @@
         Height="300" Width="460"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -24,7 +23,8 @@
         <Style TargetType="Button" BasedOn="{StaticResource ModernButton}"/>
     </Window.Resources>
 
-    <StackPanel Margin="16">
+    <!-- Единый отступ каркаса диалога 14 (аудит UI, п. 3.2). -->
+    <StackPanel Margin="14">
         <TextBlock x:Name="TitleLabel" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold"
                    Margin="0,0,0,6" HorizontalAlignment="Center"/>
         <TextBlock x:Name="PromptLabel" TextWrapping="Wrap" Margin="0,0,0,12"
@@ -39,13 +39,13 @@
             <Button x:Name="CancelButton" Width="110" Margin="0,0,8,0" IsCancel="True"
                     Click="OnCancel_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="CancelTextBlock" Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button x:Name="OkButton" Width="160" MinHeight="36" IsDefault="True" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="OkTextBlock" Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

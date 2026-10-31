@@ -30,11 +30,12 @@
     </Window.Resources>
 
     <DockPanel Margin="14">
+        <!-- Футер диалога (аудит UI, пп. 3.3 и 5.4): единые MinWidth/Padding и ключи локализации. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="AddButton" Content="Добавить" Width="96" Margin="0,0,8,0" Padding="6,4" Click="OnAdd_Click"/>
-            <Button x:Name="EditButton" Content="Изменить" Width="96" Margin="0,0,8,0" Padding="6,4" IsEnabled="False" Click="OnEdit_Click"/>
-            <Button x:Name="DeleteButton" Content="Удалить" Width="92" Margin="0,0,8,0" Padding="6,4" IsEnabled="False" Click="OnDelete_Click"/>
-            <Button Content="{loc:Loc Common.Close}" Width="90" Padding="6,4" IsCancel="True" Click="Close_Click"/>
+            <Button x:Name="AddButton" Content="{loc:Loc Common.Add}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" Click="OnAdd_Click"/>
+            <Button x:Name="EditButton" Content="{loc:Loc Common.Edit}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="OnEdit_Click"/>
+            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="OnDelete_Click"/>
+            <Button Content="{loc:Loc Common.Close}" MinWidth="96" Padding="12,5" IsCancel="True" Click="Close_Click"/>
         </StackPanel>
 
         <!-- Список действий: имя, область применения, горячая клавиша и превью команды.

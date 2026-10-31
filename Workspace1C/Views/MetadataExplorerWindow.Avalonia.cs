@@ -108,13 +108,14 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap
             };
             status.Bind(TextBlock.TextProperty, new Binding("StatusText"));
+            // Ошибка — на семантической кисти темы (аудит UI, п. 2.9).
             var error = new TextBlock
             {
                 FontSize = 12,
-                Foreground = new SolidColorBrush(Color.Parse("#DC2626")),
                 TextWrapping = TextWrapping.Wrap,
                 MaxHeight = 60
             };
+            ThemeBrushes.Bind(error, TextBlock.ForegroundProperty, "ErrorBrush");
             error.Bind(TextBlock.TextProperty, new Binding("ErrorMessage"));
             // issue #365: строка ошибки обрезается (MaxHeight=60) — полный текст в тултипе.
             error.Bind(ToolTip.TipProperty, new Binding("ErrorMessage"));

@@ -9,7 +9,7 @@
         Width="640" Height="420" MinWidth="540" MinHeight="320"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI" FontSize="13"
+        FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
 
@@ -28,7 +28,7 @@
 
         <!-- Заголовок + пояснение: выбирается файл дистрибутива для текущей ОС (issue #334). -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
-            <TextBlock FontSize="14" FontWeight="SemiBold" Text="{loc:Loc PlatformUpdate.DistributionPicker.Title}"/>
+            <TextBlock FontSize="15" FontWeight="SemiBold" Text="{loc:Loc PlatformUpdate.DistributionPicker.Title}"/>
             <TextBlock FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        Text="{loc:Loc PlatformUpdate.DistributionPicker.Description}"/>

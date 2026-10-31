@@ -399,7 +399,10 @@ namespace Workspace1C
             toolbar.Children.Add(uncheckAll);
             toolbar.Children.Add(invert);
 
-            toolbar.Children.Add(new Border { Width = 1, Height = 18, Background = Brushes.Gray });
+            // Разделитель — на кисти границы темы (аудит UI, п. 2.9) вместо Brushes.Gray.
+            var separator = new Border { Width = 1, Height = 18 };
+            ThemeBrushes.Bind(separator, Border.BackgroundProperty, "BorderColorBrush");
+            toolbar.Children.Add(separator);
 
             toolbar.Children.Add(new TextBlock
             {

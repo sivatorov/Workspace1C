@@ -46,9 +46,10 @@ public sealed class Issue54ThinClientHighlightTests
         Assert.Contains("SelectedValue=\"{Binding SelectedPlatform, Mode=TwoWay}\"", xaml, StringComparison.Ordinal);
 
         // Имя с локализованным суффиксом «(тонкий клиент)» + оранжевая подсветка.
+        // Аудит UI 1.0.1.10, п. 2.10: фиксированный #F59E0B заменён кистью темы WarningBrush.
         Assert.Contains("Text=\"{Binding DisplayName}\"", xaml, StringComparison.Ordinal);
         Assert.Contains("DataTrigger Binding=\"{Binding IsThinClient}\" Value=\"True\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("#F59E0B", xaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"{DynamicResource WarningBrush}\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]

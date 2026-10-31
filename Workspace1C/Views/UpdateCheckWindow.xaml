@@ -9,7 +9,6 @@
         MinHeight="500" MinWidth="680"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -149,7 +148,7 @@
                     </TextBlock>
 
                     <TextBlock x:Name="ErrorText" FontSize="12" Margin="0,12,0,0" TextWrapping="Wrap"
-                               Foreground="#EF4444"/>
+                               Foreground="{DynamicResource ErrorBrush}"/>
 
                     <!-- Панель действий при ошибке авторизации (issue #323/#330/#334): имя
                          используемой учётной записи ИТС, открыть login.1c.ru в браузере,

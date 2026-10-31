@@ -54,7 +54,14 @@ public sealed class Issue61TitleColorsTests
         Assert.DoesNotContain("Foreground=\"#1C1917\"", main, System.StringComparison.Ordinal);
         Assert.DoesNotContain("Foreground=\"#1C1917\"", settings, System.StringComparison.Ordinal);
         // Текст больше нигде не красится кистью плашки (только фон Border).
-        Assert.DoesNotContain("Foreground=\"{DynamicResource FavoriteBrush}\"", main, System.StringComparison.Ordinal);
+        // Исключение (аудит UI 1.0.1.10, п. 2.10): кисть разрешена значку-звезде
+        // PackIcon Star в MainWindow — это иконка, а не текст на плашке.
+        foreach (var line in main.Split('\n'))
+        {
+            if (line.Contains("Foreground=\"{DynamicResource FavoriteBrush}\"", System.StringComparison.Ordinal))
+                Assert.True(line.Contains("PackIcon", System.StringComparison.Ordinal),
+                    "Foreground=\"{DynamicResource FavoriteBrush}\" допустим только у иконки PackIcon, не у текста");
+        }
         Assert.DoesNotContain("Foreground=\"{DynamicResource FavoriteBrush}\"", settings, System.StringComparison.Ordinal);
     }
 

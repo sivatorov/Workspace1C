@@ -9,7 +9,6 @@
         MinHeight="440" MinWidth="480"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -168,7 +167,7 @@
                                 Click="OnClearSelectionClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"
-                                                         Foreground="#EF4444" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc CacheClean.ClearAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>

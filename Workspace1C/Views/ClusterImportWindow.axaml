@@ -68,7 +68,7 @@
                                    FontSize="11" Opacity="0.7" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="4" Text="{Binding SkipReason}"
-                                   FontSize="11" Foreground="#B45309" VerticalAlignment="Center"
+                                   FontSize="11" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                     </Grid>
                 </DataTemplate>

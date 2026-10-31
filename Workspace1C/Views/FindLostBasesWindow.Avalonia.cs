@@ -550,7 +550,10 @@ namespace Workspace1C
 
             toolbar.Children.Add(checkAll);
             toolbar.Children.Add(uncheckAll);
-            toolbar.Children.Add(new Border { Width = 1, Height = 18, Background = Brushes.Gray });
+            // Разделитель — на кисти границы темы (аудит UI, п. 2.9) вместо Brushes.Gray.
+            var separator = new Border { Width = 1, Height = 18 };
+            ThemeBrushes.Bind(separator, Border.BackgroundProperty, "BorderColorBrush");
+            toolbar.Children.Add(separator);
 
             _stopButton = new Button
             {
@@ -574,7 +577,10 @@ namespace Workspace1C
             _searchButton.Styled(ControlThemes.DialogConfirmButton);
             _searchButton.Click += (_, _) => OnSearchClick();
 
-            toolbar.Children.Add(new Border { Width = 1, Height = 18, Background = Brushes.Gray });
+            // Разделитель — на кисти границы темы (аудит UI, п. 2.9) вместо Brushes.Gray.
+            var separator2 = new Border { Width = 1, Height = 18 };
+            ThemeBrushes.Bind(separator2, Border.BackgroundProperty, "BorderColorBrush");
+            toolbar.Children.Add(separator2);
             toolbar.Children.Add(_stopButton);
             toolbar.Children.Add(_searchButton);
 

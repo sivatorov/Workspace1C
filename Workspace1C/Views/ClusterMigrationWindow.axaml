@@ -50,7 +50,7 @@
                                    FontSize="11" Opacity="0.7" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="4" Text="{Binding SourceStatus}"
-                                   FontSize="11" Foreground="#B45309" VerticalAlignment="Center"
+                                   FontSize="11" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="5" Text="{Binding TargetStatusDisplay}"
                                    FontSize="11" Foreground="#DC2626" VerticalAlignment="Center"

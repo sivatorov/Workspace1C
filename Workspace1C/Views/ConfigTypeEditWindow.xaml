@@ -8,7 +8,6 @@
         MinHeight="620" MinWidth="600"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -97,7 +96,7 @@
                                 <DataGridTextColumn.ElementStyle>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="HorizontalAlignment" Value="Center"/>
-                                        <Setter Property="Foreground" Value="#F59E0B"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
@@ -127,14 +126,14 @@
                                 Margin="0,0,8,0" Click="OnSetDefaultEditionClick"
                                 ToolTip="{loc:Loc Updates.SetDefaultEditionHint}">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="StarOutline" Width="16" Height="16" Foreground="#F59E0B"/>
+                                <materialDesign:PackIcon Kind="StarOutline" Width="16" Height="16" Foreground="{DynamicResource FavoriteBrush}"/>
                                 <TextBlock Text="{loc:Loc Updates.SetDefaultEdition}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
                         <Button x:Name="RemoveEditionButton" Height="30" Style="{StaticResource OutlineButtonStyle}"
                                 Click="OnRemoveEditionClick">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Minus" Width="16" Height="16" Foreground="#EF4444"/>
+                                <materialDesign:PackIcon Kind="Minus" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}"/>
                                 <TextBlock Text="{loc:Loc Updates.Delete}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>

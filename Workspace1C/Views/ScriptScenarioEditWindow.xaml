@@ -25,17 +25,20 @@
     </Window.Resources>
 
     <DockPanel x:Name="RootPanel" Margin="14">
+        <!-- Футер диалога (аудит UI, пп. 3.3 и 5.3): единые MinWidth/Padding и ключи локализации. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-            <Button x:Name="OkButton" Content="OK" Width="90" Margin="0,0,8,0" Padding="6,4" IsDefault="True" Click="Ok_Click"/>
-            <Button Content="Отмена" Width="90" Padding="6,4" IsCancel="True" Click="Cancel_Click"/>
+            <Button x:Name="OkButton" Content="{loc:Loc Common.Save}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsDefault="True" Click="Ok_Click"/>
+            <Button Content="{loc:Loc Common.Cancel}" MinWidth="96" Padding="12,5" IsCancel="True" Click="Cancel_Click"/>
         </StackPanel>
 
         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock x:Name="NameLabel" Text="Наименование" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <!-- Локализация (аудит UI, п. 5.3): литералы заменены ключами Script.*.
+                     Конструктор окна дополнительно перезаписывает их через LocalizationManager.T. -->
+                <TextBlock x:Name="NameLabel" Text="{loc:Loc Script.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <TextBox x:Name="NameBox" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Padding="4" Margin="0,0,0,10"/>
 
-                <TextBlock x:Name="FilePathLabel" Text="Путь к файлу" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="FilePathLabel" Text="{loc:Loc Script.FilePath}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -43,12 +46,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="FilePathBox" Grid.Column="0" Text="{Binding FilePath, UpdateSourceTrigger=PropertyChanged}" Padding="4" TextChanged="OnTextChanged"/>
-                    <Button x:Name="BrowseButton" Grid.Column="2" Content="Обзор…" Width="90" Padding="6,3" Click="Browse_Click"/>
+                    <Button x:Name="BrowseButton" Grid.Column="2" Content="{loc:Loc Script.Browse}" MinWidth="96" Padding="12,5" Click="Browse_Click"/>
                 </Grid>
 
                 <!-- Issue #308, п.7: «Папка запуска» — рабочий каталог процесса скрипта
                      (WorkingDirectory); пусто — наследуется каталог приложения. -->
-                <TextBlock x:Name="WorkingDirectoryLabel" Text="Папка запуска" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="WorkingDirectoryLabel" Text="{loc:Loc Script.WorkingDirectory}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <Grid Margin="0,0,0,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -56,12 +59,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="WorkingDirectoryBox" Grid.Column="0" Text="{Binding WorkingDirectory, UpdateSourceTrigger=PropertyChanged}" Padding="4" TextChanged="OnTextChanged"/>
-                    <Button x:Name="WorkingDirectoryBrowseButton" Grid.Column="2" Content="Обзор…" Width="90" Padding="6,3" Click="BrowseWorkingDirectory_Click"/>
+                    <Button x:Name="WorkingDirectoryBrowseButton" Grid.Column="2" Content="{loc:Loc Script.Browse}" MinWidth="96" Padding="12,5" Click="BrowseWorkingDirectory_Click"/>
                 </Grid>
 
                 <!-- Issue #308, п.9: «Интерпретатор» — выбор shell запуска:
                      Авто (по платформе) / cmd / PowerShell / sh. -->
-                <TextBlock x:Name="ShellLabel" Text="Интерпретатор" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="ShellLabel" Text="{loc:Loc Script.Shell}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <!-- Issue #308, п.14:39: галки «Скрывать окно скрипта» и «Уведомлять
                      о запуске» — в одной строке с «Интерпретатор», чтобы не терялись
                      внизу окна. При снятой «Скрывать окно» на Windows показывается
@@ -91,13 +94,13 @@
                     </CheckBox>
                 </Grid>
 
-                <TextBlock x:Name="ParametersLabel" Text="Параметры" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="ParametersLabel" Text="{loc:Loc Script.Parameters}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <TextBox x:Name="ParametersBox" Text="{Binding ParametersText, UpdateSourceTrigger=PropertyChanged}"
                          AcceptsReturn="True" TextWrapping="Wrap" MinHeight="90" MaxHeight="150"
                          VerticalScrollBarVisibility="Auto" Padding="4" Margin="0,0,0,4" TextChanged="OnTextChanged"/>
                 <TextBlock x:Name="ParametersHint" Text="" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="11" Margin="2,0,0,10"/>
 
-                <TextBlock x:Name="TokensLabel" Text="Подстановки" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="TokensLabel" Text="{loc:Loc Script.Tokens}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <!-- Issue #308: в списке отображается «%token% — описание», двойной клик
                      вставляет только сам токен (DataTemplate по объекту ScriptTokenHint). -->
                 <ListBox x:Name="TokensList" Height="130" Margin="0,0,0,4" MouseDoubleClick="TokensList_MouseDoubleClick">
@@ -121,7 +124,7 @@
                                FontSize="11" VerticalAlignment="Center" Margin="10,0,0,0" TextWrapping="Wrap"/>
                 </StackPanel>
 
-                <TextBlock x:Name="ExampleBaseLabel" Text="База для примера подстановок" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <TextBlock x:Name="ExampleBaseLabel" Text="{loc:Loc Script.ExampleBase}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <!-- Issue #308, п.14:37: явный ItemTemplate — закрытый комбобокс показывает
                      имя базы, а не ToString() объекта (имя типа Infobase). Рядом — галка
                      «Не закрывать»: добавляет хвост pause/Read-Host/read к команде

@@ -152,7 +152,8 @@
                 <DataGridTemplateColumn Width="1.6*" Header="{loc:Loc ConnectionReplace.Columns.After}">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <Border Margin="2,2" CornerRadius="3">
+                            <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 3 → 4. -->
+                            <Border Margin="2,2" CornerRadius="4">
                                 <Border.Style>
                                     <Style TargetType="Border">
                                         <Setter Property="Background" Value="Transparent"/>
@@ -204,7 +205,7 @@
                     Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="8,0,0,0"
                     Foreground="{DynamicResource TextPrimaryBrush}" Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

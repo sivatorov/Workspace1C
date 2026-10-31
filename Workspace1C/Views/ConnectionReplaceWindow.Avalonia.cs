@@ -123,12 +123,13 @@ namespace Workspace1C
             summary.Bind(TextBlock.TextProperty, new Binding("SummaryText"));
             var result = new TextBlock { FontSize = 12, Opacity = 0.85, TextWrapping = TextWrapping.Wrap };
             result.Bind(TextBlock.TextProperty, new Binding("ResultText"));
+            // Ошибка — на семантической кисти темы (аудит UI, п. 2.9).
             var error = new TextBlock
             {
                 FontSize = 12,
-                Foreground = new SolidColorBrush(Color.Parse("#DC2626")),
                 TextWrapping = TextWrapping.Wrap
             };
+            ThemeBrushes.Bind(error, TextBlock.ForegroundProperty, "ErrorBrush");
             error.Bind(TextBlock.TextProperty, new Binding("ErrorMessage"));
 
             // ---- Кнопки: Заменить (с подтверждением), Отменить, Закрыть. ----

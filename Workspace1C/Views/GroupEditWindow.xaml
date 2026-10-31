@@ -16,7 +16,6 @@
         MaxHeight="880"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        FontFamily="Segoe UI"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -42,15 +41,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- Тёмный фон — белые и цветные иконки всегда читаются -->
+        <!-- Плитки пикера иконок на кистях темы (аудит UI, п. 2.6): фон и наведение
+             следуют IconPickerBaseBrush/IconPickerHoverBrush вместо фиксированных
+             тёмно-серых #374151/#4B5563. -->
         <Style x:Key="IconPickButton" TargetType="Button">
             <Setter Property="Width" Value="40"/>
             <Setter Property="Height" Value="40"/>
             <Setter Property="Margin" Value="3"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Background" Value="#374151"/>
+            <Setter Property="Background" Value="{DynamicResource IconPickerBaseBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="#4B5563"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource IconPickerHoverBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -62,8 +63,8 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#4B5563"/>
-                                <Setter TargetName="Bd" Property="BorderBrush" Value="#9CA3AF"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource IconPickerHoverBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

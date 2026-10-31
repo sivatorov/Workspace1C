@@ -24,7 +24,6 @@
         AllowDrop="True"
         PreviewDragOver="OnWindow_PreviewDragOver"
         PreviewDrop="OnWindow_PreviewDrop"
-        FontFamily="Segoe UI"
         FontSize="13"
         Background="{DynamicResource ContentBackgroundBrush}"
         ResizeMode="CanResize"
@@ -389,8 +388,9 @@
                             </Border>
 
                             <!-- Вкладки Все / Избранное / Недавние + действия -->
+                            <!-- Шкала скруглений (аудит UI, п. 3.1): 4/6/8/10; выброс 12 → 10. -->
                             <Border Grid.Column="2" Background="{DynamicResource ContentBackgroundBrush}"
-                                    CornerRadius="12" Padding="4" Margin="0,0,8,0" VerticalAlignment="Center"
+                                    CornerRadius="10" Padding="4" Margin="0,0,8,0" VerticalAlignment="Center"
                                     BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
                                 <StackPanel x:Name="TabsPanel" Orientation="Horizontal" VerticalAlignment="Center">
                                     <RadioButton GroupName="ListMode"
@@ -605,7 +605,7 @@
                             <Button Command="{Binding AddInfobaseCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.AddBase}">
-                                <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Foreground="#22C55E"/>
+                                <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Foreground="{DynamicResource SuccessBrush}"/>
                             </Button>
                             <Button Command="{Binding EditInfobaseCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
@@ -624,7 +624,7 @@
                             <Button Command="{Binding ClearCacheCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.ClearCacheTooltip}">
-                                <materialDesign:PackIcon Kind="Broom" Width="18" Height="18" Foreground="#F59E0B"/>
+                                <materialDesign:PackIcon Kind="Broom" Width="18" Height="18" Foreground="{DynamicResource WarningBrush}"/>
                             </Button>
                             <!-- Индикатор выгрузки .dt/.cf: появляется при запуске пакетной операции,
                                  анимируется (стрелка вверх подпрыгивает) и скрывается по её завершении.
@@ -635,7 +635,7 @@
                                     ToolTip="{Binding ExportIndicatorTooltip}"
                                     Focusable="False" Cursor="Hand">
                                 <materialDesign:PackIcon Kind="Upload" Width="18" Height="18"
-                                                         Foreground="#F59E0B">
+                                                         Foreground="{DynamicResource WarningBrush}">
                                     <materialDesign:PackIcon.RenderTransform>
                                         <TranslateTransform x:Name="ExportIndicatorBounce" Y="0"/>
                                     </materialDesign:PackIcon.RenderTransform>
@@ -1770,7 +1770,8 @@
                                                             </Style>
                                                         </materialDesign:PackIcon.Style>
                                                     </materialDesign:PackIcon>
-                                                    <Border VerticalAlignment="Center" Margin="2,0,0,0" CornerRadius="3" Padding="4,0,4,1"
+                                                    <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 3 → 4. -->
+                                                    <Border VerticalAlignment="Center" Margin="2,0,0,0" CornerRadius="4" Padding="4,0,4,1"
                                                             Background="{DynamicResource FavoriteBrush}">
                                                         <Border.Style>
                                                             <Style TargetType="Border">
@@ -1801,7 +1802,7 @@
                                                              была фиксированная константа #1C1917, нечитаемая при тёмных
                                                              пользовательских схемах. -->
                                                         <TextBlock Text="{Binding FavoriteHotkeyDisplay}"
-                                                                   FontSize="{Binding DataContext.RowHotkeyFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="Bold"
+                                                                   FontSize="{Binding DataContext.RowHotkeyFontSize, RelativeSource={RelativeSource AncestorType=Window}}" FontWeight="SemiBold"
                                                                    Foreground="{DynamicResource FavoriteTextBrush}"
                                                                    HorizontalAlignment="Center"
                                                                    VerticalAlignment="Center"/>
@@ -1999,7 +2000,8 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Background="{DynamicResource ItemHoverBrush}" CornerRadius="3"
+                                                        <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 3 → 4. -->
+                                                        <Border Background="{DynamicResource ItemHoverBrush}" CornerRadius="4"
                                                                 Padding="4,0" Margin="0,0,3,0"
                                                                 VerticalAlignment="Center"
                                                                 BorderThickness="0" SnapsToDevicePixels="True">
@@ -2229,12 +2231,13 @@
                                                         </Button.Style>
                                                         <Button.Template>
                                                             <ControlTemplate TargetType="Button">
+                                                                <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 5 → 4. -->
                                                                 <Border x:Name="ExpanderBorder"
                                                                         Width="22" Height="22"
                                                                         Background="{DynamicResource CardBackgroundBrush}"
                                                                         BorderBrush="{DynamicResource AccentBrush}"
                                                                         BorderThickness="1.5"
-                                                                        CornerRadius="5"
+                                                                        CornerRadius="4"
                                                                         SnapsToDevicePixels="True">
                                                                     <Grid>
                                                                         <!-- «−» : группа развёрнута -->
@@ -2451,7 +2454,7 @@
                                 <Border Background="#FEF3C7" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
                                         Visibility="{Binding SelectedInfobase.IsFavorite, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Star" Width="12" Height="12" Foreground="#F59E0B" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Star" Width="12" Height="12" Foreground="{DynamicResource FavoriteBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                         <!-- Issue #61: подпись «Избранное» на постоянной светло-кремовой плашке #FEF3C7.
                                              Раньше текст был кистью FavoriteBrush (в тёмной теме жёлтый #FBBF24) —
                                              «жёлтое на жёлтом», нечитаемо. Теперь тёмный текст FavoriteTextBrush. -->
@@ -2466,11 +2469,11 @@
                                         </TextBlock>
                                     </StackPanel>
                                 </Border>
-                                <Border Background="#EDE9FE" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
+                                <Border Background="{DynamicResource PinnedBadgeBrush}" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
                                         Visibility="{Binding SelectedInfobase.IsPinned, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Pin" Width="12" Height="12" Foreground="#8B5CF6" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Main.PinnedLabel}" FontSize="11" Foreground="#5B21B6"/>
+                                        <TextBlock Text="{loc:Loc Main.PinnedLabel}" FontSize="11" Foreground="{DynamicResource PinnedBadgeTextBrush}"/>
                                     </StackPanel>
                                 </Border>
                             </WrapPanel>
@@ -2479,7 +2482,8 @@
                             <TextBlock Text="{loc:Loc Main.SectionConnInfo}" FontWeight="SemiBold" FontSize="11"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
                                        Typography.Capitals="AllSmallCaps"/>
-                            <Border Background="{DynamicResource ContentBackgroundBrush}" CornerRadius="12"
+                            <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 12 → 10. -->
+                            <Border Background="{DynamicResource ContentBackgroundBrush}" CornerRadius="10"
                                     BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
                                     Padding="12,10" Margin="0,0,0,14">
                                 <Grid>
@@ -2707,7 +2711,7 @@
                                             <MenuItem Header="{loc:Loc Main.LaunchAsAdmin}" Command="{Binding LaunchEnterpriseAsAdminCommand}"
                                                       Style="{DynamicResource ModernMenuItem}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="ShieldAccount" Width="18" Height="18" Foreground="#F59E0B"/>
+                                                    <materialDesign:PackIcon Kind="ShieldAccount" Width="18" Height="18" Foreground="{DynamicResource WarningBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                         </ContextMenu>
@@ -2805,7 +2809,7 @@
                                             <MenuItem Header="{loc:Loc Main.LaunchAsAdmin}" Command="{Binding LaunchConfiguratorAsAdminCommand}"
                                                       Style="{DynamicResource ModernMenuItem}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="ShieldAccount" Width="18" Height="18" Foreground="#F59E0B"/>
+                                                    <materialDesign:PackIcon Kind="ShieldAccount" Width="18" Height="18" Foreground="{DynamicResource WarningBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                         </ContextMenu>
@@ -2832,7 +2836,7 @@
                             </Button.Style>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                 <materialDesign:PackIcon Kind="Application" Width="15" Height="15" Margin="0,0,6,0"
-                                                         Foreground="#F59E0B" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center"/>
                                 <!-- Светлая подпись на тёмной кнопке панели действий (issue #26): ButtonTextBrush
                                      в тёмной теме чёрный и на фоне карточки не читался — здесь и у «По ссылке» текст
                                      берёт основной цвет темы TextPrimaryBrush (WPF) / TextPrimaryColorBrush (Avalonia). -->

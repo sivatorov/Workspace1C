@@ -7,6 +7,12 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://Workspace1C/Themes/ControlDefaults.axaml" />
+        <!-- Пользовательский шрифт интерфейса (аудит UI 1.0.1.10, п. 1.9): окна строятся
+             кодом без литералов FontFamily и следуют ресурсу UiFontFamily, который
+             выставляет ThemeManager.ApplyFontToAllWindows из настроек (FontSettings). -->
+        <Style Selector=":is(Window)">
+            <Setter Property="FontFamily" Value="{DynamicResource UiFontFamily}"/>
+        </Style>
     </Application.Styles>
 
     <Application.Resources>

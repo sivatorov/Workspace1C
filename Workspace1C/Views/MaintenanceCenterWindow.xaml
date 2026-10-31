@@ -98,7 +98,7 @@
                         <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding FreeSpaceIsProblem}" Value="True">
-                                    <Setter Property="Foreground" Value="#E53935"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                                     <Setter Property="FontWeight" Value="SemiBold"/>
                                 </DataTrigger>
                             </Style.Triggers>
@@ -159,7 +159,7 @@
                                 <StackPanel>
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="{Binding GrowthText}" FontSize="11" Foreground="#E53935"/>
+                                        <TextBlock Text="{Binding GrowthText}" FontSize="11" Foreground="{DynamicResource ErrorBrush}"/>
                                         <TextBlock Text="{Binding CurrentSizeText}" FontSize="11" Margin="8,0,0,0"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                                     </StackPanel>
@@ -220,7 +220,7 @@
                     Foreground="{DynamicResource TextPrimaryBrush}"
                     Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

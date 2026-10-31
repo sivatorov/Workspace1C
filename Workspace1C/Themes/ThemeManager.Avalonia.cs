@@ -343,6 +343,14 @@ namespace Workspace1C.Themes
         public static void ApplyFontToAllWindows(
             string fontFamily, double fontSize, string fontWeight, string fontStyle)
         {
+            // Ресурс UiFontFamily (аудит UI 1.0.1.10, п. 1.9): окна следуют ему через
+            // стиль в App.axaml, поэтому новые диалоги, открытые после смены шрифта,
+            // тоже наследуют выбор пользователя без перезапуска.
+            if (Application.Current is { } app)
+            {
+                var family = string.IsNullOrWhiteSpace(fontFamily) ? DefaultFontFamily : fontFamily;
+                app.Resources["UiFontFamily"] = new FontFamily(family);
+            }
             if (Application.Current?.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
                 return;
             foreach (Window window in desktop.Windows)

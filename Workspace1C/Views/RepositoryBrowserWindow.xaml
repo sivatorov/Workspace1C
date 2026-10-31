@@ -119,7 +119,7 @@
                     Foreground="{DynamicResource TextPrimaryBrush}"
                     Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.Close}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -268,7 +268,7 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#D97706"
+            <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource WarningBrush}"
                        TextWrapping="Wrap" Text="{loc:Loc RepositoryBrowser.HistoryUnavailable}">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">

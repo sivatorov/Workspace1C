@@ -312,15 +312,17 @@
                 </Button>
                 <!-- Сортировка списка баз (issue #3, 7OH 17.10): Добавить, Правка | А→Я, Я→А | Удалить. -->
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
+                <!-- Языконезависимые глифы сортировки (аудит UI, п. 4.4): «А↓/Я↓»
+                     сменились на нейтральные «A↓/Z↓». -->
                 <Button x:Name="SortInfobasesAscButton" Style="{StaticResource IconOnlyButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortAsc}"
                         Click="OnSortInfobasesAsc_Click">
-                    <TextBlock Text="А↓" VerticalAlignment="Center"/>
+                    <TextBlock Text="A↓" VerticalAlignment="Center"/>
                 </Button>
                 <Button x:Name="SortInfobasesDescButton" Style="{StaticResource IconOnlyButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortDesc}"
                         Click="OnSortInfobasesDesc_Click">
-                    <TextBlock Text="Я↓" VerticalAlignment="Center"/>
+                    <TextBlock Text="Z↓" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Кнопке удаления — красная иконка (issue #3). -->
@@ -547,7 +549,7 @@
                                             Binding="{Binding StateText}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
-                                    <Setter Property="Foreground" Value="#64748B"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding State}" Value="active">
                                             <Setter Property="Foreground" Value="#16A34A"/>
@@ -556,13 +558,13 @@
                                             <Setter Property="Foreground" Value="#DC2626"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding State}" Value="sleep">
-                                            <Setter Property="Foreground" Value="#D97706"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding State}" Value="call">
-                                            <Setter Property="Foreground" Value="#D97706"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding State}" Value="wait">
-                                            <Setter Property="Foreground" Value="#D97706"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -639,10 +641,10 @@
                                             Binding="{Binding BlockedText}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
-                                    <Setter Property="Foreground" Value="#64748B"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding Blocked}" Value="True">
-                                            <Setter Property="Foreground" Value="#D97706"/>
+                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -681,7 +683,7 @@
                                             Binding="{Binding WaitingSymbol}">
                             <DataGridTextColumn.ElementStyle>
                                 <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
-                                    <Setter Property="Foreground" Value="#D97706"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
@@ -765,7 +767,7 @@
                              когда текст непустой; при пустом — скрывается. Раньше
                              триггеры были инвертированы (warning скрывался). -->
                         <TextBlock Text="{Binding LicenseStatusText}" FontSize="12"
-                                   Foreground="#D97706" TextWrapping="Wrap" Margin="0,0,0,4">
+                                   Foreground="{DynamicResource WarningBrush}" TextWrapping="Wrap" Margin="0,0,0,4">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">
                                     <Setter Property="Visibility" Value="Visible"/>

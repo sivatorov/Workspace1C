@@ -9,7 +9,7 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         MaxHeight="800"
-        FontFamily="Segoe UI" FontSize="13"
+        FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
 
