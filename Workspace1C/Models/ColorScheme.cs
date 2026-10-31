@@ -108,6 +108,34 @@ public class ColorScheme
         => dark ? DarkColors : LightColors;
 
     /// <summary>
+    /// Проверяет, совпадает ли палитра схемы с палитрой <paramref name="other"/> по всем
+    /// ключам обоих вариантов (светлый и тёмный). Используется, чтобы не накладывать
+    /// идентичную схему повторно при старте (аудит производительности: двойное наложение
+    /// палитры в LoginWindow.ApplyActiveTheme перерисовывало все потребители ресурсов).
+    /// </summary>
+    public bool SamePaletteAs(ColorScheme? other)
+    {
+        if (other is null)
+            return false;
+        return SameColors(LightColors, other.LightColors) && SameColors(DarkColors, other.DarkColors);
+    }
+
+    private static bool SameColors(Dictionary<string, string>? a, Dictionary<string, string>? b)
+    {
+        if (a is null || b is null)
+            return ReferenceEquals(a, b);
+        if (a.Count != b.Count)
+            return false;
+        foreach (var (key, value) in a)
+        {
+            if (!b.TryGetValue(key, out var otherValue) ||
+                !string.Equals(value?.Trim(), otherValue?.Trim(), StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
     /// Возвращает значение цвета указанной палитры по ключу. Если ключа нет — значение
     /// по умолчанию для этого варианта (для неузнаваемых ключей — нейтральный запасной).
     /// </summary>

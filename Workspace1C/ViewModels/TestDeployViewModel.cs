@@ -206,6 +206,28 @@ public sealed class TestDeployViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>
+    /// Автосбор профиля СУБД для ibcmd из формы (issue #79, коммент 8: «профиль обязателен»):
+    /// при движке ibcmd для клиент-серверной базы параметры СУБД обязательны — если поля
+    /// СУБД формы пусты, они автоматически собираются из сохранённого профиля окна
+    /// «Резервные копии СУБД» (пользователю не требуется заполнять их повторно; значения
+    /// остаются на форме и выгрузка выполняется по ним — см.
+    /// TestDeployService.BuildDbmsProfileOverride). Возвращает true, если требование
+    /// выполнено либо движок ibcmd не задействован (не ibcmd / файловая база).
+    /// </summary>
+    public bool EnsureIbcmdProfileFromForm(Func<Infobase, DbmsBackupProfile?>? profileResolver = null)
+    {
+        if (EngineIndex != 1 || _source.Connection?.Type != ConnectionType.ClientServer)
+            return true; // ibcmd не задействован — собирать нечего.
+
+        if (!string.IsNullOrWhiteSpace(DbServer) && !string.IsNullOrWhiteSpace(DbName))
+            return true; // параметры уже на форме — используем их.
+
+        // Поля пусты — автосбор из сохранённого профиля в поля формы.
+        AutofillDbmsFromProfile(profileResolver);
+        return !string.IsNullOrWhiteSpace(DbServer) && !string.IsNullOrWhiteSpace(DbName);
+    }
+
     public bool DisableScheduledJobs { get; set; } = true;
     public bool ChangeTitle { get; set; } = true;
     public bool ChangeColor { get; set; } = true;

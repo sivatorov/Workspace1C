@@ -171,7 +171,7 @@ namespace Workspace1C
             // ---- Кнопки (паттерн BaseSelectionWindow: строятся в коде, хост — в разметке). ----
             // Пароль приходит из выбранной записи справочника (issue #27) — PasswordBox нет.
             _connectButton = BuildActionButton(LocalizationManager.T("ClusterImport.Connect"), "🔌",
-                () => _ = ConnectAndSaveAsync());
+                () => _ = SafeConnectAndSaveAsync());
             this.FindControl<ContentControl>("ConnectHost")!.Content = _connectButton;
 
             _loadBasesButton = BuildActionButton(LocalizationManager.T("ClusterImport.LoadBases"), "⟳",
@@ -221,16 +221,37 @@ namespace Workspace1C
                 SaveRacSettings();
         }
 
+        /// <summary>
+        /// «Подключиться» с гарантией обработки исключений (аудит гонок): ConnectAsync
+        /// сам глотает ошибки rac, но сбои сохранения настроек и прочие исключения не
+        /// должны уходить в «ничто» — показываем их пользователем через IDialogService.
+        /// </summary>
+        private async System.Threading.Tasks.Task SafeConnectAndSaveAsync()
+        {
+            try
+            {
+                await ConnectAndSaveAsync();
+            }
+            catch (Exception ex)
+            {
+                AppServices.GetRequiredService<IDialogService>()
+                    .ShowError(ex.Message, Title);
+            }
+        }
+
         private void OnImportClick()
         {
-            _vm.ImportCommand.Execute(null);
-            if (_vm.SelectedBases.Count == 0)
+            // Проверка выбора ДО запуска команды (аудит гонок): ранее команда выполнялась
+            // первой, а счётчик проверялся после — при пустом выборе импорт всё равно
+            // проходил с ложным «ничего не выбрано» после закрытия.
+            if (_vm.ReadyToImportCount == 0)
             {
                 AppServices.GetRequiredService<IDialogService>()
                     .ShowInfo(LocalizationManager.T("Selection.NothingSelected"), Title);
                 return;
             }
 
+            _vm.ImportCommand.Execute(null);
             DialogResult = true;
             Close();
         }

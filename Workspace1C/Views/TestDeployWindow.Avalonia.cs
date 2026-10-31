@@ -463,6 +463,10 @@ public class TestDeployWindow : ModalWindowBase
         if (_busy)
             return;
 
+        // Автосбор профиля СУБД ibcmd из формы (issue #79, коммент 8): если профиль
+        // обязателен, а поля пусты — подставляем из сохранённого профиля автоматически.
+        _vm.EnsureIbcmdProfileFromForm();
+
         var errors = _vm.Validate();
         if (errors.Count > 0)
         {

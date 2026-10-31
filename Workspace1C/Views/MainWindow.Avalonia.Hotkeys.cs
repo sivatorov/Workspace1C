@@ -722,7 +722,12 @@ namespace Workspace1C
             if (!string.IsNullOrWhiteSpace(colorHex))
             {
                 try { circle.Background = new SolidColorBrush(Color.Parse(colorHex)); }
-                catch { circle.Background = Brushes.Gray; }
+                catch { circle.Background = Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B"); }
+            }
+            else
+            {
+                // Без статуса — тематизированная нейтральная кисть (аудит UI) вместо Brushes.Gray.
+                circle.Background = Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B");
             }
             return circle;
         }
@@ -753,7 +758,7 @@ namespace Workspace1C
                     HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
                     VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
                     Margin = new Thickness(0, 0, 1, 1),
-                    BorderBrush = Brushes.White,
+                    BorderBrush = Themes.ThemeBrushes.Get("CardBackgroundBrush", "#FFFFFF"),
                     BorderThickness = new Thickness(1)
                 });
             }

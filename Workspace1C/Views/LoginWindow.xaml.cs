@@ -77,11 +77,18 @@ namespace Workspace1C
                 // задаётся до ApplyScheme — тот выбирает палитру по CurrentTheme.
                 if (Themes.ThemeFeatureMap.ResolveDarkVariant(settings.Theme) is bool darkVariant)
                     Themes.ThemeManager.ApplyTheme(darkVariant);
-                Themes.ThemeManager.ApplyScheme(mergedScheme);
+                // Оптимизация старта (аудит производительности): ApplyFullTheme/ApplyTheme
+                // уже наложили палитру — идентичную схему повторно не накладываем
+                // (иначе все DynamicResource-потребители перерисовывались дважды).
+                if (!Themes.ThemeManager.CurrentScheme.SamePaletteAs(mergedScheme))
+                    Themes.ThemeManager.ApplyScheme(mergedScheme);
             }
-            catch
+            catch (Exception ex)
             {
-                // Тема не должна блокировать вход: без неё используется тема по умолчанию.
+                // Тема не должна блокировать вход: без неё используется тема по умолчанию,
+                // но причина фиксируется в журнале (диагностика темы при входе).
+                try { AppServices.GetRequiredService<IAppLogger>().Warn($"LoginWindow: не удалось применить тему при старте: {ex.Message}"); }
+                catch { /* журнал недоступен — не блокируем вход */ }
             }
         }
 

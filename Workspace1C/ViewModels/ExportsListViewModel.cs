@@ -41,6 +41,16 @@ public class ExportsListViewModel : ViewModelBase
     /// </summary>
     public void Refresh()
     {
+        var items = ScanItems();
+
+        Items.Clear();
+        foreach (var item in items)
+            Items.Add(item);
+    }
+
+    /// <summary>Сканирует каталоги (без обращения к <see cref="Items"/>) — синхронно.</summary>
+    private List<BackupExportItem> ScanItems()
+    {
         var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var dir in _settings.BackupTargetDirectories ?? new List<string>())
         {
@@ -86,7 +96,18 @@ public class ExportsListViewModel : ViewModelBase
         }
 
         items.Sort((a, b) => b.LastWriteTime.CompareTo(a.LastWriteTime));
+        return items;
+    }
 
+    /// <summary>
+    /// Асинхронное обновление (аудит производительности): сканирование каталогов
+    /// (в т.ч. сетевых) выполняется в фоновой задаче, а применение результата к
+    /// <see cref="Items"/> — в исходном (UI) контексте. Продолжение после await
+    /// возвращается в контекст вызывающего (SyncContext не подавляется намеренно).
+    /// </summary>
+    public async Task RefreshAsync()
+    {
+        var items = await Task.Run(ScanItems).ConfigureAwait(false);
         Items.Clear();
         foreach (var item in items)
             Items.Add(item);

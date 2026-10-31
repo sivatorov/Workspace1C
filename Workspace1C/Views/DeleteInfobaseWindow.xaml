@@ -105,7 +105,9 @@
         <!-- Единый контракт кнопок (issue #26): удаление — опасная DangerButton
              (красная заливка и белый текст), «Отмена» — вторичная SecondaryButton. -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Width="140" Height="36" Margin="0,0,10,0" IsDefault="True" Click="OnDelete_Click"
+            <!-- IsDefault убран (аудит безопасности UI): Enter в диалоге НЕ должен удалять
+                 базу — подтверждение только явным щелчком. Esc-отмена уже работает (IsCancel). -->
+            <Button Width="140" Height="36" Margin="0,0,10,0" Click="OnDelete_Click"
                     Style="{DynamicResource DangerButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Delete" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>

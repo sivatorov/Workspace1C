@@ -45,7 +45,25 @@ public partial class ExportsListWindow : Window
         ColDate.Header = T("Restore.DateColumn");
         RestoreButton.IsEnabled = _infobase is not null && _mainVm is not null;
 
-        _vm.Refresh();
+        // Сканирование каталогов НЕ в конструкторе (аудит производительности): сетевые
+        // пути блокировали открытие окна. Первое обновление — после отрисовки, фоновой задачей.
+        ContentRendered += async (_, _) => await RefreshItemsAsync();
+    }
+
+    /// <summary>Фоновое обновление списка с занятием кнопок на время сканирования.</summary>
+    private async System.Threading.Tasks.Task RefreshItemsAsync()
+    {
+        RestoreButton.IsEnabled = false;
+        RefreshButton.IsEnabled = false;
+        try
+        {
+            await _vm.RefreshAsync();
+        }
+        finally
+        {
+            RefreshButton.IsEnabled = true;
+            RestoreButton.IsEnabled = _infobase is not null && _mainVm is not null;
+        }
     }
 
     private static string T(string key) => LocalizationManager.T(key);
@@ -58,7 +76,7 @@ public partial class ExportsListWindow : Window
         RestoreButton.IsEnabled = Selected is not null && _infobase is not null && _mainVm is not null;
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e) => _vm.Refresh();
+    private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshItemsAsync();
 
     private async void Restore_Click(object sender, RoutedEventArgs e)
     {

@@ -117,14 +117,16 @@ namespace Workspace1C.Services
                     }
                 };
                 process.Start();
-                Task<string> stdout = process.StandardOutput.ReadToEndAsync();
-                Task<string> stderr = process.StandardError.ReadToEndAsync();
+                // Синхронное чтение после завершения процесса (аудит sync-over-async):
+                // Task.WaitAll + .Result блокировали поток пула без нужды. Чтение ПОСЛЕ
+                // WaitForExit/Kill безопасно — вывод процесса завершён и буферизован.
                 if (!process.WaitForExit(5000))
                 {
                     try { process.Kill(); } catch { /* процесс уже мог завершиться */ }
                 }
-                Task.WaitAll(stdout, stderr);
-                var output = (stdout.Result + "\n" + stderr.Result).Trim();
+                var stdout = process.StandardOutput.ReadToEnd();
+                var stderr = process.StandardError.ReadToEnd();
+                var output = (stdout + "\n" + stderr).Trim();
                 return output.Length == 0 ? null : output;
             }
             catch

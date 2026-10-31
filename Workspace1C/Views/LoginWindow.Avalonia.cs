@@ -76,11 +76,19 @@ namespace Workspace1C
                 // задаётся до ApplyScheme — тот выбирает палитру по CurrentTheme.
                 if (ThemeFeatureMap.ResolveDarkVariant(settings.Theme) is bool darkVariant)
                     ThemeManager.ApplyTheme(darkVariant);
-                ThemeManager.ApplyScheme(mergedScheme);
+                // Оптимизация старта (аудит производительности): ApplyFullTheme/ApplyTheme
+                // уже наложили палитру — идентичную схему повторно не накладываем
+                // (иначе все DynamicResource-потребители перерисовывались дважды).
+                if (!ThemeManager.CurrentScheme.SamePaletteAs(mergedScheme))
+                    ThemeManager.ApplyScheme(mergedScheme);
             }
-            catch
+            catch (Exception ex)
             {
-                // Тема не должна блокировать вход: без неё используется тема по умолчанию.
+                // Тема не должна блокировать вход: без неё используется тема по умолчанию,
+                // но причина фиксируется в журнале — тема при входе бывает «виновата»
+                // в пустых окнах/нечитаемых формах, диагностика полезна.
+                try { AppServices.GetRequiredService<IAppLogger>().Warn($"LoginWindow: не удалось применить тему при старте: {ex.Message}"); }
+                catch { /* журнал недоступен — не блокируем вход */ }
             }
         }
 
@@ -91,7 +99,11 @@ namespace Workspace1C
             // Кегль окна из разметки: подписи без явного размера берут его по наследству.
             FontSize = 13;
             Width = 460;
-            Height = 360;
+            // Авторазмер по контенту с ограничениями (аудит UI): фиксированная высота 360
+            // сжимала список при 4+ профилях. NaN (Height) — авторасчёт по контенту.
+            Height = double.NaN;
+            MinHeight = 360;
+            MaxHeight = 560;
             MinWidth = 400;
             CanResize = false;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;

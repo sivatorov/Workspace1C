@@ -509,13 +509,14 @@ namespace Workspace1C
             }
             _historyChartCanvas.Children.Add(polyline);
 
+            // Обводка маркера — фон карточки из темы (аудит UI) вместо фиксированного белого.
             var last = chart.Points[chart.Points.Count - 1];
             var dot = new Ellipse
             {
                 Width = 6,
                 Height = 6,
                 Fill = accentBrush,
-                Stroke = Brushes.White,
+                Stroke = ThemeResource("CardBackgroundBrush", new Avalonia.Media.SolidColorBrush(Avalonia.Media.Colors.White)),
                 StrokeThickness = 1
             };
             Canvas.SetLeft(dot, left + last.X * plotW - 3);

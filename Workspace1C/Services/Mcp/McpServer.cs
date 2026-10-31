@@ -45,9 +45,19 @@ public sealed class McpServer
 
     /// <summary>
     /// Запускает stdio-цикл: читает строки из <paramref name="input"/> до EOF и
-    /// обрабатывает каждую. Возвращает код выхода процесса (0 — нормальное завершение).
+    /// обрабатывает каждую (sync-обёртка над <see cref="RunAsync"/> для CLI-точки входа).
     /// </summary>
     public int Run(TextReader input, CancellationToken cancellationToken = default)
+        // Sync-context OK (CLI-точка входа): у процесса MCP нет UI-контекста.
+        => RunAsync(input, cancellationToken).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Асинхронный stdio-цикл (аудит sync-over-async): читает строки из
+    /// <paramref name="input"/> до EOF и обрабатывает каждую через
+    /// <see cref="HandleMessageAsync"/> — инструменты выполняются await'ом,
+    /// без блокировки потока. Возвращает код выхода процесса (0 — нормальное завершение).
+    /// </summary>
+    public async Task<int> RunAsync(TextReader input, CancellationToken cancellationToken = default)
     {
         WriteDiagnostic($"MCP-сервер запущен (инструментов: {_tools.Count}).");
         while (!cancellationToken.IsCancellationRequested)
@@ -68,11 +78,11 @@ public sealed class McpServer
 
             try
             {
-                var response = HandleMessage(line, cancellationToken);
+                var response = await HandleMessageAsync(line, cancellationToken).ConfigureAwait(false);
                 if (response is not null)
                 {
-                    _output.WriteLine(response);
-                    _output.Flush();
+                    await _output.WriteLineAsync(response).ConfigureAwait(false);
+                    await _output.FlushAsync().ConfigureAwait(false);
                 }
             }
             catch (Exception ex)
@@ -99,9 +109,18 @@ public sealed class McpServer
 
     /// <summary>
     /// Обрабатывает одну строку JSON-RPC и возвращает сериализованный ответ
-    /// (null — уведомление/пустая строка, ответ не требуется). Internal — для юнит-тестов.
+    /// (null — уведомление/пустая строка, ответ не требуется). Sync-обёртка над
+    /// <see cref="HandleMessageAsync"/> — осталась для юнит-тестов.
     /// </summary>
     internal string? HandleMessage(string line, CancellationToken cancellationToken = default)
+        // Sync-context OK (юнит-тесты): тесты проверяют синхронный контракт ответов.
+        => HandleMessageAsync(line, cancellationToken).GetAwaiter().GetResult();
+
+    /// <summary>
+    /// Асинхронная обработка одной строки JSON-RPC (аудит sync-over-async):
+    /// инструменты (<c>tools/call</c>) выполняются await'ом, без блокировки потока.
+    /// </summary>
+    internal async Task<string?> HandleMessageAsync(string line, CancellationToken cancellationToken = default)
     {
         var (outcome, request) = McpJsonRpc.Parse(line);
         switch (outcome)
@@ -132,7 +151,7 @@ public sealed class McpServer
             {
                 tools = _tools.Select(t => t.Describe()).ToList()
             }),
-            "tools/call" => HandleToolCall(request.Id, request.Params, cancellationToken),
+            "tools/call" => await HandleToolCallAsync(request.Id, request.Params, cancellationToken).ConfigureAwait(false),
             "notifications/initialized" => McpJsonRpc.SerializeResult(request.Id, new { }),
             _ => McpJsonRpc.SerializeError(
                 request.Id, McpProtocolError.MethodNotFound, $"Method not found: {method}")
@@ -162,7 +181,7 @@ public sealed class McpServer
     /// возвращаются результатом isError=true (контракт MCP); внутренние сбои — ошибкой
     /// JSON-RPC InternalError.
     /// </summary>
-    private string HandleToolCall(JsonNode? id, JsonObject? parameters, CancellationToken cancellationToken)
+    private async Task<string> HandleToolCallAsync(JsonNode? id, JsonObject? parameters, CancellationToken cancellationToken)
     {
         var name = McpJsonRpc.GetString(parameters, "name");
         if (string.IsNullOrWhiteSpace(name))
@@ -181,7 +200,7 @@ public sealed class McpServer
 
         try
         {
-            var data = tool.Handler(arguments, cancellationToken).GetAwaiter().GetResult();
+            var data = await tool.Handler(arguments, cancellationToken).ConfigureAwait(false);
             var text = JsonSerializer.Serialize(data, DataJsonOptions);
             return McpJsonRpc.SerializeResult(id, new
             {

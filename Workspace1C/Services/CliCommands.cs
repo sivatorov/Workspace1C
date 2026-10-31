@@ -319,7 +319,11 @@ public static class CliCommands
                 return (false, null, "http_" + (int)response.StatusCode);
             using var stream = response.Content.ReadAsStreamAsync().GetAwaiter().GetResult();
             using var file = File.Create(dest);
-            stream.CopyToAsync(file).GetAwaiter().GetResult();
+            // Синхронное копирование с буфером 1 МБ (аудит производительности):
+            // CopyToAsync().GetAwaiter().GetResult() давал оверхед async-машины без
+            // пользы (метод и так блокирующий), а дефолтный буфер 8 КБ тормозил
+            // копирование больших dt-файлов обновления.
+            stream.CopyTo(file, bufferSize: 1024 * 1024);
             return (true, dest, string.Empty);
         }
         catch (Exception ex)

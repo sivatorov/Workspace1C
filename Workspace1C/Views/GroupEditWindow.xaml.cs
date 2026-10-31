@@ -57,7 +57,6 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// <summary>
         /// Редактирование служебного узла «Без группы» / «Закреплённые» (у него нет модели Group).
         /// Открывается то же окно, но только с вкладками «Цвет» и «Иконка»,
         /// как для обычной группы (по аналогии с настройками группы).
@@ -194,11 +193,13 @@ namespace Workspace1C
 
                 if (string.IsNullOrEmpty(key))
                 {
+                    // Кисть на теме (аудит UI): текст на кнопке-пикере — «текст на акценте»,
+                    // а не фиксированный белый.
                     btn.Content = new TextBlock
                     {
                         Text = "∅",
                         FontSize = 14,
-                        Foreground = Brushes.White,
+                        Foreground = (TryFindResource("TextOnAccentBrush") as Brush) ?? Brushes.White,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center
                     };
@@ -281,7 +282,9 @@ namespace Workspace1C
                     var isSelected = string.Equals(key, _icon, StringComparison.Ordinal);
                     button.BorderBrush = isSelected
                         ? (isLightIcon
-                            ? new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24)) // янтарь
+                            // Подсветка светлой иконки — семантическая WarningBrush темы
+                            // (аудит UI) вместо фиксированного янтаря #FBBF24.
+                            ? ((TryFindResource("WarningBrush") as Brush) ?? new SolidColorBrush(Color.FromRgb(0xFB, 0xBF, 0x24)))
                             : new SolidColorBrush(c))
                         : IconPickHoverBrush;
                     button.BorderThickness = new Thickness(isSelected ? 2.5 : 1);

@@ -158,11 +158,12 @@ namespace Workspace1C
 
             // Последняя точка — маркер (текущий размер).
             var last = chart.Points[chart.Points.Count - 1];
+            // Обводка маркера — фон карточки из темы (аудит UI) вместо фиксированного белого.
             var dot = new Ellipse
             {
                 Width = 6, Height = 6,
                 Fill = accentBrush,
-                Stroke = Brushes.White,
+                Stroke = (TryFindResource("CardBackgroundBrush") as Brush) ?? Brushes.White,
                 StrokeThickness = 1
             };
             Canvas.SetLeft(dot, left + last.X * plotW - 3);

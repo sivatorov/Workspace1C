@@ -40,13 +40,14 @@ namespace Workspace1C
         {
             // Числа из разметки (SettingsWindow.xaml:912): образец 28 на 20
             // в колонке шириной 36.
+            // Граница образца — DividerBrush темы (аудит UI) вместо фиксированного серого.
             var swatch = new Border
             {
                 Width = 28,
                 Height = 20,
                 CornerRadius = new CornerRadius(4),
                 BorderThickness = new Thickness(1),
-                BorderBrush = Brushes.Gray,
+                BorderBrush = Themes.ThemeBrushes.Get("DividerBrush", "#4B5563"),
                 Background = ParseBrush(value)
             };
 

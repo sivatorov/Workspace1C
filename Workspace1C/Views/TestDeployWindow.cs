@@ -563,6 +563,10 @@ public class TestDeployWindow : Window
         if (_busy)
             return;
 
+        // Автосбор профиля СУБД ibcmd из формы (issue #79, коммент 8): если профиль
+        // обязателен, а поля пусты — подставляем из сохранённого профиля автоматически.
+        _vm.EnsureIbcmdProfileFromForm();
+
         // Валидация формы (понятная ошибка до старта).
         var errors = _vm.Validate();
         if (errors.Count > 0)

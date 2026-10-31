@@ -183,9 +183,12 @@ public partial class UpdateCheckWindow : Window
     {
         StatusText.Text = StatusTextLocalized(_row.Status);
 
-        var brush = FindResource("TextPrimaryBrush") as Brush ?? Brushes.Gray;
+        // Фолбэки — на семантических кистях темы (аудит UI) вместо Brushes.Gray/Green.
+        var brush = FindResource("TextPrimaryBrush") as Brush
+            ?? FindResource("TextSecondaryBrush") as Brush;
         if (_row.HasNewer)
-            brush = FindResource("AccentBrush") as Brush ?? Brushes.Green;
+            brush = FindResource("AccentBrush") as Brush
+                ?? FindResource("SuccessBrush") as Brush;
         else if (_row.Status == ConfigUpdateStatus.Failed)
             brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(0xFF, 0xEF, 0x44, 0x44));
         StatusText.Foreground = brush;
@@ -275,7 +278,8 @@ public partial class UpdateCheckWindow : Window
             _urlLinkEnabled = true;
             UrlLink.NavigateUri = uri;
             UrlLink.IsEnabled = true;
-            UrlLink.Foreground = FindResource("AccentBrush") as Brush ?? Brushes.Gray;
+            UrlLink.Foreground = FindResource("AccentBrush") as Brush
+                ?? FindResource("TextPrimaryBrush") as Brush;
             UrlLink.TextDecorations = TextDecorations.Underline;
             System.Windows.Controls.ToolTipService.SetToolTip(UrlLink, LocalizationManager.T("Updates.OpenCatalog"));
         }
@@ -284,7 +288,7 @@ public partial class UpdateCheckWindow : Window
             _urlLinkEnabled = false;
             UrlLink.NavigateUri = null;
             UrlLink.IsEnabled = false;
-            UrlLink.Foreground = FindResource("TextSecondaryBrush") as Brush ?? Brushes.Gray;
+            UrlLink.Foreground = FindResource("TextSecondaryBrush") as Brush;
             UrlLink.TextDecorations = null;
             System.Windows.Controls.ToolTipService.SetToolTip(UrlLink, null);
         }

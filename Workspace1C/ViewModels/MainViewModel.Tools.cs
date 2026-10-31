@@ -900,44 +900,14 @@ public partial class MainViewModel : ViewModelBase
                      $"пропущено дубликатов {plan.DuplicatesSkipped}");
     }
 
-    /// <summary>Строки CSV-документа: локализованный заголовок + по строке на видимую базу.</summary>
-    private static List<string[]> BuildCsvRows(IEnumerable<Infobase> bases)
-    {
-        var rows = new List<string[]>
-        {
-            new[]
-            {
-                LocalizationManager.T("ExportCsv.ColName"),
-                LocalizationManager.T("ExportCsv.ColGroup"),
-                LocalizationManager.T("ExportCsv.ColType"),
-                LocalizationManager.T("ExportCsv.ColConnection"),
-                LocalizationManager.T("ExportCsv.ColTags"),
-                LocalizationManager.T("ExportCsv.ColFavorite"),
-                LocalizationManager.T("ExportCsv.ColPinned"),
-                LocalizationManager.T("ExportCsv.ColModified"),
-                LocalizationManager.T("ExportCsv.ColSize")
-            }
-        };
-
-        foreach (var ib in bases)
-        {
-            rows.Add(new[]
-            {
-                ib.Name,
-                ib.Group ?? string.Empty,
-                ib.ConnectionTypeDisplay,
-                ib.ConnectionStringDisplay,
-                string.Join(", ", ib.Tags),
-                ib.FavoriteHotkeyNumber >= 1 && ib.FavoriteHotkeyNumber <= 9
-                    ? ib.FavoriteHotkeyNumber.ToString()
-                    : string.Empty,
-                ib.IsPinned ? LocalizationManager.T("ExportCsv.Yes") : LocalizationManager.T("ExportCsv.No"),
-                FormatCsvModified(ib),
-                FormatCsvSize(ib)
-            });
-        }
-        return rows;
-    }
+    /// <summary>
+    /// Строки CSV-документа: локализованный заголовок + по строке на видимую базу.
+    /// Сборка вынесена в <see cref="Services.InfobaseCsvExportService"/> (v100113) —
+    /// единая для WPF/Avalonia и юнит-тестируемая; добавлены колонки «Версия платформы»
+    /// и «Дата последней копии».
+    /// </summary>
+    private static List<IReadOnlyList<string?>> BuildCsvRows(IEnumerable<Infobase> bases)
+        => new(Services.InfobaseCsvExportService.BuildRows(bases));
 
     /// <summary>Дата изменений файла ИБ в формате ГГГГ-ММ-ДД ЧЧ:ММ (локальное время) или пусто.</summary>
     private static string FormatCsvModified(Infobase ib) =>

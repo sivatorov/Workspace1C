@@ -318,21 +318,23 @@ namespace Workspace1C
                 TextTrimming = TextTrimming.CharacterEllipsis
             }, 1);
             AddCell(grid, CellText("BeforeText"), 2);
-            // «Станет»: зелёный Foreground при реальном изменении (подсветка, как фон ячейки WPF).
-            AddCell(grid, CellText("AfterText", colorHex: row.Changed ? "#16A34A" : null), 3);
+            // «Станет»: семантическая SuccessBrush темы при реальном изменении (аудит UI)
+            // вместо захардкоженного зелёного #16A34A.
+            AddCell(grid, CellText("AfterText", brushKey: row.Changed ? "SuccessBrush" : null), 3);
             return grid;
         }
 
-        private static Control CellText(string property, bool bold = false, string? colorHex = null)
+        private static Control CellText(string property, bool bold = false, string? brushKey = null)
         {
             var text = new TextBlock
             {
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 0),
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                FontWeight = bold ? FontWeight.SemiBold : FontWeight.Normal,
-                Foreground = colorHex is null ? null : new SolidColorBrush(Color.Parse(colorHex))
+                FontWeight = bold ? FontWeight.SemiBold : FontWeight.Normal
             };
+            if (brushKey is not null)
+                Themes.ThemeBrushes.Bind(text, TextBlock.ForegroundProperty, brushKey);
             text.Bind(TextBlock.TextProperty, new Binding(property));
             return text;
         }

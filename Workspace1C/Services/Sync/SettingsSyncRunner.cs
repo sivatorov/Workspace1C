@@ -108,23 +108,27 @@ public sealed class SettingsSyncRunner : IDisposable
     /// <summary>Фоновый тик: пропускаем, если интервал ещё не наступил или выполнение идёт.</summary>
     private void Tick()
     {
-        // Не запускаем параллельно ручной синхронизации.
-        if (!_gate.Wait(0))
-            return;
+        // Асинхронный запуск без блокировки потока таймера (аудит sync-over-async):
+        // RunNowAsync сам защищён гейтом _gate — фоновый тик не пересечётся с ручным
+        // запуском. Прежний вариант держал гейт и блокирующе ждал RunNowAsync
+        // (RunNowAsync внутренне ждёт ТОТ ЖЕ гейт — до дедлока не доходило только
+        // потому, что тик редко совпадал с ручной синхронизацией).
+        _ = RunScheduledTickAsync();
+    }
+
+    /// <summary>Фоновое выполнение тика: все исключения фиксируются в журнале.</summary>
+    private async Task RunScheduledTickAsync()
+    {
         try
         {
             var settings = SettingsSyncStore.Load();
             if (!IsDue(settings, DateTime.UtcNow))
                 return;
-            RunNowAsync().GetAwaiter().GetResult();
+            await RunNowAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger?.Error("Синхронизация настроек: ошибка фонового запуска", ex);
-        }
-        finally
-        {
-            _gate.Release();
         }
     }
 

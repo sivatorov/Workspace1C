@@ -606,7 +606,10 @@ namespace Workspace1C
                 var token = _activateCts.Token;
                 var activatePath = Path.Combine(DataDirectory, ActivateFileName);
 
-                Task.Run(() =>
+                // Task.Delay вместо Thread.Sleep (аудит производительности): фоновый
+                // поток не занят «спячкой» между опросами файла-сигнала. Поток не UI —
+                // это Task.Run-наблюдатель.
+                Task.Run(async () =>
                 {
                     while (!token.IsCancellationRequested)
                     {
@@ -619,7 +622,14 @@ namespace Workspace1C
                             }
                         }
                         catch { /* ignore transient errors */ }
-                        Thread.Sleep(300);
+                        try
+                        {
+                            await Task.Delay(300, token).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            break; // штатная остановка наблюдателя.
+                        }
                     }
                 }, token);
             }

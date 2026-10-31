@@ -96,9 +96,20 @@ namespace Workspace1C
         private async void OnConnect_Click(object sender, RoutedEventArgs e)
         {
             // Пароль приходит из выбранной записи справочника (issue #27) — PasswordBox нет.
-            await _vm.ConnectAsync();
-            if (_vm.Clusters.Count > 0)
-                SaveRacSettings();
+            // Исключения не теряются (аудит гонок): ConnectAsync глотает ошибки rac,
+            // но сбои сохранения настроек и прочие сбои показываем пользователю.
+            try
+            {
+                await _vm.ConnectAsync();
+                if (_vm.Clusters.Count > 0)
+                    SaveRacSettings();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    ex.Message,
+                    Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void OnLoadBases_Click(object sender, RoutedEventArgs e) =>
@@ -124,8 +135,9 @@ namespace Workspace1C
 
         private void OnImport_Click(object sender, RoutedEventArgs e)
         {
-            _vm.ImportCommand.Execute(null);
-            if (_vm.SelectedBases.Count == 0)
+            // Проверка выбора ДО запуска команды (аудит гонок, синхронно с Avalonia-версией):
+            // команда выполняется только когда есть отмеченные новые базы.
+            if (_vm.ReadyToImportCount == 0)
             {
                 MessageBox.Show(
                     LocalizationManager.T("Selection.NothingSelected"),
@@ -133,6 +145,7 @@ namespace Workspace1C
                 return;
             }
 
+            _vm.ImportCommand.Execute(null);
             DialogResult = true;
             Close();
         }

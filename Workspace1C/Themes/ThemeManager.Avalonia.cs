@@ -93,14 +93,21 @@ namespace Workspace1C.Themes
                 CurrentFullTheme = ThemeFeatureMap.WithBaseVariant(CurrentFullTheme, dark);
             if (Application.Current is { } app)
                 app.RequestedThemeVariant = dark ? ThemeVariant.Dark : ThemeVariant.Light;
-            ApplyScheme(CurrentScheme);
-            // issue #26 (1.0.1.6): ресурсы кнопок окна должны обновляться при КАЖДОМ
-            // применении темы, иначе после переключения Light/Dark остаётся подложка
-            // от прошлой темы (ApplyWindowButtonStyle вызывался только из ApplyFullTheme
-            // и ReapplyThemeFeatures).
-            ApplyWindowButtonStyle();
+
+            // Оптимизация старта (аудит производительности): при НЕизменном варианте темы
+            // палитра уже наложена (ApplyFullTheme/предыдущим ApplyTheme) — повторное
+            // ApplyScheme + ApplyWindowButtonStyle вызывали полную перерисовку всех
+            // DynamicResource-потребителей без пользы (LoginWindow.ApplyActiveTheme
+            // накладывал палитру дважды). Тяжёлое наложение — только при реальной смене.
             if (changed)
+            {
+                ApplyScheme(CurrentScheme);
+                // issue #26 (1.0.1.6): ресурсы кнопок окна должны обновляться при КАЖДОЙ
+                // реальной смене варианта, иначе после переключения Light/Dark остаётся
+                // подложка от прошлой темы.
+                ApplyWindowButtonStyle();
                 ThemeChanged?.Invoke(null, EventArgs.Empty);
+            }
         }
 
         /// <summary>Применяет вариант темы по имени («Light» / «Dark»).</summary>

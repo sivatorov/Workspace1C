@@ -25,6 +25,7 @@ public sealed class ExportsListWindow : ModalWindowBase
     private readonly IDialogService _dialogs = AppServices.GetRequiredService<IDialogService>();
     private readonly ListBox _list = new();
     private readonly Button _restoreButton = new();
+    private readonly Button _refreshButton = new();
 
     /// <param name="infobase">ИБ, в которую выполняется восстановление (может быть null).</param>
     /// <param name="mainVm">MainViewModel для операции восстановления (может быть null).</param>
@@ -43,7 +44,25 @@ public sealed class ExportsListWindow : ModalWindowBase
         MinHeight = 400;
         FontSize = 13;
         Content = BuildRoot();
-        _vm.Refresh();
+        // Сканирование каталогов НЕ в конструкторе (аудит производительности): сетевые
+        // пути блокировали открытие окна. Первое обновление — в Opened, фоновой задачей.
+        Opened += async (_, _) => await RefreshItemsAsync();
+    }
+
+    /// <summary>Фоновое обновление списка с занятием кнопок на время сканирования.</summary>
+    private async System.Threading.Tasks.Task RefreshItemsAsync()
+    {
+        _restoreButton.IsEnabled = false;
+        _refreshButton.IsEnabled = false;
+        try
+        {
+            await _vm.RefreshAsync();
+        }
+        finally
+        {
+            _refreshButton.IsEnabled = true;
+            _restoreButton.IsEnabled = _infobase is not null && _mainVm is not null;
+        }
     }
 
     /// <summary>Показывает окно модально (синхронно).</summary>
@@ -64,9 +83,11 @@ public sealed class ExportsListWindow : ModalWindowBase
         };
         // Кнопки списка выгрузок используют вторичный стиль темы (issue #46):
         // иначе они рисуются дефолтным стилем и не переключаются с темой.
-        var refresh = new Button { Content = T("Common.Refresh"), Width = 100 };
+        var refresh = _refreshButton;
+        refresh.Content = T("Common.Refresh");
+        refresh.Width = 100;
         refresh.Styled(ControlThemes.SecondaryButton);
-        refresh.Click += (_, _) => _vm.Refresh();
+        refresh.Click += async (_, _) => await RefreshItemsAsync();
 
         _restoreButton.Content = T("Restore.Title");
         _restoreButton.Width = 110;

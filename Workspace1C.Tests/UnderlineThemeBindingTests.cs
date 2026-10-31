@@ -36,11 +36,16 @@ public sealed class UnderlineThemeBindingTests
     [Fact]
     public void UpdateCheckWindow_NoHardcodedBlueUnderline()
     {
-        // Issue #51: fallback Brushes.Blue у ссылки с подчёркиванием заменён
-        // на нейтральный серый (как в остальном коде); основной цвет — AccentBrush из темы.
+        // Issue #51: fallback Brushes.Blue у ссылки с подчёркиванием заменён на кисть
+        // темы; v100113 (аудит UI): остатки фолбэков Brushes.Gray/Green тоже убраны —
+        // все цвета статуса/ссылки берутся из семантических кистей темы.
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "UpdateCheckWindow.xaml.cs"));
         Assert.DoesNotContain("Brushes.Blue", code);
-        Assert.Contains("FindResource(\"AccentBrush\") as Brush ?? Brushes.Gray", code);
+        Assert.DoesNotContain("?? Brushes.Gray", code);
+        Assert.DoesNotContain("?? Brushes.Green", code);
+        Assert.Contains("FindResource(\"AccentBrush\") as Brush", code);
+        Assert.Contains("FindResource(\"TextPrimaryBrush\") as Brush", code);
+        Assert.Contains("FindResource(\"TextSecondaryBrush\") as Brush", code);
     }
 
     [Fact]

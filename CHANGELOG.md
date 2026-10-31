@@ -11,6 +11,90 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.13] — 2026-10-31
+
+### Новые функции
+
+- **CSV-экспорт списка баз расширен (Windows и Linux).** В экспорт «Утилиты →
+  Экспорт списка баз в CSV» добавлены колонки «Версия платформы» и «Дата
+  последней копии»; сборка строк вынесена в общий юнит-тестируемый сервис
+  [`InfobaseCsvExportService`](Workspace1C/Services/InfobaseCsvExportService.cs)
+  (единый для WPF и Avalonia). Экранирование полей — RFC 4180.
+
+### Исправления
+
+- **Гонка выбора в окне «Импорт из кластера 1С» (Windows и Linux).** «Импортировать»
+  проверял счётчик выбранных баз ПОСЛЕ запуска команды — при пустом выборе
+  выполнение проходило с ложным «ничего не выбрано». Теперь выбор проверяется
+  ДО запуска команды; fire-and-forget подключение обёрнуто в обработку
+  исключений с показом ошибки пользователю
+  ([`ClusterImportWindow.Avalonia.cs`](Workspace1C/Views/ClusterImportWindow.Avalonia.cs),
+  [`ClusterImportWindow.xaml.cs`](Workspace1C/Views/ClusterImportWindow.xaml.cs)).
+
+- **Остатки хардкод-цветов заменены на семантические кисти темы (Windows и Linux).**
+  Зелёная подсветка колонки «Станет» в окне замены подключений, белый текст «∅» и
+  янтарная обводка пикера иконок в редакторе группы, белый маркер графика в Центре
+  обслуживания, серые/зелёные фолбэки в окне проверки обновлений конфигураций,
+  серая граница образцов в редакторе схем, серые/белые фолбэки кружков-индикаторов
+  служб — теперь берутся из `SuccessBrush`/`WarningBrush`/`TextOnAccentBrush`/
+  `CardBackgroundBrush`/`DividerBrush`/`TextSecondaryBrush` темы.
+
+- **Фоновая синхронизация настроек без блокировки (Linux).** Тик таймера
+  [`SettingsSyncRunner`](Workspace1C/Services/Sync/SettingsSyncRunner.cs) больше не
+  блокирует поток `RunNowAsync().GetAwaiter().GetResult()` и не захватывает гейт
+  вручную (устранён риск взаимоблокировки с ручной синхронизацией).
+
+- **MCP-сервер: асинхронная обработка запросов (Windows и Linux).** Цикл stdio
+  выполняет `tools/call` через `await` без блокировки потока
+  ([`McpServer.cs`](Workspace1C/Services/Mcp/McpServer.cs)); синхронный
+  `HandleMessage` сохранён для CLI-точки входа и тестов.
+
+- **Диагностика Apache на Linux без Task.WaitAll (Linux).** В
+  [`ApacheInstanceDetector.Linux.cs`](Workspace1C/Services/ApacheInstanceDetector.Linux.cs)
+  вывод `apache2ctl`/`httpd` читается синхронно после завершения процесса —
+  без блокировки потока пула на `.Result`.
+
+- **Мелкие UX/диагностика (Windows и Linux).** В диалоге удаления базы Enter
+  больше не удаляет (кнопка «Удалить» без `IsDefault`); задвоенный тег
+  `/// <summary>` в [`GroupEditWindow.xaml.cs`](Workspace1C/Views/GroupEditWindow.xaml.cs)
+  устранён; окно входа получает авторазмер по контенту (`MinHeight=360`,
+  `MaxHeight=560`) вместо фиксированной высоты 360 — список при 4+ профилях
+  больше не сжимается; пустой `catch` в `ApplyActiveTheme` пишет причину сбоя
+  темы в журнал; мастер «Развернуть тестовую копию» при движке ibcmd
+  автоматически собирает профиль СУБД из полей формы/сохранённого профиля
+  (issue #79, `TestDeployViewModel.EnsureIbcmdProfileFromForm`).
+
+### Производительность
+
+- **ThemeManager не накладывает тему повторно без изменения (Windows и Linux).**
+  При неизменном варианте темы `ApplyTheme` пропускает `ApplyScheme` +
+  `ApplyWindowButtonStyle`, а `LoginWindow.ApplyActiveTheme` не накладывает
+  идентичную схему (`ColorScheme.SamePaletteAs`) — на старте палитра
+  накладывается один раз вместо двух.
+
+- **Окно «Список выгрузок» открывается мгновенно (Windows и Linux).** Сканирование
+  каталогов копий (в том числе сетевых) перенесено из конструктора в фоновую
+  задачу (`Opened`/`ContentRendered`), кнопки занимаются на время сканирования;
+  в [`ExportsListViewModel`](Workspace1C/ViewModels/ExportsListViewModel.cs)
+  добавлен асинхронный `RefreshAsync`.
+
+- **CLI: скачивание обновления без оверхеда async-машины.** В
+  [`CliCommands.cs`](Workspace1C/Services/CliCommands.cs) копирование файла —
+  синхронное, с буфером 1 МБ (прежде — блокирующий `CopyToAsync` с буфером 8 КБ).
+
+- **Наблюдатель активации второго экземпляра без Thread.Sleep (Linux).** В
+  [`App.axaml.cs`](Workspace1C/App.axaml.cs) `Thread.Sleep(300)` заменён на
+  `Task.Delay` — фоновый поток свободен между опросами файла-сигнала.
+
+### Тесты
+
+- Новые наборы: `InfobaseCsvExportTests` (колонки, пустые значения, экранирование
+  RFC 4180, BOM), `TestDeployViewModelProfileTests` (issue #79: «Из профиля» и
+  автосбор профиля из формы), `WebPublishLoadModuleDedupRegressionTests`
+  (issue #63: подчистка дубля `LoadModule _1cws_module` в алиасах при наличии
+  модуля в httpd.conf). Обновлён `UnderlineThemeBindingTests` под кисти темы
+  без `Brushes.Gray/Green`. Полный прогон: 5343 теста зелёные.
+
 ## [1.0.1.12] — 2026-10-31
 
 ### Новые функции
