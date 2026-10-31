@@ -60,10 +60,12 @@ public sealed class Issue54ThinClientHighlightTests
         // Список строится из элементов с признаком тонкого клиента.
         Assert.Contains("ItemsSource = _vm.InstalledPlatformItems", code, StringComparison.Ordinal);
 
-        // Шаблон строки: имя с суффиксом + оранжевая подсветка тонкого клиента.
+        // Шаблон строки: имя с суффиксом + подсветка тонкого клиента кистью темы.
+        // v100112: как в WPF-версии — фиксированный #F59E0B заменён WarningBrush.
         Assert.Contains("FuncDataTemplate<PlatformVersionInfo>", code, StringComparison.Ordinal);
         Assert.Contains("item?.DisplayName", code, StringComparison.Ordinal);
         Assert.Contains("IsThinClient", code, StringComparison.Ordinal);
-        Assert.Contains("#F59E0B", code, StringComparison.Ordinal);
+        Assert.Contains("WarningBrush", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("#F59E0B", code, StringComparison.Ordinal);
     }
 }

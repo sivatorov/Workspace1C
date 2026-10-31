@@ -69,8 +69,12 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
     /// которое пользователь выбрал для удаления, или null (отмена). null — делегат
     /// не задан (тесты/окружение без UI): используется общий диалог подтверждения
     /// <c>_confirmDialog</c> на версии без признаков риска.
+    /// <para>v100112: делегат асинхронный — окно показывает диалог в UI-потоке через
+    /// <see cref="TaskCompletionSource{TResult}"/>/<c>Dispatcher.InvokeAsync</c>, а не
+    /// блокирует рабочий поток ожиданием (<c>.Wait()</c> — риск дедлока).</para>
     /// </summary>
-    private readonly Func<IReadOnlyList<OldVersionCleanupEntry>, IReadOnlyList<PlatformVersionInfo>?>? _chooseVersionsToDelete;
+    private readonly Func<IReadOnlyList<OldVersionCleanupEntry>,
+        Task<IReadOnlyList<PlatformVersionInfo>?>>? _chooseVersionsToDelete;
 
     /// <summary>True — Windows-ветка удаления (инжектирован делегат удаления каталога);
     /// false — Linux-ветка (показ команды sudo с копированием в буфер).</summary>
@@ -88,8 +92,12 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
     /// Диалог выбора варианта дистрибутива (issue #334): по списку доступных для текущей
     /// ОС файлов возвращает выбранный вариант или null (отмена → рекомендуемый). null —
     /// диалог не показывается (тесты, окружение без UI), берётся рекомендуемый вариант.
+    /// <para>v100112: делегат асинхронный — окно показывает диалог в UI-потоке через
+    /// <see cref="TaskCompletionSource{TResult}"/>/<c>Dispatcher.InvokeAsync</c>, а не
+    /// блокирует рабочий поток ожиданием (<c>.Wait()</c> — риск дедлока).</para>
     /// </summary>
-    private readonly Func<IReadOnlyList<PlatformDistributionOption>, PlatformDistributionOption?>? _chooseDistribution;
+    private readonly Func<IReadOnlyList<PlatformDistributionOption>,
+        Task<PlatformDistributionOption?>>? _chooseDistribution;
 
     private readonly StringBuilder _log = new();
     private IReadOnlyList<PlatformRelease> _availableReleases = new List<PlatformRelease>();
@@ -216,8 +224,8 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
         Func<string, string>? buildUninstallCommand = null,
         Action<string>? copyToClipboard = null,
         Action<Action>? dispatchToUi = null,
-        Func<IReadOnlyList<PlatformDistributionOption>, PlatformDistributionOption?>? chooseDistribution = null,
-        Func<IReadOnlyList<OldVersionCleanupEntry>, IReadOnlyList<PlatformVersionInfo>?>? chooseVersionsToDelete = null,
+        Func<IReadOnlyList<PlatformDistributionOption>, Task<PlatformDistributionOption?>>? chooseDistribution = null,
+        Func<IReadOnlyList<OldVersionCleanupEntry>, Task<IReadOnlyList<PlatformVersionInfo>?>>? chooseVersionsToDelete = null,
         Services.BackgroundDownloadManager? backgroundDownloads = null,
         Func<string, string, Services.DownloadConflictDecision>? askConflict = null)
     {
@@ -859,7 +867,7 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             IReadOnlyList<PlatformVersionInfo> selected;
             if (_chooseVersionsToDelete is not null)
             {
-                var chosen = _chooseVersionsToDelete(entries);
+                var chosen = await _chooseVersionsToDelete(entries).ConfigureAwait(false);
                 if (chosen is null || chosen.Count == 0)
                 {
                     AppendLog(LocalizationManager.T("PlatformUpdate.Error.Cancelled"));
@@ -1061,7 +1069,7 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
     /// окна сами маршалируют показ в UI-поток); при одном варианте или отсутствии
     /// делегата — рекомендуемый. null — файлов нет.
     /// </summary>
-    private Task<PlatformReleaseFile?> ResolvePickedFileAsync(PlatformUpdateRowViewModel row)
+    private async Task<PlatformReleaseFile?> ResolvePickedFileAsync(PlatformUpdateRowViewModel row)
     {
         var files = row.Release?.Files ?? (IReadOnlyList<PlatformReleaseFile>)Array.Empty<PlatformReleaseFile>();
         var options = PlatformDistributionPicker.BuildOptions(
@@ -1091,13 +1099,13 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
                 $"Обновление платформы {row.Version}: нет дистрибутива для текущей ОС "
                 + $"(файлы релиза: {fileListing})");
             NotifyError(string.Format(LocalizationManager.T("Notify.PlatformUpdateError"), message));
-            return Task.FromResult<PlatformReleaseFile?>(null);
+            return null;
         }
 
         if (options.Count == 1 || _chooseDistribution is null)
-            return Task.FromResult<PlatformReleaseFile?>(options[0].File);
+            return options[0].File;
 
-        var chosen = _chooseDistribution(options);
+        var chosen = await _chooseDistribution(options).ConfigureAwait(false);
         if (chosen is null)
         {
             // issue #334 п.2 (0.3.12.2): отмена выбора дистрибутива прерывает операцию —
@@ -1106,10 +1114,10 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             AppendLog(LocalizationManager.T("Updates.Distribution.Cancelled"));
             _appLogger?.Info(
                 $"Обновление платформы {row.Version}: выбор дистрибутива отменён пользователем");
-            return Task.FromResult<PlatformReleaseFile?>(null);
+            return null;
         }
 
-        return Task.FromResult<PlatformReleaseFile?>(chosen.File);
+        return chosen.File;
     }
 
     /// <summary>Краткое описание файла дистрибутива для журнала: имя, размер, разрядность

@@ -1237,6 +1237,13 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Ограничение параллельных проверок доступности баз.</summary>
     private const int AvailabilityParallelism = 4;
 
+    /// <summary>
+    /// Размер батча результатов проверки доступности для ОДНОГО маршалинга в UI-поток
+    /// (P4, v100112): вместо Dispatcher.UIThread.Post на каждую завершённую базу
+    /// результаты публикуются пачками; хвост батча сбрасывается по завершении проверки.
+    /// </summary>
+    private const int AvailabilityBatchSize = 4;
+
     private bool _availabilityCheckRunning;
 
     private async Task RunAvailabilityCheckAsync(List<Infobase> targets)
@@ -1246,25 +1253,49 @@ public partial class MainViewModel : ViewModelBase
             var results = new List<(Infobase Base, bool Available)>(targets.Count);
             var processed = 0;
 
+            // Батч ещё не опубликованных результатов (P4, v100112): накапливается
+            // воркерами, публикуется одним маршалингом на батч.
+            var pendingBatch = new List<(Infobase Base, bool Available)>();
+            var batchLock = new object();
+
+            void FlushBatch(bool force)
+            {
+                List<(Infobase Base, bool Available)> toApply;
+                lock (batchLock)
+                {
+                    if (pendingBatch.Count == 0)
+                        return;
+                    if (!force && pendingBatch.Count < AvailabilityBatchSize)
+                        return;
+                    toApply = new List<(Infobase Base, bool Available)>(pendingBatch);
+                    pendingBatch.Clear();
+                }
+
+                var done = Volatile.Read(ref processed);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    foreach (var (ib, available) in toApply)
+                        ib.SetCheckedAvailability(available);
+                    StatusBarInfo = string.Format(
+                        LocalizationManager.T("Main.AvailabilityProgress"), done, targets.Count);
+                });
+            }
+
             await Task.Run(() => Parallel.ForEach(targets,
                 new ParallelOptions { MaxDegreeOfParallelism = AvailabilityParallelism },
                 ib =>
                 {
                     var available = IsBaseAvailable(ib);
-                    var done = Interlocked.Increment(ref processed);
+                    Interlocked.Increment(ref processed);
                     lock (results)
                         results.Add((ib, available));
+                    lock (batchLock)
+                        pendingBatch.Add((ib, available));
+                    FlushBatch(force: false);
+                })).ConfigureAwait(false);
 
-                    // Каждая завершённая база сразу публикуется в UI-потоке: иконка
-                    // строки меняется с серой на фактический статус (по PropertyChanged),
-                    // в строке состояния обновляется прогресс «i из N».
-                    Dispatcher.UIThread.Post(() =>
-                    {
-                        ib.SetCheckedAvailability(available);
-                        StatusBarInfo = string.Format(
-                            LocalizationManager.T("Main.AvailabilityProgress"), done, targets.Count);
-                    });
-                }));
+            // Хвост батча: результаты, не дотянувшие до полного батча.
+            FlushBatch(force: true);
 
             Dispatcher.UIThread.Post(() =>
             {

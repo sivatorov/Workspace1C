@@ -30,13 +30,13 @@
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffChangeKind.Added}">
-                    <Setter Property="Foreground" Value="#16A34A"/>
+                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffChangeKind.Changed}">
                     <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:DiffChangeKind.Removed}">
-                    <Setter Property="Foreground" Value="#DC2626"/>
+                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>

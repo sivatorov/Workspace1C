@@ -111,9 +111,9 @@ namespace Workspace1C
                 // issue #334: обновление списка версий и связанных свойств — в UI-потоке.
                 dispatchToUi: action => Dispatcher.UIThread.Post(action),
                 // issue #334: диалог выбора варианта дистрибутива после «Скачать и установить».
-                chooseDistribution: ChooseDistribution,
+                chooseDistribution: ChooseDistributionAsync,
                 // issue #334: диалог выбора удаляемых старых версий (список с флажками).
-                chooseVersionsToDelete: ChooseOldVersionsToDelete,
+                chooseVersionsToDelete: ChooseOldVersionsToDeleteAsync,
                 // issue #334 п.1 (0.3.12.2): загрузки из этого окна видны в индикаторе
                 // главного окна и отменяются из него.
                 backgroundDownloads: Services.BackgroundDownloadManager.Default,
@@ -172,28 +172,38 @@ namespace Workspace1C
         /// Диалог выбора варианта дистрибутива (issue #334): список файлов для текущей ОС,
         /// предвыбран рекомендуемый; null — отмена (остаётся рекомендуемый). Может
         /// вызываться из фонового потока — показ переводится в UI-поток.
+        /// <para>v100112: вместо блокирующего <c>Dispatcher.UIThread.InvokeAsync(...).Wait()</c>
+        /// (риск дедлока — рабочий поток ждёт UI, который внутри ShowDialogSync качает
+        /// вложенный цикл сообщений) используется асинхронное ожидание
+        /// <see cref="TaskCompletionSource{TResult}"/>: диалог выполняется через
+        /// <see cref="Dispatcher.UIThread.Post"/>, вызывающий поток асинхронно ждёт
+        /// результат — UI-поток и поток операции не блокируют друг друга.</para>
         /// </summary>
-        private PlatformDistributionOption? ChooseDistribution(
+        private async Task<PlatformDistributionOption?> ChooseDistributionAsync(
             IReadOnlyList<PlatformDistributionOption> options)
         {
-            PlatformDistributionOption? result = null;
             if (Dispatcher.UIThread.CheckAccess())
             {
                 var picker = new PlatformDistributionPickerWindow(options);
-                if (picker.ShowDialogSync(this))
-                    result = picker.Result;
-            }
-            else
-            {
-                Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    var picker = new PlatformDistributionPickerWindow(options);
-                    if (picker.ShowDialogSync(this))
-                        result = picker.Result;
-                }).Wait();
+                return picker.ShowDialogSync(this) ? picker.Result : null;
             }
 
-            return result;
+            var completion = new TaskCompletionSource<PlatformDistributionOption?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    var picker = new PlatformDistributionPickerWindow(options);
+                    completion.SetResult(picker.ShowDialogSync(this) ? picker.Result : null);
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            });
+
+            return await completion.Task.ConfigureAwait(false);
         }
 
         private static string T(string key) => LocalizationManager.T(key);
@@ -637,28 +647,35 @@ namespace Workspace1C
         /// с признаками риска и флажками; возвращает выбранные пользователем версии
         /// или null при отмене. Может вызываться из фонового потока — показ
         /// переводится в UI-поток.
+        /// <para>v100112: вместо блокирующего <c>Dispatcher.UIThread.InvokeAsync(...).Wait()</c>
+        /// используется асинхронное ожидание <see cref="TaskCompletionSource{TResult}"/>
+        /// (см. <see cref="ChooseDistributionAsync"/>) — без риска дедлока.</para>
         /// </summary>
-        private IReadOnlyList<PlatformVersionInfo>? ChooseOldVersionsToDelete(
+        private async Task<IReadOnlyList<PlatformVersionInfo>?> ChooseOldVersionsToDeleteAsync(
             IReadOnlyList<OldVersionCleanupEntry> entries)
         {
-            IReadOnlyList<PlatformVersionInfo>? result = null;
             if (Dispatcher.UIThread.CheckAccess())
             {
                 var picker = new PlatformOldVersionsWindow(entries);
-                if (picker.ShowDialogSync(this))
-                    result = picker.Result;
-            }
-            else
-            {
-                Dispatcher.UIThread.InvokeAsync(() =>
-                {
-                    var picker = new PlatformOldVersionsWindow(entries);
-                    if (picker.ShowDialogSync(this))
-                        result = picker.Result;
-                }).Wait();
+                return picker.ShowDialogSync(this) ? picker.Result : null;
             }
 
-            return result;
+            var completion = new TaskCompletionSource<IReadOnlyList<PlatformVersionInfo>?>(
+                TaskCreationOptions.RunContinuationsAsynchronously);
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    var picker = new PlatformOldVersionsWindow(entries);
+                    completion.SetResult(picker.ShowDialogSync(this) ? picker.Result : null);
+                }
+                catch (Exception ex)
+                {
+                    completion.SetException(ex);
+                }
+            });
+
+            return await completion.Task.ConfigureAwait(false);
         }
 
         /// <summary>Кнопка команды нижней панели: тема подтверждения для главной, вторичная — для остальных.</summary>

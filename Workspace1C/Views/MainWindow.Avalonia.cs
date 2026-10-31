@@ -794,7 +794,7 @@ namespace Workspace1C
             panel.Children.Add(CommandPanelSeparator());
 
             // «Правка»: добавить, изменить и удалить выбранную базу.
-            var addBtn = TopBarIconButton("IconAdd", LocalizationManager.T("Main.AddBase"), "#22C55E");
+            var addBtn = TopBarIconButton("IconAdd", LocalizationManager.T("Main.AddBase"), "@SuccessBrush");
             addBtn.Bind(Button.CommandProperty, new Binding("AddInfobaseCommand"));
             panel.Children.Add(addBtn);
 
@@ -803,7 +803,7 @@ namespace Workspace1C
             editBtn.Bind(Button.CommandProperty, new Binding("EditInfobaseCommand"));
             panel.Children.Add(editBtn);
 
-            var deleteBtn = TopBarIconButton("IconDelete", LocalizationManager.T("Main.DeleteTooltip"), "#DC2626");
+            var deleteBtn = TopBarIconButton("IconDelete", LocalizationManager.T("Main.DeleteTooltip"), "@ErrorBrush");
             deleteBtn.Bind(Button.CommandProperty, new Binding("DeleteInfobaseCommand"));
             panel.Children.Add(deleteBtn);
 
@@ -811,19 +811,19 @@ namespace Workspace1C
 
             // «Управление списком»: очистка кеша, индикатор выгрузки, синхронизация
             // с ibases.v8i и проверка доступности баз.
-            var clearCacheBtn = TopBarIconButton("IconBroom", LocalizationManager.T("Main.ClearCacheTooltip"), "#F59E0B");
+            var clearCacheBtn = TopBarIconButton("IconBroom", LocalizationManager.T("Main.ClearCacheTooltip"), "@WarningBrush");
             clearCacheBtn.Bind(Button.CommandProperty, new Binding("ClearCacheCommand"));
             panel.Children.Add(clearCacheBtn);
 
             // Индикатор выгрузки .dt и .cf: виден только во время пакетной
             // операции, подсказка сводкой (MainWindow.xaml:563).
-            var exportBtn = TopBarIconButton("IconUpload", string.Empty, "#F59E0B");
+            var exportBtn = TopBarIconButton("IconUpload", string.Empty, "@WarningBrush");
             exportBtn.Bind(ToolTip.TipProperty, new Binding("ExportIndicatorTooltip"));
             exportBtn.Bind(Control.IsVisibleProperty, new Binding("IsExporting"));
             exportBtn.Focusable = false;
             panel.Children.Add(exportBtn);
 
-            var syncBtn = TopBarIconButton("IconSync", LocalizationManager.T("Main.SyncDetailedTooltip"), "#14B8A6");
+            var syncBtn = TopBarIconButton("IconSync", LocalizationManager.T("Main.SyncDetailedTooltip"), "@InfoBrush");
             syncBtn.Bind(Button.CommandProperty, new Binding("SynchronizeWithIbasesCommand"));
             panel.Children.Add(syncBtn);
 
@@ -832,7 +832,7 @@ namespace Workspace1C
             var checkAvailBtn = new Button
             {
                 Content = IconHelper.MakeIcon("IconSonar", UiMetrics.Scaled(18),
-                    new SolidColorBrush(Color.Parse("#14B8A6"))),
+                    Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9")),
                 Padding = new Thickness(UiMetrics.Scaled(8)),
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
@@ -881,7 +881,7 @@ namespace Workspace1C
             // Значок темы меняется вместе со схемой, как в версии для Windows
             // (MainWindow.Language.cs:41): в тёмной солнце, в светлой луна.
             var themeIconKey = ThemeManager.CurrentTheme == ThemeManager.DarkThemeName ? "IconSun" : "IconMoon";
-            var themeBtn = TopBarIconButton(themeIconKey, LocalizationManager.T("Main.Theme"), "#8B5CF6");
+            var themeBtn = TopBarIconButton(themeIconKey, LocalizationManager.T("Main.Theme"), "@PurpleAccentBrush");
             themeBtn.Bind(Button.CommandProperty, new Binding("ToggleThemeCommand"));
             panel.Children.Add(themeBtn);
 
@@ -1425,7 +1425,7 @@ namespace Workspace1C
             else
             {
                 icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18),
-                    new SolidColorBrush(Color.Parse(colorHex)));
+                    Themes.ThemeBrushes.FromSpec(colorHex));
             }
 
             // Оформление берёт тема IconButton разметки (LightTheme.xaml:561

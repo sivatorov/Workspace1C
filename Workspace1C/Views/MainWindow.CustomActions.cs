@@ -22,8 +22,8 @@ namespace Workspace1C
     public partial class MainWindow
     {
         /// <summary>Цвет иконок пунктов пользовательских действий (как в разметке меню).</summary>
-        private static readonly Brush CustomActionIconBrush =
-            new SolidColorBrush((Color)ColorConverter.ConvertFromString("#06B6D4"));
+        private static Brush CustomActionIconBrush =>
+            Themes.WpfBrushes.Get("InfoBrush") ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#0EA5E9")); // fallback
 
         /// <summary>
         /// Перестраивает подменю «Пользовательские действия…» для текущего контекста

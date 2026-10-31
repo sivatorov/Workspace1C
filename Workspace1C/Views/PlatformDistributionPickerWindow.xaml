@@ -57,7 +57,7 @@
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
                             <TextBlock Margin="10,0,0,0" FontSize="11" VerticalAlignment="Center"
-                                       Foreground="#16A34A">
+                                       Foreground="{DynamicResource SuccessBrush}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Visibility" Value="Collapsed"/>

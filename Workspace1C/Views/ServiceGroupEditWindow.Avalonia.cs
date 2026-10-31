@@ -88,17 +88,17 @@ namespace Workspace1C
 
             // ---- Кнопки-иконки ▲/▼ над «Управляемым списком» и стрелки между списками. ----
             var moveUpButton = BuildIconButton("▲", LocalizationManager.T("Services.MoveUp"),
-                () => _vm.MoveUpCommand.Execute(null), "#2563EB");
+                () => _vm.MoveUpCommand.Execute(null), "@InfoBrush");
             moveUpButton.Bind(Button.CommandProperty, new Binding("MoveUpCommand"));
             var moveDownButton = BuildIconButton("▼", LocalizationManager.T("Services.MoveDown"),
-                () => _vm.MoveDownCommand.Execute(null), "#2563EB");
+                () => _vm.MoveDownCommand.Execute(null), "@InfoBrush");
             moveDownButton.Bind(Button.CommandProperty, new Binding("MoveDownCommand"));
 
             var moveLeftButton = BuildIconButton("◀", LocalizationManager.T("Services.MoveLeft"),
-                () => _vm.MoveLeftCommand.Execute(null), "#16A34A");
+                () => _vm.MoveLeftCommand.Execute(null), "@SuccessBrush");
             moveLeftButton.Bind(Button.CommandProperty, new Binding("MoveLeftCommand"));
             var moveRightButton = BuildIconButton("▶", LocalizationManager.T("Services.MoveRight"),
-                () => _vm.MoveRightCommand.Execute(null), "#DC2626");
+                () => _vm.MoveRightCommand.Execute(null), "@ErrorBrush");
             moveRightButton.Bind(Button.CommandProperty, new Binding("MoveRightCommand"));
 
             var managedHeader = new StackPanel
@@ -228,7 +228,7 @@ namespace Workspace1C
                     VerticalAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Center,
                     FontSize = 13,
-                    Foreground = new SolidColorBrush(Color.Parse(iconColorHex))
+                    Foreground = Themes.ThemeBrushes.FromSpec(iconColorHex)
                 },
                 Width = 34,
                 Height = 30,

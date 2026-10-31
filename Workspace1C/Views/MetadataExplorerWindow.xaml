@@ -169,7 +169,7 @@
             <TextBlock FontSize="12" TextWrapping="Wrap"
                        Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding StatusText}"/>
             <TextBlock FontSize="12" TextWrapping="Wrap"
-                       Foreground="#DC2626" Text="{Binding ErrorMessage}"
+                       Foreground="{DynamicResource ErrorBrush}" Text="{Binding ErrorMessage}"
                        Style="{StaticResource ErrorMessageStyle}"
                        MaxHeight="60" ToolTip="{Binding ErrorMessage}"/>
         </StackPanel>

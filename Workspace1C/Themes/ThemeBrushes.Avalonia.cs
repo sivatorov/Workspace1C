@@ -44,6 +44,37 @@ namespace Workspace1C.Themes
         /// </summary>
         /// <param name="brush">Исходная кисть, обычно из ресурсов темы.</param>
         /// <param name="alpha">Новая альфа (0–255): 0 полностью прозрачно, 255 непрозрачно.</param>
+        /// <summary>
+        /// Отдаёт кисть темы по ключу; при отсутствии — запасной HEX (v100112,
+        /// тематизация остатков хардкод-цветов). Разовое чтение: для свойств
+        /// долгоживущих элементов предпочтительнее <see cref="Bind"/>, но для
+        /// разовых параметров (иконки, Setter'ы, выбор кисти по состоянию) — так.
+        /// </summary>
+        /// <param name="brushKey">Ключ ресурса-кисти темы, например "ErrorBrush".</param>
+        /// <param name="fallbackHex">Запасной HEX вида "#DC2626", если ресурса нет.</param>
+        public static Avalonia.Media.IBrush Get(string brushKey, string fallbackHex)
+            => Avalonia.Application.Current?.TryGetResource(brushKey, Avalonia.Styling.ThemeVariant.Default, out var value) == true
+                && value is Avalonia.Media.IBrush brush
+                    ? brush
+                    : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(fallbackHex));
+
+        /// <summary>
+        /// Кисть из строковой спецификации: строка с префиксом «@» — кисть ресурса
+        /// темы (обновляется вместе со схемой), иначе — HEX вида «#RRGGBB».
+        /// Нужно хелперам, которые до v100112 принимали только HEX-литералы
+        /// (иконки меню, цветные глифы кнопок) — v100112, тематизация остатков.
+        /// </summary>
+        /// <param name="spec">Спецификация цвета: "@SuccessBrush" или "#16A34A".</param>
+        public static Avalonia.Media.IBrush FromSpec(string spec)
+        {
+            if (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@'
+                && Avalonia.Application.Current?.TryGetResource(spec[1..],
+                    Avalonia.Styling.ThemeVariant.Default, out var resource) == true
+                && resource is Avalonia.Media.IBrush brush)
+                return brush;
+            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(spec));
+        }
+
         public static Avalonia.Media.IBrush WithAlpha(Avalonia.Media.IBrush brush, byte alpha)
         {
             if (brush is Avalonia.Media.ISolidColorBrush solid)

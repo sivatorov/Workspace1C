@@ -372,11 +372,11 @@ namespace Workspace1C
         {
             if (row.HasNewer)
             {
-                block.Foreground = TryBrush("AccentBrush") ?? new SolidColorBrush(Color.Parse("#16A34A"));
+                block.Foreground = TryBrush("SuccessBrush") ?? new SolidColorBrush(Color.Parse("#16A34A"));
             }
             else if (row.Status == ConfigUpdateStatus.Failed)
             {
-                block.Foreground = new SolidColorBrush(Color.Parse("#EF4444"));
+                block.Foreground = TryBrush("ErrorBrush") ?? new SolidColorBrush(Color.Parse("#DC2626"));
             }
             else
             {
@@ -638,7 +638,7 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(16, 0, 8, 0)
             };
-            error.Foreground = new SolidColorBrush(Color.Parse("#EF4444"));
+            error.Foreground = TryBrush("ErrorBrush") ?? new SolidColorBrush(Color.Parse("#DC2626"));
             cell.Children.Add(error);
 
             _latestTexts[row] = latest;

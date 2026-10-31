@@ -363,6 +363,9 @@ public class ColorScheme
         ["WarningColor"] = "#D97706",
         ["ErrorColor"] = "#DC2626",
         ["InfoColor"] = "#0EA5E9",
+        // Акцентные декоративные кисти (v100112): сиреневая и розовая для иконок/меток.
+        ["PurpleAccentBrush"] = "#7C3AED",
+        ["PinkAccentBrush"] = "#EC4899",
         // Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5).
         ["DangerSoftBrush"] = "#FEF2F2",
         ["DangerSoftBorderBrush"] = "#FECACA",
@@ -418,6 +421,9 @@ public class ColorScheme
         ["WarningColor"] = "#F59E0B",
         ["ErrorColor"] = "#EF4444",
         ["InfoColor"] = "#38BDF8",
+        // Акцентные декоративные кисти (v100112): осветлённые варианты для тёмного фона.
+        ["PurpleAccentBrush"] = "#A78BFA",
+        ["PinkAccentBrush"] = "#F472B6",
         // Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5).
         ["DangerSoftBrush"] = "#3F1D1D",
         ["DangerSoftBorderBrush"] = "#7F1D1D",
@@ -492,6 +498,8 @@ public class ColorScheme
                 ["WarningColor"] = "#F59E0B",
                 ["ErrorColor"] = "#EF4444",
                 ["InfoColor"] = "#38BDF8",
+                ["PurpleAccentBrush"] = "#A78BFA",
+                ["PinkAccentBrush"] = "#F472B6",
                 ["DangerSoftBrush"] = "#3F1D1D",
                 ["DangerSoftBorderBrush"] = "#7F1D1D",
                 ["PinnedBadgeBrush"] = "#4C1D95",
@@ -540,6 +548,8 @@ public class ColorScheme
             ["WarningColor"] = "#D97706",
             ["ErrorColor"] = "#DC2626",
             ["InfoColor"] = "#0EA5E9",
+            ["PurpleAccentBrush"] = "#7C3AED",
+            ["PinkAccentBrush"] = "#EC4899",
             ["DangerSoftBrush"] = "#FEF2F2",
             ["DangerSoftBorderBrush"] = "#FECACA",
             ["PinnedBadgeBrush"] = "#EDE9FE",

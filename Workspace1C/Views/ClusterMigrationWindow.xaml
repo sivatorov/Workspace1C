@@ -354,10 +354,10 @@
                      ширине, а не только под локалью») — отдельной строкой, растянутой. -->
                 <ProgressBar Grid.Row="1" x:Name="BusyProgress" Height="4" MinWidth="200"
                              HorizontalAlignment="Stretch" Margin="0,5,0,0"
-                             IsIndeterminate="True" Visibility="Collapsed" Foreground="#06B6D4"
+                             IsIndeterminate="True" Visibility="Collapsed" Foreground="{DynamicResource InfoBrush}"
                              VerticalAlignment="Center"/>
             </Grid>
-            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="#DC2626" TextWrapping="Wrap"
+            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="{DynamicResource ErrorBrush}" TextWrapping="Wrap"
                        Margin="0,6,0,0" Text="{Binding ErrorMessage}"/>
             <!-- Единый контракт кнопок (issue #26): «Мигрировать» — акцентная ModernButton
                  (без жёсткой зелёной заливки и белого текста), «Отмена» — вторичная

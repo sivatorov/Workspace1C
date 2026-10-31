@@ -87,9 +87,9 @@ public partial class PlatformUpdateWindow : Window
             // (WPF CollectionView запрещает изменения из фонового потока NotSupportedException).
             dispatchToUi: action => Dispatcher.InvokeAsync(action),
             // issue #334: диалог выбора варианта дистрибутива после «Скачать и установить».
-            chooseDistribution: ShowDistributionPicker,
+            chooseDistribution: ShowDistributionPickerAsync,
             // issue #334: диалог выбора удаляемых старых версий (список с флажками).
-            chooseVersionsToDelete: ShowOldVersionsPicker,
+            chooseVersionsToDelete: ShowOldVersionsPickerAsync,
             // issue #334 п.1 (0.3.12.2): загрузки из этого окна видны в индикаторе
             // главного окна и отменяются из него.
             backgroundDownloads: BackgroundDownloadManager.Default,
@@ -248,23 +248,25 @@ public partial class PlatformUpdateWindow : Window
     /// с признаками риска и флажками; возвращает выбранные пользователем версии
     /// или null при отмене. Может вызываться из фонового потока — показ переводится
     /// в UI-поток через <see cref="Dispatcher"/>.
+    /// <para>v100112: из фонового потока используется асинхронное ожидание
+    /// <c>Dispatcher.InvokeAsync(...).Task</c> вместо блокирующего
+    /// <c>Dispatcher.Invoke</c> — рабочий поток операции не занимает поток
+    /// под синхронное ожидание диалога.</para>
     /// </summary>
-    private IReadOnlyList<PlatformVersionInfo>? ShowOldVersionsPicker(
+    private async Task<IReadOnlyList<PlatformVersionInfo>?> ShowOldVersionsPickerAsync(
         IReadOnlyList<OldVersionCleanupEntry> entries)
     {
-        IReadOnlyList<PlatformVersionInfo>? result = null;
-        void Show()
+        if (Dispatcher.CheckAccess())
         {
             var picker = new PlatformOldVersionsWindow(entries) { Owner = this };
-            if (picker.ShowDialog() == true)
-                result = picker.Result;
+            return picker.ShowDialog() == true ? picker.Result : null;
         }
 
-        if (Dispatcher.CheckAccess())
-            Show();
-        else
-            Dispatcher.Invoke(Show);
-        return result;
+        return await Dispatcher.InvokeAsync(() =>
+        {
+            var picker = new PlatformOldVersionsWindow(entries) { Owner = this };
+            return picker.ShowDialog() == true ? picker.Result : null;
+        }).Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -272,23 +274,25 @@ public partial class PlatformUpdateWindow : Window
     /// (x86/x64, полный/тонкий клиент), предвыбран рекомендуемый; null — отмена, остаётся
     /// рекомендуемый вариант. Может вызываться из фонового потока — показ переводится
     /// в UI-поток через <see cref="Dispatcher"/>.
+    /// <para>v100112: из фонового потока используется асинхронное ожидание
+    /// <c>Dispatcher.InvokeAsync(...).Task</c> вместо блокирующего
+    /// <c>Dispatcher.Invoke</c> — рабочий поток операции не занимает поток
+    /// под синхронное ожидание диалога.</para>
     /// </summary>
-    private PlatformDistributionOption? ShowDistributionPicker(
+    private async Task<PlatformDistributionOption?> ShowDistributionPickerAsync(
         IReadOnlyList<PlatformDistributionOption> options)
     {
-        PlatformDistributionOption? result = null;
-        void Show()
+        if (Dispatcher.CheckAccess())
         {
             var picker = new PlatformDistributionPickerWindow(options) { Owner = this };
-            if (picker.ShowDialog() == true)
-                result = picker.Result;
+            return picker.ShowDialog() == true ? picker.Result : null;
         }
 
-        if (Dispatcher.CheckAccess())
-            Show();
-        else
-            Dispatcher.Invoke(Show);
-        return result;
+        return await Dispatcher.InvokeAsync(() =>
+        {
+            var picker = new PlatformDistributionPickerWindow(options) { Owner = this };
+            return picker.ShowDialog() == true ? picker.Result : null;
+        }).Task.ConfigureAwait(false);
     }
 }
 #endif

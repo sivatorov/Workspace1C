@@ -559,7 +559,7 @@ namespace Workspace1C
             _resultText.FontSize = 12;
             _resultText.TextWrapping = TextWrapping.Wrap;
             _resultText.Margin = new Thickness(0, 8, 0, 0);
-            _resultText.Foreground = new SolidColorBrush(Color.Parse("#16A34A"));
+            Themes.ThemeBrushes.Bind(_resultText, TextBlock.ForegroundProperty, "SuccessBrush");
             form.Children.Add(_resultText);
 
             var scroll = new ScrollViewer { Content = form, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };

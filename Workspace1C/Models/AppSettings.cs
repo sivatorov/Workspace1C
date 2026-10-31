@@ -388,6 +388,18 @@ public class AppSettings
     /// <summary>Автоматически устанавливать новые версии без подтверждения (self-update при запуске).</summary>
     public bool AutoUpdateEnabled { get; set; } = true;
 
+    /// <summary>
+    /// Диалог «Что нового» после обновления (v100112, F3): показывать при старте
+    /// сводку изменений релиза, если версия приложения изменилась с прошлого запуска.
+    /// </summary>
+    public bool ShowWhatsNewOnStart { get; set; } = true;
+
+    /// <summary>
+    /// Версия приложения, для которой диалог «Что нового» уже показывался
+    /// (пустая строка — ещё не показывался ни разу).
+    /// </summary>
+    public string LastWhatsNewVersion { get; set; } = string.Empty;
+
     /// <summary>Показывать колонку «Версия платформы» в списке баз.</summary>
     public bool ShowVersionColumn { get; set; } = true;
 

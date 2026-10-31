@@ -109,7 +109,7 @@ namespace Workspace1C
             {
                 Setters =
                 {
-                    new Setter(TextBlock.ForegroundProperty, new SolidColorBrush(Color.Parse("#E53935"))),
+                    new Setter(TextBlock.ForegroundProperty, ThemeResource("ErrorBrush", new SolidColorBrush(Color.Parse("#DC2626")))),
                     new Setter(TextBlock.FontWeightProperty, FontWeight.SemiBold)
                 }
             });
@@ -341,7 +341,7 @@ namespace Workspace1C
                 {
                     Text = row.GrowthText,
                     FontSize = 11,
-                    Foreground = new SolidColorBrush(Color.Parse("#E53935"))
+                    Foreground = ThemeResource("ErrorBrush", new SolidColorBrush(Color.Parse("#DC2626")))
                 };
                 var current = new TextBlock
                 {

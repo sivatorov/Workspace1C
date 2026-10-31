@@ -1036,18 +1036,153 @@ namespace Workspace1C.Services
             }
         }
 
-        /// <summary>Применяет обновление режимом «Перезапустить сейчас». Возвращает true при успехе.</summary>
+        /// <summary>
+        /// Применяет обновление режимом «Перезапустить сейчас». Возвращает true при успехе.
+        /// </summary>
+        /// <remarks>
+        /// Основной путь (issue #89): прямая замена из работающего процесса. На Linux
+        /// переименование поверх исполняемого файла работающего процесса разрешено
+        /// (ETXTBSY запрещает только запись в открытый файл, но не rename), поэтому
+        /// внешний bash-помощник не нужен вовсе: копия кладётся рядом с целью, ей
+        /// выставляется признак исполняемого, затем файл атомарно переименовывается
+        /// на место рабочего. Новый процесс запускается ещё до выхода текущего —
+        /// исключается целый класс сбоев «помощник не стартовал / bash недоступен /
+        /// сценарий упал молча», которые у пользователя выглядели как «Не удалось
+        /// установить обновление», а в temp оставался только .etag.
+        /// </remarks>
         internal bool ApplyRestartNow(string target, string newBinary)
         {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Установка обновления: target={target}; new={newBinary} " +
+                $"({SafeFileLength(newBinary)} байт); pid={Environment.ProcessId}.");
+
+            // Прямая замена из работающего процесса — без помощника и без ожидания выхода.
+            if (TryInstallDirect(target, newBinary))
+            {
+                TryDelete(newBinary);
+                TryDelete(newBinary + ".etag");
+
+                if (StartDetached(target))
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        "Установка обновления: бинарник заменён, новый процесс запущен.");
+                }
+                else
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        "Установка обновления: бинарник заменён, но перезапуск не удался — " +
+                        "приложение нужно запустить вручную.");
+                }
+
+                return true;
+            }
+
+            // Запасной путь: прежний bash-помощник (замена после выхода приложения) —
+            // на случай файловых систем/условий, где прямая замена невозможна.
+            Log.Info(TraceFlags.UpdatesFlag,
+                "Установка обновления: прямая замена не удалась — перехожу к помощнику-сценарию.");
             var script = CreateUpdaterScript(target, newBinary, Environment.ProcessId, restart: true);
-            return LaunchUpdater(script);
+            var launched = LaunchUpdater(script);
+            Log.Info(TraceFlags.UpdatesFlag, launched
+                ? $"Установка обновления: помощник запущен ({script}), ожидание выхода приложения."
+                : $"Установка обновления: помощник запустить не удалось ({script}).");
+            return launched;
+        }
+
+        /// <summary>
+        /// Прямая установка обновления из работающего процесса (issue #89): staged-копия
+        /// рядом с целью, chmod +x, атомарное переименование поверх работающего бинаря.
+        /// Возвращает true, если файл успешно заменён.
+        /// </summary>
+        internal bool TryInstallDirect(string target, string newBinary)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(target);
+                if (string.IsNullOrWhiteSpace(dir) || !IsDirectoryWritable(dir))
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Установка обновления: каталог «{dir}» недоступен на запись — прямая замена невозможна.");
+                    return false;
+                }
+
+                var staged = Path.Combine(dir, $".cm-update-staged-{Guid.NewGuid():N}");
+                Log.Info(TraceFlags.UpdatesFlag, $"Установка обновления: копирование {newBinary} → {staged}.");
+                File.Copy(newBinary, staged, overwrite: true);
+
+                // Признак исполняемого (rwxr-xr-x): File.SetUnixFileMode доступен на Linux;
+                // сбой не фатален, пока копия наследует права каталога — но без бита
+                // исполнения перезапуск не стартовал бы, поэтому сбой честно фиксируется.
+                // Блок компилируется только в Linux-сборку (#if LINUX), но анализатор
+                // считает файл кросс-платформенным — глушим CA1416 (паттерн NoteCrypto.cs).
+#pragma warning disable CA1416
+                try
+                {
+                    File.SetUnixFileMode(staged,
+                        UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+                        UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+                        UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+                    Log.Info(TraceFlags.UpdatesFlag, "Установка обновления: права 0755 выставлены.");
+                }
+#pragma warning restore CA1416
+                catch (Exception chmodEx)
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Установка обновления: SetUnixFileMode не удался ({chmodEx.GetType().Name}: " +
+                        $"{chmodEx.Message}) — продолжаю, права проверит запуск.");
+                }
+
+                Log.Info(TraceFlags.UpdatesFlag, $"Установка обновления: rename {staged} → {target}.");
+                File.Move(staged, target, overwrite: true);
+                Log.Info(TraceFlags.UpdatesFlag, "Установка обновления: замена бинарника выполнена.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Log.Info(TraceFlags.UpdatesFlag,
+                    $"Установка обновления: прямая замена не удалась — {ex.GetType().Name}: {ex.Message}.");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Запускает приложение отдельным (detached) процессом: UseShellExecute=false
+        /// без перенаправления потоков — процесс не привязан к текущему и переживает
+        /// его выход. Возвращает true, если процесс запущен.
+        /// </summary>
+        private static bool StartDetached(string target)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = target,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(target) ?? string.Empty
+                };
+                return Process.Start(psi) is not null;
+            }
+            catch (Exception ex)
+            {
+                Log.Info(TraceFlags.UpdatesFlag,
+                    $"Установка обновления: перезапуск не удался — {ex.GetType().Name}: {ex.Message}.");
+                return false;
+            }
         }
 
         /// <summary>Применяет обновление режимом «Обновить после закрытия». Возвращает true при успехе.</summary>
         internal bool ApplyAfterClose(string target, string newBinary)
         {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Установка обновления (после закрытия): target={target}; new={newBinary} " +
+                $"({SafeFileLength(newBinary)} байт).");
             var script = CreateUpdaterScript(target, newBinary, Environment.ProcessId, restart: false);
-            return LaunchUpdater(script);
+            var launched = LaunchUpdater(script);
+            Log.Info(TraceFlags.UpdatesFlag, launched
+                ? $"Установка обновления (после закрытия): помощник запущен ({script})."
+                : $"Установка обновления (после закрытия): помощник запустить не удалось ({script}).");
+            return launched;
         }
 
         /// <summary>

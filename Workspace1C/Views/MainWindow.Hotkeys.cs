@@ -1,4 +1,4 @@
-﻿#if WINDOWS
+#if WINDOWS
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -628,7 +628,7 @@ namespace Workspace1C
                     {
                         ServiceMenuItemKind.ServiceSubmenu => MenuStatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuIconText("☰", "#7C3AED")
+                        _ => MenuIconText("☰", "@PurpleAccentBrush")
                     };
                     if (item.Kind == ServiceMenuItemKind.ServiceSubmenu
                         && !string.IsNullOrEmpty(item.StatusText))
@@ -671,7 +671,7 @@ namespace Workspace1C
         private static TextBlock MenuIconText(string text, string colorHex) => new()
         {
             Text = text,
-            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex)),
+            Foreground = Themes.WpfBrushes.FromSpec(colorHex),
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -697,7 +697,7 @@ namespace Workspace1C
             {
                 Text = "📦",
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")),
+                Foreground = Themes.WpfBrushes.Get("PurpleAccentBrush") ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")), // fallback
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             });

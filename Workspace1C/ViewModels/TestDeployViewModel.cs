@@ -150,9 +150,15 @@ public sealed class TestDeployViewModel : ViewModelBase
     /// поля только когда <see cref="UseInfobaseAuth"/> выключен (при включённом авторизация
     /// и так берётся резолвером).
     /// </summary>
-    public void AutofillCredentialFromSource()
+    /// <param name="force">
+    /// Принудительная подстановка независимо от <see cref="UseInfobaseAuth"/> (issue #79,
+    /// хвост 1.0.1.12): кнопка «Подставить из базы» активна и при включённой галке —
+    /// явный клик пользователя есть согласие заполнить поля, а автоподстановка на
+    /// смене галки по-прежнему не трогает введённое вручную.
+    /// </param>
+    public void AutofillCredentialFromSource(bool force = false)
     {
-        if (_useInfobaseAuth)
+        if (_useInfobaseAuth && !force)
             return;
         InfobaseAuthResolver.Resolve(_source, OneCLaunchMode.Configurator,
             out var mode, out var user, out var password,

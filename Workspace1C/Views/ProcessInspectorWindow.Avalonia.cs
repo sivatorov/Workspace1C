@@ -206,7 +206,7 @@ namespace Workspace1C
                 FontSize = 14,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.Parse(row.IsKnown ? "#22C55E" : "#94A3B8"))
+                Foreground = Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush")
             };
 
             var rowGrid = new Grid

@@ -140,7 +140,7 @@ namespace Workspace1C
             body.Children.Add(editorCard);
             Grid.SetRow(body, 2);
 
-            _errorLabel = new TextBlock { Foreground = new SolidColorBrush(Color.Parse("#E53935")), TextWrapping = TextWrapping.Wrap, IsVisible = false, Margin = new Thickness(0, 0, 0, 12) };
+            _errorLabel = new TextBlock { Foreground = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626"), TextWrapping = TextWrapping.Wrap, IsVisible = false, Margin = new Thickness(0, 0, 0, 12) };
             Grid.SetRow(_errorLabel, 3);
 
             var buttons = BuildButtons();
@@ -175,7 +175,7 @@ namespace Workspace1C
                 Margin = new Thickness(8, 0, 0, 0),
                 FontSize = 11,
                 FontWeight = FontWeight.Bold,
-                Foreground = new SolidColorBrush(Color.Parse("#2E7D32")),
+                Foreground = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"),
                 VerticalAlignment = VerticalAlignment.Center,
                 // Признака «активная» у модели профиля нет: активной считается та,
                 // что сейчас выбрана службой профилей, как и в вьюмодели WPF.

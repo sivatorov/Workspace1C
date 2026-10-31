@@ -197,7 +197,7 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="4,2">
-                                        <TextBlock Text="{Binding CurrentMark}" Foreground="#16A34A"
+                                        <TextBlock Text="{Binding CurrentMark}" Foreground="{DynamicResource SuccessBrush}"
                                                    FontSize="12" VerticalAlignment="Top" Margin="0,2,6,0"/>
                                         <TextBlock Text="{Binding Comment}" TextWrapping="Wrap"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>

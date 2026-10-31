@@ -45,7 +45,8 @@ namespace Workspace1C
                 if (exists && !string.IsNullOrEmpty(dir))
                 {
                     ExistsText.Text = string.Format(LocalizationManager.T("DeleteInfobase.ExistsYes"), dir);
-                    ExistsText.Foreground = System.Windows.Media.Brushes.SeaGreen;
+                    ExistsText.Foreground = TryFindResource("SuccessBrush") as System.Windows.Media.Brush
+                        ?? System.Windows.Media.Brushes.SeaGreen;
                     PhysicalDeleteCheck.IsEnabled = true;
                     PhysicalHint.Text =
                         string.Format(LocalizationManager.T("DeleteInfobase.PhysicalHintDynamic"), dir);

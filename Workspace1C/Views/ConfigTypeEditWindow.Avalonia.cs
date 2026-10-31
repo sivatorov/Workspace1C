@@ -430,7 +430,7 @@ public sealed class ConfigTypeEditWindow : ModalWindowBase
         };
         var mark = EditionCellText(edition.DefaultMark, 0);
         mark.HorizontalAlignment = HorizontalAlignment.Center;
-        mark.Foreground = new SolidColorBrush(Color.Parse("#F59E0B"));
+        Themes.ThemeBrushes.Bind(mark, TextBlock.ForegroundProperty, "WarningBrush");
         grid.Children.Add(mark);
         grid.Children.Add(EditionCellText(edition.Name, 1));
         grid.Children.Add(EditionCellText(edition.Red, 2));

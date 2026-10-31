@@ -82,11 +82,11 @@
             <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,6">
                 <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveUpCommand}"
                         ToolTip="{loc:Loc Services.MoveUp}">
-                    <TextBlock Text="▲" Foreground="#2563EB" FontSize="12"/>
+                    <TextBlock Text="▲" Foreground="{DynamicResource InfoBrush}" FontSize="12"/>
                 </Button>
                 <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveDownCommand}"
                         ToolTip="{loc:Loc Services.MoveDown}" Margin="6,3,0,3">
-                    <TextBlock Text="▼" Foreground="#2563EB" FontSize="12"/>
+                    <TextBlock Text="▼" Foreground="{DynamicResource InfoBrush}" FontSize="12"/>
                 </Button>
                 <TextBlock Style="{StaticResource ListHeaderText}" Text="{loc:Loc Services.ManagedList}" Margin="10,0,0,0"/>
             </StackPanel>
@@ -115,11 +115,11 @@
                         HorizontalAlignment="Center" Margin="10,0">
                 <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveLeftCommand}"
                         ToolTip="{loc:Loc Services.MoveLeft}">
-                    <TextBlock Text="◀" Foreground="#16A34A" FontSize="13"/>
+                    <TextBlock Text="◀" Foreground="{DynamicResource SuccessBrush}" FontSize="13"/>
                 </Button>
                 <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveRightCommand}"
                         ToolTip="{loc:Loc Services.MoveRight}">
-                    <TextBlock Text="▶" Foreground="#DC2626" FontSize="13"/>
+                    <TextBlock Text="▶" Foreground="{DynamicResource ErrorBrush}" FontSize="13"/>
                 </Button>
             </StackPanel>
 

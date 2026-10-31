@@ -76,8 +76,10 @@ public sealed class PlatformUpdateViewModelTests
         Func<string, string>? buildUninstall = null,
         Action<string>? copyCommand = null,
         Action<Action>? dispatchToUi = null,
-        Func<IReadOnlyList<OldVersionCleanupEntry>, IReadOnlyList<PlatformVersionInfo>?>? chooseVersionsToDelete = null,
-        Func<IReadOnlyList<PlatformDistributionOption>, PlatformDistributionOption?>? chooseDistribution = null,
+        // v100112: делегаты диалогов асинхронные (окна больше не блокируют рабочий
+        // поток .Wait() на маршалинге диалога в UI).
+        Func<IReadOnlyList<OldVersionCleanupEntry>, Task<IReadOnlyList<PlatformVersionInfo>?>>? chooseVersionsToDelete = null,
+        Func<IReadOnlyList<PlatformDistributionOption>, Task<PlatformDistributionOption?>>? chooseDistribution = null,
         BackgroundDownloadManager? backgroundDownloads = null)
     {
         return new PlatformUpdateViewModel(
@@ -1102,10 +1104,11 @@ public sealed class PlatformUpdateViewModelTests
         var runningBinPaths = new List<string> { @"C:\1cv8\8.3.26.1890\bin\1cv8c.exe" };
         IReadOnlyList<OldVersionCleanupEntry>? received = null;
 
-        IReadOnlyList<PlatformVersionInfo>? Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
+        Task<IReadOnlyList<PlatformVersionInfo>?> Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
         {
             received = entries;
-            return entries.Select(e => e.Version).ToList();
+            return Task.FromResult<IReadOnlyList<PlatformVersionInfo>?>(
+                entries.Select(e => e.Version).ToList());
         }
 
         var vm = CreateVm(
@@ -1145,8 +1148,9 @@ public sealed class PlatformUpdateViewModelTests
         };
         var deleted = new List<string>();
         var confirmCalls = 0;
-        IReadOnlyList<PlatformVersionInfo>? Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
-            => entries.Where(e => !e.HasRiskMarkers).Select(e => e.Version).ToList();
+        Task<IReadOnlyList<PlatformVersionInfo>?> Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
+            => Task.FromResult<IReadOnlyList<PlatformVersionInfo>?>(
+                entries.Where(e => !e.HasRiskMarkers).Select(e => e.Version).ToList());
 
         var vm = CreateVm(
             installedInfos: () => installedInfos.ToList(),
@@ -1184,8 +1188,9 @@ public sealed class PlatformUpdateViewModelTests
         };
         var deleted = new List<string>();
         var confirmMessages = new List<string>();
-        IReadOnlyList<PlatformVersionInfo>? Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
-            => entries.Where(e => e.IsNewest).Select(e => e.Version).ToList();
+        Task<IReadOnlyList<PlatformVersionInfo>?> Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
+            => Task.FromResult<IReadOnlyList<PlatformVersionInfo>?>(
+                entries.Where(e => e.IsNewest).Select(e => e.Version).ToList());
 
         var vm = CreateVm(
             installedInfos: () => installedInfos.ToList(),
@@ -1230,8 +1235,9 @@ public sealed class PlatformUpdateViewModelTests
         };
         var deleted = new List<string>();
         var logger = new FakeAppLogger();
-        IReadOnlyList<PlatformVersionInfo>? Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
-            => entries.Where(e => e.IsUsedByBases).Select(e => e.Version).ToList();
+        Task<IReadOnlyList<PlatformVersionInfo>?> Choose(IReadOnlyList<OldVersionCleanupEntry> entries)
+            => Task.FromResult<IReadOnlyList<PlatformVersionInfo>?>(
+                entries.Where(e => e.IsUsedByBases).Select(e => e.Version).ToList());
 
         var vm = CreateVm(
             service: OkService(),
@@ -1273,7 +1279,7 @@ public sealed class PlatformUpdateViewModelTests
                 deleted.Add(version.Display);
                 return Task.FromResult((Success: true, ErrorKey: (string?)null));
             },
-            chooseVersionsToDelete: _ => null);
+            chooseVersionsToDelete: _ => Task.FromResult<IReadOnlyList<PlatformVersionInfo>?>(null));
 
         await vm.RemoveOldVersionsAsync();
 
@@ -1645,7 +1651,7 @@ public sealed class PlatformUpdateViewModelTests
                 Interlocked.Increment(ref saveDialogCalls);
                 return null;
             },
-            chooseDistribution: _ => null);
+            chooseDistribution: _ => Task.FromResult<PlatformDistributionOption?>(null));
 
         await vm.CheckUpdatesAsync();
         vm.SelectedRow = vm.Rows.Single(r => r.Version == "8.3.27.2214");
@@ -1678,7 +1684,7 @@ public sealed class PlatformUpdateViewModelTests
                 Interlocked.Increment(ref installCalls);
                 return Task.FromResult((Success: true, ErrorKey: (string?)null, ExitCode: 0));
             },
-            chooseDistribution: _ => null);
+            chooseDistribution: _ => Task.FromResult<PlatformDistributionOption?>(null));
 
         await vm.CheckUpdatesAsync();
         vm.SelectedRow = vm.Rows.Single(r => r.Version == "8.3.27.2214");
@@ -1703,7 +1709,8 @@ public sealed class PlatformUpdateViewModelTests
                 Interlocked.Increment(ref saveDialogCalls);
                 return Path.Combine(Path.GetTempPath(), "cm_dist_test.zip");
             },
-            chooseDistribution: _ => throw new InvalidOperationException("диалог не должен показываться"));
+            chooseDistribution: _ => Task.FromException<PlatformDistributionOption?>(
+                new InvalidOperationException("диалог не должен показываться")));
 
         await vm.CheckUpdatesAsync();
         vm.SelectedRow = vm.Rows.Single(r => r.Version == "8.3.27.2214");

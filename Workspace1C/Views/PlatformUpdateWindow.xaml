@@ -224,7 +224,7 @@
                         Command="{Binding DownloadAndInstallCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DownloadOutline" Width="16" Height="16"
-                                                 Foreground="#16A34A"/>
+                                                 Foreground="{DynamicResource SuccessBrush}"/>
                         <TextBlock Text="{loc:Loc PlatformUpdate.DownloadInstall}" Margin="6,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -239,7 +239,7 @@
                         Command="{Binding RemoveOldVersionsCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DeleteOutline" Width="16" Height="16"
-                                                 Foreground="#DC2626"/>
+                                                 Foreground="{DynamicResource ErrorBrush}"/>
                         <TextBlock Text="{loc:Loc PlatformUpdate.RemoveOld}" Margin="6,0,0,0"
                                    VerticalAlignment="Center"/>
                     </StackPanel>

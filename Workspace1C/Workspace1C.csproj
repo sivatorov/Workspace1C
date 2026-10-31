@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.11</Version>
-    <AssemblyVersion>1.0.1.11</AssemblyVersion>
-    <FileVersion>1.0.1.11</FileVersion>
-    <InformationalVersion>1.0.1.11</InformationalVersion>
+    <Version>1.0.1.12</Version>
+    <AssemblyVersion>1.0.1.12</AssemblyVersion>
+    <FileVersion>1.0.1.12</FileVersion>
+    <InformationalVersion>1.0.1.12</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -281,6 +281,14 @@
     <!-- Окно «Серверы 1С» (0.3.9.124): WPF code-behind исключается, Avalonia-версия
          (ServerMonitorWindow.Avalonia.cs) подключается глобом *Window.Avalonia.cs ниже. -->
     <Compile Remove="Views\ServerMonitorWindow.xaml.cs" />
+    <!-- Диалог «Регламентные задания сервера» (v100112, F1): WPF code-behind
+         исключается, Avalonia-версия (ServerJobsWindow.Avalonia.cs) подключается
+         глобом *Window.Avalonia.cs ниже. -->
+    <Compile Remove="Views\ServerJobsWindow.xaml.cs" />
+    <!-- Диалог «Что нового» после обновления (v100112, F3): WPF code-behind
+         исключается, Avalonia-версия (WhatsNewWindow.Avalonia.cs) подключается
+         глобом *Window.Avalonia.cs ниже. -->
+    <Compile Remove="Views\WhatsNewWindow.xaml.cs" />
     <!-- Окно «Управление службами» и его диалог «Настроить» (issue #11): WPF code-behind
          исключается, Avalonia-версии (ServicesWindow.Avalonia.cs / ServicesPickerWindow.Avalonia.cs)
          подключаются глобом *Window.Avalonia.cs ниже. -->
@@ -566,6 +574,10 @@
          *.Avalonia.cs). -->
     <Compile Include="ViewModels\RacJobRow.cs" />
     <Compile Include="ViewModels\RacJobFilterRow.cs" />
+    <!-- ViewModel диалога «Регламентные задания сервера» (v100112, F1): чистый .NET
+         без WPF-зависимостей, используется обеими платформами — на Linux подключается
+         явно (имя не совпадает с глобом *.Avalonia.cs). -->
+    <Compile Include="ViewModels\ServerJobsViewModel.cs" />
     <!-- Строка вкладки «Базы» (issue #3): чистая модель — на Linux подключается
          явно (имя не совпадает с глобом *.Avalonia.cs). -->
     <Compile Include="ViewModels\RacInfobaseRow.cs" />

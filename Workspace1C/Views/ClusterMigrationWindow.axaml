@@ -53,7 +53,7 @@
                                    FontSize="11" Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="5" Text="{Binding TargetStatusDisplay}"
-                                   FontSize="11" Foreground="#DC2626" VerticalAlignment="Center"
+                                   FontSize="11" Foreground="{DynamicResource ErrorBrush}" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                     </Grid>
                 </DataTemplate>
@@ -124,9 +124,9 @@
                      на всю доступную ширину (HorizontalAlignment=Stretch). -->
                 <ProgressBar x:Name="BusyProgress" Grid.Row="1" Height="4" MinWidth="200"
                              HorizontalAlignment="Stretch" Margin="0,5,0,0" IsIndeterminate="True"
-                             Foreground="#06B6D4" VerticalAlignment="Center" IsVisible="False"/>
+                             Foreground="{DynamicResource InfoBrush}" VerticalAlignment="Center" IsVisible="False"/>
             </Grid>
-            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="#DC2626"
+            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="{DynamicResource ErrorBrush}"
                        TextWrapping="Wrap"/>
             <DockPanel Margin="0,10,0,0">
                 <ContentControl x:Name="CancelHost" DockPanel.Dock="Right" VerticalAlignment="Center"/>

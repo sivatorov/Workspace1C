@@ -838,13 +838,13 @@ namespace Workspace1C
             grid.Children.Add(modified);
 
             var inApp = MakeFlagDot();
-            ApplyFlagStyle(inApp, row.InApp, "#16A34A", "#94A3B8");
+            ApplyFlagStyle(inApp, row.InApp, "@SuccessBrush", "@TextSecondaryBrush");
             ToolTip.SetTip(inApp, LocalizationManager.T("FindLostBases.AlreadyInAppHint"));
             Grid.SetColumn(inApp, 5);
             grid.Children.Add(inApp);
 
             var inV8i = MakeFlagDot();
-            ApplyFlagStyle(inV8i, row.InIbasesV8i, "#8B5CF6", "#94A3B8");
+            ApplyFlagStyle(inV8i, row.InIbasesV8i, "@PurpleAccentBrush", "@TextSecondaryBrush");
             ToolTip.SetTip(inV8i, LocalizationManager.T("FindLostBases.InV8iHint"));
             Grid.SetColumn(inV8i, 6);
             grid.Children.Add(inV8i);
@@ -866,7 +866,7 @@ namespace Workspace1C
             };
 
         private static void ApplyFlagStyle(TextBlock block, bool on, string onColor, string offColor)
-            => block.Foreground = Brush.Parse(on ? onColor : offColor);
+            => block.Foreground = Themes.ThemeBrushes.FromSpec(on ? onColor : offColor);
 
         private static void AddText(Grid grid, int column, string text, bool allowEllipsis)
         {
@@ -885,9 +885,9 @@ namespace Workspace1C
         private void UpdateRow(FoundBaseRowViewModel row)
         {
             if (_inAppTexts.TryGetValue(row, out var inApp))
-                ApplyFlagStyle(inApp, row.InApp, "#16A34A", "#94A3B8");
+                ApplyFlagStyle(inApp, row.InApp, "@SuccessBrush", "@TextSecondaryBrush");
             if (_inV8iTexts.TryGetValue(row, out var inV8i))
-                ApplyFlagStyle(inV8i, row.InIbasesV8i, "#8B5CF6", "#94A3B8");
+                ApplyFlagStyle(inV8i, row.InIbasesV8i, "@PurpleAccentBrush", "@TextSecondaryBrush");
             if (_checks.TryGetValue(row, out var check))
                 check.IsEnabled = row.NotInApp;
         }

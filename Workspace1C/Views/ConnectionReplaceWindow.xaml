@@ -177,7 +177,7 @@
         <StackPanel Grid.Row="2" Margin="0,8,0,0">
             <TextBlock Text="{Binding SummaryText}" FontWeight="SemiBold"/>
             <TextBlock Text="{Binding ResultText}" FontSize="12" Opacity="0.85" Margin="0,2,0,0"/>
-            <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="#DC2626"
+            <TextBlock Text="{Binding ErrorMessage}" FontSize="12" Foreground="{DynamicResource ErrorBrush}"
                        TextWrapping="Wrap" Margin="0,2,0,0"/>
         </StackPanel>
 

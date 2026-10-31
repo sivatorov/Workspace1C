@@ -40,9 +40,11 @@ public sealed class WebPublishServerComboBoxWidthTests
     {
         var source = ReadProjectFile("Workspace1C", "Views", "WebPublishWindow.cs");
 
-        // Ширина ComboBox «Веб-сервер» увеличена (200 → 400), надписи не обрезаются.
-        Assert.Contains("nameof(WebPublishViewModel.ServerIndex), 400", source, StringComparison.Ordinal);
+        // Ширина ComboBox «Веб-сервер» увеличена (200 → 400 → 600, issue #63, хвост
+        // 1.0.1.12: «раза в полтора или по содержимому»), надписи не обрезаются.
+        Assert.Contains("nameof(WebPublishViewModel.ServerIndex), 600", source, StringComparison.Ordinal);
         Assert.DoesNotContain("nameof(WebPublishViewModel.ServerIndex), 200", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("nameof(WebPublishViewModel.ServerIndex), 400", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -50,9 +52,10 @@ public sealed class WebPublishServerComboBoxWidthTests
     {
         var source = ReadProjectFile("Workspace1C", "Views", "WebPublishWindow.Avalonia.cs");
 
-        const string marker = "nameof(WebPublishViewModel.ServerIndex), 400";
+        const string marker = "nameof(WebPublishViewModel.ServerIndex), 600";
         Assert.Contains(marker, source, StringComparison.Ordinal);
         Assert.DoesNotContain("nameof(WebPublishViewModel.ServerIndex), 200", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("nameof(WebPublishViewModel.ServerIndex), 400", source, StringComparison.Ordinal);
     }
 
     [Fact]

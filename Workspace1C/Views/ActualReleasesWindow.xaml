@@ -230,7 +230,7 @@
                                         Command="{Binding DownloadCommand}"
                                         ToolTip="{loc:Loc Updates.Download}">
                                     <materialDesign:PackIcon Kind="DownloadOutline" Width="16" Height="16"
-                                                             Foreground="#16A34A"/>
+                                                             Foreground="{DynamicResource SuccessBrush}"/>
                                 </Button>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>

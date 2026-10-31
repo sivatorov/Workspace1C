@@ -615,7 +615,7 @@
                             <Button Command="{Binding DeleteInfobaseCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.DeleteTooltip}">
-                                <materialDesign:PackIcon Kind="Delete" Width="18" Height="18" Foreground="#DC2626"/>
+                                <materialDesign:PackIcon Kind="Delete" Width="18" Height="18" Foreground="{DynamicResource ErrorBrush}"/>
                             </Button>
                             <!-- Вертикальный разделитель: отделяет группу «Правка» от «Управление списком» -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
@@ -644,13 +644,13 @@
                             <Button Command="{Binding SynchronizeWithIbasesCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.SyncDetailedTooltip}">
-                                <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="#14B8A6"/>
+                                <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                             </Button>
                             <Button Command="{Binding CheckAvailabilityCommand}"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.CheckAvailabilityTooltip}">
                                 <Path Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconSonar}" Fill="#14B8A6"/>
+                                      Data="{DynamicResource IconSonar}" Fill="{DynamicResource InfoBrush}"/>
                             </Button>
                             <!-- Вертикальный разделитель: отделяет группу «Управление списком» от «Настройки» -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
@@ -684,7 +684,7 @@
                             <Button x:Name="ThemeToggleButton" Click="OnToggleTheme_Click"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" ToolTip="{loc:Loc Main.Theme}">
                                 <Path x:Name="ThemeToggleIcon" Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconMoon}" Fill="#8B5CF6"/>
+                                      Data="{DynamicResource IconMoon}" Fill="{DynamicResource PurpleAccentBrush}"/>
                             </Button>
                             <!-- Компактный режим: быстрый переключатель плотности интерфейса -->
                             <ToggleButton x:Name="CompactModeButton" Click="OnCompactMode_Toggled"
@@ -697,7 +697,7 @@
                                     Margin="0,0,2,0"
                                     Visibility="{Binding SwitchUserVisible, Converter={StaticResource BoolToVis}}"
                                     ToolTip="{loc:Loc Main.SwitchUserTooltip}">
-                                <materialDesign:PackIcon Kind="AccountSwitch" Width="18" Height="18" Foreground="#06B6D4"/>
+                                <materialDesign:PackIcon Kind="AccountSwitch" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                             </Button>
                             <Button Command="{Binding OpenSettingsCommand}" Style="{DynamicResource IconButton}"
                                     ToolTip="{loc:Loc Main.SettingsTooltip}">
@@ -1526,7 +1526,7 @@
                                                     </Style>
                                                 </Button.Style>
                                                 <materialDesign:PackIcon Kind="Delete" Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="#DC2626"/>
+                                                                         Foreground="{DynamicResource ErrorBrush}"/>
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -2472,7 +2472,7 @@
                                 <Border Background="{DynamicResource PinnedBadgeBrush}" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
                                         Visibility="{Binding SelectedInfobase.IsPinned, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Pin" Width="12" Height="12" Foreground="#8B5CF6" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Pin" Width="12" Height="12" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Main.PinnedLabel}" FontSize="11" Foreground="{DynamicResource PinnedBadgeTextBrush}"/>
                                     </StackPanel>
                                 </Border>
@@ -2697,14 +2697,14 @@
                                                       Style="{DynamicResource ModernMenuItem}"
                                                       InputGestureText="{Binding HotkeyEnterpriseWithParams}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="Tune" Width="18" Height="18" Foreground="#0EA5E9"/>
+                                                    <materialDesign:PackIcon Kind="Tune" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <MenuItem Header="{loc:Loc Main.LaunchWithAuth}" Command="{Binding LaunchEnterpriseWithAuthCommand}"
                                                       Style="{DynamicResource ModernMenuItem}"
                                                       InputGestureText="{Binding HotkeyEnterpriseWithAuth}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="AccountKey" Width="18" Height="18" Foreground="#8B5CF6"/>
+                                                    <materialDesign:PackIcon Kind="AccountKey" Width="18" Height="18" Foreground="{DynamicResource PurpleAccentBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator/>
@@ -2795,14 +2795,14 @@
                                                       Style="{DynamicResource ModernMenuItem}"
                                                       InputGestureText="{Binding HotkeyConfiguratorWithParams}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="Tune" Width="18" Height="18" Foreground="#0EA5E9"/>
+                                                    <materialDesign:PackIcon Kind="Tune" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <MenuItem Header="{loc:Loc Main.LaunchWithAuth}" Command="{Binding LaunchConfiguratorWithAuthCommand}"
                                                       Style="{DynamicResource ModernMenuItem}"
                                                       InputGestureText="{Binding HotkeyConfiguratorWithAuth}">
                                                 <MenuItem.Icon>
-                                                    <materialDesign:PackIcon Kind="AccountKey" Width="18" Height="18" Foreground="#8B5CF6"/>
+                                                    <materialDesign:PackIcon Kind="AccountKey" Width="18" Height="18" Foreground="{DynamicResource PurpleAccentBrush}"/>
                                                 </MenuItem.Icon>
                                             </MenuItem>
                                             <Separator/>
@@ -2973,7 +2973,7 @@
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                     <materialDesign:PackIcon Kind="Link" Width="16" Height="16" Margin="0,0,4,0"
-                                                             Foreground="#0EA5E9" VerticalAlignment="Center"/>
+                                                             Foreground="{DynamicResource InfoBrush}" VerticalAlignment="Center"/>
                                     <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimaryBrush}">
                                         <TextBlock.Style>
@@ -3031,12 +3031,12 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                    <materialDesign:PackIcon Kind="ExitToApp" Width="16" Height="16" Foreground="#DC2626" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Main.Exit}" VerticalAlignment="Center" Foreground="#DC2626" FontSize="12" FontWeight="SemiBold"/>
+                                    <materialDesign:PackIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Main.Exit}" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}" FontSize="12" FontWeight="SemiBold"/>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="✕"
                                            VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"
-                                           Foreground="#DC2626" Opacity="0.85" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource ErrorBrush}" Opacity="0.85" Margin="8,0,0,0"
                                            Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
                             </Grid>
                         </Button>

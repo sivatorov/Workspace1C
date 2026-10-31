@@ -62,7 +62,7 @@
                     Visibility="{Binding CanOpenSystemDialog, Converter={StaticResource BooleanToVisibilityConverter}}"
                     Click="OnSystemDialog_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🗔" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#2563EB"/>
+                    <TextBlock Text="🗔" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
                     <TextBlock Text="{loc:Loc Services.SystemDialog}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -75,7 +75,7 @@
                     IsEnabled="{Binding HasRows}"
                     Click="OnGrantRights_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🛡" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="#7C3AED"/>
+                    <TextBlock Text="🛡" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
                     <TextBlock Text="{loc:Loc Services.GrantRights}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -111,12 +111,12 @@
             <Button x:Name="MoveUpButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.MoveUp}" IsEnabled="{Binding CanMoveUp}"
                     Click="OnMoveUp_Click">
-                <TextBlock Text="▲" VerticalAlignment="Center" Foreground="#2563EB"/>
+                <TextBlock Text="▲" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Button x:Name="MoveDownButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.MoveDown}" IsEnabled="{Binding CanMoveDown}"
                     Click="OnMoveDown_Click">
-                <TextBlock Text="▼" VerticalAlignment="Center" Foreground="#2563EB"/>
+                <TextBlock Text="▼" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <!-- Группы служб (issue #11, итерация 2 — релиз 1.0.0.12): «Добавить/Изменить/
@@ -125,28 +125,28 @@
             <Button x:Name="AddGroupButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.GroupAddHint}" IsEnabled="{Binding CanAddGroup}"
                     Click="OnAddGroup_Click">
-                <TextBlock Text="📦" VerticalAlignment="Center" Foreground="#7C3AED"/>
+                <TextBlock Text="📦" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
             </Button>
             <Button x:Name="EditGroupButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.GroupEditHint}" IsEnabled="{Binding CanEditGroup}"
                     Click="OnEditGroup_Click">
-                <TextBlock Text="✎" VerticalAlignment="Center" Foreground="#7C3AED"/>
+                <TextBlock Text="✎" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
             </Button>
             <!-- «Перенести в группу» (issue #11, 1.0.0.14): рядом с кнопкой правки. -->
             <Button x:Name="MoveToGroupButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.MoveToGroupHint}" IsEnabled="{Binding CanMoveToGroup}"
                     Click="OnMoveToGroup_Click">
-                <TextBlock Text="⇄" VerticalAlignment="Center" Foreground="#0EA5E9"/>
+                <TextBlock Text="⇄" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Button x:Name="DeleteGroupButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.GroupDeleteHint}" IsEnabled="{Binding CanDeleteGroup}"
                     Click="OnDeleteGroup_Click">
-                <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="#DC2626"/>
+                <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <Button x:Name="RefreshButton" Style="{StaticResource IconOnlyButton}"
                     ToolTip="{loc:Loc Services.Refresh}" Click="OnRefresh_Click">
-                <TextBlock Text="⟳" VerticalAlignment="Center" Foreground="#2563EB"/>
+                <TextBlock Text="⟳" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <!-- Команды — только цветные иконки, без подписей (замечание 7OH 18.10:
@@ -156,12 +156,12 @@
             <Button x:Name="StartButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Start}"
                     IsEnabled="{Binding CanStart}" Click="OnStart_Click">
-                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StartGlyph}" VerticalAlignment="Center" Foreground="#16A34A"/>
+                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StartGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource SuccessBrush}"/>
             </Button>
             <Button x:Name="StopButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Stop}"
                     IsEnabled="{Binding CanStop}" Click="OnStop_Click">
-                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StopGlyph}" VerticalAlignment="Center" Foreground="#DC2626"/>
+                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StopGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <Button x:Name="PauseButton" Style="{StaticResource CommandButton}"
@@ -172,13 +172,13 @@
             <Button x:Name="ContinueButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Continue}"
                     IsEnabled="{Binding CanContinue}" Click="OnContinue_Click">
-                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.ContinueGlyph}" VerticalAlignment="Center" Foreground="#0EA5E9"/>
+                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.ContinueGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <Button x:Name="RestartButton" Style="{StaticResource CommandButton}"
                     ToolTip="{loc:Loc Services.Restart}"
                     IsEnabled="{Binding CanRestart}" Click="OnRestart_Click">
-                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.RestartGlyph}" VerticalAlignment="Center" Foreground="#2563EB"/>
+                <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.RestartGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <!-- Подменю «Все сервисы» (Запустить / Остановить / Перезапустить). -->
@@ -249,7 +249,7 @@
                                  VerticalAlignment="Center"
                                  Fill="{Binding StatusColorHex, Converter={StaticResource BrushFromHex}}"/>
                         <TextBlock Grid.Column="1" Text="📦" Margin="0,0,6,0"
-                                   VerticalAlignment="Center" Foreground="#7C3AED"/>
+                                   VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
                         <TextBlock Grid.Column="2" Text="{Binding DisplayName}"
                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="3" Text="{Binding StatusText}"

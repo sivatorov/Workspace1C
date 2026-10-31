@@ -67,7 +67,7 @@ namespace Workspace1C
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 if (item is { IsThinClient: true })
-                    text.Foreground = new SolidColorBrush(Color.Parse("#F59E0B"));
+                    text.Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706");
                 else
                     ThemeBrushes.Bind(text, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                 return text;

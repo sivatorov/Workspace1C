@@ -84,7 +84,7 @@ namespace Workspace1C
             var appDark = Themes.ThemeManager.CurrentTheme == Themes.ThemeManager.DarkThemeName;
             var rowBackground = Themes.ThemeManager.CurrentScheme is { } appScheme
                 ? appScheme.PaletteValue(appDark, "CardBackgroundColor")
-                : (appDark ? "#1E293B" : "#FFFFFF");
+                : (appDark ? "#1E293B" : "#FFFFFF"); // fallback при отсутствии схемы
             hex.Foreground = new SolidColorBrush(Color.Parse(
                 Models.ColorScheme.ContrastTextHex(rowBackground)));
 
@@ -192,7 +192,7 @@ namespace Workspace1C
                 Width = 12,
                 Height = 12,
                 CornerRadius = new CornerRadius(6),
-                Background = new SolidColorBrush(Color.Parse("#22C55E")),
+                Background = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"),
                 VerticalAlignment = VerticalAlignment.Center
             };
             var titleGrid = new Grid();

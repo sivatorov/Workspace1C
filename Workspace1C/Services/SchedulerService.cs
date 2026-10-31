@@ -196,22 +196,34 @@ public class SchedulerService : IDisposable
         }
     }
 
-    private void Tick()
+    /// <summary>
+    /// Колбэк таймера планировщика (v100112): полностью асинхронный путь —
+    /// <see cref="ProcessDueAsync"/> ожидается через await, а не через
+    /// <c>GetAwaiter().GetResult()</c> (sync-over-async: блокировка потока пула и
+    /// риск дедлока при синхронном контексте). Семафорная защита от параллельного
+    /// выполнения сохранена: <c>WaitAsync(0)</c> — «занято — тихо выходим», как
+    /// раньше <c>Wait(0)</c>. <c>async void</c> здесь безопасен: весь путь (включая
+    /// ожидание семафора) обёрнут в try/catch, исключение не уйдёт в ThreadPool.
+    /// </summary>
+    private async void Tick()
     {
-        // Не выполняем параллельную обработку: операции 1С конфликтуют между собой.
-        if (!_gate.Wait(0))
-            return;
         try
         {
-            ProcessDueAsync().GetAwaiter().GetResult();
+            // Не выполняем параллельную обработку: операции 1С конфликтуют между собой.
+            if (!await _gate.WaitAsync(0).ConfigureAwait(false))
+                return;
+            try
+            {
+                await ProcessDueAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _gate.Release();
+            }
         }
         catch (Exception ex)
         {
             _logger?.Error("Ошибка фонового планировщика заданий", ex);
-        }
-        finally
-        {
-            _gate.Release();
         }
     }
 

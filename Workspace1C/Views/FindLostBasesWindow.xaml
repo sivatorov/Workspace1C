@@ -78,7 +78,7 @@
                                 ToolTip="{loc:Loc FindLostBases.Drive.AllTooltip}" Click="OnDriveCheckAll">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
-                                                         Foreground="#16A34A" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc FindLostBases.Drive.All}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -159,7 +159,7 @@
                             ToolTip="{loc:Loc FindLostBases.FoundAllTooltip}" Click="OnFoundCheckAll">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
-                                                     Foreground="#16A34A" VerticalAlignment="Center"/>
+                                                     Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc FindLostBases.FoundAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -215,7 +215,7 @@
                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding InApp}" Value="True">
-                                                    <Setter Property="Foreground" Value="#16A34A"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -235,7 +235,7 @@
                                             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding InIbasesV8i}" Value="True">
-                                                    <Setter Property="Foreground" Value="#8B5CF6"/>
+                                                    <Setter Property="Foreground" Value="{DynamicResource PurpleAccentBrush}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>

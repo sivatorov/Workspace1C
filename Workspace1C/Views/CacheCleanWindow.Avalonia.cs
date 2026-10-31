@@ -239,7 +239,7 @@ namespace Workspace1C
         /// </summary>
         private static Control SelectAllContent(string iconKey, string colorHex, string text)
         {
-            var icon = IconHelper.MakeIcon(iconKey, 16, new SolidColorBrush(Color.Parse(colorHex)));
+            var icon = IconHelper.MakeIcon(iconKey, 16, Themes.ThemeBrushes.FromSpec(colorHex));
             icon.VerticalAlignment = VerticalAlignment.Center;
             var caption = new TextBlock
             {
@@ -484,7 +484,7 @@ namespace Workspace1C
             // Фон под полем это фон самой карточки списка, отдельной заливки нет.
             _searchBox.Background = Brushes.Transparent;
             _searchBox.BorderThickness = new Thickness(0, 0, 0, 1);
-            _searchBox.BorderBrush = new SolidColorBrush(Color.Parse("#7F000000"));
+            Themes.ThemeBrushes.Bind(_searchBox, TextBox.BorderBrushProperty, "BorderColorBrush");
             _searchBox.FontSize = 13;
             _searchBox.VerticalContentAlignment = VerticalAlignment.Center;
             _searchBox.Margin = new Thickness(8, 8, 8, 2);
@@ -497,14 +497,14 @@ namespace Workspace1C
             var toolbarButtons = new StackPanel { Orientation = Orientation.Horizontal };
             var selectAll = new Button
             {
-                Content = SelectAllContent("IconCheckboxMultipleMarked", "#16A34A", LocalizationManager.T("CacheClean.SelectAll"))
+                Content = SelectAllContent("IconCheckboxMultipleMarked", "@SuccessBrush", LocalizationManager.T("CacheClean.SelectAll"))
             };
             selectAll.Styled(ControlThemes.SelectAllButton);
             ToolTip.SetTip(selectAll, LocalizationManager.T("CacheClean.SelectAllTooltip"));
             selectAll.Click += (_, _) => { foreach (var check in _baseChecks.Keys) check.IsChecked = true; UpdateCount(); UpdateCleanEnabled(); };
             var clearAll = new Button
             {
-                Content = SelectAllContent("IconCheckboxMultipleBlankOutline", "#EF4444", LocalizationManager.T("CacheClean.ClearAll")),
+                Content = SelectAllContent("IconCheckboxMultipleBlankOutline", "@ErrorBrush", LocalizationManager.T("CacheClean.ClearAll")),
                 Margin = new Thickness(16, 0, 0, 0)
             };
             clearAll.Styled(ControlThemes.SelectAllButton);

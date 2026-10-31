@@ -296,16 +296,16 @@ namespace Workspace1C
             UpdateUrlLinkDisplay();
             _statusText.Text = StatusTextLocalized(_row.Status);
 
-            IBrush? brush = new SolidColorBrush(Colors.Gray);
+            IBrush? brush = TryGetBrush("TextSecondaryBrush") ?? new SolidColorBrush(Colors.Gray);
             var primary = TryGetBrush("TextPrimaryBrush");
             if (primary is not null) brush = primary;
             if (_row.HasNewer)
             {
-                brush = TryGetBrush("AccentBrush") ?? new SolidColorBrush(Color.Parse("#16A34A"));
+                brush = TryGetBrush("SuccessBrush") ?? new SolidColorBrush(Color.Parse("#16A34A"));
             }
             else if (_row.Status == ConfigUpdateStatus.Failed)
             {
-                brush = new SolidColorBrush(Color.Parse("#EF4444"));
+                brush = TryGetBrush("ErrorBrush") ?? new SolidColorBrush(Color.Parse("#DC2626"));
             }
             _statusText.Foreground = brush;
 
@@ -1447,7 +1447,7 @@ namespace Workspace1C
             fields.Children.Add(MakeFieldRow(T("Updates.Url"), _urlText));
 
             _errorText.TextWrapping = TextWrapping.Wrap;
-            _errorText.Foreground = new SolidColorBrush(Color.Parse("#EF4444"));
+            _errorText.Foreground = TryGetBrush("ErrorBrush") ?? new SolidColorBrush(Color.Parse("#DC2626"));
             fields.Children.Add(MakeFieldRow(string.Empty, _errorText));
 
             // Панель действий при ошибке авторизации (issue #323/#330/#334): имя учётной

@@ -395,7 +395,7 @@ namespace Workspace1C
             // Несколько экземпляров: настройка лежит в общем с версией для
             // Windows файле и уже учитывается при запуске (App.axaml.cs),
             // но в Linux-сборке её нечем было изменить.
-            var multipleInstancesCheck = SettingsSwitch("Settings.General.AllowMultipleInstances", _viewModel.AllowMultipleInstances, "IconApplicationOutline", "#3B82F6");
+            var multipleInstancesCheck = SettingsSwitch("Settings.General.AllowMultipleInstances", _viewModel.AllowMultipleInstances, "IconApplicationOutline", "@InfoBrush");
             multipleInstancesCheck.Margin = new Thickness(0, 0, 0, 6);
             settingsBehavior.Children.Add(multipleInstancesCheck);
 
@@ -403,8 +403,8 @@ namespace Workspace1C
             // (App.axaml.cs), но в Linux-сборке их нечем было изменить. Цвет значка
             // взят из разметки Windows (SettingsWindow.xaml:1269, 1275); значка
             // Update в наборе Icons.axaml нет, поэтому стоит ближайший IconRefresh.
-            var checkUpdatesCheck = SettingsSwitch("Settings.General.CheckForUpdatesOnStartup", _viewModel.CheckForUpdatesOnStartup, "IconRefresh", "#22C55E", "Settings.General.CheckForUpdatesOnStartupTooltip");
-            var autoUpdateCheck = SettingsSwitch("Settings.General.AutoUpdate", _viewModel.AutoUpdateEnabled, "IconRefresh", "#22C55E", "Settings.General.AutoUpdateTooltip");
+            var checkUpdatesCheck = SettingsSwitch("Settings.General.CheckForUpdatesOnStartup", _viewModel.CheckForUpdatesOnStartup, "IconRefresh", "@SuccessBrush", "Settings.General.CheckForUpdatesOnStartupTooltip");
+            var autoUpdateCheck = SettingsSwitch("Settings.General.AutoUpdate", _viewModel.AutoUpdateEnabled, "IconRefresh", "@SuccessBrush", "Settings.General.AutoUpdateTooltip");
             checkUpdatesCheck.Margin = new Thickness(0, 0, 0, 6);
             autoUpdateCheck.Margin = new Thickness(0, 0, 0, 6);
             settingsBehavior.Children.Add(checkUpdatesCheck);
@@ -466,18 +466,18 @@ namespace Workspace1C
             // Поведение значка в области уведомлений. До этого три настройки
             // жили только в файле и в версии для Windows: в Linux-сборке ни
             // флажков, ни учёта не было.
-            var trayIconCheck = SettingsSwitch("Settings.General.ShowTrayIcon", _viewModel.ShowTrayIcon, "IconTrayFull", "#14B8A6");
-            var closeToTrayCheck = SettingsSwitch("Settings.General.CloseToTray", _viewModel.CloseToTray, "IconWindowMinimize", "#F59E0B");
-            var escapeToTrayCheck = SettingsSwitch("Settings.General.EscapeToTray", _viewModel.EscapeToTray, "IconKeyboard", "#8B5CF6");
+            var trayIconCheck = SettingsSwitch("Settings.General.ShowTrayIcon", _viewModel.ShowTrayIcon, "IconTrayFull", "@InfoBrush");
+            var closeToTrayCheck = SettingsSwitch("Settings.General.CloseToTray", _viewModel.CloseToTray, "IconWindowMinimize", "@WarningBrush");
+            var escapeToTrayCheck = SettingsSwitch("Settings.General.EscapeToTray", _viewModel.EscapeToTray, "IconKeyboard", "@PurpleAccentBrush");
             // Системные уведомления ОС о завершении фоновых операций (функция №4):
             // резервная копия, задание по расписанию, найденное обновление приложения.
             var notificationsCheck = SettingsSwitch(
-                "Settings.General.ShowSystemNotifications", _viewModel.ShowSystemNotifications, "IconInformationOutline", "#14B8A6");
+                "Settings.General.ShowSystemNotifications", _viewModel.ShowSystemNotifications, "IconInformationOutline", "@InfoBrush");
             // Догоняющее выполнение пропущенных заданий (функция №7): задания, чьё
             // плановое время наступило, пока приложение было выключено, выполняются
             // сразу при следующем старте — один раз (только свежие пропуски).
             var catchUpCheck = SettingsSwitch(
-                "Settings.General.CatchUpMissedTasks", _viewModel.CatchUpMissedTasks, "IconHistory", "#6366F1");
+                "Settings.General.CatchUpMissedTasks", _viewModel.CatchUpMissedTasks, "IconHistory", "@PurpleAccentBrush");
             trayIconCheck.Margin = new Thickness(0, 0, 0, 6);
             closeToTrayCheck.Margin = new Thickness(0, 0, 0, 6);
             escapeToTrayCheck.Margin = new Thickness(0, 0, 0, 6);
@@ -518,7 +518,7 @@ namespace Workspace1C
                 Orientation = Orientation.Horizontal,
                 Margin = new Thickness(0, 6, 0, 6)
             };
-            var afterLaunchIcon = IconHelper.MakeIcon("IconRocketLaunch", 16, new SolidColorBrush(Color.Parse("#22C55E")));
+            var afterLaunchIcon = IconHelper.MakeIcon("IconRocketLaunch", 16, Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
             afterLaunchIcon.Margin = new Thickness(0, 0, 8, 0);
             afterLaunchIcon.VerticalAlignment = VerticalAlignment.Center;
             afterLaunchRow.Children.Add(afterLaunchIcon);
@@ -542,13 +542,13 @@ namespace Workspace1C
 
             // Запоминание геометрии окна. Значения лежали в общем файле настроек,
             // но Linux-сборка их не читала и не писала вовсе.
-            var rememberLayoutCheck = SettingsSwitch("Settings.General.RememberWindowLayout", _viewModel.RememberWindowLayout, "IconMonitor", "#EC4899");
+            var rememberLayoutCheck = SettingsSwitch("Settings.General.RememberWindowLayout", _viewModel.RememberWindowLayout, "IconMonitor", "@PinkAccentBrush");
             // У автора у этой строки своего отступа нет (SettingsWindow.xaml:1139).
             rememberLayoutCheck.Margin = new Thickness(0);
             settingsBehavior.Children.Add(rememberLayoutCheck);
 
             // Компактный режим интерфейса.
-            var compactToggle = SettingsSwitch("Settings.CompactMode", _viewModel.CompactMode, "IconCompress", "#22C55E");
+            var compactToggle = SettingsSwitch("Settings.CompactMode", _viewModel.CompactMode, "IconCompress", "@SuccessBrush");
             // Отступ сверху из разметки (SettingsWindow.xaml:1144).
             compactToggle.Margin = new Thickness(0, 12, 0, 0);
             compactToggle.IsCheckedChanged += (_, _) =>
@@ -699,7 +699,7 @@ namespace Workspace1C
             // Управление учётными записями (профилями).
             // Кнопка учётных записей: значок и тема из разметки
             // (SettingsWindow.xaml:1151-1157).
-            var profilesIcon = IconHelper.MakeIcon("IconAccountMultiple", 16, new SolidColorBrush(Color.Parse("#3B82F6")));
+            var profilesIcon = IconHelper.MakeIcon("IconAccountMultiple", 16, Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9"));
             profilesIcon.Margin = new Thickness(0, 0, 8, 0);
             profilesIcon.VerticalAlignment = VerticalAlignment.Center;
             var manageProfilesButton = new Button
@@ -1019,7 +1019,7 @@ namespace Workspace1C
             // (SettingsWindow.xaml:389), а не под ним.
             var refreshButton = new Button
             {
-                Content = IconTextContent("IconRefresh", "#3B82F6", "Settings.Platforms.Refresh"),
+                Content = IconTextContent("IconRefresh", "@InfoBrush", "Settings.Platforms.Refresh"),
                 Padding = new Thickness(10, 6),
                 Margin = new Thickness(6, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Top
@@ -1042,7 +1042,7 @@ namespace Workspace1C
             var pathButtons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
             var addPath = new Button
             {
-                Content = IconTextContent("IconFolderPlus", "#22C55E", "Settings.AdditionalPaths.Add"),
+                Content = IconTextContent("IconFolderPlus", "@SuccessBrush", "Settings.AdditionalPaths.Add"),
                 Padding = new Thickness(10, 6),
                 Margin = new Thickness(0, 0, 8, 0)
             };
@@ -1071,7 +1071,7 @@ namespace Workspace1C
             // строка молча исчезала бы вместо предупреждения.
             var editPath = new Button
             {
-                Content = IconTextContent("IconFolderEdit", "#F59E0B", "Common.Edit"),
+                Content = IconTextContent("IconFolderEdit", "@WarningBrush", "Common.Edit"),
                 Padding = new Thickness(10, 6),
                 Margin = new Thickness(0, 0, 8, 0)
             };
@@ -1112,7 +1112,7 @@ namespace Workspace1C
 
             var removePath = new Button
             {
-                Content = IconTextContent("IconFolderRemove", "#EF4444", "Common.Delete"),
+                Content = IconTextContent("IconFolderRemove", "@ErrorBrush", "Common.Delete"),
                 Padding = new Thickness(10, 6)
             };
             removePath.Styled(ControlThemes.SecondaryButton);
@@ -1202,10 +1202,10 @@ namespace Workspace1C
 
             displayIcons.Children.Add(Hint(LocalizationManager.T("Settings.Icons.Description"), bottom: 10));
             // Значки и их цвета из разметки (SettingsWindow.xaml:498-517).
-            var favoritesCheck = DisplayCheck("Settings.Icons.FavoritesButton", _viewModel.ShowFavoritesButton, "IconStar", "#FBBF24");
-            var pinnedCheck = DisplayCheck("Settings.Icons.PinButton", _viewModel.ShowPinnedButton, "IconPin", "#F59E0B");
-            var tagsCheck = DisplayCheck("Settings.Icons.Tags", _viewModel.ShowTags, "IconTag", "#EC4899");
-            var tagPanelCheck = DisplayCheck("Settings.Icons.TagFilterPanel", _viewModel.ShowTagFilterPanel, "IconFilter", "#EC4899");
+            var favoritesCheck = DisplayCheck("Settings.Icons.FavoritesButton", _viewModel.ShowFavoritesButton, "IconStar", "@WarningBrush");
+            var pinnedCheck = DisplayCheck("Settings.Icons.PinButton", _viewModel.ShowPinnedButton, "IconPin", "@WarningBrush");
+            var tagsCheck = DisplayCheck("Settings.Icons.Tags", _viewModel.ShowTags, "IconTag", "@PinkAccentBrush");
+            var tagPanelCheck = DisplayCheck("Settings.Icons.TagFilterPanel", _viewModel.ShowTagFilterPanel, "IconFilter", "@PinkAccentBrush");
             foreach (var check in new[] { favoritesCheck, pinnedCheck, tagsCheck, tagPanelCheck })
                 displayIcons.Children.Add(check);
 
@@ -1320,7 +1320,7 @@ namespace Workspace1C
             // Значок закреплённой строки «Название» акцентно-синий, как в разметке
             // (SettingsWindow.xaml:556), и того же размера 16.
             nameRowContent.Children.Add(IconHelper.MakeIcon(IconHelper.ColumnIconKey("Name"), 16,
-                new SolidColorBrush(Color.Parse("#3B82F6"))));
+                Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9")));
             var nameRowLabel = new TextBlock
             {
                 Text = LocalizationManager.T("Column.Name"),
@@ -1428,15 +1428,15 @@ namespace Workspace1C
             displayColumns.Children.Add(orderGrid);
 
             displayPanels.Children.Add(Hint(LocalizationManager.T("Settings.Panels.Description"), bottom: 10));
-            var rightPanelCheck = DisplayCheck("Settings.Panels.RightPanelDetails", _viewModel.ShowRightPanelDetails, "IconPageLayoutSidebarRight", "#14B8A6");
-            var sessionPanelCheck = DisplayCheck("Settings.Panels.SessionLaunchPanel", _viewModel.ShowSessionLaunchPanel, "IconMonitor", "#8B5CF6");
-            var groupByGroupCheck = DisplayCheck("Settings.Panels.GroupByGroups", _viewModel.GroupByGroup, "IconFolderMultiple", "#3B82F6");
+            var rightPanelCheck = DisplayCheck("Settings.Panels.RightPanelDetails", _viewModel.ShowRightPanelDetails, "IconPageLayoutSidebarRight", "@InfoBrush");
+            var sessionPanelCheck = DisplayCheck("Settings.Panels.SessionLaunchPanel", _viewModel.ShowSessionLaunchPanel, "IconMonitor", "@PurpleAccentBrush");
+            var groupByGroupCheck = DisplayCheck("Settings.Panels.GroupByGroups", _viewModel.GroupByGroup, "IconFolderMultiple", "@InfoBrush");
             // Системный заголовок окна вместо собственного безрамкового (issue #152).
-            var systemTitleBarCheck = DisplayCheck("Settings.SystemTitleBar", _viewModel.UseSystemTitleBar, "IconMonitoring", "#6366F1");
+            var systemTitleBarCheck = DisplayCheck("Settings.SystemTitleBar", _viewModel.UseSystemTitleBar, "IconMonitoring", "@PurpleAccentBrush");
             // Режим списка «только избранные» тот же, что переключается кнопкой
             // в главном окне: флажок и кнопка меняют одно значение.
-            var favoritesOnlyCheck = DisplayCheck("Settings.Panels.ShowFavoritesOnly", _viewModel.IsListModeFavorites, "IconStarCircle", "#FBBF24");
-            var emptyGroupsCheck = DisplayCheck("Settings.Panels.ShowEmptyGroups", _viewModel.ShowEmptyGroups, "IconFolderOutline", "#0EA5E9");
+            var favoritesOnlyCheck = DisplayCheck("Settings.Panels.ShowFavoritesOnly", _viewModel.IsListModeFavorites, "IconStarCircle", "@WarningBrush");
+            var emptyGroupsCheck = DisplayCheck("Settings.Panels.ShowEmptyGroups", _viewModel.ShowEmptyGroups, "IconFolderOutline", "@InfoBrush");
 
             // Пояснения под переключателями стоят там же, где в разметке WPF
             // (SettingsWindow.xaml:628): у правой панели, у блока сессии
@@ -1538,15 +1538,15 @@ namespace Workspace1C
             UpdateAvaloniaTitleSuffixPreview(titleSuffixTemplateBox, titleSuffixPreview);
 
             displayStatus.Children.Add(Hint(LocalizationManager.T("Settings.Status.Description"), bottom: 10));
-            var statusPathCheck = DisplayCheck("Settings.Status.ConnectionPath", _viewModel.StatusShowConnectionPath, "IconFolderOutline", "#3B82F6");
-            var statusPortCheck = DisplayCheck("Settings.Status.Port", _viewModel.StatusShowPort, "IconLan", "#6366F1");
-            var statusArchCheck = DisplayCheck("Settings.Status.Architecture", _viewModel.StatusShowArchitecture, "IconChip", "#8B5CF6");
-            var statusVersionCheck = DisplayCheck("Column.Version", _viewModel.StatusShowPlatformVersion, "IconCubeOutline", "#A855F7");
-            var statusLaunchModeCheck = DisplayCheck("Column.LaunchMode", _viewModel.StatusShowLaunchMode, "IconPlayCircleOutline", "#22C55E");
-            var statusClientTypeCheck = DisplayCheck("Settings.Status.ClientType", _viewModel.StatusShowClientType, "IconMonitor", "#EC4899");
-            var statusConnectionTypeCheck = DisplayCheck("Settings.Status.ConnectionType", _viewModel.StatusShowConnectionType, "IconDatabase", "#6366F1");
-            var statusUserCheck = DisplayCheck("Settings.Status.User", _viewModel.StatusShowUser, "IconAccount", "#94A3B8");
-            var statusIdCheck = DisplayCheck("Settings.Status.Id", _viewModel.StatusShowId, "IconIdentifier", "#0EA5E9");
+            var statusPathCheck = DisplayCheck("Settings.Status.ConnectionPath", _viewModel.StatusShowConnectionPath, "IconFolderOutline", "@InfoBrush");
+            var statusPortCheck = DisplayCheck("Settings.Status.Port", _viewModel.StatusShowPort, "IconLan", "@PurpleAccentBrush");
+            var statusArchCheck = DisplayCheck("Settings.Status.Architecture", _viewModel.StatusShowArchitecture, "IconChip", "@PurpleAccentBrush");
+            var statusVersionCheck = DisplayCheck("Column.Version", _viewModel.StatusShowPlatformVersion, "IconCubeOutline", "@PurpleAccentBrush");
+            var statusLaunchModeCheck = DisplayCheck("Column.LaunchMode", _viewModel.StatusShowLaunchMode, "IconPlayCircleOutline", "@SuccessBrush");
+            var statusClientTypeCheck = DisplayCheck("Settings.Status.ClientType", _viewModel.StatusShowClientType, "IconMonitor", "@PinkAccentBrush");
+            var statusConnectionTypeCheck = DisplayCheck("Settings.Status.ConnectionType", _viewModel.StatusShowConnectionType, "IconDatabase", "@PurpleAccentBrush");
+            var statusUserCheck = DisplayCheck("Settings.Status.User", _viewModel.StatusShowUser, "IconAccount", "@TextSecondaryBrush");
+            var statusIdCheck = DisplayCheck("Settings.Status.Id", _viewModel.StatusShowId, "IconIdentifier", "@InfoBrush");
             foreach (var check in new[]
             {
                 statusPathCheck, statusPortCheck, statusArchCheck, statusVersionCheck, statusLaunchModeCheck,
@@ -3945,7 +3945,7 @@ namespace Workspace1C
         /// </summary>
         private static Control IconTextContent(string iconKey, string iconColor, string textKey)
         {
-            var icon = IconHelper.MakeIcon(iconKey, 16, new SolidColorBrush(Color.Parse(iconColor)));
+            var icon = IconHelper.MakeIcon(iconKey, 16, Themes.ThemeBrushes.FromSpec(iconColor));
             icon.Margin = new Thickness(0, 0, 6, 0);
             icon.VerticalAlignment = VerticalAlignment.Center;
             return new StackPanel
@@ -4543,7 +4543,7 @@ namespace Workspace1C
                 if (iconKey is not null)
                 {
                     var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16),
-                        new SolidColorBrush(Color.Parse(iconColor ?? "#94A3B8")));
+                        Themes.ThemeBrushes.FromSpec(iconColor ?? "@TextSecondaryBrush"));
                     icon.Margin = new Thickness(0, 0, 8, 0);
                     panel.Children.Insert(0, icon);
                 }
@@ -4620,7 +4620,7 @@ namespace Workspace1C
             panel.Children.Add(GroupSectionHeader("Settings.UtilitiesMenu.GroupTitle"));
             _utilitiesMenuEditingCheck = SettingsSwitch(
                 "Settings.UtilitiesMenu.EditingEnabled", _viewModel.UtilitiesMenuEditingEnabled,
-                "IconApps", "#3B82F6", "Settings.UtilitiesMenu.EditingEnabledTooltip");
+                "IconApps", "@InfoBrush", "Settings.UtilitiesMenu.EditingEnabledTooltip");
             _utilitiesMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
             panel.Children.Add(_utilitiesMenuEditingCheck);
 
@@ -4651,7 +4651,7 @@ namespace Workspace1C
             panel.Children.Add(GroupSectionHeader("Settings.ContextMenu.GroupTitle"));
             _contextMenuEditingCheck = SettingsSwitch(
                 "Settings.ContextMenu.EditingEnabled", _viewModel.ContextMenuEditingEnabled,
-                "IconApps", "#8B5CF6", "Settings.ContextMenu.EditingEnabledTooltip");
+                "IconApps", "@PurpleAccentBrush", "Settings.ContextMenu.EditingEnabledTooltip");
             _contextMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
             panel.Children.Add(_contextMenuEditingCheck);
 
@@ -4685,7 +4685,7 @@ namespace Workspace1C
             panel.Children.Add(GroupSectionHeader("Settings.TrayMenu.GroupTitle"));
             _trayMenuEditingCheck = SettingsSwitch(
                 "Settings.TrayMenu.EditingEnabled", _viewModel.TrayMenuEditingEnabled,
-                "IconTrayFull", "#14B8A6", "Settings.TrayMenu.EditingEnabledTooltip");
+                "IconTrayFull", "@InfoBrush", "Settings.TrayMenu.EditingEnabledTooltip");
             _trayMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
             panel.Children.Add(_trayMenuEditingCheck);
 
@@ -4838,7 +4838,7 @@ namespace Workspace1C
                 FontSize = 12
             };
             var checkIcon = IconHelper.MakeIcon("IconRefresh", 14,
-                new SolidColorBrush(Color.Parse("#3B82F6")));
+                Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9"));
             checkIcon.VerticalAlignment = VerticalAlignment.Center;
             checkIcon.Margin = new Thickness(0, 0, 5, 0);
             var checkButton = new Button
@@ -4943,7 +4943,7 @@ namespace Workspace1C
                 Text = LocalizationManager.T("Settings.About.CopyTechInfo"),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            var copyIcon = IconHelper.MakeIcon("IconCopy", 16, new SolidColorBrush(Color.Parse("#3B82F6")));
+            var copyIcon = IconHelper.MakeIcon("IconCopy", 16, Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9"));
             copyIcon.VerticalAlignment = VerticalAlignment.Center;
             copyIcon.Margin = new Thickness(0, 0, 6, 0);
             var copyButton = new Button

@@ -102,7 +102,7 @@
                     HorizontalAlignment="Right" Spacing="10">
             <Button x:Name="DeleteButton" Width="140" Height="36" IsDefault="True"
                     CornerRadius="8" HorizontalContentAlignment="Center"
-                    Background="#DC2626" BorderThickness="0" Foreground="White">
+                    Background="{DynamicResource ErrorBrush}" BorderThickness="0" Foreground="White">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Path Data="{DynamicResource IconDelete}" Width="16" Height="16"
                           Stretch="Uniform" Fill="White" VerticalAlignment="Center"/>

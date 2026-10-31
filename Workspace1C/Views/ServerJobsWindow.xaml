@@ -1,0 +1,172 @@
+<Window x:Class="Workspace1C.ServerJobsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Workspace1C.Localization"
+        Icon="{StaticResource AppIcon}"
+        Height="600" Width="1100" MinHeight="420" MinWidth="820"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Loaded="Window_Loaded"
+        Background="{DynamicResource ContentBackgroundBrush}">
+
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+
+        <!-- Выравнивание содержимого ячеек по центру (как в мониторе серверов). -->
+        <Style x:Key="CenteredCellText" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+            <Setter Property="Margin" Value="4,0"/>
+        </Style>
+
+        <Style x:Key="CellTextAccent" TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+
+        <!-- Кнопка действия диалога: стиль и заливка — как у кнопок монитора серверов
+             (без хардкод-цветов, темы/ресурсы). -->
+        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Панель действий: фильтр по базе + кнопки состояния задания (v100112, F1).
+             Доступность кнопок — от состояния выбранной строки (CanPause/CanResume/
+             CanRunNow/CanRestart) и флага занятости (IsBusy). -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="{loc:Loc ServerMonitor.Jobs.FilterInfobase}"
+                       VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox x:Name="FilterCombo" Width="260" Style="{StaticResource ModernComboBox}"
+                      ItemsSource="{Binding Filters}"
+                      SelectedItem="{Binding SelectedFilter, Mode=TwoWay}"
+                      VerticalContentAlignment="Center" Padding="6,2">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding DisplayText}" VerticalAlignment="Center"/>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <Button Style="{StaticResource ActionButton}" Margin="16,0,6,0"
+                    Command="{Binding RefreshCommand}"
+                    ToolTip="{loc:Loc ServerMonitor.Refresh}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc ServerMonitor.Refresh}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Style="{StaticResource ActionButton}"
+                    IsEnabled="{Binding CanRunNow}" Command="{Binding RunNowCommand}">
+                <TextBlock Text="{loc:Loc ServerMonitor.Jobs.RunNow}" VerticalAlignment="Center"/>
+            </Button>
+            <Button Style="{StaticResource ActionButton}"
+                    IsEnabled="{Binding CanRestart}" Command="{Binding RestartCommand}">
+                <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Restart}" VerticalAlignment="Center"/>
+            </Button>
+            <Button Style="{StaticResource ActionButton}"
+                    IsEnabled="{Binding CanPause}" Command="{Binding PauseCommand}">
+                <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Pause}" VerticalAlignment="Center"/>
+            </Button>
+            <Button Style="{StaticResource ActionButton}"
+                    IsEnabled="{Binding CanResume}" Command="{Binding ResumeCommand}">
+                <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Resume}" VerticalAlignment="Center"/>
+            </Button>
+            <Button Style="{StaticResource ActionButton}"
+                    Command="{Binding DetailsCommand}">
+                <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Details}" VerticalAlignment="Center"/>
+            </Button>
+        </StackPanel>
+
+        <!-- Список заданий (rac «job list»): колонки как в прежней вкладке монитора —
+             имя, база, состояние, расписание, последний запуск, результат. -->
+        <DataGrid x:Name="JobsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  SelectedItem="{Binding SelectedJob}"
+                  HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
+                  CanUserSortColumns="True"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="All"
+                  CanUserResizeColumns="True"
+                  HorizontalGridLinesBrush="{DynamicResource BorderBrushColor}"
+                  VerticalGridLinesBrush="{DynamicResource BorderBrushColor}"
+                  RowHeight="34" AlternatingRowBackground="{DynamicResource CardBackgroundBrush}"
+                  BorderThickness="0">
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                    <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    <Setter Property="BorderThickness" Value="0"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+            </DataGrid.CellStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Width="1.6*" MinWidth="180"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColName}"
+                                    Binding="{Binding Name}" ElementStyle="{StaticResource CellTextAccent}"/>
+                <DataGridTextColumn Width="1.1*" MinWidth="120"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColInfobase}"
+                                    Binding="{Binding InfobaseName}" ElementStyle="{StaticResource CenteredCellText}"/>
+                <DataGridTextColumn Width="130" MinWidth="110"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColState}"
+                                    Binding="{Binding StateText}">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding State}" Value="running">
+                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="scheduled">
+                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="paused">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding State}" Value="interrupted">
+                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Width="1.4*" MinWidth="160"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColSchedule}"
+                                    Binding="{Binding Schedule}" ElementStyle="{StaticResource CenteredCellText}"/>
+                <DataGridTextColumn Width="150" MinWidth="130"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColLastStart}"
+                                    Binding="{Binding LastStartText}" ElementStyle="{StaticResource CenteredCellText}"/>
+                <DataGridTextColumn Width="1.2*" MinWidth="140"
+                                    Header="{loc:Loc ServerMonitor.Jobs.ColResult}"
+                                    Binding="{Binding ResultText}" ElementStyle="{StaticResource CenteredCellText}"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Строка состояния + подсказка при пустом списке. -->
+        <StackPanel Grid.Row="2" Margin="0,10,0,0">
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                       Text="{Binding StatusText}"/>
+            <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                       Text="{Binding EmptyHint}" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasVisibleJobs}" Value="False">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+    </Grid>
+</Window>

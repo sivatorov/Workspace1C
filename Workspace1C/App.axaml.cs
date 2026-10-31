@@ -346,6 +346,10 @@ namespace Workspace1C
                     // новой версии, когда интерфейс готов и каналы уведомлений настроены.
                     NotifyPendingUpdate();
 
+                    // Диалог «Что нового» после обновления (v100112, F3): при смене версии
+                    // с прошлого запуска показываем краткую сводку изменений релиза.
+                    ShowWhatsNewDialog(settings, mainWindow);
+
                     // Фоновая проверка обновлений (Linux/Avalonia): запускаем после показа
                     // главного окна, чтобы не задерживать старт. Если пользователь отключил
                     // проверку в настройках — пропускаем. При обнаружении новой версии всегда
@@ -463,6 +467,47 @@ namespace Workspace1C
             catch
             {
                 // Уведомление не должно блокировать запуск приложения.
+            }
+        }
+
+        /// <summary>
+        /// Диалог «Что нового» после обновления (v100112, F3): если версия изменилась
+        /// с прошлого запуска (<see cref="WhatsNewService.ShouldShow"/>) — компактный
+        /// диалог со сводкой изменений релиза. Версия помечается показанной ДО открытия
+        /// диалога (сбой не должен показывать его повторно); галка «Показывать при
+        /// запуске» применяется к настройкам после закрытия. Ошибки не роняют старт.
+        /// </summary>
+        private void ShowWhatsNewDialog(Models.AppSettings settings, Avalonia.Controls.Window owner)
+        {
+            try
+            {
+                if (!WhatsNewService.ShouldShow(settings))
+                    return;
+                WhatsNewService.MarkShown(settings);
+                try
+                {
+                    AppServices.GetRequiredService<IInfobaseRepository>().SaveSettings(settings);
+                }
+                catch
+                {
+                    // Сохранение настройки — вспомогательное: диалог важнее.
+                }
+
+                var dialog = new WhatsNewWindow(settings);
+                dialog.ShowDialogSync(owner);
+                dialog.ApplyShowOnStart();
+                try
+                {
+                    AppServices.GetRequiredService<IInfobaseRepository>().SaveSettings(settings);
+                }
+                catch
+                {
+                    // Сбой сохранения не должен ронять старт приложения.
+                }
+            }
+            catch
+            {
+                // Диалог не должен блокировать запуск приложения.
             }
         }
 

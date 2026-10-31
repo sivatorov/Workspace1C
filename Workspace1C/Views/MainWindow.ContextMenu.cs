@@ -216,7 +216,7 @@ public partial class MainWindow
         try
         {
             if (!string.IsNullOrWhiteSpace(colorHex))
-                return new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
+                return Themes.WpfBrushes.FromSpec(colorHex);
         }
         catch { /* невалидный цвет — серый */ }
         return new SolidColorBrush((Color)ColorConverter.ConvertFromString("#6B7280"));
@@ -330,20 +330,20 @@ public partial class MainWindow
     private void PopulateBatchOperationsMenu(MenuItem batchMenu)
     {
         batchMenu.Header = BatchMenuHeader(_viewModel?.BatchOperationTargetCount ?? 0);
-        batchMenu.Icon = CreateRowMenuIcon("SelectionMultiple", "#8B5CF6");
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchAssignTag", "Tag", "#14B8A6", OnBatchAssignTag_Click));
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchMoveToGroup", "FolderMove", "#0EA5E9", OnBatchMoveToGroup_Click));
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchAddFavorites", "Star", "#FBBF24", OnBatchAddFavorites_Click));
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchRunBackup", "DatabaseExport", "#22C55E", OnBatchRunBackup_Click));
+        batchMenu.Icon = CreateRowMenuIcon("SelectionMultiple", "@PurpleAccentBrush");
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchAssignTag", "Tag", "@InfoBrush", OnBatchAssignTag_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchMoveToGroup", "FolderMove", "@InfoBrush", OnBatchMoveToGroup_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchAddFavorites", "Star", "@WarningBrush", OnBatchAddFavorites_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchRunBackup", "DatabaseExport", "@SuccessBrush", OnBatchRunBackup_Click));
         // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchDumpDtCf", "DatabaseExport", "#16A34A", OnBatchDumpDtCf_Click));
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchCheckAvailability", "CloudCheck", "#3B82F6", OnBatchCheckAvailability_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchDumpDtCf", "DatabaseExport", "@SuccessBrush", OnBatchDumpDtCf_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchCheckAvailability", "CloudCheck", "@InfoBrush", OnBatchCheckAvailability_Click));
         // Массовая замена строк подключения (0.3.9.191, функция 6).
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchConnectionReplace", "FindReplace", "#F59E0B", OnBatchConnectionReplace_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchConnectionReplace", "FindReplace", "@WarningBrush", OnBatchConnectionReplace_Click));
         // Смена платформы выделенных баз (issue #54, переработка по комментарию 7OH):
         // отдельное окно «Сменить платформу» вместо встроенной галочки в «Замене строк…».
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchChangePlatform", "PackageVariant", "#22C55E", OnBatchChangePlatform_Click));
-        batchMenu.Items.Add(CreateBatchAction("Main.BatchDelete", "Delete", "#EF4444", OnBatchDelete_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchChangePlatform", "PackageVariant", "@SuccessBrush", OnBatchChangePlatform_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchDelete", "Delete", "@ErrorBrush", OnBatchDelete_Click));
     }
 
     /// <summary>Пункт пакетной операции (0.3.9.90): подпись, значок, обработчик клика.</summary>

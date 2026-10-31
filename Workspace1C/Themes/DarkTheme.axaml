@@ -34,6 +34,10 @@
     <Color x:Key="WarningColor">#F59E0B</Color>
     <Color x:Key="ErrorColor">#EF4444</Color>
     <Color x:Key="InfoColor">#38BDF8</Color>
+    <!-- Акцентные декоративные кисти (v100112): осветлённые варианты для контраста
+         на тёмном фоне (раньше — хардкоды #7C3AED/#8B5CF6/#EC4899). -->
+    <Color x:Key="PurpleAccentColor">#A78BFA</Color>
+    <Color x:Key="PinkAccentColor">#F472B6</Color>
     <!-- Мягкая красная плашка (аудит UI, п. 2.4): тёмный красноватый фон вместо
          светлых фиксированных #FEF2F2/#FECACA. -->
     <Color x:Key="DangerSoftColor">#3F1D1D</Color>
@@ -99,6 +103,9 @@
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
     <SolidColorBrush x:Key="ErrorBrush" Color="{DynamicResource ErrorColor}"/>
     <SolidColorBrush x:Key="InfoBrush" Color="{DynamicResource InfoColor}"/>
+    <!-- Акцентные декоративные кисти (v100112). -->
+    <SolidColorBrush x:Key="PurpleAccentBrush" Color="{DynamicResource PurpleAccentColor}"/>
+    <SolidColorBrush x:Key="PinkAccentBrush" Color="{DynamicResource PinkAccentColor}"/>
     <!-- Мягкая красная плашка и плашка закрепления (аудит UI, пп. 2.4–2.5). -->
     <SolidColorBrush x:Key="DangerSoftBrush" Color="{DynamicResource DangerSoftColor}"/>
     <SolidColorBrush x:Key="DangerSoftBorderBrush" Color="{DynamicResource DangerSoftBorderColor}"/>

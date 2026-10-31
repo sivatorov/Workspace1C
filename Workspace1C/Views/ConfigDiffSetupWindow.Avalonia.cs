@@ -164,7 +164,7 @@ namespace Workspace1C
             root.Children.Add(_platformHint);
 
             // Ошибка
-            _errorText.Foreground = new SolidColorBrush(Color.Parse("#EF4444"));
+            Themes.ThemeBrushes.Bind(_errorText, TextBlock.ForegroundProperty, "ErrorBrush");
             _errorText.TextWrapping = TextWrapping.Wrap;
             _errorText.FontSize = 12;
             _errorText.MaxHeight = 120;

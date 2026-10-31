@@ -170,19 +170,47 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void ScheduleSaveSettings()
     {
-        _ = Task.Run(() =>
+        // Асинхронный debounce (v100112): Task.Delay вместо блокирующего
+        // Thread.Sleep; новый вызов отменяет ещё не выполненное отложенное
+        // сохранение — при быстрых щелчках по фильтрам настройки сохраняются
+        // один раз (последнее состояние), поток пула и UI-поток не блокируются.
+        var cts = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _saveSettingsDebounceCts, cts);
+        previous?.Cancel();
+
+        _ = RunDelayedSaveSettingsAsync(cts);
+    }
+
+    /// <summary>Задержка debounce отложенного сохранения настроек (A8, v100112).</summary>
+    private static readonly TimeSpan SaveSettingsDebounceDelay = TimeSpan.FromMilliseconds(150);
+
+    /// <summary>Отложенное сохранение: источник отмены последнего вызова
+    /// <see cref="ScheduleSaveSettings"/> (асинхронный debounce).</summary>
+    private CancellationTokenSource? _saveSettingsDebounceCts;
+
+    private async Task RunDelayedSaveSettingsAsync(CancellationTokenSource cts)
+    {
+        try
         {
-            try
-            {
-                // Небольшой debounce, если пользователь быстро щёлкает фильтры.
-                Thread.Sleep(150);
-                Application.Current?.Dispatcher.Invoke(SaveSettings);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("Ошибка отложенного сохранения настроек", ex);
-            }
-        });
+            // Небольшой debounce, если пользователь быстро щёлкает фильтры.
+            await Task.Delay(SaveSettingsDebounceDelay, cts.Token).ConfigureAwait(false);
+
+            // Сохранение короткое — выполняется через Dispatcher.Invoke из потока
+            // пула (как раньше), но уже без Thread.Sleep и с отменой предыдущего.
+            Application.Current?.Dispatcher.Invoke(SaveSettings);
+        }
+        catch (OperationCanceledException)
+        {
+            // Отменено новым вызовом ScheduleSaveSettings — штатный debounce.
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка отложенного сохранения настроек", ex);
+        }
+        finally
+        {
+            cts.Dispose();
+        }
     }
 
     /// <summary>
@@ -1572,6 +1600,14 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Ограничение параллельных проверок доступности баз (избегаем лавины COM-запросов).</summary>
     private const int AvailabilityParallelism = 4;
 
+    /// <summary>
+    /// Размер батча результатов проверки доступности для ОДНОГО маршалинга в UI-поток
+    /// (P4, v100112): вместо Dispatcher.Invoke на каждую завершённую базу (десятки
+    /// блокирующих Invoke с Refresh на больших списках) результаты публикуются
+    /// пачками; хвост батча сбрасывается по завершении проверки.
+    /// </summary>
+    private const int AvailabilityBatchSize = 4;
+
     private bool _availabilityCheckRunning;
 
     private async Task RunAvailabilityCheckAsync(List<Infobase> targets)
@@ -1581,26 +1617,50 @@ public partial class MainViewModel : ViewModelBase
             var results = new List<(Infobase Base, bool Available)>(targets.Count);
             var processed = 0;
 
+            // Батч ещё не опубликованных результатов (P4, v100112): накапливается
+            // воркерами, публикуется одним Dispatcher.Invoke на батч.
+            var pendingBatch = new List<(Infobase Base, bool Available)>();
+            var batchLock = new object();
+
+            void FlushBatch(bool force)
+            {
+                List<(Infobase Base, bool Available)> toApply;
+                lock (batchLock)
+                {
+                    if (pendingBatch.Count == 0)
+                        return;
+                    if (!force && pendingBatch.Count < AvailabilityBatchSize)
+                        return;
+                    toApply = new List<(Infobase Base, bool Available)>(pendingBatch);
+                    pendingBatch.Clear();
+                }
+
+                var done = Volatile.Read(ref processed);
+                Application.Current?.Dispatcher.Invoke(() =>
+                {
+                    foreach (var (ib, available) in toApply)
+                        ib.SetCheckedAvailability(available);
+                    InfobasesView?.Refresh();
+                    SyncMessage = string.Format(
+                        LocalizationManager.T("Main.AvailabilityProgress"), done, targets.Count);
+                });
+            }
+
             await Task.Run(() => Parallel.ForEach(targets,
                 new ParallelOptions { MaxDegreeOfParallelism = AvailabilityParallelism },
                 ib =>
                 {
                     var available = IsBaseAvailable(ib);
-                    var done = Interlocked.Increment(ref processed);
+                    Interlocked.Increment(ref processed);
                     lock (results)
                         results.Add((ib, available));
+                    lock (batchLock)
+                        pendingBatch.Add((ib, available));
+                    FlushBatch(force: false);
+                })).ConfigureAwait(false);
 
-                    // Каждая завершённая база сразу публикуется в UI-потоке:
-                    // иконка меняется с серой на фактический статус, в строке
-                    // состояния обновляется прогресс «i из N».
-                    Application.Current?.Dispatcher.Invoke(() =>
-                    {
-                        ib.SetCheckedAvailability(available);
-                        InfobasesView?.Refresh();
-                        SyncMessage = string.Format(
-                            LocalizationManager.T("Main.AvailabilityProgress"), done, targets.Count);
-                    });
-                }));
+            // Хвост батча: результаты, не дотянувшие до полного батча.
+            FlushBatch(force: true);
 
             Application.Current?.Dispatcher.Invoke(() =>
             {

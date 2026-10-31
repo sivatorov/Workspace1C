@@ -84,7 +84,7 @@ namespace Workspace1C
             if (exists && !string.IsNullOrEmpty(dir))
             {
                 existsText.Text = string.Format(LocalizationManager.T("DeleteInfobase.ExistsYes"), dir);
-                existsText.Foreground = new SolidColorBrush(Color.Parse("#2E8B57"));
+                Themes.ThemeBrushes.Bind(existsText, TextBlock.ForegroundProperty, "SuccessBrush");
                 _physicalCheck.IsEnabled = true;
                 // Подсказка из разметки общая, а здесь известен каталог,
                 // поэтому текст уточняется на предметный.

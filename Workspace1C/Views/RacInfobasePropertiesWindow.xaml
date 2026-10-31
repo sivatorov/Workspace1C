@@ -75,7 +75,7 @@
                     <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding StatusIsError}" Value="True">
-                            <Setter Property="Foreground" Value="#DC2626"/>
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>

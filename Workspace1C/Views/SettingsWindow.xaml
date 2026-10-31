@@ -359,7 +359,7 @@
                                            Foreground="{DynamicResource TextPrimaryBrush}"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AllowMultipleInstancesCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="ApplicationOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.AllowMultipleInstances}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -381,7 +381,7 @@
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.ShowTrayIcon}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -393,19 +393,19 @@
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="EscapeToTrayCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Keyboard" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Keyboard" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.EscapeToTray}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSystemNotificationsCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.ShowSystemNotifications}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CatchUpMissedTasksCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="History" Width="16" Height="16" Foreground="#6366F1" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="History" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.CatchUpMissedTasks}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -418,7 +418,7 @@
                                 </StackPanel>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="RememberWindowLayoutCheck">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="{DynamicResource PinkAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.General.RememberWindowLayout}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -726,7 +726,7 @@
                                            TextWrapping="Wrap" Margin="0,0,0,10"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowFavoritesButtonCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Star" Width="16" Height="16" Foreground="#FBBF24" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Star" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Icons.FavoritesButton}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -738,13 +738,13 @@
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTagsCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="TagOutline" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="TagOutline" Width="16" Height="16" Foreground="{DynamicResource PinkAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Icons.Tags}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTagFilterPanelCheck">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FilterVariant" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FilterVariant" Width="16" Height="16" Foreground="{DynamicResource PinkAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Icons.TagFilterPanel}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -788,7 +788,7 @@
                                             <!-- Колонка «Название» закреплена и всегда первая (тумблер неактивен). -->
                                             <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowNameColumnCheck" IsChecked="True" IsEnabled="False">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FormatTitle" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FormatTitle" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Column.Name}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </ToggleButton>
@@ -864,7 +864,7 @@
                                            TextWrapping="Wrap" Margin="0,0,0,10"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowRightPanelDetailsCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="PageLayoutSidebarRight" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="PageLayoutSidebarRight" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Panels.RightPanelDetails}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -872,7 +872,7 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="24,0,0,12"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSessionLaunchPanelCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Panels.SessionLaunchPanel}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -880,19 +880,19 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="24,0,0,12"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="GroupByGroupCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderMultiple" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FolderMultiple" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Panels.GroupByGroups}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowFavoritesOnlyCheck">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="StarCircle" Width="16" Height="16" Foreground="#FBBF24" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="StarCircle" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Panels.ShowFavoritesOnly}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowEmptyGroupsCheck" Margin="0,6,0,0">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderOutline" Width="16" Height="16" Foreground="#0EA5E9" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FolderOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Panels.ShowEmptyGroups}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -906,7 +906,7 @@
                                            Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,6"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="TitleSuffixEnabledCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="StarCircle" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="StarCircle" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Display.TitleSuffixEnabled}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -971,25 +971,25 @@
                                            TextWrapping="Wrap" Margin="0,0,0,10"/>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowConnectionPathCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderOutline" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FolderOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.ConnectionPath}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowPortCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Lan" Width="16" Height="16" Foreground="#6366F1" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Lan" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.Port}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowArchitectureCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Chip" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Chip" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.Architecture}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowPlatformVersionCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="CubeOutline" Width="16" Height="16" Foreground="#A855F7" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="CubeOutline" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Column.Version}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -1001,13 +1001,13 @@
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowClientTypeCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="#EC4899" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Monitor" Width="16" Height="16" Foreground="{DynamicResource PinkAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.ClientType}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowConnectionTypeCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Database" Width="16" Height="16" Foreground="#6366F1" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Database" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.ConnectionType}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -1019,7 +1019,7 @@
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="StatusShowIdCheck">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Identifier" Width="16" Height="16" Foreground="#0EA5E9" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="Identifier" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Status.Id}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
@@ -1294,7 +1294,7 @@
                                                 Click="OnRenameScheme_Click"
                                                 ToolTip="{loc:Loc Settings.RenameTooltip}">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Pencil" Width="16" Height="16" Foreground="#0EA5E9" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Pencil" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Settings.Rename}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -1318,7 +1318,7 @@
                                                 Click="OnExportScheme_Click"
                                                 ToolTip="{loc:Loc Settings.ExportThemeTooltip}">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Export" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Export" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Settings.ExportTheme}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -1326,7 +1326,7 @@
                                                 Click="OnImportScheme_Click"
                                                 ToolTip="{loc:Loc Settings.ImportThemeTooltip}">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Settings.ImportTheme}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -1337,7 +1337,7 @@
                                                 Click="OnGenerateSchemeFromColor_Click"
                                                 ToolTip="{loc:Loc Settings.GenerateSchemeTooltip}">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Palette" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Palette" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Settings.GenerateScheme}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -1358,7 +1358,7 @@
                                                 Style="{DynamicResource IconButton}"
                                                 ToolTip="{loc:Loc Theme.Dark}">
                                             <Path x:Name="PaletteToggleIcon" Width="18" Height="18" Stretch="Uniform"
-                                                  Data="{DynamicResource IconMoon}" Fill="#8B5CF6"/>
+                                                  Data="{DynamicResource IconMoon}" Fill="{DynamicResource PurpleAccentBrush}"/>
                                         </Button>
                                         <TextBlock x:Name="PaletteStateText" Text="{loc:Loc Theme.Light}"
                                                    VerticalAlignment="Center" Margin="8,0,0,0"
@@ -2079,7 +2079,7 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Kind}" Value="BuildGroup">
                                                                 <Setter Property="Kind" Value="FolderOpen"/>
-                                                                <Setter Property="Foreground" Value="#3B82F6"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX64">
                                                                 <Setter Property="Kind" Value="CubeOutline"/>
@@ -2087,11 +2087,11 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX32">
                                                                 <Setter Property="Kind" Value="Cube"/>
-                                                                <Setter Property="Foreground" Value="#8B5CF6"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource PurpleAccentBrush}"/>
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Kind}" Value="Leaf">
                                                                 <Setter Property="Kind" Value="Application"/>
-                                                                <Setter Property="Foreground" Value="#0EA5E9"/>
+                                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -2136,7 +2136,7 @@
                                 Click="OnRefreshPlatforms_Click"
                                 ToolTip="{loc:Loc Settings.Platforms.RefreshTooltip}">
                             <StackPanel Orientation="Horizontal">
-                                <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc Settings.Platforms.Refresh}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -2330,7 +2330,7 @@
                                             Click="OnSyncImport_Click"
                                             ToolTip="{loc:Loc Settings.Ibases.ImportTooltip}">
                                         <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="Download" Width="16" Height="16" Foreground="#F97316" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <materialDesign:PackIcon Kind="Download" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{loc:Loc Settings.Ibases.Import}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
@@ -2339,7 +2339,7 @@
                                             Click="OnSyncExport_Click"
                                             ToolTip="{loc:Loc Settings.Ibases.ExportTooltip}">
                                         <StackPanel Orientation="Horizontal">
-                                            <materialDesign:PackIcon Kind="Upload" Width="16" Height="16" Foreground="#A855F7" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                            <materialDesign:PackIcon Kind="Upload" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{loc:Loc Settings.Ibases.Export}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
@@ -2372,7 +2372,7 @@
                                         Click="OnRestoreIbasesBackup_Click"
                                         ToolTip="{loc:Loc Settings.Ibases.RestoreTooltip}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="BackupRestore" Width="16" Height="16" Foreground="#0EA5E9" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="BackupRestore" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Settings.Ibases.Restore}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
@@ -2433,7 +2433,7 @@
                                                     Click="OnExportSelectedInfobases_Click"
                                                     ToolTip="{loc:Loc ExportSelect.ExportHint}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="Export" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Export" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc ExportSelect.Title}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2442,7 +2442,7 @@
                                                     Click="OnImportInfobases_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ImportListTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="#F97316" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ImportList}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2452,7 +2452,7 @@
                                                     Click="OnImportMergeInfobases_Click"
                                                     ToolTip="{loc:Loc ExportSelect.ImportHint}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Import" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc ExportSelect.ImportTitle}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2461,7 +2461,7 @@
                                                     Click="OnImportIbasesV8i_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ImportV8iTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FileDownload" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FileDownload" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ImportV8i}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2472,7 +2472,7 @@
                                                     Click="OnExportIbasesV8iFile_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ExportV8iFileTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="Upload" Width="16" Height="16" Foreground="#A855F7" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="Upload" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ExportV8iFile}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2481,7 +2481,7 @@
                                                     Click="OnImportIbasesV8iFile_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ImportV8iFileTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FileDownload" Width="16" Height="16" Foreground="#F97316" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FileDownload" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ImportV8iFile}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2491,7 +2491,7 @@
                                                     Click="OnDetectAllConfigurations_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.DetectAllConfigsTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="MagnifyScan" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="MagnifyScan" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.DetectAllConfigs}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2501,7 +2501,7 @@
                                                     Click="OnFindLostBases_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.FindLostBasesTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FolderSearch" Width="16" Height="16" Foreground="#14B8A6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FolderSearch" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.FindLostBases}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2545,7 +2545,7 @@
                                                     Click="OnImportStartManager_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ImportStartManagerTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FolderOpen" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ImportStartManager}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2619,7 +2619,7 @@
                                                         Click="OnEditTemplatePath_Click"
                                                         ToolTip="{loc:Loc Settings.Bases.EditTemplateTooltip}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <materialDesign:PackIcon Kind="FolderEdit" Width="16" Height="16" Foreground="#0EA5E9" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <materialDesign:PackIcon Kind="FolderEdit" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Loc Settings.Bases.EditTemplate}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -2635,7 +2635,7 @@
                                                         Click="OnLoadDefaultTemplatePaths_Click"
                                                         ToolTip="{loc:Loc Settings.Bases.LoadDefaultTooltip}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <materialDesign:PackIcon Kind="Download" Width="16" Height="16" Foreground="#8B5CF6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <materialDesign:PackIcon Kind="Download" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Loc Settings.Bases.LoadDefault}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -2830,7 +2830,7 @@
                                     Click="OnCheckForUpdates_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="Update" Width="14" Height="14"
-                                                             Foreground="#3B82F6" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                             Foreground="{DynamicResource InfoBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{loc:Loc Settings.About.CheckForUpdates}"
                                                VerticalAlignment="Center" FontSize="12"/>
                                 </StackPanel>
@@ -2870,7 +2870,7 @@
                                     Click="OnCopyTechInfo_Click">
                                 <StackPanel Orientation="Horizontal">
                                     <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16"
-                                                             Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                             Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{loc:Loc Settings.About.CopyTechInfo}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
@@ -2894,7 +2894,7 @@
                     Click="OnSettingsSync_Click" Style="{DynamicResource SecondaryButton}" Cursor="Hand">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Sync" Width="16" Height="16"
-                                             Foreground="#3B82F6" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                             Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc SettingsSync.BottomButton}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

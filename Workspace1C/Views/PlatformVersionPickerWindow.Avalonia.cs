@@ -285,13 +285,13 @@ namespace Workspace1C
                 // зелёный куб, x32 сплошной фиолетовый, без метки синее окно.
                 var (iconKey, iconColor) = node.Kind switch
                 {
-                    PlatformNodeKind.Line => ("IconFolder", "#F59E0B"),
-                    PlatformNodeKind.BuildGroup => ("IconFolderOpen", "#3B82F6"),
-                    PlatformNodeKind.LeafX64 => ("IconCubeOutline", "#22C55E"),
-                    PlatformNodeKind.LeafX32 => ("IconCube", "#8B5CF6"),
-                    _ => ("IconApplication", "#0EA5E9")
+                    PlatformNodeKind.Line => ("IconFolder", "@WarningBrush"),
+                    PlatformNodeKind.BuildGroup => ("IconFolderOpen", "@InfoBrush"),
+                    PlatformNodeKind.LeafX64 => ("IconCubeOutline", "@SuccessBrush"),
+                    PlatformNodeKind.LeafX32 => ("IconCube", "@PurpleAccentBrush"),
+                    _ => ("IconApplication", "@InfoBrush")
                 };
-                var icon = IconHelper.MakeIcon(iconKey, 16, new SolidColorBrush(Color.Parse(iconColor)));
+                var icon = IconHelper.MakeIcon(iconKey, 16, Themes.ThemeBrushes.FromSpec(iconColor));
                 icon.Margin = new Thickness(0, 0, 6, 0);
                 icon.VerticalAlignment = VerticalAlignment.Center;
                 panel.Children.Add(icon);
@@ -311,7 +311,7 @@ namespace Workspace1C
                 // Тонкий клиент (issue #33): оранжевая подсветка —
                 // видно, что полные возможности (конфигуратор, сервер) недоступны.
                 if (thin)
-                    text.Foreground = new SolidColorBrush(Color.Parse("#F59E0B"));
+                    text.Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706");
                 panel.Children.Add(text);
                 return panel;
             }

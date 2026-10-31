@@ -172,7 +172,7 @@ namespace Workspace1C
             Icon = new TextBlock
             {
                 Text = icon,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex)),
+                Foreground = Themes.WpfBrushes.FromSpec(colorHex),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             }
@@ -200,10 +200,10 @@ namespace Workspace1C
                 PlacementTarget = button,
                 Style = TryFindResource("ModernContextMenu") as Style,
             };
-            menu.Items.Add(CommandItem("Services.StartAll", "▶", "#16A34A", _vm.StartAllCommand));
-            menu.Items.Add(CommandItem("Services.StopAll", "■", "#DC2626", _vm.StopAllCommand));
+            menu.Items.Add(CommandItem("Services.StartAll", "▶", "@SuccessBrush", _vm.StartAllCommand));
+            menu.Items.Add(CommandItem("Services.StopAll", "■", "@ErrorBrush", _vm.StopAllCommand));
             menu.Items.Add(new Separator());
-            menu.Items.Add(CommandItem("Services.RestartAll", "⟲", "#2563EB", _vm.RestartAllCommand));
+            menu.Items.Add(CommandItem("Services.RestartAll", "⟲", "@InfoBrush", _vm.RestartAllCommand));
             menu.IsOpen = true;
         }
 
@@ -308,35 +308,35 @@ namespace Workspace1C
             if (_vm.SelectedRow is ServiceGroupRow)
             {
                 // Меню группы: команды группы + разделитель + изменить/удалить + перемещение.
-                menu.Items.Add(CommandItem("Services.Start", "▶", "#16A34A", _vm.StartGroupCommand));
-                menu.Items.Add(CommandItem("Services.Stop", "■", "#DC2626", _vm.StopGroupCommand));
+                menu.Items.Add(CommandItem("Services.Start", "▶", "@SuccessBrush", _vm.StartGroupCommand));
+                menu.Items.Add(CommandItem("Services.Stop", "■", "@ErrorBrush", _vm.StopGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.Pause", "❚❚", "#D97706", _vm.PauseGroupCommand));
-                menu.Items.Add(CommandItem("Services.Continue", ServiceCommandGlyphs.ContinueGlyph, "#0EA5E9", _vm.ContinueGroupCommand));
+                menu.Items.Add(CommandItem("Services.Pause", "❚❚", "@WarningBrush", _vm.PauseGroupCommand));
+                menu.Items.Add(CommandItem("Services.Continue", ServiceCommandGlyphs.ContinueGlyph, "@InfoBrush", _vm.ContinueGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.Restart", "⟲", "#2563EB", _vm.RestartGroupCommand));
+                menu.Items.Add(CommandItem("Services.Restart", "⟲", "@InfoBrush", _vm.RestartGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.EditGroup", "✎", "#7C3AED", _vm.EditGroupCommand));
-                menu.Items.Add(CommandItem("Services.DeleteGroup", "🗑", "#DC2626", _vm.DeleteGroupCommand));
+                menu.Items.Add(CommandItem("Services.EditGroup", "✎", "@PurpleAccentBrush", _vm.EditGroupCommand));
+                menu.Items.Add(CommandItem("Services.DeleteGroup", "🗑", "@ErrorBrush", _vm.DeleteGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "#2563EB", _vm.MoveUpCommand));
-                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "#2563EB", _vm.MoveDownCommand));
+                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "@InfoBrush", _vm.MoveUpCommand));
+                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "@InfoBrush", _vm.MoveDownCommand));
             }
             else
             {
-                menu.Items.Add(CommandItem("Services.Start", "▶", "#16A34A", _vm.StartCommand));
-                menu.Items.Add(CommandItem("Services.Stop", "■", "#DC2626", _vm.StopCommand));
+                menu.Items.Add(CommandItem("Services.Start", "▶", "@SuccessBrush", _vm.StartCommand));
+                menu.Items.Add(CommandItem("Services.Stop", "■", "@ErrorBrush", _vm.StopCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.Pause", "❚❚", "#D97706", _vm.PauseCommand));
-                menu.Items.Add(CommandItem("Services.Continue", ServiceCommandGlyphs.ContinueGlyph, "#0EA5E9", _vm.ContinueCommand));
+                menu.Items.Add(CommandItem("Services.Pause", "❚❚", "@WarningBrush", _vm.PauseCommand));
+                menu.Items.Add(CommandItem("Services.Continue", ServiceCommandGlyphs.ContinueGlyph, "@InfoBrush", _vm.ContinueCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.Restart", "⟲", "#2563EB", _vm.RestartCommand));
+                menu.Items.Add(CommandItem("Services.Restart", "⟲", "@InfoBrush", _vm.RestartCommand));
                 menu.Items.Add(new Separator());
                 // «Перенести в группу» (issue #11, 1.0.0.14): только для службы.
-                menu.Items.Add(CommandItem("Services.MoveToGroup", "⇄", "#0EA5E9", _vm.MoveToGroupCommand));
+                menu.Items.Add(CommandItem("Services.MoveToGroup", "⇄", "@InfoBrush", _vm.MoveToGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "#2563EB", _vm.MoveUpCommand));
-                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "#2563EB", _vm.MoveDownCommand));
+                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "@InfoBrush", _vm.MoveUpCommand));
+                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "@InfoBrush", _vm.MoveDownCommand));
             }
             return menu;
         }

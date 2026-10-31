@@ -208,7 +208,7 @@
                                             <!-- Группа сборок 8.3.27 — открытая папка -->
                                             <DataTrigger Binding="{Binding Kind}" Value="BuildGroup">
                                                 <Setter Property="Kind" Value="FolderOpen"/>
-                                                <Setter Property="Foreground" Value="#3B82F6"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                             </DataTrigger>
                                             <!-- Сборка x64 -->
                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX64">
@@ -218,12 +218,12 @@
                                             <!-- Сборка x32 -->
                                             <DataTrigger Binding="{Binding Kind}" Value="LeafX32">
                                                 <Setter Property="Kind" Value="Cube"/>
-                                                <Setter Property="Foreground" Value="#8B5CF6"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource PurpleAccentBrush}"/>
                                             </DataTrigger>
                                             <!-- Сборка без метки разрядности -->
                                             <DataTrigger Binding="{Binding Kind}" Value="Leaf">
                                                 <Setter Property="Kind" Value="Application"/>
-                                                <Setter Property="Foreground" Value="#0EA5E9"/>
+                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

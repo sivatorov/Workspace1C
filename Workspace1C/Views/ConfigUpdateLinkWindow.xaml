@@ -134,7 +134,7 @@
                 </StackPanel>
 
                 <TextBlock x:Name="ResultText" FontSize="12" Margin="0,8,0,0" TextWrapping="Wrap"
-                           Foreground="#16A34A"/>
+                           Foreground="{DynamicResource SuccessBrush}"/>
             </StackPanel>
         </ScrollViewer>
 

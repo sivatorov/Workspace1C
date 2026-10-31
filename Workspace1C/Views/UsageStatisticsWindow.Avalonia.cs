@@ -117,7 +117,7 @@ namespace Workspace1C
             var barsPanel = new StackPanel { Children = { barsTitle, barsHost } };
             var barsBox = new Border
             {
-                Background = new SolidColorBrush(Color.Parse("#1E293B")),
+                Background = Themes.ThemeBrushes.Get("CardBackgroundColorBrush", "#FFFFFF"),
                 Padding = new Thickness(12, 8),
                 Margin = new Thickness(0, 12, 0, 0),
                 Child = barsPanel

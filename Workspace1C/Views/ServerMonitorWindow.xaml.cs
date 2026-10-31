@@ -1064,7 +1064,7 @@ namespace Workspace1C
                     // как в трее и в контекстном меню служб главного окна; «Все сервисы» — ☰.
                     submenu.Icon = item.Kind == ServiceMenuItemKind.GroupSubmenu
                         ? MenuGroupIcon(item.StatusColorHex)
-                        : MenuIconText("☰", "#7C3AED");
+                        : MenuIconText("☰", "@PurpleAccentBrush");
                     foreach (var child in item.Children)
                         submenu.Items.Add(ToWpfServiceMenuItem(child));
                     return submenu;
@@ -1131,7 +1131,7 @@ namespace Workspace1C
             {
                 Text = "📦",
                 FontSize = 13,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")),
+                Foreground = Themes.WpfBrushes.Get("PurpleAccentBrush") ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")), // fallback
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             });

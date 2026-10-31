@@ -92,7 +92,7 @@
                                 Click="OnCheckAllClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
-                                                         Foreground="#16A34A" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc DetectConfigs.Button.CheckAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -112,7 +112,7 @@
                                 Click="OnInvertClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="SelectInverse" Width="16" Height="16"
-                                                         Foreground="#8B5CF6" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource PurpleAccentBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc DetectConfigs.Button.Invert}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -183,7 +183,7 @@
                                                 <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding HasCredentials}" Value="True">
-                                                        <Setter Property="Foreground" Value="#16A34A"/>
+                                                        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
                                                         <Setter Property="ToolTip"
                                                                 Value="{loc:Loc DetectConfigs.CredentialsFilledTooltip}"/>
                                                     </DataTrigger>
@@ -203,7 +203,7 @@
                                             BorderThickness="0" Style="{StaticResource SelectAllButtonStyle}"
                                             ToolTip="{loc:Loc DetectConfigs.Button.PropertiesTooltip}">
                                         <materialDesign:PackIcon Kind="CogOutline" Width="16" Height="16"
-                                                                 Foreground="#8B5CF6"/>
+                                                                 Foreground="{DynamicResource PurpleAccentBrush}"/>
                                     </Button>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>

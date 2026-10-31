@@ -622,7 +622,7 @@ namespace Workspace1C
             var appDark = Themes.ThemeManager.CurrentTheme == Themes.ThemeManager.DarkThemeName;
             var backgroundHex = Themes.ThemeManager.CurrentScheme is { } appScheme
                 ? appScheme.PaletteValue(appDark, "CardBackgroundColor")
-                : (appDark ? "#1E293B" : "#FFFFFF");
+                : (appDark ? "#1E293B" : "#FFFFFF"); // fallback при отсутствии схемы
             var hexForeground = Parse(Models.ColorScheme.ContrastTextHex(backgroundHex));
             foreach (var (key, label, hex) in _settings.GetEditableColors())
             {

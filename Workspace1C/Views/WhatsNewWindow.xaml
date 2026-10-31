@@ -1,0 +1,66 @@
+<Window x:Class="Workspace1C.WhatsNewWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Workspace1C.Localization"
+        Icon="{StaticResource AppIcon}"
+        Height="420" Width="560" MinHeight="320" MinWidth="440"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ContentBackgroundBrush}">
+
+    <Window.Resources>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style x:Key="DialogButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="Margin" Value="8,0,0,0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Заголовок: «Что нового в Workspace 1C <версия>». -->
+        <TextBlock x:Name="TitleText" Grid.Row="0" FontSize="16" FontWeight="SemiBold"
+                   Margin="0,0,0,12" TextWrapping="Wrap"/>
+
+        <!-- Сводка изменений релиза: пункты списком, читаемо в обеих темах. -->
+        <Border Grid.Row="1" Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
+                Padding="14" CornerRadius="4">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel x:Name="NotesPanel"/>
+            </ScrollViewer>
+        </Border>
+
+        <!-- Кнопки: открыть CHANGELOG на GitHub; галка «показывать при запуске»; закрыть. -->
+        <Grid Grid.Row="2" Margin="0,14,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <CheckBox x:Name="ShowOnStartCheck" Grid.Column="0" VerticalAlignment="Center"
+                      Content="{loc:Loc WhatsNew.ShowOnStart}"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <Button Style="{StaticResource DialogButton}" Click="OnOpenChangelog_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="🌐" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc WhatsNew.OpenChangelog}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource DialogButton}" IsCancel="True" Click="OnClose_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</Window>

@@ -665,12 +665,12 @@ namespace Workspace1C
         {
             if (filled)
             {
-                block.Foreground = Brush.Parse("#16A34A");
+                block.Foreground = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A");
                 ToolTip.SetTip(block, LocalizationManager.T("DetectConfigs.CredentialsFilledTooltip"));
             }
             else
             {
-                block.Foreground = Brush.Parse("#EF4444");
+                block.Foreground = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
                 ToolTip.SetTip(block, LocalizationManager.T("DetectConfigs.CredentialsMissingTooltip"));
             }
         }

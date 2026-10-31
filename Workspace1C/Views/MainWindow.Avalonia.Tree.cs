@@ -859,8 +859,8 @@ namespace Workspace1C
                 primary: true,
                 new (string, string, string?, string?, string?)[]
                 {
-                    (LocalizationManager.T("Main.LaunchWithParams"), "LaunchEnterpriseWithParamsCommand", "IconTune", "#0EA5E9", _vm?.HotkeyEnterpriseWithParams),
-                    (LocalizationManager.T("Main.LaunchWithAuth"), "LaunchEnterpriseWithAuthCommand", "IconAccountKey", "#8B5CF6", _vm?.HotkeyEnterpriseWithAuth)
+                    (LocalizationManager.T("Main.LaunchWithParams"), "LaunchEnterpriseWithParamsCommand", "IconTune", "@InfoBrush", _vm?.HotkeyEnterpriseWithParams),
+                    (LocalizationManager.T("Main.LaunchWithAuth"), "LaunchEnterpriseWithAuthCommand", "IconAccountKey", "@PurpleAccentBrush", _vm?.HotkeyEnterpriseWithAuth)
                 });
 
             // Конфигуратор — secondary full-width (без отдельной тяжёлой карточки).
@@ -872,8 +872,8 @@ namespace Workspace1C
                 primary: false,
                 new (string, string, string?, string?, string?)[]
                 {
-                    (LocalizationManager.T("Main.LaunchWithParams"), "LaunchConfiguratorWithParamsCommand", "IconTune", "#0EA5E9", _vm?.HotkeyConfiguratorWithParams),
-                    (LocalizationManager.T("Main.LaunchWithAuth"), "LaunchConfiguratorWithAuthCommand", "IconAccountKey", "#8B5CF6", _vm?.HotkeyConfiguratorWithAuth)
+                    (LocalizationManager.T("Main.LaunchWithParams"), "LaunchConfiguratorWithParamsCommand", "IconTune", "@InfoBrush", _vm?.HotkeyConfiguratorWithParams),
+                    (LocalizationManager.T("Main.LaunchWithAuth"), "LaunchConfiguratorWithAuthCommand", "IconAccountKey", "@PurpleAccentBrush", _vm?.HotkeyConfiguratorWithAuth)
                 });
 
             // Остальные действия («Очистить кеш», «Изменить настройки», «Удалить»,
@@ -883,13 +883,13 @@ namespace Workspace1C
             // и штатный стартер. «Открыть каталог» и «Ярлык на рабочем столе»
             // у него живут в контекстном меню строки, там они есть и у нас.
             var starterBlock = BuildActionList(
-                CompactActionButton("IconApplication", LocalizationManager.T("Main.NativeStarter"), "OpenNativeStarterCommand", LocalizationManager.T("Main.NativeStarterTooltipLinux"), "#F59E0B", colorTextToo: false,
+                CompactActionButton("IconApplication", LocalizationManager.T("Main.NativeStarter"), "OpenNativeStarterCommand", LocalizationManager.T("Main.NativeStarterTooltipLinux"), "@WarningBrush", colorTextToo: false,
                     iconSize: UiMetrics.Scaled(15), widePadding: new Thickness(8, 6), narrowPadding: new Thickness(6, 8))
             );
 
             // Переход по ссылке идёт после карточки сессии, как в разметке.
             var byLinkBlock = BuildActionList(
-                CompactActionButtonBound("IconLink", "OpenByLinkCaption", "OpenInfobaseByLinkCommand", LocalizationManager.T("Main.OpenLinkTooltip"), "#0EA5E9", "IconArrowRight", colorTextToo: false,
+                CompactActionButtonBound("IconLink", "OpenByLinkCaption", "OpenInfobaseByLinkCommand", LocalizationManager.T("Main.OpenLinkTooltip"), "@InfoBrush", "IconArrowRight", colorTextToo: false,
                     iconSize: UiMetrics.Scaled(16), widePadding: new Thickness(14, 11), narrowPadding: new Thickness(6, 8))
             );
 
@@ -901,7 +901,7 @@ namespace Workspace1C
             // FavoriteBrush: плашка #FEF3C7 постоянная, а FavoriteBrush в тёмной теме
             // жёлтый (#FBBF24) — «жёлтое на жёлтом» было нечитаемо.
             var favoriteBadge = Badge("#FEF3C7");
-            favoriteBadge.Child = BadgeContent("IconStar", "#F59E0B", textBinding:
+            favoriteBadge.Child = BadgeContent("IconStar", "@WarningBrush", textBinding:
                 new MultiBinding
                 {
                     StringFormat = "{0} {1}",
@@ -918,7 +918,7 @@ namespace Workspace1C
             // (PinnedBadgeBrush/PinnedBadgeTextBrush), а не из фиксированных светлых цветов.
             var pinnedBadge = Badge("#EDE9FE");
             ThemeBrushes.Bind(pinnedBadge, Border.BackgroundProperty, "PinnedBadgeBrush");
-            pinnedBadge.Child = BadgeContent("IconPin", "#8B5CF6", null,
+            pinnedBadge.Child = BadgeContent("IconPin", "@PurpleAccentBrush", null,
                 new Binding { Source = LocalizationManager.T("Main.PinnedLabel") }, "PinnedBadgeTextBrush");
             pinnedBadge.Bind(Control.IsVisibleProperty, new Binding("SelectedInfobase.IsPinned"));
             badges.Children.Add(pinnedBadge);
@@ -1625,7 +1625,7 @@ namespace Workspace1C
                 item.Styled(Themes.ControlThemes.ModernMenuItem);
                 if (itemIcon is not null)
                     item.Icon = IconHelper.MakeIcon(itemIcon, 18,
-                        itemColor is not null ? new SolidColorBrush(Color.Parse(itemColor)) : Brushes.Gray);
+                        itemColor is not null ? Themes.ThemeBrushes.FromSpec(itemColor) : Brushes.Gray);
                 // Производный хоткей (issue #48) показывается рядом с пунктом,
                 // как в остальных меню программы; пустая строка — не показываем.
                 if (!string.IsNullOrWhiteSpace(gesture)
@@ -2219,29 +2219,29 @@ namespace Workspace1C
         /// из BuildRowContextMenu v1.0.0.66; null — без иконки (как было в Avalonia-меню).</summary>
         private static (string? Icon, string? Color) RowAvaloniaItemIcon(ContextMenuCommandKind kind) => kind switch
         {
-            ContextMenuCommandKind.LaunchEnterprise => ("IconPlay", "#22C55E"),
-            ContextMenuCommandKind.LaunchConfigurator => ("IconSettings", "#3B82F6"),
-            ContextMenuCommandKind.RunScript => ("IconScript", "#06B6D4"),
-            ContextMenuCommandKind.CustomActions => ("IconScript", "#06B6D4"),
-            ContextMenuCommandKind.ToFavorites => ("IconStar", "#FBBF24"),
-            ContextMenuCommandKind.Pin => ("IconPin", "#8B5CF6"),
-            ContextMenuCommandKind.AddBase => ("IconAdd", "#22C55E"),
-            ContextMenuCommandKind.RefreshConfigInfo => ("IconCloudDownload", "#14B8A6"),
-            ContextMenuCommandKind.CheckUpdate => ("IconCloudDownload", "#14B8A6"),
-            ContextMenuCommandKind.SessionLock => ("IconRights", "#EF4444"),
-            ContextMenuCommandKind.NetworkDiagnostics => ("IconNetwork", "#3B82F6"),
-            ContextMenuCommandKind.OpenInfobaseFolder => ("IconFolderOpen", "#0EA5E9"),
-            ContextMenuCommandKind.CloneBase => ("IconCopy", "#14B8A6"),
-            ContextMenuCommandKind.TestDeploy => ("IconCloudUpload", "#22C55E"),
-            ContextMenuCommandKind.CheckIntegrity => ("IconDatabase", "#10B981"),
-            ContextMenuCommandKind.DumpToDt => ("IconDatabaseExport", "#0EA5E9"),
-            ContextMenuCommandKind.DumpConfigToCf => ("IconFileExport", "#3B82F6"),
-            ContextMenuCommandKind.Delete => ("IconDelete", "#EF4444"),
-            ContextMenuCommandKind.FindInList => ("IconSearch", "#3B82F6"),
-            ContextMenuCommandKind.CreateDesktopShortcut => ("IconDesktopClassic", "#6366F1"),
-            ContextMenuCommandKind.CopyConnectionString => ("IconCopy", "#06B6D4"),
-            ContextMenuCommandKind.EditSettings => ("IconEdit", "#3B82F6"),
-            ContextMenuCommandKind.Notes => ("IconNote", "#8B5CF6"),
+            ContextMenuCommandKind.LaunchEnterprise => ("IconPlay", "@SuccessBrush"),
+            ContextMenuCommandKind.LaunchConfigurator => ("IconSettings", "@InfoBrush"),
+            ContextMenuCommandKind.RunScript => ("IconScript", "@InfoBrush"),
+            ContextMenuCommandKind.CustomActions => ("IconScript", "@InfoBrush"),
+            ContextMenuCommandKind.ToFavorites => ("IconStar", "@WarningBrush"),
+            ContextMenuCommandKind.Pin => ("IconPin", "@PurpleAccentBrush"),
+            ContextMenuCommandKind.AddBase => ("IconAdd", "@SuccessBrush"),
+            ContextMenuCommandKind.RefreshConfigInfo => ("IconCloudDownload", "@InfoBrush"),
+            ContextMenuCommandKind.CheckUpdate => ("IconCloudDownload", "@InfoBrush"),
+            ContextMenuCommandKind.SessionLock => ("IconRights", "@ErrorBrush"),
+            ContextMenuCommandKind.NetworkDiagnostics => ("IconNetwork", "@InfoBrush"),
+            ContextMenuCommandKind.OpenInfobaseFolder => ("IconFolderOpen", "@InfoBrush"),
+            ContextMenuCommandKind.CloneBase => ("IconCopy", "@InfoBrush"),
+            ContextMenuCommandKind.TestDeploy => ("IconCloudUpload", "@SuccessBrush"),
+            ContextMenuCommandKind.CheckIntegrity => ("IconDatabase", "@SuccessBrush"),
+            ContextMenuCommandKind.DumpToDt => ("IconDatabaseExport", "@InfoBrush"),
+            ContextMenuCommandKind.DumpConfigToCf => ("IconFileExport", "@InfoBrush"),
+            ContextMenuCommandKind.Delete => ("IconDelete", "@ErrorBrush"),
+            ContextMenuCommandKind.FindInList => ("IconSearch", "@InfoBrush"),
+            ContextMenuCommandKind.CreateDesktopShortcut => ("IconDesktopClassic", "@PurpleAccentBrush"),
+            ContextMenuCommandKind.CopyConnectionString => ("IconCopy", "@InfoBrush"),
+            ContextMenuCommandKind.EditSettings => ("IconEdit", "@InfoBrush"),
+            ContextMenuCommandKind.Notes => ("IconNote", "@PurpleAccentBrush"),
             _ => (null, null) // ConfigLink/ShowExportsList/кэш-пункты — без иконки (как было)
         };
 
@@ -2351,22 +2351,22 @@ namespace Workspace1C
         private void PopulateRowAvaloniaBatchMenu(MenuItem batchMenu)
         {
             batchMenu.Header = _vm?.BatchMenuTitle ?? LocalizationManager.T("Main.BatchForSelected");
-            batchMenu.Icon = MenuIcon("IconTag", "#8B5CF6");
+            batchMenu.Icon = MenuIcon("IconTag", "@PurpleAccentBrush");
             batchMenu.Styled(Themes.ControlThemes.ModernMenuItem);
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchAssignTag", OnBatchAssignTagClick, "IconTag", "#14B8A6"));
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchMoveToGroup", OnBatchMoveToGroupClick, "IconFolder", "#0EA5E9"));
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchAddFavorites", OnBatchAddFavoritesClick, "IconStar", "#FBBF24"));
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchRunBackup", OnBatchRunBackupClick, "IconDatabaseExport", "#22C55E"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchAssignTag", OnBatchAssignTagClick, "IconTag", "@InfoBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchMoveToGroup", OnBatchMoveToGroupClick, "IconFolder", "@InfoBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchAddFavorites", OnBatchAddFavoritesClick, "IconStar", "@WarningBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchRunBackup", OnBatchRunBackupClick, "IconDatabaseExport", "@SuccessBrush"));
             // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "#16A34A"));
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "#3B82F6"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "@SuccessBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "@InfoBrush"));
             // Массовая замена строк подключения (0.3.9.191, функция 6): окно с правилом
             // «найти → заменить на» по полям строк подключения выделенных баз.
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchConnectionReplace", OnBatchConnectionReplaceClick, "IconFindReplace", "#F59E0B"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchConnectionReplace", OnBatchConnectionReplaceClick, "IconFindReplace", "@WarningBrush"));
             // Смена платформы выделенных баз (issue #54, переработка по комментарию 7OH):
             // отдельное окно выбора установленной версии вместо галочки в «Замене строк…».
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchChangePlatform", OnBatchChangePlatformClick, "IconPackageVariant", "#22C55E"));
-            batchMenu.Items.Add(BatchMenuAction("Main.BatchDelete", OnBatchDeleteClick, "IconDelete", "#EF4444"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchChangePlatform", OnBatchChangePlatformClick, "IconPackageVariant", "@SuccessBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchDelete", OnBatchDeleteClick, "IconDelete", "@ErrorBrush"));
             _batchMenu = batchMenu;
         }
 
@@ -2375,7 +2375,7 @@ namespace Workspace1C
         /// WPF у каждого пункта свой цвет, и он один и тот же в светлой и тёмной.
         /// </summary>
         private static Control MenuIcon(string iconKey, string colorHex)
-            => IconHelper.MakeIcon(iconKey, 16, new SolidColorBrush(Color.Parse(colorHex)));
+            => IconHelper.MakeIcon(iconKey, 16, Themes.ThemeBrushes.FromSpec(colorHex));
 
         // ======================= Пользовательские действия (0.3.9.198) =======================
 
@@ -2418,7 +2418,7 @@ namespace Workspace1C
                 var action = info.Action;
                 var item = new MenuItem { Header = action.Name, IsEnabled = !running };
                 item.Styled(Themes.ControlThemes.ModernMenuItem);
-                item.Icon = MenuIcon("IconScript", "#06B6D4");
+                item.Icon = MenuIcon("IconScript", "@InfoBrush");
                 if (Controls.HotkeyBox.TryParse(action.Hotkey, out var gesture) && gesture is not null)
                     item.InputGesture = gesture;
                 item.Click += async (_, _) => await _vm.ExecuteCustomActionAsync(action, info.Context);
@@ -2429,7 +2429,7 @@ namespace Workspace1C
 
             var settingsItem = new MenuItem { Header = LocalizationManager.T("Main.CustomActionsSettings") };
             settingsItem.Styled(Themes.ControlThemes.ModernMenuItem);
-            settingsItem.Icon = MenuIcon("IconTune", "#06B6D4");
+            settingsItem.Icon = MenuIcon("IconTune", "@InfoBrush");
             settingsItem.Click += (_, _) => _vm.ShowCustomActionsSettingsCommand.Execute(null);
             _customActionsMenu.Items.Add(settingsItem);
 

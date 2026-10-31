@@ -1380,7 +1380,7 @@ namespace Workspace1C
             // Значок обновления зелёный, как в разметке (xaml:996).
             var generate = SecondaryButton("IconRefresh", "Connection.GenerateId",
                 () => _viewModel.Id = Guid.NewGuid().ToString("D"), "Connection.GenerateIdTooltip",
-                iconBrush: new SolidColorBrush(Color.Parse("#22C55E")));
+                iconBrush: Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
             generate.Padding = new Thickness(10, 5);
             generate.Margin = new Thickness(0, 0, 8, 0);
             var copy = SecondaryButton("IconCopy", "Connection.CopyId", OnCopyId_Click, "Connection.CopyIdTooltip");
@@ -1487,7 +1487,7 @@ namespace Workspace1C
             });
 
             var add = SecondaryButton("IconPlus", "Connection.AdditionalFieldsAdd", OnAddAdditionalField_Click,
-                "Connection.AdditionalFieldsAddTooltip", iconBrush: new SolidColorBrush(Color.Parse("#22C55E")));
+                "Connection.AdditionalFieldsAddTooltip", iconBrush: Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
             add.Padding = new Thickness(10, 5);
             add.Margin = new Thickness(0, 0, 8, 0);
             var edit = SecondaryButton("IconEdit", "Connection.AdditionalFieldsEdit", OnEditAdditionalField_Click,
@@ -1495,7 +1495,7 @@ namespace Workspace1C
             edit.Padding = new Thickness(10, 5);
             edit.Margin = new Thickness(0, 0, 8, 0);
             var remove = SecondaryButton("IconDelete", "Connection.AdditionalFieldsDelete", OnRemoveAdditionalField_Click,
-                "Connection.AdditionalFieldsDeleteTooltip", iconBrush: new SolidColorBrush(Color.Parse("#EF4444")));
+                "Connection.AdditionalFieldsDeleteTooltip", iconBrush: Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626"));
             remove.Padding = new Thickness(10, 5);
             remove.Margin = new Thickness(0, 0, 8, 0);
             var scenarios = SecondaryButton("IconScript", "Connection.AdditionalFieldsScenarios", OnOpenScenarios_Click,

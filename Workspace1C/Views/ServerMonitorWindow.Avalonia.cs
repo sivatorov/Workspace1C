@@ -542,7 +542,7 @@ namespace Workspace1C
                 FontSize = 12,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 4),
-                Foreground = new SolidColorBrush(Color.Parse("#D97706"))
+                Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706")
             };
             status.Bind(TextBlock.TextProperty, new Binding("LicenseStatusText"));
             // issue #83: предупреждение о недоступности утилиты лицензий показывается,
@@ -1251,7 +1251,7 @@ namespace Workspace1C
         private static Button BuildActionButton(
             string text, string icon, System.Action onClick, bool red = false)
         {
-            var redBrush = new SolidColorBrush(Color.Parse("#EF4444"));
+            var redBrush = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
             var button = new Button
             {
                 Content = new StackPanel
@@ -1300,7 +1300,7 @@ namespace Workspace1C
         /// «Вверх»/«Вниз» (глифы ↑/↓ уже соседних) получают ту же ширину, что и остальные.</summary>
         private static Button BuildIconButton(string icon, string tooltip, System.Action onClick, bool red = false)
         {
-            var redBrush = new SolidColorBrush(Color.Parse("#EF4444"));
+            var redBrush = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
             var button = new Button
             {
                 Content = new TextBlock
@@ -1429,7 +1429,7 @@ namespace Workspace1C
                         FontWeight = FontWeight.SemiBold,
                         FontSize = 13,
                         Margin = new Thickness(0, 10, 0, 4),
-                        Foreground = new SolidColorBrush(Color.Parse("#8B5CF6"))
+                        Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED") // fallback
                     });
                     foreach (var row in rows)
                         panel.Children.Add(BuildClusterPropertyRow(row));
@@ -1854,7 +1854,7 @@ namespace Workspace1C
                     {
                         ServiceMenuItemKind.ServiceSubmenu => StatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuIcon("☰", "#7C3AED")
+                        _ => MenuIcon("☰", "@PurpleAccentBrush")
                     };
                     foreach (var child in item.Children)
                         submenu.Items.Add(ToAvaloniaMenuItem(child));
@@ -1925,7 +1925,7 @@ namespace Workspace1C
             {
                 Text = "📦",
                 FontSize = 13,
-                Foreground = new SolidColorBrush(Color.Parse("#7C3AED")),
+                Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"), // fallback
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             });
@@ -2103,7 +2103,7 @@ namespace Workspace1C
                 FontSize = 13,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.Parse("#D97706"))
+                Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706")
             };
 
             var grid = new Grid

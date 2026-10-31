@@ -1326,7 +1326,7 @@ namespace Workspace1C
 
             // Красная подложка кнопки «закрыть» при нажатии: алый при наведении приходит
             // из темы (WindowButtonCloseHoverBrush), нажатие — темнее. Значок на ней белый.
-            private static readonly IBrush ClosePressedBrush = new SolidColorBrush(Color.Parse("#B91C1C"));
+            private static readonly IBrush ClosePressedBrush = ThemeBrushes.Get("DangerPressedBrush", "#B91C1C"); // fallback
 
             // Тёмный значок «светофора» macOS (Задача 3): почти чёрный под курсором,
             // полупрозрачный в покое — как у настоящих кнопок macOS.

@@ -430,7 +430,7 @@ namespace Workspace1C
             };
             // Подсветка совпадения поиска: фон узла по IsMatch (этап 3). DataTrigger
             // в код-билде Avalonia неудобен — подписываемся на смену пометки узла.
-            var highlightBrush = new SolidColorBrush(Color.Parse("#06B6D4"));
+            var highlightBrush = Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9");
             void ApplyMatchHighlight()
             {
                 name.Background = node.IsMatch ? highlightBrush : Brushes.Transparent;

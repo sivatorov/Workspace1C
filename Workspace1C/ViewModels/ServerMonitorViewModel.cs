@@ -964,7 +964,8 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
                 }
 
                 attempts++;
-                var answer = AskDropRetryOnUi(detail, infobaseUser, infobasePassword, attempts, retryNote);
+                var answer = await AskDropRetryOnUiAsync(
+                    detail, infobaseUser, infobasePassword, attempts, retryNote).ConfigureAwait(false);
                 retryNote = null;
                 if (!answer.Retry)
                 {
@@ -1120,10 +1121,11 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
     /// попытками — комментарий 7OH от 2026-10-26). Если колбэк диалога не назначен
     /// (тесты/окно без поддержки) — прежнее поведение: предупреждение с одной
     /// кнопкой OK, повтор не выполняется. Модальное окно открывается через
-    /// dispatch-маршалер (как <see cref="ShowWarningOnUi"/>), рабочий поток ждёт
-    /// результат диалога.
+    /// dispatch-маршалер (как <see cref="ShowWarningOnUi"/>); результат диалога
+    /// ожидается асинхронно (v100112 — TaskCompletionSource вместо блокирующего
+    /// ManualResetEventSlim.Wait(), без занятия потока пула под ожидание UI).
     /// </summary>
-    private DropRetryResult AskDropRetryOnUi(
+    private async Task<DropRetryResult> AskDropRetryOnUiAsync(
         string detail, string? login, string? password, int attempts, string? retryNote = null)
     {
         // Заголовок диалога повтора: на исходной неудаче — «Не удалось удалить
@@ -1148,21 +1150,26 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         if (_dispatchToUi is null)
             return _dropRetryDialog(message, login, password);
 
-        DropRetryResult result = DropRetryResult.Cancel;
-        using var gate = new ManualResetEventSlim(false);
+        // v100112: вместо блокирующего ожидания ManualResetEventSlim.Wait() (рабочий
+        // поток занимает ядро под синхронное ожидание UI) — асинхронное ожидание через
+        // TaskCompletionSource: диалог выполняется в UI-потоке через маршалер, вызывающий
+        // async-метод (DropSelectedInfobaseAsync) продолжает работу на потоке пула без
+        // блокировки. RunContinuationsAsynchronously — продолжение не выполняется прямо
+        // в UI-потоке в момент SetResult.
+        var completion = new TaskCompletionSource<DropRetryResult>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         _dispatchToUi(() =>
         {
             try
             {
-                result = _dropRetryDialog(message, login, password);
+                completion.SetResult(_dropRetryDialog(message, login, password));
             }
-            finally
+            catch (Exception ex)
             {
-                gate.Set();
+                completion.SetException(ex);
             }
         });
-        gate.Wait();
-        return result;
+        return await completion.Task.ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1702,6 +1709,225 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectedInfobaseId));
         ApplyInfobaseFilter();
     }
+
+    // ===================== Регламентные задания (v100112, F1) =====================
+
+    /// <summary>
+    /// Создаёт ViewModel диалога «Регламентные задания сервера» (v100112, F1): тот же
+    /// клиент rac и параметры подключения, что у монитора, идентификатор выбранного
+    /// кластера и список баз для фильтра. null — нет подключения или не выбран кластер
+    /// (кнопка «Регламентные задания» в этом случае неактивна).
+    /// </summary>
+    public ServerJobsViewModel? CreateJobsViewModel()
+    {
+        if (!HasConnected || SelectedClusterId is not Guid clusterId)
+            return null;
+        return new ServerJobsViewModel(
+            _rac, _dialogs, BuildParams(), clusterId, Infobases.ToList());
+    }
+
+    // ===================== Экспорт сводки в CSV (v100112, F2) =====================
+
+    /// <summary>
+    /// «Экспорт CSV» (v100112, F2): диалог сохранения → текущая сводка монитора
+    /// (общая информация, процессы, сеансы, соединения, блокировки, базы, лицензии)
+    /// в CSV через <see cref="CsvExporter"/> (UTF-8 с BOM, RFC 4180). Ошибки записи не
+    /// роняют окно — предупреждение. Требует подключения: без него кнопка неактивна.
+    /// </summary>
+    public void ExportSummary()
+    {
+        if (!HasConnected)
+            return;
+
+        var rows = BuildSummaryCsvRows(
+            ConnectedServer?.Description ?? string.Empty,
+            ServerAddress, ServerPort,
+            ClusterInfo, StatusText,
+            Processes.ToList(), FilteredSessions.ToList(), FilteredConnections.ToList(),
+            FilteredLocks.ToList(), Infobases.ToList(),
+            LicensedSessions.ToList(), InstalledLicenses.ToList(),
+            LicenseSummaryText, LicenseStatusText,
+            DateTime.Now);
+
+        var fileName = $"server-summary-{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+        var path = _dialogs.SaveFileDialog(
+            LocalizationManager.T("ServerMonitor.Export.Title"),
+            fileName,
+            LocalizationManager.T("ServerMonitor.Export.Filter"));
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        try
+        {
+            CsvExporter.WriteFile(path, rows);
+            StatusText = string.Format(
+                LocalizationManager.T("ServerMonitor.Export.DoneFormat"), path);
+        }
+        catch (Exception ex)
+        {
+            ShowWarningOnUi(
+                string.Format(
+                    LocalizationManager.T("ServerMonitor.Export.FailedFormat"), ex.Message),
+                LocalizationManager.T("ServerMonitor.Export.Title"));
+        }
+    }
+
+    /// <summary>
+    /// Собирает строки CSV-сводки монитора сервера (v100112, F2): секции «Общая
+    /// информация», «Рабочие процессы», «Сеансы», «Соединения», «Блокировки», «Базы»,
+    /// «Лицензии» — заголовки секций локализованы (ключи вкладок монитора). Чистый
+    /// метод (вход — готовые данные, вывод — строки полей) — юнит-тестируется без rac.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<string?>> BuildSummaryCsvRows(
+        string serverDescription, string serverAddress, int serverPort,
+        RacClusterInfo? clusterInfo, string statusText,
+        IReadOnlyList<RacProcessRow> processes,
+        IReadOnlyList<RacSessionRow> sessions,
+        IReadOnlyList<RacConnectionRow> connections,
+        IReadOnlyList<RacLockRow> locks,
+        IReadOnlyList<RacInfobaseRow> infobases,
+        IReadOnlyList<RacLicensedSessionRow> licensedSessions,
+        IReadOnlyList<ProgramLicense> installedLicenses,
+        string licenseSummary, string licenseStatus,
+        DateTime exportedAt)
+    {
+        var rows = new List<IReadOnlyList<string?>>();
+
+        // --- Общая информация ---
+        rows.Add(new[] { T("ServerMonitor.Export.Section.General") });
+        rows.Add(new[] { T("ServerMonitor.Servers.Title"), serverDescription });
+        rows.Add(new[] { T("ServerMonitor.Cluster"),
+            serverPort > 0 ? $"{serverAddress}:{serverPort}" : serverAddress });
+        rows.Add(new[] { T("ServerMonitor.Export.ClusterName"), clusterInfo?.Name ?? string.Empty });
+        rows.Add(new[] { T("ServerMonitor.Export.ExportedAt"),
+            exportedAt.ToString("dd.MM.yyyy HH:mm:ss") });
+        rows.Add(new[] { T("ServerMonitor.Export.Status"), statusText ?? string.Empty });
+        rows.Add(Array.Empty<string>());
+
+        // --- Рабочие процессы ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Processes")} ({processes.Count})" });
+        if (processes.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Columns.Process.Type"), T("ServerMonitor.Columns.Process.Host"),
+                "PID", T("ServerMonitor.Columns.Process.Port"), T("ServerMonitor.Columns.Process.StartedAt"),
+                T("ServerMonitor.Columns.Process.Memory"), T("ServerMonitor.Columns.Process.Threads"),
+                T("ServerMonitor.Columns.Process.Cpu"), T("ServerMonitor.Columns.Process.Running"),
+                T("ServerMonitor.Columns.Process.Infobases") });
+            foreach (var p in processes)
+            {
+                rows.Add(new[] { p.Type, p.Host, p.Pid.ToString(CultureInfo.InvariantCulture),
+                    p.Port.ToString(CultureInfo.InvariantCulture), p.StartedAtText,
+                    p.MemorySizeText, p.Threads.ToString(CultureInfo.InvariantCulture),
+                    p.CpuText, p.RunningText, p.Infobases.ToString(CultureInfo.InvariantCulture) });
+            }
+        }
+        rows.Add(Array.Empty<string>());
+
+        // --- Сеансы ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Sessions")} ({sessions.Count})" });
+        if (sessions.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Columns.Session.User"), T("ServerMonitor.Columns.Session.Infobase"),
+                T("ServerMonitor.Columns.Session.Host"), T("ServerMonitor.Columns.Session.App"),
+                T("ServerMonitor.Columns.Session.StartedAt"), T("ServerMonitor.Columns.Session.LastActive"),
+                T("ServerMonitor.Columns.Session.State"), T("ServerMonitor.Columns.Session.Memory"),
+                T("ServerMonitor.Columns.Session.Duration") });
+            foreach (var s in sessions)
+            {
+                rows.Add(new[] { s.User, s.InfobaseName, s.Host, s.AppId,
+                    s.StartedAtText, s.LastActiveAtText, s.StateText, s.MemoryText,
+                    s.DurationAllText });
+            }
+        }
+        rows.Add(Array.Empty<string>());
+
+        // --- Соединения ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Connections")} ({connections.Count})" });
+        if (connections.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Columns.Connection.Host"), T("ServerMonitor.Columns.Connection.Port"),
+                T("ServerMonitor.Columns.Connection.Connector"), T("ServerMonitor.Columns.Connection.Established"),
+                T("ServerMonitor.Columns.Connection.LastActive"), T("ServerMonitor.Columns.Connection.Duration"),
+                T("ServerMonitor.Columns.Connection.Descr"), T("ServerMonitor.Columns.Connection.Blocked") });
+            foreach (var c in connections)
+            {
+                rows.Add(new[] { c.Host, c.Port.ToString(CultureInfo.InvariantCulture), c.Connector,
+                    c.EstablishedAtText, c.LastConnectionTimeText, c.DurationText, c.Descr,
+                    c.BlockedText });
+            }
+        }
+        rows.Add(Array.Empty<string>());
+
+        // --- Блокировки ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Locks")} ({locks.Count})" });
+        if (locks.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Columns.Lock.Object"), T("ServerMonitor.Columns.Lock.Waiting"),
+                T("ServerMonitor.Columns.Lock.Blocking"), T("ServerMonitor.Columns.Lock.Session"),
+                T("ServerMonitor.Columns.Lock.Connection"), T("ServerMonitor.Columns.Lock.Transaction") });
+            foreach (var l in locks)
+            {
+                rows.Add(new[] { l.Object, l.WaitingSymbol, l.BlockingSymbol,
+                    l.SessionId.ToString(), l.ConnectionId.ToString(), l.TransactionId.ToString() });
+            }
+        }
+        rows.Add(Array.Empty<string>());
+
+        // --- Базы ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Infobases")} ({infobases.Count})" });
+        if (infobases.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Infobase.Name"), T("ServerMonitor.Infobase.Description"),
+                T("ServerMonitor.Infobase.Dbms"), T("ServerMonitor.Infobase.DbServer"),
+                T("ServerMonitor.Infobase.DbName"), T("ServerMonitor.Infobase.DbUser"),
+                T("ServerMonitor.Infobase.Locale"), T("ServerMonitor.Infobase.Licensed") });
+            foreach (var ib in infobases)
+            {
+                rows.Add(new[] { ib.Name, ib.Descr, ib.DbmsText, ib.DbServer, ib.DbName,
+                    ib.DbUser, ib.Locale, ib.LicensedText });
+            }
+        }
+        rows.Add(Array.Empty<string>());
+
+        // --- Лицензии ---
+        rows.Add(new[] { $"{T("ServerMonitor.Tabs.Licenses")} ({licensedSessions.Count + installedLicenses.Count})" });
+        rows.Add(new[] { licenseSummary ?? string.Empty });
+        if (!string.IsNullOrWhiteSpace(licenseStatus))
+            rows.Add(new[] { licenseStatus });
+        if (licensedSessions.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Licenses.InUseHeader") });
+            rows.Add(new[] { T("ServerMonitor.Licenses.Columns.User"), T("ServerMonitor.Licenses.Columns.Infobase"),
+                T("ServerMonitor.Licenses.Columns.Host"), T("ServerMonitor.Licenses.Columns.Type"),
+                T("ServerMonitor.Licenses.Columns.Used"), T("ServerMonitor.Licenses.Columns.Max") });
+            foreach (var ls in licensedSessions)
+            {
+                rows.Add(new[] { ls.User, ls.InfobaseName, ls.Host, ls.LicType,
+                    ls.LicensesUsedText, ls.MaxLicensesText });
+            }
+        }
+        if (installedLicenses.Count > 0)
+        {
+            rows.Add(new[] { T("ServerMonitor.Licenses.InstalledHeader") });
+            rows.Add(new[] { T("ServerMonitor.Licenses.Columns.Serial"), T("ServerMonitor.Licenses.Columns.Type"),
+                T("ServerMonitor.Licenses.Columns.Version"), T("ServerMonitor.Licenses.Columns.Module"),
+                T("ServerMonitor.Licenses.Columns.User"), T("ServerMonitor.Licenses.Columns.State"),
+                T("ServerMonitor.Licenses.Columns.Expiry") });
+            foreach (var il in installedLicenses)
+            {
+                rows.Add(new[] { il.SerialNumber, il.Type, il.Version, il.Module, il.User,
+                    il.State, FormatLicenseExpiry(il.ExpiryDate) });
+            }
+        }
+
+        return rows;
+    }
+
+    /// <summary>Срок действия лицензии для CSV: «dd.MM.yyyy», null — пустое поле.</summary>
+    private static string FormatLicenseExpiry(DateTime? expiry) =>
+        expiry is { } date ? date.ToString("dd.MM.yyyy") : string.Empty;
+
+    private static string T(string key) => LocalizationManager.T(key);
 
     // ===================== Автообновление =====================
 

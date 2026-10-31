@@ -1241,7 +1241,7 @@
                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsOs64Bit}" Value="False">
-                                        <Setter Property="Foreground" Value="#DC2626"/>
+                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

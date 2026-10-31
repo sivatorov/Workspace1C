@@ -47,13 +47,13 @@ namespace Workspace1C
             // x32 сплошной фиолетовый, без метки синее окно.
             var (iconKey, iconColor) = node.Kind switch
             {
-                PlatformNodeKind.Line => ("IconFolder", "#F59E0B"),
-                PlatformNodeKind.BuildGroup => ("IconFolderOpen", "#3B82F6"),
-                PlatformNodeKind.LeafX64 => ("IconCubeOutline", "#22C55E"),
-                PlatformNodeKind.LeafX32 => ("IconCube", "#8B5CF6"),
-                _ => ("IconApplication", "#0EA5E9")
+                PlatformNodeKind.Line => ("IconFolder", "@WarningBrush"),
+                PlatformNodeKind.BuildGroup => ("IconFolderOpen", "@InfoBrush"),
+                PlatformNodeKind.LeafX64 => ("IconCubeOutline", "@SuccessBrush"),
+                PlatformNodeKind.LeafX32 => ("IconCube", "@PurpleAccentBrush"),
+                _ => ("IconApplication", "@InfoBrush")
             };
-            var icon = IconHelper.MakeIcon(iconKey, 14, new SolidColorBrush(Color.Parse(iconColor)));
+            var icon = IconHelper.MakeIcon(iconKey, 14, Themes.ThemeBrushes.FromSpec(iconColor));
             icon.Margin = new Thickness(0, 2, 8, 0);
             icon.VerticalAlignment = VerticalAlignment.Top;
 
@@ -68,7 +68,7 @@ namespace Workspace1C
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
             if (node.IsThinClient)
-                name.Foreground = new SolidColorBrush(Color.Parse("#F59E0B"));
+                name.Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706");
             else
                 ThemeBrushes.Bind(name, TextBlock.ForegroundProperty, "TextPrimaryBrush");
 

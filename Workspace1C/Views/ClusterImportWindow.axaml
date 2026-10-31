@@ -103,8 +103,8 @@
             <!-- Имя BusyProgress, а не ProgressBar: x:Name создаёт поле с именем типа
                  (тот же member-hides-type при FindControl<ProgressBar>). -->
             <ProgressBar x:Name="BusyProgress" Height="4" IsIndeterminate="True"
-                         Foreground="#06B6D4" IsVisible="False"/>
-            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="#DC2626"
+                         Foreground="{DynamicResource InfoBrush}" IsVisible="False"/>
+            <TextBlock x:Name="ErrorText" FontSize="12" Foreground="{DynamicResource ErrorBrush}"
                        TextWrapping="Wrap"/>
         </StackPanel>
     </Grid>

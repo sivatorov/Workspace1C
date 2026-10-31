@@ -660,7 +660,7 @@ namespace Workspace1C
                     {
                         ServiceMenuItemKind.ServiceSubmenu => StatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuGlyph("☰", "#7C3AED")
+                        _ => MenuGlyph("☰", "@PurpleAccentBrush")
                     };
                     if (item.Kind == ServiceMenuItemKind.ServiceSubmenu
                         && !string.IsNullOrEmpty(item.StatusText))
@@ -706,7 +706,7 @@ namespace Workspace1C
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
             FontSize = 16,
-            Foreground = new SolidColorBrush(Color.Parse(colorHex))
+            Foreground = Themes.ThemeBrushes.FromSpec(colorHex)
         };
 
         /// <summary>Кружок статуса службы в пункте меню (цвет StatusColorHex).</summary>
@@ -738,7 +738,7 @@ namespace Workspace1C
             {
                 Text = "📦",
                 FontSize = 16,
-                Foreground = new SolidColorBrush(Color.Parse("#7C3AED")),
+                Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"), // fallback
                 HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
                 VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
             });

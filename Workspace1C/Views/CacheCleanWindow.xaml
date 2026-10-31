@@ -49,13 +49,13 @@
                                 <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BoxBorder" Property="Background" Value="#16A34A"/>
-                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="#16A34A"/>
+                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource SuccessBrush}"/>
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
                                 <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="{x:Null}">
-                                <Setter TargetName="BoxBorder" Property="Background" Value="#16A34A"/>
-                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="#16A34A"/>
+                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource SuccessBrush}"/>
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
                                 <Setter TargetName="DashIcon" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -157,7 +157,7 @@
                                 Click="OnSelectAllClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
-                                                         Foreground="#16A34A" VerticalAlignment="Center"/>
+                                                         Foreground="{DynamicResource SuccessBrush}" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc CacheClean.SelectAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>

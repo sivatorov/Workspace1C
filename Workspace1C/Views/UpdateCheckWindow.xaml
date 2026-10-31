@@ -96,7 +96,7 @@
                             <!-- issue #352: признак отозванного релиза — красное предупреждение
                                  под текущей версией; видимость переключает UpdateChainDisplay. -->
                             <TextBlock x:Name="CurrentVersionMissingText" FontSize="12" Margin="0,4,0,0"
-                                       TextWrapping="Wrap" FontWeight="SemiBold" Foreground="#DC2626"
+                                       TextWrapping="Wrap" FontWeight="SemiBold" Foreground="{DynamicResource ErrorBrush}"
                                        Visibility="Collapsed"
                                        Text="{loc:Loc Updates.Chain.VersionMissing}"/>
                         </StackPanel>
