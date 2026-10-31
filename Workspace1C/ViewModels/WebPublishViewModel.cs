@@ -899,6 +899,16 @@ public sealed class WebPublishViewModel : ViewModelBase
             if (removedDuplicates > 0)
                 TracePublish($"пост-обработка: удалено дубликатов LoadModule _1cws_module: {removedDuplicates}");
 
+            // 1a) Issue #63 (комментарий 7OH 2026-10-31): основная строка подключения
+            //     модуля обычно в httpd.conf (другой файл include-цепочки) — если
+            //     «LoadModule _1cws_module» фигурирует в любом файле цепочки, из
+            //     выбранного файла алиасов она подчистится полностью.
+            var (chainCleaned, removedChainLines) = WebPublishConfPostProcessor.RemoveLoadModuleIfPresentInChain(
+                deduped, ReadChainConfTexts(confPath));
+            if (removedChainLines > 0)
+                TracePublish($"пост-обработка: LoadModule _1cws_module уже подключён в include-цепочке — удалено строк из файла: {removedChainLines}");
+            deduped = chainCleaned;
+
             // 2) Подстановка путей через переменные (${myDocumentRoot} и т.п.) — только
             //    при однозначном совпадении с префиксом и наличии существующих записей
             //    с этой переменной; иначе обычные пути остаются как есть.
@@ -907,7 +917,7 @@ public sealed class WebPublishViewModel : ViewModelBase
             if (pathsRewritten)
                 TracePublish("пост-обработка: пути нового блока алиаса переписаны через ${…}-переменную (как в существующих записях файла)");
 
-            if (removedDuplicates == 0 && !pathsRewritten)
+            if (removedDuplicates == 0 && removedChainLines == 0 && !pathsRewritten)
             {
                 TracePublish("пост-обработка: правки конфига не требуются (дубликатов нет, переменная не однозначна или не используется)");
                 return;
@@ -923,6 +933,8 @@ public sealed class WebPublishViewModel : ViewModelBase
             var changes = new List<string>();
             if (removedDuplicates > 0)
                 changes.Add($"удалено дубликатов LoadModule _1cws_module: {removedDuplicates}");
+            if (removedChainLines > 0)
+                changes.Add($"LoadModule _1cws_module удалён (уже подключён в include-цепочке), строк: {removedChainLines}");
             if (pathsRewritten)
                 changes.Add("пути нового блока переписаны через ${…}-переменные");
             AppendLog("Конфиг Apache обновлён после публикации (" + string.Join("; ", changes) + ").");
@@ -932,6 +944,36 @@ public sealed class WebPublishViewModel : ViewModelBase
             // Публикация уже успешна — пост-обработка не должна её «отменить».
             TracePublish("пост-обработка конфига не выполнена: " + ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Тексты остальных файлов include-цепочки (issue #63, 1.0.1.11): основной конфиг
+    /// и Include-файлы списка webinst, кроме выбранного для публикации. Ошибки чтения
+    /// игнорируются (файл мог быть удалён/недоступен) — цепочка без него.
+    /// </summary>
+    private List<string> ReadChainConfTexts(string excludePath)
+    {
+        var texts = new List<string>();
+        string excludeFull;
+        try { excludeFull = Path.GetFullPath(excludePath).TrimEnd('\\', '/'); }
+        catch { return texts; }
+        foreach (var path in _confTargetPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                continue;
+            try
+            {
+                var full = Path.GetFullPath(path).TrimEnd('\\', '/');
+                if (string.Equals(full, excludeFull, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                texts.Add(File.ReadAllText(path));
+            }
+            catch
+            {
+                // Файл цепочки недоступен — проверяем цепочку без него.
+            }
+        }
+        return texts;
     }
 
     /// <summary>

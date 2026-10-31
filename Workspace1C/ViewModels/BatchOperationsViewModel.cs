@@ -143,6 +143,7 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     private string _summary = string.Empty;
     private string _pathText = string.Empty;
     private string _template = BatchOperationsService.DefaultDumpTemplate;
+    private string? _timestampFormat;
     private BatchOperationKind _kind;
 
     /// <summary>
@@ -209,6 +210,18 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     {
         get => _template;
         set => SetProperty(ref _template, value ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Формат метки времени для токена <c>{Дата}</c> (issue #92, комментарий 7OH
+    /// от 2026-10-31: «формат даты задать можно»): настройка приложения
+    /// «Формат даты в имени файла выгрузки», передаётся окном. null/пусто —
+    /// встроенный формат сервиса; токен <c>{Дата:формат}</c> перекрывает его.
+    /// </summary>
+    public string? TimestampFormat
+    {
+        get => _timestampFormat;
+        set => SetProperty(ref _timestampFormat, value);
     }
 
     /// <summary>Это операция выгрузки (в .dt или .cf) — в окне показывается шаблон имени.</summary>
@@ -308,9 +321,9 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             var targetPath = Kind switch
             {
                 BatchOperationKind.DumpDt => BatchOperationsService.BuildDumpFilePath(
-                    PathText, ib.Name, Kind, Template, startedAt),
+                    PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
                 BatchOperationKind.DumpCf => BatchOperationsService.BuildDumpFilePath(
-                    PathText, ib.Name, Kind, Template, startedAt),
+                    PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
                 _ => PathText.Trim()
             };
             AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");

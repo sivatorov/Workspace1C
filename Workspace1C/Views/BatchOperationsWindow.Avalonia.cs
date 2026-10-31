@@ -35,7 +35,9 @@ namespace Workspace1C
         private readonly ListBox _logList = new() { IsHitTestVisible = false };
         private readonly TextBlock _hint;
         private readonly TextBlock _summary;
-        private readonly TextBox _pathBox = new();
+        // Поля ввода тематизируются (issue #92, 1.0.1.11: без стиля текст поля
+        // рисуется чёрным на тёмном фоне тёмной темы).
+        private readonly TextBox _pathBox = new TextBox().Styled(ControlThemes.ModernTextBox);
         private readonly Button _runButton = new();
         private readonly Button _browseButton = new();
         private readonly Button _stopButton = new() { IsEnabled = false };
@@ -45,7 +47,8 @@ namespace Workspace1C
         public BatchOperationsViewModel ViewModel => _vm;
 
         public BatchOperationsWindow(System.Collections.Generic.IEnumerable<Infobase> infobases, BatchOperationKind kind,
-            string? initialDirectory = null, string? template = null)
+            string? initialDirectory = null, string? template = null,
+            string? timestampFormat = null)
         {
             Width = 700;
             Height = 620;
@@ -59,6 +62,9 @@ namespace Workspace1C
                 _vm.PathText = initialDirectory!.Trim();
             if (!string.IsNullOrWhiteSpace(template) && _vm.IsDumpKind)
                 _vm.Template = template!.Trim();
+            // Формат метки времени токена {Дата} — из настроек приложения
+            // «Формат даты в имени файла выгрузки» (issue #92, 1.0.1.11).
+            _vm.TimestampFormat = timestampFormat;
             Title = LocalizationManager.T(_vm.Kind switch
             {
                 BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
@@ -124,7 +130,13 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 8, 0)
             };
-            var templateBox = new TextBox { Width = 260, VerticalContentAlignment = VerticalAlignment.Center };
+            // Поле шаблона тематизируется — иначе в тёмной теме текст чёрный на тёмном
+            // (issue #92, комментарий 7OH от 2026-10-31: «чёрный на тёмном»).
+            var templateBox = new TextBox
+            {
+                Width = 260,
+                VerticalContentAlignment = VerticalAlignment.Center
+            }.Styled(ControlThemes.ModernTextBox);
             ToolTip.SetTip(templateBox, LocalizationManager.T("BatchOps.TemplateHint"));
             templateBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("Template") { Mode = Avalonia.Data.BindingMode.TwoWay });
             _kindDtRadio = new RadioButton

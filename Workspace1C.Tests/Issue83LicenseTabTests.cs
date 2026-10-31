@@ -159,6 +159,22 @@ public sealed class Issue83LicenseTabTests
             RingLicenseService.FirstNonEmptyLine("/usr/bin/ring\n/opt/ring"));
     }
 
+    [Fact]
+    public void TruncateForLog_EmptyMarks_TruncatesLongOutput()
+    {
+        // Вывод where.exe/which попадает в журнал целиком (issue #83, 7OH),
+        // но усечённо — до 500 символов.
+        Assert.Equal("(пусто)", RingLicenseService.TruncateForLog(null));
+        Assert.Equal("(пусто)", RingLicenseService.TruncateForLog("   \n"));
+        var shortOutput = "  C:\\Program Files\\1C\\ring.cmd  ";
+        Assert.Equal("C:\\Program Files\\1C\\ring.cmd", RingLicenseService.TruncateForLog(shortOutput));
+
+        var longOutput = new string('x', 600);
+        var truncated = RingLicenseService.TruncateForLog(longOutput);
+        Assert.Equal(501, truncated.Length); // 500 символов + «…»
+        Assert.EndsWith("…", truncated, StringComparison.Ordinal);
+    }
+
     // ===================== Модуль лицензий ring не установлен (issue #83) =====================
 
     [Theory]

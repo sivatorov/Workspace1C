@@ -46,6 +46,30 @@ public sealed class ProcessRunResult
 public static class ProcessRunner
 {
     /// <summary>
+    /// Кодировка чтения вывода консольных утилит платформы 1С (webinst, ibcmd и др.)
+    /// (issue #63 «каракули» webinst; issue #79 «каракули» вывода ibcmd в окне
+    /// учётных данных): на русской Windows эти утилиты пишут в консольной
+    /// OEM-кодировке (cp866) — читаем её; на Linux и при недоступной кодовой
+    /// странице — null (UTF-8 по умолчанию). Поставщик кодовых страниц
+    /// регистрируется однократно (идемпотентно).
+    /// </summary>
+    public static Encoding? ConsoleOutputEncoding()
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+        try
+        {
+            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(866);
+        }
+        catch
+        {
+            // Провайдер/кодовая страница недоступны — читаем как UTF-8.
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Запускает внешнюю программу с захватом вывода (выпуск 1.0.0.69). Необязательный
     /// <paramref name="outputEncoding"/> задаёт кодировку чтения stdout/stderr
     /// (issue #63: консольные утилиты вроде webinst на русской Windows пишут вывод

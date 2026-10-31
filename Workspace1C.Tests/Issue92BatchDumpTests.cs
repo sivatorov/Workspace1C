@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -95,6 +96,57 @@ public sealed class Issue92BatchDumpTests
         {
             Directory.Delete(dir, recursive: true);
         }
+    }
+
+    [Fact]
+    public void BuildDumpFilePath_TimestampFormatParameter_ChangesDefaultStamp()
+    {
+        // Формат из настроек приложения («Формат даты в имени файла выгрузки»)
+        // применяется к токену {Дата} без собственного формата (issue #92, 1.0.1.11).
+        var stamp = new DateTime(2026, 10, 30, 17, 45, 0);
+        var path = BatchOperationsService.BuildDumpFilePath(
+            @"C:\dumps", "Альфа", BatchOperationKind.DumpDt,
+            BatchOperationsService.DefaultDumpTemplate, stamp,
+            timestampFormat: "yyyyMMdd_HHmmss");
+
+        Assert.Equal(Path.Combine(@"C:\dumps", "Альфа_20261030_174500.dt"), path);
+    }
+
+    [Fact]
+    public void BuildDumpFilePath_TokenWithOwnFormat_OverridesDefault()
+    {
+        // Токен {Дата:формат} задаёт собственный формат (issue #92, 7OH:
+        // «формат даты задать можно») и перекрывает формат из настроек.
+        var stamp = new DateTime(2026, 10, 30, 17, 45, 0);
+        var path = BatchOperationsService.BuildDumpFilePath(
+            @"C:\dumps", "Альфа", BatchOperationKind.DumpDt,
+            "{Имя}_{Дата:yyyy-MM-dd}", stamp,
+            timestampFormat: "yyyyMMdd_HHmmss");
+
+        Assert.Equal(Path.Combine(@"C:\dumps", "Альфа_2026-10-30.dt"), path);
+    }
+
+    [Fact]
+    public void BuildDumpFilePath_TokenWithInvalidFormat_FallsBackToDefault()
+    {
+        // Некорректный формат токена не ломает операцию: fallback на формат по умолчанию.
+        var stamp = new DateTime(2026, 10, 30, 17, 45, 0);
+        var path = BatchOperationsService.BuildDumpFilePath(
+            @"C:\dumps", "Альфа", BatchOperationKind.DumpDt,
+            "{Имя}_{Дата:QQQ}", stamp,
+            timestampFormat: "yyyyMMdd");
+
+        Assert.Equal(Path.Combine(@"C:\dumps", "Альфа_20261030.dt"), path);
+    }
+
+    [Fact]
+    public void ExpandDumpTemplate_MixedTokensWithSpacesAroundColon_Work()
+    {
+        var stamp = new DateTime(2026, 10, 30, 17, 45, 0);
+        var expanded = BatchOperationsService.ExpandDumpTemplate(
+            "{Имя} {Date : dd.MM.yyyy}", "Бета", stamp, "yyyyMMdd");
+
+        Assert.Equal("Бета 30.10.2026", expanded);
     }
 
     // ===================== Вид операции DT/CF =====================
@@ -203,5 +255,38 @@ public sealed class Issue92BatchDumpTests
         Assert.Equal(BatchOperationsService.DefaultDumpTemplate, settings.BatchDumpTemplate);
         Assert.Equal(BatchOperationKind.DumpDt, BatchOperationsService.ParseDumpKind(settings.BatchDumpKind));
         Assert.Equal(string.Empty, settings.BatchDumpDirectory);
+    }
+
+    [Fact]
+    public void ViewModel_TimestampFormat_IsPassedToFilePathBuilding()
+    {
+        // Формат из окна (настройка приложения) доходит до построителя пути (issue #92):
+        // имя файла перед исполнителем построено с настроенным форматом {Дата}
+        // «yyyyMMdd_HHmmss» (отметка времени берётся в момент прогона).
+        var dir = Directory.CreateTempSubdirectory("ws1c_dumptf").FullName;
+        try
+        {
+            var builtPaths = new List<string>();
+            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+            {
+                PathText = dir,
+                Template = "{Имя}_{Дата}",
+                TimestampFormat = "yyyyMMdd_HHmmss",
+                ExecutorOverride = (_, path, _) =>
+                {
+                    builtPaths.Add(path);
+                    return Task.FromResult(new IbcmdResult { Success = true, ExitCode = 0 });
+                }
+            };
+
+            vm.RunAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+            var fileName = Path.GetFileName(Assert.Single(builtPaths));
+            Assert.Matches(@"^Альфа_\d{8}_\d{6}\.dt$", fileName);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 }

@@ -980,7 +980,7 @@
     "BatchOps.TitleLoadCf": "Load configuration from .cf over a list of bases",
     "BatchOps.HintDumpCf": "Select the bases whose configurations should be dumped to .cf files. A separate file per selected base is created in the chosen folder according to the file name template. The dump runs sequentially via ibcmd, one base at a time.",
     "BatchOps.TemplateLabel": "File name template:",
-    "BatchOps.TemplateHint": "Tokens: {Name} — infobase name, {Date} — dump date and time. Example: {Name}_{Date}",
+    "BatchOps.TemplateHint": "Tokens: {Name} — infobase name; {Date} — dump date and time in the format from the app settings (Settings → Export file name timestamp format); {Date:format} — date in a per-token format, e.g. {Date:yyyy-MM-dd} or {Date:dd.MM.yyyy HH-mm}. An invalid format falls back to the settings format. Example: {Name}_{Date:yyyy-MM-dd_HH-mm}.",
     "BatchOps.KindDtRadio": "Dump to DT",
     "BatchOps.KindCfRadio": "Dump to CF",
     "BatchOps.KindDumpCf": "configuration dump to .cf",

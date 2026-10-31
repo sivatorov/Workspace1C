@@ -358,14 +358,27 @@ internal static class ParallelDownloader
         Action<double>? reportProgress, long expectedSize = 0,
         CancellationToken cancellationToken = default)
     {
+        // Диагностика CM_UPDATES (issue #89, 1.0.1.11): каждая причина отказа
+        // параллельного пути пишется в журнал — иначе после строки «Загрузка
+        // обновления…» ничего не видно и причину («в temp только .etag») не понять.
         var probe = await ProbeAsync(http, url, cancellationToken).ConfigureAwait(false);
         if (probe is null)
+        {
+            Log.Info(TraceFlags.UpdatesFlag,
+                "Параллельная загрузка: probe не удался (сервер без поддержки Range/206, " +
+                $"нет Content-Range, ошибка сети или таймаут) — переход к однопоточной загрузке. URL={url}");
             return null;
+        }
 
         // Сервер отдаёт файл не того размера, что заявлен GitHub API: качать такой
         // гибрид бессмысленно, пусть вызывающий код покажет ошибку загрузки (issue #302).
         if (expectedSize > 0 && probe.TotalBytes != expectedSize)
+        {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Параллельная загрузка: размер с сервера ({probe.TotalBytes} байт) не совпал " +
+                $"с ожидаемым ({expectedSize}) — переход к однопоточной загрузке (issue #302).");
             return null;
+        }
 
         var zones = SplitRanges(probe.TotalBytes, DefaultMaxParallelism, MinSegmentBytes);
         if (zones.Count < 2)
@@ -454,14 +467,20 @@ internal static class ParallelDownloader
         {
             await Task.WhenAll(tasks).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Параллельная загрузка: ошибка сегмента ({ex.GetType().Name}: {ex.Message}) — " +
+                "части удалены, переход к однопоточной загрузке.");
             CleanupParts(destPath, zones.Count);
             return null;
         }
 
         if (!await TryMergeAsync(destPath, zones, probe.TotalBytes, cancellationToken).ConfigureAwait(false))
         {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Параллельная загрузка: склейка частей не удалась (итоговый размер не совпал с {probe.TotalBytes}) — " +
+                "части удалены, переход к однопоточной загрузке.");
             CleanupParts(destPath, zones.Count);
             return null;
         }
@@ -494,15 +513,30 @@ internal static class ParallelDownloader
                 .ConfigureAwait(false);
 
             if (response.StatusCode != HttpStatusCode.PartialContent)
+            {
+                // Диагностика CM_UPDATES (issue #89, 1.0.1.11): код ответа — ключ
+                // к «качает, но не устанавливает» (404/403 редиректа S3 и т.п.).
+                Log.Info(TraceFlags.UpdatesFlag,
+                    $"Параллельная загрузка: probe получил {response.StatusCode} вместо 206 (Range) " +
+                    $"по URL={response.RequestMessage?.RequestUri ?? new Uri(url)}.");
                 return null; // 200: Range проигнорирован, либо ошибка.
+            }
 
             var total = response.Content.Headers.ContentRange?.Length ?? -1;
             if (total <= 0)
+            {
+                Log.Info(TraceFlags.UpdatesFlag,
+                    "Параллельная загрузка: probe не получил Content-Range (total<=0).");
                 return null;
+            }
 
             var uri = response.RequestMessage?.RequestUri;
             if (uri is null)
+            {
+                Log.Info(TraceFlags.UpdatesFlag,
+                    "Параллельная загрузка: probe не определил итоговый URI после редиректов.");
                 return null;
+            }
 
             // ETag ассета: метка идентичности для докачки частей между запусками
             // (issue #302). GitHub отдаёт сильный ETag, уникальный для содержимого.
@@ -513,8 +547,16 @@ internal static class ParallelDownloader
 
             return new ProbeResult(total, uri, etag);
         }
-        catch
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
+            Log.Info(TraceFlags.UpdatesFlag,
+                "Параллельная загрузка: probe не уложился в таймаут 30 с.");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Параллельная загрузка: ошибка probe — {ex.GetType().Name}: {ex.Message}");
             return null;
         }
     }

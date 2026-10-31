@@ -123,6 +123,72 @@ public sealed class Issue57CommonAuthSourceTests
         Assert.Equal("entU", user);
     }
 
+    // ---- Issue #57 (1.0.1.11, репорт 7OH от 2026-10-31): база с режимом Prompt ----
+
+    [Fact]
+    public void ModePromptWithUser_WithCommonCredentials_UsesCommonAuth()
+    {
+        // Сценарий 7OH (лог CM_BASE_RUN «источник=режим базы, режим базы=Prompt,
+        // пользователь=задан»): у базы явно выбран «Запрашивать имя и пароль»,
+        // но в свойствах базы остался пользователь (поэтому режим НЕ IsDefault),
+        // а общая авторизация задана Credentials с «Автоматическим входом» —
+        // общий логин/пароль должен передаваться в командную строку.
+        var ib = FileBase(AuthenticationMode.Prompt, "", "");
+        ib.EnterpriseAuth = Common("oldU", "", AuthenticationMode.Prompt);
+
+        InfobaseAuthResolver.Resolve(ib, OneCLaunchMode.Enterprise,
+            out var mode, out var user, out var pass, Common("comU", "comP"));
+
+        Assert.Equal(AuthenticationMode.Credentials, mode);
+        Assert.Equal("comU", user);
+        Assert.Equal("comP", pass);
+    }
+
+    [Fact]
+    public void ConfiguratorModePromptWithUser_WithCommonCredentials_UsesCommonAuth()
+    {
+        // То же для «Конфигуратора»: ConfiguratorAuth = Prompt + общая Configurator Credentials.
+        var ib = FileBase(AuthenticationMode.Prompt, "", "");
+        ib.ConfiguratorAuth = Common("oldU", "", AuthenticationMode.Prompt);
+
+        InfobaseAuthResolver.Resolve(ib, OneCLaunchMode.Configurator,
+            out var mode, out var user, out var pass, null, Common("cfgU", "cfgP"), null);
+
+        Assert.Equal(AuthenticationMode.Credentials, mode);
+        Assert.Equal("cfgU", user);
+        Assert.Equal("cfgP", pass);
+    }
+
+    [Fact]
+    public void ModePromptWithUser_WithLegacyCommonCredentials_UsesLegacyCommonAuth()
+    {
+        var ib = FileBase(AuthenticationMode.Prompt, "", "");
+        ib.EnterpriseAuth = Common("oldU", "", AuthenticationMode.Prompt);
+
+        InfobaseAuthResolver.Resolve(ib, OneCLaunchMode.Enterprise,
+            out var mode, out var user, out var pass, null, null, Common("legU", "legP"));
+
+        Assert.Equal(AuthenticationMode.Credentials, mode);
+        Assert.Equal("legU", user);
+        Assert.Equal("legP", pass);
+    }
+
+    [Fact]
+    public void ModePromptWithUser_WithoutCommonCredentials_KeepsPrompt()
+    {
+        // Регресс-защита: без общих кредов Prompt раздельной авторизации остаётся —
+        // платформа показывает окно логина (прежнее поведение).
+        var ib = FileBase(AuthenticationMode.Prompt, "", "");
+        ib.EnterpriseAuth = Common("oldU", "", AuthenticationMode.Prompt);
+
+        InfobaseAuthResolver.Resolve(ib, OneCLaunchMode.Enterprise,
+            out var mode, out var user, out var pass);
+
+        Assert.Equal(AuthenticationMode.Prompt, mode);
+        Assert.Equal("oldU", user);
+        Assert.Equal(string.Empty, pass);
+    }
+
     // ---- Источник учётных данных (диагностика CM_BASE_RUN, issue #57, 1.0.1.7) ----
 
     [Fact]
@@ -180,6 +246,20 @@ public sealed class Issue57CommonAuthSourceTests
             out _, out _, out _, null, null, null, out var source);
 
         Assert.Equal(InfobaseAuthSource.Prompt, source);
+    }
+
+    [Fact]
+    public void Source_IsCommonMode_WhenModePromptOverriddenByCommonCredentials()
+    {
+        // Issue #57 (1.0.1.11): Prompt-база с общими кредами — источник «общая режима»
+        // (в журнале CM_BASE_RUN видно, что переданы именно общие креды).
+        var ib = FileBase(AuthenticationMode.Prompt, "", "");
+        ib.EnterpriseAuth = Common("oldU", "", AuthenticationMode.Prompt);
+
+        InfobaseAuthResolver.Resolve(ib, OneCLaunchMode.Enterprise,
+            out _, out _, out _, Common("comU", "comP"), null, null, out var source);
+
+        Assert.Equal(InfobaseAuthSource.CommonMode, source);
     }
 
     // ---- Человекочитаемые метки источника для записи CM_BASE_RUN ----

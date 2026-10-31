@@ -277,10 +277,16 @@ public static class IbcmdService
         return await RunAsync(exe, args, new[] { password, dbms?.Password }, DefaultTimeout, ct).ConfigureAwait(false);
     }
 
-    /// <summary>Запускает ibcmd с аргументами, ждёт завершения; успех — код 0.</summary>
+    /// <summary>
+    /// Запускает ibcmd с аргументами, ждёт завершения; успех — код 0. Вывод читается
+    /// в кодировке <see cref="ProcessRunner.ConsoleOutputEncoding"/> (issue #79,
+    /// «каракули» в окне учётных данных ibcmd: на русской Windows ibcmd пишет в
+    /// консольной OEM-кодировке cp866, чтение как UTF-8 давало нечитаемый текст).
+    /// </summary>
     public static async Task<IbcmdResult> RunAsync(string exe, IReadOnlyList<string> args, IEnumerable<string?> secrets,
         TimeSpan timeout, CancellationToken ct = default)
     {
+        var outputEncoding = ProcessRunner.ConsoleOutputEncoding() ?? Encoding.UTF8;
         var psi = new ProcessStartInfo
         {
             FileName = exe,
@@ -288,8 +294,8 @@ public static class IbcmdService
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = Encoding.UTF8,
-            StandardErrorEncoding = Encoding.UTF8,
+            StandardOutputEncoding = outputEncoding,
+            StandardErrorEncoding = outputEncoding,
             WorkingDirectory = Path.GetDirectoryName(exe) ?? string.Empty
         };
         foreach (var a in args)

@@ -286,20 +286,31 @@ namespace Workspace1C
         protected override void OnClosed(EventArgs e)
         {
             ModalCloseTrace.Log($"OnClosed: окно {GetType().Name}");
-            // Событие живёт у синглтона локализации, а обработчик это метод
-            // экземпляра: без отписки закрытое окно оставалось бы достижимым.
-            // Кисти темы отписывать не нужно, их привязку держит сам элемент.
-            if (_languageSubscribed)
+            try
             {
-                LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
-                _languageSubscribed = false;
-            }
+                // Событие живёт у синглтона локализации, а обработчик это метод
+                // экземпляра: без отписки закрытое окно оставалось бы достижимым.
+                // Кисти темы отписывать не нужно, их привязку держит сам элемент.
+                if (_languageSubscribed)
+                {
+                    LocalizationManager.Instance.LanguageChanged -= OnLanguageChanged;
+                    _languageSubscribed = false;
+                }
 
-            // Подписки обёртки «стекла» на состояние окна и заголовок.
-            _glassStateSub?.Dispose();
-            _glassStateSub = null;
-            _titleSub?.Dispose();
-            _titleSub = null;
+                // Подписки обёртки «стекла» на состояние окна и заголовок.
+                _glassStateSub?.Dispose();
+                _glassStateSub = null;
+                _titleSub?.Dispose();
+                _titleSub = null;
+            }
+            catch (Exception ex)
+            {
+                // Issue #94 (1.0.1.11): сбой в обработчиках Closed не должен оставлять
+                // окно «полузакрытым» — исключение пишется в журнал с полным стеком
+                // (у 7OH NRE при закрытии окна Свойств уходил только в терминал).
+                LogWindowConstructionError(
+                    $"Исключение при закрытии окна {GetType().Name} (OnClosed)", ex);
+            }
 
             base.OnClosed(e);
         }
@@ -438,7 +449,17 @@ namespace Workspace1C
                 // в списке окон приложения и держит процесс.
                 if (hiddenWithoutClose && !closed)
                 {
-                    try { Close(); } catch { /* ignore */ }
+                    // Issue #94 (1.0.1.11): закрытие «скрытого без закрытия» окна
+                    // трассируется — по логу видно, что «Отмена» доведена до конца,
+                    // даже если Closed не пришёл во время кадра.
+                    ModalCloseTrace.Log(
+                        $"ShowDialogSync.finally: окно {GetType().Name} скрыто без закрытия — закрываю в finally");
+                    try { Close(); }
+                    catch (Exception ex)
+                    {
+                        ModalCloseTrace.Log(
+                            $"ShowDialogSync.finally: окно {GetType().Name} — Close не удался: {ex.GetType().Name}: {ex.Message}");
+                    }
                 }
 
                 // Подписки этого сеанса снимаются: окно может показываться повторно,
@@ -805,7 +826,23 @@ namespace Workspace1C
         protected override void OnClosing(WindowClosingEventArgs e)
         {
             ModalCloseTrace.Log($"OnClosing: окно {GetType().Name}, Cancel={e.Cancel}");
-            base.OnClosing(e);
+            try
+            {
+                base.OnClosing(e);
+            }
+            catch (Exception ex)
+            {
+                // Issue #94 (1.0.1.11): исключение внутри цепочки Closing (у 7OH —
+                // NullReferenceException на вкладке «Идентификатор») обрывало закрытие:
+                // окно оставалось «полуживым» (скрыто без Closed) и повторные «Отмена»
+                // ничего не делали. Теперь исключение не теряется — пишется в журнал
+                // с полным стеком, а окно получает шанс закрыться дальше по кадру.
+                LogWindowConstructionError(
+                    $"Исключение при закрытии окна {GetType().Name} (OnClosing)", ex);
+                ModalCloseTrace.Log(
+                    $"OnClosing: окно {GetType().Name} — исключение {ex.GetType().Name}: {ex.Message}");
+                throw;
+            }
             ModalCloseTrace.Log($"OnClosing: окно {GetType().Name}, после base — Cancel={e.Cancel}");
         }
 
@@ -950,6 +987,7 @@ namespace Workspace1C
                 // Диагностика зависания «Отмена» (issue #94): клик получен — далее
                 // должно прийти OnClosing и OnClosed (см. ModalCloseTrace).
                 ModalCloseTrace.Log($"BuildCancelButton.Click: окно {GetType().Name} — Close()");
+                ClearFocusBeforeClose();
                 Close();
             };
 
@@ -1114,12 +1152,34 @@ namespace Workspace1C
                 // Диагностика зависания «Отмена» (issue #94): клик получен — далее
                 // должно прийти OnClosing и OnClosed (см. ModalCloseTrace).
                 ModalCloseTrace.Log($"BuildCancelActionButton.Click: окно {GetType().Name} — Close()");
+                ClearFocusBeforeClose();
                 Close();
             };
 
             _lastCancelText = caption;
             EnsureLanguageSubscription();
             return button;
+        }
+
+        /// <summary>
+        /// Issue #94 (1.0.1.11): перед программным закрытием диалога фокус ввода
+        /// переносится на само окно. Активный редактор/список на вкладке
+        /// «Идентификатор» окна Свойств (у 7OH — после double-click по «Произвольным
+        /// полям») держал фокус, и закрытие обрывалось «скрытием без Closed» — окно
+        /// зависало. Сбой сброса фокуса закрытию не мешает (проглатывается).
+        /// </summary>
+        private void ClearFocusBeforeClose()
+        {
+            try
+            {
+                // Перенос фокуса на окно (TopLevel) — снимает фокус с редакторов
+                // и списков; отдельного ClearFocus у IFocusManager не требуется.
+                this.Focus();
+            }
+            catch
+            {
+                // Фокус не критичен для закрытия окна.
+            }
         }
 
         /// <summary>

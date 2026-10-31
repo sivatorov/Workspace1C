@@ -223,21 +223,7 @@ public static class WebPublishService
     /// недоступной кодовой странице — null (UTF-8 по умолчанию). Поставщик кодовых
     /// страниц регистрируется однократно (идемпотентно).
     /// </summary>
-    public static Encoding? WebinstOutputEncoding()
-    {
-        if (!OperatingSystem.IsWindows())
-            return null;
-        try
-        {
-            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
-            return Encoding.GetEncoding(866);
-        }
-        catch
-        {
-            // Провайдер/кодовая страница недоступны — читаем как UTF-8.
-            return null;
-        }
-    }
+    public static Encoding? WebinstOutputEncoding() => ProcessRunner.ConsoleOutputEncoding();
 
     public static async Task<ProcessRunResult> RunAsync(Infobase infobase, IEnumerable<string> arguments,
         CancellationToken ct = default)

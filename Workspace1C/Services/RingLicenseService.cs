@@ -540,31 +540,42 @@ public sealed class RingLicenseService : IRingLicenseService
     /// а запуск самой утилиты поиска — «where.exe ring» (Windows) / «which ring» (Linux);
     /// запасной способ — прямой запуск «ring --version». Возвращает первый найденный
     /// путь (маркер доступности; сам вызов ring выполняется «как есть») или null, если
-    /// утилита недоступна. Internal — для юнит-тестов.
+    /// утилита недоступна.
+    /// <para>
+    /// Issue #83 (1.0.1.11, репорт 7OH «в лог писать вывод where.exe ring»): вывод
+    /// утилиты поиска логируется в CM_RAC и при успехе, и при неудаче — чтобы
+    /// расхождение «в консоли найдено / в приложении не найдено» было видно сразу
+    /// (PATH процесса может отличаться от PATH консоли пользователя).
+    /// </para>
     /// </summary>
     internal static async Task<string?> FindRingInPathAsync(CancellationToken ct = default)
     {
 #if WINDOWS
-        var probe = await ProcessRunner.RunAsync("where.exe", new[] { "ring" },
-                timeout: CommandTimeout, ct: ct)
-            .ConfigureAwait(false);
-        if (probe.Success)
-        {
-            var line = FirstNonEmptyLine(probe.StdOut);
-            if (line is not null)
-                return line;
-        }
+        const string probeTool = "where.exe";
+        var probeArgs = new[] { "ring" };
 #else
-        var probe = await ProcessRunner.RunAsync("which", new[] { "ring" },
+        const string probeTool = "which";
+        var probeArgs = new[] { "ring" };
+#endif
+        var probe = await ProcessRunner.RunAsync(probeTool, probeArgs,
                 timeout: CommandTimeout, ct: ct)
             .ConfigureAwait(false);
         if (probe.Success)
         {
             var line = FirstNonEmptyLine(probe.StdOut);
             if (line is not null)
+            {
+                Log.Info(LogCategory.Rac,
+                    $"RING: {probeTool} {probeArgs[0]} — найдено: {line}");
                 return line;
+            }
         }
-#endif
+
+        // При неудаче — вывод утилиты поиска в журнал целиком (issue #83, 7OH:
+        // «можно в лог писать вывод where.exe ring?»), усечённо до 500 символов.
+        Log.Info(LogCategory.Rac,
+            $"RING: {probeTool} {probeArgs[0]} не дал результата (код={probe.ExitCode}): " +
+            TruncateForLog(probe.CombinedOutput));
 
         // Запасная проверка (если where/which нет в системе или не дала результата) —
         // прямой запуск «ring --version»: работает — утилита доступна (issue #83,
@@ -572,7 +583,21 @@ public sealed class RingLicenseService : IRingLicenseService
         var version = await ProcessRunner.RunAsync("ring", new[] { "--version" },
                 timeout: CommandTimeout, ct: ct)
             .ConfigureAwait(false);
-        return version.Success ? "ring" : null;
+        if (version.Success)
+            return "ring";
+        Log.Info(LogCategory.Rac,
+            $"RING: ring --version не дал результата (код={version.ExitCode}): " +
+            TruncateForLog(version.CombinedOutput));
+        return null;
+    }
+
+    /// <summary>Усекает вывод внешней утилиты для записи в журнал. Internal — тесты.</summary>
+    internal static string TruncateForLog(string? output)
+    {
+        var text = (output ?? string.Empty).Trim();
+        if (text.Length == 0)
+            return "(пусто)";
+        return text.Length <= 500 ? text : text[..500] + "…";
     }
 
     /// <summary>Первая непустая строка вывода (путь, найденный where/which). Internal — тесты.</summary>

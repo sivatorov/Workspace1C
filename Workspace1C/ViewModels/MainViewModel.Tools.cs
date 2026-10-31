@@ -2795,7 +2795,9 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var window = new BatchOperationsWindow(bases, effectiveKind,
-            settings.BatchDumpDirectory, settings.BatchDumpTemplate)
+            settings.BatchDumpDirectory, settings.BatchDumpTemplate,
+            // Формат метки времени токена {Дата} — общая настройка выгрузок (issue #92).
+            settings.ExportTimestampFormat)
         {
             Owner = System.Windows.Application.Current.MainWindow
         };

@@ -1651,7 +1651,9 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var window = new Workspace1C.BatchOperationsWindow(bases, effectiveKind,
-            _settings.BatchDumpDirectory, _settings.BatchDumpTemplate);
+            _settings.BatchDumpDirectory, _settings.BatchDumpTemplate,
+            // Формат метки времени токена {Дата} — общая настройка выгрузок (issue #92).
+            _settings.ExportTimestampFormat);
         window.ShowDialogSync(OwnerWindow());
 
         // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).

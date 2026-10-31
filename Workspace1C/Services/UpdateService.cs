@@ -394,8 +394,14 @@ public sealed class UpdateService : IAppUpdateService
 
         // Сервер отдаёт не тот файл, что заявлен GitHub API (размер ассета не совпал):
         // качать такой гибрид бессмысленно, считаем загрузку неудачной (issue #302).
+        // Диагностика CM_UPDATES (issue #89, 1.0.1.11): причина видна в журнале.
         if (expectedSize > 0 && totalBytes > 0 && totalBytes != expectedSize)
+        {
+            Log.Info(TraceFlags.UpdatesFlag,
+                $"Загрузка обновления {versionKey}: размер с сервера ({totalBytes} байт) " +
+                $"не совпал с ожидаемым ({expectedSize}) — загрузка не принята (issue #302).");
             return (null, false);
+        }
 
         // Докачка допустима только в тот же ассет: ETag из прошлого сеанса обязан
         // совпадать с текущим. Отсутствие метки (остаток старой версии приложения)
@@ -463,7 +469,13 @@ public sealed class UpdateService : IAppUpdateService
                 await Task.Delay(TimeSpan.FromSeconds(Math.Min(attempt, 5)));
         }
 
+        // Диагностика CM_UPDATES (issue #89, 1.0.1.11): исчерпание попыток — с причиной;
+        // .etag недокачанной загрузки стирается (не остаётся мусора «в temp только .etag»).
+        Log.Info(TraceFlags.UpdatesFlag,
+            $"Загрузка обновления {versionKey}: не удалось скачать после {maxAttempts} попыток " +
+            $"(URL={url}); скачано байт={TryGetFileLength(dest)}.");
         TryDelete(dest);
+        TryDelete(etagPath);
         return (null, false);
     }
 

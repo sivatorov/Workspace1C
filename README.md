@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.10-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.11-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.10**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.11**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Общая авторизация, публикация и обновления: 7 исправлений по issues (1.0.1.11,
+  Windows и Linux)** — общая авторизация подставляется и для баз с «Запрашивать имя
+  и пароль» (issue #57, единый резолвер — действует во всех местах запуска); дубль
+  `LoadModule _1cws_module` после публикации чистится с учётом include-цепочки
+  (issue #63); вывод ibcmd без «каракулей» (cp866, issue #79); диагностика неудач
+  установки обновления в журнале `CM_UPDATES` + чистка `.etag` (issue #89); вывод
+  `where.exe ring` в журнале лицензий (issue #83); настраиваемый формат даты в
+  шаблоне выгрузки DT/CF `{Дата:формат}` и контраст полей в тёмной теме (issue #92);
+  защита закрытия модальных окон от NRE/зависаний (issue #94).
 - **Единый стиль интерфейса: тематизация цветов, шрифтов и типографики (1.0.1.10,
   Windows и Linux)** — по итогам аудита UI введены семантические кисти
   `SuccessBrush`/`WarningBrush`/`ErrorBrush`/`InfoBrush` во все темы (Light/Dark,

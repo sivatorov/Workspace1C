@@ -57,6 +57,68 @@ public static class WebPublishConfPostProcessor
     }
 
     /// <summary>
+    /// Удаляет ВСЕ строки <c>LoadModule _1cws_module …</c> из конфига webinst
+    /// (файла алиасов), если маркер фигурирует хотя бы в ОДНОМ файле include-цепочки
+    /// (основной conf, его Include-файлы — issue #63, комментарий 7OH от 2026-10-31:
+    /// «Основная строка подключения обычно находится в httpd.conf. Просьба проверять
+    /// дубль с цепочкой файлов. Если "LoadModule _1cws_module" фигурировало ранее
+    /// в файле, отличном от выбранного для публикации — то в файле алиаса подчистить»).
+    /// Модуль при этом остаётся подключённым в цепочке — Apache продолжит работать;
+    /// без вхождения в цепочке текст возвращается без изменений. Internal — тесты.
+    /// </summary>
+    /// <param name="confText">Текст выбранного для публикации конфига (файла алиасов).</param>
+    /// <param name="chainConfTexts">Тексты остальных файлов include-цепочки (основной conf
+    /// и Include-файлы; текст самого confText допустим — не влияет на результат).</param>
+    public static (string Text, int RemovedLines) RemoveLoadModuleIfPresentInChain(
+        string? confText, IEnumerable<string?> chainConfTexts)
+    {
+        if (string.IsNullOrEmpty(confText) || chainConfTexts is null)
+            return (confText ?? string.Empty, 0);
+
+        // Строка модуля есть в цепочке (в любом файле, включая сам confText)?
+        var markerInChain = false;
+        foreach (var chain in chainConfTexts)
+        {
+            if (string.IsNullOrEmpty(chain))
+                continue;
+            if (ContainsLoadModuleMarker(chain))
+            {
+                markerInChain = true;
+                break;
+            }
+        }
+        if (!markerInChain)
+            return (confText, 0);
+
+        // Чистим ВСЕ вхождения в выбранном файле: модуль уже подключён цепочкой,
+        // повторное подключение лишь шумит (и может дублировать путь к wsap24.dll).
+        var sb = new StringBuilder(confText.Length);
+        var removedLines = 0;
+        foreach (var (line, terminator) in SplitLinesWithTerminators(confText))
+        {
+            if (IsLoadModule1CwsLine(line))
+            {
+                removedLines++;
+                continue;
+            }
+            sb.Append(line).Append(terminator);
+        }
+
+        return removedLines > 0 ? (sb.ToString(), removedLines) : (confText, 0);
+    }
+
+    /// <summary>Есть ли в тексте конфига строка <c>LoadModule _1cws_module</c>.</summary>
+    private static bool ContainsLoadModuleMarker(string confText)
+    {
+        foreach (var (line, _) in SplitLinesWithTerminators(confText))
+        {
+            if (IsLoadModule1CwsLine(line))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Переписывает пути НОВОГО блока алиаса (<paramref name="virtualDirectory"/>) через
     /// <c>${…}</c>-переменную (issue #63, «ТАК ТУТ ЗАВЕДЕНО - с ПЕРЕМЕННОЙ»). Замена
     /// выполняется только при выполнении ВСЕХ условий:

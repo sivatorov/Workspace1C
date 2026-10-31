@@ -144,7 +144,16 @@ public static class InfobaseAuthResolver
             && !(string.IsNullOrWhiteSpace(ma.User)
                 && commonCredentials
                 && (ma.AuthenticationMode == AuthenticationMode.Windows
-                    || ma.AuthenticationMode == AuthenticationMode.Credentials)))
+                    || ma.AuthenticationMode == AuthenticationMode.Credentials))
+            // Исправление issue #57 (1.0.1.11, репорт 7OH от 2026-10-31): база с явным
+            // режимом «Запрашивать имя и пароль» (Prompt) при наличии общих кредов
+            // режима Credentials пропускает шаг 1 — общий логин/пароль передаётся
+            // в командную строку запуска (лог CM_BASE_RUN показывал
+            // «источник=режим базы, режим базы=Prompt» и пустую подстановку,
+            // а платформа открывала окно логина). Смысл Prompt по 7OH: «передать
+            // общий логин\пароль в командную строку»; неверные креды платформа
+            // переспросит сама. Без общих кредов Prompt остаётся Prompt.
+            && !(ma.AuthenticationMode == AuthenticationMode.Prompt && commonCredentials))
         {
             authMode = ma.AuthenticationMode;
             authUser = ma.User;
@@ -209,7 +218,10 @@ public static class InfobaseAuthResolver
     /// (раздельная общая авторизация по режимам запуска, issue #57). Порядок приоритета:
     /// 1) раздельная авторизация режима — <see cref="Infobase.EnterpriseAuth"/> для
     ///    «1С:Предприятия» / <see cref="Infobase.ConfiguratorAuth"/> для «Конфигуратора»,
-    ///    если она задана (не <see cref="InfobaseAuthSettings.IsDefault"/>);
+    ///    если она задана (не <see cref="InfobaseAuthSettings.IsDefault"/>); исключения —
+    ///    Windows/Credentials с пустым пользователем и режим Prompt при наличии общих
+    ///    кредов режима Credentials (issue #57, 1.0.1.11 — общий логин/пароль передаётся
+    ///    в командную строку);
     /// 2) авторизация информационной базы (<see cref="Infobase.Connection"/>) — только если
     ///    она реально содержит учётные данные (см. ниже);
     /// 3) общая авторизация по режиму запуска (issue #57): для «1С:Предприятия» —

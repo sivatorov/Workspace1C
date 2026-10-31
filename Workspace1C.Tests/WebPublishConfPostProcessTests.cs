@@ -149,6 +149,66 @@ public sealed class WebPublishConfPostProcessTests
         Assert.Equal(0, removed);
     }
 
+    // ----------------------- Чистка LoadModule по include-цепочке (issue #63, 1.0.1.11) -----------------------
+
+    [Fact]
+    public void RemoveLoadModuleIfPresentInChain_ModuleInMainConf_RemovedFromAliasFile()
+    {
+        // Сценарий 7OH: «LoadModule _1cws_module» уже в httpd.conf (другой файл
+        // цепочки), webinst дописал его в файл алиасов — подчистить полностью.
+        const string httpdConf = """
+            Define SRVROOT "c:/Apache/Apache24"
+            LoadModule _1cws_module "C:/Program Files/1cv8/8.3.27.2342/bin/wsap24.dll"
+            Include "${SRVROOT}/conf/1c8Aliases27.conf"
+            """;
+        const string aliasConf = """
+            Alias "/demo_27" "c:/Apache/Apache24/htdocs/27/demo_27/"
+            <Directory "c:/Apache/Apache24/htdocs/27/demo_27/">
+                SetHandler 1c-application
+            </Directory>
+            LoadModule _1cws_module "C:/Program Files/1cv8/8.3.27.2342/bin/wsap24.dll"
+            """;
+
+        var (text, removed) = WebPublishConfPostProcessor.RemoveLoadModuleIfPresentInChain(
+            aliasConf, new[] { httpdConf });
+
+        Assert.Equal(1, removed);
+        Assert.Equal(0, CountOccurrences(text, "LoadModule _1cws_module"));
+        Assert.Contains("Alias \"/demo_27\"", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RemoveLoadModuleIfPresentInChain_ModuleNotInChain_TextUnchanged()
+    {
+        const string aliasConf = """
+            Alias "/demo_27" "c:/Apache/Apache24/htdocs/27/demo_27/"
+            LoadModule _1cws_module "C:/x/wsap24.dll"
+            """;
+
+        // Модуля в цепочке нет (файл алиасов — единственное подключение): не трогаем.
+        var (text, removed) = WebPublishConfPostProcessor.RemoveLoadModuleIfPresentInChain(
+            aliasConf, new[] { "ServerRoot \"c:/Apache\"\nListen 80\n" });
+
+        Assert.Equal(0, removed);
+        Assert.Equal(aliasConf, text);
+    }
+
+    [Fact]
+    public void RemoveLoadModuleIfPresentInChain_EmptyChainOrText_NoChanges()
+    {
+        const string aliasConf = "LoadModule _1cws_module \"C:/x/wsap24.dll\"\n";
+        var (text, removed) = WebPublishConfPostProcessor.RemoveLoadModuleIfPresentInChain(
+            aliasConf, Array.Empty<string?>());
+
+        Assert.Equal(0, removed);
+        Assert.Equal(aliasConf, text);
+
+        var (text2, removed2) = WebPublishConfPostProcessor.RemoveLoadModuleIfPresentInChain(
+            string.Empty, new[] { aliasConf });
+        Assert.Equal(string.Empty, text2);
+        Assert.Equal(0, removed2);
+    }
+
     // ----------------------- Подстановка ${…}-переменных -----------------------
 
     [Fact]
@@ -418,8 +478,21 @@ public sealed class WebPublishConfPostProcessTests
             var confPath = Path.Combine(tempDir, "1c8Aliases27.conf");
             File.WriteAllText(confPath, AppendNewBlock(Aliases27ConfFragment) + "\n");
 
-            var vm = new WebPublishViewModel(new[] { Infobase() }, Infobase());
-            vm.ServerIndex = 0; // fallback «Apache по умолчанию» (Apache24, не IIS).
+            // Цепочка include намеренно ПУСТАЯ (основной конфиг не существует):
+            // тест не должен зависеть от машины — на машине с реальным Apache
+            // fallback-ветка подключила бы C:\Apache24\conf\httpd.conf, и если в нём
+            // есть LoadModule _1cws_module, новая чистка по цепочке (issue #63,
+            // 1.0.1.11) удалила бы строку и из файла алиасов.
+            var instance = new ApacheInstance
+            {
+                Id = "Apache2.4",
+                Name = "Apache2.4",
+                ServerRoot = tempDir,
+                ConfPath = Path.Combine(tempDir, "absent-httpd.conf"),
+                Kind = WebServerKind.Apache24
+            };
+            var vm = new WebPublishViewModel(new[] { Infobase() }, Infobase(), new[] { instance });
+            vm.ServerIndex = vm.ServerIndexFor(instance);
             vm.VirtualDirectory = "demo_27";
             vm.PostProcessApacheConfAfterPublish(new WebPublishRequest
             {

@@ -27,7 +27,8 @@ namespace Workspace1C
         public BatchOperationsViewModel ViewModel => _vm;
 
         public BatchOperationsWindow(IEnumerable<Infobase> infobases, BatchOperationKind kind,
-            string? initialDirectory = null, string? template = null)
+            string? initialDirectory = null, string? template = null,
+            string? timestampFormat = null)
         {
             InitializeComponent();
             _vm = new BatchOperationsViewModel(infobases, kind);
@@ -36,6 +37,9 @@ namespace Workspace1C
                 _vm.PathText = initialDirectory!.Trim();
             if (!string.IsNullOrWhiteSpace(template) && _vm.IsDumpKind)
                 _vm.Template = template!.Trim();
+            // Формат метки времени токена {Дата} — из настроек приложения
+            // «Формат даты в имени файла выгрузки» (issue #92, 1.0.1.11).
+            _vm.TimestampFormat = timestampFormat;
             DataContext = _vm;
 
             TemplateLabel.Text = LocalizationManager.T("BatchOps.TemplateLabel");

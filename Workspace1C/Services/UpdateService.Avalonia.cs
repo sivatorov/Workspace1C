@@ -29,6 +29,14 @@ namespace Workspace1C.Services
         /// <summary>Сколько ждать ответа на запрос прав администратора (PolicyKit).</summary>
         private static readonly TimeSpan PrivilegedUpdateTimeout = TimeSpan.FromMinutes(3);
 
+        /// <summary>
+        /// Таймаут чтения ТЕЛА ответа при загрузке бинарника обновления (issue #89,
+        /// 1.0.1.11): ранее заимствовался <c>HttpClient.Timeout</c> (таймаут на весь
+        /// запрос) — для 50+ МБ на медленном канале его могло не хватить, загрузка
+        /// молча обрывалась и установка падала. Явный generous-таймаут на тело.
+        /// </summary>
+        private static readonly TimeSpan BodyDownloadTimeout = TimeSpan.FromMinutes(15);
+
         /// <summary>Каталог этого запуска для загрузки и временных сценариев обновления.</summary>
         private static string? _updateDirectory;
 
@@ -889,7 +897,10 @@ namespace Workspace1C.Services
                 // целиком в памяти (бинарник весит десятки МБ). При этом HttpClient.Timeout
                 // перестаёт покрывать чтение тела, поэтому срок задаётся здесь явно, иначе
                 // залипшее соединение висело бы вместо честной ошибки загрузки.
-                using var cancellation = new CancellationTokenSource(_http.Timeout);
+                // Issue #89 (1.0.1.11): таймаут — отдельный generous (BodyDownloadTimeout),
+                // а не HttpClient.Timeout: для 50+ МБ на медленном канале его не хватало,
+                // загрузка обрывалась молча и установка падала («в temp только .etag»).
+                using var cancellation = new CancellationTokenSource(BodyDownloadTimeout);
                 using var response = await _http
                     .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellation.Token)
                     .ConfigureAwait(false);
@@ -942,7 +953,14 @@ namespace Workspace1C.Services
                 var accepted = expectedSize > 0 ? expectedSize : totalBytes;
                 if (size <= 0 || (accepted > 0 && size != accepted))
                 {
+                    // Диагностика CM_UPDATES (issue #89, 1.0.1.11): причина отказа
+                    // видна в журнале, а .etag недокачанной загрузки удаляется.
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Загрузка обновления {versionKey}: размер не совпал — " +
+                        $"скачано {size} байт, ожидалось {accepted} (expectedSize={expectedSize}, " +
+                        $"ContentLength={totalBytes}). Файл удалён, загрузка не принята.");
                     TryDelete(dest);
+                    TryDelete(dest + ".etag");
                     BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
                     return (null, false);
                 }
@@ -958,6 +976,12 @@ namespace Workspace1C.Services
                     logDir: Workspace1C.Services.PlatformPaths.AppDataDirectory);
                 if (_downloadValidationMessage is not null)
                 {
+                    // Диагностика CM_UPDATES (issue #89, 1.0.1.11): сообщение карантина
+                    // «wrong-platform» дублируется в журнал.
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Загрузка обновления {versionKey}: файл отклонён валидацией платформы — " +
+                        $"{_downloadValidationMessage}");
+                    TryDelete(dest + ".etag");
                     BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
                     return (null, false);
                 }
@@ -965,11 +989,32 @@ namespace Workspace1C.Services
                 BackgroundDownloadManager.Default.Complete(entry.Id);
                 return (dest, false);
             }
-            catch
+            catch (Exception ex)
             {
+                // Диагностика CM_UPDATES (issue #89, 1.0.1.11): ранее исключение
+                // глоталось молча — в журнале после «Загрузка обновления…» не было
+                // ни одной записи, а во временной папке оставался только .etag.
+                Log.Info(TraceFlags.UpdatesFlag,
+                    $"Загрузка обновления {versionKey}: ошибка загрузки — {ex.GetType().Name}: {ex.Message}; " +
+                    $"dest={dest}; скачано байт={SafeFileLength(dest)}.");
                 TryDelete(dest);
+                TryDelete(dest + ".etag");
                 BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
                 return (null, false);
+            }
+        }
+
+        /// <summary>Размер файла или 0, если файла нет/не читается. Для диагностики CM_UPDATES.</summary>
+        private static long SafeFileLength(string path)
+        {
+            try
+            {
+                var fi = new FileInfo(path);
+                return fi.Exists ? fi.Length : 0;
+            }
+            catch
+            {
+                return 0;
             }
         }
 
