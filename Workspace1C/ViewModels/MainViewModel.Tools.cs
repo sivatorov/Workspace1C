@@ -1849,6 +1849,21 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private async void RefreshFileMetadata()
     {
+        // v100114: фоновый async void — исключение не должно ронять приложение;
+        // тихо пишем в журнал (диалоги из фонового пересчёта размеров не нужны).
+        try
+        {
+            await RefreshFileMetadataCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка фонового пересчёта размеров файловых баз: " + ex.Message);
+        }
+    }
+
+    /// <summary>Тело фонового пересчёта размеров (см. <see cref="RefreshFileMetadata"/>).</summary>
+    private async System.Threading.Tasks.Task RefreshFileMetadataCoreAsync()
+    {
         // Снимок файловых баз на момент вызова: коллекция может меняться, пока считаются размеры.
         var fileBases = Infobases.Where(ib => ib.Connection.Type == ConnectionType.File).ToList();
         if (fileBases.Count == 0)
@@ -2827,7 +2842,10 @@ public partial class MainViewModel : ViewModelBase
         var window = new BatchOperationsWindow(bases, effectiveKind,
             settings.BatchDumpDirectory, settings.BatchDumpTemplate,
             // Формат метки времени токена {Дата} — общая настройка выгрузок (issue #92).
-            settings.ExportTimestampFormat)
+            settings.ExportTimestampFormat,
+            // Автоподстановка данных СУБД из кластера (rac) для серверных баз без
+            // профиля (issue #92, v100114); null при недоступном rac — старое поведение.
+            BuildDbmsProfileResolver())
         {
             Owner = System.Windows.Application.Current.MainWindow
         };
@@ -2847,6 +2865,20 @@ public partial class MainViewModel : ViewModelBase
         {
             // Ошибка записи настроек не должна ронять окно после успешного прогона.
         }
+    }
+
+    /// <summary>
+    /// Резолвер данных СУБД из кластера (rac) для массовых операций (issue #92, v100114):
+    /// сообщения — в журнал приложения; при недоступности rac-клиента — null
+    /// (автоподстановка выключена, старое поведение).
+    /// </summary>
+    private Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? BuildDbmsProfileResolver()
+    {
+        var resolver = ClusterInfobaseCredentialsResolver.CreateDefault(
+            message => _logger.Warn($"Автоподстановка данных СУБД (rac): {message}"));
+        if (resolver is null)
+            return null;
+        return (infobase, ct) => resolver.ResolveAsync(infobase, ct);
     }
 
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================

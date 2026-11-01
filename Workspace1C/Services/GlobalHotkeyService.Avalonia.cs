@@ -144,7 +144,15 @@ public sealed class GlobalHotkeyServiceAvalonia : IGlobalHotkeyService
                     }
                 }
                 if (_running)
-                    Thread.Sleep(10);
+                {
+                    // v100114 (п.4.2 плана): вместо активного ожидания Thread.Sleep(10) —
+                    // poll() на сокете X-соединения: поток спит в ядре до прихода данных
+                    // (нажатие хоткея будит его мгновенно) или до контрольного таймаута
+                    // (чтобы своевременно увидеть сброс _running в Stop/закрытие дисплея).
+                    XFlush(_display);
+                    var pollFd = new PollFd { Fd = XConnectionNumber(_display), Events = PollIn };
+                    _ = poll(ref pollFd, (UIntPtr)1, PollTimeoutMs);
+                }
             }
         }
         catch
@@ -261,5 +269,27 @@ public sealed class GlobalHotkeyServiceAvalonia : IGlobalHotkeyService
 
     [DllImport("libX11.so.6")]
     private static extern uint XStringToKeysym(string name);
+
+    [DllImport("libX11.so.6")]
+    private static extern int XConnectionNumber(IntPtr display);
+
+    // ---- libc: poll() для событийного ожидания событий X11 (п.4.2 плана v100114) ----
+
+    [DllImport("libc", SetLastError = true)]
+    private static extern int poll(ref PollFd fds, UIntPtr nfds, int timeout);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PollFd
+    {
+        public int Fd;
+        public short Events;
+        public short Revents;
+    }
+
+    /// <summary>Запрашиваем события POLLIN (есть данные для чтения из сокета X11).</summary>
+    private const short PollIn = 0x001;
+
+    /// <summary>Контрольный таймаут poll, мс: только для реакции на Stop/закрытие дисплея.</summary>
+    private const int PollTimeoutMs = 500;
 }
 #endif

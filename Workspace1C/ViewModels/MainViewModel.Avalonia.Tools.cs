@@ -1654,7 +1654,10 @@ public partial class MainViewModel : ViewModelBase
         var window = new Workspace1C.BatchOperationsWindow(bases, effectiveKind,
             _settings.BatchDumpDirectory, _settings.BatchDumpTemplate,
             // Формат метки времени токена {Дата} — общая настройка выгрузок (issue #92).
-            _settings.ExportTimestampFormat);
+            _settings.ExportTimestampFormat,
+            // Автоподстановка данных СУБД из кластера (rac) для серверных баз без
+            // профиля (issue #92, v100114); null при недоступном rac — старое поведение.
+            BuildDbmsProfileResolver());
         window.ShowDialogSync(OwnerWindow());
 
         // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).
@@ -1667,6 +1670,20 @@ public partial class MainViewModel : ViewModelBase
             _settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
         }
         SaveSettingsSilently();
+    }
+
+    /// <summary>
+    /// Резолвер данных СУБД из кластера (rac) для массовых операций (issue #92, v100114):
+    /// сообщения — в журнал приложения; при недоступности rac-клиента — null
+    /// (автоподстановка выключена, старое поведение).
+    /// </summary>
+    private Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? BuildDbmsProfileResolver()
+    {
+        var resolver = ClusterInfobaseCredentialsResolver.CreateDefault(
+            message => _logger.Warn($"Автоподстановка данных СУБД (rac): {message}"));
+        if (resolver is null)
+            return null;
+        return (infobase, ct) => resolver.ResolveAsync(infobase, ct);
     }
 
     // ======================= Обозреватель хранилища конфигурации (0.3.9.128) =======================

@@ -114,11 +114,25 @@ public sealed class Issue83LicenseTabTests
     {
         // issue #83: командные файлы (.cmd/.bat) прямому CreateProcess недоступны
         // (поиск по PATHEXT не выполняется — «Не удается найти указанный файл»),
-        // поэтому запускаются через cmd.exe /c — как в командной строке пользователя.
+        // поэтому запускаются через cmd.exe /d /c call — как в командной строке
+        // пользователя; «call» защищает кавычки пути от срезания логикой cmd.exe /c
+        // (v100114: пути с «особыми» символами вроде «Program Files (x86)»).
         var (command, arguments) = RingLicenseService.ToLaunchCommand("C:\\bin\\ring.cmd", "license", "list");
 
         Assert.Equal("cmd.exe", command);
-        Assert.Equal(new[] { "/c", "C:\\bin\\ring.cmd", "license", "list" }, arguments);
+        Assert.Equal(new[] { "/d", "/c", "call", "C:\\bin\\ring.cmd", "license", "list" }, arguments);
+    }
+
+    [Fact]
+    public void ToLaunchCommand_CmdFileWithSpacesAndParens_QuotesArePreserved()
+    {
+        // v100114 (issue #83): путь с пробелами и скобками — cmd.exe /c без «call» срезает
+        // кавычки при «особых» символах (&<>()@^|), с «call» — нет.
+        var (command, arguments) = RingLicenseService.ToLaunchCommand(
+            "C:\\Program Files (x86)\\1C\\ring.cmd", "license", "list");
+
+        Assert.Equal("cmd.exe", command);
+        Assert.Equal(new[] { "/d", "/c", "call", "C:\\Program Files (x86)\\1C\\ring.cmd", "license", "list" }, arguments);
     }
 #endif
 

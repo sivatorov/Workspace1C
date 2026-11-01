@@ -161,12 +161,12 @@ namespace Workspace1C
             SettingsTabs.Items.Insert(Math.Max(0, SettingsTabs.Items.Count - 1), tab);
         }
 
-        /// <summary>Кисть вторичного текста темы (с запасным серым цветом).</summary>
-        private Brush SecondaryBrush()
-        {
-            try { return (Brush)FindResource("TextSecondaryBrush"); }
-            catch { return Brushes.Gray; }
-        }
+        /// <summary>
+        /// Кисть вторичного текста темы (v100114: запасной цвет — тематизированный
+        /// нейтральный #64748B, а не фиксированный серый — текст читается в обеих темах).
+        /// </summary>
+        private Brush SecondaryBrush() =>
+            Themes.WpfBrushes.Get("TextSecondaryBrush") ?? Themes.WpfBrushes.FromSpec("#64748B");
 
         /// <summary>Выбор каталога резервной копии профиля.</summary>
         private void OnBrowseProfileDir_Click()

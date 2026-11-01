@@ -148,9 +148,26 @@ public sealed class BatchOperationsViewModel : ViewModelBase
 
     /// <summary>
     /// Подмена исполнителя операции для юнит-тестов (без запуска ibcmd):
-    /// (база, целевой путь) → результат. null — реальный исполнитель.
+    /// (база, целевой путь) → результат. null — реальный исполнитель. Исполнитель
+    /// без профиля СУБД: <see cref="IbcmdService"/> сам загрузит сохранённый профиль базы.
     /// </summary>
     internal Func<Infobase, string, CancellationToken, Task<IbcmdResult>>? ExecutorOverride { get; set; }
+
+    /// <summary>
+    /// Подмена исполнителя с уже разрешённым профилем СУБД (юнит-тесты автоподстановки,
+    /// issue #92): (база, целевой путь, профиль СУБД или null) → результат. Приоритетнее
+    /// <see cref="ExecutorOverride"/>; null — используется <see cref="ExecutorOverride"/>
+    /// либо реальный исполнитель.
+    /// </summary>
+    internal Func<Infobase, string, DbmsBackupProfile?, CancellationToken, Task<IbcmdResult>>? ExecutorWithProfileOverride { get; set; }
+
+    /// <summary>
+    /// Автоподстановка данных СУБД из кластера (rac) для клиент-серверных баз без
+    /// профиля (issue #92, v100114): (база, токен отмены) → профиль или null.
+    /// null — автоподстановка выключена (старое поведение: отсутствие профиля —
+    /// ошибка пред-валидации). Ошибки резолвера не прерывают прогон.
+    /// </summary>
+    internal Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? DbmsProfileResolver { get; set; }
 
     /// <summary>
     /// Вид операции окна (issue #92): выгрузка в .dt, выгрузка конфигурации в .cf
@@ -274,9 +291,11 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         }
 
         // Пред-валидация ДО старта (issue #91): ошибки параметров и заведомо
-        // неподдерживаемых баз помечаются сразу, без запуска ibcmd.
+        // неподдерживаемых баз помечаются сразу, без запуска ibcmd. При включённой
+        // автоподстановке СУБД из rac (issue #92) отсутствие профиля не блокирует.
         var errors = BatchOperationsService.Validate(
-            selected.Select(i => i.Infobase), Kind, PathText);
+            selected.Select(i => i.Infobase), Kind, PathText,
+            allowMissingDbmsProfiles: DbmsProfileResolver is not null);
         if (errors.Count > 0)
         {
             foreach (var error in errors)
@@ -328,11 +347,58 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             };
             AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
 
+            // Профиль СУБД для клиент-серверной базы (issue #92, v100114): сохранённый
+            // профиль берёт сам <see cref="IbcmdService"/>; если его нет и включена
+            // автоподстановка — данные СУБД пробуются из кластера (rac). Ошибка rac
+            // не прерывает прогон: операция идёт со старым поведением (ошибку вернёт
+            // ibcmd по конкретной базе).
+            DbmsBackupProfile? resolvedProfile = null;
+            if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null)
+            {
+                var hasSavedProfile = false;
+                try { hasSavedProfile = DbmsBackupService.Load().Find(ib.Id) is not null; }
+                catch { /* профиль недоступен — пробуем автоподстановку */ }
+                if (!hasSavedProfile)
+                {
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                              LocalizationManager.T("BatchOps.DbmsProfileResolving"));
+                    try
+                    {
+                        resolvedProfile = await DbmsProfileResolver(ib, ct).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        item.IsBusy = false;
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"), ib.Connection.Server, ex.Message));
+                        resolvedProfile = null;
+                    }
+                    AppendLog(resolvedProfile is not null
+                        ? $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                            LocalizationManager.T("BatchOps.DbmsProfileResolved"),
+                            $"{resolvedProfile.Dbms}/{resolvedProfile.Host}/{resolvedProfile.Database}" +
+                            (string.IsNullOrEmpty(resolvedProfile.User) ? "" : $"/{resolvedProfile.User}"))
+                        : $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
+                            ib.Connection.DatabaseName, ib.Connection.Server));
+                }
+            }
+
             IbcmdResult result;
             try
             {
-                var executor = ExecutorOverride ?? DefaultExecutorAsync;
-                result = await executor(ib, targetPath, ct).ConfigureAwait(false);
+                Func<Infobase, string, DbmsBackupProfile?, CancellationToken, Task<IbcmdResult>> executor;
+                if (ExecutorWithProfileOverride is not null)
+                    executor = ExecutorWithProfileOverride;
+                else if (ExecutorOverride is not null)
+                    executor = (base_, path, _, token) => ExecutorOverride(base_, path, token);
+                else
+                    executor = DefaultExecutorAsync;
+                result = await executor(ib, targetPath, resolvedProfile, ct).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -374,14 +440,22 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         IsRunning = false;
     }
 
-    /// <summary>Реальный исполнитель через ibcmd (обе платформы, без Конфигуратора).</summary>
-    private Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath, CancellationToken ct)
+    /// <summary>
+    /// Реальный исполнитель через ibcmd (обе платформы, без Конфигуратора).
+    /// <paramref name="dbmsProfile"/> — профиль СУБД, разрешённый при прогоне
+    /// (сохранённый или автоподставленный из rac, issue #92); null — профиль
+    /// загрузит сам <see cref="IbcmdService"/>.
+    /// </summary>
+    private Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath,
+        DbmsBackupProfile? dbmsProfile, CancellationToken ct)
         => Kind switch
         {
-            BatchOperationKind.DumpDt => IbcmdService.DumpAsync(infobase, targetPath, credential: null, ct),
+            BatchOperationKind.DumpDt => IbcmdService.DumpAsync(infobase, targetPath, credential: null, ct,
+                dbmsProfileOverride: dbmsProfile),
             // Выгрузка конфигурации в .cf (issue #92): ibcmd config dump.
-            BatchOperationKind.DumpCf => IbcmdService.SaveConfigAsync(infobase, targetPath, credential: null, ct),
-            _ => IbcmdService.LoadConfigAsync(infobase, targetPath, ct)
+            BatchOperationKind.DumpCf => IbcmdService.SaveConfigAsync(infobase, targetPath, credential: null, ct,
+                dbmsProfileOverride: dbmsProfile),
+            _ => IbcmdService.LoadConfigAsync(infobase, targetPath, ct, dbmsProfileOverride: dbmsProfile)
         };
 
     /// <summary>Добавляет строку в лог потокобезопасно (через захваченный контекст синхронизации).</summary>

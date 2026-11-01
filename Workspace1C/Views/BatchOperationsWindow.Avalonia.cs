@@ -37,6 +37,9 @@ namespace Workspace1C
         private readonly TextBlock _summary;
         // Поля ввода тематизируются (issue #92, 1.0.1.11: без стиля текст поля
         // рисуется чёрным на тёмном фоне тёмной темы).
+        // Поле каталога/файла тематизируется: кроме темы ModernTextBox — прямая
+        // привязка Foreground/CaretBrush к кистям темы (issue #92, v100114 —
+        // в тёмной схеме текст поля оставался чёрным).
         private readonly TextBox _pathBox = new TextBox().Styled(ControlThemes.ModernTextBox);
         private readonly Button _runButton = new();
         private readonly Button _browseButton = new();
@@ -48,7 +51,8 @@ namespace Workspace1C
 
         public BatchOperationsWindow(System.Collections.Generic.IEnumerable<Infobase> infobases, BatchOperationKind kind,
             string? initialDirectory = null, string? template = null,
-            string? timestampFormat = null)
+            string? timestampFormat = null,
+            Func<Infobase, System.Threading.CancellationToken, Task<DbmsBackupProfile?>>? dbmsProfileResolver = null)
         {
             Width = 700;
             Height = 620;
@@ -57,6 +61,9 @@ namespace Workspace1C
             FontSize = 13;
             CanResize = true;
             DataContext = _vm = new BatchOperationsViewModel(infobases, kind);
+            // Автоподстановка данных СУБД из кластера (rac) для серверных баз без
+            // профиля (issue #92, v100114); null — старое поведение.
+            _vm.DbmsProfileResolver = dbmsProfileResolver;
             // Сохранённые каталог и шаблон массовой выгрузки (issue #92).
             if (!string.IsNullOrWhiteSpace(initialDirectory) && _vm.IsDumpKind)
                 _vm.PathText = initialDirectory!.Trim();
@@ -121,6 +128,10 @@ namespace Workspace1C
             pathRow.Children.Add(pathLabel);
             pathRow.Children.Add(_pathBox);
             pathRow.Children.Add(_browseButton);
+            // Прямая привязка к кистям темы (как у поля шаблона ниже) — иначе в тёмной
+            // схеме текст поля каталога оставался чёрным на тёмном (issue #92).
+            ThemeBrushes.Bind(_pathBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(_pathBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
 
             // Опции массовой выгрузки (issue #92): шаблон имени файла и DT/CF.
             // Видны только у выгрузок; панель пересобирается при смене вида.
@@ -131,12 +142,17 @@ namespace Workspace1C
                 Margin = new Thickness(0, 0, 8, 0)
             };
             // Поле шаблона тематизируется — иначе в тёмной теме текст чёрный на тёмном
-            // (issue #92, комментарий 7OH от 2026-10-31: «чёрный на тёмном»).
+            // (issue #92, комментарий 7OH от 2026-10-31: «чёрный на тёмном»). Помимо
+            // темы ModernTextBox текст и каретка привязываются к кистям темы напрямую
+            // (v100114): в тёмной схеме связка DynamicResource в ControlTheme у поля
+            // не обновлялась — Bind гарантирует смену цвета вместе со схемой.
             var templateBox = new TextBox
             {
                 Width = 260,
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernTextBox);
+            ThemeBrushes.Bind(templateBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(templateBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
             ToolTip.SetTip(templateBox, LocalizationManager.T("BatchOps.TemplateHint"));
             templateBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("Template") { Mode = Avalonia.Data.BindingMode.TwoWay });
             _kindDtRadio = new RadioButton

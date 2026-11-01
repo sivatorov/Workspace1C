@@ -309,6 +309,90 @@ public sealed class RingLicenseService : IRingLicenseService
     /// <summary>Tаймаут выполнения утилиты лицензий.</summary>
     internal static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// TTL кэша найденного пути ring (п.4.1 плана v100114): where.exe/which, реестровый
+    /// PATH и перебор каталогов выполняются не при каждом опросе монитора (~5 с), а не
+    /// чаще одного раза за <see cref="RingPathCacheTtl"/>. Кэш сбрасывается при неудачном
+    /// запуске найденного кандидата (StartError — путь стал неактуален). Сеттер internal —
+    /// для юнит-тестов (в тестах TTL укорачивается).
+    /// </summary>
+    internal TimeSpan RingPathCacheTtl { get; set; } = TimeSpan.FromMinutes(5);
+
+    // TTL-кэш пути ring: найденное значение (включая отрицательный результат) и срок годности.
+    private readonly object _ringPathCacheGate = new();
+    private string? _ringPathCachePath;
+    private bool _ringPathCacheFound;
+    private DateTimeOffset _ringPathCacheExpiresAt;
+    private bool _ringPathCacheHasValue;
+
+    /// <summary>Точка подмены пробы PATH (where.exe/which/ring --version) — юнит-тесты.</summary>
+    internal Func<CancellationToken, Task<string?>> RingPathProbeAsync { get; set; } = FindRingInPathAsync;
+
+    /// <summary>Точка подмены поиска вне PATH (реестр/каталоги 1С) — юнит-тесты.</summary>
+    internal Func<CancellationToken, Task<string?>> RingPathAlternateProbeAsync { get; set; } =
+        FindRingViaRegistryAndKnownDirsAsync;
+
+    /// <summary>Точка подмены запуска внешнего процесса — юнит-тесты.</summary>
+    internal Func<string, string[], CancellationToken, Task<ProcessRunResult>> RunProcessAsync { get; set; } =
+        (command, arguments, ct) => ProcessRunner.RunAsync(command, arguments, timeout: CommandTimeout, ct: ct);
+
+    /// <summary>Точка подмены чтения каталога файлов лицензий — юнит-тесты.</summary>
+    internal Func<IReadOnlyList<ProgramLicense>> ReadLicenseDirectory { get; set; } = TryReadLicenseDirectory;
+
+    /// <summary>
+    /// Резолвит путь ring с TTL-кэшем (п.4.1 плана v100114): первое обращение выполняет
+    /// пробу PATH (<see cref="FindRingInPathAsync"/>) и поиск вне PATH
+    /// (<see cref="FindRingViaRegistryAndKnownDirsAsync"/>), последующие обращения в течение
+    /// TTL отдают закэшированный результат (включая отрицательный — «ring нет»).
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal async Task<string?> ResolveRingPathAsync(CancellationToken ct = default)
+    {
+        lock (_ringPathCacheGate)
+        {
+            if (_ringPathCacheHasValue && DateTimeOffset.UtcNow < _ringPathCacheExpiresAt)
+                return _ringPathCacheFound ? _ringPathCachePath : null;
+        }
+
+        var path = await RingPathProbeAsync(ct).ConfigureAwait(false);
+        if (path is null)
+        {
+            // issue #83 (репорт 7OH от 2026-10-30 «в окне - не найдено, в командной строке
+            // работает»): PATH процесса приложения может отличаться от PATH консоли
+            // пользователя (запуск из ярлыка/планировщика не наследует свежий
+            // пользовательский PATH). Пробуем найти ring по СВЕЖЕМУ PATH из реестра и
+            // известным каталогам установки 1С — при находке запускаем по полному пути
+            // без перезапуска приложения.
+            path = await RingPathAlternateProbeAsync(ct).ConfigureAwait(false);
+        }
+
+        StoreRingPathCache(path);
+        return path;
+    }
+
+    /// <summary>Кладёт результат резолва в TTL-кэш (в том числе отрицательный). Internal — юнит-тесты.</summary>
+    internal void StoreRingPathCache(string? path)
+    {
+        lock (_ringPathCacheGate)
+        {
+            _ringPathCachePath = path;
+            _ringPathCacheFound = path is not null;
+            _ringPathCacheExpiresAt = DateTimeOffset.UtcNow + RingPathCacheTtl;
+            _ringPathCacheHasValue = true;
+        }
+    }
+
+    /// <summary>Сбрасывает TTL-кэш пути ring (например, при неудачном запуске кандидата).</summary>
+    internal void InvalidateRingPathCache()
+    {
+        lock (_ringPathCacheGate)
+        {
+            _ringPathCacheHasValue = false;
+            _ringPathCachePath = null;
+            _ringPathCacheFound = false;
+        }
+    }
+
     /// <inheritdoc />
     public async Task<RingLicenseResult> GetInstalledLicensesAsync(CancellationToken cancellationToken = default)
     {
@@ -316,43 +400,52 @@ public sealed class RingLicenseService : IRingLicenseService
         // ручным перебором PATH/PATHEXT с подменой полного пути — доступность проверяем
         // запуском «where.exe ring»/«which ring» (запасной способ — «ring --version»),
         // а вызываем «ring» как есть, поиск по PATH выполняет сама ОС.
-        var ringInPath = await FindRingInPathAsync(cancellationToken).ConfigureAwait(false);
-        if (ringInPath is null)
-        {
-            // issue #83: недоступность утилиты — прогнозируемая внешняя причина, пишем
-            // INFO (не WARN-спам при автообновлении каждые ~5 с).
-            // issue #80: запись направления RAC — через категорийный гейт CM_RAC + CM_ON.
-            Log.Info(LogCategory.Rac,
-                "RING: утилита ring не найдена в PATH (where.exe ring / which ring) — переходим к запасным вариантам.");
-
-            // issue #83 (репорт 7OH от 2026-10-30 «в окне - не найдено, в командной строке
-            // работает»): PATH процесса приложения может отличаться от PATH консоли
-            // пользователя (запуск из ярлыка/планировщика не наследует свежий
-            // пользовательский PATH). Пробуем найти ring по СВЕЖЕМУ PATH из реестра и
-            // известным каталогам установки 1С — при находке запускаем по полному пути
-            // без перезапуска приложения.
-            ringInPath = await FindRingViaRegistryAndKnownDirsAsync(cancellationToken).ConfigureAwait(false);
-        }
+        // п.4.1 плана v100114: резолв пути обёрнут в TTL-кэш (where.exe + реестр +
+        // перебор каталогов — не при каждом опросе монитора ~5 с).
+        var ringInPath = await ResolveRingPathAsync(cancellationToken).ConfigureAwait(false);
 
         // 1) ring license list (Windows и Linux — если ring доступен в PATH).
+        var candidatesRan = false;
+        string? lastCandidateOutput = null;
         foreach (var (command, arguments, source) in CommandCandidates(
             includePathRing: ringInPath is not null, ringPath: ringInPath))
         {
-            var result = await ProcessRunner.RunAsync(
-                    command, arguments, timeout: CommandTimeout, ct: cancellationToken)
+            candidatesRan = true;
+            var result = await RunProcessAsync(command, arguments, cancellationToken)
                 .ConfigureAwait(false);
-            if (result.Success && !string.IsNullOrWhiteSpace(result.StdOut))
+
+            // issue #83 (репорт 7OH от 2026-10-31 «в логе ring найден, а на вкладке
+            // Лицензии — Не найдена»): результат КАЖДОГО кандидата пишется в журнал —
+            // даже при Success/пустом выводе и нуле распознанных лицензий (раньше этот
+            // случай молча пропускался, и причину было не установить).
+            var licenses = result.Success && !string.IsNullOrWhiteSpace(result.StdOut)
+                ? RingLicenseParser.Parse(result.StdOut)
+                : Array.Empty<ProgramLicense>();
+            Log.Info(LogCategory.Rac,
+                $"RING: кандидат «{source}»: код=" +
+                $"{(result.TimedOut ? "таймаут" : result.ExitCode.ToString(CultureInfo.InvariantCulture))}, " +
+                $"байт вывода={(result.StdOut ?? string.Empty).Length}, " +
+                $"распознано лицензий={licenses.Count}{(result.TimedOut ? " (таймаут)" : string.Empty)}.");
+
+            // п.4.1 плана v100114: найденного кандидата не удалось запустить (например,
+            // кэшированный путь стал неактуален) — сбрасываем TTL-кэш пути ring.
+            if (!string.IsNullOrWhiteSpace(result.StartError))
             {
-                var licenses = RingLicenseParser.Parse(result.StdOut);
-                if (licenses.Count > 0)
-                {
-                    // issue #80: INFO-записи RING — через категорийный гейт CM_RAC + CM_ON
-                    // (не «капают» в журнал при выключенном логировании).
-                    Log.Info(LogCategory.Rac,
-                        $"RING: распознано программных лицензий: {licenses.Count} (источник: {source}).");
-                    return new RingLicenseResult { Licenses = licenses };
-                }
+                InvalidateRingPathCache();
+                Log.Info(LogCategory.Rac,
+                    $"RING: кандидат «{source}» не запущен: {result.StartError} — кэш пути ring сброшен.");
             }
+
+            if (licenses.Count > 0)
+            {
+                // issue #80: INFO-записи RING — через категорийный гейт CM_RAC + CM_ON
+                // (не «капают» в журнал при выключенном логировании).
+                Log.Info(LogCategory.Rac,
+                    $"RING: распознано программных лицензий: {licenses.Count} (источник: {source}).");
+                return new RingLicenseResult { Licenses = licenses };
+            }
+
+            lastCandidateOutput = result.CombinedOutput;
 
             // issue #83 (репорт 7OH от 2026-10-30): ring отвечает «Module "license" is not
             // registered in the command registry» — утилита ЕСТЬ, но без модуля лицензий.
@@ -382,7 +475,7 @@ public sealed class RingLicenseService : IRingLicenseService
         }
 
         // 2) Запасной источник — каталог файлов лицензий.
-        var fallback = TryReadLicenseDirectory();
+        var fallback = ReadLicenseDirectory();
         if (fallback.Count > 0)
         {
             const string warning =
@@ -393,6 +486,12 @@ public sealed class RingLicenseService : IRingLicenseService
             Log.Info(LogCategory.Rac, $"RING: {warning} Найдено файлов: {fallback.Count}.");
             return new RingLicenseResult { Licenses = fallback, Warning = warning };
         }
+
+        // issue #83 (репорт 7OH от 2026-10-31 19:20): ring НАЙДЕН и запускался, но список
+        // лицензий не получен — в Warning идёт вывод последнего кандидата, а не вводящее
+        // в заблуждение «утилита не найдена».
+        if (candidatesRan)
+            return new RingLicenseResult { Warning = BuildNoLicensesMessage(lastCandidateOutput) };
 
         return new RingLicenseResult { Warning = BuildUnavailableMessage() };
     }
@@ -459,9 +558,23 @@ public sealed class RingLicenseService : IRingLicenseService
     }
 
     /// <summary>
+    /// Понятное сообщение вкладки «Лицензии» для случая «ring найден и запускался, но
+    /// список лицензий не получен» (issue #83, репорт 7OH от 2026-10-31 19:20): вывод
+    /// последнего кандидата вместо вводящего в заблуждение «утилита не найдена».
+    /// Internal — для юнит-тестов читаемого сообщения.
+    /// </summary>
+    internal static string BuildNoLicensesMessage(string? lastCandidateOutput)
+    {
+        return "Утилита ring найдена и запущена, но список лицензий не получен. Ответ последней " +
+               "проверенной команды: " + TruncateForLog(lastCandidateOutput) +
+               ". Если модуль лицензий ring установлен и этот ответ выглядит ошибочным — " +
+               "пришлите этот текст в issue Workspace 1C.";
+    }
+
+    /// <summary>
     /// Разлагает найденный путь к утилите ring на «исполняемый вызов» (issue #83):
-    /// командные файлы Windows (.cmd/.bat) запускаются через <c>cmd.exe /c</c> — именно
-    /// так их выполняет командная строка пользователя, а прямой <c>CreateProcess</c>
+    /// командные файлы Windows (.cmd/.bat) запускаются через <c>cmd.exe /d /c call</c> —
+    /// именно так их выполняет командная строка пользователя, а прямой <c>CreateProcess</c>
     /// (UseShellExecute=false) не находит их по PATHEXT — «Не удается найти указанный
     /// файл». Всё остальное (.exe/.com, без расширения на Linux) запускается напрямую
     /// по полному пути. Internal — для юнит-тестов без запуска процессов.
@@ -473,7 +586,13 @@ public sealed class RingLicenseService : IRingLicenseService
         if (string.Equals(extension, ".cmd", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(extension, ".bat", StringComparison.OrdinalIgnoreCase))
         {
-            return ("cmd.exe", new[] { "/c", ringPath }.Concat(toolArgs).ToArray());
+            // v100114 (issue #83): форма «cmd.exe /d /c call "<путь>" args». Хвост после
+            // /c начинается со слова «call», а не с кавычки — поэтому cmd.exe НЕ применяет
+            // старое правило срезания первой/последней кавычек (оно срабатывает, когда в
+            // пути есть «особые» символы &<>()@^| — например «Program Files (x86)» — и
+            // условие сохранения кавычек из справки cmd /? нарушается). «/d» отключает
+            // исполнение реестровых AutoRun-скриптов.
+            return ("cmd.exe", new[] { "/d", "/c", "call", ringPath }.Concat(toolArgs).ToArray());
         }
 #endif
         return (ringPath, (toolArgs ?? Array.Empty<string>()).ToArray());

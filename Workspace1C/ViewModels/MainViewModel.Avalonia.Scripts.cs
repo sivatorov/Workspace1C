@@ -40,6 +40,22 @@ public partial class MainViewModel
     /// <summary>Выполняет сценарий: одиночный — сразу, несколько — выбор в окне.</summary>
     private async void ExecuteRunScriptForSelected()
     {
+        // v100114: прямой async void (вне обёртки RelayCommand) — исключение не должно
+        // ронять приложение: журнал + диалог ошибки.
+        try
+        {
+            await ExecuteRunScriptForSelectedCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка запуска сценария скрипта", ex);
+            _dialog.ShowError(ex.Message, LocalizationManager.T("Script.RunTitle"));
+        }
+    }
+
+    /// <summary>Тело запуска сценария скрипта (см. <see cref="ExecuteRunScriptForSelected"/>).</summary>
+    private async System.Threading.Tasks.Task ExecuteRunScriptForSelectedCoreAsync()
+    {
         var infobase = SelectedInfobase;
         if (infobase is null)
         {

@@ -1017,7 +1017,17 @@ namespace Workspace1C
         {
             if (_viewModel is null || _viewModel.IsCustomActionRunning)
                 return;
-            await _viewModel.ExecuteCustomActionAsync(action, context);
+            // v100114: вызов идёт как fire-and-forget (`_ = …`) по хоткею — ошибка
+            // кастомного действия не должна ронять приложение.
+            try
+            {
+                await _viewModel.ExecuteCustomActionAsync(action, context);
+            }
+            catch (Exception ex)
+            {
+                AppServices.GetRequiredService<Services.IAppLogger>().Error(
+                    "Ошибка кастомного действия по горячей клавише: " + ex.Message);
+            }
         }
 
         /// <summary>

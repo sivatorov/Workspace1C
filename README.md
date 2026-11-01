@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.13-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.14-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.13**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.14**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,16 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Автоподстановка СУБД из rac и фикс зависания окна настроек (1.0.1.14,
+  Windows и Linux)** — учётные данные СУБД автоматически подставляются из
+  кластера `rac` при массовой выгрузке серверных баз ibcmd (снимает блокер
+  issue #92); устранено зависание закрытия окна «Настройки подключения»
+  на Linux (issue #94); диагностика лицензий `ring` стала подробнее, а путь
+  `ring` кэшируется (issue #83); поля массовой выгрузки корректно отображаются
+  в тёмной теме (issue #92); уточнены формулировки мастера тестовой копии
+  (issue #79); остатки хардкод-цветов переведены на ресурсы тем; async-команды
+  и хоткеи защищены обработкой ошибок; устранён busy-wait в обработке хоткеев
+  на Linux.
 - **Безопасный импорт из кластера, ускоренный старт и доводка тем (1.0.1.13,
   Windows и Linux)** — проверка выбора баз до запуска импорта из кластера и
   обработка ошибок подключения; CSV-экспорт списка баз дополнен колонками

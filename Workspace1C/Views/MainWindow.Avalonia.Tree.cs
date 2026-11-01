@@ -1624,8 +1624,12 @@ namespace Workspace1C
                 var item = new MenuItem { Header = header };
                 item.Styled(Themes.ControlThemes.ModernMenuItem);
                 if (itemIcon is not null)
+                    // Фолбэк значка без явного цвета — тематизированная нейтральная кисть,
+                    // как в Hotkeys/ServerMonitor (аудит UI v100114, вместо Brushes.Gray).
                     item.Icon = IconHelper.MakeIcon(itemIcon, 18,
-                        itemColor is not null ? Themes.ThemeBrushes.FromSpec(itemColor) : Brushes.Gray);
+                        itemColor is not null
+                            ? Themes.ThemeBrushes.FromSpec(itemColor)
+                            : Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B"));
                 // Производный хоткей (issue #48) показывается рядом с пунктом,
                 // как в остальных меню программы; пустая строка — не показываем.
                 if (!string.IsNullOrWhiteSpace(gesture)

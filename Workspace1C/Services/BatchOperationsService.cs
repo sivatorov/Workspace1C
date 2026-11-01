@@ -45,8 +45,12 @@ public static class BatchOperationsService
         return Path.Combine(dir, SanitizeFileName(infobaseName) + ".dt");
     }
 
-    /// <summary>Шаблон имени файла массовой выгрузки по умолчанию (issue #92).</summary>
-    public const string DefaultDumpTemplate = "{Имя}_{Дата}";
+    /// <summary>
+    /// Шаблон имени файла массовой выгрузки по умолчанию (issue #92). Со встроенным
+    /// форматом токена (v100114, 7OH: пример даты должен быть виден сразу): {Имя}_{Дата:yyyy-MM-dd_HH-mm}
+    /// — совпадает со значением из подсказки окна.
+    /// </summary>
+    public const string DefaultDumpTemplate = "{Имя}_{Дата:yyyy-MM-dd_HH-mm}";
 
     /// <summary>Формат метки времени токена {Дата} в шаблоне имени файла (issue #92).</summary>
     public const string DumpTimestampFormat = "yyyy-MM-dd_HH-mm";
@@ -171,8 +175,13 @@ public static class BatchOperationsService
     /// <param name="targets">Выбранные базы.</param>
     /// <param name="kind">Вид операции.</param>
     /// <param name="path">Каталог для .dt (DumpDt) или файл .cf (LoadConfig).</param>
+    /// <param name="allowMissingDbmsProfiles">true — не считать отсутствие профиля СУБД
+    /// у клиент-серверных баз ошибкой пред-валидации (issue #92, v100114: при включённой
+    /// автоподстановке данные СУБД пробуются из кластера rac на этапе прогона; если не
+    /// удалось — понятную ошибку вернёт сам ibcmd по конкретной базе).</param>
     public static IReadOnlyList<string> Validate(
-        IEnumerable<Infobase>? targets, BatchOperationKind kind, string? path)
+        IEnumerable<Infobase>? targets, BatchOperationKind kind, string? path,
+        bool allowMissingDbmsProfiles = false)
     {
         var errors = new List<string>();
         var list = targets?.Where(b => b is not null).ToList() ?? new List<Infobase>();
@@ -201,19 +210,24 @@ public static class BatchOperationsService
 
         // Для клиент-серверных баз ibcmd требует профиль СУБД (как в окне «Развернуть
         // тестовую копию», issue #79): ошибка ДО старта, а не посреди прогона.
-        foreach (var ib in list)
+        // С автоподстановкой из rac (issue #92) отсутствие профиля не блокирует запуск:
+        // резолвер пробует взять данные СУБД из кластера на этапе прогона.
+        if (!allowMissingDbmsProfiles)
         {
-            if (ib.Connection?.Type != ConnectionType.ClientServer)
-                continue;
-            try
+            foreach (var ib in list)
             {
-                if (DbmsBackupService.Load().Find(ib.Id) is null)
-                    errors.Add(string.Format(
-                        LocalizationManager.T("BatchOps.NeedDbmsProfileFormat"), ib.Name));
-            }
-            catch
-            {
-                // Профиль недоступен — конкретная ошибка придёт от ibcmd по базе.
+                if (ib.Connection?.Type != ConnectionType.ClientServer)
+                    continue;
+                try
+                {
+                    if (DbmsBackupService.Load().Find(ib.Id) is null)
+                        errors.Add(string.Format(
+                            LocalizationManager.T("BatchOps.NeedDbmsProfileFormat"), ib.Name));
+                }
+                catch
+                {
+                    // Профиль недоступен — конкретная ошибка придёт от ibcmd по базе.
+                }
             }
         }
 

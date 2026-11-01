@@ -453,7 +453,9 @@ namespace Workspace1C
                 }
                 catch
                 {
-                    dot.Fill = Brushes.Gray;
+                    // Аудит UI v100114: вместо фиксированного серого — вторичный текст темы
+                    // (в светлой схеме выглядит так же, в тёмной читается).
+                    dot.Fill = Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B");
                 }
             }
 

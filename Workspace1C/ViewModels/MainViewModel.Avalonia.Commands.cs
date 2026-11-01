@@ -438,6 +438,22 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Клонирует выбранную базу: файловая — копия каталога, серверная — клон на сервере.</summary>
     private async void ExecuteCloneInfobase()
     {
+        // v100114: прямой async void (вне обёртки RelayCommand) — исключение не должно
+        // ронять приложение: журнал + диалог ошибки.
+        try
+        {
+            await ExecuteCloneInfobaseCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка дублирования базы", ex);
+            _dialog.ShowError(ex.Message, LocalizationManager.T("Clone.Title"));
+        }
+    }
+
+    /// <summary>Тело дублирования базы (см. <see cref="ExecuteCloneInfobase"/>).</summary>
+    private async System.Threading.Tasks.Task ExecuteCloneInfobaseCoreAsync()
+    {
         var source = SelectedInfobase;
         if (source?.Connection is null)
             return;

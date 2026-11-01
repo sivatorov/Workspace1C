@@ -48,6 +48,22 @@ public partial class MainViewModel
     /// <summary>Выполняет сценарий резервирования: одиночный — сразу, несколько — выбор в окне.</summary>
     private async void ExecuteRunBackupScenario()
     {
+        // v100114: прямой async void (вне обёртки RelayCommand) — исключение не должно
+        // ронять приложение: журнал + диалог ошибки.
+        try
+        {
+            await ExecuteRunBackupScenarioCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка запуска сценария резервирования", ex);
+            _dialog.ShowError(ex.Message, LocalizationManager.T("Backup.RunTitle"));
+        }
+    }
+
+    /// <summary>Тело запуска сценария резервирования (см. <see cref="ExecuteRunBackupScenario"/>).</summary>
+    private async System.Threading.Tasks.Task ExecuteRunBackupScenarioCoreAsync()
+    {
         var infobase = SelectedInfobase;
         if (infobase is null)
         {

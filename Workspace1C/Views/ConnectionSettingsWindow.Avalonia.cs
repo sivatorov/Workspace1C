@@ -1447,8 +1447,15 @@ namespace Workspace1C
             };
             additionalList.Bind(ListBox.ItemsSourceProperty, new Binding(nameof(ConnectionSettingsViewModel.AdditionalFields)));
             additionalList.Bind(ListBox.SelectedItemProperty, new Binding(nameof(ConnectionSettingsViewModel.SelectedAdditionalField)));
+            // Issue #94: при закрытии окна Avalonia переразбирает контейнеры и вызывает
+            // шаблон с row == null — без проверки падает NRE и обрывается цепочка закрытия.
             additionalList.ItemTemplate = new FuncDataTemplate<AdditionalFieldRow>((row, _) =>
             {
+                if (row is null)
+                {
+                    return new TextBlock();
+                }
+
                 var grid = new Grid
                 {
                     ColumnDefinitions =

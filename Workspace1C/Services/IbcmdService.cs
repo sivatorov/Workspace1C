@@ -207,16 +207,24 @@ public static class IbcmdService
         RunForInfobaseAsync(infobase, RestoreCommand, new[] { dtPath }, credential, ct);
 
     public static Task<IbcmdResult> SaveConfigAsync(Infobase infobase, string cfPath, BackupCredential? credential = null,
-        CancellationToken ct = default) =>
-        RunForInfobaseAsync(infobase, ConfigSaveCommand, new[] { cfPath }, credential, ct, ensureDirOf: cfPath);
+        CancellationToken ct = default, DbmsBackupProfile? dbmsProfileOverride = null) =>
+        RunForInfobaseAsync(infobase, ConfigSaveCommand, new[] { cfPath }, credential, ct, ensureDirOf: cfPath,
+            dbmsProfileOverride: dbmsProfileOverride);
 
-    /// <summary>Загружает конфигурацию из .cf и применяет её к базе данных.</summary>
-    public static async Task<IbcmdResult> LoadConfigAsync(Infobase infobase, string cfPath, CancellationToken ct = default)
+    /// <summary>
+    /// Загружает конфигурацию из .cf и применяет её к базе данных.
+    /// <paramref name="dbmsProfileOverride"/> — переопределение профиля СУБД (issue #92,
+    /// v100114: автоподстановка данных СУБД из rac для клиент-серверных баз без профиля).
+    /// </summary>
+    public static async Task<IbcmdResult> LoadConfigAsync(Infobase infobase, string cfPath, CancellationToken ct = default,
+        DbmsBackupProfile? dbmsProfileOverride = null)
     {
-        var load = await RunForInfobaseAsync(infobase, ConfigLoadCommand, new[] { cfPath }, null, ct).ConfigureAwait(false);
+        var load = await RunForInfobaseAsync(infobase, ConfigLoadCommand, new[] { cfPath }, null, ct,
+            dbmsProfileOverride: dbmsProfileOverride).ConfigureAwait(false);
         if (!load.Success)
             return load;
-        var apply = await RunForInfobaseAsync(infobase, ConfigApplyCommand, new[] { "--force" }, null, ct).ConfigureAwait(false);
+        var apply = await RunForInfobaseAsync(infobase, ConfigApplyCommand, new[] { "--force" }, null, ct,
+            dbmsProfileOverride: dbmsProfileOverride).ConfigureAwait(false);
         return Merge(load, apply);
     }
 

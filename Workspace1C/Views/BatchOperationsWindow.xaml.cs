@@ -28,10 +28,14 @@ namespace Workspace1C
 
         public BatchOperationsWindow(IEnumerable<Infobase> infobases, BatchOperationKind kind,
             string? initialDirectory = null, string? template = null,
-            string? timestampFormat = null)
+            string? timestampFormat = null,
+            Func<Infobase, System.Threading.CancellationToken, Task<DbmsBackupProfile?>>? dbmsProfileResolver = null)
         {
             InitializeComponent();
             _vm = new BatchOperationsViewModel(infobases, kind);
+            // Автоподстановка данных СУБД из кластера (rac) для серверных баз без
+            // профиля (issue #92, v100114); null — старое поведение.
+            _vm.DbmsProfileResolver = dbmsProfileResolver;
             // Сохранённые каталог и шаблон массовой выгрузки (issue #92).
             if (!string.IsNullOrWhiteSpace(initialDirectory) && _vm.IsDumpKind)
                 _vm.PathText = initialDirectory!.Trim();

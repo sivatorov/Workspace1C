@@ -28,6 +28,36 @@ public sealed class ConfigExtensionServiceTests
     }
 
     [Fact]
+    public void InstallArguments_ServerInfobase_NoDefectiveOptions()
+    {
+        // issue #87 (юнит-тест сборки аргументов для клиент-серверной базы): полная
+        // строка DESIGNER для серверной базы — подключение в форме /S"srv\db", а в
+        // ключах операции НЕ повторяется -Extension у /UpdateDBCfg («Error in
+        // command-line options») и нет лишних ключей вроде /AppAutoCheckMode.
+        var infobase = new Infobase
+        {
+            Name = "Серверная",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "srv-1c",
+                Port = 2541,
+                DatabaseName = "buh"
+            }
+        };
+        var connectionArg = OneCLauncher.BuildConnectionArgument(infobase);
+        var args = ConfigExtensionService.BuildInstallArguments(@"C:\cfe\Доработки.cfe", "Доработки")!;
+
+        Assert.Equal("/S\"srv-1c:2541\\buh\"", connectionArg);
+        var full = DesignerCommandRunner.BuildArguments(connectionArg, "", args, "C:\\tmp\\out.log");
+        Assert.StartsWith("DESIGNER /S\"srv-1c:2541\\buh\"", full);
+        var updateIndex = full.IndexOf("/UpdateDBCfg", StringComparison.Ordinal);
+        Assert.True(updateIndex > 0, "/UpdateDBCfg не найден в строке запуска");
+        Assert.DoesNotContain("-Extension", full.Substring(updateIndex), StringComparison.Ordinal);
+        Assert.DoesNotContain("/AppAutoCheckMode", full, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void IsCommandLineOptionsError_DetectsDesignerParameterFailure()
     {
         // issue #87: fallback на ibcmd при отказе конфигуратора «Error in command-line options».

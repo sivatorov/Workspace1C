@@ -294,7 +294,9 @@ namespace Workspace1C
         public static IBrush Brush(string hex)
         {
             try { return new SolidColorBrush(Color.Parse(hex)); }
-            catch { return Brushes.Gray; }
+            // Аудит UI v100114: фолбэк — тематизированная нейтральная кисть, а не
+            // фиксированный серый (текст/иконки читаются в обеих темах).
+            catch { return Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B"); }
         }
     }
 }

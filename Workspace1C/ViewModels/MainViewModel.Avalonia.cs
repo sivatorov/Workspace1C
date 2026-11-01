@@ -873,6 +873,21 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private async void RefreshFileModifiedTimesInBackground()
     {
+        // v100114: фоновый async void — исключение не должно ронять приложение;
+        // тихо пишем в журнал (диалоги из фонового обновления колонки не нужны).
+        try
+        {
+            await RefreshFileModifiedTimesInBackgroundCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка фонового расчёта дат изменения файловых баз", ex);
+        }
+    }
+
+    /// <summary>Тело фонового расчёта дат изменения (см. <see cref="RefreshFileModifiedTimesInBackground"/>).</summary>
+    private async System.Threading.Tasks.Task RefreshFileModifiedTimesInBackgroundCoreAsync()
+    {
         var fileBases = _allInfobases.Where(ib => ib.Connection.Type == ConnectionType.File).ToList();
         if (fileBases.Count == 0)
             return;

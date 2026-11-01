@@ -103,10 +103,12 @@ public sealed class Issue92BatchDumpTests
     {
         // Формат из настроек приложения («Формат даты в имени файла выгрузки»)
         // применяется к токену {Дата} без собственного формата (issue #92, 1.0.1.11).
+        // v100114: шаблон по умолчанию содержит {Дата:формат}, поэтому механика
+        // настроек проверяется на токене без собственного формата.
         var stamp = new DateTime(2026, 10, 30, 17, 45, 0);
         var path = BatchOperationsService.BuildDumpFilePath(
             @"C:\dumps", "Альфа", BatchOperationKind.DumpDt,
-            BatchOperationsService.DefaultDumpTemplate, stamp,
+            "{Имя}_{Дата}", stamp,
             timestampFormat: "yyyyMMdd_HHmmss");
 
         Assert.Equal(Path.Combine(@"C:\dumps", "Альфа_20261030_174500.dt"), path);

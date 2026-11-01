@@ -760,7 +760,9 @@ public class AppSettings
     /// Шаблон имени файла массовой выгрузки в DT/CF «Для выделенных…» (issue #92):
     /// токены {Имя} и {Дата}. По умолчанию — «{Имя}_{Дата}».
     /// </summary>
-    public string BatchDumpTemplate { get; set; } = "{Имя}_{Дата}";
+    // v100114 (issue #92): пример даты виден сразу — значение по умолчанию единое
+    // с шаблоном окна массовой выгрузки (BatchOperationsService.DefaultDumpTemplate).
+    public string BatchDumpTemplate { get; set; } = Workspace1C.Services.BatchOperationsService.DefaultDumpTemplate;
 
     /// <summary>Каталог назначения массовой выгрузки в DT/CF (issue #92); пусто — не задан.</summary>
     public string BatchDumpDirectory { get; set; } = string.Empty;
