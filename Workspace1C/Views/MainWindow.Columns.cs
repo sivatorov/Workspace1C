@@ -73,6 +73,16 @@ namespace Workspace1C
         /// </summary>
         private void OnBaseContextMenu_Opened(object sender, RoutedEventArgs e)
         {
+            // issue #96: правый клик по строке входит в сценарий «Ошибка интерфейса» —
+            // построение меню по выделению защищено guard'ом (исключение не роняет UI,
+            // полный стек + контекст — в журнал, пользователю показываются детали).
+            UiExceptionGuard.Guard(
+                nameof(OnBaseContextMenu_Opened),
+                () => OnBaseContextMenu_OpenedCore(sender, e));
+        }
+
+        private void OnBaseContextMenu_OpenedCore(object sender, RoutedEventArgs e)
+        {
             if (sender is not ContextMenu menu || _viewModel == null)
                 return;
 
@@ -434,8 +444,12 @@ namespace Workspace1C
             // Avalonia-события ContainerPrepared). В Recycling-виртуализации тот же экземпляр
             // сетки может «загрузиться» заново под новую строку — каждая реализация считается.
             _treeRowRealizeCount++;
-            if (sender is not Grid grid)
-                return;
+            // issue #96: подписки при реализации строки (Recycling) защищены guard'ом —
+            // исключение на полуразобранном DataContext не должно ронять UI.
+            UiExceptionGuard.Guard(nameof(OnInfobaseRowGrid_Loaded), () =>
+            {
+                if (sender is not Grid grid)
+                    return;
             // issue #255: при Recycling-виртуализации экземпляр сетки переиспользуется под новые
             // строки, поэтому порядок колонок, однажды применённый, сохраняется до сброса флага
             // в ApplyColumnOrder. Пропускаем ReorderGridColumns целиком для уже приведённых сеток,
@@ -458,6 +472,7 @@ namespace Workspace1C
             // скролла и усиливал рывки (issue #255). Стабилизатор HeaderAlignStabilizeStep
             // сам повторяется, пока первая строка ещё не появилась (!hadRows), поэтому
             // выравнивание после пересборки восстанавливается и без перезапуска здесь.
+            });
         }
 
         /// <summary>
@@ -469,17 +484,21 @@ namespace Workspace1C
             // Диагностика переключения вкладок (issue #21, CM_TREESWITCH, v2): счётчик
             // реализованных строк — см. OnInfobaseRowGrid_Loaded.
             _treeRowRealizeCount++;
-            if (sender is not Grid grid)
-                return;
-            // То же, что в OnInfobaseRowGrid_Loaded (issue #255): пропускаем пересборку колонок
-            // для сеток, к которым порядок уже применён (Recycling переиспользует экземпляр).
-            if (!GetColumnOrderApplied(grid))
+            // issue #96: та же защита, что и у строки базы (см. OnInfobaseRowGrid_Loaded).
+            UiExceptionGuard.Guard(nameof(OnGroupRowGrid_Loaded), () =>
             {
-                ReorderGridColumns(grid, RowFirstDataColumn);
-                SetColumnOrderApplied(grid, true);
-            }
-            grid.Tag = GroupGridMarker;
-            ApplyRowCompact(grid);
+                if (sender is not Grid grid)
+                    return;
+                // То же, что в OnInfobaseRowGrid_Loaded (issue #255): пропускаем пересборку колонок
+                // для сеток, к которым порядок уже применён (Recycling переиспользует экземпляр).
+                if (!GetColumnOrderApplied(grid))
+                {
+                    ReorderGridColumns(grid, RowFirstDataColumn);
+                    SetColumnOrderApplied(grid, true);
+                }
+                grid.Tag = GroupGridMarker;
+                ApplyRowCompact(grid);
+            });
         }
 
         /// <summary>
@@ -1262,6 +1281,14 @@ namespace Workspace1C
         /// </summary>
         private void OnColumnResize_MouseDown(object sender, MouseButtonEventArgs e)
         {
+            // issue #96: ресайз колонок входит в сценарий «Ошибка интерфейса» — guard.
+            UiExceptionGuard.Guard(
+                nameof(OnColumnResize_MouseDown),
+                () => OnColumnResize_MouseDownCore(sender, e));
+        }
+
+        private void OnColumnResize_MouseDownCore(object sender, MouseButtonEventArgs e)
+        {
             var column = GetSplitterTargetColumn(sender);
             if (column is null)
                 return;
@@ -1338,6 +1365,15 @@ namespace Workspace1C
         /// Завершает перетаскивание разделителя и сохраняет ширины колонок.
         /// </summary>
         private void OnColumnResize_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            // issue #96: guard завершения ресайза — сбой сохранения ширин не должен
+            // ронять UI (захват мыши при этом освобождается штатно).
+            UiExceptionGuard.Guard(
+                nameof(OnColumnResize_MouseUp),
+                () => OnColumnResize_MouseUpCore(sender, e));
+        }
+
+        private void OnColumnResize_MouseUpCore(object sender, MouseButtonEventArgs e)
         {
             if (sender is UIElement element)
                 element.ReleaseMouseCapture();

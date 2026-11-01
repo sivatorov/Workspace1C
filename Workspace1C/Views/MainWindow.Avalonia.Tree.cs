@@ -590,6 +590,12 @@ namespace Workspace1C
             {
                 if (_vm is not { } vm)
                     return;
+                // issue #96: двойной клик — запуск базы; сбой (например, утилизированный
+                // контейнер) не должен уходить в Dispatcher как «Ошибка интерфейса».
+                UiExceptionGuard.Guard(
+                    "MainWindow.Avalonia.RowCard.DoubleTapped",
+                    () =>
+                    {
                 // Issue #97: база из DataContext карточки в момент события, а не из
                 // замыкания: контейнер строки переиспользуется при пересборке
                 // плоского списка поиска, и клик по второй базе срабатывал по
@@ -607,6 +613,8 @@ namespace Workspace1C
                     vm.LaunchConfiguratorCommand.Execute(null);
                 else
                     vm.LaunchEnterpriseCommand.Execute(null);
+                    },
+                    () => $"tapped={(ResolveRowBase(card)?.Id ?? "null")}");
             };
 
             // Ctrl+щелчок по телу строки — поставить/снять закладку (номер). Клики
@@ -618,11 +626,18 @@ namespace Workspace1C
                     return;
                 if ((e.KeyModifiers & KeyModifiers.Control) == 0)
                     return;
+                // issue #96: Ctrl+клик — закладка; guard, как у DoubleTapped выше.
+                UiExceptionGuard.Guard(
+                    "MainWindow.Avalonia.RowCard.PointerPressed",
+                    () =>
+                    {
                 // Issue #97: база из DataContext события — см. ResolveRowBase.
                 if (ResolveRowBase(card) is not { } pressedIb)
                     return;
                 vm.ToggleBookmark(pressedIb);
                 e.Handled = true;
+                    },
+                    () => $"pressed={(ResolveRowBase(card)?.Id ?? "null")}");
             };
 
             return card;

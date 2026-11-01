@@ -99,6 +99,15 @@ namespace Workspace1C
         /// </summary>
         private void OnTreeDragPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            // issue #96: туннельный DnD-перехват защищён guard'ом — сбой фиксации payload
+            // не должен уходить в Dispatcher как «Ошибка интерфейса».
+            UiExceptionGuard.Guard(
+                nameof(OnTreeDragPointerPressed),
+                () => OnTreeDragPointerPressedCore(sender, e));
+        }
+
+        private void OnTreeDragPointerPressedCore(object? sender, PointerPressedEventArgs e)
+        {
             _dragPayload = null;
             var point = e.GetCurrentPoint(this);
             if (!point.Properties.IsLeftButtonPressed)

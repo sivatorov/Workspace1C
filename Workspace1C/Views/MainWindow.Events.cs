@@ -725,6 +725,20 @@ namespace Workspace1C
         /// </summary>
         private void OnInfobaseTree_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
+            // issue #96: защитная обёртка клик-конвейера. При исключении — полный стек,
+            // версия, ОС, имя обработчика и Id базы в журнал + содержательный диалог
+            // (вместо голого «Ошибка интерфейса»); приложение продолжает работу.
+            // Поведение без исключения не меняется (регресс #340/#326/#97 обязателен).
+            UiExceptionGuard.Guard(
+                nameof(OnInfobaseTree_PreviewMouseLeftButtonDown),
+                () => OnInfobaseTree_PreviewMouseLeftButtonDownCore(sender, e),
+                () => $"ClickCount={e.ClickCount}, " +
+                      $"selected={_viewModel?.SelectedInfobase?.Id ?? "null"}, " +
+                      $"modifiers={Keyboard.Modifiers}");
+        }
+
+        private void OnInfobaseTree_PreviewMouseLeftButtonDownCore(object sender, MouseButtonEventArgs e)
+        {
             // issue #340 (новая стратегия): клик, которым закрыли контекстное меню, после
             // освобождения захвата попапа WPF повторно доставляет в дерево «хвост» того же
             // MouseDown. Это ШТАТНЫЙ путь выбора строки (клик по ЖИВОМУ контейнеру под
@@ -993,6 +1007,16 @@ namespace Workspace1C
         /// (в т.ч. двойной клик для запуска базы). Метод остаётся подписанным в XAML.
         /// </summary>
         private void OnInfobaseTree_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            // issue #96: та же защитная обёртка, что и для MouseDown (см. выше).
+            UiExceptionGuard.Guard(
+                nameof(OnInfobaseTree_PreviewMouseLeftButtonUp),
+                () => OnInfobaseTree_PreviewMouseLeftButtonUpCore(sender, e),
+                () => $"selected={_viewModel?.SelectedInfobase?.Id ?? "null"}, " +
+                      $"modifiers={Keyboard.Modifiers}");
+        }
+
+        private void OnInfobaseTree_PreviewMouseLeftButtonUpCore(object sender, MouseButtonEventArgs e)
         {
             // B-1 (0.3.9.311): БЕЗУСЛОВНАЯ запись MouseUp по дереву — те же поля, что
             // у MouseDown (координаты, цель, модификаторы, состояние снимка). Прежняя

@@ -51,6 +51,22 @@ public static class BatchSelectionHelper
     };
 
     /// <summary>
+    /// Всё ли контейнер строки ещё показывает ЦЕЛЕВУЮ базу (issue #96). При
+    /// виртуализации (VirtualizingStackPanel Recycling) контейнер, захваченный в
+    /// момент клика, к моменту применения выделения может быть переиспользован под
+    /// другую строку — установка IsSelected на нём подсвечивала бы чужую строку,
+    /// а его DataContext указывал на чужие/осиротевшие данные. История-ориентиры:
+    /// #97 (клик по второй найденной базе) и #340/#326 (выделение «уезжало»).
+    /// Проверка по ссылке (ReferenceEquals после разворота обёртки): скриншот
+    /// данных бессмыслен — требуется именно тот экземпляр модели.
+    /// </summary>
+    /// <param name="containerDataContext">Текущий DataContext контейнера (может быть null).</param>
+    /// <param name="target">Целевая база выделения (может быть null — тогда false).</param>
+    /// <returns>True, если DataContext контейнера после разворота — та же ссылка модели.</returns>
+    public static bool IsContainerForBase(object? containerDataContext, Infobase? target) =>
+        target is not null && ReferenceEquals(Unwrap(containerDataContext), target);
+
+    /// <summary>
     /// Видимый порядок строк секции «Закреплённые» по ДАННЫМ узла, а не по
     /// контейнерам дерева (issue #326). Узел «Закреплённые» — плоский список
     /// обёрток <see cref="PinnedInfobaseItem"/> (или баз), поэтому его порядок

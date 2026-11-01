@@ -498,6 +498,15 @@ namespace Workspace1C
 
         private void OnTreeMenuCloseClickDedup_PointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            // issue #96: сложная логика стабилизации после закрытия меню (issue #340) —
+            // исключение здесь не должно уходить в Dispatcher как «Ошибка интерфейса».
+            UiExceptionGuard.Guard(
+                nameof(OnTreeMenuCloseClickDedup_PointerPressed),
+                () => OnTreeMenuCloseClickDedup_PointerPressedCore(sender, e));
+        }
+
+        private void OnTreeMenuCloseClickDedup_PointerPressedCore(object? sender, PointerPressedEventArgs e)
+        {
             if (_tree is null || e.Source is not Visual source)
                 return;
 
@@ -874,6 +883,19 @@ namespace Workspace1C
             EventHandler onLayoutUpdated = null!;
             onLayoutUpdated = (_, _) =>
             {
+                // issue #96: проход стабилизации обёрнут в try/catch (catch — в конце тела),
+                // зеркало WPF-версии (MainWindow.Tree.cs). Исключение здесь раньше уходило
+                // в Dispatcher.UIThread.UnhandledException; теперь проход завершается
+                // с записью в журнал, UI не роняется.
+                try
+                {
+                    if (_tree is null || _vm is null)
+                    {
+                        // Окно/дерево разобрано до сходимости стабилизации — отписываемся.
+                        _tree?.LayoutUpdated -= onLayoutUpdated;
+                        return;
+                    }
+
                 passes++;
                 var timeSinceStartMs = Environment.TickCount - startTick;
                 if (passes > maxPasses || timeSinceStartMs >= timeoutMs)
@@ -913,6 +935,15 @@ namespace Workspace1C
                                    $"selectedItemId={SelectedItemId()}, " +
                                    $"SelectedInfobase={(_vm.SelectedInfobase?.Id ?? "null")}, " +
                                    $"containerIsSelected={passRow?.IsSelected}, timeSinceStartMs={timeSinceStartMs}");
+                }
+                catch (Exception passEx)
+                {
+                    // issue #96: сбой прохода стабилизации не уходит в Dispatcher —
+                    // отписываемся и пишем полный стек через UiExceptionGuard.
+                    try { _tree?.LayoutUpdated -= onLayoutUpdated; } catch { }
+                    UiExceptionGuard.Report("EnsureSelectionStable.LayoutUpdated", passEx,
+                        $"target={target.Id}, pass={passes}, pinned={isPinnedSection}");
+                }
             };
 
             _tree.LayoutUpdated += onLayoutUpdated;

@@ -61,7 +61,11 @@ namespace Workspace1C
             };
             TaskScheduler.UnobservedTaskException += (_, args) =>
             {
-                ShowFatalError(TOr("App.Fatal.BackgroundTask", "Ошибка фоновой задачи"), args.Exception);
+                // issue #96: фоновая задача раньше не писалась в журнал (только диалог) —
+                // полнота централизованного логирования фатальных ошибок.
+                var bgTitle = TOr("App.Fatal.BackgroundTask", "Ошибка фоновой задачи");
+                LogFatal(bgTitle, args.Exception);
+                ShowFatalError(bgTitle, args.Exception);
                 args.SetObserved();
             };
 
@@ -516,8 +520,24 @@ namespace Workspace1C
                 var logger = AppServices.GetRequiredService<IAppLogger>();
                 var sb = new StringBuilder();
                 sb.AppendLine(title);
+                // issue #96: контекст в каждой фатальной записи — версия, ОС, разрядность,
+                // время; чтобы репорт пользователя можно было сопоставить с релизом без
+                // дополнительных вопросов.
+                sb.AppendLine("Версия: " + VersionInfo.Display());
+                try
+                {
+                    sb.AppendLine("ОС: " + System.Runtime.InteropServices.RuntimeInformation.OSDescription
+                                  + " (" + System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture + ")");
+                }
+                catch
+                {
+                    sb.AppendLine("ОС: " + Environment.OSVersion.VersionString);
+                }
+                sb.AppendLine("Время: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
                 sb.AppendLine("Исключение: " + ex.GetType().FullName);
                 sb.AppendLine("Сообщение: " + ex.Message);
+                // Полный стек БЕЗ обрезки: обрезка оставлена только для диалога
+                // (ShowFatalError), журнал должен содержать весь отчёт (issue #96).
                 sb.AppendLine("StackTrace:");
                 sb.AppendLine(ex.ToString());
                 logger.Error(sb.ToString());
@@ -549,6 +569,19 @@ namespace Workspace1C
                 if (stack.Length > 1200)
                     stack = stack[..1200] + "…";
                 sb.AppendLine(stack);
+                // issue #96: путь к журналу в тексте диалога — чтобы пользователь сам мог
+                // приложить полный отчёт (запись LogFatal выше содержит весь стек).
+                try
+                {
+                    sb.AppendLine();
+                    sb.AppendLine(string.Format(
+                        TOr("App.Fatal.LogPath", "Полный отчёт (журнал приложения): {0}"),
+                        Services.PlatformPaths.LogDirectory));
+                }
+                catch
+                {
+                    // Каталог данных не определён — диалог важнее строки с путём.
+                }
 
                 AppServices.GetRequiredService<IDialogService>()
                     .ShowError(sb.ToString(), TOr("App.Fatal.Title", "Workspace 1C — ошибка"));

@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -678,14 +679,57 @@ namespace Workspace1C
 
                 // Дублируем в штатный журнал приложения (app.log), если логгер уже доступен:
                 // в нём фатальная ошибка видна рядом с обычными событиями и облегчает разбор.
+                // issue #96: в запись добавляются версия приложения и ОС — полный стек идёт
+                // вместе с текстом (ex.ToString()), обрезки нет.
                 try
                 {
                     var logger = AppServices.Services?.GetService<IAppLogger>();
-                    logger?.Error($"{title}: {ex.Message}", ex);
+                    var os = RuntimeInformation.OSDescription;
+                    logger?.Error(
+                        $"{title} | Версия: {VersionInfo.Display()} | ОС: {os} | " +
+                        $"Время: {DateTime.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}{ex}", ex);
                 }
                 catch { /* ignore */ }
+
+                // issue #96: показ диалога ошибки пользователю. Раньше на Linux ошибка
+                // уходила только в stderr/errors.log — окно «Ошибка интерфейса» не появлялось
+                // вовсе (комментарий «Этап 3»). Диалог показывается ТОЛЬКО когда главное окно
+                // уже показано: на раннем этапе запуска окон нет и модальный показ невозможен.
+                try
+                {
+                    var mainWindow = _desktopLifetime?.MainWindow;
+                    if (mainWindow is { IsVisible: true })
+                    {
+                        var dialogs = AppServices.TryGetService<IDialogService>();
+                        dialogs?.ShowError(
+                            BuildFatalDialogText(title, ex),
+                            TOr("App.Fatal.Title", "Workspace 1C — ошибка"));
+                    }
+                }
+                catch { /* диалог не должен маскировать исходную ошибку */ }
             }
             catch { /* ignore */ }
+        }
+
+        /// <summary>Текст диалога фатальной ошибки (issue #96): тип, сообщение, стек (обрезанный
+        /// для читаемости) и путь к журналу, чтобы пользователь мог приложить полный отчёт.</summary>
+        private static string BuildFatalDialogText(string title, Exception ex)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine(title);
+            sb.AppendLine();
+            sb.AppendLine(ex.Message);
+            sb.AppendLine();
+            sb.AppendLine(ex.GetType().FullName);
+            var stack = ex.StackTrace ?? "";
+            if (stack.Length > 1200)
+                stack = stack[..1200] + "…";
+            sb.AppendLine(stack);
+            sb.AppendLine();
+            sb.AppendLine(string.Format(
+                TOr("App.Fatal.LogPath", "Полный отчёт (журнал приложения): {0}"),
+                PlatformPaths.LogDirectory));
+            return sb.ToString();
         }
 
         /// <summary>

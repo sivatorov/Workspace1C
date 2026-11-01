@@ -84,6 +84,19 @@ namespace Workspace1C.Controls
         /// </summary>
         private void OnRowPointerPressed(object? sender, PointerPressedEventArgs e)
         {
+            // issue #96: защитная обёртка клик-конвейера (Linux). При исключении — полный
+            // стек, версия, ОС, имя обработчика и контекст в журнал + содержательный диалог;
+            // приложение продолжает работу. Поведение без исключения не меняется
+            // (регресс #340/#97 обязателен).
+            UiExceptionGuard.Guard(
+                nameof(OnRowPointerPressed),
+                () => OnRowPointerPressedCore(sender, e),
+                () => $"keyModifiers={e.KeyModifiers}, " +
+                      $"selectedBase={(DataContext is MainViewModel vm ? vm.SelectedInfobase?.Id ?? "null" : "no-vm")}");
+        }
+
+        private void OnRowPointerPressedCore(object? sender, PointerPressedEventArgs e)
+        {
             var point = e.GetCurrentPoint(this);
             if (!point.Properties.IsLeftButtonPressed && !point.Properties.IsRightButtonPressed)
                 return;
@@ -259,10 +272,28 @@ namespace Workspace1C.Controls
             if (row is null)
                 return;
 
-            if (_selectedRow is { } previous && !ReferenceEquals(previous, row) && previous.IsSelected)
-                previous.IsSelected = false;
-            row.IsSelected = true;
-            _selectedRow = row;
+            // issue #96: прежняя строка могла быть утилизирована/переподготовлена
+            // (комментарий у ClearContainerForItemOverride) — обращение к IsSelected
+            // по осиротевшему контейнеру защищаем: ссылка на DETACHED-контейнер
+            // просто сбрасывается, чужая подсветка не гасится. Плюс общий guard:
+            // сбой здесь не должен уходить в Dispatcher как «Ошибка интерфейса».
+            UiExceptionGuard.Guard(
+                nameof(SelectRow),
+                () =>
+                {
+                    if (_selectedRow is { } previous && !ReferenceEquals(previous, row) &&
+                        previous.IsAttachedToVisualTree() && previous.IsSelected)
+                    {
+                        previous.IsSelected = false;
+                    }
+                    else if (_selectedRow is { } stale && !stale.IsAttachedToVisualTree())
+                    {
+                        // Контейнер уже вне дерева — ссылка недействительна.
+                        _selectedRow = null;
+                    }
+                    row.IsSelected = true;
+                    _selectedRow = row;
+                });
         }
 
         /// <summary>

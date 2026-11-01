@@ -1,0 +1,26 @@
+Release 1.0.1.18: защита клик-конвейера списка баз и диагностика UI-исключений (issue #96)
+
+- клик-конвейер списка баз: все обработчики кликов, выделения и
+  контекстного меню по списку баз (Windows и Avalonia/Linux) защищены
+  от необработанных исключений — вместо окна «Ошибка интерфейса»
+  показывается содержательный диалог с типом ошибки, обработчиком и
+  путём к журналу (issue #96, Views/MainWindow.Events.cs,
+  Views/MainWindow.Tree.cs, Views/MainWindow.Columns.cs,
+  Views/MainWindow.Avalonia.Events.cs, Views/MainWindow.Avalonia.Tree.cs,
+  Views/MainWindow.Avalonia.DragDrop.cs, Controls/LeveledTreeView.Avalonia.cs);
+- подсветка переиспользованных контейнеров дерева: контейнер, захваченный
+  в момент клика, при виртуализации может быть переиспользован под другую
+  строку — установка IsSelected на нём подсвечивала чужую базу; добавлена
+  проверка по ссылке DataContext контейнера против целевой базы
+  (issue #96, родственная проблема #97, Services/BatchSelectionHelper.cs);
+- диагностика фатальных UI-исключений: глобальный перехват в App — при
+  любом фатальном UI-исключении в журнал (CM_MAIN/app-*.log) пишется
+  полный стек, версия приложения и версия ОС; на Linux ошибку ранее было
+  не видно вовсе (issue #96, App.xaml.cs, App.axaml.cs, новый сервис
+  Services/UiExceptionGuard.cs);
+- локализация: новые строки диалогов ошибок интерфейса
+  (Localization/Languages/ru.json, en.json);
+- тесты: новый UiExceptionGuardTests (5454/5454 зелёные);
+- версия 1.0.1.17 → 1.0.1.18 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  план plan-issue-96-v100118.md, скрипт сборки _build_v100118.ps1.

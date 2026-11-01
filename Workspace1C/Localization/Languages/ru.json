@@ -1880,6 +1880,10 @@
     "App.Fatal.StartupFailed": "Не удалось запустить приложение",
     "App.Fatal.InternalError": "Внутренняя ошибка:",
     "App.Fatal.Title": "Workspace 1C — ошибка",
+    "App.Fatal.GuardIntro": "Возникла ошибка при обработке действия в интерфейсе. Работа приложения продолжена.",
+    "App.Fatal.GuardHandler": "Обработчик: {0}",
+    "App.Fatal.GuardContext": "Контекст: {0}",
+    "App.Fatal.LogPath": "Полный отчёт (журнал приложения): {0}",
 
     "Main.HideGroups": "📁 Скрыть группы",
     "Main.ShowGroups": "📁 Показывать группы",

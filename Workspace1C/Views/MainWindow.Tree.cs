@@ -763,12 +763,7 @@ namespace Workspace1C
         /// данные каждой строки, issue #314), а выбор, команды и поиск работают
         /// с моделью <see cref="Infobase"/>, как раньше.
         /// </summary>
-        private static Infobase? UnwrapInfobase(object? data) => data switch
-        {
-            Infobase ib => ib,
-            PinnedInfobaseItem pinned => pinned.Base,
-            _ => null
-        };
+        private static Infobase? UnwrapInfobase(object? data) => Services.BatchSelectionHelper.Unwrap(data);
 
         /// <summary>
         /// Находит узел группы, в котором размещена указанная база.
@@ -981,7 +976,30 @@ namespace Workspace1C
         /// </summary>
         private void ApplyGroupSelection(TreeViewItem item, GroupNodeViewModel groupNode)
         {
-            item.IsSelected = true;
+            UiExceptionGuard.Guard(
+                nameof(ApplyGroupSelection),
+                () => ApplyGroupSelectionCore(item, groupNode),
+                () => $"group={groupNode.Group?.Name ?? "null"}, " +
+                      $"containerDataContextMatches={ReferenceEquals(item.DataContext, groupNode)}");
+        }
+
+        private void ApplyGroupSelectionCore(TreeViewItem item, GroupNodeViewModel groupNode)
+        {
+            // issue #96: контейнер мог быть переиспущен виртуализацией (Recycling) и
+            // показывать другую строку — подсветка чужой строки недопустима. Несовпадение
+            // не бросает исключение: подсветка пропускается, выбор ставится только на
+            // модель (штатное поведение нереализованной строки), расхождение — в trace.
+            if (!ReferenceEquals(item.DataContext, groupNode))
+            {
+                MenuCloseTrace.Log($"ApplyGroupSelection: containerRecycled=true, " +
+                                   $"expected={groupNode.Group?.Name ?? "null"}, " +
+                                   $"actual={item.DataContext?.GetType().Name ?? "null"}");
+            }
+            else
+            {
+                item.IsSelected = true;
+            }
+
             _viewModel.SelectedInfobase = null;
             _viewModel.SelectedGroupNode = groupNode;
 
@@ -998,7 +1016,34 @@ namespace Workspace1C
         /// </summary>
         private void ApplySelection(TreeViewItem item, Infobase infobase)
         {
-            item.IsSelected = true;
+            UiExceptionGuard.Guard(
+                nameof(ApplySelection),
+                () => ApplySelectionCore(item, infobase),
+                () => $"target={infobase.Id}, " +
+                      $"containerMatches={Services.BatchSelectionHelper.IsContainerForBase(item.DataContext, infobase)}");
+        }
+
+        private void ApplySelectionCore(TreeViewItem item, Infobase infobase)
+        {
+            // issue #96: контейнер, захваченный в момент клика, мог быть переиспущен
+            // виртуализацией (Recycling) и к моменту применения показывать ДРУГУЮ строку
+            // (DataContext уже заменён) — установка IsSelected подсветила бы чужую строку,
+            // а при осиротевшем контейнере бросила бы NRE, видимое как «Ошибка интерфейса».
+            // Несовпадение не бросает: подсветка пропускается, выбор ставится только на
+            // модель (штатное поведение нереализованной строки), расхождение — в trace.
+            // В штатных путях (контейнер под кликом или найденный по данным) контекст
+            // всегда совпадает — поведение не меняется (регресс #340/#97 обязателен).
+            if (!Services.BatchSelectionHelper.IsContainerForBase(item.DataContext, infobase))
+            {
+                MenuCloseTrace.Log($"ApplySelection: containerRecycled=true, " +
+                                   $"target={infobase.Id}, " +
+                                   $"actualDataContext={item.DataContext?.GetType().Name ?? "null"}");
+            }
+            else
+            {
+                item.IsSelected = true;
+            }
+
             _viewModel.SelectedInfobase = infobase;
         }
 
@@ -1093,6 +1138,18 @@ namespace Workspace1C
             EventHandler onLayoutUpdated = null!;
             onLayoutUpdated = (_, _) =>
             {
+                // issue #96: проход стабилизации обёрнут в try/catch (catch — в конце тела).
+                // Исключение здесь раньше уходило в DispatcherUnhandledException и показывало
+                // «Ошибка интерфейса»; теперь проход молча завершается с записью в журнал.
+                try
+                {
+                    if (MainTree is null || _viewModel is null)
+                    {
+                        // Окно/дерево разобрано до сходимости стабилизации — просто отписываемся.
+                        MainTree?.LayoutUpdated -= onLayoutUpdated;
+                        return;
+                    }
+
                 passes++;
                 var timeSinceStartMs = Environment.TickCount - startTick;
                 if (passes > maxPasses || timeSinceStartMs >= timeoutMs)
@@ -1144,6 +1201,17 @@ namespace Workspace1C
                                    $"selectedItemId={SelectedItemId()}, " +
                                    $"SelectedInfobase={(_viewModel.SelectedInfobase?.Id ?? "null")}, " +
                                    $"containerIsSelected={passContainer?.IsSelected}, timeSinceStartMs={timeSinceStartMs}");
+                }
+                catch (Exception passEx)
+                {
+                    // issue #96: сбой в проходе стабилизации не должен уходить в
+                    // DispatcherUnhandledException («Ошибка интерфейса»): отписываемся,
+                    // полный стек + контекст пишем через UiExceptionGuard; выделение
+                    // доедет штатно (модель уже выбрана).
+                    try { MainTree?.LayoutUpdated -= onLayoutUpdated; } catch { }
+                    UiExceptionGuard.Report("EnsureSelectionStable.LayoutUpdated", passEx,
+                        $"target={target.Id}, pass={passes}, pinned={isPinnedSection}");
+                }
             };
 
             MainTree.LayoutUpdated += onLayoutUpdated;

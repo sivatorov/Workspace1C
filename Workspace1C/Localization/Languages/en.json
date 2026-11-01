@@ -1880,6 +1880,10 @@
     "App.Fatal.StartupFailed": "Failed to start the application",
     "App.Fatal.InternalError": "Internal error:",
     "App.Fatal.Title": "Workspace 1C — error",
+    "App.Fatal.GuardIntro": "An error occurred while handling a UI action. The application kept running.",
+    "App.Fatal.GuardHandler": "Handler: {0}",
+    "App.Fatal.GuardContext": "Context: {0}",
+    "App.Fatal.LogPath": "Full report (application log): {0}",
 
     "Main.HideGroups": "📁 Hide groups",
     "Main.ShowGroups": "📁 Show groups",
