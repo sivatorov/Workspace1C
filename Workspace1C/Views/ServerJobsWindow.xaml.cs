@@ -34,8 +34,17 @@ namespace Workspace1C
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             // Первичная загрузка списка после показа окна — rac вызывается асинхронно,
-            // UI-поток не блокируется.
-            await _vm.LoadJobsAsync();
+            // UI-поток не блокируется. v100120: async void — исключение не должно
+            // уходить в глобальный обработчик без контекста операции (аудит async void,
+            // шаблон RelayCommand.Execute).
+            try
+            {
+                await _vm.LoadJobsAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка загрузки сеансов/соединений сервера", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
     }
 }

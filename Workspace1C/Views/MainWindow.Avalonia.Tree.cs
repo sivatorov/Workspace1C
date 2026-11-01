@@ -2611,10 +2611,19 @@ namespace Workspace1C
         /// <summary>Выполнить сценарий резервирования для всех баз мультивыделения.</summary>
         private async void OnBatchRunBackupClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
-                return;
-            await _vm.RunBatchBackupAsync();
-            _vm.ClearBatchSelection();
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                if (_vm is null || _vm.BatchOperationTargetCount == 0)
+                    return;
+                await _vm.RunBatchBackupAsync();
+                _vm.ClearBatchSelection();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка массового резервирования", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).</summary>

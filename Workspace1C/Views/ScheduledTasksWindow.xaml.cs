@@ -210,17 +210,26 @@ public partial class ScheduledTasksWindow : Window
 
     private async void Run_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } item)
-            return;
-        var result = await _scheduler.RunNowAsync(item.Task);
-        if (result is not null)
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
         {
-            if (result.Success)
-                _dialogs.ShowInfo(string.Join("\n", result.CreatedFiles), T("Schedule.RunNow"));
-            else
-                _dialogs.ShowError(result.ErrorMessage ?? T("Schedule.RunFailed"), T("Schedule.RunNow"));
+            if (Selected is not { } item)
+                return;
+            var result = await _scheduler.RunNowAsync(item.Task);
+            if (result is not null)
+            {
+                if (result.Success)
+                    _dialogs.ShowInfo(string.Join("\n", result.CreatedFiles), T("Schedule.RunNow"));
+                else
+                    _dialogs.ShowError(result.ErrorMessage ?? T("Schedule.RunFailed"), T("Schedule.RunNow"));
+            }
+            LoadTasks();
         }
-        LoadTasks();
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка запуска задания планировщика вручную", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 }
 #endif

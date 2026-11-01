@@ -43,32 +43,41 @@ public partial class MainViewModel
     /// <summary>Выполняет сценарий: одиночный — сразу, несколько — выбор в окне.</summary>
     private async void ExecuteRunScriptForSelected()
     {
-        var infobase = SelectedInfobase;
-        if (infobase is null)
+        // v100120: фоновый async void — исключение не должно уходить в глобальный
+        // обработчик без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
         {
-            _dialogs.ShowWarning(LocalizationManager.T("Script.NoBaseSelected"), LocalizationManager.T("Script.RunTitle"));
-            return;
-        }
+            var infobase = SelectedInfobase;
+            if (infobase is null)
+            {
+                _dialogs.ShowWarning(LocalizationManager.T("Script.NoBaseSelected"), LocalizationManager.T("Script.RunTitle"));
+                return;
+            }
 
-        var store = AppServices.GetRequiredService<IScriptScenarioStore>();
-        var scenarios = store.LoadAll();
-        if (scenarios.Count == 0)
+            var store = AppServices.GetRequiredService<IScriptScenarioStore>();
+            var scenarios = store.LoadAll();
+            if (scenarios.Count == 0)
+            {
+                _dialogs.ShowInfo(LocalizationManager.T("Script.NoneConfigured"), LocalizationManager.T("Script.RunTitle"));
+                return;
+            }
+
+            if (scenarios.Count == 1)
+            {
+                await RunScriptAsync(infobase, scenarios[0]);
+                return;
+            }
+
+            var win = new Workspace1C.ScriptPickWindow(infobase, this);
+            // Настоящая модальность (issue #291): владелец — главное окно, как в
+            // ExecuteShowScriptsSettings.
+            win.Owner = System.Windows.Application.Current.MainWindow;
+            win.ShowDialog();
+        }
+        catch (Exception ex)
         {
-            _dialogs.ShowInfo(LocalizationManager.T("Script.NoneConfigured"), LocalizationManager.T("Script.RunTitle"));
-            return;
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка запуска сценария скрипта", ex); } catch { /* лог не роняет команду */ }
         }
-
-        if (scenarios.Count == 1)
-        {
-            await RunScriptAsync(infobase, scenarios[0]);
-            return;
-        }
-
-        var win = new Workspace1C.ScriptPickWindow(infobase, this);
-        // Настоящая модальность (issue #291): владелец — главное окно, как в
-        // ExecuteShowScriptsSettings.
-        win.Owner = System.Windows.Application.Current.MainWindow;
-        win.ShowDialog();
     }
 
     /// <summary>

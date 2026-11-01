@@ -99,8 +99,17 @@ namespace Workspace1C
 
         private async void OnOpened(object? sender, EventArgs e)
         {
-            if (_viewModel.VersionTree.Count == 0)
-                await _viewModel.LoadCatalogAsync();
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                if (_viewModel.VersionTree.Count == 0)
+                    await _viewModel.LoadCatalogAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка первичной загрузки каталога версий платформ", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)

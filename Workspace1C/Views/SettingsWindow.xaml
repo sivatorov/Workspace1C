@@ -2874,6 +2874,15 @@
                                     <TextBlock Text="{loc:Loc Settings.About.CopyTechInfo}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
+                            <Button Padding="14,8" HorizontalAlignment="Left" Margin="8,0,0,0"
+                                    Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                    Click="OnCollectDiagnostics_Click">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="PackageVariant" Width="16" Height="16"
+                                                             Foreground="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Settings.About.CreateDiagnostics}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
                     </StackPanel>
                 </ScrollViewer>

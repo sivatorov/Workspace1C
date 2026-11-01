@@ -104,6 +104,8 @@ namespace Workspace1C
 
         private async void OnLock_Click(object sender, RoutedEventArgs e)
         {
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             var options = BuildOptions();
             if (options is null)
                 return;
@@ -123,6 +125,10 @@ namespace Workspace1C
                         T("SessionLock.Title"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка блокировки сеансов", ex); } catch { /* лог не роняет обработчик */ }
+            }
             finally
             {
                 IsEnabled = true;
@@ -131,6 +137,8 @@ namespace Workspace1C
 
         private async void OnUnlock_Click(object sender, RoutedEventArgs e)
         {
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             IsEnabled = false;
             try
             {
@@ -145,6 +153,10 @@ namespace Workspace1C
                     System.Windows.MessageBox.Show(result.ErrorMessage ?? T("SessionLock.UnlockFailed"),
                         T("SessionLock.Title"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка разблокировки сеансов", ex); } catch { /* лог не роняет обработчик */ }
             }
             finally
             {

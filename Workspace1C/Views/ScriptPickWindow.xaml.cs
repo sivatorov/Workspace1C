@@ -138,10 +138,19 @@ public partial class ScriptPickWindow : Window
 
     private async void Run_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } item)
-            return;
-        await _vm.RunScriptAsync(_infobase, item.Scenario);
-        Close();
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            if (Selected is not { } item)
+                return;
+            await _vm.RunScriptAsync(_infobase, item.Scenario);
+            Close();
+        }
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка запуска сценария скрипта", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

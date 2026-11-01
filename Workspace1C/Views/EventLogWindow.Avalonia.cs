@@ -146,19 +146,28 @@ namespace Workspace1C
 
         private async void OnOpenFolder()
         {
-            var dialogs = AppServices.GetRequiredService<IDialogService>();
-            var folder = dialogs.OpenFolderDialog(LocalizationManager.T("EventLog.ChooseFolder"), _vm.Location.LogDir);
-            if (string.IsNullOrWhiteSpace(folder))
-                return;
-            var location = LgdJournalLocator.FromDirectory(folder);
-            if (!location.IsValid)
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
             {
-                dialogs.ShowWarning(location.ErrorMessage ?? LocalizationManager.T("EventLog.NotFound"),
-                    LocalizationManager.T("EventLog.Title"));
-                return;
+                var dialogs = AppServices.GetRequiredService<IDialogService>();
+                var folder = dialogs.OpenFolderDialog(LocalizationManager.T("EventLog.ChooseFolder"), _vm.Location.LogDir);
+                if (string.IsNullOrWhiteSpace(folder))
+                    return;
+                var location = LgdJournalLocator.FromDirectory(folder);
+                if (!location.IsValid)
+                {
+                    dialogs.ShowWarning(location.ErrorMessage ?? LocalizationManager.T("EventLog.NotFound"),
+                        LocalizationManager.T("EventLog.Title"));
+                    return;
+                }
+                _vm.ChangeLocation(location);
+                await _vm.LoadAsync();
             }
-            _vm.ChangeLocation(location);
-            await _vm.LoadAsync();
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка выбора папки журнала регистрации", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         private void OnExport()

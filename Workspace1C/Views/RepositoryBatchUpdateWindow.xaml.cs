@@ -63,7 +63,19 @@ namespace Workspace1C
 
         private void OnSelectNone_Click(object sender, RoutedEventArgs e) => _vm.SetAll(false);
 
-        private async void OnUpdateSelected_Click(object sender, RoutedEventArgs e) => await _vm.RunAsync();
+        private async void OnUpdateSelected_Click(object sender, RoutedEventArgs e)
+        {
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                await _vm.RunAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка пакетного обновления конфигураций из хранилища", ex); } catch { /* лог не роняет обработчик */ }
+            }
+        }
 
         private void OnClose_Click(object sender, RoutedEventArgs e) => Close();
     }

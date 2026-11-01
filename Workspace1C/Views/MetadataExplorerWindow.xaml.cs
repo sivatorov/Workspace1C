@@ -72,6 +72,8 @@ namespace Workspace1C
         /// выполнение выгрузки; результат — дерево, ошибки — в статус-строку VM.</summary>
         private async void OnLoad_Click(object sender, RoutedEventArgs e)
         {
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             var progress = new MetadataExplorerProgressWindow { Owner = this };
             progress.SetStage(LocalizationManager.T("MetadataExplorer.Status.Dumping"));
             Action<string> onStage = progress.SetStage;
@@ -80,6 +82,10 @@ namespace Workspace1C
             try
             {
                 await _vm.LoadAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка загрузки метаданных", ex); } catch { /* лог не роняет обработчик */ }
             }
             finally
             {

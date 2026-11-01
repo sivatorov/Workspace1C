@@ -76,13 +76,34 @@ public partial class ExportsListWindow : Window
         RestoreButton.IsEnabled = Selected is not null && _infobase is not null && _mainVm is not null;
     }
 
-    private async void Refresh_Click(object sender, RoutedEventArgs e) => await RefreshItemsAsync();
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            await RefreshItemsAsync();
+        }
+        catch (System.Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка обновления списка выгрузок", ex); } catch { /* лог не роняет обработчик */ }
+        }
+    }
 
     private async void Restore_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } item || _infobase is null || _mainVm is null)
-            return;
-        await _mainVm.RestoreAsync(_infobase, item);
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            if (Selected is not { } item || _infobase is null || _mainVm is null)
+                return;
+            await _mainVm.RestoreAsync(_infobase, item);
+        }
+        catch (System.Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка восстановления из выгрузки", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 
     private void OpenFolder_Click(object sender, RoutedEventArgs e)

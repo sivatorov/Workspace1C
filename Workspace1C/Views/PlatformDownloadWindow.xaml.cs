@@ -100,8 +100,17 @@ public partial class PlatformDownloadWindow : Window
     /// <summary>При открытии — первичная проверка каталога версий.</summary>
     private async void OnWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.VersionTree.Count == 0)
-            await _viewModel.LoadCatalogAsync();
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            if (_viewModel.VersionTree.Count == 0)
+                await _viewModel.LoadCatalogAsync();
+        }
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка первичной загрузки каталога версий платформ", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 
     private void OnWindow_PreviewKeyDown(object sender, KeyEventArgs e)

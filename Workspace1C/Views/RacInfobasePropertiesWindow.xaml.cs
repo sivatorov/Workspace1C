@@ -71,7 +71,19 @@ namespace Workspace1C
         private void OnDbPasswordChanged(object sender, RoutedEventArgs e) =>
             _vm.DbPassword = DbPasswordBox.Password;
 
-        private async void OnRefreshClick(object sender, RoutedEventArgs e) => await _vm.RefreshAsync();
+        private async void OnRefreshClick(object sender, RoutedEventArgs e)
+        {
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                await _vm.RefreshAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка обновления свойств ИБ кластера", ex); } catch { /* лог не роняет обработчик */ }
+            }
+        }
 
         private void OnSaveClick(object sender, RoutedEventArgs e)
         {

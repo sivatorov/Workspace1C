@@ -1763,6 +1763,21 @@ public string HotkeyEnterprise
     /// <summary>Клонирует выбранную базу: файловая — копия каталога, серверная — клон на сервере.</summary>
     private async void ExecuteCloneInfobase()
     {
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            await ExecuteCloneInfobaseCoreAsync();
+        }
+        catch (Exception ex)
+        {
+            try { _logger.Error("Ошибка клонирования базы", ex); } catch { /* лог не роняет команду */ }
+        }
+    }
+
+    /// <summary>Тело клонирования (см. <see cref="ExecuteCloneInfobase"/>).</summary>
+    private async System.Threading.Tasks.Task ExecuteCloneInfobaseCoreAsync()
+    {
         var source = SelectedInfobase;
         if (source?.Connection is null)
             return;

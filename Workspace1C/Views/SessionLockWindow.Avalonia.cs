@@ -206,6 +206,8 @@ public sealed class SessionLockWindow : ModalWindowBase
 
     private async void OnLock_Click(object? sender, RoutedEventArgs e)
     {
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
         var options = BuildOptions();
         if (options is null)
             return;
@@ -224,6 +226,10 @@ public sealed class SessionLockWindow : ModalWindowBase
                 _dialog.ShowError(result.ErrorMessage ?? T("SessionLock.Failed"), T("SessionLock.Title"));
             }
         }
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка блокировки сеансов", ex); } catch { /* лог не роняет обработчик */ }
+        }
         finally
         {
             IsEnabled = true;
@@ -232,6 +238,8 @@ public sealed class SessionLockWindow : ModalWindowBase
 
     private async void OnUnlock_Click(object? sender, RoutedEventArgs e)
     {
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
         IsEnabled = false;
         try
         {
@@ -245,6 +253,10 @@ public sealed class SessionLockWindow : ModalWindowBase
             {
                 _dialog.ShowError(result.ErrorMessage ?? T("SessionLock.UnlockFailed"), T("SessionLock.Title"));
             }
+        }
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка разблокировки сеансов", ex); } catch { /* лог не роняет обработчик */ }
         }
         finally
         {

@@ -75,32 +75,41 @@ public partial class MainViewModel
     /// <summary>Выполняет сценарий резервирования: одиночный — сразу, несколько — выбор в окне.</summary>
     private async void ExecuteRunBackupScenario()
     {
-        var infobase = SelectedInfobase;
-        if (infobase is null)
+        // v100120: фоновый async void — исключение не должно уходить в глобальный
+        // обработчик без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
         {
-            _dialogs.ShowWarning(LocalizationManager.T("Backup.NoBaseSelected"), LocalizationManager.T("Backup.RunTitle"));
-            return;
-        }
+            var infobase = SelectedInfobase;
+            if (infobase is null)
+            {
+                _dialogs.ShowWarning(LocalizationManager.T("Backup.NoBaseSelected"), LocalizationManager.T("Backup.RunTitle"));
+                return;
+            }
 
-        var store = AppServices.GetRequiredService<IBackupScenarioStore>();
-        var scenarios = store.LoadAll();
-        if (scenarios.Count == 0)
+            var store = AppServices.GetRequiredService<IBackupScenarioStore>();
+            var scenarios = store.LoadAll();
+            if (scenarios.Count == 0)
+            {
+                _dialogs.ShowInfo(LocalizationManager.T("Backup.NoneConfigured"), LocalizationManager.T("Backup.RunTitle"));
+                return;
+            }
+
+            if (scenarios.Count == 1)
+            {
+                await RunBackupAsync(infobase, scenarios[0]);
+                return;
+            }
+
+            var win = new Workspace1C.BackupScenariosWindow(infobase, this);
+            // Настоящая модальность (issue #291): владелец — главное окно, как в
+            // ExecuteShowBackupScenarios.
+            win.Owner = System.Windows.Application.Current.MainWindow;
+            win.ShowDialog();
+        }
+        catch (Exception ex)
         {
-            _dialogs.ShowInfo(LocalizationManager.T("Backup.NoneConfigured"), LocalizationManager.T("Backup.RunTitle"));
-            return;
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка запуска сценария резервирования", ex); } catch { /* лог не роняет команду */ }
         }
-
-        if (scenarios.Count == 1)
-        {
-            await RunBackupAsync(infobase, scenarios[0]);
-            return;
-        }
-
-        var win = new Workspace1C.BackupScenariosWindow(infobase, this);
-        // Настоящая модальность (issue #291): владелец — главное окно, как в
-        // ExecuteShowBackupScenarios.
-        win.Owner = System.Windows.Application.Current.MainWindow;
-        win.ShowDialog();
     }
 
     /// <summary>Выполняет сценарий резервирования и показывает результат.</summary>

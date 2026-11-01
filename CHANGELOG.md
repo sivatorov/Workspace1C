@@ -11,6 +11,59 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.20] — 2026-11-01
+
+### Новый функционал
+
+- **Экспорт диагностики в ZIP (Windows и Linux).** Кнопка «Собрать диагностику (ZIP)»
+  во вкладке «О программе» настроек собирает в один архив журналы приложения
+  (`logs/app-*.log`, 14 дней ротации), трассировку модальных окон
+  (`cm_modal_trace.log`, issue #94), конфиг диагностических флагов `trace.json`
+  и сгенерированный `systeminfo.txt` (версия приложения, ОС, .NET, культура,
+  аптайм). Путь к архиву копируется в буфер обмена — файл сразу можно приложить
+  к обращению в поддержку. Пароли и строки подключения в архив не попадают:
+  настройки (`settings.json`, `infobases.json`) намеренно не включаются.
+  Реализовано в [`DiagnosticsBundleService`](Workspace1C/Services/DiagnosticsBundleService.cs),
+  кнопки добавлены в [`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml)
+  (WPF) и [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs)
+  (Linux). Регрессионные тесты:
+  [`DiagnosticsBundleServiceTests`](Workspace1C.Tests/DiagnosticsBundleServiceTests.cs).
+
+### Производительность
+
+- **Кэш кистей по HEX-спецификации (Windows и Linux).** Перерисовки дерева,
+  контекстных меню и иконок вызывали `Color.Parse`/`ColorConverter` и аллокацию
+  новой `SolidColorBrush` на каждый вызов ([`ThemeBrushes.FromSpec`](Workspace1C/Themes/ThemeBrushes.Avalonia.cs)
+  и WPF-двойник [`WpfBrushes.FromSpec`](Workspace1C/Themes/ThemeBrushes.Wpf.cs)).
+  HEX-литералы теперь переиспользуются через потокобезопасный кэш; WPF-кисти
+  заморожены (`Freeze`), Avalonia-вариант не зависит от темы (кисти «@»-ресурсов,
+  наоборот, продолжают обновляться вместе со схемой).
+
+### Надёжность
+
+- **Аудит `async void` без try/catch завершён (Windows и Linux).** Все 34
+  оставшихся фоновых метода/обработчика без защиты обёрнуты в `try/catch`
+  с записью в журнал по шаблону [`RelayCommand.Execute`](Workspace1C/ViewModels/RelayCommand.cs:78):
+  клонирование базы, запуск сценариев резервирования и скриптов (включая окна
+  [`BackupScenariosWindow`](Workspace1C/Views/BackupScenariosWindow.xaml.cs) и
+  [`ScriptPickWindow`](Workspace1C/Views/ScriptPickWindow.xaml.cs)), пакетное
+  резервирование мультивыделения, журнал регистрации 1Сv8.lgd, список выгрузок,
+  обозреватель метаданных, каталог и обновления платформ, задания планировщика,
+  сеансы/соединения сервера, блокировка/разблокировка сеансов, проверка
+  обновлений конфигураций (включая «Скачать цепочку», issue #352), свойства ИБ
+  кластера, создание/правка/удаление баз кластера ([`ServerMonitorWindow`](Workspace1C/Views/ServerMonitorWindow.xaml.cs)),
+  пакетное обновление из хранилища. Необработанное исключение больше не роняет
+  процесс без контекста — ошибка пишется в `app-*.log`.
+- **Проверка фоновых таймеров подтверждена.** [`SchedulerService.Tick`](Workspace1C/Services/SchedulerService.cs:208),
+  мониторинг серверов ([`ServerAlertsService`](Workspace1C/Services/ServerAlertsService.cs)) и
+  синхронизация настроек ([`SettingsSyncRunner`](Workspace1C/Services/Sync/SettingsSyncRunner.cs))
+  уже полностью защищены: try/catch + защита от параллельного выполнения;
+  изменений не требуется.
+- **Тяжёлый старт уже отложен после показа главного окна.** Проверка обновлений
+  приложения, планировщик заданий и фоновые функции запускаются после
+  `mainWindow.Show()` ([`App.axaml.cs`](Workspace1C/App.axaml.cs:341) и WPF-двойник);
+  пересчёт размеров файловых баз — фоновый, с кэшем.
+
 ## [1.0.1.19] — 2026-11-01
 
 ### Исправления

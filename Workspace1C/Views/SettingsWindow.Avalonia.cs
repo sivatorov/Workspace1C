@@ -4977,6 +4977,47 @@ namespace Workspace1C
             };
             panel.Children.Add(copyButton);
 
+            // Сбор диагностики в ZIP (v100120): журналы приложения + трассировка
+            // модальных окон + trace.json + systeminfo.txt; путь копируется в буфер
+            // обмена, чтобы приложить архив к обращению в поддержку.
+            var diagCaption = new TextBlock
+            {
+                Text = LocalizationManager.T("Settings.About.CreateDiagnostics"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var diagIcon = IconHelper.MakeIcon("IconPackageVariant", 16, Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
+            diagIcon.VerticalAlignment = VerticalAlignment.Center;
+            diagIcon.Margin = new Thickness(0, 0, 6, 0);
+            var diagButton = new Button
+            {
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Children = { diagIcon, diagCaption }
+                },
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 8, 0, 0),
+                Padding = new Thickness(14, 8)
+            };
+            diagButton.Styled(ControlThemes.SecondaryButton);
+            diagButton.Click += async (_, _) =>
+            {
+                try
+                {
+                    var result = await Services.DiagnosticsBundleService.CreateBundleAsync();
+                    if (this.Clipboard is { } cb)
+                        await cb.SetTextAsync(result.ZipPath);
+                    ShowAboutMessage(string.Format(
+                        LocalizationManager.T("Settings.About.DiagnosticsDone"), result.ZipPath));
+                }
+                catch (Exception ex)
+                {
+                    ShowAboutError(LocalizationManager.T("Settings.About.DiagnosticsFailed")
+                        + "\n" + ex.Message);
+                }
+            };
+            panel.Children.Add(diagButton);
+
             return panel;
         }
 

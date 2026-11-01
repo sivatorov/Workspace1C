@@ -102,17 +102,26 @@ public partial class BackupScenariosWindow : Window
 
     private async void Run_Click(object sender, RoutedEventArgs e)
     {
-        if (Selected is not { } item || _vm is null)
-            return;
-        if (_batchBases is { Count: > 0 })
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
         {
-            foreach (var ib in _batchBases)
-                await _vm.RunBackupAsync(ib, item.Scenario);
-            return;
+            if (Selected is not { } item || _vm is null)
+                return;
+            if (_batchBases is { Count: > 0 })
+            {
+                foreach (var ib in _batchBases)
+                    await _vm.RunBackupAsync(ib, item.Scenario);
+                return;
+            }
+            if (_infobase is null)
+                return;
+            await _vm.RunBackupAsync(_infobase, item.Scenario);
         }
-        if (_infobase is null)
-            return;
-        await _vm.RunBackupAsync(_infobase, item.Scenario);
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка запуска сценария резервирования", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();

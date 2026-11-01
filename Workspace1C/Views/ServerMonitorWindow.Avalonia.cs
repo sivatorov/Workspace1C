@@ -1743,13 +1743,22 @@ namespace Workspace1C
         /// </summary>
         private async void OnDeleteInfobase()
         {
-            if (_vm.SelectedInfobase is not { } row)
-                return;
-            var dialog = new RacInfobaseDropWindow(
-                row.Name, ServerMonitorViewModel.CanDropDatabaseOnServer(row), row.Dbms, row.DbServer);
-            if (!dialog.ShowSync(this))
-                return;
-            await _vm.DropSelectedInfobaseAsync(dialog.DropDatabase);
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                if (_vm.SelectedInfobase is not { } row)
+                    return;
+                var dialog = new RacInfobaseDropWindow(
+                    row.Name, ServerMonitorViewModel.CanDropDatabaseOnServer(row), row.Dbms, row.DbServer);
+                if (!dialog.ShowSync(this))
+                    return;
+                await _vm.DropSelectedInfobaseAsync(dialog.DropDatabase);
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка удаления базы кластера", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         // ===================== Кнопка «СЛУЖБЫ» (issue #3, 18.10 08:57) =====================

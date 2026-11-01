@@ -239,8 +239,17 @@ namespace Workspace1C
         /// </summary>
         private async void OnServersList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (ServersList.SelectedItem is ManagementServer server)
-                await _vm.ConnectToServerAsync(server);
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                if (ServersList.SelectedItem is ManagementServer server)
+                    await _vm.ConnectToServerAsync(server);
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка подключения к серверу по двойному клику", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>
@@ -765,10 +774,19 @@ namespace Workspace1C
         /// </summary>
         private async void OnAddInfobase_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new RacInfobaseCreateWindow() { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.Result is not { } request)
-                return;
-            await _vm.CreateInfobaseAsync(request);
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                var dialog = new RacInfobaseCreateWindow() { Owner = this };
+                if (dialog.ShowDialog() != true || dialog.Result is not { } request)
+                    return;
+                await _vm.CreateInfobaseAsync(request);
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка создания базы кластера", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>
@@ -777,24 +795,33 @@ namespace Workspace1C
         /// </summary>
         private async void OnEditInfobase_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm.SelectedInfobase is not { } row || row.InfobaseId == Guid.Empty)
-                return;
-            // Полный диалог свойств (issue #3, 7OH 17.10): «infobase info» с учётными
-            // данными администратора ИБ из списка баз приложения либо введёнными вручную.
-            System.Collections.Generic.IEnumerable<Infobase>? bases = null;
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             try
             {
-                bases = AppServices.GetRequiredService<IInfobaseRepository>().Load();
+                if (_vm.SelectedInfobase is not { } row || row.InfobaseId == Guid.Empty)
+                    return;
+                // Полный диалог свойств (issue #3, 7OH 17.10): «infobase info» с учётными
+                // данными администратора ИБ из списка баз приложения либо введёнными вручную.
+                System.Collections.Generic.IEnumerable<Infobase>? bases = null;
+                try
+                {
+                    bases = AppServices.GetRequiredService<IInfobaseRepository>().Load();
+                }
+                catch
+                {
+                    // Список баз недоступен — учётные данные пользователь введёт сам.
+                }
+                var propertiesVm = _vm.CreateInfobasePropertiesViewModel(SummaryFromRow(row), bases);
+                var dialog = new RacInfobasePropertiesWindow(propertiesVm) { Owner = this };
+                if (dialog.ShowDialog() != true || dialog.Result is not { } update)
+                    return;
+                await _vm.UpdateSelectedInfobaseAsync(update);
             }
-            catch
+            catch (Exception ex)
             {
-                // Список баз недоступен — учётные данные пользователь введёт сам.
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка изменения базы кластера", ex); } catch { /* лог не роняет обработчик */ }
             }
-            var propertiesVm = _vm.CreateInfobasePropertiesViewModel(SummaryFromRow(row), bases);
-            var dialog = new RacInfobasePropertiesWindow(propertiesVm) { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.Result is not { } update)
-                return;
-            await _vm.UpdateSelectedInfobaseAsync(update);
         }
 
         /// <summary>Строит «infobase summary» из строки списка для предзаполнения диалога правки.</summary>
@@ -823,16 +850,26 @@ namespace Workspace1C
         /// </summary>
         private async void OnDeleteInfobase_Click(object sender, RoutedEventArgs e)
         {
-            if (_vm.SelectedInfobase is not { } row)
-                return;
-            var dialog = new RacInfobaseDropWindow(
-                row.Name, ServerMonitorViewModel.CanDropDatabaseOnServer(row), row.Dbms, row.DbServer)
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
             {
-                Owner = this
-            };
-            if (dialog.ShowDialog() != true)
+                if (_vm.SelectedInfobase is not { } row)
+                    return;
+                var dialog = new RacInfobaseDropWindow(
+                    row.Name, ServerMonitorViewModel.CanDropDatabaseOnServer(row), row.Dbms, row.DbServer)
+                {
+                    Owner = this
+                };
+                if (dialog.ShowDialog() != true)
+                    return;
+                await _vm.DropSelectedInfobaseAsync(dialog.DropDatabase);
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка удаления базы кластера", ex); } catch { /* лог не роняет обработчик */ }
                 return;
-            await _vm.DropSelectedInfobaseAsync(dialog.DropDatabase);
+            }
         }
 
         /// <summary>

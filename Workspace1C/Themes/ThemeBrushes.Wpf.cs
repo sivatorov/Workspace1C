@@ -15,6 +15,15 @@ namespace Workspace1C.Themes
             => Application.Current?.TryFindResource(brushKey) as System.Windows.Media.Brush;
 
         /// <summary>
+        /// Кэш сплошных кистей по HEX-спецификации (v100120, оптимизация дерева):
+        /// переиспользование кисти вместо повторного <c>ColorConverter.ConvertFromString</c>.
+        /// HEX-литералы от темы не зависят, поэтому кисть можно переиспользовать;
+        /// кисти заморожены (<see cref="System.Windows.Freezable.Freeze"/>) — безопасно
+        /// из любого потока и дешевле в рендере.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, System.Windows.Media.Brush> SpecBrushCache = new(System.StringComparer.Ordinal);
+
+        /// <summary>
         /// Кисть из строковой спецификации: строка с префиксом «@» — кисть ресурса
         /// темы, иначе — HEX вида «#RRGGBB». Симметрично Avalonia-<c>ThemeBrushes.FromSpec</c>.
         /// </summary>
@@ -26,8 +35,14 @@ namespace Workspace1C.Themes
             // как это чинится в Avalonia-двойнике — вместо краха прозрачная кисть.
             if (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@')
                 return Get(spec[1..]) ?? System.Windows.Media.Brushes.Transparent;
-            return new System.Windows.Media.SolidColorBrush(
-                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(spec));
+            return SpecBrushCache.GetOrAdd(spec ?? string.Empty, static s =>
+            {
+                var brush = new System.Windows.Media.SolidColorBrush(
+                    (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(s));
+                if (brush.CanFreeze)
+                    brush.Freeze();
+                return brush;
+            });
         }
     }
 }

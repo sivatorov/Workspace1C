@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.19-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.20-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.19**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.20**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,16 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Экспорт диагностики в ZIP (1.0.1.20, Windows и Linux)** — кнопка
+  «Собрать диагностику (ZIP)» во вкладке «О программе» собирает журналы
+  приложения, трассировку модальных окон, `trace.json` и сведения об окружении
+  в один архив; путь копируется в буфер обмена, чтобы приложить файл к обращению
+  в поддержку (пароли и строки подключения в архив не попадают).
+- **Кэш кистей и защита фоновых обработчиков (1.0.1.20, Windows и Linux)** —
+  перерисовки дерева/меню переиспользуют кисти вместо повторного разбора цвета
+  (HEX-кэш в `ThemeBrushes`); все фоновые `async void`-обработчики обёрнуты в
+  `try/catch` с записью в журнал — необработанное исключение больше не роняет
+  процесс без контекста.
 - **Устранена первопричина ошибки интерфейса при смене выбранной базы
   (1.0.1.19, Windows и Linux)** — окно «Ошибка интерфейса» при кликах по
   списку баз больше не появляется: исправлен `ObjectDisposedException`

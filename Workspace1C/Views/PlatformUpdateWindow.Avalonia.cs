@@ -142,7 +142,16 @@ namespace Workspace1C
         /// <summary>При открытии — первичная проверка обновлений платформы (issue #363).</summary>
         private async void OnOpened(object? sender, EventArgs e)
         {
-            await _viewModel.CheckUpdatesAsync();
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                await _viewModel.CheckUpdatesAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка первичной проверки обновлений платформы", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>Показывает окно модально (синхронно). Открытая публичная обёртка над

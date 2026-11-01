@@ -507,7 +507,16 @@ namespace Workspace1C
 
         private async void OnCheckClick()
         {
-            await RunCheckAsync();
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                await RunCheckAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка проверки обновлений конфигураций", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>Загружает дистрибутив обновления по ссылке каталога релизов (кнопка «Скачать»).
@@ -1100,7 +1109,16 @@ namespace Workspace1C
         /// <summary>Кнопка «Скачать цепочку» (issue #352).</summary>
         private async void OnDownloadChainClick()
         {
-            await DownloadChainAsync();
+            // v100120: async void — исключение не должно уходить в глобальный обработчик
+            // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+            try
+            {
+                await DownloadChainAsync();
+            }
+            catch (Exception ex)
+            {
+                try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка скачивания цепочки обновлений", ex); } catch { /* лог не роняет обработчик */ }
+            }
         }
 
         /// <summary>

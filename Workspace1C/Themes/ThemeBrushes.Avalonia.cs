@@ -59,6 +59,16 @@ namespace Workspace1C.Themes
                     : new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(fallbackHex));
 
         /// <summary>
+        /// Кэш сплошных кистей по HEX-спецификации (v100120, оптимизация дерева):
+        /// перерисовки дерева/меню вызывали <see cref="Avalonia.Media.Color.Parse"/>
+        /// и аллокацию <see cref="Avalonia.Media.SolidColorBrush"/> на каждый вызов.
+        /// HEX-литералы от темы не зависят, поэтому кисть можно переиспользовать.
+        /// Ключи «@»-спецификаций в кэш не попадают: их кисти приходят из ресурсов
+        /// темы и меняются вместе со схемой.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Avalonia.Media.IBrush> SpecBrushCache = new(System.StringComparer.Ordinal);
+
+        /// <summary>
         /// Кисть из строковой спецификации: строка с префиксом «@» — кисть ресурса
         /// темы (обновляется вместе со схемой), иначе — HEX вида «#RRGGBB».
         /// Нужно хелперам, которые до v100112 принимали только HEX-литералы
@@ -81,7 +91,7 @@ namespace Workspace1C.Themes
                         ? brush
                         : Avalonia.Media.Brushes.Transparent;
             }
-            return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(spec));
+            return SpecBrushCache.GetOrAdd(spec ?? string.Empty, static s => new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(s)));
         }
 
         public static Avalonia.Media.IBrush WithAlpha(Avalonia.Media.IBrush brush, byte alpha)

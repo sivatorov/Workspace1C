@@ -482,6 +482,30 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Собирает архив диагностики (v100120): журналы приложения, трассировка модальных
+        /// окон, trace.json и systeminfo.txt в один ZIP; путь копируется в буфер обмена,
+        /// чтобы приложить файл к обращению в поддержку.
+        /// </summary>
+        private async void OnCollectDiagnostics_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var result = await Services.DiagnosticsBundleService.CreateBundleAsync();
+                try { System.Windows.Clipboard.SetText(result.ZipPath); }
+                catch { /* буфер обмена недоступен — путь виден в сообщении */ }
+                _dialogs.ShowInfo(
+                    string.Format(LocalizationManager.T("Settings.About.DiagnosticsDone"), result.ZipPath),
+                    LocalizationManager.T("Common.Information"));
+            }
+            catch (Exception ex)
+            {
+                _dialogs.ShowError(
+                    LocalizationManager.T("Settings.About.DiagnosticsFailed") + "\n" + ex.Message,
+                    LocalizationManager.T("Common.Error"));
+            }
+        }
+
+        /// <summary>
         /// Копирует обезличенную техническую информацию о системе и приложении в буфер обмена
         /// (для диагностики проблемы разработчику). Работает в Windows и Linux.
         /// </summary>

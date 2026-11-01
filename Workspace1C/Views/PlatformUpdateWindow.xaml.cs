@@ -119,7 +119,16 @@ public partial class PlatformUpdateWindow : Window
     /// <summary>При открытии — первичная проверка обновлений платформы (issue #363).</summary>
     private async void OnWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        await _viewModel.CheckUpdatesAsync();
+        // v100120: async void — исключение не должно уходить в глобальный обработчик
+        // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
+        try
+        {
+            await _viewModel.CheckUpdatesAsync();
+        }
+        catch (Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка первичной проверки обновлений платформы", ex); } catch { /* лог не роняет обработчик */ }
+        }
     }
 
     /// <summary>Начальный каталог диалога сохранения: сохранённая папка скачиваний
