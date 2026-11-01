@@ -201,7 +201,7 @@ namespace Workspace1C
             var button = new Button
             {
                 Content = colorHex is not null
-                    ? IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), new SolidColorBrush(Color.Parse(colorHex)))
+                    ? IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), SpecBrush(colorHex))
                     : IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), brushKey ?? "TextSecondaryBrush"),
                 Margin = new Thickness(1, 0),
                 MinWidth = 0,
@@ -342,7 +342,7 @@ namespace Workspace1C
             // с отступом 6 справа (MainWindow.xaml:1234). Коробка вокруг него была
             // нашей отсебятиной.
             var iconBox = IconHelper.MakeIcon(connectionIconKey, UiMetrics.RowIcon, out var statusPath);
-            statusPath.Fill = new SolidColorBrush(Color.Parse(ib.StatusColorHex));
+            statusPath.Fill = SpecBrush(ib.StatusColorHex);
             iconBox.HorizontalAlignment = HorizontalAlignment.Center;
             iconBox.VerticalAlignment = VerticalAlignment.Center;
             iconBox.Margin = new Thickness(0, 0, 6, 0);
@@ -359,7 +359,7 @@ namespace Workspace1C
                     if (e.PropertyName == nameof(Infobase.StatusIconKey))
                         IconHelper.SetIcon(statusPath, ib.StatusIconKey);
                     if (e.PropertyName == nameof(Infobase.StatusColorHex))
-                        statusPath.Fill = new SolidColorBrush(Color.Parse(ib.StatusColorHex));
+                        statusPath.Fill = SpecBrush(ib.StatusColorHex);
                     if (e.PropertyName == nameof(Infobase.StatusDisplay))
                         ToolTip.SetTip(iconBox, ib.StatusDisplay);
                 }
@@ -505,7 +505,13 @@ namespace Workspace1C
                     cell.DoubleTapped += (_, e) =>
                     {
                         e.Handled = true;
-                        _vm?.PickPlatformVersionFor(ib);
+                        // Issue #97: база берётся из DataContext в момент события,
+                        // а не из замыкания: Avalonia переиспользует контейнеры
+                        // дерева, и захлопнутая ib после пересборки списка могла
+                        // уже не соответствовать этой строке.
+                        if (ResolveRowBase(cell) is not { } versionIb)
+                            return;
+                        _vm?.PickPlatformVersionFor(versionIb);
                     };
                 }
                 else if (InfobasePropertiesTabs.IsConfigurationColumnKey(columns[i].Key))
@@ -517,7 +523,10 @@ namespace Workspace1C
                     cell.DoubleTapped += (_, e) =>
                     {
                         e.Handled = true;
-                        _vm?.OpenPropertiesOnPlatformTab(ib);
+                        // Issue #97: база из DataContext события — см. ResolveRowBase.
+                        if (ResolveRowBase(cell) is not { } propsIb)
+                            return;
+                        _vm?.OpenPropertiesOnPlatformTab(propsIb);
                     };
                 }
                 grid.Children.Add(cell);
@@ -581,11 +590,17 @@ namespace Workspace1C
             {
                 if (_vm is not { } vm)
                     return;
-                vm.SelectedInfobase = ib;
+                // Issue #97: база из DataContext карточки в момент события, а не из
+                // замыкания: контейнер строки переиспользуется при пересборке
+                // плоского списка поиска, и клик по второй базе срабатывал по
+                // данным первой.
+                if (ResolveRowBase(card) is not { } tappedIb)
+                    return;
+                vm.SelectedInfobase = tappedIb;
                 // Действие по двойному щелчку (функция №28 StartManager): «1С:Предприятие»,
                 // «Конфигуратор» или «Ничего». Индивидуальное значение ИБ переопределяет
                 // глобальную настройку (см. MainViewModel.ResolveDoubleClickAction).
-                var dblAction = vm.ResolveDoubleClickAction(ib);
+                var dblAction = vm.ResolveDoubleClickAction(tappedIb);
                 if (dblAction == Workspace1C.Models.DoubleClickAction.None)
                     return;
                 if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
@@ -603,12 +618,32 @@ namespace Workspace1C
                     return;
                 if ((e.KeyModifiers & KeyModifiers.Control) == 0)
                     return;
-                vm.ToggleBookmark(ib);
+                // Issue #97: база из DataContext события — см. ResolveRowBase.
+                if (ResolveRowBase(card) is not { } pressedIb)
+                    return;
+                vm.ToggleBookmark(pressedIb);
                 e.Handled = true;
             };
 
             return card;
         }
+
+        /// <summary>
+        /// База строки дерева на момент события (issue #97): берётся из DataContext
+        /// элемента, отправившего событие, а не из замыкания на момент построения
+        /// строки. Avalonia переиспользует контейнеры дерева, и захлопнутая в
+        /// замыкание база после пересборки плоского списка (поиск перестраивает
+        /// список на каждый ввод символа) переставала соответствовать строке —
+        /// клик по второй найденной базе открывал данные первой. Для строки узла
+        /// «Закреплённые» DataContext — обёртка PinnedInfobaseItem (issue #301),
+        /// поэтому она разворачивается в реальную базу.
+        /// </summary>
+        private Infobase? ResolveRowBase(object? sender) => (sender as StyledElement)?.DataContext switch
+        {
+            Infobase rowBase => rowBase,
+            ViewModels.PinnedInfobaseItem pinned => pinned.Base,
+            _ => null
+        };
 
         /// <summary>
         /// Номер слота Alt+N у избранной базы. Пусто, если слот не назначен:
@@ -756,8 +791,7 @@ namespace Workspace1C
             }
             else
             {
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15),
-                    new SolidColorBrush(Color.Parse(colorHex)));
+                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), SpecBrush(colorHex));
             }
 
             // Оформление берёт тема IconButton разметки: у автора все пять команд
@@ -1248,7 +1282,7 @@ namespace Workspace1C
             else
             {
                 sp.Children.Add(IconHelper.MakeIcon(iconKey, iconSize ?? UiMetrics.ActionIconSize,
-                    new SolidColorBrush(Color.Parse(colorHex))));
+                    SpecBrush(colorHex)));
             }
             var tb = new TextBlock
             {
@@ -1264,7 +1298,7 @@ namespace Workspace1C
             if (colorHex is null || !colorTextToo)
                 ThemeBrushes.Bind(tb, TextBlock.ForegroundProperty, brushKey);
             else
-                tb.Foreground = new SolidColorBrush(Color.Parse(colorHex));
+                tb.Foreground = SpecBrush(colorHex);
             if (textPath is not null)
                 tb.Bind(TextBlock.TextProperty, new Binding(textPath));
             Grid.SetColumn(tb, 1);
@@ -1278,7 +1312,7 @@ namespace Workspace1C
                 var trailingHost = IconHelper.MakeIcon(trailingIconKey, 12, out var trailing);
                 trailingHost.Opacity = 0.75;
                 if (colorTextToo && colorHex is not null)
-                    trailing.Fill = new SolidColorBrush(Color.Parse(colorHex));
+                    trailing.Fill = SpecBrush(colorHex);
                 else
                     ThemeBrushes.Bind(trailing, Avalonia.Controls.Shapes.Path.FillProperty, brushKey);
                 trailingHost.Bind(Control.IsVisibleProperty, new Binding("ShowRightPanelDetails"));
@@ -1456,7 +1490,7 @@ namespace Workspace1C
             IBinding? textBinding = null, string? themeBrushKey = null)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 4 };
-            row.Children.Add(IconHelper.MakeIcon(iconKey, 12, new SolidColorBrush(Color.Parse(iconHex))));
+            row.Children.Add(IconHelper.MakeIcon(iconKey, 12, SpecBrush(iconHex)));
             var text = new TextBlock
             {
                 FontSize = 11,
@@ -1472,7 +1506,7 @@ namespace Workspace1C
                 ThemeBrushes.Bind(text, TextBlock.ForegroundProperty, themeBrushKey ?? "TextPrimaryBrush");
             }
             else
-                text.Foreground = new SolidColorBrush(Color.Parse(textHex));
+                text.Foreground = SpecBrush(textHex);
             if (textBinding is not null)
                 text.Bind(TextBlock.TextProperty, textBinding);
             row.Children.Add(text);
@@ -2432,6 +2466,15 @@ namespace Workspace1C
         /// </summary>
         private static Control MenuIcon(string iconKey, string colorHex)
             => IconHelper.MakeIcon(iconKey, 16, Themes.ThemeBrushes.FromSpec(colorHex));
+
+        /// <summary>
+        /// Кисть из строковой спецификации: «@КлючКисти» — ресурс темы,
+        /// иначе HEX вида «#RRGGBB». Прямой Color.Parse на «@»-спецификациях
+        /// кидал FormatException и валил старт окна на Linux (issue #89):
+        /// ключи кистей («@WarningBrush», «@InfoBrush», «@PurpleAccentBrush»)
+        /// приходят сюда из тех же параметров, что и HEX-литералы.
+        /// </summary>
+        private static IBrush SpecBrush(string spec) => ThemeBrushes.FromSpec(spec);
 
         // ======================= Пользовательские действия (0.3.9.198) =======================
 

@@ -1,0 +1,28 @@
+Release 1.0.1.17: фикс клика по результатам поиска и краха старта на Linux
+
+- поиск: клик по второй найденной базе открывал окно другой базы —
+  контейнеры элементов списка переиспользовались и возвращали данные
+  не той позиции; контейнеры сбрасываются при обновлении результатов,
+  клик всегда открывает именно выбранную базу (Windows и Linux,
+  issue #97, Views/MainWindow.Avalonia.Tree.cs);
+- Linux: крах старта приложения при построении дерева баз — кисти вида
+  @WarningBrush больше не передаются в Color.Parse; критический фикс
+  для обновления на Linux (issue #89, Views/MainWindow.Avalonia.Tree.cs,
+  Themes/ThemeBrushes.Avalonia.cs, Themes/ThemeBrushes.Wpf.cs);
+- диагностика выгрузки серверной базы в .dt: в журнал выводится причина
+  ошибки rac и список имён ИБ кластера; при отсутствии профиля СУБД
+  операция сразу завершается понятной ошибкой (issue #92,
+  ViewModels/BatchOperationsViewModel.cs);
+- проверка лицензий: при пустом ответе ring показывается подсказка с
+  командами самопроверки (issue #83, Services/RingLicenseService.cs,
+  Services/ClusterInfobaseCredentialsResolver.cs);
+- мастер тестовой копии: состояние «базы ещё нет — будет создана»
+  явно помечено как штатное (issue #79, Localization/Languages/ru.json,
+  en.json);
+- тесты: новый ThemeBrushesFromSpecTests, обновлены
+  ClusterInfobaseCredentialsResolverTests,
+  RingLicenseServiceV100114Tests;
+- версия 1.0.1.16 → 1.0.1.17 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  план plan-issues-97-92-89-83-79-v100117.md, скрипт сборки
+  _build_v100117.ps1.

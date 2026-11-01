@@ -109,7 +109,14 @@ public sealed class ClusterInfobaseCredentialsResolver
                 var match = summaries.FirstOrDefault(s =>
                     string.Equals(s.Name?.Trim(), infobaseName, StringComparison.OrdinalIgnoreCase));
                 if (match is null)
+                {
+                    // Issue #92: в журнале остаётся только «база не найдена», без
+                    // признаков, почему. Показываем фактическое содержимое кластера —
+                    // количество и имена ИБ, вернувшиеся из rac: сопоставление идёт
+                    // по имени, и по списку видно расхождение имён.
+                    _log?.Invoke(BuildClusterContents(cluster.Id, summaries));
                     continue;
+                }
 
                 var profile = ToProfile(match, infobase!.Id, infobaseName);
                 if (profile is not null)
@@ -136,6 +143,21 @@ public sealed class ClusterInfobaseCredentialsResolver
                 parameters.Address, ex.Message));
             return null;
         }
+    }
+
+    /// <summary>
+    /// Строка диагностики «содержимое кластера» (issue #92): количество и имена
+    /// ИБ, вернувшиеся из rac по кластеру. Чистый helper — для юнит-теста и журнала.
+    /// </summary>
+    internal static string BuildClusterContents(Guid clusterId, IEnumerable<RacInfobaseSummary>? summaries)
+    {
+        var names = (summaries ?? Enumerable.Empty<RacInfobaseSummary>())
+            .Select(s => s.Name?.Trim())
+            .Where(n => !string.IsNullOrEmpty(n))
+            .ToList();
+        return string.Format(
+            LocalizationManager.T("BatchOps.DbmsResolveClusterContentsFormat"),
+            clusterId, names.Count, string.Join(", ", names));
     }
 
     /// <summary>

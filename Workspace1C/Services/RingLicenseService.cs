@@ -565,6 +565,16 @@ public sealed class RingLicenseService : IRingLicenseService
     /// </summary>
     internal static string BuildNoLicensesMessage(string? lastCandidateOutput)
     {
+        // Issue #83 (репорт 7OH 2026-11-01: «вывод в консоли тоже пустой»): при пустом
+        // ответе ring прежний текст давал бессмыслицу «Ответ последней проверенной
+        // команды: .» — вместо неё специализированный текст с командами самопроверки.
+        if (string.IsNullOrWhiteSpace(lastCandidateOutput))
+        {
+            return "Утилита ring найдена и запущена, но вернула пустой ответ. Проверьте " +
+                   "в командной строке: «ring module list» (установлен ли модуль лицензий) " +
+                   "и «ring license list». Если в консоли лицензии есть, а здесь нет — " +
+                   "пришлите лог категории CM_RAC в issue Workspace 1C.";
+        }
         return "Утилита ring найдена и запущена, но список лицензий не получен. Ответ последней " +
                "проверенной команды: " + TruncateForLog(lastCandidateOutput) +
                ". Если модуль лицензий ring установлен и этот ответ выглядит ошибочным — " +

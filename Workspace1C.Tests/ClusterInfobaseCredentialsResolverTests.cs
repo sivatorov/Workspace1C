@@ -273,6 +273,54 @@ public sealed class ClusterInfobaseCredentialsResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_BaseNotFound_LogsClusterContents()
+    {
+        // issue #92 (репорт 7OH 2026-11-01): при отсутствии совпадения в журнал уходит
+        // фактическое содержимое кластера — количество и имена ИБ, вернувшиеся из rac,
+        // чтобы по журналу можно было судить, почему база «не найдена». Локализация в
+        // тестовом процессе может быть не загружена — тогда остаётся ключ строки.
+        var clusterId = Guid.NewGuid();
+        var rac = new FakeRacClient
+        {
+            Clusters = new[] { new RacCluster { Id = clusterId } },
+            Infobases = new[] { Summary(name: "ДругаяБаза"), Summary(name: "ЕщёБаза") }
+        };
+        var resolver = CreateResolver(rac, out var log);
+
+        var profile = await resolver.ResolveAsync(ServerBase());
+
+        Assert.Null(profile);
+        Assert.Contains(log, m =>
+            m.Contains("DbmsResolveClusterContentsFormat", StringComparison.Ordinal) ||
+            (m.Contains(clusterId.ToString(), StringComparison.Ordinal) &&
+             m.Contains("2", StringComparison.Ordinal) &&
+             m.Contains("ДругаяБаза", StringComparison.Ordinal) &&
+             m.Contains("ЕщёБаза", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void BuildClusterContents_FormatsCountAndNames()
+    {
+        var clusterId = Guid.NewGuid();
+        var line = ClusterInfobaseCredentialsResolver.BuildClusterContents(clusterId,
+            new[] { Summary(name: "База1"), Summary(name: " База2 ") });
+
+        // Локализация в тестовом процессе не загружена — возвращается ключ строки
+        // (сама подстановка формата проверяется на загруженных ресурсах приложения).
+        Assert.Equal("BatchOps.DbmsResolveClusterContentsFormat", line);
+    }
+
+    [Fact]
+    public void BuildClusterContents_DoesNotThrow_OnEmptyOrNullList()
+    {
+        var empty = ClusterInfobaseCredentialsResolver.BuildClusterContents(Guid.NewGuid(), Array.Empty<RacInfobaseSummary>());
+        Assert.Equal("BatchOps.DbmsResolveClusterContentsFormat", empty);
+
+        var nullList = ClusterInfobaseCredentialsResolver.BuildClusterContents(Guid.NewGuid(), null);
+        Assert.Equal("BatchOps.DbmsResolveClusterContentsFormat", nullList);
+    }
+
+    [Fact]
     public async Task ResolveAsync_RacError_ReturnsNull_LogsAndDoesNotThrow()
     {
         var rac = new FakeRacClient { ClustersError = new RacClientException("Не найден rac") };
@@ -438,10 +486,11 @@ public sealed class ClusterInfobaseCredentialsResolverTests
     }
 
     [Fact]
-    public async Task BatchOperationsViewModel_ResolverReturnsNull_OperationStillRunsAndFails()
+    public async Task BatchOperationsViewModel_ResolverReturnsNull_FailsFastWithoutIbcmd()
     {
-        // rac недоступен (null): пред-валидация не блокирует, операция идёт со старым
-        // поведением — исполнитель получает null-профиль и возвращает ошибку подключения.
+        // issue #92 (v100117): резолвер вернул null (база не найдена в кластере) —
+        // ibcmd НЕ запускается «наудачу»: элемент сразу получает статус ошибки
+        // с понятным текстом NeedDbmsProfileFormat, журнал содержит причину.
         var tempDir = Path.Combine(Path.GetTempPath(), "batch-resolver-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         var previous = FeatureDataStore.DirectoryOverride;
@@ -456,19 +505,19 @@ public sealed class ClusterInfobaseCredentialsResolverTests
             };
 
             var executed = false;
-            DbmsBackupProfile? passed = null;
             vm.ExecutorWithProfileOverride = (base_, path, profile, ct) =>
             {
                 executed = true;
-                passed = profile;
                 return Task.FromResult(new IbcmdResult { Success = false, ExitCode = 1, Error = "NeedDbmsProfile" });
             };
 
             await vm.RunAsync();
 
-            Assert.True(executed); // прогон не остановлен пред-валидацией
-            Assert.Null(passed);   // профиль не получен — исполнитель invoked со старым поведением
+            Assert.False(executed); // fail-fast: ibcmd не тратит время на заведомый провал
             Assert.True(vm.Items.Single(i => i.Infobase == ib).Status == BatchOperationsStatus.Failed);
+            // Локализация в тестовом процессе не загружена — остаётся ключ строки.
+            Assert.Contains("BatchOps.NeedDbmsProfileFormat",
+                vm.Items.Single(i => i.Infobase == ib).StatusText ?? string.Empty, StringComparison.Ordinal);
         }
         finally
         {
@@ -478,9 +527,10 @@ public sealed class ClusterInfobaseCredentialsResolverTests
     }
 
     [Fact]
-    public async Task BatchOperationsViewModel_ResolverThrows_OperationContinuesWithOldBehavior()
+    public async Task BatchOperationsViewModel_ResolverThrows_FailsFastWithoutIbcmd()
     {
-        // Исключение резолвера (rac сломался) не должно прерывать массовую операцию.
+        // issue #92 (v100117): исключение резолвера (rac сломался) больше не отправляет
+        // ibcmd без данных СУБД — fail-fast с понятным текстом NeedDbmsProfileFormat.
         var tempDir = Path.Combine(Path.GetTempPath(), "batch-resolver-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(tempDir);
         var previous = FeatureDataStore.DirectoryOverride;
@@ -498,14 +548,15 @@ public sealed class ClusterInfobaseCredentialsResolverTests
             vm.ExecutorWithProfileOverride = (base_, path, profile, ct) =>
             {
                 executed = true;
-                Assert.Null(profile);
                 return Task.FromResult(new IbcmdResult { Success = false, ExitCode = 1, Error = "x" });
             };
 
             await vm.RunAsync();
 
-            Assert.True(executed);
+            Assert.False(executed);
             Assert.True(vm.Items.Single(i => i.Infobase == ib).Status == BatchOperationsStatus.Failed);
+            Assert.Contains("BatchOps.NeedDbmsProfileFormat",
+                vm.Items.Single(i => i.Infobase == ib).StatusText ?? string.Empty, StringComparison.Ordinal);
         }
         finally
         {

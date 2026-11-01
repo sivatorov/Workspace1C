@@ -20,9 +20,15 @@ namespace Workspace1C.Themes
         /// </summary>
         /// <param name="spec">Спецификация цвета: "@SuccessBrush" или "#16A34A".</param>
         public static System.Windows.Media.Brush FromSpec(string spec)
-            => (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@' ? Get(spec[1..]) : null)
-               ?? new System.Windows.Media.SolidColorBrush(
-                   (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(spec));
+        {
+            // Issue #89: «@»-спецификация — ключ кисти, а не цвет; при отсутствии
+            // ресурса она не должна уходить в ColorConverter (FormatException),
+            // как это чинится в Avalonia-двойнике — вместо краха прозрачная кисть.
+            if (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@')
+                return Get(spec[1..]) ?? System.Windows.Media.Brushes.Transparent;
+            return new System.Windows.Media.SolidColorBrush(
+                (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(spec));
+        }
     }
 }
 #endif

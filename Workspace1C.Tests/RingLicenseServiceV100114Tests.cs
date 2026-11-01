@@ -202,9 +202,21 @@ public sealed class RingLicenseServiceV100114Tests
         var message = RingLicenseService.BuildNoLicensesMessage("ring: ok");
         Assert.Contains("ring: ok", message, StringComparison.Ordinal);
         Assert.Contains("ring найдена и запущена", message, StringComparison.Ordinal);
+    }
 
+    [Fact]
+    public void BuildNoLicensesMessage_EmptyAnswer_ShowsSelfCheckGuidance()
+    {
+        // issue #83 (репорт 7OH 2026-11-01: «вывод в консоли тоже пустой»): при пустом
+        // ответе ring — специализированный текст с командами самопроверки, а не
+        // бессмысленная вставка «Ответ последней проверенной команды: (пусто).»
         var empty = RingLicenseService.BuildNoLicensesMessage(null);
-        Assert.Contains("(пусто)", empty, StringComparison.Ordinal);
+        Assert.Contains("пустой ответ", empty, StringComparison.Ordinal);
+        Assert.Contains("ring module list", empty, StringComparison.Ordinal);
+        Assert.Contains("ring license list", empty, StringComparison.Ordinal);
+
+        var whitespace = RingLicenseService.BuildNoLicensesMessage("   \r\n");
+        Assert.Contains("пустой ответ", whitespace, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -353,6 +353,9 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             // не прерывает прогон: операция идёт со старым поведением (ошибку вернёт
             // ibcmd по конкретной базе).
             DbmsBackupProfile? resolvedProfile = null;
+            // Issue #92: флаг «автоподстановка реально запускалась и не дала данных» —
+            // для fail-fast вместо заведомо провального запуска ibcmd (см. ниже).
+            var dbmsResolveFailed = false;
             if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null)
             {
                 var hasSavedProfile = false;
@@ -360,6 +363,7 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 catch { /* профиль недоступен — пробуем автоподстановку */ }
                 if (!hasSavedProfile)
                 {
+                    dbmsResolveFailed = true;
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
                               LocalizationManager.T("BatchOps.DbmsProfileResolving"));
                     try
@@ -386,6 +390,25 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                             LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
                             ib.Connection.DatabaseName, ib.Connection.Server));
                 }
+            }
+
+            // Issue #92: fail-fast. Если база клиент-серверная, сохранённого профиля
+            // СУБД нет, а автоподстановка из rac не дала данных — ibcmd запускался
+            // «наудачу» и гарантированно падал с малопонятной ошибкой подключения.
+            // Вместо траты времени на ibcmd фиксируем статус ошибки сразу с понятным
+            // текстом, каким его показал бы <see cref="BatchOperationsService"/>.
+            if (dbmsResolveFailed && resolvedProfile is null)
+            {
+                failed++;
+                item.Status = BatchOperationsStatus.Failed;
+                var needProfileReason = string.Format(
+                    LocalizationManager.T("BatchOps.NeedDbmsProfileFormat"), ib.Name);
+                item.SetStatusText(needProfileReason);
+                item.DurationText = FormatElapsed(DateTime.Now - startedAt);
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                          $"{LocalizationManager.T("BatchOps.OperationFailed")} ({item.DurationText}): {needProfileReason}");
+                item.IsBusy = false;
+                return;
             }
 
             IbcmdResult result;
@@ -426,11 +449,17 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             {
                 failed++;
                 item.Status = BatchOperationsStatus.Failed;
-                item.SetStatusText(string.IsNullOrWhiteSpace(result.Error)
+                // Issue #92: причина ошибки видна и в журнале окна, а не только
+                // в статусе элемента списка: пользователь не должен гадать,
+                // почему «завершилась ошибкой» без текста.
+                var failureReason = string.IsNullOrWhiteSpace(result.Error)
                     ? result.Output.Trim()
-                    : result.Error!.Trim());
+                    : result.Error!.Trim();
+                item.SetStatusText(failureReason);
                 item.DurationText = FormatElapsed(elapsed);
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.OperationFailed")} ({FormatElapsed(elapsed)})");
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                          $"{LocalizationManager.T("BatchOps.OperationFailed")} ({FormatElapsed(elapsed)})"
+                          + (failureReason.Length > 0 ? $": {failureReason}" : string.Empty));
             }
             item.IsBusy = false;
         }

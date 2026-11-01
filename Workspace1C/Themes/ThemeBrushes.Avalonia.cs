@@ -67,11 +67,20 @@ namespace Workspace1C.Themes
         /// <param name="spec">Спецификация цвета: "@SuccessBrush" или "#16A34A".</param>
         public static Avalonia.Media.IBrush FromSpec(string spec)
         {
-            if (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@'
-                && Avalonia.Application.Current?.TryGetResource(spec[1..],
+            if (!string.IsNullOrWhiteSpace(spec) && spec[0] == '@')
+            {
+                // Issue #89: «@»-спецификация — это ключ кисти, а не цвет: при
+                // отсутствии ресурса (окно строится до применения схемы, ресурс
+                // переименован) раньше строка уходила в Color.Parse и кидала
+                // FormatException «Invalid color string: '@WarningBrush'», валив
+                // старт приложения на Linux. Вместо краха — нейтральная прозрачная
+                // кисть: элемент останется неокрашенным, но приложение запустится.
+                return Avalonia.Application.Current?.TryGetResource(spec[1..],
                     Avalonia.Styling.ThemeVariant.Default, out var resource) == true
-                && resource is Avalonia.Media.IBrush brush)
-                return brush;
+                    && resource is Avalonia.Media.IBrush brush
+                        ? brush
+                        : Avalonia.Media.Brushes.Transparent;
+            }
             return new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(spec));
         }
 
