@@ -81,10 +81,16 @@ public partial class MainViewModel
                 var running = matching.Count > 0;
 
                 // issue #310: если среди процессов базы есть «не отвечающий» —
-                // точка становится оранжевой/красной вместо зелёной.
+                // индикаторы становятся оранжевыми/красными вместо зелёных.
                 var notResponding = running && matching.Any(p => !p.IsResponding);
 
-                ib.IsRunning = running;
+                // Индикатор режимов: значок Play — 1С:Предприятие (толстый клиент без
+                // DESIGNER и тонкий клиент 1cv8c), ключ — Конфигуратор (DESIGNER/CONFIG).
+                ib.IsEnterpriseRunning = running && matching.Any(
+                    p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Enterprise);
+                ib.IsConfiguratorRunning = running && matching.Any(
+                    p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Configurator);
+
                 ib.IsNotResponding = notResponding;
                 ib.NotRespondingStreak = notResponding ? ib.NotRespondingStreak + 1 : 0;
             }

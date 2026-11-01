@@ -389,33 +389,85 @@ namespace Workspace1C
             };
             ThemeBrushes.Bind(name, TextBlock.ForegroundProperty, "TextPrimaryBrush");
 
-            // Индикатор «база сейчас запущена»: точка после имени
-            // (монитор процессов 1С, MainViewModel.Running). Видимость привязана
-            // к флагу IsRunning, цвет — к статусу отклика процесса (issue #310):
-            // зелёный — отвечает, оранжевый — завис, красный — не отвечает
-            // несколько опросов подряд. Обновляется без пересборки строки.
+            // Индикатор «база сейчас запущена»: значки режимов после имени
+            // (монитор процессов 1С, MainViewModel.Running). Play — запущено
+            // 1С:Предприятие (синий), ключ — запущен Конфигуратор (янтарный);
+            // показываются независимо. Цвет по статусу отклика процесса (issue #310):
+            // оранжевый — завис, красный — не отвечает несколько опросов подряд,
+            // пока отвечает — собственный цвет значка. Обновляется без пересборки строки.
             var nameRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            var runningDot = new Border
+            var runningIcons = new StackPanel
             {
-                Width = UiMetrics.Scaled(7),
-                Height = UiMetrics.Scaled(7),
-                CornerRadius = new CornerRadius(UiMetrics.Scaled(3.5)),
+                Orientation = Orientation.Horizontal,
                 Margin = new Thickness(UiMetrics.Scaled(6), 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 IsVisible = false
             };
-            ToolTip.SetTip(runningDot, ib.IsRunningTooltip);
-            runningDot.Bind(Visual.IsVisibleProperty,
+            ToolTip.SetTip(runningIcons, ib.RunningModesTooltip);
+            runningIcons.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib });
-            runningDot.Bind(Border.BackgroundProperty,
+
+            var enterpriseIcon = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconHelper.Geometry("IconRunning"),
+                Width = UiMetrics.Scaled(10),
+                Height = UiMetrics.Scaled(10),
+                Stretch = Stretch.Uniform,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            enterpriseIcon.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib });
+            enterpriseIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
                 {
                     Source = ib,
-                    Converter = new RunningDotColorConverter()
+                    Converter = new RunningDotColorConverter(),
+                    // Базовый цвет значка — кисть темы («@» = ресурс, обновляется со схемой);
+                    // при зависании процесса конвертер перекрашивает значок (issue #310).
+                    ConverterParameter = "@InfoBrush"
                 });
+            runningIcons.Children.Add(enterpriseIcon);
+
+            var configuratorIcon = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconHelper.Geometry("IconWrench"),
+                Width = UiMetrics.Scaled(10),
+                Height = UiMetrics.Scaled(10),
+                Stretch = Stretch.Uniform,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0)
+            };
+            configuratorIcon.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib });
+            configuratorIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                {
+                    Source = ib,
+                    Converter = new RunningDotColorConverter(),
+                    // Базовый цвет значка — кисть темы («@» = ресурс, обновляется со схемой);
+                    // при критическом статусе конвертер перекрашивает значок (issue #310).
+                    ConverterParameter = "@WarningBrush"
+                });
+            runningIcons.Children.Add(configuratorIcon);
+
             nameRow.Children.Add(name);
-            nameRow.Children.Add(runningDot);
+            nameRow.Children.Add(runningIcons);
             content.Children.Add(nameRow);
+
+            // Подсказка индикатора режимов меняется вместе с составом запущенных
+            // процессов (Предприятие/Конфигуратор/оба + «процесс не отвечает»):
+            // строка подписана на изменения, пересборка дерева не нужна.
+            card.AddSubscription(() =>
+            {
+                void OnRunningModesChanged(object? _, PropertyChangedEventArgs e)
+                {
+                    if (e.PropertyName == nameof(Infobase.RunningModesTooltip))
+                        ToolTip.SetTip(runningIcons, ib.RunningModesTooltip);
+                }
+
+                ib.PropertyChanged += OnRunningModesChanged;
+                return new ActionDisposable(() => ib.PropertyChanged -= OnRunningModesChanged);
+            });
 
             // Второй подписи под именем в разметке нет: первая строка это значок
             // статуса и имя, а вторая отдана тегам (MainWindow.xaml:1230-1247).

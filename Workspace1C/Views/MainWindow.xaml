@@ -1876,17 +1876,51 @@
                                             <TextBlock x:Name="NameText" Text="{Binding NameDisplay}" FontWeight="SemiBold" FontSize="{Binding DataContext.RowNameFontSize, RelativeSource={RelativeSource AncestorType=Window}}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis"/>
-                                            <!-- Индикатор «база сейчас запущена»: точка после имени
-                                                 (монитор процессов 1С, MainViewModel.Running). Цвет по статусу
-                                                 отклика процесса (issue #310): зелёный — отвечает, оранжевый —
-                                                 завис, красный — не отвечает несколько опросов подряд. -->
-                                            <Ellipse Width="7" Height="7" Margin="6,0,0,0" VerticalAlignment="Center"
-                                                     ToolTip="{Binding IsRunningTooltip}"
-                                                     Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
-                                                <Ellipse.Fill>
-                                                    <SolidColorBrush Color="{Binding RunningStatus, Converter={StaticResource RunningDotColorConverter}}"/>
-                                                </Ellipse.Fill>
-                                            </Ellipse>
+                                            <!-- Индикатор «база сейчас запущена»: значки режимов после имени
+                                                 (монитор процессов 1С, MainViewModel.Running). Play — запущено
+                                                 1С:Предприятие (InfoBrush), ключ — запущен Конфигуратор
+                                                 (WarningBrush); показываются независимо. Цвет по статусу
+                                                 отклика процесса (issue #310): WarningBrush — завис,
+                                                 ErrorBrush — не отвечает несколько опросов подряд, пока
+                                                 отвечает — собственный цвет значка. -->
+                                            <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                        ToolTip="{Binding RunningModesTooltip}"
+                                                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                                <materialDesign:PackIcon Kind="Play" Width="10" Height="10"
+                                                                         VerticalAlignment="Center"
+                                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
+                                                    <materialDesign:PackIcon.Style>
+                                                        <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialDesign:PackIcon.Style>
+                                                </materialDesign:PackIcon>
+                                                <materialDesign:PackIcon Kind="Wrench" Width="10" Height="10" Margin="3,0,0,0"
+                                                                         VerticalAlignment="Center"
+                                                                         Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
+                                                    <materialDesign:PackIcon.Style>
+                                                        <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialDesign:PackIcon.Style>
+                                                </materialDesign:PackIcon>
+                                            </StackPanel>
                                         </StackPanel>
 
                                         <!-- Ячейка «Версия платформы» (issue #250): растягивающийся прозрачный контейнер

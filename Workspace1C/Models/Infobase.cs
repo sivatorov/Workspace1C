@@ -138,26 +138,61 @@ public class Infobase : INotifyPropertyChanged
         set => SetProperty(ref _isBatchSelected, value);
     }
 
-    private bool _isRunning;
+    private bool _isEnterpriseRunning;
 
     /// <summary>
-    /// База сейчас запущена (индикатор «зелёная точка»): у процесса платформы 1С
-    /// в командной строке обнаружены параметры подключения этой базы. Значение
-    /// обновляется фоновым монитором вью-модели и в файл списка не сохраняется.
+    /// У базы запущен клиент 1С:Предприятие (индикатор «Play» у имени базы): среди
+    /// процессов платформы 1С, подключённых к базе, есть Предприятие — толстый или
+    /// тонкий клиент (<see cref="RunningKindClassifier"/>). Значение обновляется
+    /// фоновым монитором вью-модели и в файл списка не сохраняется.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool IsRunning
+    public bool IsEnterpriseRunning
     {
-        get => _isRunning;
+        get => _isEnterpriseRunning;
         set
         {
-            if (SetProperty(ref _isRunning, value))
+            if (SetProperty(ref _isEnterpriseRunning, value))
             {
+                OnPropertyChanged(nameof(IsRunning));
                 OnPropertyChanged(nameof(IsRunningTooltip));
+                OnPropertyChanged(nameof(RunningModesTooltip));
                 OnPropertyChanged(nameof(RunningStatus));
             }
         }
     }
+
+    private bool _isConfiguratorRunning;
+
+    /// <summary>
+    /// У базы запущен Конфигуратор (индикатор «ключ» у имени базы): среди процессов
+    /// платформы 1С, подключённых к базе, есть толстый клиент с ключами DESIGNER/CONFIG
+    /// (<see cref="RunningKindClassifier"/>). Значение обновляется фоновым монитором
+    /// вью-модели и в файл списка не сохраняется.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsConfiguratorRunning
+    {
+        get => _isConfiguratorRunning;
+        set
+        {
+            if (SetProperty(ref _isConfiguratorRunning, value))
+            {
+                OnPropertyChanged(nameof(IsRunning));
+                OnPropertyChanged(nameof(IsRunningTooltip));
+                OnPropertyChanged(nameof(RunningModesTooltip));
+                OnPropertyChanged(nameof(RunningStatus));
+            }
+        }
+    }
+
+    /// <summary>
+    /// База сейчас запущена (индикатор у имени базы): запущен клиент 1С:Предприятие
+    /// и/или Конфигуратор. Вычисляется по флагам режимов; флаги обновляет фоновый
+    /// монитор вью-модели, в файл списка значение не сохраняется.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsRunning => IsEnterpriseRunning || IsConfiguratorRunning;
 
     /// <summary>Подсказка индикатора запуска (для точки у имени базы).</summary>
     public string IsRunningTooltip
@@ -169,6 +204,32 @@ public class Infobase : INotifyPropertyChanged
             return IsNotResponding
                 ? LocalizationManager.T("Infobase.NotRespondingTooltip")
                 : LocalizationManager.T("Infobase.RunningTooltip");
+        }
+    }
+
+    /// <summary>
+    /// Подсказка компактного индикатора режимов запуска: что именно запущено —
+    /// 1С:Предприятие, Конфигуратор или оба; при зависшем процессе (issue #310)
+    /// к тексту добавляется суффикс «процесс не отвечает».
+    /// </summary>
+    public string RunningModesTooltip
+    {
+        get
+        {
+            if (!IsRunning)
+                return string.Empty;
+
+            var text = (IsEnterpriseRunning, IsConfiguratorRunning) switch
+            {
+                (true, true) => LocalizationManager.T("Infobase.RunningBothTooltip"),
+                (true, false) => LocalizationManager.T("Infobase.RunningEnterpriseTooltip"),
+                (false, true) => LocalizationManager.T("Infobase.RunningConfiguratorTooltip"),
+                _ => LocalizationManager.T("Infobase.RunningTooltip")
+            };
+
+            return IsNotResponding
+                ? text + ", " + LocalizationManager.T("Infobase.NotRespondingSuffix")
+                : text;
         }
     }
 

@@ -42,7 +42,7 @@ public sealed class InfobaseEditorIssue35Tests
             Description = "Старое описание",
             PlatformVersion = "8.3.20",
             IsFavorite = true,
-            IsRunning = true, // нередактируемое служебное поле — должно сохраниться
+            IsEnterpriseRunning = true, // нередактируемое служебное поле — должно сохраниться
         };
         var historyRef = target.LaunchHistory;
         target.AddLaunchHistory("Enterprise", maxHistory: 5);
@@ -71,7 +71,7 @@ public sealed class InfobaseEditorIssue35Tests
             ManualSizeBytes = 123L,
             MetadataRoot = null,
             AdditionalFields = new List<string> { "A=1", "B=2" },
-            IsRunning = false, // в диалоге не редактируется — не должно примениться
+            IsEnterpriseRunning = false, // в диалоге не редактируется — не должно примениться
         };
 
         var originalRef = (object)target;
