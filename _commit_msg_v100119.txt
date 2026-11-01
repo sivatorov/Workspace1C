@@ -1,0 +1,16 @@
+Release 1.0.1.19: устранена первопричина «Ошибка интерфейса» при смене выбранной базы (issue #96)
+
+- безопасный жизненный цикл debounce-сохранения настроек: новый хелпер
+  SettingsSaveDebouncer (ViewModels/SettingsSaveDebouncer.cs) владеет CTS
+  по схеме recreate-on-demand — токен пересоздаётся при каждом планировании,
+  без Dispose, что устраняет гонку ObjectDisposedException при быстрой
+  смене выбранной базы (первопричина «Ошибка интерфейса», issue #96);
+- ScheduleSaveSettings в MainViewModel делегирует хелперу; в finally
+  вызывается Complete вместо Dispose — отложенное сохранение не падает,
+  даже если таймер срабатывает после завершения планирования
+  (ViewModels/MainViewModel.Tools.cs);
+- тесты: новый SettingsSaveDebouncerTests, 6 тестов на жизненный цикл
+  CTS (5460/5460 зелёные);
+- версия 1.0.1.18 → 1.0.1.19 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  скрипт сборки _build_v100119.ps1.

@@ -174,9 +174,15 @@ public partial class MainViewModel : ViewModelBase
         // Thread.Sleep; новый вызов отменяет ещё не выполненное отложенное
         // сохранение — при быстрых щелчках по фильтрам настройки сохраняются
         // один раз (последнее состояние), поток пула и UI-поток не блокируются.
-        var cts = new CancellationTokenSource();
-        var previous = Interlocked.Exchange(ref _saveSettingsDebounceCts, cts);
-        previous?.Cancel();
+        //
+        // issue #96: жизненный цикл CTS вынесен в SettingsSaveDebouncer
+        // (recreate-on-demand). Раньше CTS освобождался в finally отложенной
+        // задачи, пока поле _saveSettingsDebounceCts всё ещё ссылалось на него —
+        // следующий вызов ScheduleSaveSettings делал Cancel() на освобождённом
+        // инстансе и бросал ObjectDisposedException прямо в сеттере
+        // SelectedInfobase (стек: CancellationTokenSource.Cancel ←
+        // ScheduleSaveSettings ← set_SelectedInfobase, MainViewModel.cs:1005).
+        var cts = _saveSettingsDebouncer.Schedule();
 
         _ = RunDelayedSaveSettingsAsync(cts);
     }
@@ -184,9 +190,12 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Задержка debounce отложенного сохранения настроек (A8, v100112).</summary>
     private static readonly TimeSpan SaveSettingsDebounceDelay = TimeSpan.FromMilliseconds(150);
 
-    /// <summary>Отложенное сохранение: источник отмены последнего вызова
-    /// <see cref="ScheduleSaveSettings"/> (асинхронный debounce).</summary>
-    private CancellationTokenSource? _saveSettingsDebounceCts;
+    /// <summary>Отложенное сохранение: debounce-хранилище CTS последнего вызова
+    /// <see cref="ScheduleSaveSettings"/> (асинхронный debounce; issue #96: не держит
+    /// освобождённые CTS, Cancel на завершённом инстансе безопасен). Хелпер чистый —
+    /// покрыт юнит-тестами SettingsSaveDebouncerTests (конвенция проекта: полный
+    /// MainViewModel для прямого теста слишком нагружен).</summary>
+    private readonly SettingsSaveDebouncer _saveSettingsDebouncer = new();
 
     private async Task RunDelayedSaveSettingsAsync(CancellationTokenSource cts)
     {
@@ -209,7 +218,13 @@ public partial class MainViewModel : ViewModelBase
         }
         finally
         {
-            cts.Dispose();
+            // issue #96: CTS намеренно НЕ освобождается (Dispose убран —
+            // первопричина ObjectDisposedException): поле дебаунсера могло всё ещё
+            // ссылаться на этот инстанс, и повторный Cancel из ScheduleSaveSettings
+            // бросал исключение. Complete убирает ссылку, если не запланирован
+            // более новый вызов; Cancel на завершённом, но не освобождённом CTS
+            // безопасен (коллбэков Task.Delay уже нет).
+            _saveSettingsDebouncer.Complete(cts);
         }
     }
 
