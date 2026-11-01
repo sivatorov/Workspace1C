@@ -14,7 +14,8 @@ namespace Workspace1C.Tests;
 /// <summary>
 /// Тесты массовой выгрузки в DT/CF с шаблоном имени файла (issue #92):
 /// чистая логика построения пути по шаблону ({Имя}/{Дата}), разбор вида
-/// операции, пред-валидация DumpCf и цикл прогона ViewModel с подменённым
+/// операции, миграция сохранённого шаблона (NormalizeSavedTemplate, v100115),
+/// пред-валидация DumpCf и цикл прогона ViewModel с подменённым
 /// исполнителем (без запуска ibcmd и без процессов).
 /// </summary>
 public sealed class Issue92BatchDumpTests
@@ -149,6 +150,49 @@ public sealed class Issue92BatchDumpTests
             "{Имя} {Date : dd.MM.yyyy}", "Бета", stamp, "yyyyMMdd");
 
         Assert.Equal("Бета 30.10.2026", expanded);
+    }
+
+    // ===================== Миграция сохранённого шаблона (v100115) =====================
+
+    [Fact]
+    public void NormalizeSavedTemplate_LegacyDefault_ReplacedWithActualDefault()
+    {
+        // У существующих пользователей в settings.json сохранён прежний дефолт
+        // {Имя}_{Дата} — при открытии окна заменяется на шаблон с форматом даты.
+        var normalized = BatchOperationsService.NormalizeSavedTemplate(BatchOperationsService.LegacyDumpTemplate);
+
+        Assert.Equal(BatchOperationsService.DefaultDumpTemplate, normalized);
+    }
+
+    [Fact]
+    public void NormalizeSavedTemplate_NullOrEmpty_ReplacedWithActualDefault()
+    {
+        Assert.Equal(BatchOperationsService.DefaultDumpTemplate,
+            BatchOperationsService.NormalizeSavedTemplate(null));
+        Assert.Equal(BatchOperationsService.DefaultDumpTemplate,
+            BatchOperationsService.NormalizeSavedTemplate(string.Empty));
+        Assert.Equal(BatchOperationsService.DefaultDumpTemplate,
+            BatchOperationsService.NormalizeSavedTemplate("   "));
+    }
+
+    [Fact]
+    public void NormalizeSavedTemplate_UserTemplate_KeptAsIs()
+    {
+        // Собственные шаблоны пользователей (в т.ч. с токеном с собственным форматом)
+        // не изменяются.
+        const string user = "{Имя}_{Дата:dd.MM.yyyy}";
+
+        Assert.Equal(user, BatchOperationsService.NormalizeSavedTemplate(user));
+    }
+
+    [Fact]
+    public void NormalizeSavedTemplate_LegacyWithWhitespace_ReplacedWithActualDefault()
+    {
+        // Равенство с legacy-шаблоном проверяется по Ordinal с Trim.
+        var normalized = BatchOperationsService.NormalizeSavedTemplate(
+            " " + BatchOperationsService.LegacyDumpTemplate + " ");
+
+        Assert.Equal(BatchOperationsService.DefaultDumpTemplate, normalized);
     }
 
     // ===================== Вид операции DT/CF =====================

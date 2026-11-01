@@ -52,8 +52,26 @@ public static class BatchOperationsService
     /// </summary>
     public const string DefaultDumpTemplate = "{Имя}_{Дата:yyyy-MM-dd_HH-mm}";
 
+    /// <summary>
+    /// Прежний шаблон по умолчанию (до v100114), сохранённый у существующих
+    /// пользователей в settings.json (issue #92, v100115).
+    /// </summary>
+    public const string LegacyDumpTemplate = "{Имя}_{Дата}";
+
     /// <summary>Формат метки времени токена {Дата} в шаблоне имени файла (issue #92).</summary>
     public const string DumpTimestampFormat = "yyyy-MM-dd_HH-mm";
+
+    /// <summary>
+    /// Миграция сохранённого шаблона имени файла (issue #92, v100115): пустое/null
+    /// значение и прежний дефолт <see cref="LegacyDumpTemplate"/> заменяются на
+    /// актуальный <see cref="DefaultDumpTemplate"/> (пример даты виден сразу);
+    /// пользовательский шаблон возвращается как есть. Чистый метод — покрыт тестами.
+    /// </summary>
+    public static string NormalizeSavedTemplate(string? savedTemplate)
+        => string.IsNullOrWhiteSpace(savedTemplate)
+            || string.Equals(savedTemplate.Trim(), LegacyDumpTemplate, StringComparison.Ordinal)
+            ? DefaultDumpTemplate
+            : savedTemplate;
 
     /// <summary>
     /// Разбирает вид пакетной операции из сохранённой строки настроек (issue #92):

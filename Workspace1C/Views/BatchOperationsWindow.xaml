@@ -13,6 +13,9 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
         <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}"/>
+        <!-- Тематизация полей ввода (issue #92, v100115): в тёмной теме поля
+             PathBox/TemplateBox иначе рисуются системным стилем («чёрный на тёмном»). -->
+        <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
     </Window.Resources>
 
     <Grid Margin="16">

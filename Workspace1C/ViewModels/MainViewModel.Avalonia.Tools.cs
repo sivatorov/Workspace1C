@@ -1652,7 +1652,10 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         var window = new Workspace1C.BatchOperationsWindow(bases, effectiveKind,
-            _settings.BatchDumpDirectory, _settings.BatchDumpTemplate,
+            _settings.BatchDumpDirectory,
+            // Миграция старого сохранённого шаблона (issue #92, v100115):
+            // прежний дефолт {Имя}_{Дата} заменяется на шаблон с форматом даты.
+            BatchOperationsService.NormalizeSavedTemplate(_settings.BatchDumpTemplate),
             // Формат метки времени токена {Дата} — общая настройка выгрузок (issue #92).
             _settings.ExportTimestampFormat,
             // Автоподстановка данных СУБД из кластера (rac) для серверных баз без

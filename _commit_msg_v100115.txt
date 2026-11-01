@@ -1,0 +1,15 @@
+Release 1.0.1.15: тёмная тема окна массовой выгрузки в Windows и миграция старого шаблона имени файла (#92)
+
+- #92 массовая выгрузка DT/CF: WPF-окно — поля «Каталог выгрузки» и
+  «Шаблон имени файла» переведены на тематический ModernTextBox —
+  в тёмной теме больше не «чёрный на тёмном» (BatchOperationsWindow.xaml);
+- #92 миграция: сохранённый старый дефолт шаблона {Имя}_{Дата} при
+  открытии окна заменяется на {Имя}_{Дата:yyyy-MM-dd_HH-mm}; собственные
+  шаблоны пользователей не затрагиваются (BatchOperationsService.cs —
+  NormalizeSavedTemplate, MainViewModel.Tools.cs,
+  MainViewModel.Avalonia.Tools.cs);
+- тесты: новые тесты миграции шаблона (Issue92BatchDumpTests);
+- версия 1.0.1.14 → 1.0.1.15 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  план plan-v100115.md, скрипт сборки _build_v100115.ps1,
+  заметки _rel_notes_v100115.md.
