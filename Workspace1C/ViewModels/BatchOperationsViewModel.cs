@@ -214,6 +214,20 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         set => SetProperty(ref _prepareDenyScheduledJobs, value);
     }
 
+    private string _sqlPassword = string.Empty;
+
+    /// <summary>
+    /// Пароль пользователя СУБД с формы (issue #92, v1.0.1.26, пожелание 7OH):
+    /// rac отдаёт логин СУБД (<c>db-user</c>), но НЕ пароль; если у базы нет профиля
+    /// СУБД — пароль можно ввести в поле окна и он будет подставлен в профиль после
+    /// rac-резолва. Секретоподобное значение: в настройки приложения не сохраняется.
+    /// </summary>
+    public string SqlPassword
+    {
+        get => _sqlPassword;
+        set => SetProperty(ref _sqlPassword, value ?? string.Empty);
+    }
+
     private bool _allowRunningBases;
 
     /// <summary>
@@ -601,6 +615,17 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                     }
                 }
 
+                // Issue #92 (v1.0.1.26): если автоподстановка из rac дала логин СУБД,
+                // но пароля нет — подставляем пароль с формы (поле «Пароль пользователя
+                // СУБД»); rac пароль не возвращает никогда.
+                if (resolvedProfile is not null && string.IsNullOrEmpty(resolvedProfile.Password) &&
+                    !string.IsNullOrWhiteSpace(SqlPassword))
+                {
+                    resolvedProfile.Password = SqlPassword;
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                              LocalizationManager.T("BatchOps.SqlPasswordApplied"));
+                }
+
                 // Issue #92: fail-fast. Если база клиент-серверная, сохранённого профиля
                 // СУБД нет, а автоподстановка из rac не дала данных — ibcmd запускался
                 // «наудачу» и гарантированно падал с малопонятной ошибкой подключения.
@@ -623,6 +648,7 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                     // блокировалось. Переход к следующей базе, итоговая строка — в finally.
                     continue;
                 }
+
 
                 IbcmdResult result;
                 try
@@ -677,6 +703,16 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
                               $"{LocalizationManager.T("BatchOps.OperationFailed")} ({FormatElapsed(elapsed)})"
                               + (failureReason.Length > 0 ? $": {failureReason}" : string.Empty));
+                    // Issue #92 (v1.0.1.26, вопрос aepkugesi): если профиль от rac есть
+                    // (логин есть), а пароля нет (rac его не отдаёт и на форме не ввели) —
+                    // к ошибке ibcmd добавляется понятное объяснение, ЧЕГО не хватает
+                    // и где его взять.
+                    if (resolvedProfile is not null && string.IsNullOrEmpty(resolvedProfile.Password) &&
+                        string.IsNullOrWhiteSpace(SqlPassword))
+                    {
+                        AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                            LocalizationManager.T("BatchOps.DbmsPasswordMissing"), ib.Name));
+                    }
                 }
             }
             finally

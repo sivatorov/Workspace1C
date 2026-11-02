@@ -86,10 +86,30 @@ public partial class MainViewModel
 
                 // Индикатор режимов: значок Play — 1С:Предприятие (толстый клиент без
                 // DESIGNER и тонкий клиент 1cv8c), ключ — Конфигуратор (DESIGNER/CONFIG).
-                ib.IsEnterpriseRunning = running && matching.Any(
-                    p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Enterprise);
-                ib.IsConfiguratorRunning = running && matching.Any(
-                    p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Configurator);
+                var enterpriseProcesses = matching
+                    .Where(p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Enterprise)
+                    .ToList();
+                var configuratorProcesses = matching
+                    .Where(p => RunningKindClassifier.Classify(p.ProcessName, p.CommandLine) == RunningKind.Configurator)
+                    .ToList();
+                ib.IsEnterpriseRunning = running && enterpriseProcesses.Count > 0;
+                ib.IsConfiguratorRunning = running && configuratorProcesses.Count > 0;
+
+                // issue #101: зависание считается ПО РЕЖИМАМ раздельно — зависший
+                // Конфигуратор красит только свой чип, Предприятие остаётся зелёным
+                // (и наоборот). Общий флаг/счётчик (точка у имени базы) сохраняет
+                // прежнее поведение — «любой процесс базы не отвечает».
+                var enterpriseNotResponding = ib.IsEnterpriseRunning &&
+                    enterpriseProcesses.Any(p => !p.IsResponding);
+                var configuratorNotResponding = ib.IsConfiguratorRunning &&
+                    configuratorProcesses.Any(p => !p.IsResponding);
+
+                ib.IsEnterpriseNotResponding = enterpriseNotResponding;
+                ib.EnterpriseNotRespondingStreak = enterpriseNotResponding
+                    ? ib.EnterpriseNotRespondingStreak + 1 : 0;
+                ib.IsConfiguratorNotResponding = configuratorNotResponding;
+                ib.ConfiguratorNotRespondingStreak = configuratorNotResponding
+                    ? ib.ConfiguratorNotRespondingStreak + 1 : 0;
 
                 ib.IsNotResponding = notResponding;
                 ib.NotRespondingStreak = notResponding ? ib.NotRespondingStreak + 1 : 0;

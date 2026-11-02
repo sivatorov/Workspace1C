@@ -10,8 +10,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
+using Avalonia.VisualTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -32,7 +34,12 @@ namespace Workspace1C
     {
         private readonly BatchOperationsViewModel _vm;
         private readonly ListBox _itemsList = new();
-        private readonly ListBox _logList = new() { IsHitTestVisible = false };
+        // issue #92 (v1.0.1.26): IsHitTestVisible=false снят — он блокировал прокрутку
+        // журнала колесом и ползунком; выделение строк гасится сбросом SelectedIndex.
+        private readonly ListBox _logList = new();
+        private ScrollViewer? _logScrollViewer;
+        private bool _logStickToBottom = true;
+        private readonly PasswordBox _sqlPasswordBox = new PasswordBox().Styled(ControlThemes.ModernPasswordBox);
         private readonly TextBlock _hint;
         private readonly TextBlock _summary;
         // Поля ввода тематизируются (issue #92, 1.0.1.11: без стиля текст поля
@@ -337,7 +344,29 @@ namespace Workspace1C
                     prepareHeader, prepareTerminateCheck, prepareDenyRow, prepareDenyJobsCheck, prepareHint
                 }
             };
-            var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow, preparePanel } };
+            // Поле «Пароль пользователя СУБД» (issue #92, v1.0.1.26, пожелание 7OH):
+            // rac отдаёт логин СУБД (db-user), но не пароль; если у базы нет профиля
+            // СУБД — пароль вводится здесь и подставляется в профиль после rac-резолва.
+            var sqlPasswordLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.SqlPasswordLabel"),
+                FontWeight = FontWeight.SemiBold,
+                Margin = new Thickness(0, 10, 0, 2)
+            };
+            ToolTip.SetTip(_sqlPasswordBox, LocalizationManager.T("BatchOps.SqlPasswordHint"));
+            _sqlPasswordBox.Width = 260;
+            var sqlPasswordHint = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.SqlPasswordHint"),
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.75
+            };
+            var sqlPasswordPanel = new StackPanel
+            {
+                Children = { sqlPasswordLabel, _sqlPasswordBox, sqlPasswordHint }
+            };
+            var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow, preparePanel, sqlPasswordPanel } };
 
             var logHeader = new TextBlock
             {
@@ -347,6 +376,8 @@ namespace Workspace1C
             };
 
             _logList.ItemsSource = _vm.LogLines;
+            // issue #92 (v1.0.1.26): журнал только читается — выделение строк гасим.
+            _logList.SelectionChanged += (_, _) => _logList.SelectedIndex = -1;
             _logList.ItemTemplate = new FuncDataTemplate<string>((_, _) =>
             {
                 var line = new TextBlock
@@ -582,6 +613,8 @@ namespace Workspace1C
 
         private async Task RunAsyncSafe()
         {
+            // Пароль PasswordBox не биндится (безопасность) — забираем на старте прогона.
+            _vm.SqlPassword = _sqlPasswordBox.Password ?? string.Empty;
             _cts = new CancellationTokenSource();
             try
             {
@@ -620,8 +653,37 @@ namespace Workspace1C
 
         private void OnLogLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.Action == NotifyCollectionChangedAction.Add && _vm.LogLines.Count > 0)
+            if (e.Action != NotifyCollectionChangedAction.Add || _vm.LogLines.Count == 0)
+                return;
+
+            HookLogScrollViewer();
+            if (_logStickToBottom)
                 _logList.ScrollIntoView(_vm.LogLines[_vm.LogLines.Count - 1]);
+        }
+
+        /// <summary>
+        /// «Умный» автоскролл журнала (issue #92, v1.0.1.26): прокручиваем к последней
+        /// строке ТОЛЬКО пока пользователь стоит на конце списка. Прокрутив вверх,
+        /// он может спокойно читать ошибки — список не дёргается, пока он не вернётся
+        /// к концу. Флаг меняется только при сдвиге СМЕЩЕНИЯ прокрутки; изменение
+        /// экстента от добавленных строк его не сбрасывает.
+        /// </summary>
+        private void HookLogScrollViewer()
+        {
+            if (_logScrollViewer is not null)
+                return;
+            _logScrollViewer = _logList.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+            if (_logScrollViewer is not null)
+                _logScrollViewer.ScrollChanged += OnLogScrollChanged;
+        }
+
+        private void OnLogScrollChanged(object? sender, Avalonia.Controls.ScrollChangedEventArgs e)
+        {
+            if (e.OffsetDelta.Y != 0 && _logScrollViewer is not null)
+            {
+                _logStickToBottom = _logScrollViewer.Offset.Y + _logScrollViewer.Viewport.Height
+                    >= _logScrollViewer.Extent.Height - 4;
+            }
         }
     }
 }

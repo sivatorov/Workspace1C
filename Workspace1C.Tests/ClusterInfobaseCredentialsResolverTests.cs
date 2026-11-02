@@ -154,8 +154,10 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         Assert.Equal("base-id-1", profile.InfobaseId);
         // v1.0.1.22 (issue #92): штатный путь содержит только диагностическую строку
         // со свойствами найденной базы; ошибок резолва в журнале нет.
+        // v1.0.1.26 (issue #79): плюс строка с источником кред ИБ для rac.
         Assert.DoesNotContain(log, m => m.Contains("DbmsResolve", StringComparison.Ordinal) &&
-            !m.Contains("DbmsResolveSummaryFieldsFormat", StringComparison.Ordinal));
+            !m.Contains("DbmsResolveSummaryFieldsFormat", StringComparison.Ordinal) &&
+            !m.Contains("DbmsResolveIbCredentialsSource", StringComparison.Ordinal));
     }
 
     [Fact]

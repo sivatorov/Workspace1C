@@ -41,4 +41,19 @@ public sealed class ProgramLicense
 
     /// <summary>Сырая строка вывода утилиты (для диагностики и отображения «как есть»).</summary>
     public string RawText { get; set; } = string.Empty;
+
+    /// <summary>Владелец лицензии (организация/ФИО) из файла *.lic (issue #83, v1.0.1.26); пусто — не распознан.</summary>
+    public string Owner { get; set; } = string.Empty;
+
+    /// <summary>Регистрационный номер лицензии из файла *.lic (issue #83, v1.0.1.26); пусто — не распознан.</summary>
+    public string RegNumber { get; set; } = string.Empty;
+
+    /// <summary>Имя компьютера, для которого выдана лицензия, из файла *.lic (issue #83, v1.0.1.26); пусто — не распознано.</summary>
+    public string Computer { get; set; } = string.Empty;
+
+    /// <summary>Дата выдачи лицензии из файла *.lic (issue #83, v1.0.1.26); null — не распознана.</summary>
+    public DateTime? IssueDate { get; set; }
+
+    /// <summary>Однострочная выжимка файла *.lic для подсказки по строке таблицы (issue #83, v1.0.1.26); пусто — файл недоступен.</summary>
+    public string RawDetails { get; set; } = string.Empty;
 }

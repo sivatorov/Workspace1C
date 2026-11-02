@@ -574,12 +574,15 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 6, 0, 4)
             };
-            var installedWidths = new[] { -1.5, 110d, 90d, -1.0, -1.0, 90d, 100d };
+            // Issue #83 (v1.0.1.26): колонка «Владелец» из файла *.lic + тултип строки
+            // с полной выжимкой файла (RawDetails).
+            var installedWidths = new[] { -1.5, 110d, 90d, -1.1, -1.0, -1.0, 90d, 100d };
             var installedTable = BuildLicenseList(
                 _vm.InstalledLicenses,
-                new[] { "SerialNumber", "Type", "Version", "Module", "User", "State", "ExpiryDate" },
+                new[] { "SerialNumber", "Type", "Version", "Owner", "Module", "User", "State", "ExpiryDate" },
                 installedWidths,
-                fixedHeight: 200);
+                fixedHeight: 200,
+                rowTooltipPath: "RawDetails");
 
             var panel = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
             DockPanel.SetDock(headerPanel, Dock.Top);
@@ -599,7 +602,7 @@ namespace Workspace1C
         /// <summary>Таблица лицензий: строка-заголовок + ListBox со строками-Grid.</summary>
         private Control BuildLicenseList<T>(
             ObservableCollection<T> items, IReadOnlyList<string> propertyPaths,
-            IReadOnlyList<double> widths, double fixedHeight = 0)
+            IReadOnlyList<double> widths, double fixedHeight = 0, string? rowTooltipPath = null)
         {
             var headerCells = propertyPaths.Select(p =>
             {
@@ -617,6 +620,7 @@ namespace Workspace1C
                     "SerialNumber" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Serial"),
                     "Type" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Type"),
                     "Version" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Version"),
+                    "Owner" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Owner"),
                     "Module" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Module"),
                     "State" => LocalizationManager.T("ServerMonitor.Licenses.Columns.State"),
                     "ExpiryDate" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Expiry"),
@@ -634,10 +638,20 @@ namespace Workspace1C
             if (fixedHeight > 0)
                 list.Height = fixedHeight;
             list.ItemTemplate = new FuncDataTemplate<object>((item, _) =>
-                LicenseRow(
+            {
+                var row = LicenseRow(
                     propertyPaths.Select(p => FormatCell(item, p)).ToList(),
                     widths,
-                    header: false));
+                    header: false);
+                // Issue #83 (v1.0.1.26): тултип строки — выжимка файла *.lic (RawDetails).
+                if (rowTooltipPath is not null)
+                {
+                    var tooltip = item?.GetType().GetProperty(rowTooltipPath)?.GetValue(item) as string;
+                    if (!string.IsNullOrEmpty(tooltip))
+                        ToolTip.SetTip(row, tooltip);
+                }
+                return row;
+            });
 
             var headerRow = LicenseRow(headerCells, widths, header: true);
             var root = new StackPanel { Children = { headerRow, list } };
@@ -669,6 +683,7 @@ namespace Workspace1C
                     "SerialNumber" => license.SerialNumber,
                     "Type" => license.Type,
                     "Version" => license.Version,
+                    "Owner" => license.Owner,
                     "Module" => license.Module,
                     "User" => license.User,
                     "State" => license.State,

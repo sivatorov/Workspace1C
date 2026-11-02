@@ -2,6 +2,8 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using Microsoft.Win32;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -66,6 +68,9 @@ namespace Workspace1C
             // Выгрузка запущенных баз (issue #92, v1.0.1.25).
             AllowRunningText.Text = LocalizationManager.T("BatchOps.AllowRunningBases");
             AllowRunningCheck.ToolTip = LocalizationManager.T("BatchOps.AllowRunningBasesHint");
+            // Поле «Пароль пользователя СУБД» (issue #92, v1.0.1.26).
+            SqlPasswordLabel.Text = LocalizationManager.T("BatchOps.SqlPasswordLabel");
+            SqlPasswordHint.Text = LocalizationManager.T("BatchOps.SqlPasswordHint");
 
             UpdateKindDependentUi();
             // issue #92 (v1.0.1.24): список показывает строки ПОД ФИЛЬТРОМ поиска;
@@ -132,13 +137,60 @@ namespace Workspace1C
             }
         }
 
+        // issue #92 (v1.0.1.26): «умный» автоскролл журнала — прокручиваем к последней
+        // строке ТОЛЬКО пока пользователь стоит на конце списка. Если он прокрутил
+        // журнал вверх, чтобы прочитать ошибку, — не дёргаем список, пока он сам не
+        // вернётся к концу.
+        private bool _logStickToBottom = true;
+        private ScrollViewer? _logScrollViewer;
+
         private void OnLogLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            if (e.Action == NotifyCollectionChangedAction.Add && _vm.LogLines.Count > 0)
+            if (e.Action != NotifyCollectionChangedAction.Add || _vm.LogLines.Count == 0)
+                return;
+
+            HookLogScrollViewer();
+            if (!_logStickToBottom)
+                return;
+
+            LogList.ScrollIntoView(_vm.LogLines[_vm.LogLines.Count - 1]);
+        }
+
+        /// <summary>Подключает отслеживание прокрутки журнала (один раз, после загрузки шаблона).</summary>
+        private void HookLogScrollViewer()
+        {
+            if (_logScrollViewer is not null)
+                return;
+            _logScrollViewer = FindDescendantScrollViewer(LogList);
+            if (_logScrollViewer is not null)
+                _logScrollViewer.ScrollChanged += OnLogScrollChanged;
+        }
+
+        private void OnLogScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            // Прокрутку содержимого (добавление строк) игнорируем — флаг меняется
+            // только при сдвиге СМЕЩЕНИЯ (пользователь / автоскролл).
+            if (e.VerticalChange != 0 && _logScrollViewer is not null)
             {
-                var last = _vm.LogLines[_vm.LogLines.Count - 1];
-                LogList.ScrollIntoView(last);
+                _logStickToBottom = _logScrollViewer.VerticalOffset + _logScrollViewer.ViewportHeight
+                    >= _logScrollViewer.ExtentHeight - 4;
             }
+        }
+
+        private static ScrollViewer? FindDescendantScrollViewer(DependencyObject? parent)
+        {
+            if (parent is null)
+                return null;
+            if (parent is ScrollViewer sv)
+                return sv;
+            var count = VisualTreeHelper.GetChildrenCount(parent);
+            for (var i = 0; i < count; i++)
+            {
+                var found = FindDescendantScrollViewer(VisualTreeHelper.GetChild(parent, i));
+                if (found is not null)
+                    return found;
+            }
+            return null;
         }
 
         /// <summary>Кнопка очистки поля поиска (issue #92, v1.0.1.25).</summary>
@@ -181,6 +233,8 @@ namespace Workspace1C
 
         private async void OnRun_Click(object sender, RoutedEventArgs e)
         {
+            // Пароль PasswordBox не биндится (безопасность) — забираем на старте прогона.
+            _vm.SqlPassword = SqlPasswordBox.Password;
             _cts = new CancellationTokenSource();
             try
             {

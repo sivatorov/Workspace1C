@@ -347,11 +347,13 @@ public sealed class Release100125Tests
     [Fact]
     public void Csproj_VersionBumpedTo100125_AllFourProperties()
     {
+        // v1.0.1.26: версия ушла вперёд — тест проверяет, что версия НЕ НИЖЕ 1.0.1.25
+        // (актуальная версия и все 4 свойства тестируются в Release100126Tests).
         var csproj = ReadProjectFile("Workspace1C/Workspace1C.csproj");
-        Assert.Contains("<Version>1.0.1.25</Version>", csproj);
-        Assert.Contains("<AssemblyVersion>1.0.1.25</AssemblyVersion>", csproj);
-        Assert.Contains("<FileVersion>1.0.1.25</FileVersion>", csproj);
-        Assert.Contains("<InformationalVersion>1.0.1.25</InformationalVersion>", csproj);
+        Assert.Matches(@"<Version>1\.0\.1\.(2[5-9]|[3-9]\d)</Version>", csproj);
+        Assert.Matches(@"<AssemblyVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</AssemblyVersion>", csproj);
+        Assert.Matches(@"<FileVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</FileVersion>", csproj);
+        Assert.Matches(@"<InformationalVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</InformationalVersion>", csproj);
     }
 
     [Fact]

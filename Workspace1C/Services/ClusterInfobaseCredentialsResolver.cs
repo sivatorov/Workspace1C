@@ -155,6 +155,11 @@ public sealed class ClusterInfobaseCredentialsResolver
         // администратора ИБ — берутся из свойств базы (авторизация «Конфигуратора»),
         // иначе rac отвечает «Недостаточно прав пользователя на информационную базу».
         var (ibUser, ibPassword) = InfobaseAdminCredentials(infobase!, CredentialOverride);
+        // Issue #79 (v1.0.1.26): источник кред ИБ — в журнал. По ZIP-диагностике
+        // сразу видно, нашлись ли креды ИБ и откуда (форма/Конфигуратор/Предприятие).
+        var (_, _, ibCredentialsSource) = InfobaseAdminCredentialsWithSource(infobase!, CredentialOverride);
+        _log?.Invoke(string.Format(
+            LocalizationManager.T("BatchOps.DbmsResolveIbCredentialsSource"), ibCredentialsSource));
         LastFailureReason = null;
         // Issue #92 (v1.0.1.22): причина последней неудачи сборки профиля по НАЙДЕННОЙ
         // базе (пустой dbms в summary + ошибка «infobase info») — для честного итогового
@@ -269,6 +274,22 @@ public sealed class ClusterInfobaseCredentialsResolver
                     var info = await _racClient.GetInfobaseInfoAsync(
                         parameters, cluster.Id, match.InfobaseId,
                         infobaseUser: ibUser, infobasePassword: ibPassword, timeoutCts.Token).ConfigureAwait(false);
+
+                    // Issue #79 (v1.0.1.26): fallback на кластерные креды. Если «infobase info»
+                    // с кредами ИБ упал с «Недостаточно прав», а у записи «Сервера управления»
+                    // есть логин администратора кластера — повторная проба с ними. На таймауты
+                    // и прочие ошибки фолбэк не делается (только явная ошибка прав).
+                    if (info is null && HasInsufficientRightsError(_racClient.LastActionError) &&
+                        !string.IsNullOrEmpty(parameters.User) &&
+                        !string.Equals(parameters.User, ibUser, StringComparison.Ordinal))
+                    {
+                        _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveClusterCredsFallback"));
+                        info = await _racClient.GetInfobaseInfoAsync(
+                            parameters, cluster.Id, match.InfobaseId,
+                            infobaseUser: parameters.User, infobasePassword: parameters.Password,
+                            timeoutCts.Token).ConfigureAwait(false);
+                    }
+
                     profile = info is null ? null : ToProfile(info, infobase.Id, infobaseName);
                     if (profile is not null)
                     {
@@ -331,6 +352,10 @@ public sealed class ClusterInfobaseCredentialsResolver
                 LastFailureReason = profileFailureReason;
                 if (ibUser is null)
                     LastFailureReason += " " + LocalizationManager.T("BatchOps.DbmsResolveNeedIbCredentials");
+                // Issue #79 (v1.0.1.26): ошибка прав при отсутствии кластерных кред —
+                // подсказка, где их задать, вместо голого rac-текста.
+                if (HasInsufficientRightsError(LastFailureReason) && string.IsNullOrEmpty(parameters.User))
+                    LastFailureReason += " " + LocalizationManager.T("BatchOps.DbmsResolveNeedClusterCredentials");
                 _log?.Invoke(string.Format(
                     LocalizationManager.T("BatchOps.DbmsResolveNoProfileFormat"),
                     infobaseName, parameters.Address, LastFailureReason));
@@ -419,13 +444,27 @@ public sealed class ClusterInfobaseCredentialsResolver
     public static (string? User, string? Password) InfobaseAdminCredentials(Infobase? infobase,
         BackupCredential? credential = null)
     {
+        var (user, password, _) = InfobaseAdminCredentialsWithSource(infobase, credential);
+        return (user, password);
+    }
+
+    /// <summary>
+    /// То же, что <see cref="InfobaseAdminCredentials"/>, плюс ИСТОЧНИК кред для
+    /// журналирования (issue #79, v1.0.1.26): «form» — поля формы мастера,
+    /// «configurator:<база>»/«enterprise:<база>» — авторизация из свойств базы,
+    /// «app-auth» — общая авторизация приложения, «none» — кред не нашлось. По строке
+    /// журнала сразу видно, почему rac шёл без учётных данных ИБ.
+    /// </summary>
+    public static (string? User, string? Password, string Source) InfobaseAdminCredentialsWithSource(
+        Infobase? infobase, BackupCredential? credential = null)
+    {
         if (infobase is null)
-            return (null, null);
+            return (null, null, "none");
         try
         {
             // Явные логин/пароль формы мастера — высший приоритет.
             if (credential is { UseInfobaseAuth: false } && !string.IsNullOrWhiteSpace(credential.User))
-                return (credential.User.Trim(), credential.Password ?? string.Empty);
+                return (credential.User.Trim(), credential.Password ?? string.Empty, "form");
 
             // Тот же источник, что у окна «Серверы 1С» → «Свойства информационной базы»
             // («Логин и пароль администратора ИБ взяты из списка баз»): авторизация
@@ -433,16 +472,31 @@ public sealed class ClusterInfobaseCredentialsResolver
             var found = ClusterInfobaseCredentials.Find(new[] { infobase },
                 infobase.Connection?.Server, infobase.Connection?.DatabaseName);
             if (found is not null)
-                return (found.User, found.Password);
+                return (found.User, found.Password, "configurator:" + (infobase.Name ?? string.Empty));
 
             // Общая авторизация приложения (как у ibcmd).
             var (user, password) = IbcmdService.ResolveUser(infobase, credential);
-            return string.IsNullOrWhiteSpace(user) ? (null, null) : (user, password ?? string.Empty);
+            return string.IsNullOrWhiteSpace(user)
+                ? (null, null, "none")
+                : (user, password ?? string.Empty, "app-auth");
         }
         catch
         {
-            return (null, null);
+            return (null, null, "none");
         }
+    }
+
+    /// <summary>
+    /// Ошибка rac — «не хватает прав» (issue #79, v1.0.1.26): по тексту ошибки решается,
+    /// делать ли fallback на кластерные креды. Internal — для юнит-теста.
+    /// </summary>
+    internal static bool HasInsufficientRightsError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
+        return error.Contains("Недостаточно прав", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Insufficient privileges", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Insufficient rights", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -218,16 +218,42 @@
                     <TextBlock x:Name="PrepareHint" FontSize="11" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
+
+                <!-- Поле «Пароль пользователя СУБД» (issue #92, v1.0.1.26, пожелание 7OH):
+                     rac отдаёт логин СУБД (db-user), но не пароль; если у базы нет профиля
+                     СУБД — пароль вводится здесь и подставляется в профиль после rac-резолва.
+                     Файловым базам поле просто не используется. Пароль не сохраняется. -->
+                <StackPanel x:Name="SqlPasswordPanel" Margin="0,10,0,0">
+                    <TextBlock x:Name="SqlPasswordLabel" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <PasswordBox x:Name="SqlPasswordBox" Width="260" HorizontalAlignment="Left"
+                                 VerticalContentAlignment="Center"/>
+                    <TextBlock x:Name="SqlPasswordHint" FontSize="11" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                </StackPanel>
             </StackPanel>
 
             <TextBlock x:Name="LogHeader" Grid.Row="2" Margin="0,14,0,6" FontWeight="SemiBold"
                        Text="{loc:Loc BatchOps.Log}"/>
 
-            <!-- Построчный лог прогона -->
+            <!-- Построчный лог прогона. Issue #92 (v1.0.1.26): IsHitTestVisible="False"
+                 снят — именно он блокировал прокрутку журнала колесом и ползунком.
+                 Выделение строк запрещено: контейнер без фокуса и без визуала выделения. -->
             <ListBox x:Name="LogList" Grid.Row="3" MinHeight="90"
                      BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
-                     IsHitTestVisible="False"
                      ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Focusable" Value="False"/>
+                        <Setter Property="Background" Value="Transparent"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <ContentPresenter/>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12"

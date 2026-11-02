@@ -2847,6 +2847,17 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
                     s.InfobaseId is null && sessionsById.TryGetValue(s.Id, out var full) ? full : s))));
             ReplaceRows(InstalledLicenses, curatedInstalled);
             LicenseStatusText = licenseWarning ?? string.Empty;
+            // Issue #83 (v1.0.1.26): «занято 0 из N» без объяснения вводит в заблуждение.
+            // Если сеансы есть, но rac не вернул lic-type ни у одного — честная причина
+            // в статус-строке (чаще всего не хватает кластерных кред).
+            if (licenseWarning is null && curatedSessions.Count > 0 &&
+                curatedSessions.All(s => string.IsNullOrWhiteSpace(s.LicType)))
+            {
+                var noLicTypeReason = LocalizationManager.T("ServerMonitor.Licenses.NoLicTypeReason");
+                LicenseStatusText = string.IsNullOrEmpty(LicenseStatusText)
+                    ? noLicTypeReason
+                    : LicenseStatusText + " " + noLicTypeReason;
+            }
             LicenseSummaryText = BuildLicenseSummaryText(curatedSessions, curatedInstalled);
             CheckLicenseThresholdAlert(curatedSessions, curatedInstalled);
 

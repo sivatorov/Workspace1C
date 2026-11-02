@@ -415,7 +415,10 @@ namespace Workspace1C
             // прежде Padding 3 при чипе 16 оставлял значку 8 px из 10 и сдвигал его;
             // теперь чип 18 без внутренних полей, значок — треугольник Play по центру
             // (с оптической поправкой: центр масс треугольника левее центра его рамки).
-            var enterpriseChip = BuildRunningChip(ib, nameof(Infobase.IsEnterpriseRunning), leftMargin: 0);
+            // issue #101: чипы биндятся к ПЕР-РЕЖИМНЫМ статусам (EnterpriseRunningStatus /
+            // ConfiguratorRunningStatus), а не к общему RunningStatus: зависший
+            // Конфигуратор красит только свой чип, Предприятие остаётся в своём цвете.
+            var enterpriseChip = BuildRunningChip(ib, nameof(Infobase.IsEnterpriseRunning), nameof(Infobase.EnterpriseRunningStatus), leftMargin: 0);
             var enterpriseIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = Avalonia.Media.Geometry.Parse(RunningEnterpriseGlyph),
@@ -427,7 +430,7 @@ namespace Workspace1C
                 Margin = new Thickness(UiMetrics.Scaled(2), 0, 0, 0)
             };
             enterpriseIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                new Avalonia.Data.Binding(nameof(Infobase.EnterpriseRunningStatus))
                 {
                     Source = ib,
                     Converter = new RunningChipBrushConverter(),
@@ -437,7 +440,7 @@ namespace Workspace1C
             enterpriseChip.Child = enterpriseIcon;
             runningIcons.Children.Add(enterpriseChip);
 
-            var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), leftMargin: 3);
+            var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), nameof(Infobase.ConfiguratorRunningStatus), leftMargin: 3);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = IconHelper.Geometry("IconWrench"),
@@ -448,7 +451,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center
             };
             configuratorIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                new Avalonia.Data.Binding(nameof(Infobase.ConfiguratorRunningStatus))
                 {
                     Source = ib,
                     Converter = new RunningChipBrushConverter(),
@@ -851,7 +854,7 @@ namespace Workspace1C
         /// без внутренних полей (значок центруется сам), фон и обводка — по статусу
         /// отклика процесса через <see cref="RunningChipBrushConverter"/>.
         /// </summary>
-        private static Border BuildRunningChip(Infobase ib, string visibilityPath, double leftMargin)
+        private static Border BuildRunningChip(Infobase ib, string visibilityPath, string statusPath, double leftMargin)
         {
             var chip = new Border
             {
@@ -862,15 +865,17 @@ namespace Workspace1C
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(UiMetrics.Scaled(leftMargin), 0, 0, 0)
             };
+            // issue #101: фон/обводка чипа — по пер-режимному статусу (statusPath),
+            // а не по общему RunningStatus.
             chip.Bind(Border.BackgroundProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                new Avalonia.Data.Binding(statusPath)
                 {
                     Source = ib,
                     Converter = new RunningChipBrushConverter(),
                     ConverterParameter = "bg"
                 });
             chip.Bind(Border.BorderBrushProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                new Avalonia.Data.Binding(statusPath)
                 {
                     Source = ib,
                     Converter = new RunningChipBrushConverter(),

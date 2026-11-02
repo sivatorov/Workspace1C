@@ -75,7 +75,12 @@ public sealed class TestDeployService
 
             var validation = await TestDeployPlanner.ValidateAsync(
                 scenario, source, existing,
-                racProfileResolverAsync: (ib, ct) => ResolveRacProfileForValidationAsync(ib, ct, PreValidateLog),
+                // Issue #79 (v1.0.1.26, регресс v1.0.1.25): pre-валидация должна получать
+                // креды ИБ с формы и тип СУБД формы — так же, как резолв перед «Выгрузкой»
+                // (ResolveSourceDumpProfileAsync); иначе rac-проба шла без учётных данных
+                // и падала с «Недостаточно прав пользователя» при верных кредах.
+                racProfileResolverAsync: (ib, ct) =>
+                    ResolveRacProfileForValidationAsync(ib, scenario, ct, PreValidateLog),
                 log: PreValidateLog,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
             if (validation.Count > 0)
@@ -557,11 +562,16 @@ public sealed class TestDeployService
     /// возвращается null (валидация покажет понятную причину).
     /// </summary>
     private static async Task<DbmsBackupProfile?> ResolveRacProfileForValidationAsync(
-        Infobase source, CancellationToken ct, Action<string>? log)
+        Infobase source, TestDeployScenario scenario, CancellationToken ct, Action<string>? log)
     {
         var resolver = ClusterInfobaseCredentialsResolver.CreateDefault(message => log?.Invoke(message));
         if (resolver is null)
             return null;
+        // Issue #79 (v1.0.1.26, регресс v1.0.1.25): креды ИБ с формы и тип СУБД формы
+        // передаются и на шаге pre-валидации (ранее — только перед «Выгрузкой»,
+        // из-за чего rac-проба шла без учётных данных и сообщала «Недостаточно прав»).
+        resolver.CredentialOverride = scenario.Credential;
+        resolver.FallbackDbms = scenario.Dbms;
         return await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
     }
 

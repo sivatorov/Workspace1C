@@ -1892,6 +1892,10 @@
                                             <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center"
                                                         ToolTip="{Binding RunningModesTooltip}"
                                                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                                <!-- issue #101: триггеры чипов привязаны к ПЕР-РЕЖИМНЫМ статусам
+                                                     (EnterpriseRunningStatus / ConfiguratorRunningStatus), а не к общему
+                                                     RunningStatus: зависший Конфигуратор красит только свой чип,
+                                                     Предприятие остаётся в своём цвете (и наоборот). -->
                                                 <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1"
                                                         VerticalAlignment="Center"
                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
@@ -1900,11 +1904,11 @@
                                                             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
                                                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
                                                                     <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Critical">
                                                                     <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
@@ -1917,10 +1921,10 @@
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
-                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Critical">
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
@@ -1936,11 +1940,11 @@
                                                             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
                                                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                                                             <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Hung">
                                                                     <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Critical">
                                                                     <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
@@ -1953,10 +1957,10 @@
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                                                 <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Hung">
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
-                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Critical">
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>

@@ -240,6 +240,16 @@ public sealed class RacClient : IRacClient
             .ConfigureAwait(false);
         var sessions = RacOutputParser.ToSessions(output);
         EnsureParsedOrThrow(output, sessions.Count, "session list --licenses", _logger);
+
+        // Issue #83 (v1.0.1.26): диагностика «занято 0 из N» — в CM_RAC пишутся сырой
+        // вывод команды (усечённо) и счётчики сеансов с/без lic-type: по ним видно,
+        // вернул ли rac лицензионные поля вообще (например, без кластерных кред он
+        // отдаёт сеансы без lic-type).
+        var withLicType = sessions.Count(s => !string.IsNullOrWhiteSpace(s.LicType));
+        var truncatedOutput = output.Length > 500 ? output.Substring(0, 500) + "…" : output;
+        Log.Info(LogCategory.Rac,
+            $"RAC{SourcePrefix}: session list --licenses — сеансов={sessions.Count}, " +
+            $"с lic-type={withLicType}, без lic-type={sessions.Count - withLicType}. Вывод: {truncatedOutput}");
         return sessions;
     }
 
@@ -720,6 +730,28 @@ public sealed class RacClient : IRacClient
     private static string OnOff(bool value) => value ? "on" : "off";
 
     /// <summary>
+    /// Командная строка rac для журнала с маскированием секретов (issue #79,
+    /// v1.0.1.26): значения параметров, чьё имя заканчивается на «pwd»/«password»
+    /// (—infobase-pwd, —db-pwd, —password, …), заменяются на «***». Логины не
+    /// трогаются — маскирование только по суффиксу ИМЕНИ параметра, значение
+    /// «***» не задевается. Internal — для юнит-теста.
+    /// </summary>
+    internal static string MaskSecrets(IEnumerable<string> args)
+    {
+        return string.Join(" ", args.Select(arg =>
+        {
+            var eq = arg.IndexOf('=');
+            if (eq <= 0)
+                return arg;
+            var name = arg.Substring(0, eq);
+            return name.EndsWith("pwd", StringComparison.OrdinalIgnoreCase) ||
+                   name.EndsWith("password", StringComparison.OrdinalIgnoreCase)
+                ? $"{name}=***"
+                : arg;
+        }));
+    }
+
+    /// <summary>
     /// Аргументы команды «infobase info» (issue #3): <c>infobase info --cluster=<uuid>
     /// --infobase=<uuid> [--infobase-user=U [--infobase-pwd=P]]</c>. Internal — для тестов.
     /// </summary>
@@ -1113,6 +1145,12 @@ public sealed class RacClient : IRacClient
             // передача значений с пробелами и спецсимволами (пароль, имена баз).
             foreach (var arg in args)
                 process.StartInfo.ArgumentList.Add(arg);
+
+            // Issue #79 (v1.0.1.26): фактическая командная строка rac в CM_RAC —
+            // по ZIP-диагностике сразу видно, ушли ли --infobase-user/--infobase-pwd
+            // и с какими параметрами шла команда. Значения паролей маскируются.
+            Log.Info(LogCategory.Rac,
+                $"RAC{SourcePrefix}: {commandLabel} — команда: rac {MaskSecrets(args)}");
 
             if (!process.Start())
                 throw new RacClientException($"Не удалось запустить rac: {rac}.");

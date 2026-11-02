@@ -117,6 +117,93 @@ public static class RingLicenseParser
         return licenses;
     }
 
+    /// <summary>Пары «ключ: значение» / «ключ=значение» из текста файла *.lic (issue #83, v1.0.1.26).</summary>
+    private static readonly Regex LicKeyValueRegex = new(
+        @"^\s*(?<key>[^:=\[\r\n]{2,40}?)\s*[:=]\s*(?<value>.+?)\s*$",
+        RegexOptions.Compiled | RegexOptions.Multiline);
+
+    /// <summary>Дата в файле лицензии: dd.MM.yyyy или yyyy-MM-dd.</summary>
+    private static readonly Regex LicDateRegex = new(
+        @"\b(?:(?<d1>0[1-9]|[12]\d|3[01])\.(?<m1>0[1-9]|1[0-2])\.(?<y1>\d{4})|(?<y2>(19|20)\d{2})-(?<m2>0[1-9]|1[0-2])-(?<d2>0[1-9]|[12]\d|3[01]))\b",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// ЧИСТЫЙ разбор содержимого файла лицензии *.lic (issue #83, v1.0.1.26): извлекает
+    /// владельца, рег. номер, пользователя/компьютер и даты. Формат файла 1С не
+    /// документирован и зависит от версии платформы, поэтому разбор толерантный:
+    /// распознаются пары «ключ=значение»/«ключ: значение» по ключевым словам (ru/en),
+    /// всё нераспознанное уходит в <see cref="ProgramLicense.RawDetails"/> — однострочную
+    /// выжимку для подсказки по строке таблицы лицензий.
+    /// </summary>
+    public static ProgramLicense ParseLicFile(string content, string? fileName = null)
+    {
+        var license = new ProgramLicense();
+        if (string.IsNullOrWhiteSpace(content))
+            return license;
+
+        var owner = FindValue(content, "владел", "owner", "организац", "organization", "компан", "company");
+        if (owner is not null)
+            license.Owner = owner;
+        var regNumber = FindValue(content, "рег.номер", "рег номер", "регномер", "регистраци", "reg. number", "regnumber", "registration");
+        if (regNumber is not null)
+            license.RegNumber = regNumber;
+        var user = FindValue(content, "пользовател", "user");
+        if (user is not null)
+            license.User = user;
+        var computer = FindValue(content, "компьютер", "computer", "машина", "machine");
+        if (computer is not null)
+            license.Computer = computer;
+        var series = FindValue(content, "серия", "series");
+        if (series is not null)
+            license.Type = series;
+        var type = FindValue(content, "тип", "вид лиценз", "type");
+        if (type is not null && license.Type.Length == 0)
+            license.Type = type;
+
+        var dateMatch = LicDateRegex.Match(content);
+        if (dateMatch.Success)
+        {
+            if (dateMatch.Groups["y1"].Success)
+            {
+                license.IssueDate = new DateTime(
+                    int.Parse(dateMatch.Groups["y1"].Value, CultureInfo.InvariantCulture),
+                    int.Parse(dateMatch.Groups["m1"].Value, CultureInfo.InvariantCulture),
+                    int.Parse(dateMatch.Groups["d1"].Value, CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                license.IssueDate = new DateTime(
+                    int.Parse(dateMatch.Groups["y2"].Value, CultureInfo.InvariantCulture),
+                    int.Parse(dateMatch.Groups["m2"].Value, CultureInfo.InvariantCulture),
+                    int.Parse(dateMatch.Groups["d2"].Value, CultureInfo.InvariantCulture));
+            }
+        }
+
+        // Выжимка файла для тултипа: непустые строки, схлопнутые в одну (до ~400 символов).
+        var details = string.Join("  •  ", content
+            .Split('\n')
+            .Select(l => l.Trim().TrimEnd('\r'))
+            .Where(l => l.Length > 0));
+        if (details.Length > 400)
+            details = details.Substring(0, 400) + "…";
+        license.RawDetails = details;
+        if (!string.IsNullOrWhiteSpace(fileName))
+            license.RawText = fileName!;
+        return license;
+    }
+
+    /// <summary>Значение первой пары «ключ: значение», чей ключ содержит одно из слов-маркеров. Internal — тесты.</summary>
+    internal static string? FindValue(string content, params string[] keyMarkers)
+    {
+        foreach (Match match in LicKeyValueRegex.Matches(content))
+        {
+            var key = match.Groups["key"].Value;
+            if (keyMarkers.Any(m => key.Contains(m, StringComparison.OrdinalIgnoreCase)))
+                return match.Groups["value"].Value.Trim();
+        }
+        return null;
+    }
+
     /// <summary>Пытается разобрать таблицу с заголовком. Возвращает кратки статус (распознан ли заголовок лицензий).</summary>
     private static void ParseTable(string output, List<ProgramLicense> licenses)
     {
@@ -492,6 +579,9 @@ public sealed class RingLicenseService : IRingLicenseService
                 // (не «капают» в журнал при выключенном логировании).
                 Log.Info(LogCategory.Rac,
                     $"RING: распознано программных лицензий: {licenses.Count} (источник: {source}).");
+                // Issue #83 (v1.0.1.26): дополняем лицензии полями файла *.lic
+                // (владелец, рег. номер, пользователь/компьютер, даты, RawDetails).
+                EnrichWithLicFiles(licenses);
                 return new RingLicenseResult { Licenses = licenses };
             }
 
@@ -1038,6 +1128,19 @@ public sealed class RingLicenseService : IRingLicenseService
     /// <summary>Читает каталог файлов лицензий платформы (Linux и Windows). Internal — тесты.</summary>
     internal static IReadOnlyList<ProgramLicense> TryReadLicenseDirectory()
     {
+        var licenses = new List<ProgramLicense>();
+        foreach (var (file, fileName) in EnumerateLicFiles())
+        {
+            var license = TryReadLicFile(file, fileName);
+            if (license is not null)
+                licenses.Add(license);
+        }
+        return licenses;
+    }
+
+    /// <summary>Каталоги файлов лицензий платформы (первый существующий). Internal — тесты.</summary>
+    internal static List<string> LicenseDirectories()
+    {
         var directories = new List<string>();
 #if WINDOWS
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
@@ -1050,24 +1153,115 @@ public sealed class RingLicenseService : IRingLicenseService
         directories.Add("/etc/1cv8/License");
         directories.Add("/var/1C/licenses");
 #endif
+        return directories;
+    }
 
-        var licenses = new List<ProgramLicense>();
-        foreach (var directory in directories)
+    /// <summary>Файлы лицензий первого существующего каталога: (полный путь, имя файла).</summary>
+    private static IEnumerable<(string File, string FileName)> EnumerateLicFiles()
+    {
+        foreach (var directory in LicenseDirectories())
         {
             if (!Directory.Exists(directory))
                 continue;
             foreach (var file in Directory.EnumerateFiles(directory)
                          .Where(f => Path.GetExtension(f).Length > 0)
                          .OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-            {
-                licenses.Add(new ProgramLicense
-                {
-                    RawText = Path.GetFileName(file),
-                    Module = $"файл лицензии: {Path.GetFileName(file)}"
-                });
-            }
+                yield return (file, Path.GetFileName(file));
             break; // берём первый существующий каталог.
         }
-        return licenses;
+    }
+
+    /// <summary>
+    /// Читает файл лицензии *.lic и разбирает его <see cref="RingLicenseParser.ParseLicFile"/>
+    /// (issue #83, v1.0.1.26). Кодировка файла заранее неизвестна (UTF-8 / UTF-16 / CP1251),
+    /// поэтому пробуется детект по BOM и валидности декодирования. Ошибки не бросаются.
+    /// </summary>
+    internal static ProgramLicense? TryReadLicFile(string path, string fileName)
+    {
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+            string content;
+            if (bytes.Length >= 2 && ((bytes[0] == 0xFF && bytes[1] == 0xFE) || (bytes[0] == 0xFE && bytes[1] == 0xFF)))
+            {
+                content = System.Text.Encoding.Unicode.GetString(bytes);
+            }
+            else if (bytes.Length > 0 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            {
+                content = System.Text.Encoding.UTF8.GetString(bytes);
+            }
+            else
+            {
+                content = System.Text.Encoding.UTF8.GetString(bytes);
+                if (content.Contains('\uFFFD', StringComparison.Ordinal))
+                {
+                    // Не UTF-8 (скорее всего CP1251) — перечитываем в CP1251.
+                    System.Text.Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+                    content = System.Text.Encoding.GetEncoding(1251).GetString(bytes);
+                }
+            }
+
+            var license = RingLicenseParser.ParseLicFile(content, fileName);
+            license.Module = $"файл лицензии: {fileName}";
+            return license;
+        }
+        catch
+        {
+            // Файл недоступен/не читается — всё равно показываем имя файла в таблице.
+            return new ProgramLicense
+            {
+                RawText = fileName,
+                Module = $"файл лицензии: {fileName}"
+            };
+        }
+    }
+
+    /// <summary>
+    /// Обогащает лицензии из ring полями файла *.lic (issue #83, v1.0.1.26):
+    /// владелец, рег. номер, пользователь/компьютер, даты и RawDetails. Сопоставление —
+    /// по имени файла (в выводе ring «номер (Имя файла: "X.lic")») либо по серийному
+    /// номеру. Точка подмены — юнит-тесты.
+    /// </summary>
+    internal Func<IReadOnlyList<ProgramLicense>> LicFilesProvider { get; set; } = TryReadLicenseDirectory;
+
+    internal void EnrichWithLicFiles(IReadOnlyList<ProgramLicense> licenses)
+    {
+        if (licenses is null || licenses.Count == 0)
+            return;
+        IReadOnlyList<ProgramLicense> files;
+        try
+        {
+            files = LicFilesProvider();
+        }
+        catch
+        {
+            return;
+        }
+        if (files.Count == 0)
+            return;
+
+        foreach (var license in licenses)
+        {
+            // Имя файла из вывода ring: «(Имя файла: "X.lic")» либо «X.lic» в Module.
+            var moduleMatch = Regex.Match(license.Module ?? string.Empty, @"(?i)(?<name>[\w\-.]+\.lic)");
+            var fileMatch = moduleMatch.Success
+                ? files.FirstOrDefault(f => string.Equals(Path.GetFileName(f.Module), moduleMatch.Groups["name"].Value, StringComparison.OrdinalIgnoreCase))
+                : null;
+            var bySerial = fileMatch is null && license.SerialNumber.Length > 0
+                ? files.FirstOrDefault(f =>
+                    string.Equals(f.RegNumber, license.SerialNumber, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(f.SerialNumber, license.SerialNumber, StringComparison.OrdinalIgnoreCase))
+                : null;
+            var source = fileMatch ?? bySerial;
+            if (source is null)
+                continue;
+
+            if (license.Owner.Length == 0) license.Owner = source.Owner;
+            if (license.RegNumber.Length == 0) license.RegNumber = source.RegNumber;
+            if (license.User.Length == 0) license.User = source.User;
+            if (license.Computer.Length == 0) license.Computer = source.Computer;
+            if (license.IssueDate is null) license.IssueDate = source.IssueDate;
+            if (license.RawDetails.Length == 0) license.RawDetails = source.RawDetails;
+        }
     }
 }

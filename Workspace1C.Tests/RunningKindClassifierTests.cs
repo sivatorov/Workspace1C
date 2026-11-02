@@ -150,7 +150,11 @@ public sealed class RunningKindClassifierTests
             ib.RunningModesTooltip,
             StringComparison.Ordinal);
 
+        // Issue #101 (v1.0.1.26): суффикс «процесс не отвечает» появляется, когда
+        // завис конкретный режим; при зависании ОБА режимов — общий суффикс.
         ib.IsNotResponding = true;
+        ib.IsEnterpriseNotResponding = true;
+        ib.IsConfiguratorNotResponding = true;
 
         Assert.EndsWith(
             ", " + LocalizationManager.T("Infobase.NotRespondingSuffix"),

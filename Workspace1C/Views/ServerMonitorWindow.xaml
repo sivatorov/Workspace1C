@@ -854,6 +854,12 @@
                                 <Setter Property="Padding" Value="0"/>
                             </Style>
                         </DataGrid.CellStyle>
+                        <!-- Issue #83 (v1.0.1.26): тултип строки — полная выжимка файла *.lic. -->
+                        <DataGrid.RowStyle>
+                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                                <Setter Property="ToolTip" Value="{Binding RawDetails}"/>
+                            </Style>
+                        </DataGrid.RowStyle>
                         <DataGrid.Columns>
                             <DataGridTextColumn Width="1.4*" MinWidth="160" Header="{loc:Loc ServerMonitor.Licenses.Columns.Serial}"
                                                 Binding="{Binding SerialNumber}" ElementStyle="{StaticResource CellTextAccent}"/>
@@ -861,6 +867,8 @@
                                                 Binding="{Binding Type}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="100" MinWidth="80" Header="{loc:Loc ServerMonitor.Licenses.Columns.Version}"
                                                 Binding="{Binding Version}" ElementStyle="{StaticResource CenteredCellText}"/>
+                            <DataGridTextColumn Width="1.1*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Owner}"
+                                                Binding="{Binding Owner}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="1.1*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Module}"
                                                 Binding="{Binding Module}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="1.1*" MinWidth="100" Header="{loc:Loc ServerMonitor.Licenses.Columns.User}"

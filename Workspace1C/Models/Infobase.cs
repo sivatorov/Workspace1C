@@ -158,6 +158,7 @@ public class Infobase : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsRunningTooltip));
                 OnPropertyChanged(nameof(RunningModesTooltip));
                 OnPropertyChanged(nameof(RunningStatus));
+                OnPropertyChanged(nameof(EnterpriseRunningStatus));
             }
         }
     }
@@ -182,6 +183,7 @@ public class Infobase : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsRunningTooltip));
                 OnPropertyChanged(nameof(RunningModesTooltip));
                 OnPropertyChanged(nameof(RunningStatus));
+                OnPropertyChanged(nameof(ConfiguratorRunningStatus));
             }
         }
     }
@@ -227,9 +229,17 @@ public class Infobase : INotifyPropertyChanged
                 _ => LocalizationManager.T("Infobase.RunningTooltip")
             };
 
-            return IsNotResponding
-                ? text + ", " + LocalizationManager.T("Infobase.NotRespondingSuffix")
-                : text;
+            // issue #101: «процесс не отвечает» относится к конкретному режиму —
+            // называем зависший режим, а не оба; при зависании обоих — общий суффикс.
+            var entHung = IsEnterpriseRunning && IsEnterpriseNotResponding;
+            var cfgHung = IsConfiguratorRunning && IsConfiguratorNotResponding;
+            if (entHung && cfgHung)
+                return text + ", " + LocalizationManager.T("Infobase.NotRespondingSuffix");
+            if (entHung)
+                return text + ", " + LocalizationManager.T("Infobase.EnterpriseNotRespondingSuffix");
+            if (cfgHung)
+                return text + ", " + LocalizationManager.T("Infobase.ConfiguratorNotRespondingSuffix");
+            return text;
         }
     }
 
@@ -279,6 +289,98 @@ public class Infobase : INotifyPropertyChanged
     /// </summary>
     public RunningDotStatus RunningStatus =>
         RunningDotStatusClassifier.Classify(IsRunning, IsNotResponding, NotRespondingStreak);
+
+    private bool _isEnterpriseNotResponding;
+
+    /// <summary>
+    /// Процесс «1С:Предприятие» этой базы не отвечает (завис, issue #101). Пер-режимный
+    /// флаг: раскрашивает ТОЛЬКО чип «Предприятие», точка у имени базы — по общему
+    /// <see cref="IsNotResponding"/>. Обновляется фоновым монитором вью-модели.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsEnterpriseNotResponding
+    {
+        get => _isEnterpriseNotResponding;
+        set
+        {
+            if (SetProperty(ref _isEnterpriseNotResponding, value))
+            {
+                OnPropertyChanged(nameof(RunningModesTooltip));
+                OnPropertyChanged(nameof(EnterpriseRunningStatus));
+            }
+        }
+    }
+
+    private int _enterpriseNotRespondingStreak;
+
+    /// <summary>
+    /// Подряд идущие опросы монитора, в которых процесс «1С:Предприятие» не отвечал
+    /// (issue #101). Сбрасывается в 0, как только процесс отвечает или не запущен.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnterpriseNotRespondingStreak
+    {
+        get => _enterpriseNotRespondingStreak;
+        set
+        {
+            if (SetProperty(ref _enterpriseNotRespondingStreak, value))
+                OnPropertyChanged(nameof(EnterpriseRunningStatus));
+        }
+    }
+
+    private bool _isConfiguratorNotResponding;
+
+    /// <summary>
+    /// Процесс «Конфигуратор» этой базы не отвечает (завис, issue #101). Пер-режимный
+    /// флаг: раскрашивает ТОЛЬКО чип «Конфигуратор», точка у имени базы — по общему
+    /// <see cref="IsNotResponding"/>. Обновляется фоновым монитором вью-модели.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsConfiguratorNotResponding
+    {
+        get => _isConfiguratorNotResponding;
+        set
+        {
+            if (SetProperty(ref _isConfiguratorNotResponding, value))
+            {
+                OnPropertyChanged(nameof(RunningModesTooltip));
+                OnPropertyChanged(nameof(ConfiguratorRunningStatus));
+            }
+        }
+    }
+
+    private int _configuratorNotRespondingStreak;
+
+    /// <summary>
+    /// Подряд идущие опросы монитора, в которых процесс «Конфигуратор» не отвечал
+    /// (issue #101). Сбрасывается в 0, как только процесс отвечает или не запущен.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int ConfiguratorNotRespondingStreak
+    {
+        get => _configuratorNotRespondingStreak;
+        set
+        {
+            if (SetProperty(ref _configuratorNotRespondingStreak, value))
+                OnPropertyChanged(nameof(ConfiguratorRunningStatus));
+        }
+    }
+
+    /// <summary>
+    /// Статус чипа «Предприятие» (issue #101): классификация по СОБСТВЕННОМУ процессу
+    /// Предприятия — завис только Конфигуратор, этот чип остаётся в своём цвете.
+    /// </summary>
+    public RunningDotStatus EnterpriseRunningStatus =>
+        RunningDotStatusClassifier.Classify(
+            IsEnterpriseRunning, IsEnterpriseNotResponding, EnterpriseNotRespondingStreak);
+
+    /// <summary>
+    /// Статус чипа «Конфигуратор» (issue #101): классификация по СОБСТВЕННОМУ процессу
+    /// Конфигуратора — завис только Предприятие, этот чип остаётся в своём цвете.
+    /// </summary>
+    public RunningDotStatus ConfiguratorRunningStatus =>
+        RunningDotStatusClassifier.Classify(
+            IsConfiguratorRunning, IsConfiguratorNotResponding, ConfiguratorNotRespondingStreak);
 
     private DateTime? _lastLaunchDate;
 
