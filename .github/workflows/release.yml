@@ -148,9 +148,11 @@ jobs:
     needs: [windows, linux]
     runs-on: ubuntu-latest
     steps:
+      # Тег может ещё не существовать (workflow_dispatch с новым тегом и явным ref) —
+      # тогда берётся ref сборки, а тег создаёт action-gh-release на коммите прогона.
       - uses: actions/checkout@v7
         with:
-          ref: ${{ env.RELEASE_TAG }}
+          ref: ${{ github.event.inputs.ref || env.RELEASE_TAG }}
 
       - uses: actions/download-artifact@v4
         with:
@@ -188,6 +190,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          target_commitish: ${{ github.sha }}
           name: Workspace 1C ${{ steps.notes.outputs.version }}
           body_path: dist/notes.md
           files: |
