@@ -12,8 +12,12 @@ namespace Workspace1C.ViewModels;
 /// <see cref="Services.BackgroundDownloadManager"/> (общий для приложения), агрегированный
 /// текст статуса («Скачивается: файл (45%)…» / «Скачивается файлов: N…»), оценка
 /// оставшегося времени (issue #360) и команда отмены.
-/// Свойства обновляются из любого потока: WPF и Avalonia поддерживают PropertyChanged
-/// для скалярных свойств из фонового потока, коллекции здесь не используются.
+/// Issue #89: события менеджера приходят из фоновых потоков загрузки. WPF прощает
+/// обновление скалярных observable-свойств из чужого потока (авто-маршалинг биндингов),
+/// Avalonia бросает «InvalidOperationException: Call from invalid thread» при применении
+/// значения к контролу. Поэтому каждое изменение свойств доставляется в UI-поток через
+/// <see cref="SynchronizationContext"/>, захваченный при конструировании VM (в тестах
+/// контекста нет — вызов прямой), см. <see cref="DispatchDownloadsUpdate"/>.
 /// </summary>
 public partial class MainViewModel
 {
@@ -161,12 +165,38 @@ public partial class MainViewModel
     /// <summary>Подписка на менеджер фоновых загрузок (вызывается из конструктора).</summary>
     private void InitializeBackgroundDownloadsIndicator()
     {
+        // issue #89: конструктор VM выполняется в UI-потоке — контекст пригоден
+        // для доставки обновлений индикатора из фоновых потоков загрузки.
+        _downloadsUiContext = SynchronizationContext.Current;
         Services.BackgroundDownloadManager.Default.Changed += OnBackgroundDownloadsChanged;
         RefreshDownloadsIndicator();
     }
 
+    /// <summary>Контекст UI-потока, захваченный при конструировании VM (issue #89).</summary>
+    private SynchronizationContext? _downloadsUiContext;
+
     private void OnBackgroundDownloadsChanged()
-        => RefreshDownloadsIndicator();
+        => DispatchDownloadsUpdate(_downloadsUiContext, RefreshDownloadsIndicator);
+
+    /// <summary>
+    /// Доставляет изменение UI-состояния индикатора в захваченный UI-поток (issue #89).
+    /// Контекст не захвачен (тесты) или событие уже в UI-потоке — прямой вызов;
+    /// иначе — <see cref="SynchronizationContext.Post"/> (WPF/Avalonia маршаллят оба).
+    /// Внутренний статический метод — для юнит-теста маршалинга без конструирования VM.
+    /// </summary>
+    internal static void DispatchDownloadsUpdate(SynchronizationContext? uiContext, Action action)
+    {
+        if (uiContext is null || SynchronizationContext.Current == uiContext)
+        {
+            action();
+            return;
+        }
+        uiContext.Post(static _ =>
+        {
+            if (_ is Action a)
+                a();
+        }, action);
+    }
 
     /// <summary>Пересчитывает индикатор из текущего снимка менеджера.</summary>
     private void RefreshDownloadsIndicator()

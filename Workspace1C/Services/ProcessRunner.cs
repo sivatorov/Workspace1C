@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Text;
 
 namespace Workspace1C.Services;
@@ -52,6 +53,14 @@ public static class ProcessRunner
     /// OEM-кодировке (cp866) — читаем её; на Linux и при недоступной кодовой
     /// странице — null (UTF-8 по умолчанию). Поставщик кодовых страниц
     /// регистрируется однократно (идемпотентно).
+    /// <para>
+    /// issue #83: явная кодировка больше НЕ обязательна — при <c>null</c>
+    /// <see cref="RunAsync"/> читает сырые байты и декодирует их центральным правилом
+    /// <see cref="ConsoleOutputDecoder"/> (UTF-8 → cp866 → cp1251). Метод оставлен
+    /// для утилит, которым нужна фиксированная кодировка чтения на уровне платформы
+    /// (например, чтение через <see cref="ProcessStartInfo"/> вне
+    /// <see cref="RunAsync"/>).
+    /// </para>
     /// </summary>
     public static Encoding? ConsoleOutputEncoding()
     {
@@ -70,10 +79,22 @@ public static class ProcessRunner
     }
 
     /// <summary>
-    /// Запускает внешнюю программу с захватом вывода (выпуск 1.0.0.69). Необязательный
-    /// <paramref name="outputEncoding"/> задаёт кодировку чтения stdout/stderr
-    /// (issue #63: консольные утилиты вроде webinst на русской Windows пишут вывод
-    /// в OEM-кодировке cp866 — чтение как UTF-8 даёт «каракули»); null — UTF-8.
+    /// Запускает внешнюю программу с захватом вывода (выпуск 1.0.0.69).
+    /// <para>
+    /// ЦЕНТРАЛЬНОЕ правило декодирования консольного вывода (issue #83, просьба 7OH
+    /// «фикс сделать правилом для всех мест работы с выводом в консоли»): при
+    /// <paramref name="outputEncoding"/> = null (по умолчанию) stdout/stderr читаются
+    /// СЫРЫМИ байтами и декодируются <see cref="ConsoleOutputDecoder"/> — строгий UTF-8,
+    /// затем cp866/cp1251 по наименьшему числу символов замены U+FFFD (по образцу
+    /// DecodeRacOutput). Кодировка вывода консольных утилит заранее неизвестна
+    /// (rac/ibcmd на русской Windows — cp866, ring — cp1251/UTF-8, Linux — UTF-8),
+    /// поэтому фиксированное чтение как UTF-8 давало «каракули» (issue #63 webinst,
+    /// #79 ibcmd, #83 ring/таблица лицензий).
+    /// </para>
+    /// <para>
+    /// Явно заданная <paramref name="outputEncoding"/> имеет приоритет — для утилит
+    /// с известной фиксированной кодировкой чтения.
+    /// </para>
     /// </summary>
     public static async Task<ProcessRunResult> RunAsync(
         string fileName,
@@ -84,17 +105,22 @@ public static class ProcessRunner
         Encoding? outputEncoding = null,
         CancellationToken ct = default)
     {
-        var encoding = outputEncoding ?? Encoding.UTF8;
+        // null → сырое чтение байтов + эвристика ConsoleOutputDecoder (issue #83).
+        var rawReading = outputEncoding is null;
+        var encoding = outputEncoding ?? ConsoleOutputEncoding() ?? Encoding.UTF8;
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            CreateNoWindow = true,
-            StandardOutputEncoding = encoding,
-            StandardErrorEncoding = encoding
+            CreateNoWindow = true
         };
+        if (!rawReading)
+        {
+            psi.StandardOutputEncoding = encoding;
+            psi.StandardErrorEncoding = encoding;
+        }
         foreach (var arg in arguments)
             psi.ArgumentList.Add(arg);
         if (!string.IsNullOrWhiteSpace(workingDirectory))
@@ -119,8 +145,16 @@ public static class ProcessRunner
 
         using (process)
         {
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
+            // Сырое чтение байтов (issue #83) или готовых строк (явная кодировка).
+            Task<byte[]> stdoutBytesTask = rawReading
+                ? ReadToEndBytesAsync(process.StandardOutput.BaseStream)
+                : Task.FromResult(Array.Empty<byte>());
+            Task<byte[]> stderrBytesTask = rawReading
+                ? ReadToEndBytesAsync(process.StandardError.BaseStream)
+                : Task.FromResult(Array.Empty<byte>());
+            var stdoutText = rawReading ? Task.FromResult(string.Empty) : process.StandardOutput.ReadToEndAsync();
+            var stderrText = rawReading ? Task.FromResult(string.Empty) : process.StandardError.ReadToEndAsync();
+
             using var timeoutCts = new CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(30));
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
             try
@@ -134,23 +168,43 @@ public static class ProcessRunner
                 return new ProcessRunResult
                 {
                     TimedOut = true,
-                    StdOut = await SafeRead(stdout).ConfigureAwait(false),
-                    StdErr = await SafeRead(stderr).ConfigureAwait(false)
+                    StdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false),
+                    StdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false)
                 };
             }
 
             return new ProcessRunResult
             {
                 ExitCode = process.ExitCode,
-                StdOut = await SafeRead(stdout).ConfigureAwait(false),
-                StdErr = await SafeRead(stderr).ConfigureAwait(false)
+                StdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false),
+                StdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false)
             };
         }
     }
 
-    private static async Task<string> SafeRead(Task<string> task)
+    /// <summary>Читает поток до конца в массив байтов (без декодирования).</summary>
+    private static async Task<byte[]> ReadToEndBytesAsync(Stream stream)
     {
-        try { return await task.ConfigureAwait(false); }
-        catch { return string.Empty; }
+        using var buffer = new MemoryStream();
+        await stream.CopyToAsync(buffer).ConfigureAwait(false);
+        return buffer.ToArray();
+    }
+
+    /// <summary>
+    /// Читает вывод: сырое чтение — декодирование <see cref="ConsoleOutputDecoder"/>;
+    /// при явной кодировке — готовый текст StreamReader.
+    /// </summary>
+    private static async Task<string> SafeReadOutput(Task<byte[]> bytesTask, Task<string> textTask, bool rawReading)
+    {
+        try
+        {
+            if (rawReading)
+                return ConsoleOutputDecoder.Decode(await bytesTask.ConfigureAwait(false));
+            return await textTask.ConfigureAwait(false);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

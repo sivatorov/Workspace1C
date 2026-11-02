@@ -4891,23 +4891,33 @@ namespace Workspace1C
             panel.Children.Add(LinkBlock(LocalizationManager.T("Settings.About.Telegram"),
                 "https://t.me/Workspace1C"));
 
-            // Спонсорская картинка во вкладке «О программе», встроенная в ресурсы
-            // сборки (см. donat.png в csproj), как в разметке WPF. По клику
-            // открывается в полном размере.
+            // Макет вкладки перестроен (issue #99): текст и кнопки — в левой колонке
+            // (кнопки и так в столбец), кликабельная спонсорская картинка — справа
+            // и крупнее. Содержимое помещается без прокрутки на типовых размерах окна.
+            var aboutRoot = new Grid();
+            aboutRoot.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+            aboutRoot.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            panel.Margin = new Thickness(0, 0, 16, 0);
+            aboutRoot.Children.Add(panel);
+
+            // Спонсорская картинка, встроенная в ресурсы сборки (см. donat.png в
+            // csproj). По клику открывается в полном размере.
             if (TryLoadDonatImage() is { } donat)
             {
                 var donatImage = new Image
                 {
                     Source = donat,
-                    MaxWidth = 240,
-                    MaxHeight = 320,
+                    MaxWidth = 380,
+                    MaxHeight = 520,
                     Stretch = Stretch.Uniform,
-                    HorizontalAlignment = HorizontalAlignment.Left,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Top,
                     Margin = new Thickness(0, 4, 0, 0),
                     Cursor = new Cursor(StandardCursorType.Hand)
                 };
                 donatImage.Tapped += async (_, _) => await ShowDonatImageFullAsync(this);
-                panel.Children.Add(donatImage);
+                Grid.SetColumn(donatImage, 1);
+                aboutRoot.Children.Add(donatImage);
             }
 
             panel.Children.Add(new TextBlock
@@ -5018,7 +5028,7 @@ namespace Workspace1C
             };
             panel.Children.Add(diagButton);
 
-            return panel;
+            return aboutRoot;
         }
 
         /// <summary>Окно ошибки вкладки «О программе» с текстом исключения.</summary>

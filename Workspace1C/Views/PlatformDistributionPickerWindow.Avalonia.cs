@@ -111,7 +111,8 @@ namespace Workspace1C
             {
                 Content = IconHelper.IconAndText("IconClose", LocalizationManager.T("Common.Close"), 14, "SecondaryButtonTextBrush"),
                 IsCancel = true,
-                Padding = new Thickness(14, 6)
+                Padding = new Thickness(14, 6),
+                Margin = new Thickness(8, 0, 0, 0)
             };
             cancel.Styled(ControlThemes.SecondaryButton);
             cancel.Click += (_, _) => Close();
@@ -120,7 +121,7 @@ namespace Workspace1C
             {
                 Content = LocalizationManager.T("PlatformUpdate.DistributionPicker.Choose"),
                 Padding = new Thickness(14, 6),
-                Margin = new Thickness(8, 0, 0, 0)
+                IsDefault = true
             };
             choose.Styled(ControlThemes.DialogConfirmButton);
             choose.Click += (_, _) =>
@@ -138,8 +139,10 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 12, 0, 0)
             };
-            buttons.Children.Add(cancel);
+            // Порядок кнопок приведён к конвенции проекта (issue #98): главная
+            // кнопка — слева, «Отмена» — справа (последней), как во всех окнах.
             buttons.Children.Add(choose);
+            buttons.Children.Add(cancel);
 
             var root = new Grid { Margin = new Thickness(16) };
             root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));

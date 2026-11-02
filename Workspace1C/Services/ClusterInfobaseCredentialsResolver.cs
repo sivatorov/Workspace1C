@@ -123,6 +123,10 @@ public sealed class ClusterInfobaseCredentialsResolver
         }
 
         var parameters = BuildConnectionParams(connection.Server, _servers);
+        // Issue #92 (v1.0.1.22): причина последней неудачи сборки профиля по НАЙДЕННОЙ
+        // базе (пустой dbms в summary + ошибка «infobase info») — для честного итогового
+        // сообщения вместо «база не найдена».
+        string? profileFailureReason = null;
         try
         {
             // Issue #92 (v1.0.1.21): общий таймаут на резолв одной базы — linked CTS
@@ -165,7 +169,7 @@ public sealed class ClusterInfobaseCredentialsResolver
                 }
 
                 var match = summaries.FirstOrDefault(s =>
-                    string.Equals(s.Name?.Trim(), infobaseName, StringComparison.OrdinalIgnoreCase));
+                    NormalizedNamesEqual(s.Name, infobaseName));
                 if (match is null)
                 {
                     // Issue #92: в журнале остаётся только «база не найдена», без
@@ -175,6 +179,15 @@ public sealed class ClusterInfobaseCredentialsResolver
                     _log?.Invoke(BuildClusterContents(cluster.Id, summaries));
                     continue;
                 }
+
+                // Issue #92 (v1.0.1.22): сырье для диагностики — фактические свойства
+                // найденной базы из rac. ZIP 7OH (diagnostics_20261102_104926) показал:
+                // rac 8.5.4 отдаёт пустой dbms в «infobase summary list», а «infobase
+                // info» падает «Недостаточно прав пользователя» — по строке журнала с
+                // полем dbms сразу видно, на чём сломался резолв.
+                _log?.Invoke(string.Format(
+                    LocalizationManager.T("BatchOps.DbmsResolveSummaryFieldsFormat"),
+                    match.Name?.Trim(), match.Dbms, match.DbServer, match.DbName, match.DbUser));
 
                 var profile = ToProfile(match, infobase!.Id, infobaseName);
                 if (profile is not null)
@@ -215,19 +228,43 @@ public sealed class ClusterInfobaseCredentialsResolver
                             Parameters = parameters
                         };
                     }
-                    _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveInfoFailed"));
+
+                    // Issue #92 (v1.0.1.22): rac при ошибке «infobase info» (в т.ч.
+                    // «Недостаточно прав пользователя на информационную базу», ZIP 7OH)
+                    // возвращает null, текст ошибки — в LastActionError. Ранее причина
+                    // терялась: в журнале оставалось только «не вернула поддерживаемый
+                    // тип СУБД», а итоговое «база не найдена» вводило в заблуждение.
+                    profileFailureReason = string.IsNullOrWhiteSpace(_racClient.LastActionError)
+                        ? LocalizationManager.T("BatchOps.DbmsResolveInfoFailed")
+                        : string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveInfoFailedFormat"),
+                            _racClient.LastActionError);
+                    _log?.Invoke(profileFailureReason);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    _log?.Invoke(string.Format(
-                        LocalizationManager.T("BatchOps.DbmsResolveInfoFailedFormat"), ex.Message));
+                    profileFailureReason = string.Format(
+                        LocalizationManager.T("BatchOps.DbmsResolveInfoFailedFormat"), ex.Message);
+                    _log?.Invoke(profileFailureReason);
                 }
             }
 
-            _log?.Invoke(string.Format(
-                LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
-                infobaseName, parameters.Address));
+            // Issue #92 (v1.0.1.22): если база НАЙДЕНА, но профиль не собран (пустой dbms
+            // в «infobase summary list» + ошибка «infobase info») — честное сообщение
+            // с причиной по каждой базе вместо вводящего в заблуждение «не найдена».
+            if (profileFailureReason is not null)
+            {
+                _log?.Invoke(string.Format(
+                    LocalizationManager.T("BatchOps.DbmsResolveNoProfileFormat"),
+                    infobaseName, parameters.Address, profileFailureReason));
+            }
+            else
+            {
+                _log?.Invoke(string.Format(
+                    LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
+                    infobaseName, parameters.Address));
+            }
             return new();
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
@@ -251,6 +288,35 @@ public sealed class ClusterInfobaseCredentialsResolver
             return new();
         }
     }
+
+    /// <summary>
+    /// Нормализация имени ИБ для сопоставления (issue #92/#79, v1.0.1.22): Trim,
+    /// нижний регистр, удаление пробелов/подчерков/дефисов/табуляций. rac и список
+    /// приложения могут именовать одну базу по-разному («Demo 27» vs «demo_27») —
+    /// строгое сравнение по Trim+OrdinalIgnoreCase такое расхождение не находило,
+    /// и автоподстановка (а за ней и мастер «Развернуть тестовую копию») падала
+    /// «база не найдена». Слишком агрессивная нормализация (сравнение без разделителей
+    /// вообще) опасна подстановкой чужой базы — убираются только эквивалентные
+    /// разделители. Чистый helper — для юнит-теста.
+    /// </summary>
+    internal static string NormalizeInfobaseName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+        var normalized = name.Trim().ToLowerInvariant();
+        var sb = new System.Text.StringBuilder(normalized.Length);
+        foreach (var ch in normalized)
+        {
+            if (ch is ' ' or '\t' or '_' or '-')
+                continue;
+            sb.Append(ch);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>True — имена ИБ совпадают после нормализации (issue #92/#79).</summary>
+    internal static bool NormalizedNamesEqual(string? left, string? right) =>
+        string.Equals(NormalizeInfobaseName(left), NormalizeInfobaseName(right), StringComparison.Ordinal);
 
     /// <summary>
     /// Строка диагностики «содержимое кластера» (issue #92): количество и имена

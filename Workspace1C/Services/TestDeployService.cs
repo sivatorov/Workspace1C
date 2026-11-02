@@ -84,11 +84,23 @@ public sealed class TestDeployService
             if (scenario.DumpEngine == BackupEngine.Ibcmd
                 && source.Connection?.Type == ConnectionType.ClientServer)
             {
+                // Issue #79 (репорт 7OH «после ОК ничего не происходит, в логах тихо»):
+                // шаги резолва СУБД дублируются в result.Log (окно показывает журнал
+                // после завершения) и в журнал приложения (_logger) — чтобы «тихий»
+                // ранний выход до шага «Выгрузка» был виден и в ZIP-диагностике.
+                void ResolveLog(string message)
+                {
+                    log?.Invoke(message);
+                    result.Log.Add(message);
+                    _logger?.Info(message);
+                }
+
                 var (profile, profileError) = await ResolveSourceDumpProfileAsync(
-                    source, scenario, log, cancellationToken).ConfigureAwait(false);
+                    source, scenario, ResolveLog, cancellationToken).ConfigureAwait(false);
                 if (profileError is not null)
                 {
                     result.ErrorMessage = profileError + "\n" + T("TestDeploy.IbcmdCredentialsHint");
+                    ResolveLog(result.ErrorMessage);
                     return result;
                 }
                 dumpProfile = profile;
@@ -482,7 +494,9 @@ public sealed class TestDeployService
         }
 
         // 3) Поля формы — только если они описывают ИСТОЧНИК (целевое имя базы вида
-        // «источник_t» сюда не попадает, issue #79).
+        // «источник_t» сюда не попадает, issue #79). Проверка журналируется (issue #79,
+        // v1.0.1.22): «поля формы: считаем/не считаем данными источника и почему».
+        log?.Invoke(T("TestDeploy.SourceDbmsFormCheck"));
         var fromForm = BuildFormProfileIfSource(scenario, source, saved);
         if (fromForm is not null)
         {

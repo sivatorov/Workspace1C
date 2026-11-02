@@ -2149,6 +2149,36 @@ namespace Workspace1C
                             // Внутренние ошибки уже показаны в UpdateService; здесь только страхуемся.
                         }
                     }; break;
+                case UtilitiesMenuCommandKind.CollectDiagnostics:
+                    // «Собрать диагностику» (issue #99): тот же сбор ZIP, что и на вкладке
+                    // «О программе» настроек, без открытия окна настроек.
+                    item.Click += async (_, _) => await OnCollectDiagnosticsMenuClickAsync(); break;
+            }
+        }
+
+        /// <summary>
+        /// «Утилиты» → «Информация» → «Собрать диагностику» (issue #99): создаёт архив
+        /// диагностики (журналы приложения, трассировка модальных окон, trace.json,
+        /// systeminfo.txt), копирует путь в буфер обмена и показывает сообщение.
+        /// </summary>
+        private async Task OnCollectDiagnosticsMenuClickAsync()
+        {
+            try
+            {
+                var result = await Services.DiagnosticsBundleService.CreateBundleAsync();
+                if (this.Clipboard is { } cb)
+                    await cb.SetTextAsync(result.ZipPath);
+                await new MaterialMessageWindowAvalonia(
+                        string.Format(LocalizationManager.T("Settings.About.DiagnosticsDone"), result.ZipPath),
+                        LocalizationManager.T("Common.Information"), MaterialMessageKind.Info)
+                    .ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                await new MaterialMessageWindowAvalonia(
+                        LocalizationManager.T("Settings.About.DiagnosticsFailed") + "\n" + ex.Message,
+                        LocalizationManager.T("Common.Error"), MaterialMessageKind.Error)
+                    .ShowDialog(this);
             }
         }
 

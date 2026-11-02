@@ -994,10 +994,22 @@ namespace Workspace1C.Services
                 // Диагностика CM_UPDATES (issue #89, 1.0.1.11): ранее исключение
                 // глоталось молча — в журнале после «Загрузка обновления…» не было
                 // ни одной записи, а во временной папке оставался только .etag.
+                // Полный стек в журнале (issue #89, репорт 7OH от 2026-11-02): на Linux
+                // «InvalidOperationException: Call from invalid thread» из индикатора
+                // загрузок был виден только по одной строке сообщения, без стека.
                 Log.Info(TraceFlags.UpdatesFlag,
-                    $"Загрузка обновления {versionKey}: ошибка загрузки — {ex.GetType().Name}: {ex.Message}; " +
+                    $"Загрузка обновления {versionKey}: ошибка загрузки — {ex}; " +
                     $"dest={dest}; скачано байт={SafeFileLength(dest)}.");
-                TryDelete(dest);
+
+                // Карантин вместо удаления (issue #89, репорт 7OH «после ошибки файлы
+                // исчезают — проверить скачанное нельзя»): скачанное остаётся рядом
+                // с именем *.download-error, .etag недокачанной загрузки удаляется.
+                var quarantined = UpdatePayload.QuarantineDownloadError(dest);
+                if (!string.Equals(quarantined, dest, StringComparison.Ordinal))
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Загрузка обновления {versionKey}: файл помещён в карантин — {quarantined}.");
+                }
                 TryDelete(dest + ".etag");
                 BackgroundDownloadManager.Default.Fail(entry.Id, "Update.DownloadFailed");
                 return (null, false);

@@ -23,21 +23,6 @@ namespace Workspace1C.Services;
 /// </summary>
 public sealed class RacClient : IRacClient
 {
-    /// <summary>Строгий UTF-8 (невалидные байты — ошибка декодирования).</summary>
-    private static readonly UTF8Encoding StrictUtf8 =
-        new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
-    /// <summary>Кодовые страницы Windows для fallback-декодирования вывода rac.</summary>
-    private static readonly Encoding[] WindowsFallbackEncodings;
-
-    static RacClient()
-    {
-        // Кодовые страницы 866/1251 доступны и на Linux (.NET Core) только после
-        // регистрации провайдера CodePagesEncodingProvider.
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        WindowsFallbackEncodings = new[] { Encoding.GetEncoding(866), Encoding.GetEncoding(1251) };
-    }
-
     /// <summary>Таймаут выполнения одной rac-команды (30 секунд).</summary>
     public static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
 
@@ -1230,49 +1215,13 @@ public sealed class RacClient : IRacClient
     }
 
     /// <summary>
-    /// Декодирует байты вывода rac в текст. Сначала строгий UTF-8 (Linux/Avalonia);
-    /// если байты невалидны как UTF-8 (rac на Windows пишет в OEM/ANSI кодовой странице,
-    /// обычно cp866, issue #324) — пробуем cp866 и cp1251 и берём вариант с наименьшим
-    /// числом символов замены U+FFFD. Internal — для юнит-тестов без запуска процесса.
+    /// Декодирует байты вывода rac в текст по центральному правилу
+    /// <see cref="ConsoleOutputDecoder"/>: строгий UTF-8 (Linux/Avalonia); если байты
+    /// невалидны как UTF-8 (rac на Windows пишет в OEM/ANSI кодовой странице, обычно
+    /// cp866, issue #324) — cp866/cp1251 с наименьшим числом символов замены U+FFFD.
+    /// issue #83: реализация делегирует общему хелперу — единое правило декодирования
+    /// консольного вывода для всех мест (rac, ibcmd, ring и др.). Internal — для
+    /// юнит-тестов без запуска процесса.
     /// </summary>
-    internal static string DecodeRacOutput(byte[] bytes)
-    {
-        if (bytes is null || bytes.Length == 0)
-            return string.Empty;
-
-        try
-        {
-            return StrictUtf8.GetString(bytes);
-        }
-        catch (DecoderFallbackException)
-        {
-            // Не UTF-8 — переходим к кодовым страницам Windows.
-        }
-
-        string? best = null;
-        var bestBad = int.MaxValue;
-        foreach (var encoding in WindowsFallbackEncodings)
-        {
-            var decoded = encoding.GetString(bytes);
-            var bad = CountReplacementChars(decoded);
-            if (bad < bestBad)
-            {
-                bestBad = bad;
-                best = decoded;
-            }
-        }
-        return best ?? WindowsFallbackEncodings[0].GetString(bytes);
-    }
-
-    /// <summary>Считает символы замены U+FFFD (признак неверной кодировки).</summary>
-    private static int CountReplacementChars(string text)
-    {
-        var count = 0;
-        foreach (var ch in text)
-        {
-            if (ch == '\uFFFD')
-                count++;
-        }
-        return count;
-    }
+    internal static string DecodeRacOutput(byte[] bytes) => ConsoleOutputDecoder.Decode(bytes);
 }

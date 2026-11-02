@@ -15,6 +15,7 @@ namespace Workspace1C.Tests;
 /// <item>полное отсутствие данных СУБД источника — понятная ошибка ДО старта операций.</item>
 /// </list>
 /// </summary>
+[Collection("LocalDataStoreState")]
 public sealed class TestDeploySourceDumpProfileTests
 {
     private static Infobase ServerSource(string name = "Бухгалтерия") => new()
@@ -197,5 +198,54 @@ public sealed class TestDeploySourceDumpProfileTests
         Assert.Null(error);
         Assert.NotNull(profile);
         Assert.Equal("Бухгалтерия", profile!.Database);
+    }
+
+    // ============ Журналирование резолва (issue #79, v1.0.1.22) ============
+    // Репорт 7OH: «после ОК ничего не происходит, в логах тихо» — шаги pre-валидации
+    // и резолва СУБД нигде не фиксировались. Теперь они видны в коллбэке журнала окна
+    // и в result.Log.
+
+    [Fact]
+    public async Task ResolveSourceDumpProfileAsync_StepsAreLogged()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        var service = new TestDeployService();
+        var log = new List<string>();
+
+        var (profile, error) = await service.ResolveSourceDumpProfileAsync(
+            source, scenario, log: log.Add, CancellationToken.None,
+            savedProfileLoader: _ => null,
+            resolverFactory: () => null);
+
+        Assert.Null(profile);
+        // Проверка «описывают ли поля формы источник» журналируется, даже когда
+        // rac-резолвер недоступен.
+        Assert.Contains("TestDeploy.SourceDbmsFormCheck", log);
+        Assert.Equal("TestDeploy.DbmsProfileNotFound", error);
+    }
+
+    [Fact]
+    public async Task DeployAsync_NoSourceDbms_FailsBeforeAnyStepWithClearError()
+    {
+        // Репорт 7OH (issue #79): после ОК «НИЧЕГО не происходит» — на деле сценарий
+        // прерывался pre-валидацией ДО шага «Выгрузка» с ранним возвратом и пустым
+        // журналом. Проверяем: ошибка понятная («чего не хватает») и никаких шагов
+        // (в т.ч. создания базы) не выполняется.
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        var service = new TestDeployService();
+
+        var result = await service.DeployAsync(
+            scenario, source, Array.Empty<Infobase>(), groups: null,
+            log: null, CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.NotNull(result.ErrorMessage);
+        Assert.Contains("TestDeploy.NeedDbmsProfile", result.ErrorMessage);
+        // Журнал и шаги пусты: до шага «Выгрузка» сценарий не дошёл, база не создавалась.
+        Assert.Empty(result.Log);
+        Assert.True(result.Steps is null || result.Steps.Count == 0);
+        Assert.Null(result.Target);
     }
 }

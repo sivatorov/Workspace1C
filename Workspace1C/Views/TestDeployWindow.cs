@@ -583,13 +583,17 @@ public class TestDeployWindow : Window
         {
             var scenario = _vm.BuildScenario();
             var service = AppServices.TryGetService<TestDeployService>() ?? new TestDeployService();
-            var progress = new Progress<string>(line =>
+            IProgress<string> progress = new Progress<string>(line =>
             {
                 _logList.Items.Add(line);
                 _logList.ScrollIntoView(_logList.Items[_logList.Items.Count - 1]);
             });
+            // Issue #79 (репорт 7OH «после ОК ничего не происходит, в логах тихо»):
+            // ранее строка журнала была заглушкой `line => { }` — шаги резолва СУБД
+            // (до 60 с rac-проб) не отображались и сценарий выглядел зависшим.
+            // Прогресс теперь пишется в журнал окна в реальном времени.
             var result = await service.DeployAsync(
-                scenario, _vm.Source, _vm.AllInfobases, _groups, line => { }, default);
+                scenario, _vm.Source, _vm.AllInfobases, _groups, line => progress.Report(line), default);
 
             foreach (var line in result.Log)
             {

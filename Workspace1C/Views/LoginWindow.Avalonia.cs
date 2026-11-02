@@ -217,10 +217,10 @@ namespace Workspace1C
                 Spacing = 8
             };
 
-            // Оформление по разметке (LoginWindow.xaml:62): обе кнопки в стиле
-            // основной, у отмены заливка мягкая, у входа акцентная.
+            // Оформление по разметке (LoginWindow.xaml): обе кнопки в стиле
+            // основной, у отмены заливка мягкая, у входа акцентная. Порядок кнопок —
+            // по конвенции проекта (issue #98): главная кнопка слева, «Отмена» справа.
             var cancel = BuildCancelButton(110);
-            panel.Children.Add(cancel);
 
             var loginCaption = new TextBlock
             {
@@ -242,6 +242,7 @@ namespace Workspace1C
             RegisterConfirmCaption(loginCaption, "Auth.Login");
             login.Click += (_, _) => TryLogin();
             panel.Children.Add(login);
+            panel.Children.Add(cancel);
 
             return panel;
         }

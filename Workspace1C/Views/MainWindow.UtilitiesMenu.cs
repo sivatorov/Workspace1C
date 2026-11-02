@@ -347,6 +347,34 @@ public partial class MainWindow
                 item.Command = _viewModel.InfobaseUsersCommand; break;
             case UtilitiesMenuCommandKind.InfobaseScheduledJobs:
                 item.Command = _viewModel.ScheduledJobsCommand; break;
+            case UtilitiesMenuCommandKind.CollectDiagnostics:
+                // «Собрать диагностику» (issue #99): тот же сбор ZIP, что и на вкладке
+                // «О программе» настроек, без открытия окна настроек.
+                item.Click += async (_, _) => await OnCollectDiagnosticsMenuClickAsync(); break;
+        }
+    }
+
+    /// <summary>
+    /// «Утилиты» → «Информация» → «Собрать диагностику» (issue #99): создаёт архив
+    /// диагностики (журналы приложения, трассировка модальных окон, trace.json,
+    /// systeminfo.txt), копирует путь в буфер обмена и показывает сообщение.
+    /// </summary>
+    private async Task OnCollectDiagnosticsMenuClickAsync()
+    {
+        try
+        {
+            var result = await Services.DiagnosticsBundleService.CreateBundleAsync();
+            try { System.Windows.Clipboard.SetText(result.ZipPath); }
+            catch { /* буфер обмена недоступен — путь виден в сообщении */ }
+            new WpfDialogService().ShowInfo(
+                string.Format(LocalizationManager.T("Settings.About.DiagnosticsDone"), result.ZipPath),
+                LocalizationManager.T("Common.Information"));
+        }
+        catch (Exception ex)
+        {
+            new WpfDialogService().ShowError(
+                LocalizationManager.T("Settings.About.DiagnosticsFailed") + "\n" + ex.Message,
+                LocalizationManager.T("Common.Error"));
         }
     }
 

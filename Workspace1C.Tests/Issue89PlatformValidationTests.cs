@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Workspace1C.Services;
+using Workspace1C.ViewModels;
 using Xunit;
 
 namespace Workspace1C.Tests;
@@ -213,5 +214,97 @@ public sealed class Issue89PlatformValidationTests : IDisposable
         Assert.False(string.IsNullOrEmpty(url));
         Assert.Equal(10, size);
 #endif
+    }
+
+    // ---- Карантин *.download-error при неизвестной ошибке загрузки (issue #89, 1.0.1.22) ----
+
+    [Fact]
+    public void QuarantineDownloadError_RenamesToDownloadError()
+    {
+        // Репорт 7OH (2026-11-02): после «Call from invalid thread» файлы исчезали —
+        // catch удалял скачанный файл. Теперь он остаётся в карантине для проверки.
+        var path = WriteFile("Workspace1C.v1.0.1.22.new", ElfBytes);
+
+        var quarantined = UpdatePayload.QuarantineDownloadError(path);
+
+        Assert.Equal(path + ".download-error", quarantined, StringComparer.OrdinalIgnoreCase);
+        Assert.False(System.IO.File.Exists(path));
+        Assert.True(System.IO.File.Exists(quarantined));
+        Assert.Equal(ElfBytes, System.IO.File.ReadAllBytes(quarantined));
+    }
+
+    [Fact]
+    public void QuarantineDownloadError_StaleQuarantine_ReplacedWithFreshFile()
+    {
+        // Повторная загрузка того же файла не накапливает мусор: прежний карантин
+        // затирается свежим скачанным файлом.
+        var path = WriteFile("Workspace1C.v1.0.1.22.new", ElfBytes);
+        System.IO.File.WriteAllText(path + ".download-error", "stale");
+
+        var quarantined = UpdatePayload.QuarantineDownloadError(path);
+
+        Assert.True(System.IO.File.Exists(quarantined));
+        Assert.Equal(ElfBytes, System.IO.File.ReadAllBytes(quarantined));
+    }
+
+    [Fact]
+    public void QuarantineDownloadError_MissingFile_ReturnsPathWithoutThrow()
+    {
+        var path = System.IO.Path.Combine(_dir, "missing.new");
+
+        Assert.Equal(path, UpdatePayload.QuarantineDownloadError(path));
+    }
+
+    // ---- Маршалинг индикатора загрузок (issue #89: «Call from invalid thread» на Linux) ----
+
+    /// <summary>Контекст синхронизации-двойник: ставит коллбэки в очередь вместо выполнения.</summary>
+    private sealed class ManualSyncContext : SynchronizationContext
+    {
+        public List<Action> Posted { get; } = new();
+        public override void Post(SendOrPostCallback d, object? state) => Posted.Add(() => d(state));
+    }
+
+    [Fact]
+    public void DispatchDownloadsUpdate_NoContext_RunsInline()
+    {
+        // Тесты/окружение без UI — прямой вызов (как раньше).
+        var ran = false;
+        MainViewModel.DispatchDownloadsUpdate(null, () => ran = true);
+        Assert.True(ran);
+    }
+
+    [Fact]
+    public void DispatchDownloadsUpdate_SameContext_RunsInline()
+    {
+        var ctx = new ManualSyncContext();
+        SynchronizationContext.SetSynchronizationContext(ctx);
+        try
+        {
+            var ran = false;
+            MainViewModel.DispatchDownloadsUpdate(ctx, () => ran = true);
+            Assert.True(ran);
+            Assert.Empty(ctx.Posted);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(null);
+        }
+    }
+
+    [Fact]
+    public void DispatchDownloadsUpdate_ForeignContext_PostsToUiInsteadOfInline()
+    {
+        // Главный сценарий #89: событие приходит из потока загрузки — обновление
+        // свойств VM НЕ выполняется инлайн (на Linux это «Call from invalid thread»),
+        // а ставится в очередь захваченного UI-контекста.
+        var ui = new ManualSyncContext();
+        var ran = false;
+
+        MainViewModel.DispatchDownloadsUpdate(ui, () => ran = true);
+
+        Assert.False(ran);
+        var posted = Assert.Single(ui.Posted);
+        posted();
+        Assert.True(ran);
     }
 }

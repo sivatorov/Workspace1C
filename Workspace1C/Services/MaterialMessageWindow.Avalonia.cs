@@ -5,6 +5,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 
@@ -21,6 +22,9 @@ internal sealed class MaterialMessageWindowAvalonia : Window
 
     /// <summary>Ответ дан кнопкой окна, а не закрытием через оконный менеджер.</summary>
     private bool _answered;
+
+    /// <summary>Кнопка по умолчанию — для фокуса при открытии и клавиш Space/Enter (issue #100).</summary>
+    private Button _okButton = null!;
 
     /// <param name="markdownBody">
     /// Необязательный текст «Что нового» в формате markdown. Показывается под
@@ -89,6 +93,14 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         };
         okButton.Styled(ControlThemes.ModernButton);
         okButton.Click += (_, _) => { _answered = true; Confirmed = true; Close(); };
+        _okButton = okButton;
+
+        // issue #100 (Linux): диалог сообщений при открытии обязан забрать фокус на
+        // кнопку по умолчанию — иначе клавиатура оставалась у владельца, и пробел
+        // «нажимал» меню перекрытого окна вместо кнопки «ОК». На Windows фокус
+        // устанавливает WPF (IsDefault), на Linux/X11 требуется явная установка
+        // после показа окна (аналогично паттерну #299).
+        Opened += (_, _) => Dispatcher.UIThread.Post(() => _okButton.Focus());
 
         // Порядок кнопок согласован с WPF-версией: «Да» (подтверждение) слева,
         // «Нет» (отмена) справа.
@@ -171,6 +183,21 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         {
             _answered = true;
             Confirmed = false;
+            e.Handled = true;
+            Close();
+            return;
+        }
+
+        // issue #100 (Linux): Space/Enter нажимают кнопку по умолчанию диалога, даже
+        // если фокус не на кнопке (например, клавиатура осталась у перекрытого окна).
+        // Если фокус на кнопке — не перехватываем: Space/Enter обрабатывает сама
+        // кнопка, иначе нажатие задваивается. Чистая логика — ModalKeysResolver.
+        if (!e.Handled && ModalKeysResolver.ShouldActivateDefaultButton(
+                TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is Button, e.Key.ToString(),
+                e.KeyModifiers != KeyModifiers.None))
+        {
+            _answered = true;
+            Confirmed = true;
             e.Handled = true;
             Close();
             return;

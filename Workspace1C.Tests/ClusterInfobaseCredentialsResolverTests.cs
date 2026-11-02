@@ -152,7 +152,10 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         // Пароль СУБД rac не возвращает — остаётся пустым.
         Assert.Equal(string.Empty, profile.Password);
         Assert.Equal("base-id-1", profile.InfobaseId);
-        Assert.Empty(log);
+        // v1.0.1.22 (issue #92): штатный путь содержит только диагностическую строку
+        // со свойствами найденной базы; ошибок резолва в журнале нет.
+        Assert.DoesNotContain(log, m => m.Contains("DbmsResolve", StringComparison.Ordinal) &&
+            !m.Contains("DbmsResolveSummaryFieldsFormat", StringComparison.Ordinal));
     }
 
     [Fact]

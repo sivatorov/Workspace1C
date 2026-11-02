@@ -11,6 +11,76 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.22] — 2026-11-02
+
+### Исправлено
+
+- **Автообновление на Linux: зависание/падение загрузки обновления (issue #89).**
+  События фоновой загрузки обновления маршалируются в UI-поток через
+  `SynchronizationContext` — устранён `InvalidOperationException: Call from invalid
+  thread` на финале загрузки (репорт 7OH: исключение после «скачано байт=53365802»).
+  Ошибочный файл больше не удаляется молча: частичная загрузка уходит в карантин
+  `*.download-error` — скачанное можно проанализировать
+  ([`UpdatePayload`](Workspace1C/Services/Updates/UpdatePayload.cs),
+  [`UpdateService.Avalonia`](Workspace1C/Services/UpdateService.Avalonia.cs));
+  в журнал пишется полный стек ошибки.
+  Правка: [`MainViewModel.Downloads`](Workspace1C/ViewModels/MainViewModel.Downloads.cs).
+- **Массовая выгрузка DT/CF: матчинг имён ИБ и диагностика автоподстановки
+  СУБД (issue #92).** Сопоставление имени базы из строки подключения с именем ИБ
+  в кластере нормализуется (регистр, пробелы, подчёркивания и дефисы) — базы
+  больше не «не находятся» из-за различий в написании
+  ([`ClusterInfobaseCredentialsResolver`](Workspace1C/Services/ClusterInfobaseCredentialsResolver.cs)).
+  Если база найдена, но профиль СУБД собрать не удалось, в журнал пишутся
+  фактические свойства найденной ИБ (dbms/db-server/db-name/db-user) и выводится
+  честное сообщение «база найдена, но профиль не собран» с причиной — вместо
+  дезориентирующего «база не найдена».
+- **Каракули в консольном выводе 1С: единый декодер (issue #83).** Новый
+  [`ConsoleOutputDecoder`](Workspace1C/Services/ConsoleOutputDecoder.cs) декодирует
+  сырые байты вывода консольных утилит 1С по цепочке UTF-8 → cp866 → cp1251
+  (выбирается вариант с минимальным числом U+FFFD). Применён по умолчанию в
+  [`ProcessRunner`](Workspace1C/Services/ProcessRunner.cs),
+  [`RacClient`](Workspace1C/Services/RacClient.cs) (`DecodeRacOutput` делегирует
+  общему декодеру), [`IbcmdService`](Workspace1C/Services/IbcmdService.cs) и
+  [`WebPublishService`](Workspace1C/Services/WebPublishService.cs); таблица лицензий
+  с колонками строится из корректно декодированного вывода `ring`.
+- **Мастер «Развернуть тестовую копию»: реальное журналирование резолва и
+  pre-валидации (issue #79).** Коллбэк журнала был заглушкой — шаги резолва
+  СУБД не попадали в окно. Теперь журнал пишется реально на обеих платформах
+  ([`TestDeployWindow`](Workspace1C/Views/TestDeployWindow.xaml.cs),
+  [`TestDeployWindow.Avalonia`](Workspace1C/Views/TestDeployWindow.Avalonia.cs)),
+  шаги pre-валидации тоже журналируются
+  ([`TestDeployService`](Workspace1C/Services/TestDeployService.cs)).
+- **Linux: пробел в модальном диалоге больше не «проваливается» (issue #100).**
+  Новый [`ModalKeysResolver`](Workspace1C/Views/ModalKeysResolver.cs):
+  в [`MaterialMessageWindow.Avalonia`](Workspace1C/Views/MaterialMessageWindow.Avalonia.cs)
+  при открытии фокус ставится на кнопку «ОК», а Space/Enter перехватываются, когда
+  фокус не на кнопке, — пробел больше не игнорируется и не активирует чужой элемент.
+- **Порядок кнопок приведён к конвенции проекта (issue #98).** Основное действие —
+  слева, «Отмена» — справа: [`PlatformDistributionPickerWindow`](Workspace1C/Views/PlatformDistributionPickerWindow.xaml)
+  («Выбрать» слева), [`ModalWindowBase.BuildButtons`](Workspace1C/Views/ModalWindowBase.cs),
+  [`NameInputWindow`](Workspace1C/Views/NameInputWindow.xaml),
+  [`BaseSelectionWindow`](Workspace1C/Views/BaseSelectionWindow.xaml),
+  [`LoginWindow`](Workspace1C/Views/LoginWindow.xaml) (WPF и Avalonia).
+
+### Новый функционал
+
+- **Сбор диагностики из меню «Утилиты» (issue #99, Windows и Linux).** В меню
+  «Утилиты» → «Информация» добавлен пункт «Собрать диагностику» — тот же ZIP-архив
+  журналов, что и кнопка во вкладке «О программе» настроек, теперь доступен прямо
+  из главного меню ([`UtilitiesMenuCatalog`](Workspace1C/ViewModels/UtilitiesMenuCatalog.cs),
+  [`MainWindow.UtilitiesMenu`](Workspace1C/Views/MainWindow.UtilitiesMenu.cs),
+  Avalonia: [`MainWindow.Avalonia.Tree`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Окно «О программе»: кнопки выровнены в одну колонку слева, donat-картинка стала
+  крупнее (до 380×520) и кликабельной. Настраиваемый хоткей «Собрать диагностику»
+  отложен на v1.0.1.23.
+  Тесты: [`Issue83ConsoleOutputDecoderTests`](Workspace1C.Tests/Issue83ConsoleOutputDecoderTests.cs),
+  [`Issue98ButtonOrderTests`](Workspace1C.Tests/Issue98ButtonOrderTests.cs),
+  [`Issue99DiagnosticsMenuTests`](Workspace1C.Tests/Issue99DiagnosticsMenuTests.cs),
+  [`Issue100ModalKeysTests`](Workspace1C.Tests/Issue100ModalKeysTests.cs);
+  расширены [`Issue89*`](Workspace1C.Tests), [`Issue92*`](Workspace1C.Tests),
+  [`TestDeploySourceDumpProfileTests`](Workspace1C.Tests/TestDeploySourceDumpProfileTests.cs) —
+  всего 5 541 зелёный тест.
+
 ## [1.0.1.21] — 2026-11-02
 
 ### Исправлено

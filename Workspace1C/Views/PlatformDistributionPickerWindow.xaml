@@ -77,12 +77,14 @@
         </Border>
 
         <!-- Кнопки — единый контракт (issue #26): «Выбрать» — акцентная ModernButton,
-             «Отмена» — вторичная SecondaryButton. -->
+             «Отмена» — вторичная SecondaryButton. Порядок кнопок приведён к конвенции
+             проекта (issue #98): главная/подтверждающая кнопка — слева, «Отмена» —
+             справа (последней), как во всех остальных окнах. -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="{loc:Loc Common.Cancel}" Style="{StaticResource SecondaryButton}"
-                    IsCancel="True" Padding="14,6" Margin="0,0,8,0"/>
             <Button Content="{loc:Loc PlatformUpdate.DistributionPicker.Choose}" Style="{StaticResource ModernButton}"
-                    Padding="14,6" Click="OnChoose_Click"/>
+                    IsDefault="True" Padding="14,6" Margin="0,0,8,0" Click="OnChoose_Click"/>
+            <Button Content="{loc:Loc Common.Cancel}" Style="{StaticResource SecondaryButton}"
+                    IsCancel="True" Padding="14,6"/>
         </StackPanel>
     </Grid>
 </Window>

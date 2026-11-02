@@ -1,0 +1,48 @@
+Release 1.0.1.22: исправления по issues #79, #83, #89, #92, #98, #99, #100
+
+- issue #89: автообновление на Linux — события фоновой загрузки обновления
+  маршалируются в UI-поток через SynchronizationContext, устранён
+  InvalidOperationException «Call from invalid thread» на финале загрузки;
+  частичная загрузка уходит в карантин *.download-error вместо молчаливого
+  удаления, в журнал пишется полный стек ошибки
+  (Services/UpdatePayload.cs, Services/UpdateService.Avalonia.cs,
+  ViewModels/MainViewModel.Downloads.cs);
+- issue #92: массовая выгрузка DT/CF — матчинг имён ИБ нормализуется
+  (регистр, пробелы, подчёркивания и дефисы), базы больше не «не находятся»
+  из-за различий в написании; если база найдена, но профиль СУБД собрать
+  не удалось, в журнал пишутся фактические свойства найденной ИБ и выводится
+  честное сообщение «база найдена, но профиль не собран»
+  (Services/ClusterInfobaseCredentialsResolver.cs);
+- issue #83: каракули в консольном выводе 1С — новый ConsoleOutputDecoder
+  (Services/) декодирует сырые байты по цепочке UTF-8 → cp866 → cp1251
+  (вариант с минимальным числом U+FFFD); применён по умолчанию в
+  ProcessRunner, RacClient, IbcmdService и WebPublishService;
+- issue #79: мастер «Развернуть тестовую копию» — реальное журналирование
+  резолва СУБД и pre-валидации на обеих платформах (коллбэк журнала был
+  заглушкой) (Views/TestDeployWindow.cs, Views/TestDeployWindow.Avalonia.cs,
+  Services/TestDeployService.cs);
+- issue #100: Linux — пробел в модальном диалоге больше не «проваливается»:
+  новый ModalKeysResolver, фокус на кнопке «ОК» при открытии
+  MaterialMessageWindow, Space/Enter перехватываются, когда фокус не на
+  кнопке (Services/ModalKeysResolver.cs,
+  Services/MaterialMessageWindow.Avalonia.cs);
+- issue #98: порядок кнопок приведён к конвенции проекта (основное действие
+  слева, «Отмена» справа): PlatformDistributionPickerWindow,
+  ModalWindowBase.BuildButtons, NameInputWindow, BaseSelectionWindow,
+  LoginWindow (WPF и Avalonia);
+- issue #99: сбор диагностики из меню «Утилиты» → «Информация» (Windows и
+  Linux) — тот же ZIP-архив журналов, что и кнопка во вкладке «О программе»;
+  окно «О программе»: кнопки выровнены в одну колонку слева, donat-картинка
+  крупнее и кликабельна (Services/UtilitiesMenuCatalog.cs,
+  Views/MainWindow.UtilitiesMenu.cs, Views/MainWindow.Avalonia.Tree.cs,
+  Views/SettingsWindow.*);
+- локализация ru/en (Localization/Languages/ru.json, en.json);
+- тесты: новые Issue83ConsoleOutputDecoderTests, Issue98ButtonOrderTests,
+  Issue99DiagnosticsMenuTests, Issue100ModalKeysTests; расширены
+  Issue89PlatformValidationTests, Issue92BatchDumpTests,
+  ClusterInfobaseCredentialsResolverTests, TestDeploySourceDumpProfileTests,
+  UtilitiesMenuLayoutTests;
+- версия 1.0.1.21 → 1.0.1.22 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  план plan-issues-79-83-89-92-98-99-100-v100122.md,
+  скрипт сборки _build_v100122.ps1.

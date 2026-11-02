@@ -262,6 +262,31 @@ public static class UpdatePayload
         }
     }
 
+    /// <summary>
+    /// Карантин скачанного файла обновления при НЕИЗВЕСТНОЙ ошибке загрузки (issue #89,
+    /// репорт 7OH от 2026-11-02 «после ошибки файлы исчезают»): ранее обработчик catch
+    /// удалял скачанный файл — проверить скачанное было невозможно. Теперь файл
+    /// переименовывается в <c>*.download-error</c> и остаётся у пользователя для
+    /// диагностики (просьба 7OH). Повторный карантин затирает прежний файл с тем же
+    /// именем (загрузка того же файла не накапливает мусор). Возвращает путь после
+    /// переименования (или исходный путь, если файла нет/переименовать не удалось).
+    /// </summary>
+    public static string QuarantineDownloadError(string downloadedFile)
+    {
+        try
+        {
+            if (!File.Exists(downloadedFile))
+                return downloadedFile;
+            var target = downloadedFile + ".download-error";
+            File.Move(downloadedFile, target, overwrite: true);
+            return target;
+        }
+        catch
+        {
+            return downloadedFile;
+        }
+    }
+
     /// <summary>Первые 8 байт файла в hex — для журнала; при ошибке чтения — пустая строка.</summary>
     private static string TryReadFirstBytesHex(string filePath)
     {

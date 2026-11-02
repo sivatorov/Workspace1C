@@ -335,4 +335,200 @@ public sealed class Issue92BatchDumpTests
             Directory.Delete(dir, recursive: true);
         }
     }
+
+    // ===================== Автоподстановка СУБД из rac (issue #92, v1.0.1.22) =====================
+    // ZIP 7OH (diagnostics_20261102_104926): rac 8.5.4 отдаёт пустой dbms в «infobase
+    // summary list», «infobase info» падает «Недостаточно прав пользователя» — резолв
+    // возвращает null, все базы «пропускаются с ошибкой». Проверяются: нормализация
+    // сопоставления имён, диагностика свойств найденной базы и честная причина по базе.
+
+    /// <summary>Минимальный фейк <see cref="IRacClient"/>: один кластер и список баз.</summary>
+    private sealed class FakeRacClient : IRacClient
+    {
+        public RacCluster Cluster { get; init; } = new() { Id = Guid.NewGuid(), Name = "Кластер" };
+        public RacInfobaseSummary[] Infobases { get; init; } = Array.Empty<RacInfobaseSummary>();
+        public RacInfobaseInfo? Info { get; init; }
+        public string LastActionErrorValue { get; init; } = string.Empty;
+        public string LastActionError => LastActionErrorValue;
+
+        public Task<IReadOnlyList<RacCluster>> GetClustersAsync(
+            RacConnectionParams parameters, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<RacCluster>>(new[] { Cluster });
+
+        public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<RacInfobaseSummary>>(Infobases);
+
+        public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
+            RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+            => Task.FromResult(Info);
+
+        public Task<RacClusterInfo?> GetClusterInfoAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<RacProcessInfo>> GetProcessesAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<RacSessionInfo>> GetSessionsAsync(RacConnectionParams p, Guid c, Guid? i = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<RacConnectionInfo>> GetConnectionsAsync(RacConnectionParams p, Guid c, Guid? i = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<RacLockInfo>> GetLocksAsync(RacConnectionParams p, Guid c, Guid? i = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<IReadOnlyList<RacJobInfo>> GetJobsAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> UpdateClusterAsync(RacConnectionParams p, Guid c, RacClusterUpdate u, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> SetJobStateAsync(RacConnectionParams p, Guid c, Guid j, RacJobAction a, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> TerminateSessionAsync(RacConnectionParams p, Guid c, Guid s, Guid? pr = null, string? u = null, string? pw = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> DisconnectConnectionAsync(RacConnectionParams p, Guid c, Guid con, Guid? pr = null, string? u = null, string? pw = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> CreateInfobaseAsync(RacConnectionParams p, Guid c, RacInfobaseCreateRequest r, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> UpdateInfobaseAsync(RacConnectionParams p, Guid c, Guid i, RacInfobaseUpdateRequest r, CancellationToken ct = default)
+            => throw new NotImplementedException();
+
+        public Task<bool> DropInfobaseAsync(RacConnectionParams p, Guid c, Guid i, bool d = false, string? u = null, string? pw = null, CancellationToken ct = default)
+            => throw new NotImplementedException();
+    }
+
+    private static Infobase ServerBase(string name) => new()
+    {
+        Id = "base-92",
+        Name = name,
+        Connection = new ConnectionSettings
+        {
+            Type = ConnectionType.ClientServer,
+            Server = "localhost:27545",
+            DatabaseName = name
+        }
+    };
+
+    [Theory]
+    [InlineData("Demo 27", "demo_27")]
+    [InlineData("Demo 27", "demo-27")]
+    [InlineData("  Demo 27 ", "Demo  27")]
+    [InlineData("demo27", "DEMO27")]
+    public void NormalizeInfobaseName_SeparatorVariants_Match(string appName, string racName)
+    {
+        // Имя базы в приложении и в кластере rac может отличаться разделителями
+        // (пробелы/подчерки/дефисы) — раньше строгое сравнение считало базы разными,
+        // и автоподстановка падала «база не найдена» (issue #79/#92).
+        Assert.True(ClusterInfobaseCredentialsResolver.NormalizedNamesEqual(appName, racName));
+    }
+
+    [Fact]
+    public void NormalizeInfobaseName_DifferentBases_DoNotMatch()
+    {
+        // «Demo 27» и «Demo_8.3.27» — разные базы: слишком агрессивная нормализация
+        // (без разделителей вообще) подставляла бы чужую базу.
+        Assert.False(ClusterInfobaseCredentialsResolver.NormalizedNamesEqual("Demo 27", "Demo_8.3.27"));
+        Assert.False(ClusterInfobaseCredentialsResolver.NormalizedNamesEqual("Demo 27", "Demo  8 3 27"));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NormalizedName_BuildsProfile()
+    {
+        var rac = new FakeRacClient
+        {
+            Infobases = new[]
+            {
+                new RacInfobaseSummary
+                {
+                    InfobaseId = Guid.NewGuid(), Name = "demo_27",
+                    Dbms = "PostgreSQL", DbServer = "pg-host", DbName = "demo_db", DbUser = "postgres"
+                }
+            }
+        };
+        var log = new List<string>();
+        var resolver = new ClusterInfobaseCredentialsResolver(rac, servers: null, log: log.Add);
+
+        var profile = await resolver.ResolveAsync(ServerBase("Demo 27"));
+
+        Assert.NotNull(profile);
+        Assert.Equal(DbmsKind.PostgreSql, profile!.Dbms);
+        Assert.Equal("demo_db", profile.Database);
+        // Штатный путь: только диагностическая строка свойств найденной базы (v1.0.1.22),
+        // без ошибок резолва.
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveSummaryFieldsFormat"));
+        Assert.DoesNotContain(log, l => l.Contains("BatchOps.DbmsResolveInfoFailed"));
+        Assert.DoesNotContain(log, l => l.Contains("BatchOps.DbmsResolveNoProfileFormat"));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EmptyDbms_InfoAccessDenied_ReasonVisibleInLog()
+    {
+        // Главный сценарий ZIP 7OH: dbms в «infobase summary list» пуст, «infobase
+        // info» возвращает null («Недостаточно прав пользователя»). Раньше итоговая
+        // строка журнала — «база не найдена», что вводило в заблуждение. Теперь:
+        // 1) в журнале фактические свойства найденной базы (dbms/db-server/...);
+        // 2) текст ошибки rac из LastActionError;
+        // 3) честное «найдена, но параметры СУБД получить не удалось».
+        var rac = new FakeRacClient
+        {
+            Infobases = new[]
+            {
+                new RacInfobaseSummary
+                {
+                    InfobaseId = Guid.NewGuid(), Name = "Demo_8.3.27",
+                    Dbms = string.Empty, DbServer = "pg-host", DbName = string.Empty, DbUser = "postgres"
+                }
+            },
+            Info = null,
+            LastActionErrorValue = "Недостаточно прав пользователя на информационную базу Demo_8.3.27"
+        };
+        var log = new List<string>();
+        var resolver = new ClusterInfobaseCredentialsResolver(rac, servers: null, log: log.Add);
+
+        var profile = await resolver.ResolveAsync(ServerBase("Demo_8.3.27"));
+
+        Assert.Null(profile);
+        // Свойства найденной базы — в журнале (следующий ZIP однозначно покажет,
+        // что rac вернул по dbms).
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveSummaryFieldsFormat"));
+        // Причина ошибки «infobase info» пошла в журнал через формат с {0}
+        // (текст rac из LastActionError; в тестовом процессе локализация не загружена —
+        // остаётся ключ строки, сам подставленный текст проверяется в приложении).
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveInfoFailedFormat"));
+        // Итог — не «база не найдена», а «найдена, но параметры СУБД получить не удалось».
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveNoProfileFormat"));
+        Assert.DoesNotContain(log, l => l.Contains("BatchOps.DbmsResolveNotFound"));
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EmptyDbms_InfoWithoutError_StillFailsWithReason()
+    {
+        // «infobase info» вернул null без текста ошибки — прежнее диагностическое
+        // сообщение «не вернула поддерживаемый тип СУБД» + честный итог.
+        var rac = new FakeRacClient
+        {
+            Infobases = new[]
+            {
+                new RacInfobaseSummary
+                {
+                    InfobaseId = Guid.NewGuid(), Name = "Demo_8.3.27", Dbms = string.Empty
+                }
+            }
+        };
+        var log = new List<string>();
+        var resolver = new ClusterInfobaseCredentialsResolver(rac, servers: null, log: log.Add);
+
+        var profile = await resolver.ResolveAsync(ServerBase("Demo_8.3.27"));
+
+        Assert.Null(profile);
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveInfoFailed"));
+        Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveNoProfileFormat"));
+    }
 }

@@ -58,8 +58,19 @@
                    Margin="0,0,0,12" Visibility="Collapsed"/>
 
         <!-- ============ Кнопки ============ -->
+        <!-- Порядок кнопок приведён к конвенции проекта (issue #98): главная кнопка —
+             слева, «Отмена» — справа (последней), как во всех остальных окнах. -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Width="110" Margin="0,0,8,0"
+            <Button x:Name="LoginButton" Width="130" Margin="0,0,8,0"
+                    IsDefault="True"
+                    Style="{StaticResource ModernButton}"
+                    Click="OnLogin_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Auth.Login}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Width="110"
                     IsCancel="True"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"
@@ -67,15 +78,6 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="LoginButton" Width="130"
-                    IsDefault="True"
-                    Style="{StaticResource ModernButton}"
-                    Click="OnLogin_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{loc:Loc Auth.Login}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </StackPanel>

@@ -155,7 +155,11 @@ public enum UtilitiesMenuCommandKind
     InfobaseUsers,
 
     /// <summary>Регламентные задания информационных баз (1.0.0.85).</summary>
-    InfobaseScheduledJobs
+    InfobaseScheduledJobs,
+
+    /// <summary>Сбор архива диагностики (ZIP с журналами) — issue #99: быстрый доступ
+    /// из «Утилиты» → «Информация», без открытия окна настроек.</summary>
+    CollectDiagnostics
 }
 
 /// <summary>
@@ -506,6 +510,13 @@ public static class UtilitiesMenuCatalog
                 "CodeBraces", "IconScript", "#06B6D4", UtilitiesMenuCommandKind.ShowScriptsSettings),
             new("UsageStatistics", "Stats.Title", GroupInformation,
                 "History", "IconHistory", "#14B8A6", UtilitiesMenuCommandKind.UsageStatistics),
+            // «Собрать диагностику» (issue #99): ZIP с журналами приложения в один клик.
+            // Хоткей пока не назначается (по умолчанию пусто — решение по хоткею отложено).
+            // Пара иконок («IconLogs»/«IconLogs») существует в ОБОИХ базовых словарях
+            // (Icons.xaml/Icons.axaml) и во всех наборах — страж TrayMenuIconCatalogTests.
+            new("CollectDiagnostics", "Utilities.CollectDiagnostics", GroupInformation,
+                "IconLogs", "IconLogs", "#16A34A", UtilitiesMenuCommandKind.CollectDiagnostics,
+                isNew: true),
 
             // ---- Операции ----
             new("ConfigDiff", "ConfigDiff.Title", GroupOperations,
@@ -653,7 +664,10 @@ public static class UtilitiesMenuLayouts
                 Item("BackupScenarios"),
                 Separator(),
                 Item("ScriptsSettings"),
-                Item("UsageStatistics")
+                Item("UsageStatistics"),
+                // «Собрать диагностику» (issue #99): в стандартной компоновке сразу
+                // на месте, чтобы пункт был доступен всем без правки меню.
+                Item("CollectDiagnostics")
             }),
             Separator(),
             Group(UtilitiesMenuCatalog.GroupOperations, new List<UtilitiesMenuNode>

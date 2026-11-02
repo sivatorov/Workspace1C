@@ -2813,78 +2813,92 @@
                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=TabItem}}"/>
                     </StackPanel>
                 </TabItem.Header>
+                <!-- Макет вкладки перестроен (issue #99): текст и кнопки — в одной левой
+                     колонке (кнопки в столбец, не в ряд), кликабельная спонсорская
+                     картинка — справа и крупнее. Содержимое помещается без прокрутки
+                     на типовых размерах окна настроек. -->
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="4,12,4,0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="{loc:Loc App.Title}" FontSize="18" FontWeight="SemiBold"
-                                       VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
-                            <controls:HelpLink Margin="8,0,0,0" VerticalAlignment="Center"
-                                               HelpText="{loc:Loc Settings.About.HelpText}"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="{loc:Loc App.Title}" FontSize="18" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <controls:HelpLink Margin="8,0,0,0" VerticalAlignment="Center"
+                                                   HelpText="{loc:Loc Settings.About.HelpText}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                                <TextBlock Text="{Binding AboutVersion, RelativeSource={RelativeSource AncestorType=Window}}"
+                                           FontSize="14" VerticalAlignment="Center"/>
+                                <Button Margin="8,0,0,0" Padding="6,2" VerticalAlignment="Center"
+                                        Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                        Click="OnCheckForUpdates_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Update" Width="14" Height="14"
+                                                                 Foreground="{DynamicResource InfoBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.About.CheckForUpdates}"
+                                                   VerticalAlignment="Center" FontSize="12"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Text="{loc:Loc Settings.About.Author}" FontSize="14"
+                                       Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"/>
+                            <TextBlock Text="{loc:Loc Settings.About.Infostart}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBlock Margin="0,0,0,12" Cursor="Hand" TextDecorations="Underline"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Text="https://infostart.ru/1c/tools/2764888/"
+                                       MouseLeftButtonUp="OnAboutLink_Click"
+                                       Tag="https://infostart.ru/1c/tools/2764888/"/>
+                            <TextBlock Text="{loc:Loc Settings.About.GitHub}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
+                            <TextBlock Cursor="Hand" TextDecorations="Underline"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Text="https://github.com/sivatorov/Workspace1C"
+                                       MouseLeftButtonUp="OnAboutLink_Click"
+                                       Tag="https://github.com/sivatorov/Workspace1C"/>
+                            <TextBlock Text="{loc:Loc Settings.About.Telegram}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,4"/>
+                            <TextBlock Cursor="Hand" TextDecorations="Underline"
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       Text="https://t.me/Workspace1C"
+                                       MouseLeftButtonUp="OnAboutLink_Click"
+                                       Tag="https://t.me/Workspace1C"/>
+                            <!-- Нижние кнопки — в одну колонку (issue #99), как подписи выше. -->
+                            <StackPanel x:Name="AboutButtonsColumn" Margin="0,24,0,0">
+                                <Button Padding="14,8" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                        Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                        Click="OnCopyTechInfo_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16"
+                                                                 Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.About.CopyTechInfo}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Padding="14,8" HorizontalAlignment="Left"
+                                        Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                        Click="OnCollectDiagnostics_Click">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="PackageVariant" Width="16" Height="16"
+                                                                 Foreground="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.About.CreateDiagnostics}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                         </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                            <TextBlock Text="{Binding AboutVersion, RelativeSource={RelativeSource AncestorType=Window}}"
-                                       FontSize="14" VerticalAlignment="Center"/>
-                            <Button Margin="8,0,0,0" Padding="6,2" VerticalAlignment="Center"
-                                    Style="{DynamicResource SecondaryButton}" Cursor="Hand"
-                                    Click="OnCheckForUpdates_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Update" Width="14" Height="14"
-                                                             Foreground="{DynamicResource InfoBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Settings.About.CheckForUpdates}"
-                                               VerticalAlignment="Center" FontSize="12"/>
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                        <TextBlock Text="{loc:Loc Settings.About.Author}" FontSize="14"
-                                   Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,16"/>
-                        <TextBlock Text="{loc:Loc Settings.About.Infostart}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                        <TextBlock Margin="0,0,0,12" Cursor="Hand" TextDecorations="Underline"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   Text="https://infostart.ru/1c/tools/2764888/"
-                                   MouseLeftButtonUp="OnAboutLink_Click"
-                                   Tag="https://infostart.ru/1c/tools/2764888/"/>
-                        <TextBlock Text="{loc:Loc Settings.About.GitHub}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
-                        <TextBlock Cursor="Hand" TextDecorations="Underline"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   Text="https://github.com/sivatorov/Workspace1C"
-                                   MouseLeftButtonUp="OnAboutLink_Click"
-                                   Tag="https://github.com/sivatorov/Workspace1C"/>
-                        <TextBlock Text="{loc:Loc Settings.About.Telegram}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,4"/>
-                        <TextBlock Cursor="Hand" TextDecorations="Underline"
-                                   Foreground="{DynamicResource AccentBrush}"
-                                   Text="https://t.me/Workspace1C"
-                                   MouseLeftButtonUp="OnAboutLink_Click"
-                                   Tag="https://t.me/Workspace1C"/>
-                        <Image Source="pack://application:,,,/donat.png" Margin="0,16,0,0"
-                               HorizontalAlignment="Left" Stretch="Uniform"
-                               MaxWidth="240" MaxHeight="320" RenderOptions.BitmapScalingMode="HighQuality"
+                        <!-- Спонсорская картинка справа и крупнее (issue #99): клик по ней
+                             по-прежнему открывает её в полном размере. -->
+                        <Image x:Name="AboutDonatImage" Grid.Column="1"
+                               Source="pack://application:,,,/donat.png" Margin="0,4,0,0"
+                               HorizontalAlignment="Right" VerticalAlignment="Top" Stretch="Uniform"
+                               MaxWidth="380" MaxHeight="520" RenderOptions.BitmapScalingMode="HighQuality"
                                Cursor="Hand" MouseLeftButtonUp="OnDonatImage_Click"
                                ToolTip="{loc:Loc Settings.About.DonatTooltip}"/>
-                        <StackPanel Margin="0,24,0,0" Orientation="Horizontal">
-                            <Button Padding="14,8" HorizontalAlignment="Left"
-                                    Style="{DynamicResource SecondaryButton}" Cursor="Hand"
-                                    Click="OnCopyTechInfo_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16"
-                                                             Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Settings.About.CopyTechInfo}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Padding="14,8" HorizontalAlignment="Left" Margin="8,0,0,0"
-                                    Style="{DynamicResource SecondaryButton}" Cursor="Hand"
-                                    Click="OnCollectDiagnostics_Click">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="PackageVariant" Width="16" Height="16"
-                                                             Foreground="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Settings.About.CreateDiagnostics}" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </StackPanel>
+                    </Grid>
                 </ScrollViewer>
             </TabItem>
         </TabControl>

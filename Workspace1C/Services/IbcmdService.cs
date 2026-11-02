@@ -296,14 +296,14 @@ public static class IbcmdService
 
     /// <summary>
     /// Запускает ibcmd с аргументами, ждёт завершения; успех — код 0. Вывод читается
-    /// в кодировке <see cref="ProcessRunner.ConsoleOutputEncoding"/> (issue #79,
-    /// «каракули» в окне учётных данных ibcmd: на русской Windows ibcmd пишет в
-    /// консольной OEM-кодировке cp866, чтение как UTF-8 давало нечитаемый текст).
+    /// СЫРЫМИ байтами и декодируется центральным правилом
+    /// <see cref="ConsoleOutputDecoder"/> (UTF-8 → cp866 → cp1251, issue #83) —
+    /// раньше фиксированно читалось в cp866 (issue #79, «каракули» в окне учётных
+    /// данных ibcmd), что ломало утилиты, пишущие в UTF-8/ANSI.
     /// </summary>
     public static async Task<IbcmdResult> RunAsync(string exe, IReadOnlyList<string> args, IEnumerable<string?> secrets,
         TimeSpan timeout, CancellationToken ct = default)
     {
-        var outputEncoding = ProcessRunner.ConsoleOutputEncoding() ?? Encoding.UTF8;
         var psi = new ProcessStartInfo
         {
             FileName = exe,
@@ -311,9 +311,9 @@ public static class IbcmdService
             CreateNoWindow = true,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            StandardOutputEncoding = outputEncoding,
-            StandardErrorEncoding = outputEncoding,
             WorkingDirectory = Path.GetDirectoryName(exe) ?? string.Empty
+            // Кодировку НЕ задаём: байты читаются сырыми и декодируются
+            // ConsoleOutputDecoder (UTF-8 / cp866 / cp1251) — issue #83.
         };
         foreach (var a in args)
             psi.ArgumentList.Add(a);
@@ -338,8 +338,12 @@ public static class IbcmdService
 
         using (process)
         {
-            var stdout = process.StandardOutput.ReadToEndAsync();
-            var stderr = process.StandardError.ReadToEndAsync();
+            // Сырое чтение байтов + декодирование ConsoleOutputDecoder (issue #83):
+            // кодировка вывода ibcmd заранее неизвестна (cp866/UTF-8/ANSI).
+            using var stdoutBuffer = new MemoryStream();
+            using var stderrBuffer = new MemoryStream();
+            var stdoutRead = process.StandardOutput.BaseStream.CopyToAsync(stdoutBuffer, ct);
+            var stderrRead = process.StandardError.BaseStream.CopyToAsync(stderrBuffer, ct);
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(timeout);
             try
@@ -354,7 +358,9 @@ public static class IbcmdService
                     : LocalizationManager.T("Designer.Timeout"));
             }
 
-            var output = Mask(((await stdout.ConfigureAwait(false)) + "\n" + (await stderr.ConfigureAwait(false))).Trim(), secretList);
+            await Task.WhenAll(stdoutRead, stderrRead).ConfigureAwait(false);
+            var output = Mask((ConsoleOutputDecoder.Decode(stdoutBuffer.ToArray()) + "\n" +
+                               ConsoleOutputDecoder.Decode(stderrBuffer.ToArray())).Trim(), secretList);
             var code = process.ExitCode;
             return new IbcmdResult
             {

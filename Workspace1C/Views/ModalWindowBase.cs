@@ -938,8 +938,11 @@ namespace Workspace1C
                 Spacing = 8
             };
 
-            panel.Children.Add(BuildCancelButton(cancelWidth));
+            // Порядок кнопок приведён к конвенции проекта (issue #98): главная
+            // кнопка — слева, «Отмена» — справа (последней), как во всех остальных
+            // окнах (см. комментарии к issue #56/#374: «отмена всегда в конце»).
             panel.Children.Add(BuildConfirmButton(okText, okWidth, onOk, okIconKey: okIconKey, okTextKey: okTextKey));
+            panel.Children.Add(BuildCancelButton(cancelWidth));
             return panel;
         }
 

@@ -59,7 +59,7 @@ public sealed class UtilitiesMenuLayoutTests
         AssertSeparator(layout.Root[11]);
         AssertGroup(layout.Root[12], UtilitiesMenuCatalog.GroupInformation);
         var infoChildren = layout.Root[12].Children;
-        Assert.Equal(11, infoChildren.Count);
+        Assert.Equal(12, infoChildren.Count);
         AssertItem(infoChildren[0], "MaintenanceCenter");
         AssertSeparator(infoChildren[1]);
         AssertItem(infoChildren[2], "ConfigTypesEdit");
@@ -72,6 +72,8 @@ public sealed class UtilitiesMenuLayoutTests
         AssertSeparator(infoChildren[8]);
         AssertItem(infoChildren[9], "ScriptsSettings");
         AssertItem(infoChildren[10], "UsageStatistics");
+        // «Собрать диагностику» (issue #99) — сразу в стандартной компоновке.
+        AssertItem(infoChildren[11], "CollectDiagnostics");
 
         // ---- Подменю «Операции» ----
         AssertSeparator(layout.Root[13]);

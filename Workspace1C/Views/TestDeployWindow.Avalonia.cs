@@ -482,8 +482,23 @@ public class TestDeployWindow : ModalWindowBase
         {
             var scenario = _vm.BuildScenario();
             var service = AppServices.TryGetService<TestDeployService>() ?? new TestDeployService();
+
+            // Issue #79 (репорт 7OH «после ОК ничего не происходит, в логах тихо»):
+            // ранее log был null — шаги резолва СУБД (до 60 с rac-проб) не отображались
+            // и сценарий выглядел зависшим. Прогресс пишется в журнал окна в реальном
+            // времени; добавление — строго в UI-потоке (коллбэк приходит из фоновых
+            // потоков DeployAsync).
+            void AddLogLine(string line)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    _logList.Items.Add(line);
+                    _logList.ScrollIntoView(line);
+                });
+            }
+
             var result = await service.DeployAsync(
-                scenario, _vm.Source, _vm.AllInfobases, _groups, log: null);
+                scenario, _vm.Source, _vm.AllInfobases, _groups, log: AddLogLine);
 
             foreach (var line in result.Log)
                 _logList.Items.Add(line);
