@@ -19,8 +19,8 @@ namespace Workspace1C.Converters
     /// </summary>
     public sealed class RunningChipBrushConverter : IValueConverter
     {
-        /// <summary>Красный чип зависшего процесса (тот же тон, что у точки #310).</summary>
-        public static readonly SolidColorBrush HungChip = new(Color.Parse("#EF4444"));
+        /// <summary>Красный чип зависшего процесса — кисть темы ErrorBrush.</summary>
+        private static IBrush HungChip => Themes.ThemeBrushes.FromSpec("@ErrorBrush");
 
         /// <summary>Значок на красном чипе.</summary>
         public static readonly SolidColorBrush HungGlyph = new(Colors.White);

@@ -1901,12 +1901,12 @@
                                                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                    <Setter Property="Background" Value="#EF4444"/>
-                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                    <Setter Property="Background" Value="#EF4444"/>
-                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
@@ -1937,12 +1937,12 @@
                                                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                    <Setter Property="Background" Value="#EF4444"/>
-                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
                                                                 <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                    <Setter Property="Background" Value="#EF4444"/>
-                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
                                                                 </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>

@@ -327,12 +327,12 @@ public sealed class Release100125Tests
     public void RunningChips_Variant4_RedOnHang_BiggerEnterpriseIcon()
     {
         var wpf = ReadProjectFile("Workspace1C/Views/MainWindow.xaml");
-        var play = wpf.IndexOf("Kind=\"Play\"", StringComparison.Ordinal);
+        var play = wpf.IndexOf("Kind=\"Play\" Width=\"16\" Height=\"16\"", StringComparison.Ordinal);
         Assert.True(play > 0);
         var chip = wpf.LastIndexOf("<Border Width=\"18\" Height=\"18\"", play, StringComparison.Ordinal);
         Assert.True(chip > 0, "значок Play без чипа 18 px");
         var chipMarkup = wpf[chip..play];
-        Assert.Contains("#EF4444", chipMarkup);
+        Assert.Contains("{DynamicResource ErrorBrush}", chipMarkup);
         Assert.Contains("Value=\"Hung\"", chipMarkup);
         Assert.Contains("Kind=\"Play\" Width=\"16\" Height=\"16\"", wpf);
 
