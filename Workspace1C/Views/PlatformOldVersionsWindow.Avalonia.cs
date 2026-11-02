@@ -195,8 +195,10 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 12, 0, 0)
             };
-            buttons.Children.Add(cancel);
+            // Порядок приведён к конвенции проекта (issue #98, v1.0.1.24):
+            // главная кнопка слева, «Отмена» — справа (последней).
             buttons.Children.Add(_deleteButton);
+            buttons.Children.Add(cancel);
 
             var root = new Grid { Margin = new Thickness(16) };
             root.RowDefinitions.Add(new RowDefinition(GridLength.Auto));

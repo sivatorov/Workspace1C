@@ -282,6 +282,14 @@ namespace Workspace1C
                 }
                 LogStartupStage(startupLogger, "Проверка единственного экземпляра завершена");
 
+                // Успешный старт после автообновления (issue #89, v1.0.1.24): раз приложение
+                // запустилось и работает, бэкап прежнего бинаря (<exe>.cm-update-backup)
+                // больше не нужен — помощник использует его только для автоотката при
+                // падении нового процесса в первые секунды. Вызывается на каждом старте:
+                // если бэкапа нет (обновления не было или был откат) — ничего не делает.
+                try { Services.UpdateService.CleanupUpdateBackup(); }
+                catch { /* чистка не должна блокировать запуск */ }
+
                 if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     _desktopLifetime = desktop;

@@ -407,13 +407,27 @@ namespace Workspace1C
             runningIcons.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib });
 
+            // Подложка-бейдж под значком (issue #101, v1.0.1.24, Вариант 1): круглый чип
+            // цвета карточки с тонкой обводкой даёт контраст значку на ЛЮБОМ акценте
+            // выделения строки (синяя иконка «Предприятие» на синем акценте и янтарный
+            // «Конфигуратор» на зелёном раньше терялись). Семантика цветов значков
+            // сохранена; конвертер статуса отклика (issue #310) не затронут.
+            var enterpriseChip = new Border
+            {
+                Width = UiMetrics.Scaled(16),
+                Height = UiMetrics.Scaled(16),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(8)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(UiMetrics.Scaled(3))
+            };
+            ThemeBrushes.Bind(enterpriseChip, Border.BackgroundProperty, "CardBackgroundBrush");
+            ThemeBrushes.Bind(enterpriseChip, Border.BorderBrushProperty, "BorderBrushColor");
+            enterpriseChip.BorderThickness = new Thickness(1);
+
             var enterpriseIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = IconHelper.Geometry("IconRunning"),
-                Width = UiMetrics.Scaled(10),
-                Height = UiMetrics.Scaled(10),
-                Stretch = Stretch.Uniform,
-                VerticalAlignment = VerticalAlignment.Center
+                Stretch = Stretch.Uniform
             };
             enterpriseIcon.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib });
@@ -426,16 +440,28 @@ namespace Workspace1C
                     // при зависании процесса конвертер перекрашивает значок (issue #310).
                     ConverterParameter = "@InfoBrush"
                 });
-            runningIcons.Children.Add(enterpriseIcon);
+            enterpriseChip.Child = enterpriseIcon;
+            enterpriseChip.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib });
+            runningIcons.Children.Add(enterpriseChip);
+
+            var configuratorChip = new Border
+            {
+                Width = UiMetrics.Scaled(16),
+                Height = UiMetrics.Scaled(16),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(8)),
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(UiMetrics.Scaled(3)),
+                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0)
+            };
+            ThemeBrushes.Bind(configuratorChip, Border.BackgroundProperty, "CardBackgroundBrush");
+            ThemeBrushes.Bind(configuratorChip, Border.BorderBrushProperty, "BorderBrushColor");
+            configuratorChip.BorderThickness = new Thickness(1);
 
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = IconHelper.Geometry("IconWrench"),
-                Width = UiMetrics.Scaled(10),
-                Height = UiMetrics.Scaled(10),
-                Stretch = Stretch.Uniform,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0)
+                Stretch = Stretch.Uniform
             };
             configuratorIcon.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib });
@@ -448,7 +474,10 @@ namespace Workspace1C
                     // при критическом статусе конвертер перекрашивает значок (issue #310).
                     ConverterParameter = "@WarningBrush"
                 });
-            runningIcons.Children.Add(configuratorIcon);
+            configuratorChip.Child = configuratorIcon;
+            configuratorChip.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib });
+            runningIcons.Children.Add(configuratorChip);
 
             nameRow.Children.Add(name);
             nameRow.Children.Add(runningIcons);
@@ -2495,6 +2524,8 @@ namespace Workspace1C
             batchMenu.Items.Add(BatchMenuAction("Main.BatchRunBackup", OnBatchRunBackupClick, "IconDatabaseExport", "@SuccessBrush"));
             // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
             batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "@SuccessBrush"));
+            // Массовая загрузка конфигурации из .cf по списку выделенных баз (issue #92, v1.0.1.24).
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchLoadCf", OnBatchLoadCfClick, "IconImport", "@WarningBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "@InfoBrush"));
             // Массовая замена строк подключения (0.3.9.191, функция 6): окно с правилом
             // «найти → заменить на» по полям строк подключения выделенных баз.
@@ -2663,6 +2694,15 @@ namespace Workspace1C
             if (_vm is null || _vm.BatchOperationTargetCount == 0)
                 return;
             _vm.ExecuteBatchDumpForSelected();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам (issue #92, v1.0.1.24).</summary>
+        private void OnBatchLoadCfClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+                return;
+            _vm.ExecuteBatchLoadCfForSelected();
             _vm.ClearBatchSelection();
         }
 

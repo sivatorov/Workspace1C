@@ -1883,43 +1883,57 @@
                                                  отклика процесса (issue #310): WarningBrush — завис,
                                                  ErrorBrush — не отвечает несколько опросов подряд, пока
                                                  отвечает — собственный цвет значка. -->
+                                            <!-- Подложка-бейдж под значком (issue #101, v1.0.1.24, Вариант 1):
+                                                 круглый чип цвета карточки с обводкой даёт контраст значку
+                                                 на любом акценте выделения строки. Семантика цветов значков
+                                                 сохранена; перекраска по статусу отклика (#310) не тронута. -->
                                             <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center"
                                                         ToolTip="{Binding RunningModesTooltip}"
                                                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
-                                                <materialDesign:PackIcon Kind="Play" Width="10" Height="10"
-                                                                         VerticalAlignment="Center"
-                                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
-                                                    <materialDesign:PackIcon.Style>
-                                                        <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                            <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </materialDesign:PackIcon.Style>
-                                                </materialDesign:PackIcon>
-                                                <materialDesign:PackIcon Kind="Wrench" Width="10" Height="10" Margin="3,0,0,0"
-                                                                         VerticalAlignment="Center"
-                                                                         Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
-                                                    <materialDesign:PackIcon.Style>
-                                                        <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                            <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
-                                                                </DataTrigger>
-                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </materialDesign:PackIcon.Style>
-                                                </materialDesign:PackIcon>
+                                                <Border Width="16" Height="16" CornerRadius="8" Padding="3"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource CardBackgroundBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushColor}"
+                                                        BorderThickness="1"
+                                                        Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
+                                                    <materialDesign:PackIcon Kind="Play" Width="10" Height="10">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Border>
+                                                <Border Width="16" Height="16" CornerRadius="8" Padding="3" Margin="3,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        Background="{DynamicResource CardBackgroundBrush}"
+                                                        BorderBrush="{DynamicResource BorderBrushColor}"
+                                                        BorderThickness="1"
+                                                        Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
+                                                    <materialDesign:PackIcon Kind="Wrench" Width="10" Height="10">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Border>
                                             </StackPanel>
                                         </StackPanel>
 

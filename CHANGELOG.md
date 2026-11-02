@@ -11,6 +11,73 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.24] — 2026-11-02
+
+### Исправлено
+
+- **Автообновление на Linux: самоперезапуск после установки снова работает
+  (issue #89, регресс v1.0.1.23).** Репорт 7OH: обновление до v1.0.1.23 скачалось и
+  установилось (бинарник заменён, права 0755), но перезапуск не удался —
+  «FileNotFoundException: System.IO.Pipes, Version=10.0.0.0», запуск вручную.
+  Причина: v1.0.1.23 запускала новый процесс из живого старого
+  ([`StartDetached`](Workspace1C/Services/UpdateService.Avalonia.cs)) — новый экземпляр
+  натыкался на файловый лок одиночного запуска и/или наследовал изменённое окружение
+  (LD_LIBRARY_PATH/DOTNET_*), а его вывод терялся вместе с каналом закрывшегося
+  родителя. Перезапуск переведён на helper-сценарий
+  ([`UpdateRestartScriptBuilder`](Workspace1C/Services/UpdateRestartScriptBuilder.cs)):
+  ожидание выхода старого процесса → бэкап прежнего бинаря → замена → перезапуск с
+  ЧИСТЫМ окружением и перехватом stdout/stderr в журнал `update-restart.log` →
+  liveness-проверка 10 секунд → автооткат на прежнюю версию при падении нового процесса.
+  Прямая замена из работающего процесса оставлена запасным путём (при недоступном bash).
+  Бэкап удаляется приложением после успешного старта; добавлен смок-тест запуска
+  Linux-бинаря в CI ([`release.yml`](.github/workflows/release.yml), xvfb, 15 с), чтобы
+  сбой старта ловился до публикации релиза. Проверка факта: сборка `System.IO.Pipes`
+  присутствует в single-file бандле (виновник — контекст запуска, а не состав бандла).
+- **Окно «Удаление старых версий платформы»: порядок кнопок приведён к конвенции
+  (issue #98, повторный репорт ArtyoZ).** В
+  [`PlatformOldVersionsWindow.xaml`](Workspace1C/Views/PlatformOldVersionsWindow.xaml) и
+  [`PlatformOldVersionsWindow.Avalonia.cs`](Workspace1C/Views/PlatformOldVersionsWindow.Avalonia.cs)
+  кнопка «Удалить» перенесена влево, «Отмена» — вправо (последней), как во всех остальных
+  окнах; ранее здесь оставался единственный пропуск аудита v1.0.1.22. Окно выбора
+  дистрибутива ([`PlatformDistributionPickerWindow`](Workspace1C/Views/PlatformDistributionPickerWindow.xaml))
+  уже исправлено в v1.0.1.22 (оба варианта, WPF и Avalonia) — в issue запрошено
+  подтверждение версии сборки со скриншота.
+
+### Изменено
+
+- **Массовые операции по списку баз: переименования, пункт в «Для выделенных»,
+  раскладка и поиск (issue #92, комментарий 7OH).**
+  - Пункты «Утилиты» переименованы: «Массовая выгрузка в .dt» → **«Массовая выгрузка
+    в DT/CF»**, «Загрузка конфигурации из .cf по списку баз» → **«Массовая загрузка
+    из CF»** ([`ru.json`](Workspace1C/Localization/Languages/ru.json),
+    [`en.json`](Workspace1C/Localization/Languages/en.json)).
+  - В подменю «Для выделенных (N)…» добавлен пункт **«Загрузить из CF…»** (WPF:
+    [`MainWindow.ContextMenu.cs`](Workspace1C/Views/MainWindow.ContextMenu.cs),
+    [`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs); Avalonia:
+    [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs);
+    VM: `ExecuteBatchLoadCfForSelected` в
+    [`MainViewModel.Tools.cs`](Workspace1C/ViewModels/MainViewModel.Tools.cs) и
+    [`MainViewModel.Avalonia.Tools.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.Tools.cs)).
+  - Оба окна массовых операций переверстаны на обеих платформах: список баз с
+    галочками — слева, на всю высоту формы; параметры операции (путь, шаблон,
+    «Перед операцией») — справа; журнал, сводка и кнопки — снизу
+    ([`BatchOperationsWindow.xaml`](Workspace1C/Views/BatchOperationsWindow.xaml),
+    [`BatchOperationsWindow.Avalonia.cs`](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs)).
+  - Над списком добавлен поиск-фильтр: подстрока имени базы без учёта регистра,
+    «Выделить все/Снять все» действует по видимым (найденным) строкам, выбор галочек
+    при фильтрации сохраняется (чистая функция `MatchesFilter` в
+    [`BatchOperationsViewModel`](Workspace1C/ViewModels/BatchOperationsViewModel.cs)).
+
+- **Видимость значков запуска на выделенной строке (issue #101, Вариант 1 —
+  подложка-бейдж).** Значки «Предприятие» (Play) и «Конфигуратор» (ключ) у имени базы
+  получили контрастную подложку — круглый чип цвета карточки с тонкой обводкой
+  (Avalonia: [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs);
+  WPF: [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml)). Раньше синяя иконка
+  исчезала на синем акценте выделения, янтарная — плохо читалась на зелёном; теперь
+  значки различимы на любом акценте, семантика цветов и перекраска по статусу
+  отклика процесса (issue #310) сохранены. Альтернативные варианты (динамический цвет
+  глифа, обводка/тень) предложены в issue #101 с мокапами.
+
 ## [1.0.1.23] — 2026-11-02
 
 ### Исправлено

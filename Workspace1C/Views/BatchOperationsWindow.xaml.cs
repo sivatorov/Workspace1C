@@ -65,7 +65,9 @@ namespace Workspace1C
             PrepareHint.Text = LocalizationManager.T("BatchOps.Prepare.Hint");
 
             UpdateKindDependentUi();
-            ItemsList.ItemsSource = _vm.Items;
+            // issue #92 (v1.0.1.24): список показывает строки ПОД ФИЛЬТРОМ поиска;
+            // прогон и выбор идут по полному списку Items в ViewModel.
+            ItemsList.ItemsSource = _vm.FilteredItems;
             LogList.ItemsSource = _vm.LogLines;
             _vm.PropertyChanged += OnVmPropertyChanged;
             ((INotifyCollectionChanged)_vm.LogLines).CollectionChanged += OnLogLinesChanged;

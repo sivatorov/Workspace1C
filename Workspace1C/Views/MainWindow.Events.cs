@@ -1168,6 +1168,15 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
+        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам (issue #92, v1.0.1.24).</summary>
+        private void OnBatchLoadCf_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+                return;
+            _viewModel.ExecuteBatchLoadCfForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
         /// <summary>Проверить доступность баз мультивыделения.</summary>
         private void OnBatchCheckAvailability_Click(object sender, RoutedEventArgs e)
         {

@@ -734,6 +734,67 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
+        /// Путь к журналу перезапущенного приложения (issue #89, v1.0.1.24): помощник
+        /// перенаправляет в него stdout/stderr нового процесса, чтобы сбой старта
+        /// (например, FileNotFoundException при загрузке сборки) не терялся вместе с
+        /// каналом закрывшегося родителя. Журнал никогда не удаляется помощником —
+        /// перезапущенное приложение пишет в него после его выхода; подрезается по
+        /// тому же порогу, что и журнал помощника.
+        /// </summary>
+        private static string EnsureRestartLogPath()
+        {
+            const long maxLogBytes = 512 * 1024;
+            var dir = Workspace1C.Services.PlatformPaths.AppDataDirectory;
+
+            try
+            {
+                Directory.CreateDirectory(dir);
+                var path = Path.Combine(dir, "update-restart.log");
+                var info = new FileInfo(path);
+                if (info.Exists && info.Length > maxLogBytes)
+                    TryDelete(path);
+
+                return path;
+            }
+            catch
+            {
+                // Каталог данных недоступен: вывод перезапуска уйдёт в никуда,
+                // но обновление важнее наблюдаемости.
+                return "/dev/null";
+            }
+        }
+
+        /// <summary>
+        /// Удаляет бэкап прежнего бинаря (<exe>.cm-update-backup), созданный
+        /// помощником обновления перед заменой (issue #89, v1.0.1.24). Вызывается при
+        /// успешном старте приложения: раз приложение запустилось и работает, рабочая
+        /// версия подтверждена и откат не нужен. Если обновление завершилось откатом,
+        /// бэкап уже восстановлен на место и файл отсутствует — удаление ничего не делает.
+        /// </summary>
+        internal static void CleanupUpdateBackup()
+        {
+            try
+            {
+                var current = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(current))
+                    return;
+
+                var backup = UpdateRestartScriptBuilder.GetBackupPath(current);
+                if (File.Exists(backup))
+                {
+                    File.Delete(backup);
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        "Обновление: бэкап прежнего бинаря удалён после успешного старта.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Info(TraceFlags.UpdatesFlag,
+                    $"Обновление: удаление бэкапа не удалось — {ex.GetType().Name}: {ex.Message}.");
+            }
+        }
+
+        /// <summary>
         /// Записывает текст сценария-помощника, приводя переводы строк к виду, который
         /// понимает <c>bash</c>. Текст сценария лежит в исходнике буквальной строкой,
         /// поэтому переводы строк попадают в него прямо из файла исходного кода: если
@@ -1052,15 +1113,18 @@ namespace Workspace1C.Services
         /// Применяет обновление режимом «Перезапустить сейчас». Возвращает true при успехе.
         /// </summary>
         /// <remarks>
-        /// Основной путь (issue #89): прямая замена из работающего процесса. На Linux
-        /// переименование поверх исполняемого файла работающего процесса разрешено
-        /// (ETXTBSY запрещает только запись в открытый файл, но не rename), поэтому
-        /// внешний bash-помощник не нужен вовсе: копия кладётся рядом с целью, ей
-        /// выставляется признак исполняемого, затем файл атомарно переименовывается
-        /// на место рабочего. Новый процесс запускается ещё до выхода текущего —
-        /// исключается целый класс сбоев «помощник не стартовал / bash недоступен /
-        /// сценарий упал молча», которые у пользователя выглядели как «Не удалось
-        /// установить обновление», а в temp оставался только .etag.
+        /// Основной путь (issue #89, v1.0.1.24): bash-помощник, который дожидается выхода
+        /// текущего процесса и только потом заменяет бинарник и запускает новый. Регресс
+        /// v1.0.1.23 (репорт 7OH) показал, что запуск нового процесса из живого старого
+        /// ломается: новый экземпляр натыкается на файловый лок одиночного запуска
+        /// (<see cref="App.SingleInstanceActive"/>) и/или наследует изменённое окружение
+        /// (LD_LIBRARY_PATH/DOTNET_*) и падает на старте, а его вывод теряется вместе с
+        /// каналом закрывшегося родителя («FileNotFoundException: System.IO.Pipes»).
+        /// Помощник (см. <see cref="UpdateRestartScriptBuilder"/>) делает всё ПОСЛЕ выхода:
+        /// бэкап прежнего бинаря → замена → перезапуск с чистым окружением и выводом в
+        /// журнал → liveness-проверка 10 с → автооткат при падении.
+        /// Прямая замена из работающего процесса (TryInstallDirect + StartDetached)
+        /// оставлена запасным путём — на случай, когда помощника запустить не удалось.
         /// </remarks>
         internal bool ApplyRestartNow(string target, string newBinary)
         {
@@ -1068,7 +1132,21 @@ namespace Workspace1C.Services
                 $"Установка обновления: target={target}; new={newBinary} " +
                 $"({SafeFileLength(newBinary)} байт); pid={Environment.ProcessId}.");
 
-            // Прямая замена из работающего процесса — без помощника и без ожидания выхода.
+            // Основной путь: помощник после выхода приложения.
+            var script = CreateUpdaterScript(target, newBinary, Environment.ProcessId, restart: true);
+            var launched = LaunchUpdater(script);
+            Log.Info(TraceFlags.UpdatesFlag, launched
+                ? $"Установка обновления: помощник запущен ({script}), замена и перезапуск — после выхода приложения."
+                : $"Установка обновления: помощник запустить не удалось ({script}).");
+            if (launched)
+                return true;
+
+            // Запасной путь (issue #89, v1.0.1.24): прямая замена из работающего процесса —
+            // только если помощника запустить не удалось (bash недоступен и т.п.). Новый
+            // процесс запускается с очищенным окружением; вывод не перехватывается —
+            // это сознательная цена запасного пути.
+            Log.Info(TraceFlags.UpdatesFlag,
+                "Установка обновления: помощник недоступен — пробую прямую замену из работающего процесса.");
             if (TryInstallDirect(target, newBinary))
             {
                 TryDelete(newBinary);
@@ -1089,16 +1167,9 @@ namespace Workspace1C.Services
                 return true;
             }
 
-            // Запасной путь: прежний bash-помощник (замена после выхода приложения) —
-            // на случай файловых систем/условий, где прямая замена невозможна.
             Log.Info(TraceFlags.UpdatesFlag,
-                "Установка обновления: прямая замена не удалась — перехожу к помощнику-сценарию.");
-            var script = CreateUpdaterScript(target, newBinary, Environment.ProcessId, restart: true);
-            var launched = LaunchUpdater(script);
-            Log.Info(TraceFlags.UpdatesFlag, launched
-                ? $"Установка обновления: помощник запущен ({script}), ожидание выхода приложения."
-                : $"Установка обновления: помощник запустить не удалось ({script}).");
-            return launched;
+                "Установка обновления: ни помощник, ни прямая замена не сработали.");
+            return false;
         }
 
         /// <summary>
@@ -1116,6 +1187,23 @@ namespace Workspace1C.Services
                     Log.Info(TraceFlags.UpdatesFlag,
                         $"Установка обновления: каталог «{dir}» недоступен на запись — прямая замена невозможна.");
                     return false;
+                }
+
+                // Бэкап прежнего бинаря до замены (issue #89, v1.0.1.24): если
+                // перезапущенный процесс упадёт, пользователь сможет восстановить
+                // рабочую версию; при успешном старте новый процесс удалит бэкап
+                // сам (UpdateService.CleanupUpdateBackup).
+                try
+                {
+                    var backup = UpdateRestartScriptBuilder.GetBackupPath(target);
+                    File.Copy(target, backup, overwrite: true);
+                    Log.Info(TraceFlags.UpdatesFlag, $"Установка обновления: бэкап прежнего бинаря — {backup}.");
+                }
+                catch (Exception backupEx)
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Установка обновления: бэкап не создан ({backupEx.GetType().Name}: " +
+                        $"{backupEx.Message}) — автооткат будет невозможен.");
                 }
 
                 var staged = Path.Combine(dir, $".cm-update-staged-{Guid.NewGuid():N}");
@@ -1173,6 +1261,21 @@ namespace Workspace1C.Services
                     CreateNoWindow = true,
                     WorkingDirectory = Path.GetDirectoryName(target) ?? string.Empty
                 };
+
+                // Чистое окружение (issue #89, v1.0.1.24): тот же набор, что и в
+                // помощнике — DOTNET_*/COREHOST_*/LD_* убираются, маркер CM_UPDATE_CHILD
+                // разрешает новому процессу удалить бэкап после успешного старта.
+                foreach (var name in new List<string>(psi.Environment.Keys))
+                {
+                    if (name.StartsWith("DOTNET_", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("COREHOST_", StringComparison.OrdinalIgnoreCase) ||
+                        name is "LD_LIBRARY_PATH" or "LD_PRELOAD" or "LD_AUDIT")
+                    {
+                        psi.Environment.Remove(name);
+                    }
+                }
+                psi.Environment["CM_UPDATE_CHILD"] = "1";
+
                 return Process.Start(psi) is not null;
             }
             catch (Exception ex)
@@ -1346,109 +1449,17 @@ namespace Workspace1C.Services
         /// </summary>
         private static string CreateUpdaterScript(string target, string newBinary, int currentPid, bool restart)
         {
-            var logPath = EnsureUpdaterLogPath();
             var scriptPath = Path.Combine(
                 EnsureUpdateDirectory(), $"apply-update-{Guid.NewGuid():N}.sh");
 
-            // Пустое тело if недопустимо в bash, поэтому в режиме «после закрытия»
-            // подставляется команда-заглушка, а не один комментарий.
-            var relaunchBlock = restart
-                ? "nohup \"$TARGET\" >/dev/null 2>&1 &"
-                : ": # Перезапуск не требуется, обновление применится при следующем закрытии.";
-
-            // Предел ожидания задаётся только режиму «перезапустить сейчас»: там
-            // пользователь ждёт приложение обратно. В режиме «после закрытия» помощник
-            // ждёт столько, сколько работает приложение.
-            var waitCondition = restart
-                ? "kill -0 \"$PID_TARGET\" 2>/dev/null && [ $i -lt 300 ]"
-                : "kill -0 \"$PID_TARGET\" 2>/dev/null";
-
-            var script = $@"#!/usr/bin/env bash
-set -u
-TARGET='{Bq(target)}'
-NEW='{Bq(newBinary)}'
-STAGED=""$TARGET.cm-update-$$""
-PID_TARGET={currentPid}
-RESTART={(restart ? 1 : 0)}
-LOG='{Bq(logPath)}'
-
-# Весь вывод уходит в журнал: приложение к этому моменту закрыто, его каналы
-# закрыты вместе с ним, и без журнала неудачная замена не оставляет следов.
-# Если журнал открыть не удалось, вывод уводится в никуда, и это обязательно:
-# унаследованные потоки ведут в трубу закрывшегося приложения, и первая же
-# запись в неё убила бы помощника сигналом PIPE до замены файла.
-if ! exec >>""$LOG"" 2>&1; then
-  exec >/dev/null 2>&1
-else
-  # Права журнала не должны зависеть от umask сборки: в нём пути пользователя.
-  chmod 600 ""$LOG"" 2>/dev/null || true
-fi
-
-log() {{ echo ""[$(date '+%Y-%m-%d %H:%M:%S')] $*""; }}
-
-log ""=== помощник обновления, pid $$, режим RESTART=$RESTART""
-log ""цель: $TARGET""
-log ""новый файл: $NEW, размер $(stat -c%s ""$NEW"" 2>/dev/null || echo '?') байт""
-FREE_KB=$(df -Pk ""$(dirname ""$TARGET"")"" 2>/dev/null | awk 'NR==2 {{print $4}}')
-log ""свободно в каталоге цели: ${{FREE_KB:-?}} КБ""
-
-# Ожидание завершения основного процесса, чтобы не было гонки при замене файла.
-i=0
-while {waitCondition}; do
-  sleep 1
-  i=$((i+1))
-done
-if kill -0 ""$PID_TARGET"" 2>/dev/null; then
-  log ""предупреждение: процесс $PID_TARGET всё ещё работает после $i с, продолжаем замену""
-else
-  log ""процесс $PID_TARGET завершился, ожидание заняло $i с""
-fi
-sleep 1
-
-# Замена в два шага: сначала копия рядом с целью, затем атомарное переименование.
-# Так недокачанный или недокопированный файл никогда не окажется на месте рабочего.
-if ! cp -f ""$NEW"" ""$STAGED""; then
-  log ""ошибка: не удалось скопировать новый файл в $STAGED""
-  rm -f ""$STAGED""
-  exit 1
-fi
-if ! chmod +x ""$STAGED""; then
-  log ""ошибка: не удалось выставить признак исполняемого для $STAGED""
-  rm -f ""$STAGED""
-  exit 1
-fi
-if ! mv -f ""$STAGED"" ""$TARGET""; then
-  log ""ошибка: не удалось переименовать $STAGED в $TARGET""
-  rm -f ""$STAGED""
-  exit 1
-fi
-log ""замена файла выполнена""
-
-# Перезапуск приложения (только по явному запросу пользователя).
-if [ ""$RESTART"" = ""1"" ]; then
-  {relaunchBlock}
-  NEW_PID=$!
-  sleep 1
-  if kill -0 ""$NEW_PID"" 2>/dev/null; then
-    log ""перезапуск: процесс $NEW_PID работает""
-  else
-    wait ""$NEW_PID""
-    log ""ошибка: перезапущенный процесс завершился с кодом $?""
-  fi
-fi
-
-# Убираем временный бинарник, сам скрипт и опустевший каталог обновления.
-WORK_DIR=""$(dirname ""$0"")""
-rm -f ""$NEW""
-log ""=== помощник закончил работу""
-rm -f ""$0""
-# Запасной журнал лежит в рабочем каталоге и после успеха не нужен: иначе
-# каталог не удаляется и копится по одному на каждое обновление.
-case ""$LOG"" in
-  ""$WORK_DIR""/*) rm -f ""$LOG"" ;;
-esac
-rmdir ""$WORK_DIR"" 2>/dev/null || true
-";
+            // Тело сценария строит чистый класс UpdateRestartScriptBuilder (issue #89,
+            // v1.0.1.24): ожидание выхода приложения, бэкап прежнего бинаря, замена,
+            // перезапуск с чистым окружением, выводом в журнал перезапуска и автооткатом.
+            // Журнал перезапуска отдельный: в него пишет ПЕРЕЗАПУЩЕННОЕ приложение ещё
+            // долго после выхода помощника, поэтому удалять его помощнику нельзя.
+            var script = UpdateRestartScriptBuilder.Build(
+                target, newBinary, currentPid, restart,
+                EnsureUpdaterLogPath(), EnsureRestartLogPath());
 
             Directory.CreateDirectory(Path.GetDirectoryName(scriptPath)!);
             WriteShellScript(scriptPath, script);

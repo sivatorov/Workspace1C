@@ -54,10 +54,12 @@ namespace Workspace1C
             string? timestampFormat = null,
             Func<Infobase, System.Threading.CancellationToken, Task<DbmsBackupProfile?>>? dbmsProfileResolver = null)
         {
-            Width = 700;
+            // Ширина под двухколоночную раскладку (issue #92, v1.0.1.24): список слева,
+            // параметры справа.
+            Width = 860;
             Height = 620;
-            MinWidth = 580;
-            MinHeight = 460;
+            MinWidth = 720;
+            MinHeight = 480;
             FontSize = 13;
             CanResize = true;
             DataContext = _vm = new BatchOperationsViewModel(infobases, kind);
@@ -91,7 +93,20 @@ namespace Workspace1C
                 Opacity = 0.75
             };
 
-            _itemsList.ItemsSource = _vm.Items;
+            // Поиск-фильтр над списком баз (issue #92, v1.0.1.24): подстрока имени
+            // без учёта регистра; фильтр влияет только на видимость, выбор сохраняется.
+            var searchBox = new TextBox
+            {
+                Watermark = LocalizationManager.T("BatchOps.SearchHint")
+            }.Styled(ControlThemes.ModernTextBox);
+            ThemeBrushes.Bind(searchBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(searchBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
+            searchBox.Bind(TextBox.TextProperty,
+                new Avalonia.Data.Binding("SearchText") { Mode = Avalonia.Data.BindingMode.TwoWay });
+
+            // issue #92 (v1.0.1.24): список показывает строки ПОД ФИЛЬТРОМ поиска;
+            // прогон и выбор идут по полному списку Items в ViewModel.
+            _itemsList.ItemsSource = _vm.FilteredItems;
             _itemsList.ItemTemplate = new FuncDataTemplate<BatchOperationsItem>((_, _) => BuildRow());
 
             // «Выделить все / Снять все».
@@ -304,6 +319,47 @@ namespace Workspace1C
                 Children = { _stopButton, closeButton, _runButton }
             };
 
+            // Раскладка issue #92 (v1.0.1.24, пожелание 7OH): список баз с поиском и
+            // кнопками «Выделить все/Снять все» — слева, на всю высоту формы; параметры
+            // операции (путь/шаблон/«Перед операцией») — справа; журнал, сводка и
+            // кнопки — общие снизу на всю ширину.
+            var leftColumn = new Grid
+            {
+                RowDefinitions =
+                {
+                    new RowDefinition(GridLength.Auto),
+                    new RowDefinition(GridLength.Auto),
+                    new RowDefinition(GridLength.Star)
+                }
+            };
+            Grid.SetRow(searchBox, 0);
+            leftColumn.Children.Add(searchBox);
+            bulk.Margin = new Thickness(0, 8, 0, 6);
+            Grid.SetRow(bulk, 1);
+            leftColumn.Children.Add(bulk);
+            Grid.SetRow(_itemsList, 2);
+            leftColumn.Children.Add(_itemsList);
+
+            var rightScroll = new ScrollViewer
+            {
+                Content = pathStack,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+
+            var columns = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(2, GridUnitType.Star)),
+                    new ColumnDefinition(new GridLength(1, GridUnitType.Star))
+                }
+            };
+            Grid.SetColumn(leftColumn, 0);
+            columns.Children.Add(leftColumn);
+            Grid.SetColumn(rightScroll, 1);
+            columns.Children.Add(rightScroll);
+
             var grid = new Grid
             {
                 Margin = new Thickness(16),
@@ -312,21 +368,23 @@ namespace Workspace1C
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Star),
                     new RowDefinition(GridLength.Auto),
-                    new RowDefinition(GridLength.Auto),
-                    new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Star),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto)
                 }
             };
             Place(grid, _hint, 0);
-            Place(grid, _itemsList, 1);
-            Place(grid, bulk, 2);
-            Place(grid, pathStack, 3);
-            Place(grid, logHeader, 4);
-            Place(grid, _logList, 5);
-            Place(grid, _summary, 6);
-            Place(grid, buttons, 7);
+            Grid.SetColumnSpan(_hint, 2);
+            Place(grid, columns, 1);
+            Grid.SetColumnSpan(columns, 2);
+            Place(grid, logHeader, 2);
+            Grid.SetColumnSpan(logHeader, 2);
+            Place(grid, _logList, 3);
+            Grid.SetColumnSpan(_logList, 2);
+            Place(grid, _summary, 4);
+            Grid.SetColumnSpan(_summary, 2);
+            Place(grid, buttons, 5);
+            Grid.SetColumnSpan(buttons, 2);
             Content = grid;
 
             UpdateKindDependentUi();

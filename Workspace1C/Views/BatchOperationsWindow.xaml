@@ -3,11 +3,15 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="620" Width="700" MinHeight="460" MinWidth="580"
+        Height="620" Width="860" MinHeight="480" MinWidth="720"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
 
+    <!-- Раскладка issue #92 (v1.0.1.24, пожелание 7OH): список баз с поиском и
+         кнопками «Выделить все/Снять все» — слева, на всю высоту формы; параметры
+         операции (путь/шаблон/«Перед операцией») — справа; журнал, сводка и кнопки —
+         общие снизу на всю ширину. -->
     <Window.Resources>
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -23,108 +27,135 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock x:Name="HintText" Grid.Row="0" Margin="0,0,0,10"
+        <TextBlock x:Name="HintText" Grid.Row="0" Grid.ColumnSpan="2" Margin="0,0,0,10"
                    TextWrapping="Wrap"
                    Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-        <!-- Список баз с флажками -->
-        <ListBox x:Name="ItemsList" Grid.Row="1"
-                 BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
-                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}"
-                              IsEnabled="{Binding IsSelectable}"
-                              Margin="2,3" Cursor="Hand">
-                        <StackPanel Orientation="Vertical">
-                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding Subtitle}" FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis"/>
-                            <TextBlock Text="{Binding StatusText}" FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}"
-                                       TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                    </CheckBox>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+        <!-- Две колонки: слева поиск + список баз, справа параметры операции. -->
+        <Grid Grid.Row="1" Grid.ColumnSpan="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="1*"/>
+            </Grid.ColumnDefinitions>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
-            <Button Content="{loc:Loc Selection.SelectAll}" Style="{StaticResource ModernButton}"
-                    Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
-                    Click="OnSelectAll_Click"/>
-            <Button Content="{loc:Loc Selection.None}" Style="{StaticResource ModernButton}"
-                    Background="{DynamicResource ItemHoverBrush}" Padding="12,5"
-                    Click="OnSelectNone_Click"/>
-        </StackPanel>
+            <!-- Левая колонка: поиск, «Выделить все/Снять все» и список на всю высоту. -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <!-- Путь: каталог выгрузки .dt/.cf или файл конфигурации .cf.
-             Ниже — опции массовой выгрузки (issue #92): шаблон имени файла
-             с токенами {Имя} и {Дата} и переключатель формата DT/CF. -->
-        <StackPanel Grid.Row="3" Margin="0,10,0,0">
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="PathLabel" Grid.Column="0" VerticalAlignment="Center"
-                           Margin="0,0,8,0"/>
-                <TextBox x:Name="PathBox" Grid.Column="1" VerticalContentAlignment="Center"
-                         Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}"/>
-                <Button x:Name="BrowseButton" Grid.Column="2" Content="…" Width="34" Margin="6,0,0,0"
-                        Style="{StaticResource ModernButton}"
-                        Background="{DynamicResource ItemHoverBrush}"
-                        Click="OnBrowse_Click"/>
-            </Grid>
-            <StackPanel x:Name="DumpOptionsPanel" Orientation="Horizontal" Margin="0,8,0,0"
-                        Visibility="Collapsed">
-                <TextBlock x:Name="TemplateLabel" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <TextBox x:Name="TemplateBox" Width="260" VerticalContentAlignment="Center"
-                         Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
-                         ToolTip="{loc:Loc BatchOps.TemplateHint}"/>
-                <RadioButton x:Name="KindDtRadio" GroupName="BatchDumpKind" Margin="16,0,0,0"
-                             VerticalAlignment="Center" Checked="OnKindDt_Checked"/>
-                <RadioButton x:Name="KindCfRadio" GroupName="BatchDumpKind" Margin="12,0,0,0"
-                             VerticalAlignment="Center" Checked="OnKindCf_Checked"/>
-            </StackPanel>
+                <!-- Поиск-фильтр над списком баз (issue #92, v1.0.1.24): подстрока имени
+                     без учёта регистра; фильтр влияет только на видимость строк.
+                     Style SearchTextBox — поле с лупой и подсказкой (Main.SearchPlaceholder). -->
+                <TextBox x:Name="SearchBox" Grid.Row="0"
+                         Style="{StaticResource SearchTextBox}"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
 
-            <!-- Блок «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
-                 завершение сеансов и блокировки сеансов/регламентных заданий перед
-                 выгрузкой/загрузкой; после операции блокировки снимаются автоматически. -->
-            <StackPanel x:Name="PreparePanel" Margin="0,10,0,0">
-                <TextBlock x:Name="PrepareHeader" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                <CheckBox x:Name="PrepareTerminateCheck" Margin="0,1"
-                          IsChecked="{Binding PrepareTerminateSessions, UpdateSourceTrigger=PropertyChanged}"/>
-                <StackPanel Orientation="Horizontal" Margin="0,1">
-                    <CheckBox x:Name="PrepareDenySessionsCheck" VerticalAlignment="Center"
-                              IsChecked="{Binding PrepareDenyNewSessions, UpdateSourceTrigger=PropertyChanged}"/>
-                    <TextBlock x:Name="PreparePermissionLabel" VerticalAlignment="Center" Margin="16,0,6,0"/>
-                    <TextBox x:Name="PreparePermissionBox" Width="140" VerticalContentAlignment="Center"
-                             Text="{Binding PreparePermissionCode, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="{loc:Loc BatchOps.Prepare.PermissionCodeHint}"/>
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,6">
+                    <Button Content="{loc:Loc Selection.SelectAll}" Style="{StaticResource ModernButton}"
+                            Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
+                            Click="OnSelectAll_Click"/>
+                    <Button Content="{loc:Loc Selection.None}" Style="{StaticResource ModernButton}"
+                            Background="{DynamicResource ItemHoverBrush}" Padding="12,5"
+                            Click="OnSelectNone_Click"/>
                 </StackPanel>
-                <CheckBox x:Name="PrepareDenyJobsCheck" Margin="0,1"
-                          IsChecked="{Binding PrepareDenyScheduledJobs, UpdateSourceTrigger=PropertyChanged}"/>
-                <TextBlock x:Name="PrepareHint" FontSize="11" TextWrapping="Wrap"
-                           Foreground="{DynamicResource TextSecondaryBrush}"/>
-            </StackPanel>
-        </StackPanel>
 
-        <TextBlock x:Name="LogHeader" Grid.Row="4" Margin="0,14,0,6" FontWeight="SemiBold"
+                <!-- Список баз с флажками -->
+                <ListBox x:Name="ItemsList" Grid.Row="2"
+                         BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsChecked, UpdateSourceTrigger=PropertyChanged}"
+                                      IsEnabled="{Binding IsSelectable}"
+                                      Margin="2,3" Cursor="Hand">
+                                <StackPanel Orientation="Vertical">
+                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding Subtitle}" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Text="{Binding StatusText}" FontSize="11"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </CheckBox>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+
+            <!-- Правая колонка: путь, опции выгрузки и блок «Перед операцией». -->
+            <ScrollViewer Grid.Column="1" Margin="12,0,0,0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <!-- Путь: каталог выгрузки .dt/.cf или файл конфигурации .cf.
+                         Ниже — опции массовой выгрузки (issue #92): шаблон имени файла
+                         с токенами {Имя} и {Дата} и переключатель формата DT/CF. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="PathLabel" Grid.Column="0" VerticalAlignment="Center"
+                                   Margin="0,0,8,0"/>
+                        <TextBox x:Name="PathBox" Grid.Column="1" VerticalContentAlignment="Center"
+                                 Text="{Binding PathText, UpdateSourceTrigger=PropertyChanged}"/>
+                        <Button x:Name="BrowseButton" Grid.Column="2" Content="…" Width="34" Margin="6,0,0,0"
+                                Style="{StaticResource ModernButton}"
+                                Background="{DynamicResource ItemHoverBrush}"
+                                Click="OnBrowse_Click"/>
+                    </Grid>
+                    <StackPanel x:Name="DumpOptionsPanel" Orientation="Horizontal" Margin="0,8,0,0"
+                                Visibility="Collapsed">
+                        <TextBlock x:Name="TemplateLabel" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBox x:Name="TemplateBox" Width="240" VerticalContentAlignment="Center"
+                                 Text="{Binding Template, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="{loc:Loc BatchOps.TemplateHint}"/>
+                        <RadioButton x:Name="KindDtRadio" GroupName="BatchDumpKind" Margin="16,0,0,0"
+                                     VerticalAlignment="Center" Checked="OnKindDt_Checked"/>
+                        <RadioButton x:Name="KindCfRadio" GroupName="BatchDumpKind" Margin="12,0,0,0"
+                                     VerticalAlignment="Center" Checked="OnKindCf_Checked"/>
+                    </StackPanel>
+
+                    <!-- Блок «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
+                         завершение сеансов и блокировки сеансов/регламентных заданий перед
+                         выгрузкой/загрузкой; после операции блокировки снимаются автоматически. -->
+                    <StackPanel x:Name="PreparePanel" Margin="0,10,0,0">
+                        <TextBlock x:Name="PrepareHeader" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                        <CheckBox x:Name="PrepareTerminateCheck" Margin="0,1"
+                                  IsChecked="{Binding PrepareTerminateSessions, UpdateSourceTrigger=PropertyChanged}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,1">
+                            <CheckBox x:Name="PrepareDenySessionsCheck" VerticalAlignment="Center"
+                                      IsChecked="{Binding PrepareDenyNewSessions, UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock x:Name="PreparePermissionLabel" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                            <TextBox x:Name="PreparePermissionBox" Width="140" VerticalContentAlignment="Center"
+                                     Text="{Binding PreparePermissionCode, UpdateSourceTrigger=PropertyChanged}"
+                                     ToolTip="{loc:Loc BatchOps.Prepare.PermissionCodeHint}"/>
+                        </StackPanel>
+                        <CheckBox x:Name="PrepareDenyJobsCheck" Margin="0,1"
+                                  IsChecked="{Binding PrepareDenyScheduledJobs, UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBlock x:Name="PrepareHint" FontSize="11" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <TextBlock x:Name="LogHeader" Grid.Row="2" Grid.ColumnSpan="2" Margin="0,14,0,6" FontWeight="SemiBold"
                    Text="{loc:Loc BatchOps.Log}"/>
 
         <!-- Построчный лог прогона -->
-        <ListBox x:Name="LogList" Grid.Row="5"
+        <ListBox x:Name="LogList" Grid.Row="3" Grid.ColumnSpan="2"
                  BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
                  IsHitTestVisible="False"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
@@ -138,10 +169,10 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <TextBlock x:Name="SummaryText" Grid.Row="6" Margin="0,10,0,0" FontWeight="SemiBold"
+        <TextBlock x:Name="SummaryText" Grid.Row="4" Grid.ColumnSpan="2" Margin="0,10,0,0" FontWeight="SemiBold"
                    TextWrapping="Wrap" Text="{Binding Summary}"/>
 
-        <StackPanel Grid.Row="7" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+        <StackPanel Grid.Row="5" Grid.ColumnSpan="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="StopButton" Width="130" Margin="0,0,8,0" IsEnabled="False"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"

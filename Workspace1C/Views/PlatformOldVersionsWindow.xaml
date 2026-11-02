@@ -57,13 +57,15 @@
         </Border>
 
         <!-- Единый контракт кнопок (issue #26): «Отмена» — вторичная SecondaryButton,
-             удаление старых версий — опасная DangerButton (красная заливка). -->
+             удаление старых версий — опасная DangerButton (красная заливка).
+             Порядок приведён к конвенции проекта (issue #98, v1.0.1.24):
+             главная кнопка слева, «Отмена» — справа (последней). -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button Content="{loc:Loc Common.Cancel}" Style="{StaticResource SecondaryButton}"
-                    IsCancel="True" Padding="14,6" Margin="0,0,8,0"/>
             <Button x:Name="DeleteButton" Content="{loc:Loc PlatformUpdate.OldVersions.Delete}"
                     Style="{StaticResource DangerButton}"
-                    Padding="14,6" Click="OnDelete_Click"/>
+                    Padding="14,6" Margin="0,0,8,0" Click="OnDelete_Click"/>
+            <Button Content="{loc:Loc Common.Cancel}" Style="{StaticResource SecondaryButton}"
+                    IsCancel="True" Padding="14,6"/>
         </StackPanel>
     </Grid>
 </Window>

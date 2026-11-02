@@ -974,8 +974,9 @@
     "DetectConfigs.CloseConfirm": "There are still unprocessed bases. Close the window?",
 
     "BatchOps.Title": "Batch operations over a list of bases",
-    "BatchOps.DumpDtTitle": "Bulk dump bases to .dt",
-    "BatchOps.LoadCfTitle": "Load configuration from .cf over a list of bases",
+    "BatchOps.SearchHint": "Search bases…",
+    "BatchOps.DumpDtTitle": "Bulk dump to DT/CF",
+    "BatchOps.LoadCfTitle": "Bulk load from CF",
     "BatchOps.TitleDumpDt": "Bulk dump of the base list to .dt files",
     "BatchOps.TitleDumpCf": "Bulk dump of base configurations to .cf files",
     "BatchOps.TitleLoadCf": "Load configuration from .cf over a list of bases",
@@ -1031,6 +1032,7 @@
     "BatchOps.KindLoadCf": "configuration load from .cf",
 
     "Main.BatchDumpDtCf": "Dump to DT\\CF…",
+    "Main.BatchLoadCf": "Load from CF…",
     "BatchOps.StartedFormat": "Batch operation started: \"{1}\". Bases selected: {0}.",
     "BatchOps.SkipRunning": "skipped — the base is running",
     "BatchOps.Cancelled": "operation stopped by the user",

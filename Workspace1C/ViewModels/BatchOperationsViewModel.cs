@@ -250,10 +250,58 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             if (ib is not null)
                 Items.Add(new BatchOperationsItem(ib));
         }
+        ApplyFilter();
     }
 
     /// <summary>Строки списка (все базы; заведомо неподдерживаемые отсеиваются при запуске).</summary>
     public ObservableCollection<BatchOperationsItem> Items { get; } = new();
+
+    /// <summary>
+    /// Строки списка ПОД ФИЛЬТРОМ поиска (issue #92, v1.0.1.24): окно показывает
+    /// именно эту коллекцию; прогон (<see cref="RunAsync"/>) по-прежнему идёт по всем
+    /// отмеченным строкам <see cref="Items"/> независимо от активного фильтра.
+    /// </summary>
+    public ObservableCollection<BatchOperationsItem> FilteredItems { get; } = new();
+
+    private string _searchText = string.Empty;
+
+    /// <summary>Текст поиска по списку баз (issue #92, v1.0.1.24). Пусто — показываются все строки.</summary>
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value ?? string.Empty))
+                ApplyFilter();
+        }
+    }
+
+    /// <summary>
+    /// Пересобирает <see cref="FilteredItems"/> по текущему <see cref="SearchText"/>.
+    /// Выбор галочек НЕ сбрасывается — фильтр влияет только на видимость строк.
+    /// </summary>
+    private void ApplyFilter()
+    {
+        var query = _searchText?.Trim() ?? string.Empty;
+        FilteredItems.Clear();
+        foreach (var item in Items)
+        {
+            if (MatchesFilter(item.Title, query))
+                FilteredItems.Add(item);
+        }
+    }
+
+    /// <summary>
+    /// Чистая функция фильтра строки по поисковому запросу: подстрока в имени базы
+    /// без учёта регистра; пустой/белый запрос матчит всё (issue #92, v1.0.1.24).
+    /// </summary>
+    internal static bool MatchesFilter(string? itemTitle, string? query)
+    {
+        var q = query?.Trim();
+        if (string.IsNullOrEmpty(q))
+            return true;
+        return itemTitle?.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
 
     /// <summary>Строки лога прогона (по одной строке на шаг).</summary>
     public ObservableCollection<string> LogLines { get; } = new();
@@ -306,10 +354,15 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         ? LocalizationManager.T("BatchOps.PathLabelLoadCf")
         : LocalizationManager.T("BatchOps.PathLabelDumpDt");
 
-    /// <summary>Отметить/снять все строки (занятые операции не трогаются).</summary>
+    /// <summary>
+    /// Отметить/снять все ВИДИМЫЕ строки (занятые операции не трогаются). С активным
+    /// поиском (issue #92, v1.0.1.24) «Выделить все» относится к строкам под фильтром —
+    /// так пользователь массово отмечает именно найденные базы; с пустым фильтром
+    /// поведение прежнее (все строки).
+    /// </summary>
     public void SetAll(bool value)
     {
-        foreach (var item in Items)
+        foreach (var item in FilteredItems)
         {
             if (!item.Infobase.IsRunning)
                 item.IsChecked = value;

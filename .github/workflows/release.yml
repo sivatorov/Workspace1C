@@ -109,6 +109,27 @@ jobs:
         working-directory: Workspace1C
         run: ./build-linux-single-file.sh Release
 
+      # Смок-тест (issue #89, v1.0.1.24): бинарь обязан стартовать на чистой Ubuntu.
+      # Ловит до публикации сбой «FileNotFoundException на старте» (например, отсутствия
+      # сборки в single-file бандле) — регресс, который пользователь v1.0.1.23 увидел
+      # только после установки обновления. Запускаем под xvfb на 15 секунд: GUI-приложение,
+      # живой процесс = успешный старт (дальше приложение само закрывается по таймауту).
+      - name: Смок-тест запуска Linux-бинаря
+        run: |
+          chmod +x Workspace1C/dist/linux-x64/Workspace1C
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
+          # 124 = timeout (процесс жил все 15 с — успех); 0 — тоже допустимо (штатный выход).
+          set +e
+          xvfb-run -a timeout 15s ./Workspace1C/dist/linux-x64/Workspace1C
+          CODE=$?
+          set -e
+          if [ "$CODE" = "124" ] || [ "$CODE" = "0" ]; then
+            echo "Смок-тест пройден (код $CODE)"
+          else
+            echo "::error::Linux-бинарь не пережил 15 секунд запуска (код $CODE)"
+            exit 1
+          fi
+
       - name: Подготовка asset'а
         run: |
           mkdir -p dist/release

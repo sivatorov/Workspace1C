@@ -2830,6 +2830,14 @@ public partial class MainViewModel : ViewModelBase
         => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: null);
 
     /// <summary>
+    /// Массовая загрузка конфигурации из .cf по списку ВЫДЕЛЕННЫХ баз (issue #92,
+    /// v1.0.1.24): пункт «Загрузить из CF…» блока «Для выделенных (N)…». Вид операции
+    /// фиксирован (LoadConfig), чтобы сохранённый вид выгрузки не подставлялся.
+    /// </summary>
+    public void ExecuteBatchLoadCfForSelected()
+        => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: BatchOperationKind.LoadConfig);
+
+    /// <summary>
     /// Общая точка открытия окна массовых операций: подтверждение, подстановка
     /// сохранённых каталога/шаблона/вида выгрузки (issue #92) и сохранение их
     /// после закрытия окна.

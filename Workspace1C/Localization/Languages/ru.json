@@ -974,8 +974,9 @@
     "DetectConfigs.CloseConfirm": "Остались необработанные базы. Закрыть окно?",
 
     "BatchOps.Title": "Массовые операции по списку баз",
-    "BatchOps.DumpDtTitle": "Массовая выгрузка в .dt",
-    "BatchOps.LoadCfTitle": "Загрузка конфигурации из .cf по списку баз",
+    "BatchOps.SearchHint": "Поиск по списку баз…",
+    "BatchOps.DumpDtTitle": "Массовая выгрузка в DT/CF",
+    "BatchOps.LoadCfTitle": "Массовая загрузка из CF",
     "BatchOps.TitleDumpDt": "Массовая выгрузка списка баз в файлы .dt",
     "BatchOps.TitleDumpCf": "Массовая выгрузка конфигураций баз в файлы .cf",
     "BatchOps.TitleLoadCf": "Загрузка конфигурации из .cf по списку баз",
@@ -1031,6 +1032,7 @@
     "BatchOps.KindLoadCf": "загрузка конфигурации из .cf",
 
     "Main.BatchDumpDtCf": "Выгрузить в DT\\CF…",
+    "Main.BatchLoadCf": "Загрузить из CF…",
     "BatchOps.StartedFormat": "Запуск массовой операции «{1}». Баз выбрано: {0}.",
     "BatchOps.SkipRunning": "пропущена — база запущена",
     "BatchOps.Cancelled": "операция остановлена пользователем",
