@@ -255,7 +255,7 @@ public sealed class Release100125Tests
         vm.AllowRunningBases = true;
         Assert.False(vm.ShouldSkipRunning(running));
 
-        vm.Kind = BatchOperationKind.LoadCf;
+        vm.Kind = BatchOperationKind.LoadConfig;
         Assert.True(vm.ShouldSkipRunning(running));
     }
 
