@@ -2013,6 +2013,7 @@ namespace Workspace1C
             {
                 case "HotkeyCommandPalette": return _vm?.HotkeyCommandPalette;
                 case "HotkeyActualReleases": return _vm?.HotkeyActualReleases;
+                case "HotkeyCollectDiagnostics": return _vm?.HotkeyCollectDiagnostics;
                 case "HotkeyPlatformUpdate": return _vm?.HotkeyPlatformUpdate;
                 case "HotkeyServerConsole": return _vm?.HotkeyServerConsole;
                 case "HotkeyServices": return _vm?.HotkeyServices;

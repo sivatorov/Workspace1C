@@ -654,6 +654,14 @@ public class AppSettings
     public string HotkeySwitchUser { get; set; } = "";
 
     /// <summary>
+    /// Горячая клавиша «Собрать диагностику» (issue #99, v1.0.1.23): запуск сбора ZIP
+    /// диагностики из главного окна (тот же сбор, что пункт «Утилиты» → «Информация»).
+    /// По умолчанию ПУСТО — не назначена (решение 7OH: «можно не ставить ничего по
+    /// умолчанию»).
+    /// </summary>
+    public string HotkeyCollectDiagnostics { get; set; } = "";
+
+    /// <summary>
     /// Поле сортировки списка баз: Name (по умолчанию), LastLaunchDate, SortOrder.
     /// </summary>
     public string SortField { get; set; } = "Name";

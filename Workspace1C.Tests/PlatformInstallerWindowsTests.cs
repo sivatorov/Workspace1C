@@ -376,6 +376,16 @@ public sealed class PlatformInstallerWindowsTests : IDisposable
         }
     }
 
+    /// <summary>Синхронный IProgress<T>: записи попадают в список немедленно,
+    /// без постинга через SynchronizationContext (Progress<T> под нагрузкой
+    /// полного прогона доставляет коллбэки уже после Assert — гонка).</summary>
+    private sealed class SyncProgress : IProgress<string>
+    {
+        private readonly List<string> _log;
+        public SyncProgress(List<string> log) => _log = log;
+        void IProgress<string>.Report(string value) => _log.Add(value);
+    }
+
     [Fact]
     public async Task InstallFromZipCore_SetupNotFound_LogsArchiveContents()
     {
@@ -386,7 +396,7 @@ public sealed class PlatformInstallerWindowsTests : IDisposable
         try
         {
         var result = await PlatformInstaller.InstallFromZipCoreAsync(
-            zipPath, "8.3.27.2214", null, new Progress<string>(log.Add), CancellationToken.None,
+            zipPath, "8.3.27.2214", null, new SyncProgress(log), CancellationToken.None,
             (zip, dir) =>
             {
                 File.WriteAllText(Path.Combine(dir, "readme.txt"), "stub");

@@ -1,0 +1,44 @@
+Release 1.0.1.23: финал #83 (лицензии ring), #79 (rac в мастере тест-копии), #89 (prerelease-проверка версии), хоткей «Собрать диагностику» (#99)
+
+- issue #83 (финал): вкладка «Лицензии» — кракозябры в ответе ring и пустая
+  таблица устранены. ConsoleOutputDecoder усилен: валидационная эвристика по
+  известным маркерам вывода ring/1С при неоднозначной метрике U+FFFD, при
+  равной метрике предпочитается cp866 (фактическая кодировка консоли 1С в
+  русской локали Windows); перезакодирование mojibake cp1251 → cp866
+  (FixCp1251ToCp866Mojibake) применяется в понятном сообщении вкладки
+  «Лицензии» (RingLicenseService); RingLicenseParser дополнен
+  локале-независимым разбором строки-структуры ring (номер «NNNN…-NNNN…» +
+  файл *.lic) — таблица лицензий заполняется даже при mojibake-заголовке
+  (Services/ConsoleOutputDecoder.cs, Services/RingLicenseService.cs);
+- issue #79: мастер «Развернуть тестовую копию» — pre-валидация больше не
+  блокирует сценарий с доступным rac: если профиля СУБД нет и поля формы не
+  описывают источник, перед ошибкой выполняется лёгкая rac-проба
+  (TestDeployPlanner.ValidateAsync через
+  ClusterInfobaseCredentialsResolver); при доступном кластере rac мастер
+  стартует, шаги пробы журналируются в окно мастера (обе платформы); ошибка
+  TestDeploy.NeedDbmsProfile переписана на конкретику; авто-подстановка «Имя
+  базы данных в СУБД» из имени целевой базы больше не затирает ручной ввод
+  исходной базы (Services/TestDeployPlanner.cs, Services/TestDeployService.cs,
+  Views/TestDeployWindow.cs, Views/TestDeployWindow.Avalonia.cs,
+  ViewModels/TestDeployViewModel.cs);
+- issue #89: prerelease-сборка с пониженной версией снова видит стабильный
+  релиз — csproj задаёт версию четырьмя свойствами, включая явное
+  InformationalVersion, прошлый test-скрипт переопределял только -p:Version;
+  новый _build_v100123_test1.ps1 передаёт пониженную версию всеми четырьмя
+  свойствами (Version/AssemblyVersion/FileVersion/InformationalVersion) и
+  проверяет ProductVersion артефакта — расхождение ловится на этапе сборки;
+- issue #99: настраиваемый хоткей «Собрать диагностику» — новое свойство
+  HotkeyCollectDiagnostics в AppSettings (по умолчанию пусто), строка в
+  настройках (Настройки → Клавиши, обе платформы), хоткей запускает тот же
+  сбор ZIP-диагностики, что пункт «Утилиты» → «Информация», подпись сочетания
+  отображается у пункта меню, сочетание занесено в список системных
+  (Models/AppSettings.cs, Views/MainWindow.Hotkeys.cs,
+  Views/MainWindow.Avalonia.Hotkeys.cs, Views/SettingsWindow.*,
+  Services/UtilitiesMenuCatalog.cs, ViewModels/CustomActionEditViewModel.cs);
+- локализация ru/en (Localization/Languages/ru.json, en.json);
+- тесты: новый Release100123Tests; расширены Issue99DiagnosticsMenuTests,
+  PlatformInstallerWindowsTests (5567/5567 проходят);
+- версия 1.0.1.22 → 1.0.1.23 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md,
+  план plan-issues-79-83-89-99-v100123.md,
+  скрипты сборки _build_v100123.ps1, _build_v100123_test1.ps1.

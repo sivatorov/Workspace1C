@@ -62,7 +62,22 @@ public sealed class TestDeployService
             // Валидация до любых действий (понятные ошибки шага «до старта»).
             var existing = TestDeployPlanner.FindExistingTarget(
                 allInfobases, scenario, TestDeployPlanner.ResolveTargetName(scenario, source.Name));
-            var validation = TestDeployPlanner.Validate(scenario, source, existing);
+
+            // issue #79 (v1.0.1.23): pre-валидация асинхронная, с rac-веткой — если
+            // профиля СУБД нет и поля формы не описывают источник, перед ошибкой
+            // выполняется лёгкая rac-проба (как позже на шаге резолва); шаги пробы
+            // журналируются в окно мастера и в журнал приложения.
+            void PreValidateLog(string message)
+            {
+                log?.Invoke(message);
+                _logger?.Info(message);
+            }
+
+            var validation = await TestDeployPlanner.ValidateAsync(
+                scenario, source, existing,
+                racProfileResolverAsync: (ib, ct) => ResolveRacProfileForValidationAsync(ib, ct, PreValidateLog),
+                log: PreValidateLog,
+                cancellationToken: cancellationToken).ConfigureAwait(false);
             if (validation.Count > 0)
             {
                 result.ErrorMessage = string.Join(
@@ -529,6 +544,21 @@ public sealed class TestDeployService
             User = scenario.DbUser?.Trim() ?? string.Empty,
             Password = scenario.DbPassword ?? string.Empty
         };
+    }
+
+    /// <summary>
+    /// Лёгкая rac-проба для pre-валидации (issue #79, v1.0.1.23): по исходной базе
+    /// резолвит профиль СУБД через <see cref="ClusterInfobaseCredentialsResolver"/>
+    /// (тот же механизм, что на шаге резолва перед «Выгрузкой»). Ошибки не бросаются —
+    /// возвращается null (валидация покажет понятную причину).
+    /// </summary>
+    private static async Task<DbmsBackupProfile?> ResolveRacProfileForValidationAsync(
+        Infobase source, CancellationToken ct, Action<string>? log)
+    {
+        var resolver = ClusterInfobaseCredentialsResolver.CreateDefault(message => log?.Invoke(message));
+        if (resolver is null)
+            return null;
+        return await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
     }
 
     /// <summary>Текст ошибки шага: «Шаг: …» + понятная причина.</summary>

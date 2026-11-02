@@ -727,6 +727,8 @@ public partial class MainViewModel : ViewModelBase
         // Меню закладок (issue #356): настраиваемый хоткей, по умолчанию Ctrl+B.
         s.HotkeyBookmarksMenu = _hotkeyBookmarksMenu;
         s.HotkeySwitchUser = _hotkeySwitchUser;
+        // «Собрать диагностику» (issue #99, v1.0.1.23).
+        s.HotkeyCollectDiagnostics = _hotkeyCollectDiagnostics;
         s.HotkeyCheckUpdate = _hotkeyCheckUpdate;
         s.HotkeyActualReleases = _hotkeyActualReleases;
         s.HotkeyPlatformUpdate = _hotkeyPlatformUpdate;

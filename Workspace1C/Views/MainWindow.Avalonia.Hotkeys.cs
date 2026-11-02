@@ -217,6 +217,17 @@ namespace Workspace1C
                     Command = new ViewModels.RelayCommand(_ => ShowServicesMenu())
                 });
             }
+            // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемый хоткей, по
+            // умолчанию пусто — тот же сбор ZIP, что пункт «Утилиты» → «Информация».
+            if (Controls.HotkeyBox.TryParse(_vm.HotkeyCollectDiagnostics, out var collectDiagnosticsGesture)
+                && collectDiagnosticsGesture is not null)
+            {
+                KeyBindings.Add(new KeyBinding
+                {
+                    Gesture = collectDiagnosticsGesture,
+                    Command = new ViewModels.RelayCommand(_ => _ = OnCollectDiagnosticsMenuClickAsync())
+                });
+            }
             // Сохранение копии экрана (функция №30 StartManager): сочетание настраивается в настройках.
             AddHotkey(_vm.ScreenshotHotkey, _vm.TakeScreenshotCommand);
             // Ctrl+Shift+Plus / Ctrl+Shift+Minus — развернуть/свернуть все узлы дерева.

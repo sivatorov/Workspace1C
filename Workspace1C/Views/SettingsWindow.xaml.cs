@@ -166,6 +166,9 @@ namespace Workspace1C
             // Меню служб (issue #11, пункт 6): Ctrl+Shift+Alt+S по умолчанию.
             if (HotkeyServicesMenuBox != null)
                 HotkeyServicesMenuBox.Value = viewModel.HotkeyServicesMenu;
+            // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто.
+            if (HotkeyCollectDiagnosticsBox != null)
+                HotkeyCollectDiagnosticsBox.Value = viewModel.HotkeyCollectDiagnostics;
             // Масштаб строк списка (issue #303): Ctrl++ / Ctrl+- / Ctrl+0.
             if (HotkeyZoomInBox != null)
                 HotkeyZoomInBox.Value = viewModel.HotkeyZoomIn;
@@ -671,6 +674,8 @@ namespace Workspace1C
             var hkServices = ReadHotkeyBox(HotkeyServicesBox);
             // Меню служб (issue #11, пункт 6): настраиваемая горячая клавиша.
             var hkServicesMenu = ReadHotkeyBox(HotkeyServicesMenuBox);
+            // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемая горячая клавиша.
+            var hkCollectDiagnostics = ReadHotkeyBox(HotkeyCollectDiagnosticsBox);
             // Копия экрана по хоткею (функция №30, Этап 8).
             var hkScreenshot = ReadHotkeyBox(HotkeyScreenshotBox);
             // Масштаб строк списка (issue #303).
@@ -707,6 +712,8 @@ namespace Workspace1C
                 (LocalizationManager.T("Admin.ServerConsoleTitle"), hkServerConsole),
                 (LocalizationManager.T("Services.MenuItem"), hkServices),
                 (LocalizationManager.T("Settings.Hotkeys.ServicesMenu"), hkServicesMenu),
+                // «Собрать диагностику» (issue #99, v1.0.1.23).
+                (LocalizationManager.T("Settings.Hotkeys.CollectDiagnostics"), hkCollectDiagnostics),
                 (LocalizationManager.T("Settings.Hotkeys.ShowWindow"), hkShowWindow),
                 (LocalizationManager.T("Settings.Screenshot.Title"), hkScreenshot),
                 (LocalizationManager.T("Settings.Hotkeys.ZoomIn"), hkZoomIn),
@@ -792,6 +799,7 @@ namespace Workspace1C
                 hotkeyServerConsole: hkServerConsole,
                 hotkeyServices: hkServices,
                 hotkeyServicesMenu: hkServicesMenu,
+                hotkeyCollectDiagnostics: hkCollectDiagnostics,
                 hotkeyZoomIn: hkZoomIn,
                 hotkeyZoomOut: hkZoomOut,
                 hotkeyZoomReset: hkZoomReset,

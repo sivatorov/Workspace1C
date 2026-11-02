@@ -192,8 +192,12 @@ public class TestDeployWindow : Window
             // issue #79: «В поле "Имя базы данных СУБД" можно подставлять такое же имя,
             // как "Имя базы на сервере"» — пока СУБД-имя не заполнено, синхронизируем его
             // с именем базы на сервере (пользователь может потом поправить вручную).
+            // Issue #79 (v1.0.1.23): ручной ввод пользователя не затирается — если в
+            // поле уже есть значение (например, имя SQL-базы ИСХОДНОЙ базы, «понятное»
+            // pre-валидации), автоподстановка имени целевой базы не выполняется.
             if (_dbNameBox is not null && string.IsNullOrWhiteSpace(_vm.DbName)
-                && !string.IsNullOrWhiteSpace(_refBox.Text))
+                && !string.IsNullOrWhiteSpace(_refBox.Text)
+                && string.IsNullOrWhiteSpace(_dbNameBox.Text))
             {
                 _vm.AutofillDbNameFromServerDbName();
                 _dbNameBox.Text = _vm.DbName;
@@ -488,8 +492,10 @@ public class TestDeployWindow : Window
 
         // Автоподстановка «Имя базы данных СУБД» из «Имя базы на сервере» (issue #79):
         // окно уже открыто с предложенным Ref — то же имя сразу подставляется в СУБД-поле.
+        // Issue #79 (v1.0.1.23): существующий ввод в поле (имя SQL-базы источника,
+        // «понятное» pre-валидации) автоподстановка целевой базы не затирает.
         _vm.AutofillDbNameFromServerDbName();
-        if (!string.IsNullOrEmpty(_vm.DbName))
+        if (!string.IsNullOrEmpty(_vm.DbName) && string.IsNullOrWhiteSpace(_dbNameBox.Text))
             _dbNameBox.Text = _vm.DbName;
 
         // Единое оформление полей ввода (issue #79, 7OH: «одни поля серые, вторые
@@ -567,8 +573,27 @@ public class TestDeployWindow : Window
         // обязателен, а поля пусты — подставляем из сохранённого профиля автоматически.
         _vm.EnsureIbcmdProfileFromForm();
 
-        // Валидация формы (понятная ошибка до старта).
-        var errors = _vm.Validate();
+        // Issue #79 (v1.0.1.23): pre-валидация асинхронная, с rac-веткой — если профиля
+        // СУБД нет и поля формы не описывают источник, выполняется лёгкая rac-проба,
+        // и её шаги журналируются в окно мастера. Журнал очищается ДО валидации, чтобы
+        // строки пробы не пропали после старта сценария.
+        _logList.Items.Clear();
+        _logList.Items.Add(LocalizationManager.T("TestDeploy.Started"));
+
+        // Коллбэк журнала приходит и из фоновых потоков rac-пробы — marshal на UI-поток.
+        void AddPreValidationLog(string line)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(() => _logList.Items.Add(line));
+                return;
+            }
+            _logList.Items.Add(line);
+            _logList.ScrollIntoView(_logList.Items[^1]);
+        }
+
+        // Валидация формы (понятная ошибка до старта; rac-проба перед ошибкой).
+        var errors = await _vm.ValidateAsync(log: AddPreValidationLog);
         if (errors.Count > 0)
         {
             _dialogs.ShowWarning(LocalizationManager.T(errors[0]), LocalizationManager.T("TestDeploy.Title"));
@@ -577,8 +602,6 @@ public class TestDeployWindow : Window
 
         _busy = true;
         _runButton.IsEnabled = false;
-        _logList.Items.Clear();
-        _logList.Items.Add(LocalizationManager.T("TestDeploy.Started"));
         try
         {
             var scenario = _vm.BuildScenario();

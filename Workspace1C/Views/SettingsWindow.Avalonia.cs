@@ -3222,6 +3222,8 @@ namespace Workspace1C
             var hotkeyServices = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.Services"), _viewModel.HotkeyServices);
             // Меню служб (issue #11, пункт 6): Ctrl+Shift+Alt+S по умолчанию.
             var hotkeyServicesMenu = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.ServicesMenu"), _viewModel.HotkeyServicesMenu);
+            // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто.
+            var hotkeyCollectDiagnostics = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.CollectDiagnostics"), _viewModel.HotkeyCollectDiagnostics);
             // Сохранение копии экрана (функция №30 StartManager).
             var hotkeyScreenshot = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.Screenshot"), _viewModel.ScreenshotHotkey);
             // У автора последняя строка идёт без нижнего поля, а весь блок строк
@@ -3656,7 +3658,8 @@ namespace Workspace1C
                     hotkeyZoomIn.Value, hotkeyZoomOut.Value, hotkeyZoomReset.Value,
                     hotkeyCommandPalette.Value, hotkeyPlatformUpdate.Value,
                     hotkeyShowRunning.Value,
-                    bookmarksMenu: hotkeyBookmarksMenu.Value);
+                    bookmarksMenu: hotkeyBookmarksMenu.Value,
+                    collectDiagnostics: hotkeyCollectDiagnostics.Value);
 
                 // Копия экрана (функция №30) и автозапуск при старте ОС (функция №31, Этап 8).
                 _viewModel.ScreenshotHotkey = hotkeyScreenshot.Value ?? "";

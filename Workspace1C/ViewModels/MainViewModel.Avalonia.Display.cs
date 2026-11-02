@@ -494,6 +494,8 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Горячая клавиша «Меню служб» (issue #11, пункт 6). По умолчанию Ctrl+Shift+Alt+S.</summary>
     public string HotkeyServicesMenu => _settings.HotkeyServicesMenu;
     public string HotkeySwitchUser => _settings.HotkeySwitchUser;
+    /// <summary>Горячая клавиша «Собрать диагностику» (issue #99, v1.0.1.23). По умолчанию пусто.</summary>
+    public string HotkeyCollectDiagnostics => _settings.HotkeyCollectDiagnostics;
     public string HotkeyCheckUpdate => _settings.HotkeyCheckUpdate;
     public string HotkeyActualReleases => _settings.HotkeyActualReleases;
     // Автообновление платформы 1С (функция 9, этап 0.3.9.214).
@@ -520,7 +522,9 @@ public partial class MainViewModel : ViewModelBase
         string commandPalette = "", string platformUpdate = "",
         string showRunning = "",
         // Меню закладок (issue #356): настраиваемая горячая клавиша, по умолчанию Ctrl+B.
-        string bookmarksMenu = "")
+        string bookmarksMenu = "",
+        // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемая горячая клавиша.
+        string collectDiagnostics = "")
     {
         _settings.HotkeyEnterprise = enterprise ?? string.Empty;
         _settings.HotkeyConfigurator = configurator ?? string.Empty;
@@ -544,6 +548,8 @@ public partial class MainViewModel : ViewModelBase
         _settings.HotkeyCommandPalette = commandPalette ?? string.Empty;
         // Меню закладок (issue #356).
         _settings.HotkeyBookmarksMenu = bookmarksMenu ?? string.Empty;
+        // «Собрать диагностику» (issue #99, v1.0.1.23).
+        _settings.HotkeyCollectDiagnostics = collectDiagnostics ?? string.Empty;
         // Блокировка сеансов ИБ (функция №20, Ctrl+Alt+L) и временная блокировка приложения (функция №19).
         _settings.HotkeySessionLock = sessionLock ?? string.Empty;
         _settings.HotkeyLockApp = lockApp ?? string.Empty;
@@ -594,6 +600,8 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HotkeyServerConsole));
         OnPropertyChanged(nameof(HotkeyServices));
         OnPropertyChanged(nameof(HotkeyServicesMenu));
+        // «Собрать диагностику» (issue #99, v1.0.1.23).
+        OnPropertyChanged(nameof(HotkeyCollectDiagnostics));
         // Масштаб строк списка (issue #303).
         OnPropertyChanged(nameof(HotkeyZoomIn));
         OnPropertyChanged(nameof(HotkeyZoomOut));

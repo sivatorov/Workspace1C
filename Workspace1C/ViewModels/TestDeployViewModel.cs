@@ -322,6 +322,43 @@ public sealed class TestDeployViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Асинхронная валидация формы с rac-веткой (issue #79, v1.0.1.23): если профиля
+    /// СУБД исходной базы нет и поля формы не описывают источник, перед ошибкой
+    /// выполняется лёгкая rac-проба (<see cref="ClusterInfobaseCredentialsResolver"/>;
+    /// точки подмены — <paramref name="resolverFactory"/> для юнит-тестов). Шаги пробы
+    /// журналируются через <paramref name="log"/> (окно мастера; коллбэк может
+    /// приходить из фоновых потоков — marshal на UI-поток на стороне окна).
+    /// </summary>
+    public async Task<List<string>> ValidateAsync(
+        Func<ClusterInfobaseCredentialsResolver?>? resolverFactory = null,
+        Action<string>? log = null)
+    {
+        var scenario = BuildScenario();
+        var existing = TestDeployPlanner.FindExistingTarget(
+            _infobases, scenario, TestDeployPlanner.ResolveTargetName(scenario, _source.Name));
+
+        Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? racProbe = null;
+        if (scenario.DumpEngine == BackupEngine.Ibcmd
+            && _source.Connection?.Type == ConnectionType.ClientServer)
+        {
+            racProbe = async (infobase, ct) =>
+            {
+                var resolver = resolverFactory is not null
+                    ? resolverFactory()
+                    : ClusterInfobaseCredentialsResolver.CreateDefault(message => log?.Invoke(message));
+                if (resolver is null)
+                    return null;
+                return await resolver.ResolveAsync(infobase, ct).ConfigureAwait(false);
+            };
+        }
+
+        return await TestDeployPlanner.ValidateAsync(
+            scenario, _source, existing,
+            racProfileResolverAsync: racProbe,
+            log: log).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Предпросмотр шагов плана (заголовки уже локализованы: ключи → текст).
     /// Issue #79 (комментарий 7OH от 2026-10-29 «ошибка при открытии»): построение
     /// предпросмотра не должно ронять открытие мастера при некорректных данных базы

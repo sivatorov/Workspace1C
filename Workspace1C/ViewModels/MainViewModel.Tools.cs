@@ -2666,7 +2666,9 @@ public partial class MainViewModel : ViewModelBase
         // Меню закладок (issue #356): настраиваемая горячая клавиша, по умолчанию Ctrl+B.
         string? hotkeyBookmarksMenu = null,
         // Отбор «Только запущенные» (issue #339): настраиваемая горячая клавиша.
-        string? hotkeyShowRunning = null)
+        string? hotkeyShowRunning = null,
+        // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемая горячая клавиша.
+        string? hotkeyCollectDiagnostics = null)
     {
         _allowMultipleInstances = allowMultipleInstances;
         _checkForUpdatesOnStartup = checkForUpdatesOnStartup;
@@ -2712,6 +2714,8 @@ public partial class MainViewModel : ViewModelBase
         if (hotkeyCommandPalette != null) HotkeyCommandPalette = hotkeyCommandPalette.Trim();
         // Меню закладок (issue #356).
         if (hotkeyBookmarksMenu != null) HotkeyBookmarksMenu = hotkeyBookmarksMenu.Trim();
+        // «Собрать диагностику» (issue #99, v1.0.1.23).
+        if (hotkeyCollectDiagnostics != null) HotkeyCollectDiagnostics = hotkeyCollectDiagnostics.Trim();
         OnPropertyChanged(nameof(AllowMultipleInstances));
         OnPropertyChanged(nameof(CheckForUpdatesOnStartup));
         OnPropertyChanged(nameof(AutoUpdateEnabled));
@@ -2740,6 +2744,8 @@ public partial class MainViewModel : ViewModelBase
         // Меню закладок (issue #356).
         OnPropertyChanged(nameof(HotkeyBookmarksMenu));
         OnPropertyChanged(nameof(HotkeySwitchUser));
+        // «Собрать диагностику» (issue #99, v1.0.1.23).
+        OnPropertyChanged(nameof(HotkeyCollectDiagnostics));
         OnPropertyChanged(nameof(HotkeyCheckIntegrity));
         OnPropertyChanged(nameof(HotkeyServerConsole));
         OnPropertyChanged(nameof(HotkeyServices));

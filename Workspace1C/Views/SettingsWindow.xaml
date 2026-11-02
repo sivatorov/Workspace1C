@@ -1895,6 +1895,18 @@
                                                     Height="34" FontSize="13"
                                                     Style="{StaticResource ModernTextBox}"/>
                             </Grid>
+                            <!-- «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемая горячая клавиша, по умолчанию пусто. -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="260"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{loc:Loc Settings.Hotkeys.CollectDiagnostics}" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <controls:HotkeyBox x:Name="HotkeyCollectDiagnosticsBox" Grid.Column="1"
+                                                    Height="34" FontSize="13"
+                                                    Style="{StaticResource ModernTextBox}"/>
+                            </Grid>
                         </StackPanel>
 
                         <TextBlock Text="{loc:Loc Settings.Hotkeys.FavoritesOrder}"

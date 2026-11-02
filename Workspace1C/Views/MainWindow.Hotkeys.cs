@@ -196,6 +196,10 @@ namespace Workspace1C
             Add(_viewModel.HotkeyServices, _viewModel.ShowServicesCommand);
             // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.
             Add(_viewModel.HotkeyServicesMenu, new ViewModels.RelayCommand(_ => ShowServicesMenu()));
+            // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемый хоткей, по
+            // умолчанию пусто — тот же сбор ZIP, что пункт «Утилиты» → «Информация».
+            Add(_viewModel.HotkeyCollectDiagnostics,
+                new ViewModels.RelayCommand(_ => _ = OnCollectDiagnosticsMenuClickAsync()));
             // Сохранение копии экрана (функция №30 StartManager): сочетание настраивается в настройках.
             Add(_viewModel.ScreenshotHotkey, _viewModel.TakeScreenshotCommand);
 

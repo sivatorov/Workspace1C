@@ -59,7 +59,12 @@ public interface IRingLicenseService
 /// именам заголовков (ru/en, по ключевым словам);</item>
 /// <item>произвольный текст — каждая строка, содержащая серийный номер вида
 /// <c>XXXX-XXXX-...-XXXXXXXXXXXX</c>, становится отдельной лицензией с сырым текстом
-/// (остальные поля — по ключевым словам в строке).</item>
+/// (остальные поля — по ключевым словам в строке);</item>
+/// <item>локале-независимый формат ring (issue #83, v1.0.1.23): строка с номером
+/// лицензии <c>NNNNNNNNNNNNN-NNNNNNNNNNNNN</c> (дефис, 10–16 цифр) и именем файла
+/// <c>*.lic</c> в кавычках — распознаётся по СТРУКТУРЕ, без локализованных
+/// маркеров («Имя файла» и т.п.), поэтому заполняет таблицу даже если локаль
+/// вывода ring изменится или заголовок пришёл mojibake.</item>
 /// </list>
 /// </summary>
 public static class RingLicenseParser
@@ -67,6 +72,20 @@ public static class RingLicenseParser
     /// <summary>Серийный номер программной лицензии 1С: 8-4-4-4-12 (hex), без учёта регистра.</summary>
     public static readonly Regex SerialNumberRegex = new(
         @"\b[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}\b",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Номер программной лицензии 1С в формате ring (issue #83, v1.0.1.23):
+    /// «499459654270590-500000000037» — две группы по 10–16 цифр через дефис.
+    /// Локале-независимый признак: не зависит от языка вывода утилиты.
+    /// </summary>
+    public static readonly Regex LicenseNumberRegex = new(
+        @"\b\d{10,16}-\d{10,16}\b",
+        RegexOptions.Compiled);
+
+    /// <summary>Имя файла лицензии *.lic — в кавычках или без (issue #83, v1.0.1.23).</summary>
+    private static readonly Regex LicenseFileRegex = new(
+        @"(?i)""[^""]*\.lic""|\S*\.lic\b",
         RegexOptions.Compiled);
 
     /// <summary>Число рабочих мест/лицензий, встречающееся рядом со словом «лиценз»/«licens» (/л всего и т.п.).</summary>
@@ -166,9 +185,29 @@ public static class RingLicenseParser
                 // Упрощённый формат серийного номера (licensetool): 16 hex-символов или
                 // «XXXX XXXX XXXX XXXX XXXX XXXX» с пробелами.
                 var compact = Regex.Match(line, @"\b[0-9A-Fa-f]{4}(?:[ -][0-9A-Fa-f]{4}){4,}\b");
-                if (!compact.Success)
+                if (compact.Success)
+                {
+                    serialMatch = compact;
+                }
+                else if (IsRingLicenseStructureLine(line))
+                {
+                    // Локале-независимый формат ring (issue #83, v1.0.1.23): номер
+                    // лицензии «NNNN…-NNNN…» + имя файла *.lic. Строка распознаётся
+                    // даже если локализованные маркеры («Имя файла») пришли mojibake
+                    // или в другой локали — таблица лицензий не остаётся пустой.
+                    var number = LicenseNumberRegex.Match(line);
+                    licenses.Add(new ProgramLicense
+                    {
+                        SerialNumber = number.Success ? number.Value : string.Empty,
+                        Module = LicenseFileRegex.Match(line).Value,
+                        RawText = line
+                    });
                     continue;
-                serialMatch = compact;
+                }
+                else
+                {
+                    continue;
+                }
             }
 
             licenses.Add(new ProgramLicense
@@ -184,6 +223,17 @@ public static class RingLicenseParser
                 RawText = line
             });
         }
+    }
+
+    /// <summary>
+    /// Строка с лицензией в структурном формате ring (issue #83, v1.0.1.23): номер
+    /// лицензии «NNNN…-NNNN…» (две группы по 10–16 цифр через дефис) И имя файла
+    /// лицензии *.lic (в кавычках или без). Оба признака не зависят от локали вывода.
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal static bool IsRingLicenseStructureLine(string line)
+    {
+        return LicenseNumberRegex.IsMatch(line) && LicenseFileRegex.IsMatch(line);
     }
 
     /// <summary>Разбивает строку таблицы на ячейки (разделители: «|», табуляция, 2+ пробела).</summary>
@@ -575,8 +625,18 @@ public sealed class RingLicenseService : IRingLicenseService
                    "и «ring license list». Если в консоли лицензии есть, а здесь нет — " +
                    "пришлите лог категории CM_RAC в issue Workspace 1C.";
         }
+        // issue #83 (v1.0.1.23): кракозябры в UI-сообщении недопустимы. Вывод
+        // нормализуется: (а) характерный mojibake «cp866-текст, декодированный как
+        // cp1251» перезакодируется обратно (raw→cp866), если после этого распознаётся
+        // маркер вывода ring; (б) оставшиеся символы замены U+FFFD заменяются на «?» —
+        // читаемость цифробуквенных фрагментов (номеров лицензий, имён файлов)
+        // сохраняется.
+        var output = ConsoleOutputDecoder.FixCp1251ToCp866Mojibake(lastCandidateOutput);
+        if (output.Contains('\uFFFD', StringComparison.Ordinal))
+            output = output.Replace('\uFFFD', '?');
+
         return "Утилита ring найдена и запущена, но список лицензий не получен. Ответ последней " +
-               "проверенной команды: " + TruncateForLog(lastCandidateOutput) +
+               "проверенной команды: " + TruncateForLog(output) +
                ". Если модуль лицензий ring установлен и этот ответ выглядит ошибочным — " +
                "пришлите этот текст в issue Workspace 1C.";
     }

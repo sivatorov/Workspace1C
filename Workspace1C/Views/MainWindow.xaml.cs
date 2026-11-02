@@ -733,6 +733,8 @@ namespace Workspace1C
                     or nameof(MainViewModel.HotkeySwitchUser)
                     // Меню служб (issue #11, пункт 6): настраиваемый хоткей.
                     or nameof(MainViewModel.HotkeyServicesMenu)
+                    // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемый хоткей.
+                    or nameof(MainViewModel.HotkeyCollectDiagnostics)
                     // Автообновление платформы 1С (функция 9, этап 0.3.9.214):
                     // сочетание применяется сразу после «ОК», а не после перезапуска
                     // (issue #38).

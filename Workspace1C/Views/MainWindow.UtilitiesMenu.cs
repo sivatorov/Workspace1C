@@ -231,6 +231,7 @@ public partial class MainWindow
         {
             case "HotkeyCommandPalette": return _viewModel.HotkeyCommandPalette;
             case "HotkeyActualReleases": return _viewModel.HotkeyActualReleases;
+            case "HotkeyCollectDiagnostics": return _viewModel.HotkeyCollectDiagnostics;
             case "HotkeyPlatformUpdate": return _viewModel.HotkeyPlatformUpdate;
             case "HotkeyServerConsole": return _viewModel.HotkeyServerConsole;
             case "HotkeyServices": return _viewModel.HotkeyServices;

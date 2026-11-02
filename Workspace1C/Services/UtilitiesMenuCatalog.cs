@@ -511,12 +511,14 @@ public static class UtilitiesMenuCatalog
             new("UsageStatistics", "Stats.Title", GroupInformation,
                 "History", "IconHistory", "#14B8A6", UtilitiesMenuCommandKind.UsageStatistics),
             // «Собрать диагностику» (issue #99): ZIP с журналами приложения в один клик.
-            // Хоткей пока не назначается (по умолчанию пусто — решение по хоткею отложено).
+            // v1.0.1.23: настраиваемый хоткей (AppSettings.HotkeyCollectDiagnostics,
+            // по умолчанию пусто — решение 7OH); подпись хоткея на пункте меню берётся
+            // из этого ключа, как у остальных пунктов.
             // Пара иконок («IconLogs»/«IconLogs») существует в ОБОИХ базовых словарях
             // (Icons.xaml/Icons.axaml) и во всех наборах — страж TrayMenuIconCatalogTests.
             new("CollectDiagnostics", "Utilities.CollectDiagnostics", GroupInformation,
                 "IconLogs", "IconLogs", "#16A34A", UtilitiesMenuCommandKind.CollectDiagnostics,
-                isNew: true),
+                "HotkeyCollectDiagnostics", isNew: true),
 
             // ---- Операции ----
             new("ConfigDiff", "ConfigDiff.Title", GroupOperations,

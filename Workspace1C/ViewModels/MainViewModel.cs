@@ -219,6 +219,8 @@ public partial class MainViewModel : ViewModelBase
     private string _hotkeyRightPanelDetails = "";
     private string _hotkeyFindInList = "Ctrl+T";
     private string _hotkeyCommandPalette = "Ctrl+K";
+    // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто.
+    private string _hotkeyCollectDiagnostics = "";
     // Меню закладок (issue #356): настраиваемый хоткей, по умолчанию Ctrl+B.
     private string _hotkeyBookmarksMenu = "Ctrl+B";
     private string _hotkeySwitchUser = "";
@@ -679,6 +681,8 @@ public partial class MainViewModel : ViewModelBase
             ? "Ctrl+B"
             : settings.HotkeyBookmarksMenu.Trim();
         _hotkeySwitchUser = settings.HotkeySwitchUser?.Trim() ?? "";
+        // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто — не назначена.
+        _hotkeyCollectDiagnostics = settings.HotkeyCollectDiagnostics?.Trim() ?? "";
         // Глобальная горячая клавиша «показать главное окно» (issue #82).
         _globalShowWindowHotkey = Services.GlobalHotkeyLogic.Normalize(settings.GlobalShowWindowHotkey);
         if (string.IsNullOrEmpty(_globalShowWindowHotkey))

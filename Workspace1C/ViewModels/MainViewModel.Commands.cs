@@ -1527,6 +1527,20 @@ public string HotkeyEnterprise
         }
     }
 
+    /// <summary>
+    /// Горячая клавиша «Собрать диагностику» (issue #99, v1.0.1.23). По умолчанию
+    /// пусто — не назначена.
+    /// </summary>
+    public string HotkeyCollectDiagnostics
+    {
+        get => _hotkeyCollectDiagnostics;
+        set
+        {
+            if (SetProperty(ref _hotkeyCollectDiagnostics, NormalizeHotkey(value, "")))
+                ScheduleSaveSettings();
+        }
+    }
+
     /// <summary>Горячая клавиша переключения подробностей правой панели информации. Пусто — не назначена (issue #172).</summary>
     public string HotkeyRightPanelDetails
     {

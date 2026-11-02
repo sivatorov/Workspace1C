@@ -12,8 +12,8 @@ namespace Workspace1C.Tests;
 /// меню «Утилиты» → «Информация» (быстрый доступ к сбору ZIP без окна настроек) и
 /// перестроенное окно «О программе» (нижние кнопки в одну колонку, кликабельная
 /// спонсорская картинка справа и крупнее, без «надоедливого скролла»).
-/// Настраиваемый хоткей кнопки — ОТЛОЖЕН (см. сводку задачи): по умолчанию хоткей
-/// не назначается, инфраструктура хоткеев остаётся без изменений.
+/// v1.0.1.23: настраиваемый хоткей реализован (AppSettings.HotkeyCollectDiagnostics,
+/// по умолчанию пусто — решение 7OH «можно не ставить ничего по умолчанию»).
 /// </summary>
 public sealed class Issue99DiagnosticsMenuTests
 {
@@ -45,8 +45,8 @@ public sealed class Issue99DiagnosticsMenuTests
         // Иконки заданы для обеих платформ (единый источник пар каталога).
         Assert.False(string.IsNullOrWhiteSpace(item.WpfIconKind));
         Assert.False(string.IsNullOrWhiteSpace(item.AvaloniaIconKey));
-        // Хоткей по умолчанию НЕ назначен (решение по настраиваемому хоткею отложено).
-        Assert.Null(item.HotkeyKey);
+        // v1.0.1.23: подпись хоткея пункта берётся из AppSettings.HotkeyCollectDiagnostics.
+        Assert.Equal("HotkeyCollectDiagnostics", item.HotkeyKey);
     }
 
     [Fact]

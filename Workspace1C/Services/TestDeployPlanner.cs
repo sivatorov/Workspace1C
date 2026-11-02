@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Workspace1C.Localization;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -300,6 +303,78 @@ public static class TestDeployPlanner
                 errors.Add("TestDeploy.NeedDbmsProfile");
         }
 
+        return errors;
+    }
+
+    /// <summary>Ключ ошибки «нет данных СУБД исходной базы» (issue #79). Internal — тесты.</summary>
+    internal const string NeedDbmsProfileErrorKey = "TestDeploy.NeedDbmsProfile";
+
+    /// <summary>
+    /// Асинхронная pre-валидация с ТРЕТЬЕЙ «веткой проходимости» (issue #79, v1.0.1.23,
+    /// репорт 7OH «хочу вручную указать данные на форме. RAC доступен. В логах ничего
+    /// нет»): если сохранённого профиля СУБД нет и поля формы не описывают источник,
+    /// ошибка <see cref="NeedDbmsProfileErrorKey"/> НЕ добавляется, когда кластер rac
+    /// доступен и по исходной базе через него резолвятся данные СУБД (лёгкая проба
+    /// через <see cref="ClusterInfobaseCredentialsResolver.ResolveAsync"/>; те же данные
+    /// rac отдаст на шаге резолва перед «Выгрузкой» в <see cref="TestDeployService"/>).
+    /// Проба журналируется (<paramref name="log"/> — окно мастера/журнал приложения).
+    /// Если rac-проба недоступна — ошибка остаётся (текст ключа перечисляет, что именно
+    /// было проверено). Остальные ошибки синхронной <see cref="Validate"/> остаются без
+    /// изменений.
+    /// </summary>
+    /// <param name="scenario">Сценарий мастера.</param>
+    /// <param name="source">Исходная база.</param>
+    /// <param name="existingTarget">Найденная тестовая копия (или null).</param>
+    /// <param name="dbmsProfileResolver">Точка подмены чтения профиля СУБД (тесты).</param>
+    /// <param name="racProfileResolverAsync">
+    /// Лёгкая rac-проба: по исходной базе вернуть профиль СУБД из кластера (или null).
+    /// null — rac-ветка не используется (старое поведение синхронной валидации).
+    /// </param>
+    /// <param name="log">Журнал pre-валидации (окно мастера); null — без журнала.</param>
+    /// <param name="cancellationToken">Отмена rac-пробы.</param>
+    public static async Task<List<string>> ValidateAsync(
+        TestDeployScenario? scenario,
+        Infobase? source,
+        Infobase? existingTarget,
+        Func<Infobase, DbmsBackupProfile?>? dbmsProfileResolver = null,
+        Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? racProfileResolverAsync = null,
+        Action<string>? log = null,
+        CancellationToken cancellationToken = default)
+    {
+        var errors = Validate(scenario, source, existingTarget, dbmsProfileResolver);
+        if (errors.Count == 0 || racProfileResolverAsync is null || source is null || scenario is null)
+            return errors;
+        if (!errors.Contains(NeedDbmsProfileErrorKey))
+            return errors; // rac-ветка нужна только для этой ошибки.
+
+        errors.Remove(NeedDbmsProfileErrorKey);
+        var racAttempted = false;
+        try
+        {
+            log?.Invoke(LocalizationManager.T("TestDeploy.PreValidationRacResolving"));
+            racAttempted = true;
+            var fromRac = await racProfileResolverAsync(source, cancellationToken).ConfigureAwait(false);
+            if (fromRac is not null && !string.IsNullOrWhiteSpace(fromRac.Database))
+            {
+                log?.Invoke(LocalizationManager.T("TestDeploy.PreValidationRacUsed"));
+                return errors; // rac доступен и база найдена — pre-валидация пройдена.
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            log?.Invoke(string.Format(
+                LocalizationManager.T("TestDeploy.PreValidationRacFailed"), ex.Message));
+            // rac-проба не состоялась — ошибка остаётся с расширенной конкретикой.
+        }
+
+        if (!racAttempted)
+            log?.Invoke(LocalizationManager.T("TestDeploy.PreValidationRacUnavailable"));
+
+        errors.Insert(0, NeedDbmsProfileErrorKey);
         return errors;
     }
 

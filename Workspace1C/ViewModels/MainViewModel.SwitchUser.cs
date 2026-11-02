@@ -183,6 +183,8 @@ public partial class MainViewModel
             // Меню закладок (issue #356): настраиваемый хоткей, по умолчанию Ctrl+B.
             _hotkeyBookmarksMenu = string.IsNullOrWhiteSpace(settings.HotkeyBookmarksMenu) ? "Ctrl+B" : settings.HotkeyBookmarksMenu.Trim();
             _hotkeySwitchUser = settings.HotkeySwitchUser?.Trim() ?? "";
+            // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто.
+            _hotkeyCollectDiagnostics = settings.HotkeyCollectDiagnostics?.Trim() ?? "";
 
             // Тема и схема нового профиля.
             _savedTheme = settings.Theme;
@@ -229,6 +231,8 @@ public partial class MainViewModel
             // Меню закладок (issue #356).
             OnPropertyChanged(nameof(HotkeyBookmarksMenu));
             OnPropertyChanged(nameof(HotkeySwitchUser));
+            // «Собрать диагностику» (issue #99, v1.0.1.23).
+            OnPropertyChanged(nameof(HotkeyCollectDiagnostics));
             FavoriteHotkeysChanged?.Invoke(this, EventArgs.Empty);
         }
         catch (Exception ex)

@@ -183,6 +183,8 @@ public class CustomActionEditViewModel : ViewModelBase
                     settings.HotkeyExportsList, settings.HotkeyFindInList, settings.HotkeyCommandPalette,
                     settings.HotkeyBookmarksMenu,
                     settings.HotkeyServicesMenu,
+                    // «Собрать диагностику» (issue #99, v1.0.1.23): сочетание занято системно.
+                    settings.HotkeyCollectDiagnostics,
                     settings.HotkeySwitchUser, settings.HotkeyClearSearch, settings.HotkeyClearTags,
                     settings.HotkeyRightPanelDetails, settings.HotkeyShowAll, settings.HotkeyShowFavorites,
                     settings.HotkeyShowRecent, settings.HotkeyShowRunning, settings.HotkeyZoomIn, settings.HotkeyZoomOut,
