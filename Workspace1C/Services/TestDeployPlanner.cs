@@ -286,16 +286,46 @@ public static class TestDeployPlanner
         if (scenario.DumpEngine == BackupEngine.Ibcmd
             && source.Connection?.Type == ConnectionType.ClientServer)
         {
+            // Issue #79 (v1.0.1.21): требование данных СУБД для выгрузки проверяется
+            // по ИСТОЧНИКУ: сохранённый профиль ИЛИ поля формы, заведомо описывающие
+            // источник (совпадающие с Ref/профилем). Поля формы с именем SQL-БД
+            // целевой базы («источник_t») выгрузку обеспечить не могут. Если и профиль,
+            // и поля не подходят — попытка rac выполняется позже, в TestDeployService
+            // ДО шага «Выгрузка» (там же понятная ошибка, если rac не помог).
             var dbmsProfile = dbmsProfileResolver is not null
                 ? dbmsProfileResolver(source)
                 : TryLoadDbmsProfile(source);
-            var hasFormDbms = !string.IsNullOrWhiteSpace(scenario.DbServer)
-                && !string.IsNullOrWhiteSpace(scenario.DbName);
-            if ((dbmsProfile is null || string.IsNullOrWhiteSpace(dbmsProfile.Database)) && !hasFormDbms)
+            var hasSourceDbms = dbmsProfile is not null && !string.IsNullOrWhiteSpace(dbmsProfile.Database);
+            if (!hasSourceDbms && !FormFieldsDescribeSource(scenario, source, dbmsProfile))
                 errors.Add("TestDeploy.NeedDbmsProfile");
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// Описывают ли поля СУБД формы мастера ИСХОДНУЮ базу (issue #79, v1.0.1.21):
+    /// сервер и имя SQL-БД заполнены, а имя БД совпадает с Ref исходной базы либо
+    /// с именем БД её сохранённого профиля. Автоподстановка «Имя базы данных в СУБД»
+    /// из имени целевой базы («источник_t») такие поля «источником» не делает —
+    /// выгрузка по ним не выполняется.
+    /// </summary>
+    internal static bool FormFieldsDescribeSource(
+        TestDeployScenario? scenario, Infobase? source, DbmsBackupProfile? savedProfile)
+    {
+        if (scenario is null || source?.Connection?.Type != ConnectionType.ClientServer)
+            return false;
+        var dbName = (scenario.DbName ?? string.Empty).Trim();
+        var dbServer = (scenario.DbServer ?? string.Empty).Trim();
+        if (dbName.Length == 0 || dbServer.Length == 0)
+            return false;
+
+        var refName = (source.Connection.DatabaseName ?? string.Empty).Trim();
+        if (refName.Length > 0 && string.Equals(dbName, refName, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var profileDb = (savedProfile?.Database ?? string.Empty).Trim();
+        return profileDb.Length > 0 && string.Equals(dbName, profileDb, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

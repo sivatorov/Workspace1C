@@ -170,6 +170,63 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     internal Func<Infobase, CancellationToken, Task<DbmsBackupProfile?>>? DbmsProfileResolver { get; set; }
 
     /// <summary>
+    /// Сервис подготовки «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
+    /// завершение сеансов, блокировки сеансов/регламентных заданий и восстановление
+    /// после операции. null — опции недоступны (rac-клиент не найден); в этом случае
+    /// базы с включёнными опциями пропускаются с записью в журнал.
+    /// </summary>
+    internal BatchOpsPreparationService? PreparationService { get; set; }
+
+    private bool _prepareTerminateSessions;
+
+    /// <summary>Опция «Завершить сеансы пользователей» перед операцией (не сохраняется в настройках автоматически — сохраняет окно).</summary>
+    public bool PrepareTerminateSessions
+    {
+        get => _prepareTerminateSessions;
+        set => SetProperty(ref _prepareTerminateSessions, value);
+    }
+
+    private bool _prepareDenyNewSessions;
+
+    /// <summary>Опция «Установить блокировку начала сеансов» перед операцией.</summary>
+    public bool PrepareDenyNewSessions
+    {
+        get => _prepareDenyNewSessions;
+        set => SetProperty(ref _prepareDenyNewSessions, value);
+    }
+
+    private string _preparePermissionCode = string.Empty;
+
+    /// <summary>Код разрешения для входа при блокировке сеансов. Секретоподобное
+    /// значение: в настройки приложения не сохраняется (только в памяти сессии).</summary>
+    public string PreparePermissionCode
+    {
+        get => _preparePermissionCode;
+        set => SetProperty(ref _preparePermissionCode, value ?? string.Empty);
+    }
+
+    private bool _prepareDenyScheduledJobs;
+
+    /// <summary>Опция «Блокировать регламентные задания» перед операцией.</summary>
+    public bool PrepareDenyScheduledJobs
+    {
+        get => _prepareDenyScheduledJobs;
+        set => SetProperty(ref _prepareDenyScheduledJobs, value);
+    }
+
+    /// <summary>Собирает опции подготовки из состояния чекбоксов окна.</summary>
+    private BatchOpsPreparationOptions BuildPreparationOptions() => new()
+    {
+        TerminateSessions = PrepareTerminateSessions,
+        DenyNewSessions = PrepareDenyNewSessions,
+        PermissionCode = string.IsNullOrWhiteSpace(PreparePermissionCode) ? null : PreparePermissionCode.Trim(),
+        DenyScheduledJobs = PrepareDenyScheduledJobs
+    };
+
+    /// <summary>Публичная запись строки в журнал окна (для сообщений сервиса подготовки).</summary>
+    public void WriteLog(string line) => AppendLog(line);
+
+    /// <summary>
     /// Вид операции окна (issue #92): выгрузка в .dt, выгрузка конфигурации в .cf
     /// или загрузка .cf. Переключатель DT/CF в окне меняет его на лету
     /// (для выгрузок), поэтому свойство — с публичным сеттером.
@@ -315,6 +372,15 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 _ => LocalizationManager.T("BatchOps.KindLoadCf")
             }));
 
+        // Issue #92 (v1.0.1.21): строка журнала «запущен ibcmd (PID …)» на каждый запуск —
+        // «повисло» неотличимо от работы, если не видно стартовавших процессов.
+        void OnIbcmdProcessStarted(string exePath, int pid) =>
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
+                      string.Format(LocalizationManager.T("BatchOps.IbcmdStartedFormat"), pid));
+
+        IbcmdService.ProcessStarted += OnIbcmdProcessStarted;
+        try
+        {
         foreach (var item in selected)
         {
             ct.ThrowIfCancellationRequested();
@@ -335,138 +401,228 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             }
 
             var startedAt = DateTime.Now;
-            // Целевой путь: для выгрузки — свой файл на каждую базу по шаблону
-            // имени (issue #92); для загрузки .cf — общий файл.
-            var targetPath = Kind switch
-            {
-                BatchOperationKind.DumpDt => BatchOperationsService.BuildDumpFilePath(
-                    PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
-                BatchOperationKind.DumpCf => BatchOperationsService.BuildDumpFilePath(
-                    PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
-                _ => PathText.Trim()
-            };
-            AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
 
-            // Профиль СУБД для клиент-серверной базы (issue #92, v100114): сохранённый
-            // профиль берёт сам <see cref="IbcmdService"/>; если его нет и включена
-            // автоподстановка — данные СУБД пробуются из кластера (rac). Ошибка rac
-            // не прерывает прогон: операция идёт со старым поведением (ошибку вернёт
-            // ibcmd по конкретной базе).
-            DbmsBackupProfile? resolvedProfile = null;
-            // Issue #92: флаг «автоподстановка реально запускалась и не дала данных» —
-            // для fail-fast вместо заведомо провального запуска ibcmd (см. ниже).
-            var dbmsResolveFailed = false;
-            if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null)
+            // ---- Фича «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
+            // завершение сеансов и блокировки сеансов/регламентных заданий. Ошибка
+            // подготовки — база пропускается (Skipped) с записью в журнал; блокировки
+            // после операции снимаются в finally ниже (и только те, что были off).
+            BatchOpsPreparationResult? prepareUndo = null;
+            var prepareOptions = BuildPreparationOptions();
+            if (prepareOptions.Any)
             {
-                var hasSavedProfile = false;
-                try { hasSavedProfile = DbmsBackupService.Load().Find(ib.Id) is not null; }
-                catch { /* профиль недоступен — пробуем автоподстановку */ }
-                if (!hasSavedProfile)
+                var preparation = PreparationService;
+                if (preparation is null)
                 {
-                    dbmsResolveFailed = true;
+                    failed++;
+                    item.Status = BatchOperationsStatus.Skipped;
+                    var unavailable = LocalizationManager.T("BatchOps.Prepare.Unavailable");
+                    item.SetStatusText(unavailable);
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {unavailable}");
+                    item.IsBusy = false;
+                    continue;
+                }
+
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                          LocalizationManager.T("BatchOps.Prepare.Applying"));
+                try
+                {
+                    prepareUndo = await preparation.ApplyBeforeAsync(ib, prepareOptions, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    item.IsBusy = false;
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    prepareUndo = new BatchOpsPreparationResult { Success = false, Error = ex.Message };
+                }
+                // null — подготовка не требовалась (например, файловой базе нечего
+                // завершать): операция продолжается штатно (issue #92, v1.0.1.21).
+                if (prepareUndo is not null && !prepareUndo.Success)
+                {
+                    failed++;
+                    var reason = prepareUndo.Error ?? LocalizationManager.T("BatchOps.Prepare.ResolveFailed");
+                    item.Status = BatchOperationsStatus.Skipped;
+                    item.SetStatusText(reason);
+                    item.DurationText = FormatElapsed(DateTime.Now - startedAt);
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {reason}");
+                    item.IsBusy = false;
+                    continue;
+                }
+            }
+
+            // Блокировки (если ставились) снимаются при любом исходе операции —
+            // успехе, ошибке или отмене (issue #92, v1.0.1.21).
+            try
+            {
+                // Целевой путь: для выгрузки — свой файл на каждую базу по шаблону
+                // имени (issue #92); для загрузки .cf — общий файл.
+                var targetPath = Kind switch
+                {
+                    BatchOperationKind.DumpDt => BatchOperationsService.BuildDumpFilePath(
+                        PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
+                    BatchOperationKind.DumpCf => BatchOperationsService.BuildDumpFilePath(
+                        PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
+                    _ => PathText.Trim()
+                };
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
+
+                // Профиль СУБД для клиент-серверной базы (issue #92, v100114): сохранённый
+                // профиль берёт сам <see cref="IbcmdService"/>; если его нет и включена
+                // автоподстановка — данные СУБД пробуются из кластера (rac). Ошибка rac
+                // не прерывает прогон: операция идёт со старым поведением (ошибку вернёт
+                // ibcmd по конкретной базе).
+                DbmsBackupProfile? resolvedProfile = null;
+                // Issue #92: флаг «автоподстановка реально запускалась и не дала данных» —
+                // для fail-fast вместо заведомо провального запуска ibcmd (см. ниже).
+                var dbmsResolveFailed = false;
+                if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null)
+                {
+                    var hasSavedProfile = false;
+                    try { hasSavedProfile = DbmsBackupService.Load().Find(ib.Id) is not null; }
+                    catch { /* профиль недоступен — пробуем автоподстановку */ }
+                    if (!hasSavedProfile)
+                    {
+                        dbmsResolveFailed = true;
+                        AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                                  LocalizationManager.T("BatchOps.DbmsProfileResolving"));
+                        try
+                        {
+                            resolvedProfile = await DbmsProfileResolver(ib, ct).ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            item.IsBusy = false;
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                                LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"), ib.Connection.Server, ex.Message));
+                            resolvedProfile = null;
+                        }
+                        AppendLog(resolvedProfile is not null
+                            ? $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                                LocalizationManager.T("BatchOps.DbmsProfileResolved"),
+                                $"{resolvedProfile.Dbms}/{resolvedProfile.Host}/{resolvedProfile.Database}" +
+                                (string.IsNullOrEmpty(resolvedProfile.User) ? "" : $"/{resolvedProfile.User}"))
+                            : $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
+                                LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
+                                ib.Connection.DatabaseName, ib.Connection.Server));
+                    }
+                }
+
+                // Issue #92: fail-fast. Если база клиент-серверная, сохранённого профиля
+                // СУБД нет, а автоподстановка из rac не дала данных — ibcmd запускался
+                // «наудачу» и гарантированно падал с малопонятной ошибкой подключения.
+                // Вместо траты времени на ibcmd фиксируем статус ошибки сразу с понятным
+                // текстом, каким его показал бы <see cref="BatchOperationsService"/>.
+                if (dbmsResolveFailed && resolvedProfile is null)
+                {
+                    failed++;
+                    item.Status = BatchOperationsStatus.Failed;
+                    var needProfileReason = string.Format(
+                        LocalizationManager.T("BatchOps.NeedDbmsProfileFormat"), ib.Name);
+                    item.SetStatusText(needProfileReason);
+                    item.DurationText = FormatElapsed(DateTime.Now - startedAt);
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
-                              LocalizationManager.T("BatchOps.DbmsProfileResolving"));
+                              $"{LocalizationManager.T("BatchOps.OperationFailed")} ({item.DurationText}): {needProfileReason}");
+                    item.IsBusy = false;
+                    // Issue #92 (v1.0.1.21, репорт 7OH «на первой ошибку выдало, на второй
+                    // просто повисло»): было `return` — прерывал ВЕСЬ прогон, остальные
+                    // базы оставались в ожидании, IsRunning не сбрасывался и окно
+                    // блокировалось. Переход к следующей базе, итоговая строка — в finally.
+                    continue;
+                }
+
+                IbcmdResult result;
+                try
+                {
+                    Func<Infobase, string, DbmsBackupProfile?, CancellationToken, Task<IbcmdResult>> executor;
+                    if (ExecutorWithProfileOverride is not null)
+                        executor = ExecutorWithProfileOverride;
+                    else if (ExecutorOverride is not null)
+                        executor = (base_, path, _, token) => ExecutorOverride(base_, path, token);
+                    else
+                        executor = DefaultExecutorAsync;
+                    result = await executor(ib, targetPath, resolvedProfile, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    item.Status = BatchOperationsStatus.Skipped;
+                    item.SetStatusText(LocalizationManager.T("BatchOps.Cancelled"));
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.Cancelled")}");
+                    item.IsBusy = false;
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    result = IbcmdResult.Fail(ex.Message);
+                }
+
+                var elapsed = DateTime.Now - startedAt;
+                if (result.Success)
+                {
+                    ok++;
+                    item.Status = BatchOperationsStatus.Success;
+                    item.SetStatusText(targetPath);
+                    item.DurationText = FormatElapsed(elapsed);
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.OperationOk")} ({FormatElapsed(elapsed)})");
+                }
+                else
+                {
+                    failed++;
+                    item.Status = BatchOperationsStatus.Failed;
+                    // Issue #92: причина ошибки видна и в журнале окна, а не только
+                    // в статусе элемента списка: пользователь не должен гадать,
+                    // почему «завершилась ошибкой» без текста.
+                    var failureReason = string.IsNullOrWhiteSpace(result.Error)
+                        ? result.Output.Trim()
+                        : result.Error!.Trim();
+                    item.SetStatusText(failureReason);
+                    item.DurationText = FormatElapsed(elapsed);
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                              $"{LocalizationManager.T("BatchOps.OperationFailed")} ({FormatElapsed(elapsed)})"
+                              + (failureReason.Length > 0 ? $": {failureReason}" : string.Empty));
+                }
+            }
+            finally
+            {
+                if (prepareUndo is not null)
+                {
                     try
                     {
-                        resolvedProfile = await DbmsProfileResolver(ib, ct).ConfigureAwait(false);
+                        var restoreError = await PreparationService!.RestoreAfterAsync(ib, prepareUndo, ct).ConfigureAwait(false);
+                        if (restoreError is not null)
+                            AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {restoreError}");
                     }
                     catch (OperationCanceledException)
                     {
-                        item.IsBusy = false;
-                        throw;
+                        // Отмена при восстановлении: блокировка могла остаться — фиксируем.
+                        AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
+                                  LocalizationManager.T("BatchOps.Prepare.RestoreCancelled"));
                     }
                     catch (Exception ex)
                     {
                         AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
-                            LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"), ib.Connection.Server, ex.Message));
-                        resolvedProfile = null;
+                            LocalizationManager.T("BatchOps.Prepare.RestoreFailedFormat"), ex.Message));
                     }
-                    AppendLog(resolvedProfile is not null
-                        ? $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
-                            LocalizationManager.T("BatchOps.DbmsProfileResolved"),
-                            $"{resolvedProfile.Dbms}/{resolvedProfile.Host}/{resolvedProfile.Database}" +
-                            (string.IsNullOrEmpty(resolvedProfile.User) ? "" : $"/{resolvedProfile.User}"))
-                        : $"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + string.Format(
-                            LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
-                            ib.Connection.DatabaseName, ib.Connection.Server));
                 }
-            }
-
-            // Issue #92: fail-fast. Если база клиент-серверная, сохранённого профиля
-            // СУБД нет, а автоподстановка из rac не дала данных — ibcmd запускался
-            // «наудачу» и гарантированно падал с малопонятной ошибкой подключения.
-            // Вместо траты времени на ibcmd фиксируем статус ошибки сразу с понятным
-            // текстом, каким его показал бы <see cref="BatchOperationsService"/>.
-            if (dbmsResolveFailed && resolvedProfile is null)
-            {
-                failed++;
-                item.Status = BatchOperationsStatus.Failed;
-                var needProfileReason = string.Format(
-                    LocalizationManager.T("BatchOps.NeedDbmsProfileFormat"), ib.Name);
-                item.SetStatusText(needProfileReason);
-                item.DurationText = FormatElapsed(DateTime.Now - startedAt);
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
-                          $"{LocalizationManager.T("BatchOps.OperationFailed")} ({item.DurationText}): {needProfileReason}");
                 item.IsBusy = false;
-                return;
             }
-
-            IbcmdResult result;
-            try
-            {
-                Func<Infobase, string, DbmsBackupProfile?, CancellationToken, Task<IbcmdResult>> executor;
-                if (ExecutorWithProfileOverride is not null)
-                    executor = ExecutorWithProfileOverride;
-                else if (ExecutorOverride is not null)
-                    executor = (base_, path, _, token) => ExecutorOverride(base_, path, token);
-                else
-                    executor = DefaultExecutorAsync;
-                result = await executor(ib, targetPath, resolvedProfile, ct).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                item.Status = BatchOperationsStatus.Skipped;
-                item.SetStatusText(LocalizationManager.T("BatchOps.Cancelled"));
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.Cancelled")}");
-                item.IsBusy = false;
-                throw;
-            }
-            catch (Exception ex)
-            {
-                result = IbcmdResult.Fail(ex.Message);
-            }
-
-            var elapsed = DateTime.Now - startedAt;
-            if (result.Success)
-            {
-                ok++;
-                item.Status = BatchOperationsStatus.Success;
-                item.SetStatusText(targetPath);
-                item.DurationText = FormatElapsed(elapsed);
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.OperationOk")} ({FormatElapsed(elapsed)})");
-            }
-            else
-            {
-                failed++;
-                item.Status = BatchOperationsStatus.Failed;
-                // Issue #92: причина ошибки видна и в журнале окна, а не только
-                // в статусе элемента списка: пользователь не должен гадать,
-                // почему «завершилась ошибкой» без текста.
-                var failureReason = string.IsNullOrWhiteSpace(result.Error)
-                    ? result.Output.Trim()
-                    : result.Error!.Trim();
-                item.SetStatusText(failureReason);
-                item.DurationText = FormatElapsed(elapsed);
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " +
-                          $"{LocalizationManager.T("BatchOps.OperationFailed")} ({FormatElapsed(elapsed)})"
-                          + (failureReason.Length > 0 ? $": {failureReason}" : string.Empty));
-            }
-            item.IsBusy = false;
         }
 
         Summary = string.Format(LocalizationManager.T("BatchOps.SummaryFormat"), ok, failed, selected.Count);
         AppendLog("— " + Summary + " —");
-        IsRunning = false;
+        }
+        finally
+        {
+            IbcmdService.ProcessStarted -= OnIbcmdProcessStarted;
+            // Issue #92 (v1.0.1.21): IsRunning сбрасывается ВСЕГДА — при отмене и любом
+            // исключении окно разблокируется (ранее отмена оставляла кнопки заблокированными).
+            IsRunning = false;
+        }
     }
 
     /// <summary>

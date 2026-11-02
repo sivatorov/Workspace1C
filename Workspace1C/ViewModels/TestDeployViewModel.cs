@@ -207,13 +207,14 @@ public sealed class TestDeployViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Автосбор профиля СУБД для ibcmd из формы (issue #79, коммент 8: «профиль обязателен»):
-    /// при движке ibcmd для клиент-серверной базы параметры СУБД обязательны — если поля
-    /// СУБД формы пусты, они автоматически собираются из сохранённого профиля окна
-    /// «Резервные копии СУБД» (пользователю не требуется заполнять их повторно; значения
-    /// остаются на форме и выгрузка выполняется по ним — см.
-    /// TestDeployService.BuildDbmsProfileOverride). Возвращает true, если требование
-    /// выполнено либо движок ibcmd не задействован (не ibcmd / файловая база).
+    /// Автоподстановка профиля СУБД ИСХОДНОЙ базы при движке ibcmd (issue #79):
+    /// если поля СУБД формы пусты, они заполняются из сохранённого профиля окна
+    /// «Резервные копии СУБД» (v1.0.1.21 — только когда поля пусты: поля формы
+    /// описывают НОВУЮ (целевую) базу и используются для её создания; выгрузка
+    /// источника выполняется по профилю источника / данным rac, а автоподстановка
+    /// <see cref="AutofillDbNameFromServerDbName"/> имени целевой базы на выгрузку
+    /// больше не влияет). Наличие данных СУБД источника проверяет
+    /// <see cref="TestDeployService"/> до старта операций.
     /// </summary>
     public bool EnsureIbcmdProfileFromForm(Func<Infobase, DbmsBackupProfile?>? profileResolver = null)
     {
@@ -221,11 +222,12 @@ public sealed class TestDeployViewModel : ViewModelBase
             return true; // ibcmd не задействован — собирать нечего.
 
         if (!string.IsNullOrWhiteSpace(DbServer) && !string.IsNullOrWhiteSpace(DbName))
-            return true; // параметры уже на форме — используем их.
+            return true; // параметры целевой базы уже на форме — не трогаем их.
 
-        // Поля пусты — автосбор из сохранённого профиля в поля формы.
+        // Поля пусты — автосбор из сохранённого профиля ИСХОДНОЙ базы в поля формы
+        // (пользователю не требуется заполнять их повторно для создания SQL-БД).
         AutofillDbmsFromProfile(profileResolver);
-        return !string.IsNullOrWhiteSpace(DbServer) && !string.IsNullOrWhiteSpace(DbName);
+        return true; // выгрузка источника больше не зависит от полей формы (issue #79).
     }
 
     public bool DisableScheduledJobs { get; set; } = true;

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.20-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.21-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.20**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.21**
 (поддерживается **более 5 000 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -321,7 +321,10 @@
 - **Массовые операции по списку баз: выгрузка в .dt и загрузка конфигурации из .cf
   (1.0.1.7, issue #91, Windows и Linux)** — в меню «Утилиты» → «Операции» добавлены
   массовые операции по списку баз: выгрузка баз в файлы `.dt` и загрузка конфигурации
-  из файла `.cf` (покрыто `BatchOperationsTests`).
+  из файла `.cf` (покрыто `BatchOperationsTests`). С 1.0.1.21 в окне доступен блок
+  «Перед операцией» — завершение сеансов пользователей, блокировка начала сеансов
+  (с кодом разрешения) и блокировка регламентных заданий; после операции блокировки
+  снимаются автоматически (покрыто `BatchOpsPreparationServiceTests`).
 - **Автообновление: валидация скачанного файла по платформе (1.0.1.6, issue #89,
   Linux)** — Linux-сборка больше не применяет скачанный Windows-EXE («Обновление не
   может завершиться» у «застрявших» старых версий): файл проверяется по магическим

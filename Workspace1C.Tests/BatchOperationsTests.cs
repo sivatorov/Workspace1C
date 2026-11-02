@@ -284,5 +284,72 @@ public sealed class BatchOperationsTests
         // Первая база успела выполниться успешно, вторая осталась в статусе Running/Skipped.
         Assert.Equal(BatchOperationsStatus.Success, vm.Items[0].Status);
         Assert.NotEqual(BatchOperationsStatus.Success, vm.Items[1].Status);
+        // Issue #92 (v1.0.1.21): IsRunning сбрасывается даже при отмене — окно
+        // массовых операций больше не «повисает» с заблокированными кнопками.
+        Assert.False(vm.IsRunning);
+    }
+
+    // ===================== Issue #92 (v1.0.1.21): continue вместо return =====================
+
+    [Fact]
+    public async Task RunAsync_FailFastOnFirstBase_ContinuesToNextBase()
+    {
+        // RC-92-1 (репорт 7OH: «на первой ошибку выдало, на второй просто повисло»):
+        // fail-fast по первой клиент-серверной базе без данных СУБД больше не прерывает
+        // весь прогон — вторая база обрабатывается, итоговая строка выводится.
+        var server = new Infobase
+        {
+            Name = "Серверная",
+            Connection = new ConnectionSettings { Type = ConnectionType.ClientServer, Server = "srv1c", DatabaseName = "b1" }
+        };
+        var file = FileBase("Файловая");
+        var vm = new BatchOperationsViewModel(new[] { server, file }, BatchOperationKind.DumpDt)
+        {
+            PathText = Path.GetTempPath(),
+            Template = "{Имя}"
+        };
+        // Автоподстановка включена, но rac данных не дал (как у 7OH).
+        vm.DbmsProfileResolver = (_, _) => Task.FromResult<DbmsBackupProfile?>(null);
+
+        var executed = new List<string>();
+        vm.ExecutorOverride = (ib, _, _) =>
+        {
+            executed.Add(ib.Name);
+            return Task.FromResult(new IbcmdResult { Success = true, ExitCode = 0 });
+        };
+
+        await vm.RunAsync();
+
+        Assert.Equal(BatchOperationsStatus.Failed, vm.Items[0].Status);
+        Assert.Equal(BatchOperationsStatus.Success, vm.Items[1].Status);
+        // Вторая база реально обработана (ранее `return` не доходил до неё совсем).
+        Assert.Equal(new[] { "Файловая" }, executed);
+        Assert.False(vm.IsRunning);
+        Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
+    }
+
+    [Fact]
+    public async Task RunAsync_MixedResults_IsRunningReset()
+    {
+        // Тест RC-92-1.2: после прогона с ошибками IsRunning == false.
+        var ok = FileBase("Ок");
+        var bad = FileBase("Плохая");
+        var vm = new BatchOperationsViewModel(new[] { ok, bad }, BatchOperationKind.DumpDt)
+        {
+            PathText = Path.GetTempPath(),
+            Template = "{Имя}"
+        };
+        vm.ExecutorOverride = (ib, _, _) => Task.FromResult(new IbcmdResult
+        {
+            Success = ib.Name != "Плохая",
+            ExitCode = ib.Name != "Плохая" ? 0 : 1,
+            Error = ib.Name != "Плохая" ? null : "ibcmd: ошибка"
+        });
+
+        await vm.RunAsync();
+
+        Assert.False(vm.IsRunning);
+        Assert.Equal(BatchOperationsStatus.Failed, vm.Items[1].Status);
+        Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
     }
 }

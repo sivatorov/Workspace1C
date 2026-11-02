@@ -178,7 +178,77 @@ namespace Workspace1C
                 Children = { templateLabel, templateBox, _kindDtRadio, _kindCfRadio }
             };
             _dumpOptionsRow = dumpOptionsRow;
-            var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow } };
+
+            // Блок «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
+            // завершение сеансов и блокировки сеансов/регламентных заданий перед
+            // выгрузкой/загрузкой; после операции блокировки снимаются автоматически.
+            // Сервис подготовки; null — rac-клиент недоступен (в журнал сообщит VM).
+            _vm.PreparationService = BatchOpsPreparationService.CreateDefault(
+                line => _vm.WriteLog(line));
+            var prepareHeader = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.Prepare.Header"),
+                FontWeight = FontWeight.SemiBold,
+                Margin = new Thickness(0, 10, 0, 2)
+            };
+            var prepareTerminateCheck = new CheckBox
+            {
+                Content = LocalizationManager.T("BatchOps.Prepare.TerminateSessions"),
+                Margin = new Thickness(0, 1)
+            };
+            prepareTerminateCheck.Bind(CheckBox.IsCheckedProperty,
+                new Avalonia.Data.Binding("PrepareTerminateSessions") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            var prepareDenySessionsCheck = new CheckBox
+            {
+                Content = LocalizationManager.T("BatchOps.Prepare.DenyNewSessions"),
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            prepareDenySessionsCheck.Bind(CheckBox.IsCheckedProperty,
+                new Avalonia.Data.Binding("PrepareDenyNewSessions") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            var preparePermissionLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.Prepare.PermissionCode"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(16, 0, 6, 0)
+            };
+            var preparePermissionBox = new TextBox
+            {
+                Width = 140,
+                VerticalContentAlignment = VerticalAlignment.Center
+            }.Styled(ControlThemes.ModernTextBox);
+            ThemeBrushes.Bind(preparePermissionBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(preparePermissionBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
+            ToolTip.SetTip(preparePermissionBox, LocalizationManager.T("BatchOps.Prepare.PermissionCodeHint"));
+            preparePermissionBox.Bind(TextBox.TextProperty,
+                new Avalonia.Data.Binding("PreparePermissionCode") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            var prepareDenyRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 1),
+                Children = { prepareDenySessionsCheck, preparePermissionLabel, preparePermissionBox }
+            };
+            var prepareDenyJobsCheck = new CheckBox
+            {
+                Content = LocalizationManager.T("BatchOps.Prepare.DenyScheduledJobs"),
+                Margin = new Thickness(0, 1)
+            };
+            prepareDenyJobsCheck.Bind(CheckBox.IsCheckedProperty,
+                new Avalonia.Data.Binding("PrepareDenyScheduledJobs") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            var prepareHint = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.Prepare.Hint"),
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Opacity = 0.75
+            };
+            var preparePanel = new StackPanel
+            {
+                Children =
+                {
+                    prepareHeader, prepareTerminateCheck, prepareDenyRow, prepareDenyJobsCheck, prepareHint
+                }
+            };
+            var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow, preparePanel } };
 
             var logHeader = new TextBlock
             {

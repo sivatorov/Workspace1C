@@ -92,14 +92,21 @@ public sealed class TestDeployViewModelProfileTests
     }
 
     [Fact]
-    public void EnsureIbcmdProfileFromForm_NoProfile_ReturnsFalse()
+    public void EnsureIbcmdProfileFromForm_NoProfile_ReturnsTrue_FieldsNotFilled()
     {
+        // issue #79 (v1.0.1.21): поля формы описывают НОВУЮ (целевую) базу; выгрузка
+        // источника выполняется по профилю источника / данным rac и от полей формы
+        // не зависит — метод больше не «проваливает» сценарий без профиля. Наличие
+        // данных СУБД источника проверяет TestDeployService до старта операций.
         var vm = new TestDeployViewModel(
             MakeClientServerSource(), Array.Empty<Infobase>(), Array.Empty<Group>(),
             "Прод_Тест", "srv01", "proddb_test", string.Empty);
         vm.EngineIndex = 1;
 
-        Assert.False(vm.EnsureIbcmdProfileFromForm(_ => null));
+        Assert.True(vm.EnsureIbcmdProfileFromForm(_ => null));
+        // Профиль не найден — поля формы (целевой базы) не заполнялись.
+        Assert.Equal(string.Empty, vm.DbServer);
+        Assert.Equal(string.Empty, vm.DbName);
     }
 
     [Fact]

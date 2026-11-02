@@ -1,0 +1,201 @@
+using System.Threading;
+using Workspace1C.Models;
+using Workspace1C.Services;
+using Xunit;
+
+namespace Workspace1C.Tests;
+
+/// <summary>
+/// Тесты исправления issue #79 (v1.0.1.21): выгрузка ИСХОДНОЙ базы через ibcmd
+/// больше не выполняется по параметрам СУБД новой (целевой) базы. Проверяются:
+/// <list type="bullet">
+/// <item>поля формы с целевым именем SQL-БД («источник_t») не попадают в профиль выгрузки;</item>
+/// <item>валидация <see cref="TestDeployPlanner"/> проходит при наличии профиля источника,
+/// даже если поля формы заполнены целевыми значениями;</item>
+/// <item>полное отсутствие данных СУБД источника — понятная ошибка ДО старта операций.</item>
+/// </list>
+/// </summary>
+public sealed class TestDeploySourceDumpProfileTests
+{
+    private static Infobase ServerSource(string name = "Бухгалтерия") => new()
+    {
+        Id = "src-1",
+        Name = name,
+        PlatformVersion = "8.3.25.1000",
+        Connection = new ConnectionSettings
+        {
+            Type = ConnectionType.ClientServer,
+            Server = "srv1c",
+            DatabaseName = name
+        }
+    };
+
+    private static TestDeployScenario TargetScenario(string sourceName = "Бухгалтерия") => new()
+    {
+        SourceInfobaseId = "src-1",
+        SourceInfobaseName = sourceName,
+        TargetName = "Тест: " + sourceName,
+        TargetMode = TestDeployTargetMode.Server,
+        ServerAddress = "srv1c",
+        DatabaseName = "Тест: " + sourceName,
+        Dbms = "PostgreSQL",
+        DbServer = "pg-target",
+        DbName = sourceName + "_t",
+        DbUser = "sa",
+        DbPassword = "pwd",
+        CreateSqlDatabase = true,
+        DumpEngine = BackupEngine.Ibcmd
+    };
+
+    // ============ FormFieldsDescribeSource / BuildFormProfileIfSource ============
+
+    [Fact]
+    public void FormFieldsDescribeSource_TargetDbName_ReturnsFalse()
+    {
+        // Автоподстановка «Имя базы данных в СУБД» из имени новой базы («…_t»):
+        // такие поля выгрузку источника обеспечить не могут (issue #79).
+        var source = ServerSource();
+        var scenario = TargetScenario();
+
+        Assert.False(TestDeployPlanner.FormFieldsDescribeSource(scenario, source, savedProfile: null));
+        Assert.Null(TestDeployService.BuildFormProfileIfSource(scenario, source, savedProfile: null));
+    }
+
+    [Fact]
+    public void FormFieldsDescribeSource_MatchesRef_ReturnsTrue()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        scenario.DbName = "Бухгалтерия"; // совпадает с Ref исходной базы
+
+        Assert.True(TestDeployPlanner.FormFieldsDescribeSource(scenario, source, savedProfile: null));
+        var profile = TestDeployService.BuildFormProfileIfSource(scenario, source, savedProfile: null);
+        Assert.NotNull(profile);
+        Assert.Equal("Бухгалтерия", profile!.Database);
+        Assert.Equal("pg-target", profile.Host);
+    }
+
+    [Fact]
+    public void FormFieldsDescribeSource_MatchesSavedProfile_ReturnsTrue()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        scenario.DbName = "buh_db"; // совпадает с сохранённым профилем
+        var saved = new DbmsBackupProfile { InfobaseId = "src-1", Dbms = DbmsKind.PostgreSql, Database = "buh_db" };
+
+        Assert.True(TestDeployPlanner.FormFieldsDescribeSource(scenario, source, saved));
+    }
+
+    [Fact]
+    public void FormFieldsDescribeSource_EmptyFields_ReturnsFalse()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        scenario.DbName = string.Empty;
+        Assert.False(TestDeployPlanner.FormFieldsDescribeSource(scenario, source, savedProfile: null));
+        scenario.DbName = "Бухгалтерия";
+        scenario.DbServer = string.Empty;
+        Assert.False(TestDeployPlanner.FormFieldsDescribeSource(scenario, source, savedProfile: null));
+    }
+
+    // ============ Валидация планировщика по источнику ============
+
+    [Fact]
+    public void Validate_WithSourceProfile_Passes_EvenWithTargetFormFields()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario(); // поля формы — целевые («…_t»)
+        scenario.AddToTestGroup = false;
+
+        var errors = TestDeployPlanner.Validate(
+            scenario, source, existingTarget: null,
+            dbmsProfileResolver: _ => new DbmsBackupProfile
+            {
+                InfobaseId = "src-1",
+                Dbms = DbmsKind.PostgreSql,
+                Host = "pg-src",
+                Database = "buh_db"
+            });
+
+        Assert.DoesNotContain("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    [Fact]
+    public void Validate_TargetFormFieldsOnly_ReportsNeedDbmsProfile()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario(); // DbName = «Бухгалтерия_t», профиля нет
+        scenario.AddToTestGroup = false;
+
+        var errors = TestDeployPlanner.Validate(
+            scenario, source, existingTarget: null, dbmsProfileResolver: _ => null);
+
+        // Валидация «зелёной» не будет: целевые поля формы не считаются данными источника.
+        Assert.Contains("TestDeploy.NeedDbmsProfile", errors);
+    }
+
+    // ============ ResolveSourceDumpProfileAsync (цепочка профиль → rac → форма) ============
+
+    [Fact]
+    public async Task ResolveSourceDumpProfileAsync_TargetFieldsOnly_ReturnsError()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        var service = new TestDeployService();
+
+        var (profile, error) = await service.ResolveSourceDumpProfileAsync(
+            source, scenario, log: null, CancellationToken.None,
+            savedProfileLoader: _ => null,
+            resolverFactory: () => null);
+
+        Assert.Null(profile);
+        // Понятная ошибка ДО шага «Выгрузка»: в тестовом окружении локализация не
+        // загружена — возвращается ключ строки.
+        Assert.Equal("TestDeploy.DbmsProfileNotFound", error);
+    }
+
+    [Fact]
+    public async Task ResolveSourceDumpProfileAsync_SavedProfileUsed_TargetFieldsIgnored()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        var service = new TestDeployService();
+        var saved = new DbmsBackupProfile
+        {
+            InfobaseId = "src-1",
+            Dbms = DbmsKind.PostgreSql,
+            Host = "pg-src",
+            Database = "buh_db",
+            User = "postgres"
+        };
+
+        var (profile, error) = await service.ResolveSourceDumpProfileAsync(
+            source, scenario, log: null, CancellationToken.None,
+            savedProfileLoader: _ => saved,
+            resolverFactory: () => null);
+
+        Assert.Null(error);
+        Assert.NotNull(profile);
+        // Выгрузка идёт по данным ИСТОЧНИКА, а не целевой базы «…_t».
+        Assert.Equal("buh_db", profile!.Database);
+        Assert.Equal("pg-src", profile.Host);
+    }
+
+    [Fact]
+    public async Task ResolveSourceDumpProfileAsync_FormFieldsMatchingRef_Used()
+    {
+        var source = ServerSource();
+        var scenario = TargetScenario();
+        scenario.DbName = "Бухгалтерия"; // поля заведомо описывают источник
+        var service = new TestDeployService();
+
+        var (profile, error) = await service.ResolveSourceDumpProfileAsync(
+            source, scenario, log: null, CancellationToken.None,
+            savedProfileLoader: _ => null,
+            resolverFactory: () => null);
+
+        Assert.Null(error);
+        Assert.NotNull(profile);
+        Assert.Equal("Бухгалтерия", profile!.Database);
+    }
+}

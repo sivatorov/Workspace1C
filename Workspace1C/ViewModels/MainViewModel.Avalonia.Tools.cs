@@ -1661,9 +1661,14 @@ public partial class MainViewModel : ViewModelBase
             // Автоподстановка данных СУБД из кластера (rac) для серверных баз без
             // профиля (issue #92, v100114); null при недоступном rac — старое поведение.
             BuildDbmsProfileResolver());
+        // Опции «Перед операцией» (issue #92, v1.0.1.21): состояние чекбоксов
+        // восстанавливается из настроек; код разрешения не сохраняется.
+        window.ViewModel.PrepareTerminateSessions = _settings.BatchOpsTerminateSessions;
+        window.ViewModel.PrepareDenyNewSessions = _settings.BatchOpsDenyNewSessions;
+        window.ViewModel.PrepareDenyScheduledJobs = _settings.BatchOpsDenyScheduledJobs;
         window.ShowDialogSync(OwnerWindow());
 
-        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).
+        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF, опции подготовки).
         var vm = window.ViewModel;
         _settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.Template)
             ? BatchOperationsService.DefaultDumpTemplate : vm.Template.Trim();
@@ -1672,6 +1677,9 @@ public partial class MainViewModel : ViewModelBase
             _settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
             _settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
         }
+        _settings.BatchOpsTerminateSessions = vm.PrepareTerminateSessions;
+        _settings.BatchOpsDenyNewSessions = vm.PrepareDenyNewSessions;
+        _settings.BatchOpsDenyScheduledJobs = vm.PrepareDenyScheduledJobs;
         SaveSettingsSilently();
     }
 

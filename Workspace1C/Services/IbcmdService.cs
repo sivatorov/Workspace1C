@@ -40,6 +40,15 @@ public static class IbcmdService
 {
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromHours(3);
 
+    /// <summary>
+    /// Статическое событие фактического запуска процесса ibcmd (issue #92, v1.0.1.21):
+    /// (путь к исполняемому файлу, PID). Окно массовых операций пишет в журнал
+    /// «запущен ibcmd (PID …)» — иначе «повисло» неотличимо от работы: пользователь
+    /// не видит, что процесс реально стартовал. Подписчики не должны бросать
+    /// исключений (они здесь гасятся, чтобы не ронять операцию).
+    /// </summary>
+    public static event Action<string, int>? ProcessStarted;
+
     /// <summary>Имя исполняемого файла ibcmd для текущей ОС.</summary>
     public static string ExecutableName => OperatingSystem.IsWindows() ? "ibcmd.exe" : "ibcmd";
 
@@ -321,6 +330,11 @@ public static class IbcmdService
         }
         if (process is null)
             return IbcmdResult.Fail(LocalizationManager.T("Designer.StartFailed"));
+
+        // issue #92 (v1.0.1.21): процесс реально стартовал — подписчики (окно массовых
+        // операций) пишут «запущен ibcmd (PID …)». Исключения подписчиков гасятся:
+        // сбой журналирования не должен ронять операцию.
+        try { ProcessStarted?.Invoke(exe, process.Id); } catch { /* подписчик упал */ }
 
         using (process)
         {

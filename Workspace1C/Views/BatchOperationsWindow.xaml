@@ -97,6 +97,27 @@
                 <RadioButton x:Name="KindCfRadio" GroupName="BatchDumpKind" Margin="12,0,0,0"
                              VerticalAlignment="Center" Checked="OnKindCf_Checked"/>
             </StackPanel>
+
+            <!-- Блок «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi):
+                 завершение сеансов и блокировки сеансов/регламентных заданий перед
+                 выгрузкой/загрузкой; после операции блокировки снимаются автоматически. -->
+            <StackPanel x:Name="PreparePanel" Margin="0,10,0,0">
+                <TextBlock x:Name="PrepareHeader" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                <CheckBox x:Name="PrepareTerminateCheck" Margin="0,1"
+                          IsChecked="{Binding PrepareTerminateSessions, UpdateSourceTrigger=PropertyChanged}"/>
+                <StackPanel Orientation="Horizontal" Margin="0,1">
+                    <CheckBox x:Name="PrepareDenySessionsCheck" VerticalAlignment="Center"
+                              IsChecked="{Binding PrepareDenyNewSessions, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock x:Name="PreparePermissionLabel" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                    <TextBox x:Name="PreparePermissionBox" Width="140" VerticalContentAlignment="Center"
+                             Text="{Binding PreparePermissionCode, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{loc:Loc BatchOps.Prepare.PermissionCodeHint}"/>
+                </StackPanel>
+                <CheckBox x:Name="PrepareDenyJobsCheck" Margin="0,1"
+                          IsChecked="{Binding PrepareDenyScheduledJobs, UpdateSourceTrigger=PropertyChanged}"/>
+                <TextBlock x:Name="PrepareHint" FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+            </StackPanel>
         </StackPanel>
 
         <TextBlock x:Name="LogHeader" Grid.Row="4" Margin="0,14,0,6" FontWeight="SemiBold"

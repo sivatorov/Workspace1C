@@ -23,8 +23,35 @@ namespace Workspace1C.Services;
 /// колонке «name»), по образцу <see cref="ClusterInfobaseCredentials.Find"/>.
 /// </para>
 /// </summary>
+/// <summary>
+/// Расширенный результат автоподстановки (issue #92, v1.0.1.21, п.3 фичи блокировок):
+/// профиль СУБД плюс идентификаторы кластера/ИБ и параметры подключения — чтобы
+/// подготовка массовых операций (<see cref="BatchOpsPreparationService"/>) не делала
+/// rac-запросы повторно. <see cref="Profile"/> может быть null (например, тип СУБД
+/// не поддерживается ibcmd), а идентификаторы при этом заполнены.
+/// </summary>
+public sealed record ClusterInfobaseCredentialsResolution
+{
+    /// <summary>Профиль СУБД для ibcmd (пароль пуст); null — данные не собраны.</summary>
+    public DbmsBackupProfile? Profile { get; init; }
+
+    /// <summary>Идентификатор кластера, в котором найдена ИБ.</summary>
+    public Guid ClusterId { get; init; }
+
+    /// <summary>Идентификатор ИБ в кластере.</summary>
+    public Guid InfobaseId { get; init; }
+
+    /// <summary>Параметры подключения rac, с которыми выполнялся поиск.</summary>
+    public RacConnectionParams Parameters { get; init; } = new();
+}
+
 public sealed class ClusterInfobaseCredentialsResolver
 {
+    /// <summary>Общий таймаут резолва одной базы (issue #92, v1.0.1.21): перебор
+    /// кластеров не может тянуться дольше минуты — при недоступных серверах несколько
+    /// rac-проб подряд по 30 с выглядят как зависание без внятного прогресса.</summary>
+    public static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(60);
+
     private readonly IRacClient _racClient;
     private readonly IReadOnlyList<ManagementServer> _servers;
     private readonly Action<string>? _log;
@@ -72,29 +99,46 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// (кроме отмены операции <see cref="OperationCanceledException"/>).
     /// </summary>
     public async Task<DbmsBackupProfile?> ResolveAsync(Infobase? infobase, CancellationToken ct = default)
+        => (await ResolveDetailedAsync(infobase, ct).ConfigureAwait(false)).Profile;
+
+    /// <summary>
+    /// То же, что <see cref="ResolveAsync"/>, но вместе с профилем возвращаются
+    /// идентификаторы кластера/ИБ и параметры подключения (v1.0.1.21, для подготовки
+    /// массовых операций). Общий таймаут последовательности кластеров —
+    /// <see cref="ResolveTimeout"/> (60 с); превышение трактуется как «данные не
+    /// получены» (лог + null), отмена операции пользователем — пробрасывается.
+    /// </summary>
+    public async Task<ClusterInfobaseCredentialsResolution> ResolveDetailedAsync(
+        Infobase? infobase, CancellationToken ct = default)
     {
         var connection = infobase?.Connection;
         if (connection?.Type != ConnectionType.ClientServer)
-            return null; // файловые/веб-базы не требуют данных СУБД.
+            return new(); // файловые/веб-базы не требуют данных СУБД.
 
         var infobaseName = connection.DatabaseName?.Trim();
         if (string.IsNullOrWhiteSpace(infobaseName))
         {
             _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveNoName"));
-            return null;
+            return new();
         }
 
         var parameters = BuildConnectionParams(connection.Server, _servers);
         try
         {
-            var clusters = await _racClient.GetClustersAsync(parameters, ct).ConfigureAwait(false);
+            // Issue #92 (v1.0.1.21): общий таймаут на резолв одной базы — linked CTS
+            // на всю последовательность кластеров; rac-клиенту передаётся этот токен.
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeoutCts.CancelAfter(ResolveTimeout);
+
+            var clusters = await _racClient.GetClustersAsync(parameters, timeoutCts.Token).ConfigureAwait(false);
             foreach (var cluster in clusters)
             {
                 IReadOnlyList<RacInfobaseSummary> summaries;
+                var probeStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
                     summaries = await _racClient
-                        .GetInfobasesAsync(parameters, cluster.Id, ct)
+                        .GetInfobasesAsync(parameters, cluster.Id, timeoutCts.Token)
                         .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { throw; }
@@ -104,6 +148,20 @@ public sealed class ClusterInfobaseCredentialsResolver
                         LocalizationManager.T("BatchOps.DbmsResolveClusterListFailed"),
                         cluster.Id, ex.Message));
                     continue; // другой кластер может ответить.
+                }
+                finally
+                {
+                    // Длительность пробы логируется только для МЕДЛЕННЫХ кластеров
+                    // (>= 1 с): длительные rac-пробы при недоступном сервере выглядят
+                    // как зависание (issue #92, v1.0.1.21); при штатной работе журнал
+                    // остаётся чистым.
+                    probeStopwatch.Stop();
+                    if (probeStopwatch.ElapsedMilliseconds >= 1000)
+                    {
+                        _log?.Invoke(string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveProbeDurationFormat"),
+                            cluster.Id, probeStopwatch.ElapsedMilliseconds));
+                    }
                 }
 
                 var match = summaries.FirstOrDefault(s =>
@@ -120,17 +178,66 @@ public sealed class ClusterInfobaseCredentialsResolver
 
                 var profile = ToProfile(match, infobase!.Id, infobaseName);
                 if (profile is not null)
-                    return profile;
+                {
+                    return new ClusterInfobaseCredentialsResolution
+                    {
+                        Profile = profile,
+                        ClusterId = cluster.Id,
+                        InfobaseId = match.InfobaseId,
+                        Parameters = parameters
+                    };
+                }
 
+                // Issue #92 (v1.0.1.21): rac 8.5.4 в «infobase summary list» отдаёт ПУСТОЙ
+                // тип СУБД («тип СУБД «» не поддерживается») — догружаем полные свойства
+                // командой «infobase info», где dbms/db-server/db-name присутствуют полнее.
                 _log?.Invoke(string.Format(
                     LocalizationManager.T("BatchOps.DbmsResolveUnsupportedDbms"),
                     infobaseName, match.Dbms));
+                _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveInfoFallback"));
+                try
+                {
+                    var info = await _racClient.GetInfobaseInfoAsync(
+                        parameters, cluster.Id, match.InfobaseId,
+                        infobaseUser: null, infobasePassword: null, timeoutCts.Token).ConfigureAwait(false);
+                    profile = info is null ? null : ToProfile(info, infobase.Id, infobaseName);
+                    if (profile is not null)
+                    {
+                        _log?.Invoke(string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveInfoOkFormat"),
+                            $"{profile.Dbms}/{profile.Host}/{profile.Database}" +
+                            (string.IsNullOrEmpty(profile.User) ? "" : $"/{profile.User}")));
+                        return new ClusterInfobaseCredentialsResolution
+                        {
+                            Profile = profile,
+                            ClusterId = cluster.Id,
+                            InfobaseId = match.InfobaseId,
+                            Parameters = parameters
+                        };
+                    }
+                    _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveInfoFailed"));
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _log?.Invoke(string.Format(
+                        LocalizationManager.T("BatchOps.DbmsResolveInfoFailedFormat"), ex.Message));
+                }
             }
 
             _log?.Invoke(string.Format(
                 LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
                 infobaseName, parameters.Address));
-            return null;
+            return new();
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Сработал общий таймаут резолва (не отмена операции пользователем) —
+            // трактуем как «данные не получены» с записью в журнал (issue #92, v1.0.1.21).
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("BatchOps.DbmsResolveTimeoutFormat"),
+                (int)ResolveTimeout.TotalSeconds));
+            return new();
         }
         catch (OperationCanceledException)
         {
@@ -141,7 +248,7 @@ public sealed class ClusterInfobaseCredentialsResolver
             _log?.Invoke(string.Format(
                 LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"),
                 parameters.Address, ex.Message));
-            return null;
+            return new();
         }
     }
 
@@ -193,6 +300,32 @@ public sealed class ClusterInfobaseCredentialsResolver
         }
 
         return new RacConnectionParams { Address = host, Port = IRacClient.DefaultPort };
+    }
+
+    /// <summary>
+    /// Профиль СУБД из полных свойств ИБ («infobase info», issue #92 v1.0.1.21) —
+    /// fallback при пустой колонке «dbms» в «infobase summary list» (rac 8.5.4).
+    /// Правила те же: поддерживаемые СУБД, пароль остаётся пустым.
+    /// </summary>
+    internal static DbmsBackupProfile? ToProfile(RacInfobaseInfo info, string? infobaseId, string infobaseName)
+    {
+        if (info is null)
+            return null;
+        var dbms = ParseDbms(info.Dbms);
+        if (dbms is null)
+            return null;
+
+        var (host, port) = ParseDbServer(info.DbServer);
+        return new DbmsBackupProfile
+        {
+            InfobaseId = infobaseId ?? string.Empty,
+            Dbms = dbms.Value,
+            Host = host,
+            Port = port,
+            Database = string.IsNullOrWhiteSpace(info.DbName) ? infobaseName : info.DbName.Trim(),
+            User = info.DbUser?.Trim() ?? string.Empty,
+            Password = string.Empty
+        };
     }
 
     /// <summary>

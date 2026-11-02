@@ -29,6 +29,11 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         public int ClustersCallCount;
         public RacConnectionParams? LastParameters;
 
+        // issue #92 (v1.0.1.21): фейк «infobase info» для проверки fallback
+        // при пустом типе СУБД в «infobase summary list» (rac 8.5.4).
+        public RacInfobaseInfo? Info { get; init; }
+        public int InfoCallCount;
+
         public Task<IReadOnlyList<RacCluster>> GetClustersAsync(
             RacConnectionParams parameters, CancellationToken cancellationToken = default)
         {
@@ -42,6 +47,14 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
             RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
             => Task.FromResult(Infobases);
+
+        public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
+            RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref InfoCallCount);
+            return Task.FromResult(Info);
+        }
 
         public Task<RacClusterInfo?> GetClusterInfoAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)
             => throw new NotImplementedException();
@@ -363,6 +376,56 @@ public sealed class ClusterInfobaseCredentialsResolverTests
 
         Assert.Null(profile);
         Assert.Equal(0, rac.ClustersCallCount);
+    }
+
+    // ======================= Fallback «infobase info» (issue #92, v1.0.1.21) =======================
+
+    [Fact]
+    public async Task ResolveAsync_EmptyDbmsInSummary_FallsBackToInfobaseInfo()
+    {
+        // rac 8.5.4 отдаёт пустой тип СУБД в «infobase summary list» — профиль
+        // строится из полных свойств «infobase info» (RC-92-2, репорт 7OH).
+        var rac = new FakeRacClient
+        {
+            Clusters = new[] { new RacCluster { Id = Guid.NewGuid() } },
+            Infobases = new[] { Summary(dbms: "") },
+            Info = new RacInfobaseInfo
+            {
+                Dbms = "PostgreSQL",
+                DbServer = "pg-host port=5433",
+                DbName = "zup_db",
+                DbUser = "postgres"
+            }
+        };
+        var resolver = CreateResolver(rac, out _);
+
+        var profile = await resolver.ResolveAsync(ServerBase());
+
+        Assert.NotNull(profile);
+        Assert.Equal(DbmsKind.PostgreSql, profile!.Dbms);
+        Assert.Equal("pg-host", profile.Host);
+        Assert.Equal(5433, profile.Port);
+        Assert.Equal("zup_db", profile.Database);
+        Assert.Equal("postgres", profile.User);
+        Assert.Equal(1, rac.InfoCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EmptyDbms_InfoUnsupported_ReturnsNull()
+    {
+        // «infobase info» тоже не дал поддерживаемой СУБД — профиль не строится.
+        var rac = new FakeRacClient
+        {
+            Clusters = new[] { new RacCluster { Id = Guid.NewGuid() } },
+            Infobases = new[] { Summary(dbms: "") },
+            Info = new RacInfobaseInfo { Dbms = "IBMDB2", DbServer = "db2-host", DbName = "zup" }
+        };
+        var resolver = CreateResolver(rac, out _);
+
+        var profile = await resolver.ResolveAsync(ServerBase());
+
+        Assert.Null(profile);
+        Assert.Equal(1, rac.InfoCallCount);
     }
 
     // ======================= Парсеры =======================

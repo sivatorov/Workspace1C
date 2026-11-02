@@ -1,0 +1,20 @@
+Release 1.0.1.21: фикс зависания массовой выгрузки DT/CF (#92) и профиль СУБД источника при выгрузке в «Развернуть тестовую копию» (#79)
+
+- issue #92: устранено зависание массовой выгрузки DT/CF — подготовка
+  вынесена в BatchOpsPreparationService (Services/), этапы выполняются
+  асинхронно с прогрессом по каждой базе, UI больше не блокируется на
+  длинных операциях; «Перед операцией» для массовых операций: выбор
+  остановки сеансов и установки блокировок соединений перед выгрузкой
+  (настройки профилей в AppSettings, UI в BatchOperationsWindow.xaml/
+  BatchOperationsWindow.Avalonia.cs, локализация ru/en);
+- issue #92: пустой тип СУБД для кластера rac 8.5.4 — дополнительно
+  запрашиваются опции завершения сеансов и блокировки сеансов;
+- issue #79: профиль СУБД источника при выгрузке в «Развернуть тестовую
+  копию» — ClusterInfobaseCredentialsResolver корректно определяет
+  профиль источника, TestDeployPlanner/TestDeployService используют
+  параметры подключения источника при дампе;
+- тесты: новые BatchOpsPreparationServiceTests,
+  TestDeploySourceDumpProfileTests, дополнены BatchOperationsTests,
+  ClusterInfobaseCredentialsResolverTests, TestDeployViewModelProfileTests;
+- версия 1.0.1.20 → 1.0.1.21 (csproj: Version/AssemblyVersion/
+  FileVersion/InformationalVersion), CHANGELOG.md, README.md.

@@ -2867,9 +2867,14 @@ public partial class MainViewModel : ViewModelBase
         {
             Owner = System.Windows.Application.Current.MainWindow
         };
+        // Опции «Перед операцией» (issue #92, v1.0.1.21): состояние чекбоксов
+        // восстанавливается из настроек; код разрешения не сохраняется.
+        window.ViewModel.PrepareTerminateSessions = settings.BatchOpsTerminateSessions;
+        window.ViewModel.PrepareDenyNewSessions = settings.BatchOpsDenyNewSessions;
+        window.ViewModel.PrepareDenyScheduledJobs = settings.BatchOpsDenyScheduledJobs;
         window.ShowDialog();
 
-        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF).
+        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF, опции подготовки).
         var vm = window.ViewModel;
         settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.Template)
             ? BatchOperationsService.DefaultDumpTemplate : vm.Template.Trim();
@@ -2878,6 +2883,9 @@ public partial class MainViewModel : ViewModelBase
             settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
             settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
         }
+        settings.BatchOpsTerminateSessions = vm.PrepareTerminateSessions;
+        settings.BatchOpsDenyNewSessions = vm.PrepareDenyNewSessions;
+        settings.BatchOpsDenyScheduledJobs = vm.PrepareDenyScheduledJobs;
         try { _repository.SaveSettings(settings); }
         catch
         {

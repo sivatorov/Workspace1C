@@ -76,6 +76,24 @@ public sealed class TestDeployService
             result.Steps = TestDeployPlanner.DescribeSteps(scenario, existing, groupPlan);
             result.Log.Add(string.Format(T("TestDeploy.StartedFrom"), source.Name, targetName));
 
+            // Issue #79 (v1.0.1.21): параметры СУБД для выгрузки ИСХОДНОЙ базы разрешаются
+            // ДО старта операций: профиль → rac → совпадающие с источником поля формы.
+            // Если данных нет — понятная ошибка валидации до шага «Выгрузка», целевая
+            // база не создаётся наполовину.
+            DbmsBackupProfile? dumpProfile = null;
+            if (scenario.DumpEngine == BackupEngine.Ibcmd
+                && source.Connection?.Type == ConnectionType.ClientServer)
+            {
+                var (profile, profileError) = await ResolveSourceDumpProfileAsync(
+                    source, scenario, log, cancellationToken).ConfigureAwait(false);
+                if (profileError is not null)
+                {
+                    result.ErrorMessage = profileError + "\n" + T("TestDeploy.IbcmdCredentialsHint");
+                    return result;
+                }
+                dumpProfile = profile;
+            }
+
             var tmpRoot = Path.Combine(Path.GetTempPath(), "cm_testdeploy_" + Guid.NewGuid().ToString("N"));
             try
             {
@@ -85,7 +103,7 @@ public sealed class TestDeployService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var dtPath = TestDeployPlanner.BuildDumpPath(tmpRoot);
-                var dumpError = await DumpAsync(source, scenario, dtPath, cancellationToken).ConfigureAwait(false);
+                var dumpError = await DumpAsync(source, scenario, dtPath, dumpProfile, cancellationToken).ConfigureAwait(false);
                 if (dumpError is not null)
                 {
                     result.ErrorMessage = Fail(T("TestDeploy.Step.Dump"), dumpError);
@@ -273,9 +291,11 @@ public sealed class TestDeployService
         return null;
     }
 
-    /// <summary>Выгрузка .dt движком из сценария (конфигуратор или ibcmd).</summary>
+    /// <summary>Выгрузка .dt движком из сценария (конфигуратор или ibcmd). Для ibcmd
+    /// передаётся профиль СУБД ИСТОЧНИКА, разрешённый заранее (issue #79, v1.0.1.21).</summary>
     private async Task<string?> DumpAsync(
-        Infobase source, TestDeployScenario scenario, string dtPath, CancellationToken ct)
+        Infobase source, TestDeployScenario scenario, string dtPath,
+        DbmsBackupProfile? sourceDbmsProfile, CancellationToken ct)
     {
         if (scenario.DumpEngine == BackupEngine.Ibcmd)
         {
@@ -284,11 +304,10 @@ public sealed class TestDeployService
                 return T("Ibcmd.NotFound");
             // issue #79: явные учётные данные из мастера (блок «Данные для ibcmd») или
             // null — резолвер (авторизация базы + общая авторизация приложения).
-            // issue #79 (1.0.1.9): параметры СУБД для подключения ibcmd — по значениям
-            // на форме мастера (BuildDbmsProfileOverride); при пустых полях формы
-            // используется сохранённый профиль базы (как раньше, внутри IbcmdService).
-            var dbmsOverride = BuildDbmsProfileOverride(scenario, source);
-            var res = await IbcmdService.DumpAsync(source, dtPath, scenario.Credential, ct, dbmsOverride).ConfigureAwait(false);
+            // issue #79 (1.0.1.21): выгрузка источника выполняется по профилю СУБД
+            // ИСТОЧНИКА (ResolveSourceDumpProfileAsync); поля формы мастера описывают
+            // новую (целевую) базу и в выгрузку не попадают.
+            var res = await IbcmdService.DumpAsync(source, dtPath, scenario.Credential, ct, sourceDbmsProfile).ConfigureAwait(false);
             if (!res.Success)
                 return res.Error ?? T("Backup.Failed");
             if (!File.Exists(dtPath) || new FileInfo(dtPath).Length == 0)
@@ -400,18 +419,90 @@ public sealed class TestDeployService
     }
 
     /// <summary>
-    /// Профиль СУБД, собранный из полей формы мастера (issue #79, 1.0.1.9, 7OH: «либо
-    /// данные из профиля, либо вручную. А выполнять работу по тому, что на форме»).
-    /// Передаётся в <see cref="IbcmdService.DumpAsync"/> как переопределение — выгрузка
-    /// выполняется по значениям на форме, без требования сохранённого профиля. Для
-    /// файловой базы или незаполненных полей возвращается null (работает прежняя логика
-    /// с сохранённым профилем).
+    /// Разрешает параметры СУБД для выгрузки ИСХОДНОЙ базы через ibcmd (issue #79,
+    /// v1.0.1.21): 1) сохранённый профиль источника (окно «Резервные копии СУБД»);
+    /// 2) автоподстановка из rac по исходной базе — данные из кластера, где реально
+    /// живёт источник; 3) поля формы мастера — ТОЛЬКО если они заведомо описывают
+    /// источник (совпадают с Ref исходной базы или её профилем; см.
+    /// <see cref="TestDeployPlanner.FormFieldsDescribeSource"/>). Прежнее поведение
+    /// (1.0.1.9–1.0.1.20) брало для выгрузки поля СУБД ЦЕЛЕВОЙ базы — из-за этого ibcmd
+    /// искал SQL-БД целевой базы («…_t»), которой ещё нет, и падал с «База отсутствует
+    /// в сервере».
+    /// <para>Возвращает (профиль, null) при успехе или (null, понятная ошибка), если
+    /// данных источника нет — вызывающий код прерывает сценарий до шага «Выгрузка».</para>
     /// </summary>
-    private static DbmsBackupProfile? BuildDbmsProfileOverride(TestDeployScenario scenario, Infobase source)
+    internal async Task<(DbmsBackupProfile? Profile, string? Error)> ResolveSourceDumpProfileAsync(
+        Infobase source, TestDeployScenario scenario, Action<string>? log, CancellationToken ct,
+        Func<Infobase, DbmsBackupProfile?>? savedProfileLoader = null,
+        Func<ClusterInfobaseCredentialsResolver?>? resolverFactory = null)
     {
-        if (source.Connection?.Type != ConnectionType.ClientServer)
-            return null;
-        if (string.IsNullOrWhiteSpace(scenario.DbServer) || string.IsNullOrWhiteSpace(scenario.DbName))
+        // 1) Сохранённый профиль исходной базы.
+        DbmsBackupProfile? saved = null;
+        try
+        {
+            saved = savedProfileLoader is not null
+                ? savedProfileLoader(source)
+                : DbmsBackupService.Load().Find(source.Id);
+        }
+        catch { /* хранилище недоступно — пробуем rac */ }
+        if (saved is not null && !string.IsNullOrWhiteSpace(saved.Database))
+        {
+            log?.Invoke(T("TestDeploy.SourceDbmsProfileUsed"));
+            return (saved, null);
+        }
+
+        // 2) Автоподстановка из rac по исходной базе (как в массовых операциях, issue #92).
+        var resolver = resolverFactory is not null
+            ? resolverFactory()
+            : ClusterInfobaseCredentialsResolver.CreateDefault(message => log?.Invoke(message));
+        if (resolver is not null)
+        {
+            log?.Invoke(T("TestDeploy.SourceDbmsResolving"));
+            try
+            {
+                var fromRac = await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
+                if (fromRac is not null && !string.IsNullOrWhiteSpace(fromRac.Database))
+                {
+                    log?.Invoke(string.Format(T("TestDeploy.SourceDbmsResolvedFormat"),
+                        $"{fromRac.Dbms}/{fromRac.Host}/{fromRac.Database}" +
+                        (string.IsNullOrEmpty(fromRac.User) ? "" : $"/{fromRac.User}")));
+                    return (fromRac, null);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                log?.Invoke(string.Format(
+                    LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"),
+                    source.Connection?.Server, ex.Message));
+            }
+        }
+
+        // 3) Поля формы — только если они описывают ИСТОЧНИК (целевое имя базы вида
+        // «источник_t» сюда не попадает, issue #79).
+        var fromForm = BuildFormProfileIfSource(scenario, source, saved);
+        if (fromForm is not null)
+        {
+            log?.Invoke(T("TestDeploy.SourceDbmsFormUsed"));
+            return (fromForm, null);
+        }
+
+        return (null, T("TestDeploy.DbmsProfileNotFound"));
+    }
+
+    /// <summary>
+    /// Профиль СУБД из полей формы мастера, но ТОЛЬКО когда поля заведомо описывают
+    /// исходную базу (имя SQL-БД совпадает с Ref исходной базы или её сохранённым
+    /// профилем; сервер заполнен). Иначе (поля описывают целевую базу) — null:
+    /// выгрузка по ним не выполняется (issue #79, v1.0.1.21).
+    /// </summary>
+    internal static DbmsBackupProfile? BuildFormProfileIfSource(
+        TestDeployScenario scenario, Infobase source, DbmsBackupProfile? savedProfile)
+    {
+        if (!TestDeployPlanner.FormFieldsDescribeSource(scenario, source, savedProfile))
             return null;
         return new DbmsBackupProfile
         {
@@ -419,8 +510,8 @@ public sealed class TestDeployService
             Dbms = string.Equals(scenario.Dbms?.Trim(), "PostgreSQL", StringComparison.OrdinalIgnoreCase)
                 ? DbmsKind.PostgreSql
                 : DbmsKind.MsSql,
-            Host = scenario.DbServer.Trim(),
-            Database = scenario.DbName.Trim(),
+            Host = scenario.DbServer!.Trim(),
+            Database = scenario.DbName!.Trim(),
             User = scenario.DbUser?.Trim() ?? string.Empty,
             Password = scenario.DbPassword ?? string.Empty
         };

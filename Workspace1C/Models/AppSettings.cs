@@ -773,6 +773,21 @@ public class AppSettings
     /// </summary>
     public string BatchDumpKind { get; set; } = "DT";
 
+    /// <summary>
+    /// Опция «Перед операцией» массовых операций (issue #92, v1.0.1.21, пожелание
+    /// aepkugesi): завершать сеансы пользователей перед выгрузкой/загрузкой.
+    /// </summary>
+    public bool BatchOpsTerminateSessions { get; set; }
+
+    /// <summary>Опция «Перед операцией»: устанавливать блокировку начала сеансов
+    /// (после операции снимается автоматически). Код разрешения в настройках
+    /// НЕ сохраняется — секретоподобное значение, только в памяти сессии.</summary>
+    public bool BatchOpsDenyNewSessions { get; set; }
+
+    /// <summary>Опция «Перед операцией»: блокировать регламентные задания
+    /// (после операции снимается автоматически).</summary>
+    public bool BatchOpsDenyScheduledJobs { get; set; }
+
     /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
     public string FontFamily { get; set; } = "Segoe UI";
 

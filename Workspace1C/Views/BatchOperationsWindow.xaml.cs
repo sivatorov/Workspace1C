@@ -44,6 +44,10 @@ namespace Workspace1C
             // Формат метки времени токена {Дата} — из настроек приложения
             // «Формат даты в имени файла выгрузки» (issue #92, 1.0.1.11).
             _vm.TimestampFormat = timestampFormat;
+            // Сервис подготовки «Перед операцией» (issue #92, v1.0.1.21); null —
+            // rac-клиент недоступен, опции подготовки сообщат об этом в журнал.
+            _vm.PreparationService = BatchOpsPreparationService.CreateDefault(
+                line => _vm.WriteLog(line));
             DataContext = _vm;
 
             TemplateLabel.Text = LocalizationManager.T("BatchOps.TemplateLabel");
@@ -51,6 +55,14 @@ namespace Workspace1C
             KindCfRadio.Content = LocalizationManager.T("BatchOps.KindCfRadio");
             LogHeader.Text = LocalizationManager.T("BatchOps.Log");
             RunButtonText.Text = LocalizationManager.T("BatchOps.Execute");
+
+            // Блок «Перед операцией» (issue #92, v1.0.1.21, пожелание aepkugesi).
+            PrepareHeader.Text = LocalizationManager.T("BatchOps.Prepare.Header");
+            PrepareTerminateCheck.Content = LocalizationManager.T("BatchOps.Prepare.TerminateSessions");
+            PrepareDenySessionsCheck.Content = LocalizationManager.T("BatchOps.Prepare.DenyNewSessions");
+            PreparePermissionLabel.Text = LocalizationManager.T("BatchOps.Prepare.PermissionCode");
+            PrepareDenyJobsCheck.Content = LocalizationManager.T("BatchOps.Prepare.DenyScheduledJobs");
+            PrepareHint.Text = LocalizationManager.T("BatchOps.Prepare.Hint");
 
             UpdateKindDependentUi();
             ItemsList.ItemsSource = _vm.Items;
