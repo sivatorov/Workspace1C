@@ -214,6 +214,26 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         set => SetProperty(ref _prepareDenyScheduledJobs, value);
     }
 
+    private bool _allowRunningBases;
+
+    /// <summary>
+    /// Выгружать и запущенные базы (issue #92, v1.0.1.25, вопрос 7OH «разве ibcmd не
+    /// позволяет делать выгрузку в DT даже при наличии сеансов? Под ответственность
+    /// пользователя»). ibcmd работает с СУБД клиент-серверной базы напрямую и сеансов
+    /// не проверяет — выгрузка при активных сеансах возможна, согласованность данных —
+    /// на ответственности пользователя. Только для выгрузок (DT/CF); загрузка .cf в
+    /// работающую базу по-прежнему пропускается. По умолчанию выключено, не сохраняется.
+    /// </summary>
+    public bool AllowRunningBases
+    {
+        get => _allowRunningBases;
+        set => SetProperty(ref _allowRunningBases, value);
+    }
+
+    /// <summary>Пропускать ли запущенную базу при текущих настройках (issue #92, v1.0.1.25).</summary>
+    internal bool ShouldSkipRunning(Infobase infobase) =>
+        infobase.IsRunning && !(AllowRunningBases && IsDumpKind);
+
     /// <summary>Собирает опции подготовки из состояния чекбоксов окна.</summary>
     private BatchOpsPreparationOptions BuildPreparationOptions() => new()
     {
@@ -286,9 +306,23 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         FilteredItems.Clear();
         foreach (var item in Items)
         {
-            if (MatchesFilter(item.Title, query))
+            if (MatchesFilter(BuildSearchText(item), query))
                 FilteredItems.Add(item);
         }
+    }
+
+    /// <summary>
+    /// Текст строки для поиска «по данным баз» (issue #92, v1.0.1.25, 7OH): имя, группа,
+    /// сервер, имя базы на сервере, путь файловой базы и адрес веб-публикации.
+    /// </summary>
+    internal static string BuildSearchText(BatchOperationsItem item)
+    {
+        var ib = item.Infobase;
+        var c = ib.Connection;
+        return string.Join("\n", new[]
+        {
+            ib.Name, ib.Group, c?.Server, c?.DatabaseName, c?.FilePath, c?.WebUrl
+        }.Where(p => !string.IsNullOrWhiteSpace(p)));
     }
 
     /// <summary>
@@ -443,7 +477,8 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             item.Status = BatchOperationsStatus.Running;
 
             // Пропуск запущенных баз: операция по работающей базе может конфликтовать.
-            if (ib.IsRunning)
+            // Выгрузку можно разрешить опцией «Выгружать и запущенные базы» (v1.0.1.25).
+            if (ShouldSkipRunning(ib))
             {
                 failed++;
                 item.Status = BatchOperationsStatus.Skipped;
@@ -619,6 +654,10 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 {
                     ok++;
                     item.Status = BatchOperationsStatus.Success;
+                    // Issue #92 (v1.0.1.25, 7OH: «галочку наверное надо снимать при удачном
+                    // результате»): успешно обработанная база снимается с выбора —
+                    // повторный «Выполнить» пройдёт только по оставшимся (ошибочным) базам.
+                    item.IsChecked = false;
                     item.SetStatusText(targetPath);
                     item.DurationText = FormatElapsed(elapsed);
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.OperationOk")} ({FormatElapsed(elapsed)})");

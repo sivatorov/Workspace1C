@@ -1883,51 +1883,81 @@
                                                  отклика процесса (issue #310): WarningBrush — завис,
                                                  ErrorBrush — не отвечает несколько опросов подряд, пока
                                                  отвечает — собственный цвет значка. -->
-                                            <!-- Подложка-бейдж под значком (issue #101, v1.0.1.24, Вариант 1):
-                                                 круглый чип цвета карточки с обводкой даёт контраст значку
-                                                 на любом акценте выделения строки. Семантика цветов значков
-                                                 сохранена; перекраска по статусу отклика (#310) не тронута. -->
+                                            <!-- Подложка-бейдж под значком (issue #101): v1.0.1.24 — Вариант 1 (круглый чип
+                                                 цвета карточки с обводкой — контраст значку на любом акценте выделения строки);
+                                                 v1.0.1.25 — Вариант 4 по выбору 7OH: при зависании процесса (RunningStatus
+                                                 Hung/Critical) чип перекрашивается в красный, значок — в белый. Значок
+                                                 «Предприятие» увеличен (16 вместо 10) и отцентрован: прежде Padding 3 при чипе 16
+                                                 оставлял значку 8 px из 10 и смещал его; теперь чип 18 без внутренних полей. -->
                                             <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center"
                                                         ToolTip="{Binding RunningModesTooltip}"
                                                         Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
-                                                <Border Width="16" Height="16" CornerRadius="8" Padding="3"
+                                                <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1"
                                                         VerticalAlignment="Center"
-                                                        Background="{DynamicResource CardBackgroundBrush}"
-                                                        BorderBrush="{DynamicResource BorderBrushColor}"
-                                                        BorderThickness="1"
                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
-                                                    <materialDesign:PackIcon Kind="Play" Width="10" Height="10">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <Setter Property="Background" Value="#EF4444"/>
+                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <Setter Property="Background" Value="#EF4444"/>
+                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <materialDesign:PackIcon Kind="Play" Width="16" Height="16"
+                                                                             HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>
                                                         </materialDesign:PackIcon.Style>
                                                     </materialDesign:PackIcon>
                                                 </Border>
-                                                <Border Width="16" Height="16" CornerRadius="8" Padding="3" Margin="3,0,0,0"
+                                                <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
                                                         VerticalAlignment="Center"
-                                                        Background="{DynamicResource CardBackgroundBrush}"
-                                                        BorderBrush="{DynamicResource BorderBrushColor}"
-                                                        BorderThickness="1"
                                                         Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
-                                                    <materialDesign:PackIcon Kind="Wrench" Width="10" Height="10">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border">
+                                                            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
+                                                                    <Setter Property="Background" Value="#EF4444"/>
+                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
+                                                                    <Setter Property="Background" Value="#EF4444"/>
+                                                                    <Setter Property="BorderBrush" Value="#EF4444"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <materialDesign:PackIcon Kind="Wrench" Width="12" Height="12"
+                                                                             HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding RunningStatus}" Value="Hung">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                     <DataTrigger Binding="{Binding RunningStatus}" Value="Critical">
-                                                                        <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                                                        <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
                                                                 </Style.Triggers>
                                                             </Style>

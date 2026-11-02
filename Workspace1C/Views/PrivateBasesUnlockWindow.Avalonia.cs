@@ -124,13 +124,14 @@ namespace Workspace1C
                 Margin = new Thickness(0, 16, 0, 0)
             };
 
-            var cancel = new Button { Content = CancelText, Width = 110, Margin = new Thickness(0, 0, 8, 0) };
-            cancel.Click += OnCancel_Click;
-            buttons.Children.Add(cancel);
-
-            var ok = new Button { Content = OkText, Width = 160, MinHeight = 36 };
+            // Issue #98 (v1.0.1.25): главная кнопка слева, «Отмена» — последней.
+            var ok = new Button { Content = OkText, Width = 160, MinHeight = 36, Margin = new Thickness(0, 0, 8, 0) };
             ok.Click += OnOk_Click;
             buttons.Children.Add(ok);
+
+            var cancel = new Button { Content = CancelText, Width = 110 };
+            cancel.Click += OnCancel_Click;
+            buttons.Children.Add(cancel);
 
             stack.Children.Add(buttons);
             return stack;

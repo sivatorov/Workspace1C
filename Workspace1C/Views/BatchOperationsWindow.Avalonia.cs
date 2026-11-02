@@ -56,10 +56,10 @@ namespace Workspace1C
         {
             // Ширина под двухколоночную раскладку (issue #92, v1.0.1.24): список слева,
             // параметры справа.
-            Width = 860;
-            Height = 620;
-            MinWidth = 720;
-            MinHeight = 480;
+            Width = 980;
+            Height = 680;
+            MinWidth = 780;
+            MinHeight = 520;
             FontSize = 13;
             CanResize = true;
             DataContext = _vm = new BatchOperationsViewModel(infobases, kind);
@@ -95,10 +95,55 @@ namespace Workspace1C
 
             // Поиск-фильтр над списком баз (issue #92, v1.0.1.24): подстрока имени
             // без учёта регистра; фильтр влияет только на видимость, выбор сохраняется.
+            // v1.0.1.25 (комментарий 7OH): подсказка «Поиск по данным баз», лупа слева
+            // (текст начинается правее неё — InnerLeftContent) и кнопка очистки в конце поля.
+            var searchIcon = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconHelper.Geometry("IconSearch"),
+                Stretch = Stretch.Uniform,
+                Width = 14,
+                Height = 14,
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false
+            };
+            ThemeBrushes.Bind(searchIcon, Avalonia.Controls.Shapes.Path.FillProperty, "TextSecondaryBrush");
+            var clearIcon = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconHelper.Geometry("IconClose"),
+                Stretch = Stretch.Uniform,
+                Width = 10,
+                Height = 10
+            };
+            ThemeBrushes.Bind(clearIcon, Avalonia.Controls.Shapes.Path.FillProperty, "TextSecondaryBrush");
+            var searchClear = new Button
+            {
+                Content = clearIcon,
+                Width = 24,
+                Height = 24,
+                Padding = new Thickness(0),
+                Margin = new Thickness(4, 0, -4, 0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand)
+            };
+            ToolTip.SetTip(searchClear, LocalizationManager.T("BatchOps.SearchClear"));
+            searchClear.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding("SearchText") { Converter = Avalonia.Data.Converters.StringConverters.IsNotNullOrEmpty });
             var searchBox = new TextBox
             {
-                Watermark = LocalizationManager.T("BatchOps.SearchHint")
+                Watermark = LocalizationManager.T("BatchOps.SearchHint"),
+                InnerLeftContent = searchIcon,
+                InnerRightContent = searchClear
             }.Styled(ControlThemes.ModernTextBox);
+            searchClear.Click += (_, _) =>
+            {
+                _vm.SearchText = string.Empty;
+                searchBox.Focus();
+            };
             ThemeBrushes.Bind(searchBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
             ThemeBrushes.Bind(searchBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
             searchBox.Bind(TextBox.TextProperty,
@@ -163,7 +208,6 @@ namespace Workspace1C
             // не обновлялась — Bind гарантирует смену цвета вместе со схемой.
             var templateBox = new TextBox
             {
-                Width = 260,
                 VerticalContentAlignment = VerticalAlignment.Center
             }.Styled(ControlThemes.ModernTextBox);
             ThemeBrushes.Bind(templateBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
@@ -174,23 +218,53 @@ namespace Workspace1C
             {
                 Content = LocalizationManager.T("BatchOps.KindDtRadio"),
                 GroupName = "BatchDumpKind",
-                Margin = new Thickness(16, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             _kindCfRadio = new RadioButton
             {
                 Content = LocalizationManager.T("BatchOps.KindCfRadio"),
                 GroupName = "BatchDumpKind",
-                Margin = new Thickness(12, 0, 0, 0),
+                Margin = new Thickness(16, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             _kindDtRadio.IsCheckedChanged += (_, _) => OnKindChecked(BatchOperationKind.DumpDt);
             _kindCfRadio.IsCheckedChanged += (_, _) => OnKindChecked(BatchOperationKind.DumpCf);
-            var dumpOptionsRow = new StackPanel
+            // v1.0.1.25: шаблон — на всю ширину правой колонки, DT/CF — строкой ниже,
+            // плюс опция выгрузки запущенных баз (ibcmd не проверяет сеансы).
+            var templateRow = new Grid
+            {
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star)
+                }
+            };
+            Grid.SetColumn(templateLabel, 0);
+            Grid.SetColumn(templateBox, 1);
+            templateRow.Children.Add(templateLabel);
+            templateRow.Children.Add(templateBox);
+            var kindRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 6, 0, 0),
+                Children = { _kindDtRadio, _kindCfRadio }
+            };
+            var allowRunningCheck = new CheckBox
+            {
+                Content = new TextBlock
+                {
+                    Text = LocalizationManager.T("BatchOps.AllowRunningBases"),
+                    TextWrapping = TextWrapping.Wrap
+                },
+                Margin = new Thickness(0, 6, 0, 0)
+            };
+            ToolTip.SetTip(allowRunningCheck, LocalizationManager.T("BatchOps.AllowRunningBasesHint"));
+            allowRunningCheck.Bind(CheckBox.IsCheckedProperty,
+                new Avalonia.Data.Binding("AllowRunningBases") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            var dumpOptionsRow = new StackPanel
+            {
                 Margin = new Thickness(0, 8, 0, 0),
-                Children = { templateLabel, templateBox, _kindDtRadio, _kindCfRadio }
+                Children = { templateRow, kindRow, allowRunningCheck }
             };
             _dumpOptionsRow = dumpOptionsRow;
 
@@ -316,15 +390,17 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 8,
                 Margin = new Thickness(0, 16, 0, 0),
-                Children = { _stopButton, closeButton, _runButton }
+                Children = { _stopButton, _runButton, closeButton } // issue #98: «Закрыть» последней
             };
 
-            // Раскладка issue #92 (v1.0.1.24, пожелание 7OH): список баз с поиском и
-            // кнопками «Выделить все/Снять все» — слева, на всю высоту формы; параметры
-            // операции (путь/шаблон/«Перед операцией») — справа; журнал, сводка и
-            // кнопки — общие снизу на всю ширину.
+            // Раскладка issue #92 (v1.0.1.25, комментарий 7OH): список баз с поиском и
+            // кнопками «Выделить все/Снять все» — слева, на ВСЮ высоту окна и вдвое уже
+            // прежнего (колонки 1* : 2*); справа сверху вниз — подсказка, параметры
+            // (высота по содержимому — подписи галочек видны целиком), журнал (остаток
+            // высоты), сводка и кнопки.
             var leftColumn = new Grid
             {
+                MinWidth = 240,
                 RowDefinitions =
                 {
                     new RowDefinition(GridLength.Auto),
@@ -340,51 +416,40 @@ namespace Workspace1C
             Grid.SetRow(_itemsList, 2);
             leftColumn.Children.Add(_itemsList);
 
-            var rightScroll = new ScrollViewer
+            _logList.MinHeight = 90;
+            var rightColumn = new Grid
             {
-                Content = pathStack,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                Margin = new Thickness(12, 0, 0, 0)
-            };
-
-            var columns = new Grid
-            {
-                ColumnDefinitions =
-                {
-                    new ColumnDefinition(new GridLength(2, GridUnitType.Star)),
-                    new ColumnDefinition(new GridLength(1, GridUnitType.Star))
-                }
-            };
-            Grid.SetColumn(leftColumn, 0);
-            columns.Children.Add(leftColumn);
-            Grid.SetColumn(rightScroll, 1);
-            columns.Children.Add(rightScroll);
-
-            var grid = new Grid
-            {
-                Margin = new Thickness(16),
+                Margin = new Thickness(14, 0, 0, 0),
                 RowDefinitions =
                 {
                     new RowDefinition(GridLength.Auto),
-                    new RowDefinition(GridLength.Star),
+                    new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Star),
                     new RowDefinition(GridLength.Auto),
                     new RowDefinition(GridLength.Auto)
                 }
             };
-            Place(grid, _hint, 0);
-            Grid.SetColumnSpan(_hint, 2);
-            Place(grid, columns, 1);
-            Grid.SetColumnSpan(columns, 2);
-            Place(grid, logHeader, 2);
-            Grid.SetColumnSpan(logHeader, 2);
-            Place(grid, _logList, 3);
-            Grid.SetColumnSpan(_logList, 2);
-            Place(grid, _summary, 4);
-            Grid.SetColumnSpan(_summary, 2);
-            Place(grid, buttons, 5);
-            Grid.SetColumnSpan(buttons, 2);
+            Place(rightColumn, _hint, 0);
+            Place(rightColumn, pathStack, 1);
+            Place(rightColumn, logHeader, 2);
+            Place(rightColumn, _logList, 3);
+            Place(rightColumn, _summary, 4);
+            Place(rightColumn, buttons, 5);
+
+            var grid = new Grid
+            {
+                Margin = new Thickness(16),
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(new GridLength(1, GridUnitType.Star)),
+                    new ColumnDefinition(new GridLength(2, GridUnitType.Star))
+                }
+            };
+            Grid.SetColumn(leftColumn, 0);
+            grid.Children.Add(leftColumn);
+            Grid.SetColumn(rightColumn, 1);
+            grid.Children.Add(rightColumn);
             Content = grid;
 
             UpdateKindDependentUi();

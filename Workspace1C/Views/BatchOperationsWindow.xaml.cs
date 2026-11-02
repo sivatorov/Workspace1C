@@ -63,6 +63,9 @@ namespace Workspace1C
             PreparePermissionLabel.Text = LocalizationManager.T("BatchOps.Prepare.PermissionCode");
             PrepareDenyJobsCheck.Content = LocalizationManager.T("BatchOps.Prepare.DenyScheduledJobs");
             PrepareHint.Text = LocalizationManager.T("BatchOps.Prepare.Hint");
+            // Выгрузка запущенных баз (issue #92, v1.0.1.25).
+            AllowRunningText.Text = LocalizationManager.T("BatchOps.AllowRunningBases");
+            AllowRunningCheck.ToolTip = LocalizationManager.T("BatchOps.AllowRunningBasesHint");
 
             UpdateKindDependentUi();
             // issue #92 (v1.0.1.24): список показывает строки ПОД ФИЛЬТРОМ поиска;
@@ -136,6 +139,13 @@ namespace Workspace1C
                 var last = _vm.LogLines[_vm.LogLines.Count - 1];
                 LogList.ScrollIntoView(last);
             }
+        }
+
+        /// <summary>Кнопка очистки поля поиска (issue #92, v1.0.1.25).</summary>
+        private void OnSearchClear_Click(object sender, RoutedEventArgs e)
+        {
+            _vm.SearchText = string.Empty;
+            SearchBox.Focus();
         }
 
         private void OnSelectAll_Click(object sender, RoutedEventArgs e) => _vm.SetAll(true);

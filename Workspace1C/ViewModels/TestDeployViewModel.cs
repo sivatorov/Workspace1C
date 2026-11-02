@@ -348,7 +348,14 @@ public sealed class TestDeployViewModel : ViewModelBase
                     : ClusterInfobaseCredentialsResolver.CreateDefault(message => log?.Invoke(message));
                 if (resolver is null)
                     return null;
-                return await resolver.ResolveAsync(infobase, ct).ConfigureAwait(false);
+                // Issue #79 (v1.0.1.25): логин/пароль формы (если «авторизация базы»
+                // выключена) и тип СУБД формы — для «infobase info» и пустого dbms rac 8.5.
+                resolver.CredentialOverride = scenario.Credential;
+                resolver.FallbackDbms = scenario.Dbms;
+                var profile = await resolver.ResolveAsync(infobase, ct).ConfigureAwait(false);
+                if (profile is null && !string.IsNullOrWhiteSpace(resolver.LastFailureReason))
+                    log?.Invoke(resolver.LastFailureReason!);
+                return profile;
             };
         }
 

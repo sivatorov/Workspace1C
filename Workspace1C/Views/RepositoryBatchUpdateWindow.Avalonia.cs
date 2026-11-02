@@ -107,7 +107,7 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 8,
                 Margin = new Thickness(0, 16, 0, 0),
-                Children = { closeButton, _updateButton }
+                Children = { _updateButton, closeButton } // issue #98: «Закрыть» последней
             };
 
             var grid = new Grid

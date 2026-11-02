@@ -251,7 +251,8 @@ public sealed class Release100124Tests
         var avalonia = ReadProjectFile("Workspace1C/Views/MainWindow.Avalonia.Tree.cs");
         Assert.Contains("enterpriseChip", avalonia);
         Assert.Contains("configuratorChip", avalonia);
-        Assert.Contains("\"CardBackgroundBrush\"", avalonia);
+        // v1.0.1.25 (Вариант 4): фон чипа — через RunningChipBrushConverter («@CardBackgroundBrush»).
+        Assert.Contains("RunningChipBrushConverter", avalonia);
 
         // WPF: та же подложка в шаблоне строки.
         var wpf = ReadProjectFile("Workspace1C/Views/MainWindow.xaml");
@@ -266,12 +267,14 @@ public sealed class Release100124Tests
     [Fact]
     public void Csproj_VersionBumpedTo100124_AllFourProperties()
     {
+        // Версия не ниже 1.0.1.24 (последующие релизы поднимают последний номер).
         var csproj = ReadProjectFile("Workspace1C/Workspace1C.csproj");
-        Assert.Contains("<Version>1.0.1.24</Version>", csproj);
-        Assert.Contains("<AssemblyVersion>1.0.1.24</AssemblyVersion>", csproj);
-        Assert.Contains("<FileVersion>1.0.1.24</FileVersion>", csproj);
-        Assert.Contains("<InformationalVersion>1.0.1.24</InformationalVersion>", csproj);
-        Assert.DoesNotContain("1.0.1.23</Version>", csproj);
+        foreach (var tag in new[] { "Version", "AssemblyVersion", "FileVersion", "InformationalVersion" })
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(csproj, $"<{tag}>([0-9.]+)</{tag}>");
+            Assert.True(m.Success, tag);
+            Assert.True(new Version(m.Groups[1].Value) >= new Version(1, 0, 1, 24), tag);
+        }
     }
 
     [Fact]

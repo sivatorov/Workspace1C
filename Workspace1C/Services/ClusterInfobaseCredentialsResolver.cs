@@ -56,6 +56,24 @@ public sealed class ClusterInfobaseCredentialsResolver
     private readonly IReadOnlyList<ManagementServer> _servers;
     private readonly Action<string>? _log;
 
+    /// <summary>
+    /// Явные учётные данные пользователя ИБ (issue #79, v1.0.1.25): мастер
+    /// «Развернуть тестовую копию» передаёт логин/пароль формы, если «авторизация
+    /// базы» выключена. null — авторизация «Конфигуратора» из свойств базы.
+    /// </summary>
+    public BackupCredential? CredentialOverride { get; set; }
+
+    /// <summary>
+    /// Тип СУБД «по умолчанию» (issue #79, v1.0.1.25): rac 8.5.x отдаёт пустой dbms в
+    /// «infobase summary list»; если и «infobase info» не дал типа, но сервер и имя
+    /// SQL-БД известны — берётся этот тип (в мастере — тип СУБД с формы). null — не
+    /// подставлять (прежнее поведение).
+    /// </summary>
+    public string? FallbackDbms { get; set; }
+
+    /// <summary>Причина последней неудачи резолва (для понятного сообщения в окне).</summary>
+    public string? LastFailureReason { get; private set; }
+
     /// <param name="racClient">Клиент rac (инъекция — для юнит-тестов с фейком).</param>
     /// <param name="servers">Справочник «Сервера управления»: при совпадении хоста базы
     /// с записью справочника берутся её адрес/порт/логин/пароль кластера; иначе —
@@ -122,7 +140,22 @@ public sealed class ClusterInfobaseCredentialsResolver
             return new();
         }
 
-        var parameters = BuildConnectionParams(connection.Server, _servers);
+        // Issue #92 (v1.0.1.25, репорт 7OH «не тот кластер для списка баз взят»): на одном
+        // хосте может работать несколько агентов/кластеров (например 8.3.27 на 1541 и
+        // 8.5 на 27541) и в справочнике «Сервера управления» — несколько записей с тем же
+        // хостом. Раньше бралась ПЕРВАЯ запись по хосту и ВСЕ её кластеры по порядку:
+        // одноимённая база чужого кластера подставлялась вместо нужной. Теперь
+        // опрашиваются все записи справочника с этим хостом, а кластеры с портом
+        // менеджера из строки подключения базы (Srvr="host:port") идут первыми и
+        // единственными, если такие нашлись.
+        var candidates = BuildConnectionCandidates(connection.Server, _servers);
+        var parameters = candidates[0];
+        var managerPort = ResolveManagerPort(connection);
+        // Issue #92/#79 (v1.0.1.25): «infobase info» требует учётных данных
+        // администратора ИБ — берутся из свойств базы (авторизация «Конфигуратора»),
+        // иначе rac отвечает «Недостаточно прав пользователя на информационную базу».
+        var (ibUser, ibPassword) = InfobaseAdminCredentials(infobase!, CredentialOverride);
+        LastFailureReason = null;
         // Issue #92 (v1.0.1.22): причина последней неудачи сборки профиля по НАЙДЕННОЙ
         // базе (пустой dbms в summary + ошибка «infobase info») — для честного итогового
         // сообщения вместо «база не найдена».
@@ -134,9 +167,32 @@ public sealed class ClusterInfobaseCredentialsResolver
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             timeoutCts.CancelAfter(ResolveTimeout);
 
-            var clusters = await _racClient.GetClustersAsync(parameters, timeoutCts.Token).ConfigureAwait(false);
-            foreach (var cluster in clusters)
+            var targets = new List<(RacConnectionParams Parameters, RacCluster Cluster)>();
+            Exception? clustersError = null;
+            foreach (var candidate in candidates)
             {
+                try
+                {
+                    var found = await _racClient.GetClustersAsync(candidate, timeoutCts.Token).ConfigureAwait(false);
+                    targets.AddRange(found.Select(c => (candidate, c)));
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) when (candidates.Count > 1)
+                {
+                    // Одна из записей справочника недоступна — остальные могут ответить.
+                    clustersError = ex;
+                    _log?.Invoke(string.Format(
+                        LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"),
+                        $"{candidate.Address}:{candidate.Port}", ex.Message));
+                }
+            }
+            if (targets.Count == 0 && clustersError is not null)
+                throw clustersError;
+            targets = OrderClustersByManagerPort(targets, managerPort);
+
+            foreach (var (targetParameters, cluster) in targets)
+            {
+                parameters = targetParameters;
                 IReadOnlyList<RacInfobaseSummary> summaries;
                 var probeStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 try
@@ -212,7 +268,7 @@ public sealed class ClusterInfobaseCredentialsResolver
                 {
                     var info = await _racClient.GetInfobaseInfoAsync(
                         parameters, cluster.Id, match.InfobaseId,
-                        infobaseUser: null, infobasePassword: null, timeoutCts.Token).ConfigureAwait(false);
+                        infobaseUser: ibUser, infobasePassword: ibPassword, timeoutCts.Token).ConfigureAwait(false);
                     profile = info is null ? null : ToProfile(info, infobase.Id, infobaseName);
                     if (profile is not null)
                     {
@@ -223,6 +279,23 @@ public sealed class ClusterInfobaseCredentialsResolver
                         return new ClusterInfobaseCredentialsResolution
                         {
                             Profile = profile,
+                            ClusterId = cluster.Id,
+                            InfobaseId = match.InfobaseId,
+                            Parameters = parameters
+                        };
+                    }
+
+                    // Issue #79 (v1.0.1.25): тип СУБД неизвестен, но сервер и имя SQL-БД есть —
+                    // подставляем тип «по умолчанию» (тип СУБД с формы мастера).
+                    var fallbackProfile = ToProfileWithFallbackDbms(match, info, FallbackDbms, infobase.Id, infobaseName);
+                    if (fallbackProfile is not null)
+                    {
+                        _log?.Invoke(string.Format(
+                            LocalizationManager.T("BatchOps.DbmsResolveFallbackDbmsFormat"),
+                            fallbackProfile.Dbms, $"{fallbackProfile.Host}/{fallbackProfile.Database}"));
+                        return new ClusterInfobaseCredentialsResolution
+                        {
+                            Profile = fallbackProfile,
                             ClusterId = cluster.Id,
                             InfobaseId = match.InfobaseId,
                             Parameters = parameters
@@ -255,15 +328,19 @@ public sealed class ClusterInfobaseCredentialsResolver
             // с причиной по каждой базе вместо вводящего в заблуждение «не найдена».
             if (profileFailureReason is not null)
             {
+                LastFailureReason = profileFailureReason;
+                if (ibUser is null)
+                    LastFailureReason += " " + LocalizationManager.T("BatchOps.DbmsResolveNeedIbCredentials");
                 _log?.Invoke(string.Format(
                     LocalizationManager.T("BatchOps.DbmsResolveNoProfileFormat"),
-                    infobaseName, parameters.Address, profileFailureReason));
+                    infobaseName, parameters.Address, LastFailureReason));
             }
             else
             {
-                _log?.Invoke(string.Format(
+                LastFailureReason = string.Format(
                     LocalizationManager.T("BatchOps.DbmsResolveNotFound"),
-                    infobaseName, parameters.Address));
+                    infobaseName, parameters.Address);
+                _log?.Invoke(LastFailureReason);
             }
             return new();
         }
@@ -334,6 +411,108 @@ public sealed class ClusterInfobaseCredentialsResolver
     }
 
     /// <summary>
+    /// Учётные данные администратора ИБ для rac («--infobase-user/--infobase-pwd»,
+    /// issue #92/#79, v1.0.1.25): авторизация «Конфигуратора» из свойств базы с учётом
+    /// общей авторизации (тот же резолвер, что у ibcmd). Не заданы — null/null
+    /// (rac выполнит команду без них, как раньше).
+    /// </summary>
+    public static (string? User, string? Password) InfobaseAdminCredentials(Infobase? infobase,
+        BackupCredential? credential = null)
+    {
+        if (infobase is null)
+            return (null, null);
+        try
+        {
+            // Явные логин/пароль формы мастера — высший приоритет.
+            if (credential is { UseInfobaseAuth: false } && !string.IsNullOrWhiteSpace(credential.User))
+                return (credential.User.Trim(), credential.Password ?? string.Empty);
+
+            // Тот же источник, что у окна «Серверы 1С» → «Свойства информационной базы»
+            // («Логин и пароль администратора ИБ взяты из списка баз»): авторизация
+            // «Конфигуратора», иначе «1С:Предприятия»; вход ОС и пустой логин не в счёт.
+            var found = ClusterInfobaseCredentials.Find(new[] { infobase },
+                infobase.Connection?.Server, infobase.Connection?.DatabaseName);
+            if (found is not null)
+                return (found.User, found.Password);
+
+            // Общая авторизация приложения (как у ibcmd).
+            var (user, password) = IbcmdService.ResolveUser(infobase, credential);
+            return string.IsNullOrWhiteSpace(user) ? (null, null) : (user, password ?? string.Empty);
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    /// <summary>
+    /// Порт менеджера кластера из строки подключения базы (Srvr="host:port" или
+    /// поле Port; по умолчанию 1541). 0 — порт определить не удалось.
+    /// Для «srv1:1541,srv2» берётся первый адрес. Чистый helper — для юнит-теста.
+    /// </summary>
+    internal static int ResolveManagerPort(ConnectionSettings? connection)
+    {
+        if (connection is null)
+            return 0;
+        var first = (connection.Server ?? string.Empty)
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.Trim())
+            .FirstOrDefault() ?? string.Empty;
+        var probe = new ConnectionSettings { Port = connection.Port > 0 ? connection.Port : 1541 };
+        ConnectionSettings.ParseServerAndPort(first, probe);
+        return probe.Port > 0 ? probe.Port : 0;
+    }
+
+    /// <summary>
+    /// Упорядочивает кластеры для поиска базы (issue #92, v1.0.1.25): если среди них
+    /// есть кластеры с портом менеджера <paramref name="managerPort"/> — остаются только
+    /// они (одноимённая база соседнего кластера не подставится); иначе — все в
+    /// исходном порядке (прежнее поведение). Чистый helper — для юнит-теста.
+    /// </summary>
+    internal static List<(RacConnectionParams Parameters, RacCluster Cluster)> OrderClustersByManagerPort(
+        IEnumerable<(RacConnectionParams Parameters, RacCluster Cluster)> targets, int managerPort)
+    {
+        var list = targets.ToList();
+        if (managerPort <= 0)
+            return list;
+        var matching = list.Where(t => t.Cluster.Port == managerPort).ToList();
+        return matching.Count > 0 ? matching : list;
+    }
+
+    /// <summary>
+    /// Все варианты параметров rac для сервера базы (issue #92, v1.0.1.25): каждая
+    /// запись справочника «Сервера управления» с тем же хостом (в порядке справочника),
+    /// иначе — один вариант по умолчанию (<see cref="BuildConnectionParams"/>).
+    /// </summary>
+    internal static List<RacConnectionParams> BuildConnectionCandidates(
+        string? serverAddress, IReadOnlyList<ManagementServer>? servers)
+    {
+        var host = (serverAddress ?? string.Empty)
+            .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(ClusterInfobaseCredentials.HostOf)
+            .FirstOrDefault(h => h.Length > 0) ?? "localhost";
+        var result = new List<RacConnectionParams>();
+        foreach (var server in servers ?? Array.Empty<ManagementServer>())
+        {
+            if (!ClusterInfobaseCredentials.SameHost(ClusterInfobaseCredentials.HostOf(server.Address), host))
+                continue;
+            if (result.Any(r => string.Equals(r.Address, server.Address, StringComparison.OrdinalIgnoreCase)
+                                && r.Port == server.Port))
+                continue;
+            result.Add(new RacConnectionParams
+            {
+                Address = server.Address,
+                Port = server.Port,
+                User = server.User ?? string.Empty,
+                Password = server.Password ?? string.Empty
+            });
+        }
+        if (result.Count == 0)
+            result.Add(BuildConnectionParams(serverAddress, servers));
+        return result;
+    }
+
+    /// <summary>
     /// Параметры подключения rac для сервера базы: хост берётся из адреса базы
     /// («srv1:1541,srv2» — кластер с резервированием, берётся первый хост);
     /// при совпадении хоста с записью справочника «Сервера управления» используются
@@ -366,6 +545,35 @@ public sealed class ClusterInfobaseCredentialsResolver
         }
 
         return new RacConnectionParams { Address = host, Port = IRacClient.DefaultPort };
+    }
+
+    /// <summary>
+    /// Профиль СУБД с подстановкой типа СУБД (issue #79, v1.0.1.25): сервер/имя SQL-БД
+    /// берутся из «infobase info» (если есть) или «infobase summary list», тип — из
+    /// <paramref name="fallbackDbms"/>. Нужен хотя бы сервер СУБД; иначе null.
+    /// </summary>
+    internal static DbmsBackupProfile? ToProfileWithFallbackDbms(RacInfobaseSummary? summary, RacInfobaseInfo? info,
+        string? fallbackDbms, string? infobaseId, string infobaseName)
+    {
+        var dbms = ParseDbms(fallbackDbms);
+        if (dbms is null)
+            return null;
+        var dbServer = !string.IsNullOrWhiteSpace(info?.DbServer) ? info!.DbServer : summary?.DbServer;
+        if (string.IsNullOrWhiteSpace(dbServer))
+            return null;
+        var dbName = !string.IsNullOrWhiteSpace(info?.DbName) ? info!.DbName : summary?.DbName;
+        var dbUser = !string.IsNullOrWhiteSpace(info?.DbUser) ? info!.DbUser : summary?.DbUser;
+        var (host, port) = ParseDbServer(dbServer);
+        return new DbmsBackupProfile
+        {
+            InfobaseId = infobaseId ?? string.Empty,
+            Dbms = dbms.Value,
+            Host = host,
+            Port = port,
+            Database = string.IsNullOrWhiteSpace(dbName) ? infobaseName : dbName!.Trim(),
+            User = dbUser?.Trim() ?? string.Empty,
+            Password = string.Empty
+        };
     }
 
     /// <summary>

@@ -757,9 +757,21 @@
                  licences) + установленные программные лицензии («ring license list» /
                  licensetool). Сводка — LicenseSummaryText, предупреждение о недоступности
                  утилиты — LicenseStatusText. -->
+            <!-- Issue #83 (v1.0.1.25, 7OH: «0 из 2 занято. А какие есть?»): раскладка — Grid
+                 по строкам. Прежний DockPanel без DockPanel.Dock у таблицы сеансов
+                 прижимал её ВЛЕВО на всю ширину, и блок «Установленные программные
+                 лицензии» (Dock=Bottom + последний заполняющий элемент) сжимался до нуля —
+                 таблица установленных лицензий не была видна вовсе. -->
             <TabItem Header="{Binding LicensesTabText}">
-                <DockPanel>
-                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="120"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="120"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Margin="0,0,0,6">
                         <TextBlock Text="{Binding LicenseSummaryText}" FontWeight="SemiBold"
                                    FontSize="13" Margin="0,2,0,4"/>
                         <!-- issue #83: предупреждение (в т.ч. «module license is not
@@ -783,10 +795,10 @@
                             </TextBlock.Style>
                         </TextBlock>
                     </StackPanel>
-                    <TextBlock DockPanel.Dock="Top" FontWeight="SemiBold" Margin="0,4,0,4"
+                    <TextBlock Grid.Row="1" FontWeight="SemiBold" Margin="0,4,0,4"
                                Text="{loc:Loc ServerMonitor.Licenses.InUseHeader}"/>
                     <!-- Занятые лицензии по сеансам. -->
-                    <DataGrid x:Name="LicensedSessionsGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                    <DataGrid x:Name="LicensedSessionsGrid" Grid.Row="2" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                               CanUserSortColumns="True" Sorting="OnGridSorting"
                               ColumnHeaderStyle="{StaticResource CenteredColumnHeader}"
@@ -811,8 +823,8 @@
                                                 Binding="{Binding InfobaseName}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="1*" MinWidth="90" Header="{loc:Loc ServerMonitor.Licenses.Columns.Host}"
                                                 Binding="{Binding Host}" ElementStyle="{StaticResource CenteredCellText}"/>
-                            <DataGridTextColumn Width="110" MinWidth="90" Header="{loc:Loc ServerMonitor.Licenses.Columns.Type}"
-                                                Binding="{Binding LicType}" ElementStyle="{StaticResource CenteredCellText}"/>
+                            <DataGridTextColumn Width="1.8*" MinWidth="160" Header="{loc:Loc ServerMonitor.Licenses.Columns.Type}"
+                                                Binding="{Binding LicenseDescription}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="90" MinWidth="70" Header="{loc:Loc ServerMonitor.Licenses.Columns.Used}"
                                                 Binding="{Binding LicensesUsedText}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="100" MinWidth="80" Header="{loc:Loc ServerMonitor.Licenses.Columns.Max}"
@@ -821,10 +833,10 @@
                                                 Binding="{Binding AppId}" ElementStyle="{StaticResource CenteredCellText}"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBlock DockPanel.Dock="Bottom" FontWeight="SemiBold" Margin="0,4,0,2"
+                    <TextBlock Grid.Row="3" FontWeight="SemiBold" Margin="0,10,0,4"
                                Text="{loc:Loc ServerMonitor.Licenses.InstalledHeader}"/>
                     <!-- Установленные программные лицензии (ring/licensetool). -->
-                    <DataGrid x:Name="InstalledLicensesGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                    <DataGrid x:Name="InstalledLicensesGrid" Grid.Row="4" AutoGenerateColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                               CanUserSortColumns="True" Sorting="OnGridSorting"
                               ColumnHeaderStyle="{StaticResource CenteredColumnHeader}"
@@ -859,7 +871,7 @@
                                                 Binding="{Binding ExpiryDate}" ElementStyle="{StaticResource CenteredCellText}"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                </DockPanel>
+                </Grid>
             </TabItem>
 
             <!-- Информация о кластере (issue #324, C3; issue #3 — человекочитаемые значения

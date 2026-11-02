@@ -173,12 +173,12 @@ public sealed class AppLockWindow : ModalWindowBase
         };
         _cancelButton.Content = CancelText;
         _cancelButton.Width = 110;
-        _cancelButton.Margin = new Thickness(0, 0, 8, 0);
         _cancelButton.Click += OnCancel_Click;
-        var ok = new Button { Content = OkText, Width = 160, MinHeight = 36 };
+        // Issue #98 (v1.0.1.25): главная кнопка слева, «Отмена» — последней.
+        var ok = new Button { Content = OkText, Width = 160, MinHeight = 36, Margin = new Thickness(0, 0, 8, 0) };
         ok.Click += OnOk_Click;
-        buttons.Children.Add(_cancelButton);
         buttons.Children.Add(ok);
+        buttons.Children.Add(_cancelButton);
         stack.Children.Add(buttons);
 
         return stack;

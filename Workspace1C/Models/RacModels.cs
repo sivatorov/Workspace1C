@@ -210,6 +210,26 @@ public sealed class RacSessionInfo
     /// для сеанса с непустым <see cref="LicType"/> при расчёте сводки).
     /// </summary>
     public int Licenses { get; set; }
+
+    /// <summary>
+    /// Серия (номер) лицензии — поле «series» вывода «session list --licenses»
+    /// (issue #83, v1.0.1.25); пусто — rac не вернул.
+    /// </summary>
+    public string LicenseSeries { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Представление лицензии — поле «short-presentation» (или «full-presentation»)
+    /// вывода «session list --licenses», например «Клиент 8100000001 1 польз.»
+    /// (issue #83, v1.0.1.25).
+    /// </summary>
+    public string LicensePresentation { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Лицензия выдана сервером 1С (поле «issued-by-server»): true — серверная выдача,
+    /// false — лицензию получил сам клиент (например, лицензия разработчика на
+    /// компьютере пользователя), null — rac не вернул (issue #83, v1.0.1.25).
+    /// </summary>
+    public bool? LicenseIssuedByServer { get; set; }
 }
 
 /// <summary>

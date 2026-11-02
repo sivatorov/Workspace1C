@@ -2835,9 +2835,16 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
             // (только сеансы с распознанным типом) + установленные программные лицензии.
             var curatedSessions = licensedSessions ?? Array.Empty<RacSessionInfo>();
             var curatedInstalled = installedLicenses ?? Array.Empty<ProgramLicense>();
+            // Issue #83 (v1.0.1.25): блоки «session list --licenses» не содержат infobase —
+            // база берётся из обычного списка сеансов по идентификатору сеанса.
+            var sessionsById = sessions
+                .Where(x => x.Id != Guid.Empty)
+                .GroupBy(x => x.Id)
+                .ToDictionary(g => g.Key, g => g.First());
             ReplaceRows(LicensedSessions, curatedSessions
                 .Where(s => !string.IsNullOrWhiteSpace(s.LicType))
-                .Select(s => new RacLicensedSessionRow(s, SessionInfobaseName(s))));
+                .Select(s => new RacLicensedSessionRow(s, SessionInfobaseName(
+                    s.InfobaseId is null && sessionsById.TryGetValue(s.Id, out var full) ? full : s))));
             ReplaceRows(InstalledLicenses, curatedInstalled);
             LicenseStatusText = licenseWarning ?? string.Empty;
             LicenseSummaryText = BuildLicenseSummaryText(curatedSessions, curatedInstalled);

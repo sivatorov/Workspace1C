@@ -407,76 +407,54 @@ namespace Workspace1C
             runningIcons.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib });
 
-            // Подложка-бейдж под значком (issue #101, v1.0.1.24, Вариант 1): круглый чип
-            // цвета карточки с тонкой обводкой даёт контраст значку на ЛЮБОМ акценте
-            // выделения строки (синяя иконка «Предприятие» на синем акценте и янтарный
-            // «Конфигуратор» на зелёном раньше терялись). Семантика цветов значков
-            // сохранена; конвертер статуса отклика (issue #310) не затронут.
-            var enterpriseChip = new Border
-            {
-                Width = UiMetrics.Scaled(16),
-                Height = UiMetrics.Scaled(16),
-                CornerRadius = new CornerRadius(UiMetrics.Scaled(8)),
-                VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(UiMetrics.Scaled(3))
-            };
-            ThemeBrushes.Bind(enterpriseChip, Border.BackgroundProperty, "CardBackgroundBrush");
-            ThemeBrushes.Bind(enterpriseChip, Border.BorderBrushProperty, "BorderBrushColor");
-            enterpriseChip.BorderThickness = new Thickness(1);
-
+            // Подложка-бейдж под значком (issue #101): v1.0.1.24 — Вариант 1 (круглый чип
+            // цвета карточки с тонкой обводкой — контраст значку на ЛЮБОМ акценте
+            // выделения строки); v1.0.1.25 — Вариант 4 по выбору 7OH: та же подложка,
+            // но при зависании процесса чип перекрашивается в красный, значок — в белый
+            // (RunningChipBrushConverter). Значок «Предприятие» увеличен и отцентрован:
+            // прежде Padding 3 при чипе 16 оставлял значку 8 px из 10 и сдвигал его;
+            // теперь чип 18 без внутренних полей, значок — треугольник Play по центру
+            // (с оптической поправкой: центр масс треугольника левее центра его рамки).
+            var enterpriseChip = BuildRunningChip(ib, nameof(Infobase.IsEnterpriseRunning), leftMargin: 0);
             var enterpriseIcon = new Avalonia.Controls.Shapes.Path
             {
-                Data = IconHelper.Geometry("IconRunning"),
-                Stretch = Stretch.Uniform
+                Data = Avalonia.Media.Geometry.Parse(RunningEnterpriseGlyph),
+                Stretch = Stretch.Uniform,
+                Width = UiMetrics.Scaled(9),
+                Height = UiMetrics.Scaled(11),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(UiMetrics.Scaled(2), 0, 0, 0)
             };
-            enterpriseIcon.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib });
             enterpriseIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
                 {
                     Source = ib,
-                    Converter = new RunningDotColorConverter(),
-                    // Базовый цвет значка — кисть темы («@» = ресурс, обновляется со схемой);
-                    // при зависании процесса конвертер перекрашивает значок (issue #310).
-                    ConverterParameter = "@InfoBrush"
+                    Converter = new RunningChipBrushConverter(),
+                    // Базовый цвет значка — кисть темы; при зависании — белый на красном чипе.
+                    ConverterParameter = "glyph:@InfoBrush"
                 });
             enterpriseChip.Child = enterpriseIcon;
-            enterpriseChip.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib });
             runningIcons.Children.Add(enterpriseChip);
 
-            var configuratorChip = new Border
-            {
-                Width = UiMetrics.Scaled(16),
-                Height = UiMetrics.Scaled(16),
-                CornerRadius = new CornerRadius(UiMetrics.Scaled(8)),
-                VerticalAlignment = VerticalAlignment.Center,
-                Padding = new Thickness(UiMetrics.Scaled(3)),
-                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0)
-            };
-            ThemeBrushes.Bind(configuratorChip, Border.BackgroundProperty, "CardBackgroundBrush");
-            ThemeBrushes.Bind(configuratorChip, Border.BorderBrushProperty, "BorderBrushColor");
-            configuratorChip.BorderThickness = new Thickness(1);
-
+            var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), leftMargin: 3);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = IconHelper.Geometry("IconWrench"),
-                Stretch = Stretch.Uniform
+                Stretch = Stretch.Uniform,
+                Width = UiMetrics.Scaled(10),
+                Height = UiMetrics.Scaled(10),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            configuratorIcon.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib });
             configuratorIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
                 {
                     Source = ib,
-                    Converter = new RunningDotColorConverter(),
-                    // Базовый цвет значка — кисть темы («@» = ресурс, обновляется со схемой);
-                    // при критическом статусе конвертер перекрашивает значок (issue #310).
-                    ConverterParameter = "@WarningBrush"
+                    Converter = new RunningChipBrushConverter(),
+                    ConverterParameter = "glyph:@WarningBrush"
                 });
             configuratorChip.Child = configuratorIcon;
-            configuratorChip.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib });
             runningIcons.Children.Add(configuratorChip);
 
             nameRow.Children.Add(name);
@@ -861,6 +839,48 @@ namespace Workspace1C
         }
 
         /// <summary>Объединяет непустые фрагменты в одну строку с разделителем «•».</summary>
+        /// <summary>
+        /// Значок «запущено 1С:Предприятие» — сплошной треугольник Play (Material Design
+        /// «Play»). Прежний IconRunning был кружком с вырезанным треугольником: внутри
+        /// круглого чипа он превращался в «кружок в кружке» и читался мелко (issue #101).
+        /// </summary>
+        internal const string RunningEnterpriseGlyph = "M8,5.14V19.14L19,12.14L8,5.14Z";
+
+        /// <summary>
+        /// Круглый чип-подложка значка режима запуска (issue #101, Вариант 4): 18 px,
+        /// без внутренних полей (значок центруется сам), фон и обводка — по статусу
+        /// отклика процесса через <see cref="RunningChipBrushConverter"/>.
+        /// </summary>
+        private static Border BuildRunningChip(Infobase ib, string visibilityPath, double leftMargin)
+        {
+            var chip = new Border
+            {
+                Width = UiMetrics.Scaled(18),
+                Height = UiMetrics.Scaled(18),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(9)),
+                VerticalAlignment = VerticalAlignment.Center,
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(UiMetrics.Scaled(leftMargin), 0, 0, 0)
+            };
+            chip.Bind(Border.BackgroundProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                {
+                    Source = ib,
+                    Converter = new RunningChipBrushConverter(),
+                    ConverterParameter = "bg"
+                });
+            chip.Bind(Border.BorderBrushProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.RunningStatus))
+                {
+                    Source = ib,
+                    Converter = new RunningChipBrushConverter(),
+                    ConverterParameter = "border"
+                });
+            chip.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(visibilityPath) { Source = ib });
+            return chip;
+        }
+
         private static string JoinSegments(params string?[] parts)
         {
             var nonEmpty = parts

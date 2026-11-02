@@ -485,6 +485,10 @@ public sealed class TestDeployService
         if (resolver is not null)
         {
             log?.Invoke(T("TestDeploy.SourceDbmsResolving"));
+            // Issue #79 (v1.0.1.25): учётные данные формы и тип СУБД формы — для
+            // «infobase info» (права администратора ИБ) и пустого dbms rac 8.5.
+            resolver.CredentialOverride = scenario.Credential;
+            resolver.FallbackDbms = scenario.Dbms;
             try
             {
                 var fromRac = await resolver.ResolveAsync(source, ct).ConfigureAwait(false);

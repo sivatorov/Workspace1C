@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 
@@ -38,6 +39,28 @@ public sealed class RacLicensedSessionRow
 
     /// <summary>Тип лицензии сеанса (поле «lic-type»: server/client/web и т.п.).</summary>
     public string LicType => string.IsNullOrWhiteSpace(_session.LicType) ? "—" : _session.LicType;
+
+    /// <summary>
+    /// Описание лицензии для таблицы (issue #83, v1.0.1.25, 7OH: «а какие есть?»):
+    /// тип (soft/HASP) + представление rac («Клиент 8100000001 1 польз.») или серия,
+    /// с пометкой, если лицензию получил сам клиент, а не сервер 1С.
+    /// </summary>
+    public string LicenseDescription
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(_session.LicType))
+                parts.Add(_session.LicType.Trim());
+            if (!string.IsNullOrWhiteSpace(_session.LicensePresentation))
+                parts.Add(_session.LicensePresentation.Trim());
+            else if (!string.IsNullOrWhiteSpace(_session.LicenseSeries))
+                parts.Add(_session.LicenseSeries.Trim());
+            if (_session.LicenseIssuedByServer == false)
+                parts.Add(LocalizationManager.T("ServerMonitor.Licenses.IssuedByClient"));
+            return parts.Count == 0 ? "—" : string.Join(" · ", parts);
+        }
+    }
 
     /// <summary>Максимальное число лицензий, доступное сеансу (0 — не указано).</summary>
     public string MaxLicensesText => _session.MaxLicenses > 0

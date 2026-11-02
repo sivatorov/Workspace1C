@@ -69,7 +69,16 @@
         <!-- ============ Кнопки Отмена / ОК ============ -->
         <StackPanel Grid.Row="3" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button Width="110" Margin="0,0,8,0"
+            <Button Margin="0,0,8,0" x:Name="OkButton" Width="130"
+                    IsDefault="True"
+                    Style="{StaticResource ModernButton}"
+                    Click="OnOk_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button Width="110"
                     IsCancel="True"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"
@@ -77,15 +86,6 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="OkButton" Width="130"
-                    IsDefault="True"
-                    Style="{StaticResource ModernButton}"
-                    Click="OnOk_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </StackPanel>

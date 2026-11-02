@@ -561,10 +561,10 @@ namespace Workspace1C
                 Margin = new Thickness(0, 2, 0, 4)
             };
             // Ширины колонок: отрицательные — «звёздные» (1 / -w), положительные — пиксели.
-            var inUseWidths = new[] { -1.3, -1.3, -1.0, 110d, 80d, 90d, 90d };
+            var inUseWidths = new[] { -1.3, -1.3, -1.0, -1.8, 80d, 90d, 90d };
             var inUseTable = BuildLicenseList(
                 _vm.LicensedSessions,
-                new[] { "User", "InfobaseName", "Host", "LicType", "LicensesUsedText", "MaxLicensesText", "AppId" },
+                new[] { "User", "InfobaseName", "Host", "LicenseDescription", "LicensesUsedText", "MaxLicensesText", "AppId" },
                 inUseWidths,
                 fixedHeight: 240);
 
@@ -586,10 +586,12 @@ namespace Workspace1C
             panel.Children.Add(headerPanel);
             DockPanel.SetDock(inUseTitle, Dock.Top);
             panel.Children.Add(inUseTitle);
-            DockPanel.SetDock(installedTitle, Dock.Bottom);
-            panel.Children.Add(installedTitle);
             DockPanel.SetDock(inUseTable, Dock.Top);
             panel.Children.Add(inUseTable);
+            // Issue #83 (v1.0.1.25): заголовок «Установленные программные лицензии»
+            // стоит НАД своей таблицей (раньше Dock.Bottom уводил его под неё).
+            DockPanel.SetDock(installedTitle, Dock.Top);
+            panel.Children.Add(installedTitle);
             panel.Children.Add(installedTable);
             return panel;
         }
@@ -608,7 +610,7 @@ namespace Workspace1C
                     "User" => LocalizationManager.T("ServerMonitor.Licenses.Columns.User"),
                     "InfobaseName" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Infobase"),
                     "Host" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Host"),
-                    "LicType" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Type"),
+                    "LicType" or "LicenseDescription" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Type"),
                     "LicensesUsedText" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Used"),
                     "MaxLicensesText" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Max"),
                     "AppId" => LocalizationManager.T("ServerMonitor.Licenses.Columns.App"),
@@ -653,6 +655,7 @@ namespace Workspace1C
                     "InfobaseName" => row.InfobaseName,
                     "Host" => row.Host,
                     "LicType" => row.LicType,
+                    "LicenseDescription" => row.LicenseDescription,
                     "LicensesUsedText" => row.LicensesUsedText,
                     "MaxLicensesText" => row.MaxLicensesText,
                     "AppId" => row.AppId,

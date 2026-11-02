@@ -183,6 +183,10 @@ public sealed class BatchOpsPreparationService
         }
 
         var parameters = resolution.Parameters;
+        // Issue #92/#79 (v1.0.1.25): учётные данные администратора ИБ из свойств базы
+        // (авторизация «Конфигуратора») — без них rac отвечает «Недостаточно прав
+        // пользователя на информационную базу» на «infobase info/update» и завершение сеансов.
+        var (ibUser, ibPassword) = ClusterInfobaseCredentialsResolver.InfobaseAdminCredentials(infobase);
         var clusterId = resolution.ClusterId;
         var infobaseId = resolution.InfobaseId;
 
@@ -199,7 +203,7 @@ public sealed class BatchOpsPreparationService
                 {
                     if (await _racClient.TerminateSessionAsync(
                             parameters, clusterId, session.Id, processId: null,
-                            infobaseUser: null, infobasePassword: null, ct).ConfigureAwait(false))
+                            infobaseUser: ibUser, infobasePassword: ibPassword, ct).ConfigureAwait(false))
                         terminated++;
                 }
                 _log?.Invoke(string.Format(
@@ -231,7 +235,7 @@ public sealed class BatchOpsPreparationService
             {
                 var info = await _racClient.GetInfobaseInfoAsync(
                     parameters, clusterId, infobaseId,
-                    infobaseUser: null, infobasePassword: null, ct).ConfigureAwait(false);
+                    infobaseUser: ibUser, infobasePassword: ibPassword, ct).ConfigureAwait(false);
                 sessionsDenyNow = info?.SessionsDeny ?? false;
                 jobsDenyNow = info?.ScheduledJobsDeny ?? false;
             }
@@ -250,6 +254,8 @@ public sealed class BatchOpsPreparationService
                 {
                     SessionsDeny = setSessionsDeny ? true : null,
                     ScheduledJobsDeny = setScheduledJobsDeny || jobsDenyNow,
+                    InfobaseUser = ibUser ?? string.Empty,
+                    InfobasePassword = ibPassword ?? string.Empty,
                     // Код разрешения имеет смысл только при блокировке начала сеансов.
                     PermissionCode = setSessionsDeny && !string.IsNullOrEmpty(options.PermissionCode)
                         ? options.PermissionCode
@@ -309,13 +315,16 @@ public sealed class BatchOpsPreparationService
         try
         {
             _log?.Invoke(LocalizationManager.T("BatchOps.Prepare.Restoring"));
+            var (restoreUser, restorePassword) = ClusterInfobaseCredentialsResolver.InfobaseAdminCredentials(infobase);
             var request = new RacInfobaseUpdateRequest
             {
                 // Снимаем только то, что включали: sessions-deny=off передаётся, только
                 // когда мы её ставили; scheduled-jobs-deny восстанавливается на исходное
                 // состояние (блокировка администратора не сбрасывается).
                 SessionsDeny = undo.SetSessionsDeny ? false : null,
-                ScheduledJobsDeny = undo.SetScheduledJobsDeny ? false : undo.WasScheduledJobsDeny
+                ScheduledJobsDeny = undo.SetScheduledJobsDeny ? false : undo.WasScheduledJobsDeny,
+                InfobaseUser = restoreUser ?? string.Empty,
+                InfobasePassword = restorePassword ?? string.Empty
             };
             var updated = await _racClient.UpdateInfobaseAsync(
                 undo.Parameters, undo.ClusterId, undo.InfobaseId, request, ct).ConfigureAwait(false);

@@ -88,7 +88,14 @@
                    TextWrapping="Wrap" Text="{Binding Summary}"/>
 
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="CancelButton" Width="110" Margin="0,0,8,0" IsCancel="True"
+            <Button Margin="0,0,8,0" x:Name="UpdateButton" Width="180" IsDefault="True"
+                    Style="{StaticResource ModernButton}" Click="OnUpdateSelected_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⇅" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc RepoUpdate.UpdateSelected}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button x:Name="CancelButton" Width="110" IsCancel="True"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"
                     Foreground="{DynamicResource TextPrimaryBrush}"
@@ -96,13 +103,6 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </Button>
-            <Button x:Name="UpdateButton" Width="180" IsDefault="True"
-                    Style="{StaticResource ModernButton}" Click="OnUpdateSelected_Click">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⇅" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{loc:Loc RepoUpdate.UpdateSelected}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </StackPanel>

@@ -489,9 +489,11 @@ public static class RacOutputParser
                 switch (header[i].Trim().ToLowerInvariant())
                 {
                     case "lic-type":
+                    case "license-type":
                         licTypeIndex = i;
                         break;
                     case "max-licenses":
+                    case "max-users":
                         maxLicensesIndex = i;
                         break;
                     case "licenses":
@@ -584,9 +586,18 @@ public static class RacOutputParser
                     ConnectionId = ParseGuid(Get(block, "connection")),
                     Hibernate = ParseBool(Get(block, "hibernate")),
                     State = Unquote(Get(block, "state")),
-                    LicType = Unquote(Get(block, "lic-type")),
-                    MaxLicenses = ParseInt(Get(block, "max-licenses")),
-                    Licenses = ParseInt(GetAny(block, "licenses", "used-licenses"))
+                    // Issue #83 (v1.0.1.25, 7OH: «лицензия разработчика ТОЧНО используется,
+                    // но в таблице пусто»): rac «session list --licenses» отдаёт тип лицензии
+                    // ключом «license-type» (soft/HASP), а не «lic-type», лимит — «max-users»,
+                    // плюс «series», «issued-by-server», «short-presentation». Раньше
+                    // читался только «lic-type» → тип пуст → сеанс отбрасывался как
+                    // «без лицензии» и таблица занятых лицензий оставалась пустой.
+                    LicType = Unquote(GetAny(block, "lic-type", "license-type")),
+                    MaxLicenses = ParseInt(GetAny(block, "max-licenses", "max-users")),
+                    Licenses = ParseInt(GetAny(block, "licenses", "used-licenses")),
+                    LicenseSeries = Unquote(Get(block, "series")),
+                    LicensePresentation = Unquote(GetAny(block, "short-presentation", "full-presentation")),
+                    LicenseIssuedByServer = ParseOptionalOn(Get(block, "issued-by-server"))
                 });
             }
         }
