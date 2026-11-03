@@ -2855,6 +2855,8 @@ public partial class MainViewModel : ViewModelBase
         // (как у Avalonia-версии), прямое чтение/запись через репозиторий.
         var settings = _repository.LoadSettings() ?? new AppSettings();
         var effectiveKind = kind ?? BatchOperationsService.ParseDumpKind(settings.BatchDumpKind);
+        // Движок выгрузки (issue #92, v1.0.1.28): ibcmd по умолчанию или Конфигуратор.
+        var effectiveEngine = BatchOperationsService.ParseDumpEngine(settings.BatchDumpEngine);
 
         // Безопасность: подтверждение перед массовой операцией по нескольким базам.
         if (!_dialogs.Confirm(
@@ -2886,9 +2888,11 @@ public partial class MainViewModel : ViewModelBase
         window.ViewModel.PrepareTerminateSessions = settings.BatchOpsTerminateSessions;
         window.ViewModel.PrepareDenyNewSessions = settings.BatchOpsDenyNewSessions;
         window.ViewModel.PrepareDenyScheduledJobs = settings.BatchOpsDenyScheduledJobs;
+        window.ViewModel.DumpEngine = effectiveEngine;
         window.ShowDialog();
 
-        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF, опции подготовки).
+        // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF,
+        // движок, опции подготовки).
         var vm = window.ViewModel;
         settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.Template)
             ? BatchOperationsService.DefaultDumpTemplate : vm.Template.Trim();
@@ -2896,6 +2900,7 @@ public partial class MainViewModel : ViewModelBase
         {
             settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
             settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
+            settings.BatchDumpEngine = BatchOperationsService.DumpEngineToString(vm.DumpEngine);
         }
         settings.BatchOpsTerminateSessions = vm.PrepareTerminateSessions;
         settings.BatchOpsDenyNewSessions = vm.PrepareDenyNewSessions;

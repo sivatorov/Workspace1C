@@ -181,7 +181,7 @@ public sealed class ServerMonitorCsvSummaryTests : IDisposable
             => Task.FromResult<IReadOnlyList<RacLockInfo>>(Array.Empty<RacLockInfo>());
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => Task.FromResult<IReadOnlyList<RacInfobaseSummary>>(new[]
             {
                 new RacInfobaseSummary { InfobaseId = Guid.NewGuid(), Name = "Рабочая" }

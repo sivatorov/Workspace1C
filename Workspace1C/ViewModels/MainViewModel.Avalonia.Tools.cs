@@ -1646,6 +1646,8 @@ public partial class MainViewModel : ViewModelBase
         }
 
         var effectiveKind = kind ?? BatchOperationsService.ParseDumpKind(_settings.BatchDumpKind);
+        // Движок выгрузки (issue #92, v1.0.1.28): ibcmd по умолчанию или Конфигуратор.
+        var effectiveEngine = BatchOperationsService.ParseDumpEngine(_settings.BatchDumpEngine);
 
         // Безопасность: подтверждение перед массовой операцией по нескольким базам.
         if (!_dialog.Confirm(
@@ -1674,6 +1676,7 @@ public partial class MainViewModel : ViewModelBase
         window.ViewModel.PrepareTerminateSessions = _settings.BatchOpsTerminateSessions;
         window.ViewModel.PrepareDenyNewSessions = _settings.BatchOpsDenyNewSessions;
         window.ViewModel.PrepareDenyScheduledJobs = _settings.BatchOpsDenyScheduledJobs;
+        window.ViewModel.DumpEngine = effectiveEngine;
         window.ShowDialogSync(OwnerWindow());
 
         // Сохраняем настройки массовой выгрузки (шаблон, каталог, вид DT/CF, опции подготовки).
@@ -1684,6 +1687,7 @@ public partial class MainViewModel : ViewModelBase
         {
             _settings.BatchDumpDirectory = vm.PathText?.Trim() ?? string.Empty;
             _settings.BatchDumpKind = BatchOperationsService.DumpKindToString(vm.Kind);
+            _settings.BatchDumpEngine = BatchOperationsService.DumpEngineToString(vm.DumpEngine);
         }
         _settings.BatchOpsTerminateSessions = vm.PrepareTerminateSessions;
         _settings.BatchOpsDenyNewSessions = vm.PrepareDenyNewSessions;

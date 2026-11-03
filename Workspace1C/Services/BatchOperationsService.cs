@@ -26,6 +26,21 @@ public enum BatchOperationKind
 }
 
 /// <summary>
+/// Движок массовой выгрузки DT/CF (issue #92, v1.0.1.28, пожелание aepkugesi):
+/// ibcmd — быстрый, но для клиент-серверных баз требует профиль СУБД (пароль rac
+/// не отдаёт); Конфигуратор — использует авторизацию ИБ из свойств базы и не
+/// требует пароля СУБД, но медленнее и требует монопольного доступа к файловой базе.
+/// </summary>
+public enum BatchDumpEngine
+{
+    /// <summary>ibcmd (по умолчанию): утилита 1cmd без окна и лицензии Конфигуратора.</summary>
+    Ibcmd,
+
+    /// <summary>Конфигуратор в пакетном режиме (/DumpIB или /DumpCfg).</summary>
+    Designer
+}
+
+/// <summary>
 /// Сервис массовых операций по списку баз (issue #91): чистая логика без запуска
 /// процессов — построение целевого пути файла и пред-валидация до старта. Само
 /// выполнение (запуск ibcmd) делает <see cref="IbcmdService"/>; для юнит-тестов
@@ -85,6 +100,20 @@ public static class BatchOperationsService
     /// <summary>Строка настроек для вида выгрузки: «DT» или «CF».</summary>
     public static string DumpKindToString(BatchOperationKind kind)
         => kind == BatchOperationKind.DumpCf ? "CF" : "DT";
+
+    /// <summary>
+    /// Разбирает движок массовой выгрузки из сохранённой строки настроек (issue #92,
+    /// v1.0.1.28): «Designer» → <see cref="BatchDumpEngine.Designer"/>, остальное
+    /// (в т.ч. пусто/«Ibcmd») → <see cref="BatchDumpEngine.Ibcmd"/>.
+    /// </summary>
+    public static BatchDumpEngine ParseDumpEngine(string? value)
+        => string.Equals(value?.Trim(), "Designer", StringComparison.OrdinalIgnoreCase)
+            ? BatchDumpEngine.Designer
+            : BatchDumpEngine.Ibcmd;
+
+    /// <summary>Строка настроек для движка выгрузки: «Ibcmd» или «Designer».</summary>
+    public static string DumpEngineToString(BatchDumpEngine engine)
+        => engine == BatchDumpEngine.Designer ? "Designer" : "Ibcmd";
 
     /// <summary>
     /// Строит целевое имя файла массовой выгрузки по шаблону (issue #92):

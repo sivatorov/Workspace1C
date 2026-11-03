@@ -55,6 +55,10 @@ namespace Workspace1C
             TemplateLabel.Text = LocalizationManager.T("BatchOps.TemplateLabel");
             KindDtRadio.Content = LocalizationManager.T("BatchOps.KindDtRadio");
             KindCfRadio.Content = LocalizationManager.T("BatchOps.KindCfRadio");
+            // Движок выгрузки (issue #92, v1.0.1.28).
+            EngineLabel.Text = LocalizationManager.T("BatchOps.EngineLabel");
+            EngineIbcmdRadio.Content = LocalizationManager.T("BatchOps.EngineIbcmd");
+            EngineDesignerRadio.Content = LocalizationManager.T("BatchOps.EngineDesigner");
             LogHeader.Text = LocalizationManager.T("BatchOps.Log");
             RunButtonText.Text = LocalizationManager.T("BatchOps.Execute");
 
@@ -67,7 +71,10 @@ namespace Workspace1C
             PrepareHint.Text = LocalizationManager.T("BatchOps.Prepare.Hint");
             // Выгрузка запущенных баз (issue #92, v1.0.1.25).
             AllowRunningText.Text = LocalizationManager.T("BatchOps.AllowRunningBases");
-            AllowRunningCheck.ToolTip = LocalizationManager.T("BatchOps.AllowRunningBasesHint");
+            // Issue #92 (v1.0.1.28): подсказка многострочная — строковый ToolTip
+            // не переносится и уезжает за экран.
+            AllowRunningCheck.ToolTip = MakeWrappingToolTip(
+                LocalizationManager.T("BatchOps.AllowRunningBasesHint"));
             // Поле «Пароль пользователя СУБД» (issue #92, v1.0.1.26).
             SqlPasswordLabel.Text = LocalizationManager.T("BatchOps.SqlPasswordLabel");
             SqlPasswordHint.Text = LocalizationManager.T("BatchOps.SqlPasswordHint");
@@ -80,6 +87,20 @@ namespace Workspace1C
             _vm.PropertyChanged += OnVmPropertyChanged;
             ((INotifyCollectionChanged)_vm.LogLines).CollectionChanged += OnLogLinesChanged;
         }
+
+        /// <summary>
+        /// Многострочный ToolTip (issue #92, v1.0.1.28): TextBlock с переносом
+        /// вместо строки — длинная подсказка не уезжает за экран.
+        /// </summary>
+        private static ToolTip MakeWrappingToolTip(string text) => new()
+        {
+            Content = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 360
+            }
+        };
 
         /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
         private void UpdateKindDependentUi()
@@ -100,9 +121,14 @@ namespace Workspace1C
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
             DumpOptionsPanel.Visibility = _vm.IsDumpKind
                 ? Visibility.Visible : Visibility.Collapsed;
+            // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
+            SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
+                ? Visibility.Visible : Visibility.Collapsed;
             _suppressKindEvents = true;
             KindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
             KindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;
+            EngineIbcmdRadio.IsChecked = _vm.DumpEngine == BatchDumpEngine.Ibcmd;
+            EngineDesignerRadio.IsChecked = _vm.DumpEngine == BatchDumpEngine.Designer;
             _suppressKindEvents = false;
         }
 
@@ -112,11 +138,23 @@ namespace Workspace1C
 
         private void OnKindCf_Checked(object sender, RoutedEventArgs e) => OnKindChecked(BatchOperationKind.DumpCf);
 
+        private void OnEngineIbcmd_Checked(object sender, RoutedEventArgs e) => OnEngineChecked(BatchDumpEngine.Ibcmd);
+
+        private void OnEngineDesigner_Checked(object sender, RoutedEventArgs e) => OnEngineChecked(BatchDumpEngine.Designer);
+
         private void OnKindChecked(BatchOperationKind kind)
         {
             if (_suppressKindEvents || _vm.Kind == kind || _vm is null)
                 return;
             _vm.Kind = kind;
+            UpdateKindDependentUi();
+        }
+
+        private void OnEngineChecked(BatchDumpEngine engine)
+        {
+            if (_suppressKindEvents || _vm.DumpEngine == engine || _vm is null)
+                return;
+            _vm.DumpEngine = engine;
             UpdateKindDependentUi();
         }
 
@@ -134,6 +172,18 @@ namespace Workspace1C
             else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel))
             {
                 PathLabel.Text = _vm.PathLabel;
+            }
+            // Issue #92 (v1.0.1.28): заголовок/подсказка обновляются по изменению вида
+            // операции в модели — события радиокнопок ненадёжны как единственный триггер
+            // (программная установка, восстановление вида из настроек, uncheck соседа).
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.Kind))
+            {
+                UpdateKindDependentUi();
+            }
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.IsDbmsPasswordVisible))
+            {
+                SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
+                    ? Visibility.Visible : Visibility.Collapsed;
             }
         }
 

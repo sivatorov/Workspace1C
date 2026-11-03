@@ -235,8 +235,9 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     /// позволяет делать выгрузку в DT даже при наличии сеансов? Под ответственность
     /// пользователя»). ibcmd работает с СУБД клиент-серверной базы напрямую и сеансов
     /// не проверяет — выгрузка при активных сеансах возможна, согласованность данных —
-    /// на ответственности пользователя. Только для выгрузок (DT/CF); загрузка .cf в
-    /// работающую базу по-прежнему пропускается. По умолчанию выключено, не сохраняется.
+    /// на ответственности пользователя. Только для выгрузок (DT/CF) движком ibcmd;
+    /// загрузка .cf в работающую базу и выгрузка Конфигуратором (v1.0.1.28 — ему нужен
+    /// монопольный доступ) по-прежнему пропускаются. По умолчанию выключено, не сохраняется.
     /// </summary>
     public bool AllowRunningBases
     {
@@ -244,9 +245,36 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         set => SetProperty(ref _allowRunningBases, value);
     }
 
-    /// <summary>Пропускать ли запущенную базу при текущих настройках (issue #92, v1.0.1.25).</summary>
+    private BatchDumpEngine _dumpEngine = BatchDumpEngine.Ibcmd;
+
+    /// <summary>
+    /// Движок массовой выгрузки DT/CF (issue #92, v1.0.1.28, пожелание aepkugesi):
+    /// ibcmd — быстрый, но для клиент-серверных баз требует пароль СУБД; Конфигуратор —
+    /// авторизуется из свойств ИБ (пароль СУБД не нужен), но медленнее и запущенные
+    /// файловые базы не выгружает. Сохраняется окном в настройках приложения
+    /// (как вид операции и шаблон).
+    /// </summary>
+    public BatchDumpEngine DumpEngine
+    {
+        get => _dumpEngine;
+        set
+        {
+            if (SetProperty(ref _dumpEngine, value))
+                OnPropertyChanged(nameof(IsDbmsPasswordVisible));
+        }
+    }
+
+    /// <summary>
+    /// Виден ли блок «Пароль пользователя СУБД» (issue #92, v1.0.1.28): пароль нужен
+    /// только движку ibcmd для клиент-серверных баз; Конфигуратор использует авторизацию
+    /// ИБ из свойств базы, поэтому при этом движке поля СУБД скрываются.
+    /// </summary>
+    public bool IsDbmsPasswordVisible => IsDumpKind && DumpEngine == BatchDumpEngine.Ibcmd;
+
+    /// <summary>Пропускать ли запущенную базу при текущих настройках (issue #92, v1.0.1.25;
+    /// v1.0.1.28 — опция «Выгружать и запущенные» действует только для ibcmd).</summary>
     internal bool ShouldSkipRunning(Infobase infobase) =>
-        infobase.IsRunning && !(AllowRunningBases && IsDumpKind);
+        infobase.IsRunning && !(AllowRunningBases && IsDumpKind && DumpEngine == BatchDumpEngine.Ibcmd);
 
     /// <summary>Собирает опции подготовки из состояния чекбоксов окна.</summary>
     private BatchOpsPreparationOptions BuildPreparationOptions() => new()
@@ -472,6 +500,13 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
                 _ => LocalizationManager.T("BatchOps.KindLoadCf")
             }));
+        // Issue #92 (v1.0.1.28): движок выгрузки виден в журнале — Конфигуратор
+        // работает заметно дольше ibcmd, пользователь должен понимать почему.
+        if (Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf &&
+            DumpEngine == BatchDumpEngine.Designer)
+        {
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] " + LocalizationManager.T("BatchOps.EngineDesignerLog"));
+        }
 
         // Issue #92 (v1.0.1.21): строка журнала «запущен ibcmd (PID …)» на каждый запуск —
         // «повисло» неотличимо от работы, если не видно стартовавших процессов.
@@ -579,7 +614,10 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 // Issue #92: флаг «автоподстановка реально запускалась и не дала данных» —
                 // для fail-fast вместо заведомо провального запуска ibcmd (см. ниже).
                 var dbmsResolveFailed = false;
-                if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null)
+                // Issue #92 (v1.0.1.28): движку «Конфигуратор» данные СУБД не нужны —
+                // он авторизуется из свойств ИБ, rac-резолв не запускаем вовсе.
+                if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null &&
+                    DumpEngine != BatchDumpEngine.Designer)
                 {
                     var hasSavedProfile = false;
                     try { hasSavedProfile = DbmsBackupService.Load().Find(ib.Id) is not null; }
@@ -754,14 +792,37 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Реальный исполнитель через ibcmd (обе платформы, без Конфигуратора).
-    /// <paramref name="dbmsProfile"/> — профиль СУБД, разрешённый при прогоне
-    /// (сохранённый или автоподставленный из rac, issue #92); null — профиль
-    /// загрузит сам <see cref="IbcmdService"/>.
+    /// Реальный исполнитель (обе платформы): при движке «Конфигуратор» (issue #92,
+    /// v1.0.1.28) — пакетный запуск 1cv8 (/DumpIB или /DumpCfg) с ожиданием по событию
+    /// <see cref="OneCLauncher.DesignerBatchCompleted"/> (образец —
+    /// <c>TestDeployService.WaitForBatchAsync</c>); Конфигуратор не требует пароля СУБД —
+    /// авторизация ИБ берётся из свойств базы, как в контекстном меню
+    /// «Резервирование → Выгрузить в dt». При движке ibcmd (по умолчанию) —
+    /// <see cref="IbcmdService"/>. <paramref name="dbmsProfile"/> — профиль СУБД,
+    /// разрешённый при прогоне (сохранённый или автоподставленный из rac, issue #92);
+    /// null — профиль загрузит сам <see cref="IbcmdService"/>.
     /// </summary>
-    private Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath,
+    private async Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath,
         DbmsBackupProfile? dbmsProfile, CancellationToken ct)
-        => Kind switch
+    {
+        // Конфигуратор — только выгрузки (DumpDt/DumpCf); загрузка .cf остаётся на ibcmd.
+        if (DumpEngine == BatchDumpEngine.Designer && Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf)
+        {
+            var operation = Kind == BatchOperationKind.DumpCf
+                ? OneCLauncher.DesignerBatchOperation.DumpCfg
+                : OneCLauncher.DesignerBatchOperation.DumpIB;
+            var started = OneCLauncher.RunDesignerBatch(infobase, operation, targetPath, credential: null);
+            if (!started)
+                return IbcmdResult.Fail(LocalizationManager.T("Backup.StartFailed"));
+            var info = await WaitForDesignerBatchAsync(infobase, operation, targetPath, ct).ConfigureAwait(false);
+            if (info is null)
+                return IbcmdResult.Fail(LocalizationManager.T("Backup.Timeout"));
+            if (!info.Success)
+                return IbcmdResult.Fail(info.ErrorMessage ?? LocalizationManager.T("Backup.Failed"));
+            return new IbcmdResult { Success = true, ExitCode = info.ExitCode };
+        }
+
+        return await (Kind switch
         {
             BatchOperationKind.DumpDt => IbcmdService.DumpAsync(infobase, targetPath, credential: null, ct,
                 dbmsProfileOverride: dbmsProfile),
@@ -769,7 +830,47 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             BatchOperationKind.DumpCf => IbcmdService.SaveConfigAsync(infobase, targetPath, credential: null, ct,
                 dbmsProfileOverride: dbmsProfile),
             _ => IbcmdService.LoadConfigAsync(infobase, targetPath, ct, dbmsProfileOverride: dbmsProfile)
+        }).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Ожидает завершения пакетной операции Конфигуратора с поддержкой отмены
+    /// (issue #92, v1.0.1.28): кнопка «Остановить» гасит процесс 1cv8 через
+    /// <see cref="OneCLauncher.TerminateBatchProcess"/>, а не оставляет его висеть.
+    /// null — операция не завершилась (отмена).
+    /// </summary>
+    private static async Task<OneCLauncher.DesignerBatchInfo?> WaitForDesignerBatchAsync(
+        Infobase infobase, OneCLauncher.DesignerBatchOperation operation, string outputPath,
+        CancellationToken ct)
+    {
+        var tcs = new TaskCompletionSource<OneCLauncher.DesignerBatchInfo?>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        EventHandler<OneCLauncher.DesignerBatchInfo> handler = (_, info) =>
+        {
+            if (info.Operation == operation &&
+                string.Equals(info.OutputPath, outputPath, StringComparison.OrdinalIgnoreCase))
+            {
+                tcs.TrySetResult(info);
+            }
         };
+        OneCLauncher.DesignerBatchCompleted += handler;
+        try
+        {
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(Timeout.InfiniteTimeSpan, ct)).ConfigureAwait(false);
+            return completed == tcs.Task ? tcs.Task.Result : null;
+        }
+        catch (OperationCanceledException)
+        {
+            // Кнопка «Остановить»: гасим процесс 1cv8 вместе с деревом потомков.
+            OneCLauncher.TerminateBatchProcess(infobase);
+            throw;
+        }
+        finally
+        {
+            OneCLauncher.DesignerBatchCompleted -= handler;
+        }
+    }
 
     /// <summary>Добавляет строку в лог потокобезопасно (через захваченный контекст синхронизации).</summary>
     private void AppendLog(string line)

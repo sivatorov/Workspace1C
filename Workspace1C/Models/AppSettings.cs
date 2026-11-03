@@ -782,6 +782,13 @@ public class AppSettings
     public string BatchDumpKind { get; set; } = "DT";
 
     /// <summary>
+    /// Движок массовой выгрузки DT/CF (issue #92, v1.0.1.28): «Ibcmd» (по умолчанию)
+    /// или «Designer» (Конфигуратор — не требует пароля СУБД). Разбор —
+    /// <see cref="Workspace1C.Services.BatchOperationsService.ParseDumpEngine"/>.
+    /// </summary>
+    public string BatchDumpEngine { get; set; } = "Ibcmd";
+
+    /// <summary>
     /// Опция «Перед операцией» массовых операций (issue #92, v1.0.1.21, пожелание
     /// aepkugesi): завершать сеансы пользователей перед выгрузкой/загрузкой.
     /// </summary>

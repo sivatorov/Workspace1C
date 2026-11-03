@@ -202,8 +202,7 @@ public sealed class ClusterInfobaseCredentialsResolver
                 var probeStopwatch = System.Diagnostics.Stopwatch.StartNew();
                 try
                 {
-                    summaries = await _racClient
-                        .GetInfobasesAsync(parameters, cluster.Id, timeoutCts.Token)
+                    summaries = await GetInfobasesWithRetryAsync(parameters, cluster.Id, timeoutCts.Token)
                         .ConfigureAwait(false);
                 }
                 catch (OperationCanceledException) { throw; }
@@ -271,7 +270,7 @@ public sealed class ClusterInfobaseCredentialsResolver
                 _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveInfoFallback"));
                 try
                 {
-                    var info = await _racClient.GetInfobaseInfoAsync(
+                    var info = await GetInfobaseInfoWithRetryAsync(
                         parameters, cluster.Id, match.InfobaseId,
                         infobaseUser: ibUser, infobasePassword: ibPassword, timeoutCts.Token).ConfigureAwait(false);
 
@@ -284,7 +283,7 @@ public sealed class ClusterInfobaseCredentialsResolver
                         !string.Equals(parameters.User, ibUser, StringComparison.Ordinal))
                     {
                         _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveClusterCredsFallback"));
-                        info = await _racClient.GetInfobaseInfoAsync(
+                        info = await GetInfobaseInfoWithRetryAsync(
                             parameters, cluster.Id, match.InfobaseId,
                             infobaseUser: parameters.User, infobasePassword: parameters.Password,
                             timeoutCts.Token).ConfigureAwait(false);
@@ -389,6 +388,77 @@ public sealed class ClusterInfobaseCredentialsResolver
                 parameters.Address, ex.Message));
             return new();
         }
+    }
+
+    /// <summary>
+    /// «infobase summary list» с увеличенным таймаутом и ОДНОКРАТНЫМ повтором
+    /// (issue #79, v1.0.1.28, образец — GetInfobasesWithRetryAsync импорта из
+    /// кластера, issue #25): холодный rac / загруженный сервер не укладывается в
+    /// 30 с, результат отбрасывался и мастер показывал «база не найдена». Повтор
+    /// только для таймаутов/стартовых сбо rac (см. <see cref="IsRetryableRacFailure"/>);
+    /// ошибки прав не повторяются — это не таймаут.
+    /// </summary>
+    private async Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesWithRetryAsync(
+        RacConnectionParams parameters, Guid clusterId, CancellationToken ct)
+    {
+        try
+        {
+            return await _racClient.GetInfobasesAsync(
+                parameters, clusterId, ct, RacClient.InfobaseInfoTimeout).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (IsRetryableRacFailure(ex.Message))
+        {
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("BatchOps.DbmsResolveRacRetry"), ex.Message));
+            return await _racClient.GetInfobasesAsync(
+                parameters, clusterId, ct, RacClient.InfobaseInfoTimeout).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// «infobase info» с увеличенным таймаутом и ОДНОКРАТНЫМ повтором (issue #79,
+    /// v1.0.1.28): rac при сбое возвращает null, текст ошибки — в
+    /// <see cref="IRacClient.LastActionError"/>; повторяем только таймауты/стартовые
+    /// сбо rac, ошибки прав («Недостаточно прав пользователя») не повторяются.
+    /// </summary>
+    private async Task<RacInfobaseInfo?> GetInfobaseInfoWithRetryAsync(
+        RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
+        string? infobaseUser, string? infobasePassword, CancellationToken ct)
+    {
+        var info = await _racClient.GetInfobaseInfoAsync(
+            parameters, clusterId, infobaseId,
+            infobaseUser: infobaseUser, infobasePassword: infobasePassword, ct,
+            RacClient.InfobaseInfoTimeout).ConfigureAwait(false);
+        if (info is not null || !IsRetryableRacFailure(_racClient.LastActionError))
+            return info;
+        _log?.Invoke(string.Format(
+            LocalizationManager.T("BatchOps.DbmsResolveRacRetry"), _racClient.LastActionError));
+        return await _racClient.GetInfobaseInfoAsync(
+            parameters, clusterId, infobaseId,
+            infobaseUser: infobaseUser, infobasePassword: infobasePassword, ct,
+            RacClient.InfobaseInfoTimeout).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Повторяем ли сбой rac (issue #79, v1.0.1.28): только таймауты и стартовые
+    /// сбо (код -1 без объяснения). Ошибки прав доступа («Недостаточно прав
+    /// пользователя») НЕ повторяются — это не таймаут, повтор лишь удвоил бы время.
+    /// Чистый helper — покрыт юнит-тестом.
+    /// </summary>
+    internal static bool IsRetryableRacFailure(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
+        if (message.Contains("Недостаточно прав", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("Insufficient rights", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return message.Contains("таймаут", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("Не удалось выполнить команду rac", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

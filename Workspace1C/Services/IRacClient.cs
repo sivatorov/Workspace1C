@@ -108,9 +108,12 @@ public interface IRacClient
     /// <summary>
     /// Информационные базы кластера (команда «infobase summary list --cluster=...»).
     /// Используется функцией импорта баз из кластера 1С (цикл 0.3.9.172–0.3.9.175).
+    /// <paramref name="timeout"/> — per-call таймаут (issue #79, v1.0.1.28):
+    /// null — стандартные 30 с; резолвер свойств базы передаёт 90 с.
     /// </summary>
     Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-        RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default);
+        RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default,
+        TimeSpan? timeout = null);
 
     /// <summary>
     /// Регламентные задания кластера (команда «job list --cluster=...»).
@@ -219,7 +222,8 @@ public interface IRacClient
     /// </summary>
     Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
         RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-        string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+        string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default,
+        TimeSpan? timeout = null)
         => Task.FromResult<RacInfobaseInfo?>(null);
 
     /// <summary>

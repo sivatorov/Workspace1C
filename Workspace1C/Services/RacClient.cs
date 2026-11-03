@@ -27,6 +27,15 @@ public sealed class RacClient : IRacClient
     public static readonly TimeSpan CommandTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    /// Увеличенный таймаут для чтения свойств базы (issue #79, v1.0.1.28):
+    /// «infobase summary list» и «infobase info» в резолвере развёртывания тестовой
+    /// копии выполняются с 90 секундами — холодный rac / загруженный сервер не
+    /// укладывается в стандартные 30 с, результат отбрасывался и мастер показывал
+    /// «база не найдена». Остальные команды rac работают с прежним таймаутом.
+    /// </summary>
+    internal static readonly TimeSpan InfobaseInfoTimeout = TimeSpan.FromSeconds(90);
+
+    /// <summary>
     /// Источник rac-команд для диагностики CM_RAC-лога (issue #90): «MONITOR» — окно
     /// «Серверы 1С» (<see cref="ViewModels.ServerMonitorViewModel.MonitorLogSourceTag"/>),
     /// «ALERTS» — фоновые проверки <see cref="ServerAlertsService"/>. AsyncLocal — значение
@@ -279,7 +288,8 @@ public sealed class RacClient : IRacClient
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-        RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+        RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default,
+        TimeSpan? timeout = null)
     {
         // issue #25: rac 8.5.x может отклонять «--cluster=<uuid>» (код -1) не только
         // в «job list» (issue #324), но и в «infobase summary list» — перебираем
@@ -290,7 +300,7 @@ public sealed class RacClient : IRacClient
         var formatKey = ClusterFormatKey(parameters, clusterId, "infobase summary list");
         var output = await RunListCommandWithFormatFallbackAsync(
                 parameters, cancellationToken, "infobase summary list", formatKey,
-                index => InfobaseSummaryListArgs(index, clusterId))
+                index => InfobaseSummaryListArgs(index, clusterId), timeout)
             .ConfigureAwait(false);
         var infobases = RacOutputParser.ToInfobaseSummaries(output);
         EnsureParsedOrThrow(output, infobases.Count, "infobase summary list", _logger);
@@ -550,10 +560,11 @@ public sealed class RacClient : IRacClient
         CancellationToken cancellationToken,
         string commandName,
         string formatKey,
-        Func<int, string[]> argsBuilder)
+        Func<int, string[]> argsBuilder,
+        TimeSpan? timeout = null)
     {
         return await RunListCommandWithFormatFallbackAsync(
-                index => RunAsync(parameters, cancellationToken, argsBuilder(index)),
+                index => RunAsync(parameters, cancellationToken, timeout, argsBuilder(index)),
                 RacClient.LooksLikeUsageHelp,
                 _clusterFormats, formatKey, commandName, _logger)
             .ConfigureAwait(false);
@@ -978,11 +989,12 @@ public sealed class RacClient : IRacClient
     /// <inheritdoc />
     public async Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
         RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-        string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+        string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default,
+        TimeSpan? timeout = null)
     {
         try
         {
-            var output = await RunAsync(parameters, cancellationToken,
+            var output = await RunAsync(parameters, cancellationToken, timeout,
                 InfobaseInfoArgs(clusterId, infobaseId, infobaseUser, infobasePassword)).ConfigureAwait(false);
             var info = RacOutputParser.ToInfobaseInfo(output);
             LastActionError = info is null ? "Не удалось разобрать вывод rac «infobase info»." : string.Empty;
@@ -1083,8 +1095,20 @@ public sealed class RacClient : IRacClient
     /// stdout/stderr, таймаут 30 с. Возвращает stdout при ExitCode 0; при ошибке —
     /// <see cref="RacClientException"/> с текстом stderr.
     /// </summary>
+    /// <summary>Стандартный запуск rac-команды с таймаутом <see cref="CommandTimeout"/>.</summary>
+    private Task<string> RunAsync(
+        RacConnectionParams parameters, CancellationToken cancellationToken,
+        params string[] commandAndArgs)
+        => RunAsync(parameters, cancellationToken, null, commandAndArgs);
+
+    /// <summary>
+    /// Запуск rac-команды с per-call таймаутом (issue #79, v1.0.1.28):
+    /// <paramref name="timeout"/> — null — стандартный <see cref="CommandTimeout"/>
+    /// (30 с); резолвер свойств базы передаёт <see cref="InfobaseInfoTimeout"/> (90 с).
+    /// </summary>
     private async Task<string> RunAsync(
         RacConnectionParams parameters, CancellationToken cancellationToken,
+        TimeSpan? timeout,
         params string[] commandAndArgs)
     {
         var args = BuildArguments(parameters, commandAndArgs);
@@ -1162,8 +1186,12 @@ public sealed class RacClient : IRacClient
             var stdoutTask = ReadToEndBytesAsync(process.StandardOutput.BaseStream);
             var stderrTask = ReadToEndBytesAsync(process.StandardError.BaseStream);
 
+            // Issue #79 (v1.0.1.28): per-call таймаут — по умолчанию CommandTimeout (30 с),
+            // «infobase summary list»/«infobase info» в резолвере получают 90 с
+            // (InfobaseInfoTimeout); остальные команды rac не меняют поведение.
+            var effectiveTimeout = timeout ?? CommandTimeout;
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(CommandTimeout);
+            timeoutCts.CancelAfter(effectiveTimeout);
             try
             {
                 await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
@@ -1174,8 +1202,10 @@ public sealed class RacClient : IRacClient
                 if (cancellationToken.IsCancellationRequested)
                     throw;
 
-                const string message = "Превышен таймаут ожидания ответа rac (30 с).";
-                _logger.Warn($"RAC: {message}");
+                // Честное сообщение с ФАКТИЧЕСКИМ таймаутом команды (issue #79, v1.0.1.28):
+                // «Превышен таймаут ожидания ответа rac (90 с)» вместо безликого 30 с.
+                var message = $"Превышен таймаут ожидания ответа rac ({(int)effectiveTimeout.TotalSeconds} с).";
+                _logger.Warn($"RAC: {message} elapsed={stopwatch.ElapsedMilliseconds} мс");
                 throw new RacClientException(message);
             }
 

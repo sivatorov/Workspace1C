@@ -190,6 +190,20 @@
                         <RadioButton x:Name="KindCfRadio" GroupName="BatchDumpKind" Margin="16,0,0,0"
                                      VerticalAlignment="Center" Checked="OnKindCf_Checked"/>
                     </StackPanel>
+                    <!-- Движок выгрузки (issue #92, v1.0.1.28, пожелание aepkugesi):
+                         ibcmd — быстрый, но требует пароль СУБД для серверных баз;
+                         Конфигуратор — использует авторизацию ИБ, пароль СУБД не нужен. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <TextBlock x:Name="EngineLabel" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <RadioButton x:Name="EngineIbcmdRadio" GroupName="BatchDumpEngine"
+                                     VerticalAlignment="Center"
+                                     ToolTip="{loc:Loc BatchOps.EngineHint}"
+                                     Checked="OnEngineIbcmd_Checked"/>
+                        <RadioButton x:Name="EngineDesignerRadio" GroupName="BatchDumpEngine" Margin="16,0,0,0"
+                                     VerticalAlignment="Center"
+                                     ToolTip="{loc:Loc BatchOps.EngineHint}"
+                                     Checked="OnEngineDesigner_Checked"/>
+                    </StackPanel>
                     <!-- Выгрузка запущенных баз (issue #92, v1.0.1.25): ibcmd не проверяет
                          сеансы — под ответственность пользователя. -->
                     <CheckBox x:Name="AllowRunningCheck" Margin="0,6,0,0"

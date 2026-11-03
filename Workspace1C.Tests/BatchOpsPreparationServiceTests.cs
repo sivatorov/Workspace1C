@@ -35,10 +35,10 @@ public sealed class BatchOpsPreparationServiceTests
             return Task.FromResult<IReadOnlyList<RacCluster>>(Clusters);
         }
 
-        public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)
+        public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(RacConnectionParams p, Guid c, CancellationToken ct = default, TimeSpan? timeout = null)
             => Task.FromResult<IReadOnlyList<RacInfobaseSummary>>(Summaries);
 
-        public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(RacConnectionParams p, Guid c, Guid i, string? u, string? pw, CancellationToken ct = default)
+        public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(RacConnectionParams p, Guid c, Guid i, string? u, string? pw, CancellationToken ct = default, TimeSpan? timeout = null)
             => Task.FromResult(Info);
 
         public Task<IReadOnlyList<RacSessionInfo>> GetSessionsAsync(RacConnectionParams p, Guid c, Guid? i = null, CancellationToken ct = default)

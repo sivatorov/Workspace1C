@@ -960,7 +960,7 @@ public sealed class ClusterImportViewModelTests
         public int InfobaseRetryCount { get; private set; }
 
         public async Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, System.Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, System.Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             InfobaseCalls++;
             InfobaseClusterIds.Add(clusterId);

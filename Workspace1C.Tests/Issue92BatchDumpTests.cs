@@ -356,12 +356,12 @@ public sealed class Issue92BatchDumpTests
             => Task.FromResult<IReadOnlyList<RacCluster>>(new[] { Cluster });
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => Task.FromResult<IReadOnlyList<RacInfobaseSummary>>(Infobases);
 
         public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
             RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => Task.FromResult(Info);
 
         public Task<RacClusterInfo?> GetClusterInfoAsync(RacConnectionParams p, Guid c, CancellationToken ct = default)

@@ -40,18 +40,18 @@ public sealed class Release100127Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия 1.0.1.27 =====================
+    // ===================== Версия (актуальная — 1.0.1.28, issue #92/#83/#79) =====================
 
     [Fact]
-    public void Csproj_Version_Is_10127_In_AllFourProperties()
+    public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.27</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.27</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.27</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.27</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.26", csproj, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.1.28</Version>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>1.0.1.28</AssemblyVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>1.0.1.28</FileVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>1.0.1.28</InformationalVersion>", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("1.0.1.27", csproj, StringComparison.Ordinal);
     }
 
     // ===================== Issue #102: переносимый текст =====================
@@ -229,8 +229,11 @@ public sealed class Release100127Tests
     public void BuildReadableDetails_NullAndEmpty_AreSafe()
     {
         Assert.Equal(string.Empty, RingLicenseParser.BuildReadableDetails(null));
+        // Issue #83 (v1.0.1.28): пустая лицензия (файл не прочитан) даёт явный текст,
+        // а не пустую строку — в окне деталей видно, что читать было нечего.
         var empty = new ProgramLicense();
-        Assert.Equal(string.Empty, RingLicenseParser.BuildReadableDetails(empty));
+        var details = RingLicenseParser.BuildReadableDetails(empty);
+        Assert.Contains("Файл не прочитан или пуст", details);
     }
 
     // ===================== Issue #83: обогащение и FilePath =====================

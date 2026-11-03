@@ -45,12 +45,12 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         }
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => Task.FromResult(Infobases);
 
         public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
             RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             Interlocked.Increment(ref InfoCallCount);
             return Task.FromResult(Info);

@@ -60,4 +60,11 @@ public sealed class ProgramLicense
 
     /// <summary>Однострочная выжимка файла *.lic для подсказки по строке таблицы (issue #83, v1.0.1.26); пусто — файл недоступен.</summary>
     public string RawDetails { get; set; } = string.Empty;
+
+    /// <summary>
+    /// ПОЛНОЕ содержимое файла *.lic с переводами строк (issue #83, v1.0.1.28):
+    /// показывается в окне деталей многострочно, целиком (RawDetails остаётся
+    /// однострочной выжимкой для тултипа строки таблицы). Пусто — файл не читался.
+    /// </summary>
+    public string RawFullText { get; set; } = string.Empty;
 }

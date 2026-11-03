@@ -2994,7 +2994,7 @@ public sealed class ServerMonitorViewModelTests
 
         // Базы кластера: одна база-владелец для маппинга имён заданий и фильтра.
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             // issue #69: для блокировки регламентных заданий («infobase update
             // --scheduled-jobs-deny=on») команда требует параметры СУБД — в фикстуре
@@ -3212,7 +3212,7 @@ public sealed class ServerMonitorViewModelTests
         /// (как реализация по умолчанию интерфейса).</summary>
         public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
             RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             InfobaseInfoCalls++;
             // issue #69, комментарий 7OH от 2026-10-27: догрузка «infobase info» для

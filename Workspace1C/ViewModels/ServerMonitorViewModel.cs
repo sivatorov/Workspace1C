@@ -656,12 +656,43 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _licenseStatusText, value);
     }
 
+    private System.Threading.Timer? _transientLicenseStatusTimer;
+    private string? _transientLicenseStatusMessage;
+
     /// <summary>
     /// Тихий статус вкладки «Лицензии» (issue #83, v1.0.1.27): сообщение вроде
     /// «файл лицензии не найден» показывается в строке статуса, а не диалогом.
+    /// Issue #83 (v1.0.1.28, репорт 7OH «сообщение остаётся навсегда»): статус
+    /// ВРЕМЕННЫЙ — через 6 секунд восстанавливается прежний текст (или пусто);
+    /// сброс идёт через <see cref="_dispatchToUi"/> (UI-поток обеих платформ).
     /// </summary>
     public void ShowTransientLicenseStatus(string message)
-        => LicenseStatusText = message;
+    {
+        // Прежний статус запоминаем только при первом показе transient — повторные
+        // клики не должны затирать его сообщением об ошибке.
+        if (_transientLicenseStatusMessage is null)
+            _transientLicenseStatusRestore = LicenseStatusText;
+        _transientLicenseStatusMessage = message;
+        LicenseStatusText = message;
+
+        _transientLicenseStatusTimer?.Dispose();
+        _transientLicenseStatusTimer = new System.Threading.Timer(_ =>
+        {
+            var restore = _transientLicenseStatusRestore;
+            var shown = _transientLicenseStatusMessage;
+            _transientLicenseStatusMessage = null;
+            _transientLicenseStatusTimer?.Dispose();
+            _transientLicenseStatusTimer = null;
+            if (shown is null || LicenseStatusText != shown)
+                return; // вкладка уже обновилась своим статусом — не затираем.
+            if (_dispatchToUi is null)
+                LicenseStatusText = restore;
+            else
+                _dispatchToUi(() => LicenseStatusText = restore);
+        }, null, TimeSpan.FromSeconds(6), System.Threading.Timeout.InfiniteTimeSpan);
+    }
+
+    private string _transientLicenseStatusRestore = string.Empty;
 
     /// <summary>Выбранный сеанс на вкладке «Сеансы» (кнопка «Завершить сеанс»).</summary>
     public RacSessionRow? SelectedSession
@@ -2676,6 +2707,10 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
     {
         _disposed = true;
         StopAutoRefresh();
+        // Issue #83 (v1.0.1.28): таймер сброса transient-статуса лицензий тоже гасим.
+        _transientLicenseStatusTimer?.Dispose();
+        _transientLicenseStatusTimer = null;
+        _transientLicenseStatusMessage = null;
     }
 
     /// <summary>

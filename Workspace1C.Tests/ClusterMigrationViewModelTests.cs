@@ -1522,7 +1522,7 @@ public sealed class ClusterMigrationViewModelTests
             });
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             GetInfobasesCalls++;
             // Источник: две базы; приёмник: заданные имена (по умолчанию — пусто).
@@ -1610,7 +1610,7 @@ public sealed class ClusterMigrationViewModelTests
 
         public Task<RacInfobaseInfo?> GetInfobaseInfoAsync(
             RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default)
+            string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             InfobaseInfoCalls++;
             return Task.FromResult(InfobaseInfoResult);

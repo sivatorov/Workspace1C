@@ -91,10 +91,16 @@ namespace Workspace1C
             ScrollViewer.SetHorizontalScrollBarVisibility(_itemsList, ScrollBarVisibility.Disabled);
             ScrollViewer.SetHorizontalScrollBarVisibility(_logList, ScrollBarVisibility.Disabled);
 
+            // Issue #92 (v1.0.1.28): подсказка по switch от вида операции — прежний
+            // тернарник при открытии на CF показывал подсказку выгрузки в .dt.
             _hint = new TextBlock
             {
-                Text = LocalizationManager.T(kind == BatchOperationKind.DumpDt
-                    ? "BatchOps.HintDumpDt" : "BatchOps.HintLoadCf"),
+                Text = LocalizationManager.T(kind switch
+                {
+                    BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
+                    BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
+                    _ => "BatchOps.HintLoadCf"
+                }),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10),
                 Opacity = 0.75
@@ -265,13 +271,51 @@ namespace Workspace1C
                 },
                 Margin = new Thickness(0, 6, 0, 0)
             };
-            ToolTip.SetTip(allowRunningCheck, LocalizationManager.T("BatchOps.AllowRunningBasesHint"));
+            // Issue #92 (v1.0.1.28): подсказка многострочная — строковый ToolTip
+            // не переносится и уезжает за экран.
+            ToolTip.SetTip(allowRunningCheck, MakeWrappingTip(
+                LocalizationManager.T("BatchOps.AllowRunningBasesHint")));
             allowRunningCheck.Bind(CheckBox.IsCheckedProperty,
                 new Avalonia.Data.Binding("AllowRunningBases") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            // Движок выгрузки (issue #92, v1.0.1.28): ibcmd — быстрый, но требует
+            // пароль СУБД для серверных баз; Конфигуратор — использует авторизацию ИБ.
+            var engineLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("BatchOps.EngineLabel"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            var engineIbcmdRadio = new RadioButton
+            {
+                Content = LocalizationManager.T("BatchOps.EngineIbcmd"),
+                GroupName = "BatchDumpEngine",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var engineDesignerRadio = new RadioButton
+            {
+                Content = LocalizationManager.T("BatchOps.EngineDesigner"),
+                GroupName = "BatchDumpEngine",
+                Margin = new Thickness(16, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var engineTip = MakeWrappingTip(LocalizationManager.T("BatchOps.EngineHint"));
+            ToolTip.SetTip(engineLabel, engineTip);
+            ToolTip.SetTip(engineIbcmdRadio, engineTip);
+            ToolTip.SetTip(engineDesignerRadio, engineTip);
+            engineIbcmdRadio.IsCheckedChanged += (_, _) => OnKindCheckedEngine(BatchDumpEngine.Ibcmd);
+            engineDesignerRadio.IsCheckedChanged += (_, _) => OnKindCheckedEngine(BatchDumpEngine.Designer);
+            _engineIbcmdRadio = engineIbcmdRadio;
+            _engineDesignerRadio = engineDesignerRadio;
+            var engineRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 6, 0, 0),
+                Children = { engineLabel, engineIbcmdRadio, engineDesignerRadio }
+            };
             var dumpOptionsRow = new StackPanel
             {
                 Margin = new Thickness(0, 8, 0, 0),
-                Children = { templateRow, kindRow, allowRunningCheck }
+                Children = { templateRow, kindRow, engineRow, allowRunningCheck }
             };
             _dumpOptionsRow = dumpOptionsRow;
 
@@ -353,7 +397,8 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 10, 0, 2)
             };
-            ToolTip.SetTip(_sqlPasswordBox, LocalizationManager.T("BatchOps.SqlPasswordHint"));
+            // Issue #92 (v1.0.1.28): подсказка поля многострочная.
+            ToolTip.SetTip(_sqlPasswordBox, MakeWrappingTip(LocalizationManager.T("BatchOps.SqlPasswordHint")));
             _sqlPasswordBox.Width = 260;
             var sqlPasswordHint = new TextBlock
             {
@@ -364,8 +409,12 @@ namespace Workspace1C
             };
             var sqlPasswordPanel = new StackPanel
             {
+                // Блок «Пароль пользователя СУБД» — только для движка ibcmd
+                // (issue #92, v1.0.1.28); Конфигуратор авторизуется из свойств ИБ.
+                IsVisible = _vm.IsDbmsPasswordVisible,
                 Children = { sqlPasswordLabel, _sqlPasswordBox, sqlPasswordHint }
             };
+            _sqlPasswordPanel = sqlPasswordPanel;
             var pathStack = new StackPanel { Children = { pathRow, dumpOptionsRow, preparePanel, sqlPasswordPanel } };
 
             var logHeader = new TextBlock
@@ -490,9 +539,23 @@ namespace Workspace1C
 
         private readonly TextBlock? _pathLabel;
         private StackPanel? _dumpOptionsRow;
+        private StackPanel? _sqlPasswordPanel;
         private RadioButton? _kindDtRadio;
         private RadioButton? _kindCfRadio;
+        private RadioButton? _engineIbcmdRadio;
+        private RadioButton? _engineDesignerRadio;
         private bool _suppressKindEvents;
+
+        /// <summary>
+        /// Многострочная подсказка (issue #92, v1.0.1.28): TextBlock с переносом
+        /// вместо строки — длинная подсказка не уезжает за экран.
+        /// </summary>
+        private static TextBlock MakeWrappingTip(string text) => new()
+        {
+            Text = text,
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 360
+        };
 
         /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
         private void UpdateKindDependentUi()
@@ -514,11 +577,18 @@ namespace Workspace1C
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
             if (_dumpOptionsRow is not null)
                 _dumpOptionsRow.IsVisible = _vm.IsDumpKind;
+            // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
+            if (_sqlPasswordPanel is not null)
+                _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;
             _suppressKindEvents = true;
             if (_kindDtRadio is not null)
                 _kindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
             if (_kindCfRadio is not null)
                 _kindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;
+            if (_engineIbcmdRadio is not null)
+                _engineIbcmdRadio.IsChecked = _vm.DumpEngine == BatchDumpEngine.Ibcmd;
+            if (_engineDesignerRadio is not null)
+                _engineDesignerRadio.IsChecked = _vm.DumpEngine == BatchDumpEngine.Designer;
             _suppressKindEvents = false;
         }
 
@@ -527,6 +597,14 @@ namespace Workspace1C
             if (_suppressKindEvents || _vm is null || _vm.Kind == kind)
                 return;
             _vm.Kind = kind;
+            UpdateKindDependentUi();
+        }
+
+        private void OnKindCheckedEngine(BatchDumpEngine engine)
+        {
+            if (_suppressKindEvents || _vm is null || _vm.DumpEngine == engine)
+                return;
+            _vm.DumpEngine = engine;
             UpdateKindDependentUi();
         }
 
@@ -648,6 +726,17 @@ namespace Workspace1C
             else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel) && _pathLabel is not null)
             {
                 _pathLabel.Text = _vm.PathLabel;
+            }
+            // Issue #92 (v1.0.1.28): заголовок/подсказка обновляются по изменению вида
+            // операции в модели — события радиокнопок ненадёжны как единственный триггер
+            // (программная установка, восстановление вида из настроек, uncheck соседа).
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.Kind))
+            {
+                UpdateKindDependentUi();
+            }
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.IsDbmsPasswordVisible) && _sqlPasswordPanel is not null)
+            {
+                _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;
             }
         }
 

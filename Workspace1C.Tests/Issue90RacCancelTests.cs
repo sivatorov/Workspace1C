@@ -98,7 +98,7 @@ public sealed class Issue90RacCancelTests
             => ListAsync<RacLockInfo>(cancellationToken);
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => ListAsync<RacInfobaseSummary>(cancellationToken);
 
         public Task<IReadOnlyList<RacJobInfo>> GetJobsAsync(

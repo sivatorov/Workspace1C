@@ -321,7 +321,7 @@ public sealed class ServerJobsViewModelTests
             => Task.FromResult<IReadOnlyList<RacLockInfo>>(Array.Empty<RacLockInfo>());
 
         public Task<IReadOnlyList<RacInfobaseSummary>> GetInfobasesAsync(
-            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default)
+            RacConnectionParams parameters, Guid clusterId, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
             => Task.FromResult<IReadOnlyList<RacInfobaseSummary>>(Array.Empty<RacInfobaseSummary>());
 
         public Task<IReadOnlyList<RacJobInfo>> GetJobsAsync(

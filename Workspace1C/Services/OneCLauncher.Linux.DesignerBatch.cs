@@ -444,6 +444,35 @@ namespace Workspace1C.Services
             }
         }
 
+        /// <summary>
+        /// Завершает активную пакетную операцию DESIGNER для базы (issue #92, v1.0.1.28):
+        /// кнопка «Остановить» окна массовой выгрузки при движке «Конфигуратор» гасит
+        /// процесс 1cv8, а не оставляет его висеть. Процесс ищется по токену подключения
+        /// базы; возвращает true, если процесс был найден и завершён (или уже отсутствует).
+        /// </summary>
+        public static bool TerminateBatchProcess(Infobase infobase)
+        {
+            var token = GetBaseConnectionToken(infobase);
+            if (string.IsNullOrWhiteSpace(token) || !_activeBatchProcesses.TryRemove(token, out var process))
+                return false;
+            if (process is null)
+                return false;
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(3000);
+                }
+                return true;
+            }
+            catch
+            {
+                // Лучшее усилие: процесс мог завершиться между проверкой и Kill.
+                return false;
+            }
+        }
+
         /// <summary>Ищет запущенный конфигуратор (1cv8) для базы по командной строке из /proc.</summary>
         private static bool IsConfiguratorRunningForBase(string baseToken)
         {

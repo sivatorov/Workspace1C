@@ -128,6 +128,15 @@ public static class RingLicenseParser
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Компактная дата/метка времени в файле лицензии (issue #83, v1.0.1.28 — реальный
+    /// файл репортёра «20260907085731.lic»): yyyyMMdd или yyyyMMddHHmmss, 8–14 цифр
+    /// подряд, не часть более длинного числа.
+    /// </summary>
+    private static readonly Regex LicCompactDateRegex = new(
+        @"(?<!\d)(?<y>(19|20)\d{2})(?<m>0[1-9]|1[0-2])(?<d>0[1-9]|[12]\d|3[01])(?:\d{2}(\d{2}){2})?(?!\d)",
+        RegexOptions.Compiled);
+
+    /// <summary>
     /// ЧИСТЫЙ разбор содержимого файла лицензии *.lic (issue #83, v1.0.1.26): извлекает
     /// владельца, рег. номер, пользователя/компьютер и даты. Формат файла 1С не
     /// документирован и зависит от версии платформы, поэтому разбор толерантный:
@@ -229,16 +238,26 @@ public static class RingLicenseParser
         if (details.Length > 400)
             details = details.Substring(0, 400) + "…";
         license.RawDetails = details;
+        // Issue #83 (v1.0.1.28): ПОЛНОЕ содержимое файла (с переводами строк) —
+        // для многострочного окна деталей; RawDetails остаётся однострочной
+        // выжимкой для тултипа строки таблицы.
+        license.RawFullText = content;
         if (!string.IsNullOrWhiteSpace(fileName))
             license.RawText = fileName!;
         return license;
     }
 
-    /// <summary>Дата (dd.MM.yyyy или yyyy-MM-dd) внутри строки значения ключа; null — даты нет.</summary>
+    /// <summary>
+    /// Дата (dd.MM.yyyy, yyyy-MM-dd или компактная yyyyMMdd[HHmmss], issue #83,
+    /// v1.0.1.28) внутри строки значения ключа; null — даты нет.
+    /// </summary>
     private static DateTime? ParseLicDate(string value)
     {
         var match = LicDateRegex.Match(value);
-        return match.Success ? ParseLicDateValue(match) : null;
+        if (match.Success)
+            return ParseLicDateValue(match);
+        var compact = LicCompactDateRegex.Match(value);
+        return compact.Success ? ParseLicCompactDateValue(compact) : null;
     }
 
     /// <summary>Разобранный <see cref="LicDateRegex"/>-совпадение в DateTime; null — группа не распознана.</summary>
@@ -259,6 +278,25 @@ public static class RingLicenseParser
                 int.Parse(match.Groups["d2"].Value, CultureInfo.InvariantCulture));
         }
         return null;
+    }
+
+    /// <summary>Разобранное совпадение <see cref="LicCompactDateRegex"/> в DateTime; null — группа не распознана.</summary>
+    private static DateTime? ParseLicCompactDateValue(Match match)
+    {
+        if (!match.Groups["y"].Success)
+            return null;
+        try
+        {
+            return new DateTime(
+                int.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["m"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["d"].Value, CultureInfo.InvariantCulture));
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // Несуществующая дата в потоке цифр — не дата.
+            return null;
+        }
     }
 
     /// <summary>
@@ -295,14 +333,23 @@ public static class RingLicenseParser
             ? license.RawText
             : license.FilePath);
 
-        var details = string.IsNullOrWhiteSpace(license.RawDetails)
-            ? license.RawText
-            : license.RawDetails;
+        // Issue #83 (v1.0.1.28): в окне деталей показывается ПОЛНОЕ содержимое файла
+        // (RawFullText, с переводами строк), а не однострочная выжимка до 400 символов;
+        // если содержимого нет вообще — явный текст «файл не прочитан/пуст» с путём.
+        var details = string.IsNullOrWhiteSpace(license.RawFullText)
+            ? (string.IsNullOrWhiteSpace(license.RawDetails) ? license.RawText : license.RawDetails)
+            : license.RawFullText;
         var stripped = StripLeadingKey(details);
         if (stripped.Length > 0)
         {
             lines.Add(string.Empty);
             lines.Add(stripped);
+        }
+        else
+        {
+            lines.Add(string.Empty);
+            lines.Add("Файл не прочитан или пуст"
+                      + (string.IsNullOrWhiteSpace(license.FilePath) ? "" : $": {license.FilePath}"));
         }
         return string.Join(Environment.NewLine, lines);
     }
@@ -1266,7 +1313,12 @@ public sealed class RingLicenseService : IRingLicenseService
         return licenses;
     }
 
-    /// <summary>Каталоги файлов лицензий платформы (первый существующий). Internal — тесты.</summary>
+    /// <summary>
+    /// Каталоги файлов лицензий платформы (issue #83, v1.0.1.28): Windows — все места
+    /// хранения 1С (%ProgramData%\1C\1Cv8\licenses, %ProgramData%\1C\licenses и
+    /// пер-пользовательские %LOCALAPPDATA%/%APPDATA%\1C\1cv8\licenses); Linux — без
+    /// изменений. Дубли путей отбрасываются. Internal — тесты.
+    /// </summary>
     internal static List<string> LicenseDirectories()
     {
         var directories = new List<string>();
@@ -1276,17 +1328,36 @@ public sealed class RingLicenseService : IRingLicenseService
         {
             directories.Add(Path.Combine(programData, "1C", "1Cv8", "licenses"));
             directories.Add(Path.Combine(programData, "1C", "1cv8", "licenses"));
+            // Issue #83 (репорт 7OH, пустая таблица лицензий): 1С кладёт *.lic также
+            // в %ProgramData%\1C\licenses (без 1Cv8) и в пер-пользовательские каталоги.
+            directories.Add(Path.Combine(programData, "1C", "licenses"));
         }
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!string.IsNullOrWhiteSpace(localAppData))
+            directories.Add(Path.Combine(localAppData, "1C", "1cv8", "licenses"));
+        var roamingAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (!string.IsNullOrWhiteSpace(roamingAppData))
+            directories.Add(Path.Combine(roamingAppData, "1C", "1cv8", "licenses"));
 #else
         directories.Add("/etc/1cv8/License");
         directories.Add("/var/1C/licenses");
 #endif
-        return directories;
+        // Дедупликация: регистр каталогов на Windows может дать повтор (1Cv8/1cv8).
+        return directories
+            .Select(d => d.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
+            .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
+            .ToList();
     }
 
-    /// <summary>Файлы лицензий первого существующего каталога: (полный путь, имя файла).</summary>
+    /// <summary>
+    /// Файлы лицензий по ВСЕМ существующим каталогам (issue #83, v1.0.1.28 — раньше
+    /// брался только первый существующий каталог, и лицензии из per-user каталога
+    /// не попадали в таблицу): (полный путь, имя файла). Дубли по имени файла
+    /// отбрасываются (одна и та же .lic, скопированная в несколько мест).
+    /// </summary>
     private static IEnumerable<(string File, string FileName)> EnumerateLicFiles()
     {
+        var seenFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var directory in LicenseDirectories())
         {
             if (!Directory.Exists(directory))
@@ -1294,8 +1365,11 @@ public sealed class RingLicenseService : IRingLicenseService
             foreach (var file in Directory.EnumerateFiles(directory)
                          .Where(f => Path.GetExtension(f).Length > 0)
                          .OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-                yield return (file, Path.GetFileName(file));
-            break; // берём первый существующий каталог.
+            {
+                var fileName = Path.GetFileName(file);
+                if (seenFileNames.Add(fileName))
+                    yield return (file, fileName);
+            }
         }
     }
 
@@ -1335,13 +1409,16 @@ public sealed class RingLicenseService : IRingLicenseService
             license.FilePath = path;
             return license;
         }
-        catch
+        catch (Exception ex)
         {
             // Файл недоступен/не читается — всё равно показываем имя файла в таблице
             // (путь сохраняем: папку можно открыть даже по битому файлу).
+            // Issue #83 (v1.0.1.28): причина сбоя НЕ молчит — она попадает в RawDetails
+            // и видна в окне деталей вместо пустого «только имя файла».
             return new ProgramLicense
             {
                 RawText = fileName,
+                RawDetails = $"файл не прочитан ({ex.GetType().Name}): {ex.Message}",
                 Module = $"файл лицензии: {fileName}",
                 FilePath = path
             };
@@ -1400,6 +1477,8 @@ public sealed class RingLicenseService : IRingLicenseService
             if (license.Computer.Length == 0) license.Computer = source.Computer;
             if (license.IssueDate is null) license.IssueDate = source.IssueDate;
             if (license.RawDetails.Length == 0) license.RawDetails = source.RawDetails;
+            // Issue #83 (v1.0.1.28): полное содержимое файла переносится тоже.
+            if (license.RawFullText.Length == 0) license.RawFullText = source.RawFullText;
             // Новые поля из файла *.lic (issue #83, v1.0.1.27): тип, версия
             // (левая часть «Наименования»), срок действия, пользователей, путь к файлу.
             if (license.Type.Length == 0) license.Type = source.Type;
