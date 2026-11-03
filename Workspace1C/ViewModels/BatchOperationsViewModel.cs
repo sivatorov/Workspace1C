@@ -782,6 +782,18 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         Summary = string.Format(LocalizationManager.T("BatchOps.SummaryFormat"), ok, failed, selected.Count);
         AppendLog("— " + Summary + " —");
         }
+        catch (OperationCanceledException)
+        {
+            // Issue #92 (v1.0.1.29, репорт 7OH «остановить не работает и заново выгрузить
+            // уже невозможно»): итог по журналу и сводка выставляются И при остановке —
+            // раньше при отмене Summary оставался пустым, окно выглядело зависшим.
+            // IsRunning сбрасывается в finally ниже — повторный «Выполнить» работает
+            // без переоткрытия окна. Исключение пробрасывается дальше (окно гасит его).
+            Summary = string.Format(
+                LocalizationManager.T("BatchOps.SummaryCancelledFormat"), ok, failed, selected.Count);
+            AppendLog("— " + Summary + " —");
+            throw;
+        }
         finally
         {
             IbcmdService.ProcessStarted -= OnIbcmdProcessStarted;
@@ -837,9 +849,17 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     /// Ожидает завершения пакетной операции Конфигуратора с поддержкой отмены
     /// (issue #92, v1.0.1.28): кнопка «Остановить» гасит процесс 1cv8 через
     /// <see cref="OneCLauncher.TerminateBatchProcess"/>, а не оставляет его висеть.
-    /// null — операция не завершилась (отмена).
+    /// null — операция не завершилась (общий таймаут).
+    /// <para>
+    /// Issue #92 (v1.0.1.29, репорт 7OH «остановить не работает»): при отмене
+    /// <see cref="Task.WhenAny"/> возвращает ЗАВЕРШЁННЫЙ задачей отмены
+    /// <see cref="Task.Delay"/> — прежний код просто возвращал null, не бросал
+    /// <see cref="OperationCanceledException"/>, и процесс Конфигуратора НЕ гасился
+    /// (1cv8 продолжал работать, повторная выгрузка блокировалась блокировкой
+    /// DESIGNER). Теперь при отмене процесс гасится здесь и исключение бросается явно.
+    /// </para>
     /// </summary>
-    private static async Task<OneCLauncher.DesignerBatchInfo?> WaitForDesignerBatchAsync(
+    private async Task<OneCLauncher.DesignerBatchInfo?> WaitForDesignerBatchAsync(
         Infobase infobase, OneCLauncher.DesignerBatchOperation operation, string outputPath,
         CancellationToken ct)
     {
@@ -858,11 +878,25 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         try
         {
             var completed = await Task.WhenAny(tcs.Task, Task.Delay(Timeout.InfiniteTimeSpan, ct)).ConfigureAwait(false);
-            return completed == tcs.Task ? tcs.Task.Result : null;
+            if (completed != tcs.Task)
+            {
+                // Отмена («Остановить») — процесс 1cv8 гасится вместе с деревом потомков;
+                // в журнале окна видна причина, окно остаётся работоспособным.
+                if (ct.IsCancellationRequested)
+                {
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
+                              LocalizationManager.T("BatchOps.DesignerProcessStopped"));
+                    OneCLauncher.TerminateBatchProcess(infobase);
+                    throw new OperationCanceledException(ct);
+                }
+                return null; // общий таймаут (не использовался — Task.Delay бесконечный).
+            }
+            return tcs.Task.Result;
         }
         catch (OperationCanceledException)
         {
-            // Кнопка «Остановить»: гасим процесс 1cv8 вместе с деревом потомков.
+            // Кнопка «Остановить»: гасим процесс 1cv8 вместе с деревом потомков
+            // (страховка на случай броска отмены из ожидания) — idempotent.
             OneCLauncher.TerminateBatchProcess(infobase);
             throw;
         }

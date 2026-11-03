@@ -237,6 +237,50 @@ public sealed class TestDeployViewModel : ViewModelBase
     public string TestGroupName { get; set; } = TestDeployPlanner.DefaultTestGroupName;
     public bool UpdateExisting { get; set; } = true;
 
+    // ---- Ручные данные СУБД ИСТОЧНИКА (issue #79, v1.0.1.29) ----
+
+    /// <summary>
+    /// «Указать данные СУБД источника вручную» (issue #79): явные данные СУБД исходной
+    /// базы для выгрузки через ibcmd — когда rac отдаёт пустые свойства СУБД или отвечает
+    /// «Недостаточно прав». При включении поля автозаполняются (см.
+    /// <see cref="FillSourceDbmsOverrideDefaults"/>), профиль строится напрямую,
+    /// без rac-проб и эвристики.
+    /// </summary>
+    public bool UseSourceDbmsOverride { get; set; }
+
+    /// <summary>Тип СУБД источника (PostgreSQL / MSSQLServer).</summary>
+    public string SourceDbms { get; set; } = "MSSQLServer";
+
+    /// <summary>Сервер СУБД источника.</summary>
+    public string SourceDbServer { get; set; } = string.Empty;
+
+    /// <summary>Имя базы данных на сервере СУБД источника.</summary>
+    public string SourceDbName { get; set; } = string.Empty;
+
+    /// <summary>Пользователь СУБД источника.</summary>
+    public string SourceDbUser { get; set; } = string.Empty;
+
+    /// <summary>Пароль пользователя СУБД источника (в журнал не выводится).</summary>
+    public string SourceDbPassword { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Автозаполнение ручных полей СУБД источника при включении галочки (issue #79):
+    /// тип/сервер/пользователь — из целевых полей формы (там обычно те же значения),
+    /// имя БД — Ref исходной базы. Вызывается при включении галочки; пустые поля формы
+    /// не затирают уже введённые ручные значения.
+    /// </summary>
+    public void FillSourceDbmsOverrideDefaults()
+    {
+        if (!string.IsNullOrWhiteSpace(Dbms))
+            SourceDbms = Dbms;
+        if (!string.IsNullOrWhiteSpace(DbServer))
+            SourceDbServer = DbServer;
+        if (!string.IsNullOrWhiteSpace(DbUser))
+            SourceDbUser = DbUser;
+        if (string.IsNullOrWhiteSpace(SourceDbName))
+            SourceDbName = _source.Connection?.DatabaseName ?? string.Empty;
+    }
+
     // ---- Расписание ----
 
     public bool UseSchedule { get; set; }
@@ -265,6 +309,14 @@ public sealed class TestDeployViewModel : ViewModelBase
             DbName = (DbName ?? string.Empty).Trim(),
             DbUser = (DbUser ?? string.Empty).Trim(),
             DbPassword = DbPassword ?? string.Empty,
+            // Ручные данные СУБД источника (issue #79, v1.0.1.29); пароль — как
+            // DbPassword: хранится в JSON сценария, в журнал не выводится.
+            UseSourceDbmsOverride = UseSourceDbmsOverride,
+            SourceDbms = (SourceDbms ?? string.Empty).Trim(),
+            SourceDbServer = (SourceDbServer ?? string.Empty).Trim(),
+            SourceDbName = (SourceDbName ?? string.Empty).Trim(),
+            SourceDbUser = (SourceDbUser ?? string.Empty).Trim(),
+            SourceDbPassword = SourceDbPassword ?? string.Empty,
             CreateSqlDatabase = CreateSqlDatabase,
             // issue #79: учётные данные для выгрузки .dt (явные или «авторизация базы»).
             Credential = new BackupCredential
@@ -352,6 +404,9 @@ public sealed class TestDeployViewModel : ViewModelBase
                 // выключена) и тип СУБД формы — для «infobase info» и пустого dbms rac 8.5.
                 resolver.CredentialOverride = scenario.Credential;
                 resolver.FallbackDbms = scenario.Dbms;
+                // Issue #79 (v1.0.1.29): при неудаче rac-пробы в журнал подсказка —
+                // ручные данные СУБД источника ИЛИ движок «Конфигуратор».
+                resolver.AdviseManualSourceDbms = true;
                 var profile = await resolver.ResolveAsync(infobase, ct).ConfigureAwait(false);
                 if (profile is null && !string.IsNullOrWhiteSpace(resolver.LastFailureReason))
                     log?.Invoke(resolver.LastFailureReason!);

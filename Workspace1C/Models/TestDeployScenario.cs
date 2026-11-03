@@ -168,6 +168,36 @@ public class TestDeployScenario
     /// </summary>
     public string DbPassword { get; set; } = string.Empty;
 
+    // ---- Ручные данные СУБД ИСТОЧНИКА (issue #79, v1.0.1.29) ----
+
+    /// <summary>
+    /// Явные данные СУБД ИСХОДНОЙ базы для выгрузки через ibcmd (issue #79, v1.0.1.29):
+    /// rac 8.5.4 в «infobase summary list» отдаёт ВСЕ поля СУБД пустыми, а «infobase info»
+    /// отвечает «Недостаточно прав» — собрать профиль не из чего. Включите
+    /// <see cref="UseSourceDbmsOverride"/> и заполните поля — профиль строится напрямую,
+    /// без эвристики и rac-проб. Приоритет резолва: сохранённый профиль → этот override →
+    /// rac → эвристика полей формы.
+    /// </summary>
+    public bool UseSourceDbmsOverride { get; set; }
+
+    /// <summary>Тип СУБД источника (PostgreSQL / MSSQLServer) при ручном override.</summary>
+    public string SourceDbms { get; set; } = string.Empty;
+
+    /// <summary>Сервер СУБД источника при ручном override.</summary>
+    public string SourceDbServer { get; set; } = string.Empty;
+
+    /// <summary>Имя базы данных на сервере СУБД источника при ручном override.</summary>
+    public string SourceDbName { get; set; } = string.Empty;
+
+    /// <summary>Пользователь СУБД источника при ручном override.</summary>
+    public string SourceDbUser { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Пароль пользователя СУБД источника при ручном override. Хранится в JSON сценария
+    /// (как <see cref="DbPassword"/>); в журнал никогда не выводится.
+    /// </summary>
+    public string SourceDbPassword { get; set; } = string.Empty;
+
     /// <summary>
     /// Учётные данные пользователя ИБ для выгрузки .dt (issue #79, последний комментарий
     /// 7OH: «А зачем мне отдельно вводить, если все данные вот они — уже введены выше?»).

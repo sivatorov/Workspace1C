@@ -1,231 +1,797 @@
-﻿# Issues для работы — собрано 2026-11-03 15:31
+﻿# Issues к работе — 2026-11-03
 
-Источник: открытые issues репозитория sivatorov/Workspace1C, состояние на 2026-11-03.
+Репозиторий: sivatorov/Workspace1C. Отобраны issues, у которых нет комментариев или последний комментарий не от sivatorov.
 
-**Всего открытых issues:** 7. **Отобрано для работы:** 3: #92, #83, #79.
+Всего открытых issues: **7**. Отобрано к работе: **3**.
 
-Критерий отбора: issues без комментариев, либо последний комментарий оставлен НЕ sivatorov (обработаны/ожидают проверки исключены).
-
----
-
-## Issue #92: выгрузка списка баз в файл *.dt
-
-- **Автор issue:** aepkugesi
-- **Комментариев:** 34
-- **Обновлён:** 2026-11-03T07:09:10Z
-- **Ссылка:** https://github.com/sivatorov/Workspace1C/issues/92
-- **Источник текста для работы:** последний комментарий от @7OH (2026-11-03T07:09:10Z)
-
-### Описание issue (автор: aepkugesi)
-
-> Добавить функционал выгрузки баз по списку в файлы с указанием в названии файла имени базы, даты и времени выгрузки
-
-### Последний комментарий (@7OH, 2026-11-03T07:09:10Z)
-
-> Похоже заголовок окна меняется по галочке (dt/cf) только при запуске.
-> При изменении галочки - не изменяется.
-> 
-> Подсказку для галочки "Выгружать и запущенные" сделать бы многострочной. В одну строку тяжело читать, если вообще в экран влезет.
-> 
-> Выгрузило через ibcmd и указанием пароля пользователя СУБД.
-> 
-> Теперь остаётся решить вопрос - как быть, если пароля от СУБД пользователь не знает.
-> Возможно всё таки нужен переключатель - Конфигуратор/ibcmd
-
-### Предположения по файлам (поиск по коду, ibcmd/массовые операции)
-
-- [`Workspace1C/Views/BatchOperationsWindow.Avalonia.cs`](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs) — Avalonia-окно массовых операций: заголовок окна по галочке dt/cf (вероятно, обновляется только при запуске — нужен пересчёт при переключении чекбокса), многострочная подсказка для «Выгружать и запущенные», раскладка.
-- [`Workspace1C/Views/BatchOperationsWindow.xaml.cs`](Workspace1C/Views/BatchOperationsWindow.xaml.cs) — WPF-версия того же окна (обе платформы).
-- [`Workspace1C/ViewModels/BatchOperationsViewModel.cs`](Workspace1C/ViewModels/BatchOperationsViewModel.cs) — вся логика: BatchOperationKind (DumpDt/DumpCf), автоподстановка СУБД из rac, fail-fast; сюда — переключатель движка «Конфигуратор/ibcmd» и обработка «пароль СУБД неизвестен».
-- [`Workspace1C/Services/BatchOperationsService.cs`](Workspace1C/Services/BatchOperationsService.cs) — пред-валидация и построение целевых путей.
-- [`Workspace1C/Services/IbcmdService.cs`](Workspace1C/Services/IbcmdService.cs) — запуск ibcmd, ResolveUser/креды; если добавлять ветку «Конфигуратор» — связка с [`Workspace1C/Services/BackupService.cs`](Workspace1C/Services/BackupService.cs) (движок Designer).
-> 
-
-### История обсуждения (кратко, последние 34 комментариев)
-
-- **2026-10-30T14:18:28Z** @7OH: Добавить эти пункты в подменю "Для выделенных ..." Можно сделать окошко и в нём поле для указания шаблона (например имя базы и дату в формате) Так же поле с выбором папки - куда вы…
-- **2026-10-30T14:20:12Z** @7OH: А чтобы не дублировать выгрузку в CF - сделать переключатель на форме "DT" или "CF" И тогда пункт будет называться "Выгрузить в DT\CF"
-- **2026-10-30T14:24:25Z** @7OH: Если будет реализовано единым окном как завялено выше - то в целом в контекстном пеню подменю Резервирование станет не нужным.  Единственный его нужный пункт "Список выгрузок" можн…
-- **2026-10-30T19:51:15Z** @sivatorov ✅(обработано): Реализовано в версии **1.0.1.8** (Windows и Linux):  **Массовая выгрузка в DT/CF из «Для выделенных…»** — как вы и просили:  1. В подменю **«Для выделенных (N)…»** контекстного мен…
-- **2026-10-31T09:44:09Z** @7OH: <details> <summary>Скрин</summary>  <img width="647" height="661" alt="Image" src="https://github.com/user-attachments/assets/b10497fe-545d-41a8-ab8c-f3bf9236391d" />  </details>  …
-- **2026-10-31T14:18:30Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.11](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.11)**  1. Шаблон имени файла (и поле каталога) в окне массовой выгрузки тематизированы — в т…
-- **2026-10-31T16:34:42Z** @7OH: Текст для шаблона при темной теме всё ещё черный - не видно ничего. Каталог выгрузки - аналогично И он по прежнему при открытии окна - {Имя}_{Дата} Можно туда сразу поставить с дат…
-- **2026-10-31T17:43:40Z** @aepkugesi: Для выгрузки в *.dt и загрузки *.cf по списку баз нужен функционал:  - завершения сеансов пользователей;  - включения и выключения блокировки начала сеансов с указанием времени нач…
-- **2026-11-01T09:29:04Z** @sivatorov ✅(обработано): **Доработано в [v1.0.1.15](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.15)** (commit 4911148c)  По остаточным пунктам из последнего комментария @7OH сделаны два то…
-- **2026-11-01T11:58:06Z** @7OH: По прежнему  не может выгрузить серверную базу данных   <details> <summary>Лог из окна</summary>  Журнал выполнения  [14: 56:16] «Demo 27» - Профиль СУБД не задан - получение данны…
-- **2026-11-01T13:04:18Z** @sivatorov ✅(обработано): @aepkugesi, @7OH, спасибо за детали и обсуждение!  В [v1.0.1.17](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.17) улучшена диагностика выгрузки серверной базы в фай…
-- **2026-11-01T16:04:24Z** @7OH: <details> <summary>Логи</summary>  2026-11-01 19:02:48.656 [INFO] [CM_RAC] RAC: rac=C:\Program Files\1cv8\8.5.4.1878\bin\rac.exe, команда: localhost:27545 cluster list 2026-11-01 1…
-- **2026-11-01T17:03:46Z** @sivatorov ✅(обработано): @7OH, обновление по этому issue.  Пункты 1–2 из вашего последнего комментария реализованы в цикле 1.0.1.15–1.0.1.19 ([актуальный релиз v1.0.1.20](https://github.com/sivatorov/Works…
-- **2026-11-02T05:21:06Z** @7OH: И так - ставлю на выгрузку на базы из разных серверов.  <details> <summary>Скрин</summary>  <img width="876" height="885" alt="Image" src="https://github.com/user-attachments/asset…
-- **2026-11-02T06:21:54Z** @sivatorov ✅(обработано): @aepkugesi, @7OH, спасибо за логи и архив диагностики — они помогли найти причину!  Исправлено в [v1.0.1.21](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.21).  **Чт…
-- **2026-11-02T07:50:34Z** @7OH: [diagnostics_20261102_104926.zip](https://github.com/user-attachments/files/34261345/diagnostics_20261102_104926.zip)  Ошибки пропускает, но выгружать в упор не хочет
-- **2026-11-02T09:26:19Z** @aepkugesi: Выгрузка базы в *.dt прошла успешно. конфигурацию с файла cf загрузить не удалось.  <img width="697" height="424" alt="Image" src="https://github.com/user-attachments/assets/cb924d…
-- **2026-11-02T10:07:16Z** @7OH: Меня смущает надпись "Загрузка конфигурации". У нас разве не выгрузка ?
-- **2026-11-02T10:22:41Z** @aepkugesi: Массовая выгрузка в dt тоже не идет. Ошибка аналогичная загрузке из cf. Выгрузить можно только через контекстное меню базы в резервировании.
-- **2026-11-02T10:58:10Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.22](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.22)**  @aepkugesi, спасибо за ZIP диагностики — именно он позволил найти причину.  Что проис…
-- **2026-11-02T11:21:26Z** @7OH:  Журнал выполнения не прокручивается ни скролом мышки ни просто мышкой Ну и пока продолжает не работать [diagnostics_20261102_142031.zip](https://github.com/user-attachments/files/…
-- **2026-11-02T11:29:55Z** @7OH: Оставлю дополнение по доработке тут. 1. Пункт в меню Утилиты - должен называться так же, как и в контекстном меню. Сейчас в контекстном - "Выгрузить в DT/CF", а в Утилиты это "Масс…
-- **2026-11-02T13:12:31Z** @aepkugesi: https://github.com/sivatorov/Workspace1C/issues/92#issuecomment-6575424826 Ничего не изменилось
-- **2026-11-02T14:07:14Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.24](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.24)**  @7OH, всё из списка сделано:  **Переименования в «Утилитах»:** - «Массовая выгрузка в…
-- **2026-11-02T15:14:35Z** @7OH: От чего уходили - к тому и пришли ( список баз на ВСЮ высоту окна - на ВСЮ далее - список можно сделать в 2 раза Уже. В поле поиска просто "Поиск по данным баз" И тогда справа влез…
-- **2026-11-02T15:17:51Z** @7OH: <img width="733" height="626" alt="Image" src="https://github.com/user-attachments/assets/f6ed818f-1c5c-45cf-9e24-e42e3afc338e" />  Одну базу выгрузил - уже хороший результат. Толь…
-- **2026-11-02T15:21:14Z** @7OH: <img width="1027" height="238" alt="Image" src="https://github.com/user-attachments/assets/9656abd4-88f5-4127-a232-50e255dd32d8" />  <img width="766" height="498" alt="Image" src="…
-- **2026-11-02T19:18:52Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.25](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.25)**  По пунктам из ваших скриншотов:  1. **Новая раскладка окон массовой выгрузки/загрузки…
-- **2026-11-02T19:34:30Z** @7OH: Раскладка окна - то, что надо - спасибо Журнал - так и не прокручивается - посмотреть ошибки невозможно.  [diagnostics_20261102_223052.zip](https://github.com/user-attachments/file…
-- **2026-11-02T20:06:08Z** @aepkugesi: Что делать если не известен логин и пароль sql сервера в целях безопасности?
-- **2026-11-03T05:03:02Z** @7OH: > 29\. Что делать если не известен логин и пароль sql сервера в целях безопасности?  Тогда переключатель должен быть - как выгружать: Конфиг \ ibcmd По идее пароль от скуля нужен т…
-- **2026-11-03T06:37:21Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.26](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.26)**  1. **Журнал теперь прокручивается.** Причина была в `IsHitTestVisible="False"` у спис…
-- **2026-11-03T07:07:20Z** @aepkugesi: Когда на строке базы нажимаешь на правую клавишу мышки -> резервирование -> выгрузить в dt база же без проблем выгружается. Нельзя по этому же принципу выгрузить список баз? 
-- **2026-11-03T07:09:10Z** @7OH: Похоже заголовок окна меняется по галочке (dt/cf) только при запуске. При изменении галочки - не изменяется.  Подсказку для галочки "Выгружать и запущенные" сделать бы многострочно…
-
----
-
-## Issue #83: Информация о лицензиях в Серверы 1С
-
-- **Автор issue:** 7OH
-- **Комментариев:** 31
-- **Обновлён:** 2026-11-03T11:30:27Z
-- **Ссылка:** https://github.com/sivatorov/Workspace1C/issues/83
-- **Источник текста для работы:** последний комментарий от @7OH (2026-11-03T11:30:27Z)
-
-### Описание issue (автор: 7OH)
-
-> В логах часто вижу вот это
-> 
-> 2026-10-28 12:43:09.462 [WARN] RING: ring (PATH) — не удалось получить лицензии: ring: An error occurred trying to start process 'ring' with working directory 'D:\1cBases\Add\WorkSpace1C'. Не удается найти указанный файл.
-> 
-> Думаю при таком исходе - информации во вкладке Лицензии ждать не стОит.
-> Ну и вкладку можно поместить перед "Информация о кластере" - данные по лицензиям явно интереснее
-
-### Последний комментарий (@7OH, 2026-11-03T11:30:27Z)
-
-> <details>
-> <summary>Скрин</summary>
-> 
-> <img width="1758" height="760" alt="Image" src="https://github.com/user-attachments/assets/4b5f7dd3-1f8a-49b7-882b-c321d3aa8487" />
-> 
-> </details>
-> 
-> Файл не найден сверху, и пусто в таблице.
-> По клику показывает только, что имя файла вот такое-то и больше ничего.
-
-### Предположения по файлам (поиск по коду, лицензии/вкладка «Лицензии»)
-
-- [`Workspace1C/Services/RingLicenseService.cs`](Workspace1C/Services/RingLicenseService.cs) — классы `RingLicenseService` + `RingLicenseParser`: «Файл не найден сверху» — вероятно, не найден/не прочитан *.lic (статус LicenseStatusText); «по клику показывает только имя файла и больше ничего» — `BuildReadableDetails` не распознал поля файла лицензии (владелец, рег. номер, компьютер и т.д.) — смотреть парсер *.lic.
-- [`Workspace1C/Models/ProgramLicense.cs`](Workspace1C/Models/ProgramLicense.cs) — поля Owner/RegNumber/Computer/IssueDate/FilePath (v1.0.1.26–27): вероятно, парсинг *.lic у конкретного пользователя не даёт данных — проверить форматы файлов лицензий.
-- [`Workspace1C/Views/LicenseDetailsWindow.xaml.cs`](Workspace1C/Views/LicenseDetailsWindow.xaml.cs) и [`Workspace1C/Views/LicenseDetailsWindow.Avalonia.cs`](Workspace1C/Views/LicenseDetailsWindow.Avalonia.cs) — окно деталей лицензии (пустое содержимое при нераспознанных полях).
-- [`Workspace1C/Views/ServerMonitorWindow.Avalonia.cs`](Workspace1C/Views/ServerMonitorWindow.Avalonia.cs) / [`Workspace1C/Views/ServerMonitorWindow.xaml.cs`](Workspace1C/Views/ServerMonitorWindow.xaml.cs) — вкладка «Лицензии»: таблица пуста + статус «Файл не найден» сверху (LicenseStatusText, BuildLicenseList, OnLicenseCellClick).
-- [`Workspace1C/ViewModels/ServerMonitorViewModel.cs`](Workspace1C/ViewModels/ServerMonitorViewModel.cs) — загрузка InstalledLicenses, LicenseStatusText, ShowTransientLicenseStatus.
-
-### История обсуждения (кратко, последние 31 комментариев)
-
-- **2026-10-29T05:33:48Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.1** (Windows и Linux):  Вкладка «Лицензии» в «Серверы 1С»:  - если утилита ring не найдена, в журнал пишется INFO (а не WARN-спам при   автообновлении к…
-- **2026-10-29T06:15:24Z** @7OH: Вопрос же не в том, что в журнал пишется. Блин. Вопрос в том - ГДЕ программа утилиту ищет и ЗАЧЕМ ? Открываем командную строку, да хоть на диске Е  <img width="311" height="55" alt…
-- **2026-10-29T17:43:25Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.3** (Windows и Linux):  Вкладка «Лицензии» в «Серверы 1С»:  - утилита `ring` теперь ищется в PATH (через PATHEXT, только .exe/.com) — вызывается как ест…
-- **2026-10-29T19:39:25Z** @7OH: По прежнему ищем утилиту в папке программы Её тут НИКОГДА не будет  <details> <summary>Логи</summary>  2026-10-29 22:37:03.396 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий …
-- **2026-10-29T19:58:55Z** @7OH: Можно же просто проверить запуском без указания каталога ? Запустили "ring --version" и посмотрели - ошибка или работает. Зачем её искать ? "where.exe ring" и будет результат (под …
-- **2026-10-30T07:16:18Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.4** (Windows и Linux):  Вкладка «Лицензии» в «Серверы 1С» — утилита `ring` теперь вызывается как есть, без ручного поиска:  - в [`RingLicenseService`](W…
-- **2026-10-30T08:22:54Z** @7OH: Что-то не легчает Ошибка всё та же  <details> <summary>Логи</summary>  2026-10-30 11:21:27.803 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий недоступна: ring: An error occur…
-- **2026-10-30T10:57:56Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.5** (Windows и Linux):  Вкладка «Лицензии» в «Серверы 1С» — утилита `ring` теперь запускается, даже если установлена как командный файл в PATH:  - в [`R…
-- **2026-10-30T12:04:29Z** @7OH: Ошибка немного другой стала  <details> <summary>Логи</summary>  2026-10-30 14:54:45.593 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий недоступна: [ERROR ] ������������ �����…
-- **2026-10-30T15:53:56Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.7** (Windows и Linux):  Разобраны оба ваших кейса на вкладке «Лицензии»: - **«Module "license" is not registered»** — теперь это распознаётся отдельно: …
-- **2026-10-30T16:04:01Z** @7OH: Немного странно  <details> <summary>Скрин</summary>  <img width="1177" height="521" alt="Image" src="https://github.com/user-attachments/assets/57f0ba19-31df-47c1-aad5-ebb6386605ac…
-- **2026-10-30T19:50:40Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.8** (Windows) — новый подход:  Ключевой факт из вашего репорта: `where ring` в обычной командной строке работает, а приложение `ring` не находит. Значит…
-- **2026-10-31T09:00:29Z** @7OH: Всё ещё не найдена А можно в лог писать вывод "where.exe ring" ?  У меня в консоли всё отлично "C:\Windows\System32\WindowsPowerShell\v1.0> where.exe ring C:\Program Files\1C\1CE\c…
-- **2026-10-31T14:18:26Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.11](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.11)**  По просьбе из последнего комментария: вывод `where.exe ring` (Linux — `which ring`) т…
-- **2026-10-31T16:21:33Z** @7OH: Ну вот - в окне "Не найдена" а в логе  "2026-10-31 19:20:06.987 [INFO] [CM_RAC] RING: where.exe ring — найдено: C:\Program Files\1C\1CE\components\1c-enterprise-ring-0.20.0+4-x86_6…
-- **2026-11-01T09:29:32Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.14](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.14)** (проверено в [v1.0.1.15](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.…
-- **2026-11-01T11:48:04Z** @7OH: Уже находит утилиту - это хорошо. Нужно немного времени, чтобы проверить - почему не находит лицензии. Вывод в консоли тоже пустой. Отпишусь или закрою позже.
-- **2026-11-01T13:04:35Z** @sivatorov ✅(обработано): @7OH, спасибо за сообщение и за ожидание!  Небольшой итог по диагностики: полная диагностика лицензий (проверка наличия утилиты `ring`, поиска java, текста ошибок) уже была добавле…
-- **2026-11-01T17:03:42Z** @sivatorov ✅(обработано): Обновление по этому issue.  Работа с лицензиями в разделе «Серверы 1С» доведена в цикле 1.0.1.6–1.0.1.19 ([актуальный релиз v1.0.1.20](https://github.com/sivatorov/Workspace1C/rele…
-- **2026-11-02T05:27:02Z** @7OH: <details> <summary>СкринDetails</summary>  <img width="1706" height="103" alt="Image" src="https://github.com/user-attachments/assets/13fee35a-b51c-4b76-a8a3-757b309afe73" />  </de…
-- **2026-11-02T07:56:41Z** @7OH: Вот ещё - тоже с каракулями  <details> <summary>Скрин</summary>  <img width="1486" height="613" alt="Image" src="https://github.com/user-attachments/assets/de82787d-a28f-439d-b400-…
-- **2026-11-02T10:58:06Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.22](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.22)**  @7OH, сделано, и именно так, как вы просили — не точечный костыль, а общее правило.  …
-- **2026-11-02T11:11:44Z** @7OH: Уже ближе  "Утилита ring найдена и запущена, но список лицензий не получен. Ответ последней проверенной команды: 499459654270590-500000000037 (шь Їрщыр: "20260907085731.lic") 49945…
-- **2026-11-02T12:31:44Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.23](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.23)**  Спасибо за подробный отчёт — с «кракозябрами» вида «шь Їрщыр» вместо «Имя файла» разо…
-- **2026-11-02T12:55:32Z** @7OH: Ошибок нет Но и информации как-то больше не стало  <details> <summary>Скрин</summary>  <img width="1693" height="1002" alt="Image" src="https://github.com/user-attachments/assets/3…
-- **2026-11-02T19:18:59Z** @sivatorov ✅(обработано): **Частично исправлено в [v1.0.1.25](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.25)**  По вашему пожеланию видеть больше информации о лицензии (номер сам по себе д…
-- **2026-11-02T19:21:59Z** @7OH: Хотелось бы видеть больше информации о лицензии. Номер ничего не говорит А вот информация из файла была к месту
-- **2026-11-03T06:37:25Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.26](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.26)**  По вашему пожеланию «информация из файла лицензии была к месту»:  1. **Чтение файлов …
-- **2026-11-03T06:50:23Z** @7OH: <details> <summary>Скрин</summary>  <img width="1893" height="546" alt="Image" src="https://github.com/user-attachments/assets/f0551671-844d-4d9d-83d7-bc4ea044a86a" />  </details> …
-- **2026-11-03T11:16:56Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.27](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.27)**  @7OH, спасибо за детальные пожелания по данным из файла лицензии — в [v1.0.1.27](http…
-- **2026-11-03T11:30:27Z** @7OH: <details> <summary>Скрин</summary>  <img width="1758" height="760" alt="Image" src="https://github.com/user-attachments/assets/4b5f7dd3-1f8a-49b7-882b-c321d3aa8487" />  </details> …
+| № | Заголовок | Комментариев |
+|---|-----------|--------------|
+| #79 | Развернуть тестовую копию | 19 |
+| #83 | Информация о лицензиях в Серверы 1С | 17 |
+| #92 | выгрузка списка баз в файл *.dt | 25 |
 
 ---
 
 ## Issue #79: Развернуть тестовую копию
 
-- **Автор issue:** 7OH
-- **Комментариев:** 34
-- **Обновлён:** 2026-11-03T07:14:38Z
-- **Ссылка:** https://github.com/sivatorov/Workspace1C/issues/79
-- **Источник текста для работы:** последний комментарий от @7OH (2026-11-03T07:14:38Z)
+URL: https://github.com/sivatorov/Workspace1C/issues/79
 
-### Описание issue (автор: 7OH)
+### Описание
 
-> Просто скрин оставлю
-> 
-> <img width="1045" height="567" alt="Image" src="https://github.com/user-attachments/assets/941b0393-19b6-45c2-a4c2-34fefcd1a5c8" />
+Просто скрин оставлю
 
-### Последний комментарий (@7OH, 2026-11-03T07:14:38Z)
+<img width="1045" height="567" alt="Image" src="https://github.com/user-attachments/assets/941b0393-19b6-45c2-a4c2-34fefcd1a5c8" />
 
-> Судя по логу - по каким-то причинам программа не вычитывает свойства базы.
-> Возможно не дожидается ответа от утилиты RAC ?
+### Комментарии (не от sivatorov)
 
-### Предположения по файлам (поиск по коду, тестовая копия/rac)
+**@7OH** (2026-10-28 06:43):
 
-- [`Workspace1C/ViewModels/TestDeployViewModel.cs`](Workspace1C/ViewModels/TestDeployViewModel.cs) — мастер «Развернуть тестовую копию»: автоподстановка профиля СУБД, креды формы.
-- [`Workspace1C/Views/TestDeployWindow.Avalonia.cs`](Workspace1C/Views/TestDeployWindow.Avalonia.cs) / [`Workspace1C/Views/TestDeployWindow.cs`](Workspace1C/Views/TestDeployWindow.cs) — окно мастера (панель «Данные для выгрузки через ibcmd», профили).
-- [`Workspace1C/Services/TestDeployService.cs`](Workspace1C/Services/TestDeployService.cs) — оркестратор: разрешение параметров СУБД источника, выгрузка .dt (конфигуратор/ibcmd).
-- [`Workspace1C/Services/TestDeployPlanner.cs`](Workspace1C/Services/TestDeployPlanner.cs) — планирование сценария, требования к профилю СУБД.
-- [`Workspace1C/Services/ClusterInfobaseCredentialsResolver.cs`](Workspace1C/Services/ClusterInfobaseCredentialsResolver.cs) — автоподстановка кред из rac; «не вычитывает свойства базы / не дожидается ответа rac» — смотреть таймауты и разбор ответа rac.
-- [`Workspace1C/Services/RacClient.cs`](Workspace1C/Services/RacClient.cs) — запуск rac, таймауты, декодирование вывода (ConsoleOutputDecoder); возможная причина — rac не вернул/не успел вернуть свойства базы.
-- [`Workspace1C/Services/RacOutputParser.cs`](Workspace1C/Services/RacOutputParser.cs) — разбор вывода rac («infobase info/summary»): неполный вывод → свойства базы пустые.
+Вангую - без указания локали (а этого поля нет на форме) оно в конце ошибку выдаст
 
-### История обсуждения (кратко, последние 34 комментариев)
+**@7OH** (2026-10-28 07:51):
 
-- **2026-10-28T06:43:08Z** @7OH: Вангую - без указания локали (а этого поля нет на форме) оно в конце ошибку выдаст
-- **2026-10-28T07:33:38Z** @sivatorov ✅(обработано): Исправлено в версии 1.0.0.94 (Windows и Linux):  1. **Список «Движок выгрузки» в мастере «Развернуть тестовую копию» показывал CLR-имя типа** вместо текста — в выпадающем списке от…
-- **2026-10-28T07:51:18Z** @7OH: Просьба навести порядок в оформлении - одни поля серые, вторые нормальные и с окантовкой. В поле "Имя базы данных СУБД" можно подставлять как минимум такое же имя, как "Имя базы на…
-- **2026-10-29T04:21:10Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.0** (Windows и Linux) по комментарию 7OH от 2026-10-28 07:51 (мастер «Развернуть тестовую копию»):  - **Единое оформление редактируемых полей.** Поля ма…
-- **2026-10-29T06:16:45Z** @7OH: Ну вот теперь просто ошибка при открытии (а ведь покрыто тестами....)  <details> <summary>Ошибка</summary>  <img width="906" height="911" alt="Image" src="https://github.com/user-a…
-- **2026-10-29T17:44:38Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.3** (Windows и Linux):  Мастер «Развернуть тестовую копию» больше не падает при открытии с некорректными данными базы:  - `PreviewSteps`/`PreviewSummary…
-- **2026-10-29T19:41:22Z** @7OH: По прежнему ошибка  <details> <summary>Логи</summary>  2026-10-29 22:40:33.859 [ERROR] Ошибка интерфейса Исключение: System.InvalidOperationException Сообщение: TargetType "TextBox…
-- **2026-10-30T07:16:25Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.4** (Windows и Linux):  Мастер «Развернуть тестовую копию» больше не падает при открытии:  - в [`TestDeployWindow.ApplyModernStyles`](Workspace1C/Views/…
-- **2026-10-30T08:32:15Z** @7OH: 1. Выгружаю через ibcmd. То есть я должен закрыть окно со всеми введенными данными и пойти найти где это вводится ?  <details> <summary>Скрин</summary>  <img width="555" height="25…
-- **2026-10-30T10:57:55Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.5** (Windows и Linux):  Мастер «Развернуть тестовую копию» — добавлена автоподстановка учётных данных для выгрузки через ibcmd и кнопки перехода к настр…
-- **2026-10-30T12:16:10Z** @7OH: И так - заполнены все поля Стоит галочка "Использовать авторизацию информационной баз" (Поля логин, пароль и кнопка "Подставить из базы" не активны - наверное по причине установлен…
-- **2026-10-30T15:53:52Z** @sivatorov ✅(обработано): Исправлено в версии **1.0.1.7** (Windows и Linux):  Причина оказалась не в галке авторизации: выгрузка источника в мастере «Развернуть тестовую копию» выполняется движком ibcmd, а …
-- **2026-10-30T17:04:15Z** @7OH: 1. Кнопка внизу первая является дублем и не нужна "Учетные данные ИБ для ibcmd" 2. Если мы ОБЯЗАНЫ создать профиль субд для ibcmd - то зачем тогда вот эти все поля на форме, которы…
-- **2026-10-30T20:19:54Z** @sivatorov ✅(обработано): Доработано в версии 1.0.1.9 (Windows и Linux) по последнему комментарию:  1. **Кнопка-дубль «Учётные данные ИБ для ibcmd…» внизу окна убрана** — она дублировала    блок «Данные для…
-- **2026-10-31T09:09:41Z** @7OH: <details> <summary>Скрин</summary>  <img width="773" height="498" alt="Image" src="https://github.com/user-attachments/assets/5d56d4da-e230-4e9d-848f-a968f5a8d590" />  </details>  …
-- **2026-10-31T14:18:24Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.11](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.11)**  «Каракули» в блоке учётных данных ibcmd: причина — вывод ibcmd на русской Windows в к…
-- **2026-10-31T16:24:48Z** @7OH: <img width="607" height="373" alt="Image" src="https://github.com/user-attachments/assets/64e650cd-8568-4750-96b1-b3c075a78b73" />  Я "немного" в замешательстве. А как она может бы…
-- **2026-11-01T09:29:23Z** @sivatorov ✅(обработано): **Уточнено в [v1.0.1.14](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.14)** (проверено в [v1.0.1.15](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.15…
-- **2026-11-01T11:55:57Z** @7OH: Ну что же - смотрим список баз - серверная и файловая  <details> <summary>Скрин списка баз</summary>  <img width="606" height="437" alt="Image" src="https://github.com/user-attachm…
-- **2026-11-01T13:04:46Z** @sivatorov ✅(обработано): @7OH, спасибо за сообщение!  Уточним суть: само поведение мастера тестовой копии штатное — если базы тестовой копии ещё нет, мастер показывает «базы ещё нет — будет создана» и дейс…
-- **2026-11-01T16:07:39Z** @7OH: <img width="615" height="385" alt="Image" src="https://github.com/user-attachments/assets/769e606f-ab9c-42a4-b5e2-793c31e345f9" />  По прежнему талдычит "База отсутствует в сервере…
-- **2026-11-01T17:03:40Z** @sivatorov ✅(обработано): @7OH, обновление по этому issue.  По вашему последнему скриншоту от 2026-10-31 проверены поведение мастера тестовой копии при включённой галке «Авторизация ИБ» и вывод «каракулей» …
-- **2026-11-02T05:16:53Z** @7OH: [diagnostics_20261102_081427.zip](https://github.com/user-attachments/files/34256603/diagnostics_20261102_081427.zip) Не уверен, чем эти логи помогут. В скрине же русским по белому…
-- **2026-11-02T06:21:57Z** @sivatorov ✅(обработано): @7OH, вы правы: выгрузка исходной базы действительно выполнялась по параметрам СУБД **новой (целевой)** базы — поля «Сервер СУБД»/«Имя базы данных в СУБД» на форме мастера использу…
-- **2026-11-02T07:46:21Z** @7OH: <img width="605" height="300" alt="Image" src="https://github.com/user-attachments/assets/8a2e9c55-5d6f-4a81-8bc3-2989e40b25ae" />  Похоже ещё одна попытка и я ПАС. Сервер доступен…
-- **2026-11-02T10:58:04Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.22](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.22)**  @7OH, спасибо за терпение — причина «ничего не происходит» найдена и устранена.  Оказ…
-- **2026-11-02T11:16:02Z** @7OH: Вот ЧТО я делаю НЕ ТАК ???????????  <img width="752" height="643" alt="Image" src="https://github.com/user-attachments/assets/064ab480-bfa3-4c78-96ef-adbdd1aac5b6" />  Делать профи…
-- **2026-11-02T12:31:49Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.23](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.23)**  Спасибо за детальное описание — с мастером «Развернуть тестовую копию» разобрался.  В…
-- **2026-11-02T13:14:38Z** @7OH: 2026-11-02 16:07:47.283 [WARN] RAC: rac (localhost:27545) завершился с кодом -1. Недостаточно прав пользователя на информационную базу Demo_8.3.27  <details> <summary>Скрин</summar…
-- **2026-11-02T19:18:55Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.25](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.25)**  Отвечаю по-простому, как просили.  **Теперь на форме не хватает ровно ничего — профил…
-- **2026-11-02T19:37:12Z** @7OH: [diagnostics_20261102_223644.zip](https://github.com/user-attachments/files/34288839/diagnostics_20261102_223644.zip)  Не принимает логин\пароль, похоже. Хотя данные верные
-- **2026-11-03T06:37:11Z** @sivatorov ✅(обработано): **Исправлено в [v1.0.1.26](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.26)**  Вы были правы — rac действительно не принимал логин/пароль. Это регресс v1.0.1.25: фи…
-- **2026-11-03T07:12:30Z** @7OH: <details> <summary>Скрин</summary>  <img width="1048" height="857" alt="Image" src="https://github.com/user-attachments/assets/5d1bc2e0-305b-45e4-8049-8e04bacf22d4" />  </details> …
-- **2026-11-03T07:14:38Z** @7OH: Судя по логу - по каким-то причинам программа не вычитывает свойства базы. Возможно не дожидается ответа от утилиты RAC ?
+Просьба навести порядок в оформлении - одни поля серые, вторые нормальные и с окантовкой.
+В поле "Имя базы данных СУБД" можно подставлять как минимум такое же имя, как "Имя базы на сервере"
+
+<img width="547" height="243" alt="Image" src="https://github.com/user-attachments/assets/5672c0e4-0522-4f6b-9295-a780bb0b303a" />
+
+Логично сразу эту кнопку видеть - чтобы тут же нажать и открыть свойства 
+А нельзя брать из свойств базы разве ?
+
+Через конфигуратор 
+
+<img width="625" height="667" alt="Image" src="https://github.com/user-attachments/assets/ec7961be-c76a-4049-b1c9-63af1daf6e67" />
+
+Наверное надо или что-то предлагать сделать соответствующими кнопками или иметь кнопки в окошке, чтобы админ сам мог это сделать не выходя из этого окна
+
+**@7OH** (2026-10-29 06:16):
+
+Ну вот теперь просто ошибка при открытии (а ведь покрыто тестами....)
+
+<details>
+<summary>Ошибка</summary>
+
+<img width="906" height="911" alt="Image" src="https://github.com/user-attachments/assets/e5d3c984-d653-448a-b583-3850ca647eee" />
+
+</details>
+
+**@7OH** (2026-10-29 19:41):
+
+По прежнему ошибка
+
+<details>
+<summary>Логи</summary>
+
+2026-10-29 22:40:33.859 [ERROR] Ошибка интерфейса
+Исключение: System.InvalidOperationException
+Сообщение: TargetType "TextBox" не соответствует типу элемента "PasswordBox".
+StackTrace:
+System.InvalidOperationException: TargetType "TextBox" не соответствует типу элемента "PasswordBox".
+   at System.Windows.Style.CheckTargetType(Object element)
+   at System.Windows.FrameworkElement.OnStyleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+   at System.Windows.FrameworkElement.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.Controls.PasswordBox.OnPropertyChanged(DependencyPropertyChangedEventArgs e)
+   at System.Windows.DependencyObject.UpdateEffectiveValue(EntryIndex entryIndex, DependencyProperty dp, PropertyMetadata metadata, EffectiveValueEntry oldEntry, EffectiveValueEntry& newEntry, Boolean coerceWithDeferredReference, Boolean coerceWithCurrentValue, OperationType operationType)
+   at System.Windows.FrameworkElement.set_Style(Style value)
+   at Workspace1C.TestDeployWindow.ApplyModernStyles(DependencyObject root) in D:\a\Workspace1C\Workspace1C\Workspace1C\Views\TestDeployWindow.cs:line 627
+   at Workspace1C.TestDeployWindow.ApplyModernStyles(DependencyObject root) in D:\a\Workspace1C\Workspace1C\Workspace1C\Views\TestDeployWindow.cs:line 631
+   at Workspace1C.TestDeployWindow.ApplyModernStyles(DependencyObject root) in D:\a\Workspace1C\Workspace1C\Workspace1C\Views\TestDeployWindow.cs:line 631
+   at Workspace1C.TestDeployWindow.ApplyModernStyles(DependencyObject root) in D:\a\Workspace1C\Workspace1C\Workspace1C\Views\TestDeployWindow.cs:line 631
+   at Workspace1C.TestDeployWindow..ctor(Infobase source, IReadOnlyList`1 allInfobases, IReadOnlyList`1 groups) in D:\a\Workspace1C\Workspace1C\Workspace1C\Views\TestDeployWindow.cs:line 394
+   at Workspace1C.ViewModels.MainViewModel.ExecuteShowTestDeployAsync(Infobase source) in D:\a\Workspace1C\Workspace1C\Workspace1C\ViewModels\MainViewModel.Commands.cs:line 1948
+   at Workspace1C.ViewModels.MainViewModel.<get_TestDeployCommand>b__271_0(Object _) in D:\a\Workspace1C\Workspace1C\Workspace1C\ViewModels\MainViewModel.Commands.cs:line 1940
+   at System.Threading.Tasks.Task.<>c.<ThrowAsync>b__124_0(Object state)
+   at System.Windows.Threading.ExceptionWrapper.InternalRealCall(Delegate callback, Object args, Int32 numArgs)
+   at System.Windows.Threading.ExceptionWrapper.TryCatchWhen(Object source, Delegate callback, Object args, Int32 numArgs, Delegate catchHandler)
+
+
+</details>
+
+**@7OH** (2026-10-30 08:32):
+
+1. Выгружаю через ibcmd.
+То есть я должен закрыть окно со всеми введенными данными и пойти найти где это вводится ?
+
+<details>
+<summary>Скрин</summary>
+
+<img width="555" height="250" alt="Image" src="https://github.com/user-attachments/assets/c4b1a6d0-3613-4ee4-9351-f8016eaef9e0" />
+
+</details>
+
+Можно внизу кнопку добавить, которая отроет окно нужное прямо тут ?
+
+2. А зачем мне отдельно вводить, если все данные вот они - уже введены выше ?
+
+**@7OH** (2026-10-30 12:16):
+
+И так - заполнены все поля
+Стоит галочка "Использовать авторизацию информационной баз" (Поля логин, пароль и кнопка "Подставить из базы" не активны - наверное по причине установленной галочки и данные должно взять из базы)
+
+Нажимаем развернуть тестовую и...
+
+<img width="582" height="342" alt="Image" src="https://github.com/user-attachments/assets/1cac372b-9e6d-44ba-901a-4b88ee96b367" />
+
+И всё та же ошибка - заполните профиль.
+Зачем мне профиль заполнять ?
+Убрал галочку - подставил поля из базы.
+Не помогло - всё равно требует заполнить что-то ещё
+
+Кнопка "Учётные данные для ibcmd" открывает совсем не то. Открывает то же самое окно свойств базы, что и кнопка в начале окна "Свойства исходной базы", а должна была по идее открыть окно, где можно таки внести то, что просит сообщение на скрине
+
+**@7OH** (2026-10-30 17:04):
+
+1. Кнопка внизу первая является дублем и не нужна "Учетные данные ИБ для ibcmd"
+2. Если мы ОБЯЗАНЫ создать профиль субд для ibcmd - то зачем тогда вот эти все поля на форме, которые дублируются в профиле ?
+Допустим не не нужен профиль для резервных копий на постоянку - я хочу просто сделать копию.
+Логичнее иметь кнопку - поставить из профиля, как для логина и пароля базы (чтобы не мудрить - какие поля доступны при режиме из конфигуратора, а какие через ibcmd)
+И тогда или из профиля готовые данные или вручную.
+А выполнять работу по тому, что на форме.
+
+**@7OH** (2026-10-31 09:09):
+
+<details>
+<summary>Скрин</summary>
+
+<img width="773" height="498" alt="Image" src="https://github.com/user-attachments/assets/5d56d4da-e230-4e9d-848f-a968f5a8d590" />
+
+</details>
+
+Пока не удачно.
+Стоит галка авторизации иб, перед этим по этой кнопке отлично вошел в конфиг.
+Все поля заполнены
+Что за каракули - я не понимаю ) - возможно после исправления станет ясно - что ещё не так
+
+**@7OH** (2026-10-31 16:24):
+
+<img width="607" height="373" alt="Image" src="https://github.com/user-attachments/assets/64e650cd-8568-4750-96b1-b3c075a78b73" />
+
+Я "немного" в замешательстве.
+А как она может быть найдена и для чего ?
+Мы же в неё копию делаем
+Галочка "Создать базу данные на сервере СУБД" - тоже стоит.
+
+**@7OH** (2026-11-01 11:55):
+
+Ну что же - смотрим список баз - серверная и файловая
+
+<details>
+<summary>Скрин списка баз</summary>
+
+<img width="606" height="437" alt="Image" src="https://github.com/user-attachments/assets/5e606001-1f74-4c04-b42d-d75e9fcac249" />
+
+</details>
+
+Смотрим список баз в сервере - одна - её и будем копировать
+
+<details>
+<summary>Скрин - сервер</summary>
+
+<img width="686" height="497" alt="Image" src="https://github.com/user-attachments/assets/b1a4a34a-96aa-42d8-841c-0f6801f4ca16" />
+
+</details>
+
+В Скуле тоже одна база такая.
+
+Та же ошибка - целевая база не найдена, хотя галочки про создание стоят.
+
+<details>
+<summary>Скрин - целевая база отсутствует</summary>
+
+<img width="888" height="666" alt="Image" src="https://github.com/user-attachments/assets/368e3fc2-b6b0-4a33-95ce-e09df65b0f03" />
+
+</details>
+
+
+
+**@7OH** (2026-11-01 16:07):
+
+<img width="615" height="385" alt="Image" src="https://github.com/user-attachments/assets/769e606f-ab9c-42a4-b5e2-793c31e345f9" />
+
+По прежнему талдычит "База отсутствует в сервере.
+Почему для ИСХОДНОЙ оно ищет по имени новой ?
+
+**@7OH** (2026-11-02 05:16):
+
+[diagnostics_20261102_081427.zip](https://github.com/user-attachments/files/34256603/diagnostics_20261102_081427.zip)
+Не уверен, чем эти логи помогут.
+В скрине же русским по белому ошибка видна - а именно попытка сделать копию с базы, которая должна по итогу получиться, а не той, которая исходная.
+Конечно ошибка будет.
+
+**@7OH** (2026-11-02 07:46):
+
+<img width="605" height="300" alt="Image" src="https://github.com/user-attachments/assets/8a2e9c55-5d6f-4a81-8bc3-2989e40b25ae" />
+
+Похоже ещё одна попытка и я ПАС.
+Сервер доступен - в логах тихо.
+Нажимаешь ОК и НИ ЧЕ ГО.
+Вроде простая операция, и опять 25.
+
+**@7OH** (2026-11-02 11:16):
+
+Вот ЧТО я делаю НЕ ТАК ???????????
+
+<img width="752" height="643" alt="Image" src="https://github.com/user-attachments/assets/064ab480-bfa3-4c78-96ef-adbdd1aac5b6" />
+
+Делать профиль я не хочу - я хочу вручную указать данные на форме.
+ЧТО оно от меня хочет ?
+Написано же - профиль субд ЛИБО ДОСТУПНЫЙ КЛАСТЕР RAC
+RAC доступен.
+В настройках логов всё для RAC и резервного копирования включено
+В логах ничего нет
+
+**@7OH** (2026-11-02 13:14):
+
+2026-11-02 16:07:47.283 [WARN] RAC: rac (localhost:27545) завершился с кодом -1. Недостаточно прав пользователя на информационную базу Demo_8.3.27
+
+<details>
+<summary>Скрин</summary>
+
+<img width="610" height="405" alt="Image" src="https://github.com/user-attachments/assets/6d75746b-9f64-4a51-baa5-a1bab873c375" />
+</details>
+
+<details>
+<summary>Скрин 2Details</summary>
+
+<img width="942" height="821" alt="Image" src="https://github.com/user-attachments/assets/d60fce2c-d9b0-4777-aa41-c77ea4a3d64e" />
+
+</details>
+
+
+<details>
+<summary>Скрин 3</summary>
+
+<img width="1457" height="835" alt="Image" src="https://github.com/user-attachments/assets/bc2c1ef5-ec33-41a5-bd08-b17ecd86eeed" />
+
+</details>
+
+А можно для тупых ещё раз ?
+Чего у нас на форме не хватает, чтобы не создавать профиль ?
+Сложно соотнести данные на 3-х скринах ?
+В свойствах базы сохранены и логин и пароль, и данные про базу в кластере.
+В кластере 1С остальное всё тоже есть.
+Что ему ещё надо ?
+
+**@7OH** (2026-11-02 19:37):
+
+[diagnostics_20261102_223644.zip](https://github.com/user-attachments/files/34288839/diagnostics_20261102_223644.zip)
+
+Не принимает логин\пароль, похоже.
+Хотя данные верные
+
+**@7OH** (2026-11-03 07:12):
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1048" height="857" alt="Image" src="https://github.com/user-attachments/assets/5d1bc2e0-305b-45e4-8049-8e04bacf22d4" />
+
+</details>
+
+[diagnostics_20261103_101142.zip](https://github.com/user-attachments/files/34307002/diagnostics_20261103_101142.zip)
+
+Сделать копию, в отличие от просто выгрузки в DT (в тикете #92 ) - пока не удаётся.
+
+**@7OH** (2026-11-03 07:14):
+
+Судя по логу - по каким-то причинам программа не вычитывает свойства базы.
+Возможно не дожидается ответа от утилиты RAC ?
+
+**@7OH** (2026-11-03 14:30):
+
+Всё ещё не удачно
+"2026-11-03 17:28:11.665 [INFO] Свойства базы «Demo_8.3.27» из «infobase summary list»: dbms=«», db-server=«», db-name=«», db-user=«»
+2026-11-03 17:28:11.665 [INFO] База «Demo_8.3.27»: тип СУБД «» не поддерживается утилитой ibcmd"
 
 ---
 
-## Исключённые issues (последний комментарий от sivatorov — обработаны, ожидают проверки репортером)
+## Issue #83: Информация о лицензиях в Серверы 1С
 
-- #102 'Обрезан текст на некоторых элементах' -> last comment by sivatorov (processed)
-- #91 'Пожелания по новому функционалу' -> last comment by sivatorov (processed)
-- #87 'Загрузка расширения конфигурации в клиент-серверную базу' -> last comment by sivatorov (processed)
-- #85 'Групповое применение. Не доступны команды для групп' -> last comment by sivatorov (processed)
+URL: https://github.com/sivatorov/Workspace1C/issues/83
 
+### Описание
+
+В логах часто вижу вот это
+
+2026-10-28 12:43:09.462 [WARN] RING: ring (PATH) — не удалось получить лицензии: ring: An error occurred trying to start process 'ring' with working directory 'D:\1cBases\Add\WorkSpace1C'. Не удается найти указанный файл.
+
+Думаю при таком исходе - информации во вкладке Лицензии ждать не стОит.
+Ну и вкладку можно поместить перед "Информация о кластере" - данные по лицензиям явно интереснее
+
+### Комментарии (не от sivatorov)
+
+**@7OH** (2026-10-29 06:15):
+
+Вопрос же не в том, что в журнал пишется. Блин.
+Вопрос в том - ГДЕ программа утилиту ищет и ЗАЧЕМ ?
+Открываем командную строку, да хоть на диске Е
+
+<img width="311" height="55" alt="Image" src="https://github.com/user-attachments/assets/3b4c4ab3-baca-4e4b-96c8-830d691375e4" />
+
+И всё работает.
+
+Но в логах же про другое похоже.
+Совсем про другое.
+Ну не будет рядом со стартером этой утилиты.
+Она может быть установлена в разные места даже самой 1С.
+
+Давайте просто вызывать, а не искать её рядом
+
+**@7OH** (2026-10-29 19:39):
+
+По прежнему ищем утилиту в папке программы
+Её тут НИКОГДА не будет
+
+<details>
+<summary>Логи</summary>
+
+2026-10-29 22:37:03.396 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий недоступна: ring: An error occurred trying to start process 'ring' with working directory 'D:\1cBases\Add\WorkSpace1C'. Не удается найти указанный файл.
+
+</details>
+
+Да - логи теперь пишет только по галочкам в настройках - тут спасибо.
+
+**@7OH** (2026-10-29 19:58):
+
+Можно же просто проверить запуском без указания каталога ?
+Запустили "ring --version" и посмотрели - ошибка или работает.
+Зачем её искать ?
+"where.exe ring" и будет результат (под линукс "which ring")
+
+**@7OH** (2026-10-30 08:22):
+
+Что-то не легчает
+Ошибка всё та же
+
+<details>
+<summary>Логи</summary>
+
+2026-10-30 11:21:27.803 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий недоступна: ring: An error occurred trying to start process 'ring' with working directory 'D:\1cBases\Add\WorkSpace1C'. Не удается найти указанный файл.
+
+</details>
+
+
+**@7OH** (2026-10-30 12:04):
+
+Ошибка немного другой стала
+
+<details>
+<summary>Логи</summary>
+
+2026-10-30 14:54:45.593 [INFO] [CM_RAC] RING: ring (PATH) — утилита лицензий недоступна: [ERROR ] ������������ ����� ������� (��� ������� ��. "ring help"): Module "license" is not registered in the command registry.
+
+</details>
+
+Возможно на вкладке лицензий надо надпись выводить об этом.
+
+Установил модуль
+
+Теперь в логе только 
+
+<details>
+<summary>Лог с модулем лицензий</summary>
+
+2026-10-30 15:00:29.306 [INFO] [CM_RAC] RING: утилита ring не найдена в PATH (where.exe ring / which ring) — переходим к запасным вариантам.
+
+</details>
+
+Собственно - чего ожидать в окошке ?
+У меня сейчас и ошибок нет и про лицензии ничего нет.
+
+**@7OH** (2026-10-30 16:04):
+
+Немного странно
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1177" height="521" alt="Image" src="https://github.com/user-attachments/assets/57f0ba19-31df-47c1-aad5-ebb6386605ac" />
+
+</details>
+
+В окне  - не найдено, открываю командную строку - ввожу то, что просит программа и вуаля - всё найдено.
+
+
+**@7OH** (2026-10-31 09:00):
+
+Всё ещё не найдена
+А можно в лог писать вывод "where.exe ring" ?
+
+У меня в консоли всё отлично
+"C:\Windows\System32\WindowsPowerShell\v1.0> where.exe ring
+C:\Program Files\1C\1CE\components\1c-enterprise-ring-0.20.0+4-x86_64\ring.cmd"
+
+А то сейчас в логе пусто, а на экране опять "не найдено"
+
+**@7OH** (2026-10-31 16:21):
+
+Ну вот - в окне "Не найдена"
+а в логе
+
+"2026-10-31 19:20:06.987 [INFO] [CM_RAC] RING: where.exe ring — найдено: C:\Program Files\1C\1CE\components\1c-enterprise-ring-0.20.0+4-x86_64\ring.cmd"
+
+Что дальше делать будем ?
+
+**@7OH** (2026-11-01 11:48):
+
+Уже находит утилиту - это хорошо.
+Нужно немного времени, чтобы проверить - почему не находит лицензии.
+Вывод в консоли тоже пустой.
+Отпишусь или закрою позже.
+
+**@7OH** (2026-11-02 05:27):
+
+<details>
+<summary>СкринDetails</summary>
+
+<img width="1706" height="103" alt="Image" src="https://github.com/user-attachments/assets/13fee35a-b51c-4b76-a8a3-757b309afe73" />
+
+</details>
+
+Надо бы починить вывод каракулей - уже в других окнах чинили. 
+И фикс сделать правилом для последующих доработок при работе с выводом в консоли.
+
+**@7OH** (2026-11-02 07:56):
+
+Вот ещё - тоже с каракулями
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1486" height="613" alt="Image" src="https://github.com/user-attachments/assets/de82787d-a28f-439d-b400-d7b9374565a4" />
+
+</details>
+
+В целом мы где-то рядом, но я пока не пойму - как этот список поможет показать таблицу с заполненными колонками. Ждём исправления
+
+**@7OH** (2026-11-02 11:11):
+
+Уже ближе
+
+"Утилита ring найдена и запущена, но список лицензий не получен. Ответ последней проверенной команды: 499459654270590-500000000037 (шь Їрщыр: "20260907085731.lic")
+499459654270590-500000000037 (шь Їрщыр: "20261102090623.lic"). Если модуль лицензий ring установлен и этот ответ выглядит ошибочным - пришлите этот текст в issue Workspace 1C."
+
+По идее должно быть "Имя файла" там, где "шь Їрщыр".
+
+Ну и да - в таблице при этом пусто
+
+
+**@7OH** (2026-11-02 12:55):
+
+Ошибок нет
+Но и информации как-то больше не стало
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1693" height="1002" alt="Image" src="https://github.com/user-attachments/assets/329bc42a-3849-492e-8c5d-0e7c6676d8ce" />
+
+</details>
+
+Что я должен понять по тому, что 0 из 2 занято. 
+А какие есть ?
+
+Интереса ради - поставил лицензию разработчика.
+Показывает занято 0 из 1
+При этом я в базе - то есть лицензия ТОЧНО используется. 
+Но в таблице пусто.
+
+**@7OH** (2026-11-02 19:21):
+
+Хотелось бы видеть больше информации о лицензии.
+Номер ничего не говорит
+А вот информация из файла была к месту
+
+**@7OH** (2026-11-03 06:50):
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1893" height="546" alt="Image" src="https://github.com/user-attachments/assets/f0551671-844d-4d9d-83d7-bc4ea044a86a" />
+
+</details>
+
+Уже интереснее, список верхний в целом показывает кто и где занял
+Но ничего из файла внизу не показывает - увы
+
+По идее:
+1. Тип лицензии - да в файле есть и в колонке видеть будет нужно
+2. Попробовать разделить наименование. Если есть ":" - то левая часть, допустим, попадает в колонку "Версия".
+3. А правая часть, если в п.2 было ":" - попадает в колонку "Владелец"
+4. Срок действия - в колонку "Срок действия"
+5. Количество пользователей - возможно нужна колонка "Пользователей"
+
+Что за колонки "Пользователь" и "Состояние" и откуда они собираются брать данные - пока не понятно. Они точно нужны ?
+
+Предлагаю сделать колонку "Модуль" кликабельной - при наведении менять курсор, а по клику - открывать папку с файлом. Также подвинуть её сразу после "Серийный номер".
+
+Так же кликабельной сделать колонку "Серийный номер" - при наведении менять курсор, а по клику - открывать небольшое окно, где будет вся читабельная информация из файла лицензии. Убираем начальный длинный ключ и оставляет только то, что в конце.
+
+
+**@7OH** (2026-11-03 11:30):
+
+<details>
+<summary>Скрин</summary>
+
+<img width="1758" height="760" alt="Image" src="https://github.com/user-attachments/assets/4b5f7dd3-1f8a-49b7-882b-c321d3aa8487" />
+
+</details>
+
+Файл не найден сверху, и пусто в таблице.
+По клику показывает только, что имя файла вот такое-то и больше ничего.
+
+**@7OH** (2026-11-03 14:12):
+
+Информации стало больше - да
+Клики заработали
+
+1. Срок действия можно без AM/PM выводить ? В формате dd.MM.yyyy HH:mm:ss
+2. Колонка "Пользователей" внизу - пустая, хотя в файле это есть в "Количество пользователей"
+3. В просмотре лицензии лишние поля. Прежде всего там не нужен весь ключ. Не уверен, но от начала файла до "=:" наверное надо убирать - пользователю это ничего не скажет
+4. И, наверное, начальная часть, которая сейчас до ключа выводится - тоже не нужна, только "Файл лицензии" оставить строку. Остальные строки есть под ключом и в более корректном формате (в том, как оно указано в файле)
+
+---
+
+## Issue #92: выгрузка списка баз в файл *.dt
+
+URL: https://github.com/sivatorov/Workspace1C/issues/92
+
+### Описание
+
+Добавить функционал выгрузки баз по списку в файлы с указанием в названии файла имени базы, даты и времени выгрузки
+
+### Комментарии (не от sivatorov)
+
+**@7OH** (2026-10-30 14:18):
+
+Добавить эти пункты в подменю "Для выделенных ..."
+Можно сделать окошко и в нём поле для указания шаблона (например имя базы и дату в формате)
+Так же поле с выбором папки - куда выгружать.
+Сохранять значения шаблона и папки
+
+**@7OH** (2026-10-30 14:20):
+
+А чтобы не дублировать выгрузку в CF - сделать переключатель на форме "DT" или "CF"
+И тогда пункт будет называться "Выгрузить в DT\CF"
+
+**@7OH** (2026-10-30 14:24):
+
+Если будет реализовано единым окном как завялено выше - то в целом в контекстном пеню подменю Резервирование станет не нужным. 
+Единственный его нужный пункт "Список выгрузок" можно будет перенести на место текущего подменю.
+
+**@7OH** (2026-10-31 09:44):
+
+<details>
+<summary>Скрин</summary>
+
+<img width="647" height="661" alt="Image" src="https://github.com/user-attachments/assets/b10497fe-545d-41a8-ab8c-f3bf9236391d" />
+
+</details>
+
+1. Шаблон имени файла - черный на темном в темном режиме.
+2. А формат даты задать можно ? Если да - хотелось бы сразу с форматом и в подсказку добавить - как пользоваться.
+
+**@7OH** (2026-10-31 16:34):
+
+Текст для шаблона при темной теме всё ещё черный - не видно ничего.
+Каталог выгрузки - аналогично
+И он по прежнему при открытии окна - {Имя}_{Дата}
+Можно туда сразу поставить с датой для примера ? 
+Например тот, который в подсказке последний указан.
+
+И да - добавьте разделителей строки в подсказку. 
+Мне повезло - на 27" мониторе она в одну строку влезла, но надо исправить.
+
+Пункты меню с раздельной выгрузкой тоже на месте  ( смотри https://github.com/sivatorov/Workspace1C/issues/92#issuecomment-6525126490 )
+
+Сама выгрузка не работает - просит профиль СУБД.
+
+Так же выгружается ?
+"ibcmd infobase dump --dbms=<ТипСУБД> --db-server=<СерверБД> --db-name=<ИмяБазы> --db-user=<ПользовательБД> --db-pwd=<ПарольБД> <ПутьКФайлу.dt>"
+
+У меня свойства базы заполнены - там почти всё, что надо есть, чего нет - можно дать на выбор - профиль СУДБ или найти через RAC ?
+
+Мне будет влом на каждую базу создавать профиль, если проще полезть в RAC и вытянуть данные оттуда
+
+
+
+**@aepkugesi** (2026-10-31 17:43):
+
+Для выгрузки в *.dt и загрузки *.cf по списку баз нужен функционал: 
+- завершения сеансов пользователей; 
+- включения и выключения блокировки начала сеансов с указанием времени начала блокировки и кода разрешения;
+- включения и выключения блокировки регламентных заданий .
+<img width="1528" height="1149" alt="Image" src="https://github.com/user-attachments/assets/a2378962-4496-4dac-9ae5-848ef7e55c9f" />
+В окне выбора баз для выгрузки в *.dt и загрузки из *.cf предусмотреть ввод кода разрешения для монопольного подключения в базы.
+
+Можно это реализовать отдельными пунктами меню. Или перед выгрузкой или загрузкой блокировать регламентные задания, включить блокировку начала сеансов текущей датой и временем и завершить сеансы пользователей. После выгрузки и загрузки отключить блокировки. 
+
+**@7OH** (2026-11-01 11:58):
+
+По прежнему  не может выгрузить серверную базу данных
+
+
+<details>
+<summary>Лог из окна</summary>
+
+Журнал выполнения
+
+[14: 56:16] «Demo 27» - Профиль СУБД не задан - получение данных СУБД из кластера (rac) ...
+
+[14:56:16] «Demo 27» - База «Demo_8.3.27» не найдена в кластерах сервера localhost - операция
+может завершиться ошибкой подключения к СУБД
+[14 : 56:16] «Demo 27» - операция завершилась ошибкой (1 сек)
+- Выполнено успешно: 1, с ошибкой: 1, всего: 2 -
+
+</details>
+
+**@7OH** (2026-11-01 16:04):
+
+<details>
+<summary>Логи</summary>
+
+2026-11-01 19:02:48.656 [INFO] [CM_RAC] RAC: rac=C:\Program Files\1cv8\8.5.4.1878\bin\rac.exe, команда: localhost:27545 cluster list
+2026-11-01 19:02:48.743 [INFO] [CM_RAC] RAC: cluster list — выполнено, exit=0, stdout=1060 симв., stderr=0 симв., за 86 мс
+2026-11-01 19:02:48.744 [INFO] [CM_RAC] RAC: cluster list — распознано кластеров: «Локальный кластер» (порт 27541)
+2026-11-01 19:02:48.745 [INFO] [CM_RAC] RAC: rac=C:\Program Files\1cv8\8.5.4.1878\bin\rac.exe, команда: localhost:27545 infobase summary list --cluster=cbc95ef0-99c9-4b1a-909f-cff4c8de61d9
+2026-11-01 19:02:48.833 [INFO] [CM_RAC] RAC: infobase summary list --cluster=cbc95ef0-99c9-4b1a-909f-cff4c8de61d9 — выполнено, exit=0, stdout=4569 симв., stderr=0 симв., за 87 мс
+2026-11-01 19:02:48.834 [WARN] Автоподстановка данных СУБД (rac): База «Demo_8.3.27»: тип СУБД «» не поддерживается утилитой ibcmd
+2026-11-01 19:02:48.835 [WARN] Автоподстановка данных СУБД (rac): База «Demo_8.3.27» не найдена в кластерах сервера localhost — операция может завершиться ошибкой подключения к СУБД
+
+</details>
+
+
+
+**@7OH** (2026-11-02 05:21):
+
+И так - ставлю на выгрузку на базы из разных серверов.
+
+<details>
+<summary>Скрин</summary>
+
+<img width="876" height="885" alt="Image" src="https://github.com/user-attachments/assets/5e4aae18-9ac0-4c2b-b5ed-09301410f4ee" />
+
+</details>
+
+На первой ошибку выдало, на второй просто повисло.
+В диспетчере запущенных процессов 1cv8 или ibcmd  - нет.
+
+[diagnostics_20261102_082030.zip](https://github.com/user-attachments/files/34256754/diagnostics_20261102_082030.zip)
+
+**@7OH** (2026-11-02 07:50):
+
+[diagnostics_20261102_104926.zip](https://github.com/user-attachments/files/34261345/diagnostics_20261102_104926.zip)
+
+Ошибки пропускает, но выгружать в упор не хочет
+
+**@aepkugesi** (2026-11-02 09:26):
+
+Выгрузка базы в *.dt прошла успешно.
+конфигурацию с файла cf загрузить не удалось.
+
+<img width="697" height="424" alt="Image" src="https://github.com/user-attachments/assets/cb924d6e-0b9b-465f-ad72-e9904275d93f" />
+
+**@7OH** (2026-11-02 10:07):
+
+Меня смущает надпись "Загрузка конфигурации". У нас разве не выгрузка ?
+
+**@aepkugesi** (2026-11-02 10:22):
+
+Массовая выгрузка в dt тоже не идет.
+Ошибка аналогичная загрузке из cf.
+Выгрузить можно только через контекстное меню базы в резервировании.
+
+**@7OH** (2026-11-02 11:21):
+
+ Журнал выполнения не прокручивается ни скролом мышки ни просто мышкой
+Ну и пока продолжает не работать
+[diagnostics_20261102_142031.zip](https://github.com/user-attachments/files/34269420/diagnostics_20261102_142031.zip)
+
+**@7OH** (2026-11-02 11:29):
+
+Оставлю дополнение по доработке тут.
+1. Пункт в меню Утилиты - должен называться так же, как и в контекстном меню. Сейчас в контекстном - "Выгрузить в DT/CF", а в Утилиты это "Массовая выгрузка в DT". По идее это же одно и то же окно ? Давайте одинаново "Массовая выгрузка в DT/CF".
+2. Там же в Утилиты "Загрузка конфигурации из cf по списку баз" - переименовать в "Массовая загрузка из CF".
+И добавить возможно вызова этого окна в подменю "Для выделенных"по аналогии с п.1
+
+У обоих окошек очень неудачная раскладка элементов.
+Надо перенести список с галочками налево, чтобы он бы на всю высоту формы
+И добавить над списком поиск - если инструмент открыт не из контекстного меню - то базы надо удобно найти и отобрать.
+
+**@aepkugesi** (2026-11-02 13:12):
+
+https://github.com/sivatorov/Workspace1C/issues/92#issuecomment-6575424826
+Ничего не изменилось
+
+**@7OH** (2026-11-02 15:14):
+
+От чего уходили - к тому и пришли (
+список баз на ВСЮ высоту окна - на ВСЮ
+далее - список можно сделать в 2 раза Уже.
+В поле поиска просто "Поиск по данным баз"
+И тогда справа влезет нормально и каталог (сейчас почти не видно)
+и шаблон - то же самое
+и подписи у галочек.
+Журналу хватит места - но с высотой журнала надо что-то делать
+или делать её меньше, чтобы надписи галочек 100% вылезли, или делать окно немного выше.
+
+Текст в окне поиска накладывается на иконку поиска - наверное он должен начинаться правее иконки.
+Ну и не хватает кнопки очистки поиска в конце поля ввода.
+
+**@7OH** (2026-11-02 15:17):
+
+<img width="733" height="626" alt="Image" src="https://github.com/user-attachments/assets/f6ed818f-1c5c-45cf-9e24-e42e3afc338e" />
+
+Одну базу выгрузил - уже хороший результат.
+Только галочку наверное надо снимать при удачном результате.
+А вот вторую - вопрос.
+Разве ibcmd не позволяет делать выгрузку в DT даже при наличии сеансов ?
+Под ответственность пользователя конечно.
+
+**@7OH** (2026-11-02 15:21):
+
+<img width="1027" height="238" alt="Image" src="https://github.com/user-attachments/assets/9656abd4-88f5-4127-a232-50e255dd32d8" />
+
+<img width="766" height="498" alt="Image" src="https://github.com/user-attachments/assets/efb92e38-ae32-41a5-b112-ba3166c958e9" />
+
+<img width="1531" height="740" alt="Image" src="https://github.com/user-attachments/assets/e714d9c4-7e63-4115-b438-265bd463254c" />
+
+С идентификацией базы всё ещё проблема  - печально
+А причина - смотри выше - не тот кластер для списка баз взят
+
+**@7OH** (2026-11-02 19:34):
+
+Раскладка окна - то, что надо - спасибо
+Журнал - так и не прокручивается - посмотреть ошибки невозможно.
+
+[diagnostics_20261102_223052.zip](https://github.com/user-attachments/files/34288589/diagnostics_20261102_223052.zip)
+
+Судя по логу - в кластере есть имя пользователя, а вот пароль скорее всего не хранится.
+
+Как вариант - добавить на форму пароль пользователя СУБД.
+Если база не файловая (где обычной авториазции хватит) и нет профиля - пробовать подставлять пароль для субд.
+
+**@aepkugesi** (2026-11-02 20:06):
+
+Что делать если не известен логин и пароль sql сервера в целях безопасности?
+
+**@7OH** (2026-11-03 05:03):
+
+> 29\. Что делать если не известен логин и пароль sql сервера в целях безопасности?
+
+Тогда переключатель должен быть - как выгружать: Конфиг \ ibcmd
+По идее пароль от скуля нужен только для ibcmd и только для  выгрузки DT.
+Конфу же оно может выгрузить без этого в обоих режимах ?
+
+**@aepkugesi** (2026-11-03 07:07):
+
+Когда на строке базы нажимаешь на правую клавишу мышки -> резервирование -> выгрузить в dt база же без проблем выгружается.
+Нельзя по этому же принципу выгрузить список баз? 
+
+**@7OH** (2026-11-03 07:09):
+
+Похоже заголовок окна меняется по галочке (dt/cf) только при запуске.
+При изменении галочки - не изменяется.
+
+Подсказку для галочки "Выгружать и запущенные" сделать бы многострочной. В одну строку тяжело читать, если вообще в экран влезет.
+
+Выгрузило через ibcmd и указанием пароля пользователя СУБД.
+
+Теперь остаётся решить вопрос - как быть, если пароля от СУБД пользователь не знает.
+Возможно всё таки нужен переключатель - Конфигуратор/ibcmd
+
+
+**@7OH** (2026-11-03 14:27):
+
+Подсказки для остальных элементов надо тоже сделать с переносами.
+И сделать, чтобы цвет текста у подсказок был нормальным - сейчас при светлой теме - темные буквы на сером - не видны.
+
+Выгрузить через конфигуратор базу с фоновыми заданиями не смогло
+Были ошибки опять по поводу пустого типа базы в RAC.
+
+<img width="801" height="111" alt="Image" src="https://github.com/user-attachments/assets/9cbc90df-5e39-4937-b972-506472e6c865" />
+
+В конце вот так - остановить не работает и заново выгрузить уже невозможно. Только заново окно открывать
+
+---
 

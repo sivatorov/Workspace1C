@@ -71,6 +71,14 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// </summary>
     public string? FallbackDbms { get; set; }
 
+    /// <summary>
+    /// Добавлять ли к сообщению о неудаче подсказку «задайте данные СУБД источника
+    /// вручную или выберите движок „Конфигуратор"» (issue #79, v1.0.1.29). Включается
+    /// вызывающим кодом мастера «Развернуть тестовую копию»; в массовых операциях
+    /// подсказка не показывается (там свои механизмы выбора движка/пароля СУБД).
+    /// </summary>
+    public bool AdviseManualSourceDbms { get; set; }
+
     /// <summary>Причина последней неудачи резолва (для понятного сообщения в окне).</summary>
     public string? LastFailureReason { get; private set; }
 
@@ -349,6 +357,12 @@ public sealed class ClusterInfobaseCredentialsResolver
             if (profileFailureReason is not null)
             {
                 LastFailureReason = profileFailureReason;
+                // Issue #79 (v1.0.1.29): когда база найдена, но rac отдал пустые свойства
+                // СУБД, а «infobase info» не помог — резолвер прямо советует оба выхода:
+                // ручные данные СУБД источника в мастере ИЛИ движок «Конфигуратор»
+                // (подсказка включается вызывающим кодом — только из мастера тест-копии).
+                if (AdviseManualSourceDbms)
+                    LastFailureReason += " " + LocalizationManager.T("TestDeploy.DbmsResolveAdviseManual");
                 if (ibUser is null)
                     LastFailureReason += " " + LocalizationManager.T("BatchOps.DbmsResolveNeedIbCredentials");
                 // Issue #79 (v1.0.1.26): ошибка прав при отсутствии кластерных кред —

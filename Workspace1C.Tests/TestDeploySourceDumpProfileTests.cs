@@ -151,8 +151,12 @@ public sealed class TestDeploySourceDumpProfileTests
 
         Assert.Null(profile);
         // Понятная ошибка ДО шага «Выгрузка»: в тестовом окружении локализация не
-        // загружена — возвращается ключ строки.
-        Assert.Equal("TestDeploy.DbmsProfileNotFound", error);
+        // загружена — возвращается ключ строки. v1.0.1.29 (issue #79): к ошибке
+        // добавлена подсказка «задайте данные СУБД источника вручную ИЛИ движок
+        // „Конфигуратор"».
+        Assert.NotNull(error);
+        Assert.StartsWith("TestDeploy.DbmsProfileNotFound", error!, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.DbmsResolveAdviseManual", error!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -222,7 +226,11 @@ public sealed class TestDeploySourceDumpProfileTests
         // Проверка «описывают ли поля формы источник» журналируется, даже когда
         // rac-резолвер недоступен.
         Assert.Contains("TestDeploy.SourceDbmsFormCheck", log);
-        Assert.Equal("TestDeploy.DbmsProfileNotFound", error);
+        // v1.0.1.29 (issue #79): к ошибке добавлена подсказка о ручных данных СУБД
+        // источника / движке «Конфигуратор» (см. ResolveSourceDumpProfileAsync_..._ReturnsError).
+        Assert.NotNull(error);
+        Assert.StartsWith("TestDeploy.DbmsProfileNotFound", error!, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.DbmsResolveAdviseManual", error!, StringComparison.Ordinal);
     }
 
     [Fact]

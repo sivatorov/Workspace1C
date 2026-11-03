@@ -79,6 +79,18 @@ namespace Workspace1C
             SqlPasswordLabel.Text = LocalizationManager.T("BatchOps.SqlPasswordLabel");
             SqlPasswordHint.Text = LocalizationManager.T("BatchOps.SqlPasswordHint");
 
+            // Issue #92 (v1.0.1.29, 7OH: «подсказки для остальных элементов надо тоже
+            // сделать с переносами»): ВСЕ строковые ToolTip окна (из XAML через loc:Loc)
+            // заменяются многострочными — строковый ToolTip не переносится и уезжает
+            // за экран. Строка «Очистить поиск» короткая — остаётся как есть.
+            TemplateBox.ToolTip = MakeWrappingToolTip(LocalizationManager.T("BatchOps.TemplateHint"));
+            var engineTip = MakeWrappingToolTip(LocalizationManager.T("BatchOps.EngineHint"));
+            EngineLabel.ToolTip = engineTip;
+            EngineIbcmdRadio.ToolTip = engineTip;
+            EngineDesignerRadio.ToolTip = engineTip;
+            PreparePermissionBox.ToolTip = MakeWrappingToolTip(
+                LocalizationManager.T("BatchOps.Prepare.PermissionCodeHint"));
+
             UpdateKindDependentUi();
             // issue #92 (v1.0.1.24): список показывает строки ПОД ФИЛЬТРОМ поиска;
             // прогон и выбор идут по полному списку Items в ViewModel.

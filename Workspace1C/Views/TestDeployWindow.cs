@@ -60,6 +60,14 @@ public class TestDeployWindow : Window
     private readonly TextBox _ibcmdUserBox;
     private readonly PasswordBox _ibcmdPwdBox;
     private readonly Button _fillCredentialsButton;
+    // Блок «Данные СУБД источника (вручную)» (issue #79, v1.0.1.29).
+    private readonly CheckBox _sourceDbmsOverrideCheck;
+    private readonly StackPanel _sourceDbmsPanel;
+    private readonly ComboBox _sourceDbmsCombo;
+    private readonly TextBox _sourceDbServerBox;
+    private readonly TextBox _sourceDbNameBox;
+    private readonly TextBox _sourceDbUserBox;
+    private readonly PasswordBox _sourceDbPwdBox;
 
     private bool _busy;
 
@@ -345,6 +353,58 @@ public class TestDeployWindow : Window
             _ibcmdPwdBox.Password = _vm.Password;
         };
         _ibcmdPanel.Children.Add(_fillCredentialsButton);
+
+        // --- Данные СУБД ИСТОЧНИКА (вручную) (issue #79, v1.0.1.29): rac 8.5.4 отдаёт
+        // пустые свойства СУБД, «infobase info» — «Недостаточно прав» — пользователь
+        // вводит данные сам, профиль строится напрямую, без rac-проб и эвристики. ---
+        _sourceDbmsOverrideCheck = MakeCheckBox("TestDeploy.SourceDbmsOverride", _vm.UseSourceDbmsOverride);
+        _sourceDbmsOverrideCheck.ToolTip = LocalizationManager.T("TestDeploy.SourceDbmsOverrideHint");
+        _sourceDbmsOverrideCheck.Checked += (_, _) =>
+        {
+            _vm.UseSourceDbmsOverride = true;
+            FillSourceOverrideFields();
+            UpdateSourceDbmsOverridePanel();
+        };
+        _sourceDbmsOverrideCheck.Unchecked += (_, _) =>
+        {
+            _vm.UseSourceDbmsOverride = false;
+            UpdateSourceDbmsOverridePanel();
+        };
+        _ibcmdPanel.Children.Add(_sourceDbmsOverrideCheck);
+
+        _sourceDbmsPanel = new StackPanel { Visibility = Visibility.Collapsed };
+        _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbms"));
+        _sourceDbmsCombo = new ComboBox
+        {
+            ItemsSource = new[] { "PostgreSQL", "MSSQLServer" },
+            SelectedItem = string.IsNullOrWhiteSpace(_vm.SourceDbms) ? "MSSQLServer" : _vm.SourceDbms,
+            Margin = new Thickness(0, 2, 0, 8)
+        };
+        _sourceDbmsCombo.SelectionChanged += (_, _) =>
+            _vm.SourceDbms = _sourceDbmsCombo.SelectedItem?.ToString() ?? _vm.SourceDbms;
+        _sourceDbmsPanel.Children.Add(_sourceDbmsCombo);
+
+        _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbServer"));
+        _sourceDbServerBox = new TextBox { Text = _vm.SourceDbServer, Margin = new Thickness(0, 2, 0, 8) };
+        _sourceDbServerBox.TextChanged += (_, _) => _vm.SourceDbServer = _sourceDbServerBox.Text;
+        _sourceDbmsPanel.Children.Add(_sourceDbServerBox);
+
+        _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbName"));
+        _sourceDbNameBox = new TextBox { Text = _vm.SourceDbName, Margin = new Thickness(0, 2, 0, 8) };
+        _sourceDbNameBox.TextChanged += (_, _) => _vm.SourceDbName = _sourceDbNameBox.Text;
+        _sourceDbmsPanel.Children.Add(_sourceDbNameBox);
+
+        _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbUser"));
+        _sourceDbUserBox = new TextBox { Text = _vm.SourceDbUser, Margin = new Thickness(0, 2, 0, 8) };
+        _sourceDbUserBox.TextChanged += (_, _) => _vm.SourceDbUser = _sourceDbUserBox.Text;
+        _sourceDbmsPanel.Children.Add(_sourceDbUserBox);
+
+        _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbPassword"));
+        _sourceDbPwdBox = new PasswordBox { Margin = new Thickness(0, 2, 0, 8) };
+        _sourceDbPwdBox.PasswordChanged += (_, _) => _vm.SourceDbPassword = _sourceDbPwdBox.Password;
+        _sourceDbmsPanel.Children.Add(_sourceDbPwdBox);
+
+        _ibcmdPanel.Children.Add(_sourceDbmsPanel);
         panel.Children.Add(_ibcmdPanel);
 
         // --- Отключаемые регламенты ---
@@ -521,6 +581,26 @@ public class TestDeployWindow : Window
         _ibcmdUserBox.IsEnabled = explicitAuth;
         _ibcmdPwdBox.IsEnabled = explicitAuth;
         _fillCredentialsButton.IsEnabled = explicitAuth;
+        UpdateSourceDbmsOverridePanel();
+    }
+
+    /// <summary>Показывает поля «Данные СУБД источника» только при включённой галочке (issue #79).</summary>
+    private void UpdateSourceDbmsOverridePanel()
+    {
+        if (_sourceDbmsPanel is not null)
+            _sourceDbmsPanel.Visibility = _vm.UseSourceDbmsOverride
+                ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Автозаполнение ручных полей СУБД источника из формы/Ref источника (issue #79).</summary>
+    private void FillSourceOverrideFields()
+    {
+        _vm.FillSourceDbmsOverrideDefaults();
+        _sourceDbmsCombo.SelectedItem = string.IsNullOrWhiteSpace(_vm.SourceDbms)
+            ? "MSSQLServer" : _vm.SourceDbms;
+        _sourceDbServerBox.Text = _vm.SourceDbServer;
+        _sourceDbNameBox.Text = _vm.SourceDbName;
+        _sourceDbUserBox.Text = _vm.SourceDbUser;
     }
 
     private readonly TextBlock _previewText;

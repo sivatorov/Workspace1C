@@ -122,18 +122,33 @@ public static class RingLicenseParser
         @"^\s*(?<key>[^:=\[\r\n]{2,40}?)\s*[:=]\s*(?<value>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.Multiline);
 
-    /// <summary>Дата в файле лицензии: dd.MM.yyyy или yyyy-MM-dd.</summary>
+    /// <summary>
+    /// Пара «ключ: значение» ВНУТРИ строки (issue #83, v1.0.1.29): реальный файл *.lic
+    /// может начинаться с длинного ключа, после которого в ОДНОЙ строке идут поля
+    /// («ключ… Количество пользователей: 5»), либо содержать ключ после «(»/«;».
+    /// Применяется как запасной проход, если якорный <see cref="LicKeyValueRegex"/>
+    /// маркер не нашёл.
+    /// </summary>
+    private static readonly Regex LicKeyValueInlineRegex = new(
+        @"(?<key>[^:=\[\]\r\n]{2,60}?)\s*[:=]\s*(?<value>[^\r\n]+)",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Дата в файле лицензии: dd.MM.yyyy или yyyy-MM-dd, с необязательным временем
+    /// «HH:mm[:ss]» (issue #83, v1.0.1.29 — в реальном файле репортёра дата со временем;
+    /// ранее время терялось, а UI показывал AM/PM локали ОС).
+    /// </summary>
     private static readonly Regex LicDateRegex = new(
-        @"\b(?:(?<d1>0[1-9]|[12]\d|3[01])\.(?<m1>0[1-9]|1[0-2])\.(?<y1>\d{4})|(?<y2>(19|20)\d{2})-(?<m2>0[1-9]|1[0-2])-(?<d2>0[1-9]|[12]\d|3[01]))\b",
+        @"\b(?:(?<d1>0[1-9]|[12]\d|3[01])\.(?<m1>0[1-9]|1[0-2])\.(?<y1>\d{4})|(?<y2>(19|20)\d{2})-(?<m2>0[1-9]|1[0-2])-(?<d2>0[1-9]|[12]\d|3[01]))(?:\s+(?<hh>[01]?\d|2[0-3]):(?<mi>[0-5]\d)(?::(?<ss>[0-5]\d))?)?",
         RegexOptions.Compiled);
 
     /// <summary>
     /// Компактная дата/метка времени в файле лицензии (issue #83, v1.0.1.28 — реальный
     /// файл репортёра «20260907085731.lic»): yyyyMMdd или yyyyMMddHHmmss, 8–14 цифр
-    /// подряд, не часть более длинного числа.
+    /// подряд, не часть более длинного числа. С v1.0.1.29 время (если есть) сохраняется.
     /// </summary>
     private static readonly Regex LicCompactDateRegex = new(
-        @"(?<!\d)(?<y>(19|20)\d{2})(?<m>0[1-9]|1[0-2])(?<d>0[1-9]|[12]\d|3[01])(?:\d{2}(\d{2}){2})?(?!\d)",
+        @"(?<!\d)(?<y>(19|20)\d{2})(?<m>0[1-9]|1[0-2])(?<d>0[1-9]|[12]\d|3[01])(?:(?<hh>[01]?\d|2[0-3])(?<mi>[0-5]\d)(?<ss>[0-5]\d))?(?!\d)",
         RegexOptions.Compiled);
 
     /// <summary>
@@ -201,8 +216,14 @@ public static class RingLicenseParser
                 license.ExpiryDate = expiryDate;
         }
 
-        // Количество пользователей/рабочих мест (нечисловое значение → 0, без исключений).
-        var countRaw = FindValue(content, "количество пользователей", "пользователей", "рабочих мест", "мест", "seats");
+        // Количество пользователей/рабочих мест (issue #83, v1.0.1.29 — колонка
+        // «Пользователей» была пустой: в реальном файле репортёра ключ «Количество
+        // пользователей» не находился из-за формата/окружения; добавлены варианты
+        // написания; сам поиск устойчив к ключу внутри строки — см. FindValue;
+        // нечисловое значение → 0, без исключений).
+        var countRaw = FindValue(content,
+            "количество пользователей", "кол-во пользователей", "число пользователей",
+            "пользователей", "рабочих мест", "мест", "users count", "seats");
         if (countRaw is not null)
         {
             var digits = Regex.Replace(countRaw, @"[^\d]", string.Empty);
@@ -260,42 +281,67 @@ public static class RingLicenseParser
         return compact.Success ? ParseLicCompactDateValue(compact) : null;
     }
 
-    /// <summary>Разобранный <see cref="LicDateRegex"/>-совпадение в DateTime; null — группа не распознана.</summary>
+    /// <summary>Разобранный <see cref="LicDateRegex"/>-совпадение в DateTime; null — группа не распознана.
+    /// Время в совпадении (если есть, issue #83 v1.0.1.29) сохраняется.</summary>
     private static DateTime? ParseLicDateValue(Match match)
     {
         if (match.Groups["y1"].Success)
         {
-            return new DateTime(
+            return ApplyTime(new DateTime(
                 int.Parse(match.Groups["y1"].Value, CultureInfo.InvariantCulture),
                 int.Parse(match.Groups["m1"].Value, CultureInfo.InvariantCulture),
-                int.Parse(match.Groups["d1"].Value, CultureInfo.InvariantCulture));
+                int.Parse(match.Groups["d1"].Value, CultureInfo.InvariantCulture)), match);
         }
         if (match.Groups["y2"].Success)
         {
-            return new DateTime(
+            return ApplyTime(new DateTime(
                 int.Parse(match.Groups["y2"].Value, CultureInfo.InvariantCulture),
                 int.Parse(match.Groups["m2"].Value, CultureInfo.InvariantCulture),
-                int.Parse(match.Groups["d2"].Value, CultureInfo.InvariantCulture));
+                int.Parse(match.Groups["d2"].Value, CultureInfo.InvariantCulture)), match);
         }
         return null;
     }
 
-    /// <summary>Разобранное совпадение <see cref="LicCompactDateRegex"/> в DateTime; null — группа не распознана.</summary>
+    /// <summary>Разобранное совпадение <see cref="LicCompactDateRegex"/> в DateTime; null — группа не распознана.
+    /// Компактное время в совпадении (если есть, issue #83 v1.0.1.29) сохраняется.</summary>
     private static DateTime? ParseLicCompactDateValue(Match match)
     {
         if (!match.Groups["y"].Success)
             return null;
         try
         {
-            return new DateTime(
+            return ApplyTime(new DateTime(
                 int.Parse(match.Groups["y"].Value, CultureInfo.InvariantCulture),
                 int.Parse(match.Groups["m"].Value, CultureInfo.InvariantCulture),
-                int.Parse(match.Groups["d"].Value, CultureInfo.InvariantCulture));
+                int.Parse(match.Groups["d"].Value, CultureInfo.InvariantCulture)), match);
         }
         catch (ArgumentOutOfRangeException)
         {
             // Несуществующая дата в потоке цифр — не дата.
             return null;
+        }
+    }
+
+    /// <summary>Время из групп hh/mi/ss совпадения (если распознано) поверх даты.</summary>
+    private static DateTime ApplyTime(DateTime date, Match match)
+    {
+        var hh = match.Groups["hh"];
+        var mi = match.Groups["mi"];
+        if (!hh.Success || !mi.Success)
+            return date;
+        try
+        {
+            return new DateTime(
+                date.Year, date.Month, date.Day,
+                int.Parse(hh.Value, CultureInfo.InvariantCulture),
+                int.Parse(mi.Value, CultureInfo.InvariantCulture),
+                match.Groups["ss"].Success
+                    ? int.Parse(match.Groups["ss"].Value, CultureInfo.InvariantCulture)
+                    : 0);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return date;
         }
     }
 
@@ -326,9 +372,9 @@ public static class RingLicenseParser
         Add("Рег. номер", license.RegNumber);
         Add("Компьютер", license.Computer);
         if (license.IssueDate is { } issued)
-            lines.Add($"Дата выдачи: {issued:dd.MM.yyyy}");
+            lines.Add($"Дата выдачи: {FormatLicDate(issued)}");
         if (license.ExpiryDate is { } expiry)
-            lines.Add($"Срок действия: {expiry:dd.MM.yyyy}");
+            lines.Add($"Срок действия: {FormatLicDate(expiry)}");
         Add("Файл лицензии", string.IsNullOrWhiteSpace(license.FilePath)
             ? license.RawText
             : license.FilePath);
@@ -339,7 +385,11 @@ public static class RingLicenseParser
         var details = string.IsNullOrWhiteSpace(license.RawFullText)
             ? (string.IsNullOrWhiteSpace(license.RawDetails) ? license.RawText : license.RawDetails)
             : license.RawFullText;
-        var stripped = StripLeadingKey(details);
+        // Issue #83 (v1.0.1.29, 7OH: «лишние поля — прежде всего весь ключ», «начальная
+        // часть до ключа тоже не нужна — только „Файл лицензии" оставить»): из содержимого
+        // срезаются и начальный длинный ключ, и ВСЯ «шапка» файла до первой содержательной
+        // строки «ключ=значение» (StripFileNoise); остаётся содержимое в формате файла.
+        var stripped = StripFileNoise(details);
         if (stripped.Length > 0)
         {
             lines.Add(string.Empty);
@@ -355,6 +405,16 @@ public static class RingLicenseParser
     }
 
     /// <summary>
+    /// Дата лицензии для отображения (issue #83, v1.0.1.29): «dd.MM.yyyy HH:mm:ss», когда
+    /// в файле было время (без AM/PM локали ОС), иначе «dd.MM.yyyy». Public-доступен
+    /// из модели/окон (внутри сборки).
+    /// </summary>
+    internal static string FormatLicDate(DateTime value) =>
+        value.TimeOfDay == TimeSpan.Zero
+            ? value.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)
+            : value.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// Вырезает из текста файла лицензии начальный длинный ключ — токен вида
     /// «NNNNNNNNNNNNNNNN…» (20+ символов подряд из цифр/букв) в начале текста.
     /// </summary>
@@ -367,14 +427,79 @@ public static class RingLicenseParser
         return leadingKey.Success ? trimmed.Substring(leadingKey.Length).TrimStart(' ', '•', '\r', '\n') : trimmed;
     }
 
-    /// <summary>Значение первой пары «ключ: значение», чей ключ содержит одно из слов-маркеров. Internal — тесты.</summary>
+    /// <summary>
+    /// Чистит текст файла лицензии от «шума» (issue #83, v1.0.1.29): срезает ведущий
+    /// длинный ключ И предшествующие/служебные строки («шапку» файла) — остаётся
+    /// содержимое, начиная с первой содержательной строки «ключ=значение»/
+    /// «ключ: значение». Если содержательных строк нет — возвращается текст без
+    /// начального ключа (как раньше).
+    /// </summary>
+    internal static string StripFileNoise(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+        var trimmed = StripLeadingKey(text);
+        var lines = trimmed.Replace("\r\n", "\n").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var line = lines[i];
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            // Первая содержательная строка «ключ=значение»/«ключ: значение» —
+            // с неё начинается полезное содержимое файла.
+            if (LicKeyValueRegex.IsMatch(line))
+                return string.Join(Environment.NewLine, lines.Skip(i)).Trim();
+        }
+        return trimmed;
+    }
+
+    /// <summary>
+    /// Значение первой пары «ключ: значение», чей ключ содержит одно из слов-маркеров.
+    /// Issue #83 (v1.0.1.29): в реальном файле ключ может стоять НЕ в начале строки
+    /// (после длинного ключа в той же строке, после «(»/«;») — если якорный поиск
+    /// не нашёл маркер, выполняется запасной проход по парам ВНУТРИ строк
+    /// (<see cref="LicKeyValueInlineRegex"/>). Internal — тесты.
+    /// </summary>
     internal static string? FindValue(string content, params string[] keyMarkers)
+    {
+        var anchored = FindValueAnchored(content, keyMarkers);
+        if (anchored is not null)
+            return anchored;
+        return FindValueInline(content, keyMarkers);
+    }
+
+    private static string? FindValueAnchored(string content, params string[] keyMarkers)
     {
         foreach (Match match in LicKeyValueRegex.Matches(content))
         {
             var key = match.Groups["key"].Value;
             if (keyMarkers.Any(m => key.Contains(m, StringComparison.OrdinalIgnoreCase)))
                 return match.Groups["value"].Value.Trim();
+        }
+        return null;
+    }
+
+    private static string? FindValueInline(string content, params string[] keyMarkers)
+    {
+        foreach (var rawLine in content.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (string.IsNullOrWhiteSpace(line))
+                continue;
+            // На строке ищем пару, чей ключ содержит маркер, даже если перед ним
+            // стоит длинный ключ файла или другой текст.
+            var best = (string?)null;
+            foreach (Match match in LicKeyValueInlineRegex.Matches(line))
+            {
+                var key = match.Groups["key"].Value;
+                if (!keyMarkers.Any(m => key.Contains(m, StringComparison.OrdinalIgnoreCase)))
+                    continue;
+                var value = match.Groups["value"].Value.Trim();
+                if (value.Length > 0)
+                    best = value; // последнее вхождение на строке — «ключ: значение» в конце.
+            }
+            if (best is not null)
+                return best;
         }
         return null;
     }

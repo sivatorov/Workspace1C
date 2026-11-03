@@ -162,8 +162,9 @@ public sealed class Issue128BatchEngineLicenseRacTests
         Assert.Equal("499459654270590-500000000037", license.RegNumber);
         Assert.Equal(5, license.LicenseCount);
         Assert.Equal(new DateTime(2027, 1, 1), license.ExpiryDate);
-        // Компактная дата «20260907085731» (реальный файл репортёра) распознаётся.
-        Assert.Equal(new DateTime(2026, 9, 7), license.IssueDate);
+        // Компактная дата «20260907085731» (реальный файл репортёра) распознаётся;
+        // v1.0.1.29 (issue #83): время в дате сохраняется (а не отбрасывается).
+        Assert.Equal(new DateTime(2026, 9, 7, 8, 57, 31), license.IssueDate);
     }
 
     [Fact]

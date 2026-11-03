@@ -562,6 +562,11 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 2, 0, 4)
             };
+            // Issue #83 (v1.0.1.29, вопрос 7OH «что за колонки „Пользователь"/„Состояние"
+            // и откуда данные»): источник данных колонок указан в подсказке заголовка —
+            // rac/ring; отсутствующее у источника поле — пустая ячейка.
+            ToolTip.SetTip(inUseTitle,
+                LocalizationManager.T("ServerMonitor.Licenses.ColumnsSourceHint"));
             // Ширины колонок: отрицательные — «звёздные» (1 / -w), положительные — пиксели.
             var inUseWidths = new[] { -1.3, -1.3, -1.0, -1.8, 80d, 90d, 90d };
             var inUseTable = BuildLicenseList(
@@ -715,7 +720,9 @@ namespace Workspace1C
                     "User" => license.User,
                     "State" => license.State,
                     // Issue #83 (v1.0.1.27): отсутствующие в *.lic поля — пустые ячейки.
-                    "ExpiryDate" => license.ExpiryDate?.ToString("dd.MM.yyyy") ?? string.Empty,
+                    // Issue #83 (v1.0.1.29): формат «dd.MM.yyyy HH:mm:ss» без AM/PM
+                    // (когда в файле есть время), иначе «dd.MM.yyyy».
+                    "ExpiryDate" => license.ExpiryDateText,
                     "LicenseCount" => license.LicenseCount > 0 ? license.LicenseCount.ToString() : string.Empty,
                     _ => string.Empty
                 };

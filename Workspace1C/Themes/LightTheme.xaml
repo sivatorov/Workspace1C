@@ -1063,6 +1063,21 @@
         </Setter>
     </Style>
 
+    <!-- ===================== Стиль всплывающей подсказки ===================== -->
+    <!-- Issue #92 (v1.0.1.29, 7OH: «цвет текста подсказок при светлой теме не виден —
+         тёмные буквы на сером»): в светлой теме у ToolTip раньше не было стиля вовсе —
+         текст наследовался от окна и терял контраст на системном фоне подсказки.
+         Явные Background/Foreground по теме — контрастно и в светлой, и в тёмной
+         схеме (стиль тёмной темы — DarkTheme.xaml). -->
+    <Style TargetType="ToolTip">
+        <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="8,6"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+
     <!-- ===================== Стиль разделителя меню ===================== -->
     <!-- Компактный разделитель (issue #287): тонкая линия с минимальным вертикальным
          отступом, чтобы меню с подменю занимало меньше высоты. Такой же стиль

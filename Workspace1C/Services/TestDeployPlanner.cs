@@ -299,6 +299,12 @@ public static class TestDeployPlanner
                 ? dbmsProfileResolver(source)
                 : TryLoadDbmsProfile(source);
             var hasSourceDbms = dbmsProfile is not null && !string.IsNullOrWhiteSpace(dbmsProfile.Database);
+            // Issue #79 (v1.0.1.29): явный ручной override данных СУБД источника
+            // (галочка «Указать данные СУБД источника вручную») делает rac-пробу
+            // НЕОБЯЗАТЕЛЬНОЙ — pre-валидация считает данные СУБД заданными; профиль
+            // на шаге резолва строится напрямую из ручных полей (TestDeployService).
+            if (!hasSourceDbms && Services.TestDeployService.HasSourceDbmsOverride(scenario))
+                hasSourceDbms = true;
             if (!hasSourceDbms && !FormFieldsDescribeSource(scenario, source, dbmsProfile))
                 errors.Add("TestDeploy.NeedDbmsProfile");
         }

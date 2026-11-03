@@ -483,6 +483,18 @@ public sealed class TestDeployService
             return (saved, null);
         }
 
+        // 1.5) Явный ручной override формы (issue #79, v1.0.1.29): пользователь включил
+        // «Указать данные СУБД источника вручную» и заполнил поля — профиль строится
+        // НАПРЯМУЮ, без эвристики FormFieldsDescribeSource и rac-проб: rac 8.5.4 отдаёт
+        // пустые свойства СУБД, «infobase info» — «Недостаточно прав», и собрать профиль
+        // автоматически не из чего.
+        if (HasSourceDbmsOverride(scenario))
+        {
+            var overrideProfile = BuildSourceOverrideProfile(scenario);
+            log?.Invoke(T("TestDeploy.SourceDbmsOverrideUsed"));
+            return (overrideProfile, null);
+        }
+
         // 2) Автоподстановка из rac по исходной базе (как в массовых операциях, issue #92).
         var resolver = resolverFactory is not null
             ? resolverFactory()
@@ -494,6 +506,9 @@ public sealed class TestDeployService
             // «infobase info» (права администратора ИБ) и пустого dbms rac 8.5.
             resolver.CredentialOverride = scenario.Credential;
             resolver.FallbackDbms = scenario.Dbms;
+            // Issue #79 (v1.0.1.29): при неудаче резолва журнал/окно мастера прямо
+            // советуют ручные данные СУБД источника ИЛИ движок «Конфигуратор».
+            resolver.AdviseManualSourceDbms = true;
             try
             {
                 var fromRac = await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
@@ -528,7 +543,39 @@ public sealed class TestDeployService
             return (fromForm, null);
         }
 
-        return (null, T("TestDeploy.DbmsProfileNotFound"));
+        return (null, T("TestDeploy.DbmsProfileNotFound") + "\n" + T("TestDeploy.DbmsResolveAdviseManual"));
+    }
+
+    /// <summary>
+    /// Активен ли явный ручной override данных СУБД источника (issue #79, v1.0.1.29):
+    /// галочка <see cref="TestDeployScenario.UseSourceDbmsOverride"/> включена и заполнены
+    /// сервер и имя SQL-БД источника. Internal — юнит-тесты и валидация планировщика.
+    /// </summary>
+    internal static bool HasSourceDbmsOverride(TestDeployScenario? scenario)
+    {
+        return scenario is { UseSourceDbmsOverride: true } &&
+               !string.IsNullOrWhiteSpace(scenario.SourceDbServer) &&
+               !string.IsNullOrWhiteSpace(scenario.SourceDbName);
+    }
+
+    /// <summary>
+    /// Профиль СУБД ИСТОЧНИКА из ручных полей мастера (issue #79, v1.0.1.29). Вызывается
+    /// только когда <see cref="HasSourceDbmsOverride"/> — проверка валидности не дублируется.
+    /// Тип СУБД ограничен поддерживаемыми ibcmd (PostgreSQL/MSSQLServer).
+    /// </summary>
+    internal static DbmsBackupProfile BuildSourceOverrideProfile(TestDeployScenario scenario)
+    {
+        return new DbmsBackupProfile
+        {
+            InfobaseId = scenario.SourceInfobaseId,
+            Dbms = string.Equals(scenario.SourceDbms?.Trim(), "PostgreSQL", StringComparison.OrdinalIgnoreCase)
+                ? DbmsKind.PostgreSql
+                : DbmsKind.MsSql,
+            Host = scenario.SourceDbServer!.Trim(),
+            Database = scenario.SourceDbName!.Trim(),
+            User = scenario.SourceDbUser?.Trim() ?? string.Empty,
+            Password = scenario.SourceDbPassword ?? string.Empty
+        };
     }
 
     /// <summary>
@@ -572,6 +619,8 @@ public sealed class TestDeployService
         // из-за чего rac-проба шла без учётных данных и сообщала «Недостаточно прав»).
         resolver.CredentialOverride = scenario.Credential;
         resolver.FallbackDbms = scenario.Dbms;
+        // Issue #79 (v1.0.1.29): подсказка о ручных данных СУБД источника при неудаче.
+        resolver.AdviseManualSourceDbms = true;
         return await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
     }
 

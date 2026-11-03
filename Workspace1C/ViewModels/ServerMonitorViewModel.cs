@@ -1961,9 +1961,18 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         return rows;
     }
 
-    /// <summary>Срок действия лицензии для CSV: «dd.MM.yyyy», null — пустое поле.</summary>
-    private static string FormatLicenseExpiry(DateTime? expiry) =>
-        expiry is { } date ? date.ToString("dd.MM.yyyy") : string.Empty;
+    /// <summary>
+    /// Срок действия лицензии для CSV (issue #83, v1.0.1.29): «dd.MM.yyyy HH:mm:ss» без
+    /// AM/PM, когда в файле есть время, иначе «dd.MM.yyyy»; null — пустое поле.
+    /// </summary>
+    private static string FormatLicenseExpiry(DateTime? expiry)
+    {
+        if (expiry is not { } date)
+            return string.Empty;
+        return date.TimeOfDay == TimeSpan.Zero
+            ? date.ToString("dd.MM.yyyy", CultureInfo.InvariantCulture)
+            : date.ToString("dd.MM.yyyy HH:mm:ss", CultureInfo.InvariantCulture);
+    }
 
     private static string T(string key) => LocalizationManager.T(key);
 

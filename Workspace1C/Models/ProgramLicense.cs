@@ -67,4 +67,12 @@ public sealed class ProgramLicense
     /// однострочной выжимкой для тултипа строки таблицы). Пусто — файл не читался.
     /// </summary>
     public string RawFullText { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Срок действия для отображения (issue #83, v1.0.1.29): «dd.MM.yyyy HH:mm:ss», когда
+    /// в файле было время (без AM/PM локали ОС), иначе «dd.MM.yyyy»; пусто — даты нет.
+    /// Форматируется через <see cref="Services.RingLicenseParser.FormatLicDate"/>.
+    /// </summary>
+    public string ExpiryDateText =>
+        ExpiryDate is { } date ? Services.RingLicenseParser.FormatLicDate(date) : string.Empty;
 }

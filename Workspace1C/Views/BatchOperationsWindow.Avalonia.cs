@@ -225,7 +225,8 @@ namespace Workspace1C
             }.Styled(ControlThemes.ModernTextBox);
             ThemeBrushes.Bind(templateBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
             ThemeBrushes.Bind(templateBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
-            ToolTip.SetTip(templateBox, LocalizationManager.T("BatchOps.TemplateHint"));
+            // Issue #92 (v1.0.1.29): подсказка многострочная, с контрастным по теме цветом.
+            ToolTip.SetTip(templateBox, MakeWrappingTip(LocalizationManager.T("BatchOps.TemplateHint")));
             templateBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("Template") { Mode = Avalonia.Data.BindingMode.TwoWay });
             _kindDtRadio = new RadioButton
             {
@@ -358,7 +359,9 @@ namespace Workspace1C
             }.Styled(ControlThemes.ModernTextBox);
             ThemeBrushes.Bind(preparePermissionBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
             ThemeBrushes.Bind(preparePermissionBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
-            ToolTip.SetTip(preparePermissionBox, LocalizationManager.T("BatchOps.Prepare.PermissionCodeHint"));
+            // Issue #92 (v1.0.1.29): подсказка многострочная, с контрастным по теме цветом.
+            ToolTip.SetTip(preparePermissionBox, MakeWrappingTip(
+                LocalizationManager.T("BatchOps.Prepare.PermissionCodeHint")));
             preparePermissionBox.Bind(TextBox.TextProperty,
                 new Avalonia.Data.Binding("PreparePermissionCode") { Mode = Avalonia.Data.BindingMode.TwoWay });
             var prepareDenyRow = new StackPanel
@@ -548,14 +551,21 @@ namespace Workspace1C
 
         /// <summary>
         /// Многострочная подсказка (issue #92, v1.0.1.28): TextBlock с переносом
-        /// вместо строки — длинная подсказка не уезжает за экран.
+        /// вместо строки — длинная подсказка не уезжает за экран. Issue #92 (v1.0.1.29):
+        /// цвет текста привязан к кисти темы — в светлой схеме текст подсказки был
+        /// тёмно-серым на сером фоне и не читался.
         /// </summary>
-        private static TextBlock MakeWrappingTip(string text) => new()
+        private static TextBlock MakeWrappingTip(string text)
         {
-            Text = text,
-            TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 360
-        };
+            var tip = new TextBlock
+            {
+                Text = text,
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 360
+            };
+            Themes.ThemeBrushes.Bind(tip, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            return tip;
+        }
 
         /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
         private void UpdateKindDependentUi()
