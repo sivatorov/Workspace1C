@@ -1,0 +1,56 @@
+<Window x:Class="Workspace1C.LicenseDetailsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:loc="clr-namespace:Workspace1C.Localization"
+        mc:Ignorable="d"
+        Title="{loc:Loc ServerMonitor.Licenses.DetailsTitle}"
+        Icon="{StaticResource AppIcon}"
+        Height="500" Width="600" MinHeight="380" MinWidth="460"
+        WindowStartupLocation="CenterOwner"
+        FontSize="13"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ContentBackgroundBrush}">
+
+    <Window.Resources>
+        <!-- Неявный стиль для корректного отображения в тёмной теме -->
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ============ Читабельная информация из файла лицензии ============ -->
+        <!-- Текст строит RingLicenseParser.BuildReadableDetails: тип/версия/владелец/
+             пользователи/срок/даты/файл — без начального длинного ключа (issue #83). -->
+        <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
+            <TextBlock x:Name="DetailsText" TextWrapping="Wrap"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       FontFamily="Consolas"/>
+        </ScrollViewer>
+
+        <!-- ============ Кнопки ============ -->
+        <!-- Порядок кнопок — по конвенции проекта (issue #98): главная слева,
+             «Закрыть» справа последней. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Margin="0,16,0,0">
+            <Button x:Name="OpenFolderButton" MinWidth="140" Margin="0,0,8,0"
+                    Style="{StaticResource ModernButton}"
+                    Click="OnOpenFolder_Click">
+                <TextBlock Text="{loc:Loc ServerMonitor.Licenses.OpenFolder}" VerticalAlignment="Center"/>
+            </Button>
+            <Button MinWidth="110" IsCancel="True"
+                    Style="{StaticResource ModernButton}"
+                    Background="{DynamicResource ItemHoverBrush}"
+                    Foreground="{DynamicResource TextPrimaryBrush}">
+                <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

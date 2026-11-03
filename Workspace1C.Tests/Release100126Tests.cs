@@ -58,16 +58,6 @@ public sealed class Release100126Tests
         }
     };
 
-    // ===================== Версия 1.0.1.26 =====================
-
-    [Fact]
-    public void Version_100126_SetInAllFourProperties()
-    {
-        var csproj = ReadProjectFile("Workspace1C/Workspace1C.csproj");
-        foreach (var property in new[] { "Version", "AssemblyVersion", "FileVersion", "InformationalVersion" })
-            Assert.Contains($"<{property}>1.0.1.26</{property}>", csproj, StringComparison.Ordinal);
-    }
-
     // ===================== #101: пер-режимные статусы =====================
 
     [Fact]

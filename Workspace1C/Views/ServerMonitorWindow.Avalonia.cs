@@ -12,6 +12,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -574,12 +576,15 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 6, 0, 4)
             };
-            // Issue #83 (v1.0.1.26): колонка «Владелец» из файла *.lic + тултип строки
-            // с полной выжимкой файла (RawDetails).
-            var installedWidths = new[] { -1.5, 110d, 90d, -1.1, -1.0, -1.0, 90d, 100d };
+            // Issue #83 (v1.0.1.27): состав колонок — Serial / Module / Type / Version /
+            // Owner / Expiry / Users; «Пользователь» и «Состояние» убраны (у файловых
+            // лицензий всегда пустовали; данные — в тултипе и окне деталей). Колонки
+            // «Серийный номер» (окно деталей) и «Модуль» (открыть папку с файлом)
+            // кликабельны — курсор-хенд и акцентный цвет задаются в BuildLicenseList.
+            var installedWidths = new[] { -1.5, -1.0, 110d, 90d, -1.1, 100d, 80d };
             var installedTable = BuildLicenseList(
                 _vm.InstalledLicenses,
-                new[] { "SerialNumber", "Type", "Version", "Owner", "Module", "User", "State", "ExpiryDate" },
+                new[] { "SerialNumber", "Module", "Type", "Version", "Owner", "ExpiryDate", "LicenseCount" },
                 installedWidths,
                 fixedHeight: 200,
                 rowTooltipPath: "RawDetails");
@@ -624,9 +629,29 @@ namespace Workspace1C
                     "Module" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Module"),
                     "State" => LocalizationManager.T("ServerMonitor.Licenses.Columns.State"),
                     "ExpiryDate" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Expiry"),
+                    // Issue #83 (v1.0.1.27): новая колонка «Пользователей» (из *.lic).
+                    "LicenseCount" => LocalizationManager.T("ServerMonitor.Licenses.Columns.Users"),
                     _ => p
                 };
             }).ToList();
+
+            // Issue #83 (v1.0.1.27): кликабельные колонки «Серийный номер» (окно деталей)
+            // и «Модуль» (открыть папку с файлом лицензии) — только для таблицы
+            // установленных лицензий (у сеансов таких колонок нет).
+            // У IReadOnlyList<string> нет IndexOf — ищем индекс вручную.
+            static int IndexOfPath(IReadOnlyList<string> list, string value)
+            {
+                for (var i = 0; i < list.Count; i++)
+                {
+                    if (list[i] == value) return i;
+                }
+                return -1;
+            }
+            var serialIndex = IndexOfPath(propertyPaths, "SerialNumber");
+            var moduleIndex = IndexOfPath(propertyPaths, "Module");
+            IReadOnlyList<int> clickableColumns = serialIndex >= 0 || moduleIndex >= 0
+                ? new[] { serialIndex, moduleIndex }.Where(i => i >= 0).ToList()
+                : Array.Empty<int>();
 
             var list = new ListBox
             {
@@ -642,7 +667,9 @@ namespace Workspace1C
                 var row = LicenseRow(
                     propertyPaths.Select(p => FormatCell(item, p)).ToList(),
                     widths,
-                    header: false);
+                    header: false,
+                    clickableColumns,
+                    i => OnLicenseCellClick(item, i, serialIndex, moduleIndex));
                 // Issue #83 (v1.0.1.26): тултип строки — выжимка файла *.lic (RawDetails).
                 if (rowTooltipPath is not null)
                 {
@@ -687,15 +714,46 @@ namespace Workspace1C
                     "Module" => license.Module,
                     "User" => license.User,
                     "State" => license.State,
-                    "ExpiryDate" => license.ExpiryDate?.ToString("dd.MM.yyyy") ?? "—",
+                    // Issue #83 (v1.0.1.27): отсутствующие в *.lic поля — пустые ячейки.
+                    "ExpiryDate" => license.ExpiryDate?.ToString("dd.MM.yyyy") ?? string.Empty,
+                    "LicenseCount" => license.LicenseCount > 0 ? license.LicenseCount.ToString() : string.Empty,
                     _ => string.Empty
                 };
             }
             return Convert.ToString(item) ?? string.Empty;
         }
 
+        /// <summary>
+        /// Обработка клика по ячейке таблицы установленных лицензий (issue #83,
+        /// v1.0.1.27): «Серийный номер» — окно деталей, «Модуль» — открыть папку
+        /// с файлом лицензии (тихое сообщение в статус, если файл не найден).
+        /// </summary>
+        private void OnLicenseCellClick(object? item, int columnIndex, int serialIndex, int moduleIndex)
+        {
+            if (item is not ProgramLicense license)
+                return;
+            if (columnIndex == serialIndex)
+            {
+                ShowLicenseDetails(license);
+            }
+            else if (columnIndex == moduleIndex)
+            {
+                if (!LicenseFolderOpener.TryOpenFolderWithFile(license.FilePath))
+                    _vm.ShowTransientLicenseStatus(string.Format(
+                        LocalizationManager.T("ServerMonitor.Licenses.FileNotFound"), license.FilePath));
+            }
+        }
+
+        /// <summary>Окно с читабельной информацией из файла лицензии (issue #83, v1.0.1.27).</summary>
+        private void ShowLicenseDetails(ProgramLicense license)
+        {
+            var details = new LicenseDetailsWindow(license);
+            details.ShowDialogSync(this);
+        }
+
         /// <summary>Строка таблицы лицензий: Grid с ячейками по ширинам колонок.</summary>
-        private static Control LicenseRow(IReadOnlyList<string> cells, IReadOnlyList<double> widths, bool header)
+        private static Control LicenseRow(IReadOnlyList<string> cells, IReadOnlyList<double> widths, bool header,
+            IReadOnlyList<int>? clickableColumns = null, Action<int>? cellClick = null)
         {
             var grid = new Grid { Margin = new Thickness(0, 1, 0, 1) };
             foreach (var width in widths)
@@ -715,7 +773,20 @@ namespace Workspace1C
                     FontWeight = header ? FontWeight.SemiBold : FontWeight.Normal,
                     FontSize = header ? 12 : 12.5
                 };
-                ThemeBrushes.Bind(cell, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
+                // Issue #83 (v1.0.1.27): кликабельная ячейка — курсор-хенд, акцентный
+                // цвет и подчёркивание, как у ссылок.
+                if (!header && clickableColumns is not null && cellClick is not null && clickableColumns.Contains(i))
+                {
+                    ThemeBrushes.Bind(cell, TextBlock.ForegroundProperty, "AccentBrush");
+                    cell.TextDecorations = TextDecorations.Underline;
+                    cell.Cursor = new Cursor(StandardCursorType.Hand);
+                    var index = i;
+                    cell.Tapped += (_, _) => cellClick(index);
+                }
+                else
+                {
+                    ThemeBrushes.Bind(cell, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
+                }
                 Grid.SetColumn(cell, i);
                 grid.Children.Add(cell);
             }

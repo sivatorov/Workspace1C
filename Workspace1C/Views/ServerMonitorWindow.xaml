@@ -29,6 +29,14 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
 
+        <!-- Кликабельная ячейка таблицы лицензий (issue #83, v1.0.1.27): акцентный
+             цвет, подчёркивание и курсор-хенд — как у ссылок. -->
+        <Style x:Key="LicenseLinkText" TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
+            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="TextDecorations" Value="Underline"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+
         <!-- Заголовки колонок: текст по вертикали по центру (issue #324; глобальный шаблон
              темы центрирует ContentPresenter, здесь фиксируем явно для окна монитора).
              Явный шаблон со стрелкой ▲/▼ (issue #3): тема DataGrid не показывала штатную
@@ -860,23 +868,40 @@
                                 <Setter Property="ToolTip" Value="{Binding RawDetails}"/>
                             </Style>
                         </DataGrid.RowStyle>
+                        <!-- Issue #83 (v1.0.1.27): состав и порядок колонок — Serial / Module /
+                             Type / Version / Owner / Expiry / Users. «Пользователь» и «Состояние»
+                             убраны (у файловых лицензий всегда пустовали; данные — в тултипе
+                             строки и окне деталей). «Серийный номер» кликабельна — окно деталей;
+                             «Модуль» кликабельна — открыть папку с файлом лицензии. -->
                         <DataGrid.Columns>
-                            <DataGridTextColumn Width="1.4*" MinWidth="160" Header="{loc:Loc ServerMonitor.Licenses.Columns.Serial}"
-                                                Binding="{Binding SerialNumber}" ElementStyle="{StaticResource CellTextAccent}"/>
+                            <DataGridTemplateColumn Width="1.4*" MinWidth="160" SortMemberPath="SerialNumber"
+                                                    Header="{loc:Loc ServerMonitor.Licenses.Columns.Serial}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding SerialNumber}" Style="{StaticResource LicenseLinkText}"
+                                                   FontWeight="SemiBold" MouseLeftButtonUp="OnLicenseSerial_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Width="1.1*" MinWidth="110" SortMemberPath="Module"
+                                                    Header="{loc:Loc ServerMonitor.Licenses.Columns.Module}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Module}" Style="{StaticResource LicenseLinkText}"
+                                                   MouseLeftButtonUp="OnLicenseModule_Click"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Width="120" MinWidth="90" Header="{loc:Loc ServerMonitor.Licenses.Columns.Type}"
                                                 Binding="{Binding Type}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="100" MinWidth="80" Header="{loc:Loc ServerMonitor.Licenses.Columns.Version}"
                                                 Binding="{Binding Version}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="1.1*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Owner}"
                                                 Binding="{Binding Owner}" ElementStyle="{StaticResource CenteredCellText}"/>
-                            <DataGridTextColumn Width="1.1*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Module}"
-                                                Binding="{Binding Module}" ElementStyle="{StaticResource CenteredCellText}"/>
-                            <DataGridTextColumn Width="1.1*" MinWidth="100" Header="{loc:Loc ServerMonitor.Licenses.Columns.User}"
-                                                Binding="{Binding User}" ElementStyle="{StaticResource CenteredCellText}"/>
-                            <DataGridTextColumn Width="100" MinWidth="80" Header="{loc:Loc ServerMonitor.Licenses.Columns.State}"
-                                                Binding="{Binding State}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="110" MinWidth="90" Header="{loc:Loc ServerMonitor.Licenses.Columns.Expiry}"
-                                                Binding="{Binding ExpiryDate}" ElementStyle="{StaticResource CenteredCellText}"/>
+                                                Binding="{Binding ExpiryDate, TargetNullValue=''}" ElementStyle="{StaticResource CenteredCellText}"/>
+                            <DataGridTextColumn Width="90" MinWidth="70" SortMemberPath="LicenseCount" Header="{loc:Loc ServerMonitor.Licenses.Columns.Users}"
+                                                Binding="{Binding LicenseCountText}" ElementStyle="{StaticResource CenteredCellText}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>

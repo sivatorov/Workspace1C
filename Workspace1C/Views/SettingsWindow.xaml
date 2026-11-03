@@ -397,11 +397,17 @@
                                         <TextBlock Text="{loc:Loc Settings.General.EscapeToTray}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
+                                <!-- Issue #102: длинная подпись должна переноситься — Grid (Auto,*) вместо
+                                     горизонтального StackPanel, который отдаёт TextBlock бесконечную ширину. -->
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSystemNotificationsCheck" Margin="0,0,0,6">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="BellOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.General.ShowSystemNotifications}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Grid.Column="0" Kind="BellOutline" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="{loc:Loc Settings.General.ShowSystemNotifications}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </ToggleButton>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CatchUpMissedTasksCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
@@ -2881,24 +2887,34 @@
                                        MouseLeftButtonUp="OnAboutLink_Click"
                                        Tag="https://t.me/Workspace1C"/>
                             <!-- Нижние кнопки — в одну колонку (issue #99), как подписи выше. -->
+                            <!-- Issue #102: кнопки растягиваются по ширине колонки, подпись переносится
+                                 (Grid Auto,* вместо горизонтального StackPanel). -->
                             <StackPanel x:Name="AboutButtonsColumn" Margin="0,24,0,0">
-                                <Button Padding="14,8" HorizontalAlignment="Left" Margin="0,0,0,8"
+                                <Button Padding="14,8" HorizontalAlignment="Stretch" Margin="0,0,0,8"
                                         Style="{DynamicResource SecondaryButton}" Cursor="Hand"
                                         Click="OnCopyTechInfo_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Grid.Column="0" Kind="ContentCopy" Width="16" Height="16"
                                                                  Foreground="{DynamicResource InfoBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.About.CopyTechInfo}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{loc:Loc Settings.About.CopyTechInfo}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </Button>
-                                <Button Padding="14,8" HorizontalAlignment="Left"
+                                <Button Padding="14,8" HorizontalAlignment="Stretch"
                                         Style="{DynamicResource SecondaryButton}" Cursor="Hand"
                                         Click="OnCollectDiagnostics_Click">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="PackageVariant" Width="16" Height="16"
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <materialDesign:PackIcon Grid.Column="0" Kind="PackageVariant" Width="16" Height="16"
                                                                  Foreground="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.About.CreateDiagnostics}" VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                        <TextBlock Grid.Column="1" Text="{loc:Loc Settings.About.CreateDiagnostics}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </Button>
                             </StackPanel>
                         </StackPanel>

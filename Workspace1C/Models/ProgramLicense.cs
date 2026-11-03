@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Workspace1C.Models;
 
@@ -53,6 +54,9 @@ public sealed class ProgramLicense
 
     /// <summary>Дата выдачи лицензии из файла *.lic (issue #83, v1.0.1.26); null — не распознана.</summary>
     public DateTime? IssueDate { get; set; }
+
+    /// <summary>Полный путь к файлу *.lic (issue #83, v1.0.1.27); пусто — файл не найден/лицензия только из вывода ring.</summary>
+    public string FilePath { get; set; } = string.Empty;
 
     /// <summary>Однострочная выжимка файла *.lic для подсказки по строке таблицы (issue #83, v1.0.1.26); пусто — файл недоступен.</summary>
     public string RawDetails { get; set; } = string.Empty;

@@ -4538,29 +4538,39 @@ namespace Workspace1C
             }
             else
             {
-                var panel = new StackPanel
+                // Issue #102: Grid (Auto,*,Auto) вместо горизонтального StackPanel —
+                // StackPanel отдаёт подписи бесконечную ширину, из-за чего перенос
+                // (TextWrapping.Wrap) не срабатывает и длинный текст обрезается.
+                var grid = new Grid
                 {
-                    Orientation = Orientation.Horizontal,
-                    Children = { caption }
+                    ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto")
                 };
+                var captionColumn = 0;
                 if (iconKey is not null)
                 {
                     var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16),
                         Themes.ThemeBrushes.FromSpec(iconColor ?? "@TextSecondaryBrush"));
                     icon.Margin = new Thickness(0, 0, 8, 0);
-                    panel.Children.Insert(0, icon);
+                    icon.VerticalAlignment = VerticalAlignment.Center;
+                    Grid.SetColumn(icon, 0);
+                    grid.Children.Add(icon);
+                    captionColumn = 1;
                 }
+                Grid.SetColumn(caption, captionColumn);
+                grid.Children.Add(caption);
                 // Пояснение пункта выносим под знак «?» рядом с подписью (как в WPF).
                 if (helpTextKey is not null)
                 {
-                    panel.Children.Add(new HelpLink
+                    var help = new HelpLink
                     {
                         HelpText = LocalizationManager.T(helpTextKey),
                         VerticalAlignment = VerticalAlignment.Center,
                         Margin = new Thickness(6, 0, 0, 0)
-                    });
+                    };
+                    Grid.SetColumn(help, captionColumn + 1);
+                    grid.Children.Add(help);
                 }
-                content = panel;
+                content = grid;
             }
 
             var toggle = new ToggleButton
@@ -4951,22 +4961,29 @@ namespace Workspace1C
             // Кнопка копирования по разметке (SettingsWindow.xaml:1511-1518):
             // вторичная кнопка, отступ сверху 24, значок копирования 16 синим
             // с зазором 6 до подписи.
+            // Issue #102: Grid (Auto,*) вместо горизонтального StackPanel — подпись
+            // занимает колонку «*» и переносится (Wrap), а не обрезается.
             var copyCaption = new TextBlock
             {
                 Text = LocalizationManager.T("Settings.About.CopyTechInfo"),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
             };
             var copyIcon = IconHelper.MakeIcon("IconCopy", 16, Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9"));
             copyIcon.VerticalAlignment = VerticalAlignment.Center;
             copyIcon.Margin = new Thickness(0, 0, 6, 0);
+            var copyContent = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*")
+            };
+            Grid.SetColumn(copyIcon, 0);
+            Grid.SetColumn(copyCaption, 1);
+            copyContent.Children.Add(copyIcon);
+            copyContent.Children.Add(copyCaption);
             var copyButton = new Button
             {
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Children = { copyIcon, copyCaption }
-                },
-                HorizontalAlignment = HorizontalAlignment.Left,
+                Content = copyContent,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 24, 0, 0),
                 Padding = new Thickness(14, 8)
             };
@@ -4996,19 +5013,24 @@ namespace Workspace1C
             var diagCaption = new TextBlock
             {
                 Text = LocalizationManager.T("Settings.About.CreateDiagnostics"),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
             };
             var diagIcon = IconHelper.MakeIcon("IconPackageVariant", 16, Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
             diagIcon.VerticalAlignment = VerticalAlignment.Center;
             diagIcon.Margin = new Thickness(0, 0, 6, 0);
+            var diagContent = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*")
+            };
+            Grid.SetColumn(diagIcon, 0);
+            Grid.SetColumn(diagCaption, 1);
+            diagContent.Children.Add(diagIcon);
+            diagContent.Children.Add(diagCaption);
             var diagButton = new Button
             {
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Children = { diagIcon, diagCaption }
-                },
-                HorizontalAlignment = HorizontalAlignment.Left,
+                Content = diagContent,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 8, 0, 0),
                 Padding = new Thickness(14, 8)
             };

@@ -144,7 +144,8 @@ public static class RingLicenseParser
         var owner = FindValue(content, "владел", "owner", "организац", "organization", "компан", "company");
         if (owner is not null)
             license.Owner = owner;
-        var regNumber = FindValue(content, "рег.номер", "рег номер", "регномер", "регистраци", "reg. number", "regnumber", "registration");
+        // «рег.номер»/«рег. номер»/«рег номер»/«регномер» — форматы ключа различаются.
+        var regNumber = FindValue(content, "рег.номер", "рег. номер", "рег номер", "регномер", "регистраци", "reg. number", "regnumber", "registration");
         if (regNumber is not null)
             license.RegNumber = regNumber;
         var user = FindValue(content, "пользовател", "user");
@@ -160,22 +161,63 @@ public static class RingLicenseParser
         if (type is not null && license.Type.Length == 0)
             license.Type = type;
 
-        var dateMatch = LicDateRegex.Match(content);
-        if (dateMatch.Success)
+        // Issue #83 (v1.0.1.27): поле «Наименование» формата «версия: владелец» —
+        // разбиваем по ПЕРВОМУ «:»: левая часть → Version, правая → Owner
+        // (явный владелец из ключа «владел/организац» не затирается).
+        var name = FindValue(content, "наименование", "название", "name");
+        if (name is not null)
         {
-            if (dateMatch.Groups["y1"].Success)
+            var separatorIndex = name.IndexOf(':');
+            if (separatorIndex > 0)
             {
-                license.IssueDate = new DateTime(
-                    int.Parse(dateMatch.Groups["y1"].Value, CultureInfo.InvariantCulture),
-                    int.Parse(dateMatch.Groups["m1"].Value, CultureInfo.InvariantCulture),
-                    int.Parse(dateMatch.Groups["d1"].Value, CultureInfo.InvariantCulture));
+                var versionPart = name.Substring(0, separatorIndex).Trim();
+                var ownerPart = name.Substring(separatorIndex + 1).Trim();
+                if (license.Version.Length == 0 && versionPart.Length > 0)
+                    license.Version = versionPart;
+                if (license.Owner.Length == 0 && ownerPart.Length > 0)
+                    license.Owner = ownerPart;
             }
-            else
+            else if (license.Version.Length == 0 && name.Trim().Length > 0)
             {
-                license.IssueDate = new DateTime(
-                    int.Parse(dateMatch.Groups["y2"].Value, CultureInfo.InvariantCulture),
-                    int.Parse(dateMatch.Groups["m2"].Value, CultureInfo.InvariantCulture),
-                    int.Parse(dateMatch.Groups["d2"].Value, CultureInfo.InvariantCulture));
+                license.Version = name.Trim();
+            }
+        }
+
+        // Срок действия — отдельная дата (не путать с датой выдачи).
+        var expiry = FindValue(content, "срок действия", "срок действия лицензии", "действует до", "истекает", "expires", "valid until");
+        if (expiry is not null)
+        {
+            var expiryDate = ParseLicDate(expiry);
+            if (expiryDate is not null)
+                license.ExpiryDate = expiryDate;
+        }
+
+        // Количество пользователей/рабочих мест (нечисловое значение → 0, без исключений).
+        var countRaw = FindValue(content, "количество пользователей", "пользователей", "рабочих мест", "мест", "seats");
+        if (countRaw is not null)
+        {
+            var digits = Regex.Replace(countRaw, @"[^\d]", string.Empty);
+            if (digits.Length > 0 &&
+                int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count))
+                license.LicenseCount = count;
+        }
+
+        // Дата выдачи: сначала по явным маркерам, чтобы «Срок действия» не подменял её;
+        // при отсутствии маркеров — первая дата файла, НЕ равная сроку действия.
+        var issuedRaw = FindValue(content, "выдана", "дата выдачи", "дата регистрации", "issued", "issue date");
+        if (issuedRaw is not null)
+            license.IssueDate = ParseLicDate(issuedRaw);
+        if (license.IssueDate is null)
+        {
+            foreach (Match dateMatch in LicDateRegex.Matches(content))
+            {
+                var candidate = ParseLicDateValue(dateMatch);
+                if (candidate is null)
+                    continue;
+                if (license.ExpiryDate is not null && candidate.Value == license.ExpiryDate.Value)
+                    continue;
+                license.IssueDate = candidate;
+                break;
             }
         }
 
@@ -190,6 +232,92 @@ public static class RingLicenseParser
         if (!string.IsNullOrWhiteSpace(fileName))
             license.RawText = fileName!;
         return license;
+    }
+
+    /// <summary>Дата (dd.MM.yyyy или yyyy-MM-dd) внутри строки значения ключа; null — даты нет.</summary>
+    private static DateTime? ParseLicDate(string value)
+    {
+        var match = LicDateRegex.Match(value);
+        return match.Success ? ParseLicDateValue(match) : null;
+    }
+
+    /// <summary>Разобранный <see cref="LicDateRegex"/>-совпадение в DateTime; null — группа не распознана.</summary>
+    private static DateTime? ParseLicDateValue(Match match)
+    {
+        if (match.Groups["y1"].Success)
+        {
+            return new DateTime(
+                int.Parse(match.Groups["y1"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["m1"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["d1"].Value, CultureInfo.InvariantCulture));
+        }
+        if (match.Groups["y2"].Success)
+        {
+            return new DateTime(
+                int.Parse(match.Groups["y2"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["m2"].Value, CultureInfo.InvariantCulture),
+                int.Parse(match.Groups["d2"].Value, CultureInfo.InvariantCulture));
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Человекочитаемая выжимка данных лицензии для окна деталей (issue #83, v1.0.1.27):
+    /// тип, версия, владелец, пользователи, срок/дата выдачи, рег. номер, файл —
+    /// БЕЗ начального длинного ключа (20+ символов цифр/букв подряд, с которого
+    /// начинается содержимое *.lic). Internal — юнит-тесты.
+    /// </summary>
+    internal static string BuildReadableDetails(ProgramLicense license)
+    {
+        if (license is null)
+            return string.Empty;
+
+        var lines = new List<string>();
+        void Add(string label, string value)
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+                lines.Add($"{label}: {value}");
+        }
+
+        Add("Тип лицензии", license.Type);
+        Add("Версия", license.Version);
+        Add("Владелец", license.Owner);
+        Add("Пользователь", license.User);
+        if (license.LicenseCount > 0)
+            lines.Add($"Пользователей: {license.LicenseCount}");
+        Add("Рег. номер", license.RegNumber);
+        Add("Компьютер", license.Computer);
+        if (license.IssueDate is { } issued)
+            lines.Add($"Дата выдачи: {issued:dd.MM.yyyy}");
+        if (license.ExpiryDate is { } expiry)
+            lines.Add($"Срок действия: {expiry:dd.MM.yyyy}");
+        Add("Файл лицензии", string.IsNullOrWhiteSpace(license.FilePath)
+            ? license.RawText
+            : license.FilePath);
+
+        var details = string.IsNullOrWhiteSpace(license.RawDetails)
+            ? license.RawText
+            : license.RawDetails;
+        var stripped = StripLeadingKey(details);
+        if (stripped.Length > 0)
+        {
+            lines.Add(string.Empty);
+            lines.Add(stripped);
+        }
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    /// <summary>
+    /// Вырезает из текста файла лицензии начальный длинный ключ — токен вида
+    /// «NNNNNNNNNNNNNNNN…» (20+ символов подряд из цифр/букв) в начале текста.
+    /// </summary>
+    internal static string StripLeadingKey(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+        var trimmed = text.TrimStart();
+        var leadingKey = Regex.Match(trimmed, @"^[A-Za-z0-9+/=]{20,}\s*(?:•|\r?\n|\s{2,})?");
+        return leadingKey.Success ? trimmed.Substring(leadingKey.Length).TrimStart(' ', '•', '\r', '\n') : trimmed;
     }
 
     /// <summary>Значение первой пары «ключ: значение», чей ключ содержит одно из слов-маркеров. Internal — тесты.</summary>
@@ -1203,15 +1331,19 @@ public sealed class RingLicenseService : IRingLicenseService
 
             var license = RingLicenseParser.ParseLicFile(content, fileName);
             license.Module = $"файл лицензии: {fileName}";
+            // Полный путь — для клика «открыть папку с файлом» (issue #83, v1.0.1.27).
+            license.FilePath = path;
             return license;
         }
         catch
         {
-            // Файл недоступен/не читается — всё равно показываем имя файла в таблице.
+            // Файл недоступен/не читается — всё равно показываем имя файла в таблице
+            // (путь сохраняем: папку можно открыть даже по битому файлу).
             return new ProgramLicense
             {
                 RawText = fileName,
-                Module = $"файл лицензии: {fileName}"
+                Module = $"файл лицензии: {fileName}",
+                FilePath = path
             };
         }
     }
@@ -1244,8 +1376,14 @@ public sealed class RingLicenseService : IRingLicenseService
         {
             // Имя файла из вывода ring: «(Имя файла: "X.lic")» либо «X.lic» в Module.
             var moduleMatch = Regex.Match(license.Module ?? string.Empty, @"(?i)(?<name>[\w\-.]+\.lic)");
+            // Issue #83 (v1.0.1.27): Module файловой лицензии из запасного источника —
+            // «файл лицензии: X.lic»; Path.GetFileName не извлекает имя из такой строки
+            // (двоеточие — не разделитель пути), поэтому дополнительно ищем имя файла
+            // подстрокой в Module.
             var fileMatch = moduleMatch.Success
-                ? files.FirstOrDefault(f => string.Equals(Path.GetFileName(f.Module), moduleMatch.Groups["name"].Value, StringComparison.OrdinalIgnoreCase))
+                ? files.FirstOrDefault(f =>
+                    string.Equals(Path.GetFileName(f.Module), moduleMatch.Groups["name"].Value, StringComparison.OrdinalIgnoreCase) ||
+                    (f.Module ?? string.Empty).Contains(moduleMatch.Groups["name"].Value, StringComparison.OrdinalIgnoreCase))
                 : null;
             var bySerial = fileMatch is null && license.SerialNumber.Length > 0
                 ? files.FirstOrDefault(f =>
@@ -1262,6 +1400,13 @@ public sealed class RingLicenseService : IRingLicenseService
             if (license.Computer.Length == 0) license.Computer = source.Computer;
             if (license.IssueDate is null) license.IssueDate = source.IssueDate;
             if (license.RawDetails.Length == 0) license.RawDetails = source.RawDetails;
+            // Новые поля из файла *.lic (issue #83, v1.0.1.27): тип, версия
+            // (левая часть «Наименования»), срок действия, пользователей, путь к файлу.
+            if (license.Type.Length == 0) license.Type = source.Type;
+            if (license.Version.Length == 0) license.Version = source.Version;
+            if (license.ExpiryDate is null) license.ExpiryDate = source.ExpiryDate;
+            if (license.LicenseCount == 0) license.LicenseCount = source.LicenseCount;
+            if (license.FilePath.Length == 0) license.FilePath = source.FilePath;
         }
     }
 }

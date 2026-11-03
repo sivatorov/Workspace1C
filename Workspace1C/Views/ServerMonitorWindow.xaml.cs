@@ -320,6 +320,42 @@ namespace Workspace1C
             e.Handled = false;
         }
 
+        // ===================== Кликабельные ячейки лицензий (issue #83, v1.0.1.27) =====================
+
+        /// <summary>
+        /// Клик по «Серийный номер» в таблице установленных лицензий: открывает окно
+        /// с читабельной информацией из файла лицензии (без начального ключа).
+        /// </summary>
+        private void OnLicenseSerial_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: ProgramLicense license })
+                ShowLicenseDetails(license);
+            e.Handled = true;
+        }
+
+        /// <summary>
+        /// Клик по «Модуль»: открывает папку с файлом лицензии (explorer /select на
+        /// Windows, xdg-open на Linux — общий <see cref="Services.LicenseFolderOpener"/>);
+        /// при отсутствии файла — тихое сообщение в статус вкладки, не диалогом.
+        /// </summary>
+        private void OnLicenseModule_Click(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is FrameworkElement { DataContext: ProgramLicense license })
+            {
+                if (!Services.LicenseFolderOpener.TryOpenFolderWithFile(license.FilePath))
+                    _vm.ShowTransientLicenseStatus(string.Format(
+                        LocalizationManager.T("ServerMonitor.Licenses.FileNotFound"), license.FilePath));
+            }
+            e.Handled = true;
+        }
+
+        /// <summary>Окно деталей лицензии (владелец — окно монитора).</summary>
+        private void ShowLicenseDetails(ProgramLicense license)
+        {
+            var details = new LicenseDetailsWindow(license) { Owner = this };
+            details.ShowDialog();
+        }
+
         // ===================== Ширины колонок вкладок (issue #75) =====================
         // Колонки вкладок «Сеансы/Соединения/Блокировки/Рабочие процессы» по умолчанию
         // имеют размер, достаточный для заголовка и стрелки сортировки (MinWidth задан

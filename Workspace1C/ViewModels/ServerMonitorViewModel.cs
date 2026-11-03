@@ -656,6 +656,13 @@ public sealed class ServerMonitorViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref _licenseStatusText, value);
     }
 
+    /// <summary>
+    /// Тихий статус вкладки «Лицензии» (issue #83, v1.0.1.27): сообщение вроде
+    /// «файл лицензии не найден» показывается в строке статуса, а не диалогом.
+    /// </summary>
+    public void ShowTransientLicenseStatus(string message)
+        => LicenseStatusText = message;
+
     /// <summary>Выбранный сеанс на вкладке «Сеансы» (кнопка «Завершить сеанс»).</summary>
     public RacSessionRow? SelectedSession
     {
