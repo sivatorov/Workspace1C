@@ -34,6 +34,10 @@ public sealed class ClusterInfobaseCredentialsResolverTests
         public RacInfobaseInfo? Info { get; init; }
         public int InfoCallCount;
 
+        // issue #79 (v1.0.1.30): креды ИБ, с которыми вызывалось «infobase info».
+        public string? LastInfoUser;
+        public string? LastInfoPassword;
+
         public Task<IReadOnlyList<RacCluster>> GetClustersAsync(
             RacConnectionParams parameters, CancellationToken cancellationToken = default)
         {
@@ -53,6 +57,8 @@ public sealed class ClusterInfobaseCredentialsResolverTests
             string? infobaseUser, string? infobasePassword, CancellationToken cancellationToken = default, TimeSpan? timeout = null)
         {
             Interlocked.Increment(ref InfoCallCount);
+            LastInfoUser = infobaseUser;
+            LastInfoPassword = infobasePassword;
             return Task.FromResult(Info);
         }
 
@@ -431,6 +437,66 @@ public sealed class ClusterInfobaseCredentialsResolverTests
 
         Assert.Null(profile);
         Assert.Equal(1, rac.InfoCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_EmptyDbServerInSummary_FallsBackToInfobaseInfo()
+    {
+        // Issue #79 (v1.0.1.30, репорт 7OH от 2026-11-03): rac 8.5.4 в «infobase
+        // summary list» отдаёт ВСЕ поля СУБД пустыми; профиль с хостом-заглушкой
+        // «localhost» не строится — параметры гарантированно берутся из «infobase info»
+        // (в консоли та же команда с кредами ИБ отдаёт dbms/db-server/db-name/db-user).
+        var rac = new FakeRacClient
+        {
+            Clusters = new[] { new RacCluster { Id = Guid.NewGuid() } },
+            Infobases = new[] { Summary(dbms: "", dbServer: "", dbName: "", dbUser: "") },
+            Info = new RacInfobaseInfo
+            {
+                Dbms = "MSSQLServer",
+                DbServer = "localhost",
+                DbName = "Demo_8.3.27",
+                DbUser = "sa"
+            }
+        };
+        var resolver = CreateResolver(rac, out _);
+
+        var profile = await resolver.ResolveAsync(ServerBase());
+
+        Assert.NotNull(profile);
+        Assert.Equal(DbmsKind.MsSql, profile!.Dbms);
+        Assert.Equal("localhost", profile.Host);
+        Assert.Equal("Demo_8.3.27", profile.Database);
+        Assert.Equal("sa", profile.User);
+        Assert.Equal(1, rac.InfoCallCount);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_PassesInfobaseCredentialsToInfo()
+    {
+        // Issue #79 (v1.0.1.30): «infobase info» вызывается с кредами ИБ (форма мастера),
+        // как в консоли пользователя: --infobase-user/--infobase-pwd.
+        var rac = new FakeRacClient
+        {
+            Clusters = new[] { new RacCluster { Id = Guid.NewGuid() } },
+            Infobases = new[] { Summary(dbms: "") },
+            Info = new RacInfobaseInfo
+            {
+                Dbms = "MSSQLServer", DbServer = "localhost", DbName = "Demo_8.3.27", DbUser = "sa"
+            }
+        };
+        var resolver = CreateResolver(rac, out _);
+        resolver.CredentialOverride = new BackupCredential
+        {
+            UseInfobaseAuth = false,
+            User = "Администратор",
+            Password = "123"
+        };
+
+        var profile = await resolver.ResolveAsync(ServerBase());
+
+        Assert.NotNull(profile);
+        Assert.Equal("Администратор", rac.LastInfoUser);
+        Assert.Equal("123", rac.LastInfoPassword);
     }
 
     // ======================= Парсеры =======================

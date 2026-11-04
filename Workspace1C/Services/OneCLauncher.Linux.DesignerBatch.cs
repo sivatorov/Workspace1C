@@ -449,27 +449,63 @@ namespace Workspace1C.Services
         /// кнопка «Остановить» окна массовой выгрузки при движке «Конфигуратор» гасит
         /// процесс 1cv8, а не оставляет его висеть. Процесс ищется по токену подключения
         /// базы; возвращает true, если процесс был найден и завершён (или уже отсутствует).
+        /// <para>
+        /// Issue #92 (v1.0.1.30, репорт 7OH «остановить по-прежнему ничего не даёт»):
+        /// процесс-лаунчер 1cv8 может уже завершиться, а работа идёт в порождённом
+        /// процессе. Поэтому дополнительно гасятся процессы DESIGNER этой базы по
+        /// командной строке из /proc (как в <see cref="IsConfiguratorRunningForBase"/>;
+        /// <paramref name="outputPath"/>, если задан, сужает поиск до нашей операции).
+        /// </para>
         /// </summary>
-        public static bool TerminateBatchProcess(Infobase infobase)
+        public static bool TerminateBatchProcess(Infobase infobase, string? outputPath = null)
         {
             var token = GetBaseConnectionToken(infobase);
-            if (string.IsNullOrWhiteSpace(token) || !_activeBatchProcesses.TryRemove(token, out var process))
-                return false;
-            if (process is null)
-                return false;
+            var killed = false;
+            if (!string.IsNullOrWhiteSpace(token) && _activeBatchProcesses.TryRemove(token, out var process) &&
+                process is not null)
+            {
+                try
+                {
+                    if (!process.HasExited)
+                    {
+                        process.Kill(entireProcessTree: true);
+                        process.WaitForExit(3000);
+                    }
+                    killed = true;
+                }
+                catch
+                {
+                    // Лучшее усилие: процесс мог завершиться между проверкой и Kill —
+                    // порождённые процессы догоняются поиском по /proc ниже.
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(token))
+                return killed;
+
             try
             {
-                if (!process.HasExited)
-                {
-                    process.Kill(entireProcessTree: true);
-                    process.WaitForExit(3000);
-                }
+                var victims = LinuxProc.Enumerate1C()
+                    .Where(p => (p.Name ?? string.Empty).StartsWith("1cv8", StringComparison.OrdinalIgnoreCase))
+                    .Where(p =>
+                    {
+                        var cmd = p.CmdLine ?? string.Empty;
+                        return cmd.Contains("DESIGNER", StringComparison.OrdinalIgnoreCase) &&
+                               cmd.Contains(token, StringComparison.OrdinalIgnoreCase) &&
+                               (string.IsNullOrWhiteSpace(outputPath) ||
+                                cmd.Contains(outputPath, StringComparison.OrdinalIgnoreCase));
+                    })
+                    .Select(p => (p.Pid, p.StartTime))
+                    .ToList();
+                if (victims.Count == 0)
+                    return killed;
+                LinuxProc.KillOneC(victims);
                 return true;
             }
             catch
             {
-                // Лучшее усилие: процесс мог завершиться между проверкой и Kill.
-                return false;
+                // Чтение /proc недоступно — лучшее усилие.
+                return killed;
             }
         }
 

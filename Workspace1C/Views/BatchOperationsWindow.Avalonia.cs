@@ -52,6 +52,9 @@ namespace Workspace1C
         private readonly Button _browseButton = new();
         private readonly Button _stopButton = new() { IsEnabled = false };
         private CancellationTokenSource? _cts;
+        // Строка «Блокировка начала сеансов» (issue #92, v1.0.1.30): отключается
+        // при движке «Конфигуратор» — опция несовместима с /DumpIB.
+        private StackPanel? _prepareDenyRow;
 
         /// <summary>ViewModel окна — для чтения шаблона/пути/вида после закрытия (issue #92).</summary>
         public BatchOperationsViewModel ViewModel => _vm;
@@ -370,6 +373,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 1),
                 Children = { prepareDenySessionsCheck, preparePermissionLabel, preparePermissionBox }
             };
+            _prepareDenyRow = prepareDenyRow;
             var prepareDenyJobsCheck = new CheckBox
             {
                 Content = LocalizationManager.T("BatchOps.Prepare.DenyScheduledJobs"),
@@ -590,6 +594,17 @@ namespace Workspace1C
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             if (_sqlPasswordPanel is not null)
                 _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;
+            // Issue #92 (v1.0.1.30): «Блокировка начала сеансов» несовместима с движком
+            // «Конфигуратор» (/DumpIB не может войти в базу: «Начало сеанса запрещено») —
+            // галочка отключается с подсказкой-объяснением.
+            if (_prepareDenyRow is not null)
+            {
+                var designerEngine = _vm.IsDumpKind && _vm.DumpEngine == BatchDumpEngine.Designer;
+                _prepareDenyRow.IsEnabled = !designerEngine;
+                ToolTip.SetTip(_prepareDenyRow, designerEngine
+                    ? MakeWrappingTip(LocalizationManager.T("BatchOps.Prepare.SessionDenyDesignerHint"))
+                    : null);
+            }
             _suppressKindEvents = true;
             if (_kindDtRadio is not null)
                 _kindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;

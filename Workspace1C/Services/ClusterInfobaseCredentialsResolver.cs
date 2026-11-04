@@ -258,7 +258,14 @@ public sealed class ClusterInfobaseCredentialsResolver
                     match.Name?.Trim(), match.Dbms, match.DbServer, match.DbName, match.DbUser));
 
                 var profile = ToProfile(match, infobase!.Id, infobaseName);
-                if (profile is not null)
+                // Issue #79 (v1.0.1.30): профиль из «infobase summary list» принимается
+                // ТОЛЬКО когда в нём есть сервер СУБД — rac 8.5.4 отдаёт в summary пустые
+                // dbms/db-server/db-name/db-user, и профиль с хостом-заглушкой «localhost»
+                // (ParseDbServer от пустой строки) уводил бы ibcmd не туда. В этом случае
+                // ГАРАНТИРОВАННО догружаем полные свойства командой «infobase info»
+                // (с кредами ИБ — как в консоли пользователя), где dbms/db-server/db-name/
+                // db-user присутствуют полнее.
+                if (profile is not null && !string.IsNullOrWhiteSpace(match.DbServer))
                 {
                     return new ClusterInfobaseCredentialsResolution
                     {
@@ -270,11 +277,13 @@ public sealed class ClusterInfobaseCredentialsResolver
                 }
 
                 // Issue #92 (v1.0.1.21): rac 8.5.4 в «infobase summary list» отдаёт ПУСТОЙ
-                // тип СУБД («тип СУБД «» не поддерживается») — догружаем полные свойства
-                // командой «infobase info», где dbms/db-server/db-name присутствуют полнее.
-                _log?.Invoke(string.Format(
-                    LocalizationManager.T("BatchOps.DbmsResolveUnsupportedDbms"),
-                    infobaseName, match.Dbms));
+                // тип СУБД («тип СУБД «» не поддерживается»); сообщение про неподерживаемый
+                // тип — только когда тип действительно не распознан (issue #79: при пустом
+                // db-server распознанный тип не является причиной ухода в «infobase info»).
+                if (ParseDbms(match.Dbms) is null)
+                    _log?.Invoke(string.Format(
+                        LocalizationManager.T("BatchOps.DbmsResolveUnsupportedDbms"),
+                        infobaseName, match.Dbms));
                 _log?.Invoke(LocalizationManager.T("BatchOps.DbmsResolveInfoFallback"));
                 try
                 {

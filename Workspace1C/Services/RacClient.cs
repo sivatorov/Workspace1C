@@ -764,16 +764,25 @@ public sealed class RacClient : IRacClient
 
     /// <summary>
     /// Аргументы команды «infobase info» (issue #3): <c>infobase info --cluster=<uuid>
-    /// --infobase=<uuid> [--infobase-user=U [--infobase-pwd=P]]</c>. Internal — для тестов.
+    /// --infobase=<uuid> [--infobase-user=U [--infobase-pwd=P]]</c>. Формат 0
+    /// (стандартный «--cluster=<uuid>», <see cref="ClusterFormatName"/>). Internal — для тестов.
     /// </summary>
-    internal static string[] InfobaseInfoArgs(Guid clusterId, Guid infobaseId, string? infobaseUser, string? infobasePassword)
+    internal static string[] InfobaseInfoArgs(Guid clusterId, Guid infobaseId, string? infobaseUser, string? infobasePassword) =>
+        InfobaseInfoArgsByFormat(0, clusterId, infobaseId, infobaseUser, infobasePassword);
+
+    /// <summary>
+    /// Аргументы команды «infobase info» по индексу формата передачи идентификатора
+    /// кластера (issue #79, v1.0.1.30): rac 8.5.4 может отклонять «--cluster=<uuid>»
+    /// в «infobase info» так же, как в list-командах (issue #25), — форматы 0/1/2
+    /// по образцу <see cref="ClusterArgs"/>; креды ИБ (—infobase-user/--infobase-pwd)
+    /// добавляются при заданных. Internal — для юнит-тестов без запуска rac.
+    /// </summary>
+    internal static string[] InfobaseInfoArgsByFormat(
+        int formatIndex, Guid clusterId, Guid infobaseId, string? infobaseUser, string? infobasePassword)
     {
-        var args = new List<string>(6)
-        {
-            "infobase", "info",
-            $"--cluster={clusterId}",
-            $"--infobase={infobaseId}"
-        };
+        var args = new List<string>(6);
+        args.AddRange(ClusterArgs(new[] { "infobase", "info" }, formatIndex, clusterId));
+        args.Add($"--infobase={infobaseId}");
         if (!string.IsNullOrEmpty(infobaseUser))
         {
             args.Add($"--infobase-user={infobaseUser}");
@@ -906,12 +915,46 @@ public sealed class RacClient : IRacClient
     }
 
     /// <inheritdoc />
-    public Task<bool> TerminateSessionAsync(
+    public async Task<bool> TerminateSessionAsync(
         RacConnectionParams parameters, Guid clusterId, Guid sessionId,
         Guid? processId = null, string? infobaseUser = null,
-        string? infobasePassword = null, CancellationToken cancellationToken = default) =>
-        RunActionAsync(parameters, cancellationToken,
-            SessionTerminateArgs(clusterId, sessionId, processId, infobaseUser, infobasePassword));
+        string? infobasePassword = null, CancellationToken cancellationToken = default)
+    {
+        var args = SessionTerminateArgs(clusterId, sessionId, processId, infobaseUser, infobasePassword);
+        if (await RunActionAsync(parameters, cancellationToken, args).ConfigureAwait(false))
+            return true;
+
+        // Issue #92 (v1.0.1.30, репорт 7OH): rac 8.5.4 отвергает «session terminate»
+        // с «Ошибка разбора параметра: --infobase-user=…» — эта версия rac НЕ знает
+        // параметр «--infobase-user» в «session terminate» (в отличие от «infobase info»).
+        // Ретрай без кредов ИБ (кластерные креды --user/--password остаются — их rac
+        // принимает на точке подключения); «Недостаточно прав» — не ошибка разбора,
+        // ретрай по ней бессмыслен и не выполняется.
+        if (!string.IsNullOrEmpty(infobaseUser) && LooksLikeArgumentParseError(LastActionError))
+        {
+            _logger.Info(
+                "RAC: session terminate отклонил --infobase-user (rac 8.5.4 не знает параметр " +
+                "в этой команде) — повтор без кредов ИБ.");
+            return await RunActionAsync(parameters, cancellationToken,
+                SessionTerminateArgs(clusterId, sessionId, processId)).ConfigureAwait(false);
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Ошибка rac — «разбор параметра» (issue #92, v1.0.1.30): «Ошибка разбора параметра:
+    /// --infobase-user=…» / «Invalid option» — ретрай команды без отвергнутых параметров
+    /// имеет смысл. Internal — для юнит-теста.
+    /// </summary>
+    internal static bool LooksLikeArgumentParseError(string? error)
+    {
+        if (string.IsNullOrWhiteSpace(error))
+            return false;
+        return error.Contains("Ошибка разбора параметра", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Invalid option", StringComparison.OrdinalIgnoreCase)
+            || error.Contains("Unknown parameter", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <inheritdoc />
     public Task<bool> DisconnectConnectionAsync(
@@ -994,8 +1037,17 @@ public sealed class RacClient : IRacClient
     {
         try
         {
-            var output = await RunAsync(parameters, cancellationToken, timeout,
-                InfobaseInfoArgs(clusterId, infobaseId, infobaseUser, infobasePassword)).ConfigureAwait(false);
+            // Issue #79 (v1.0.1.30): rac 8.5.4 может отклонять «--cluster=<uuid>» и в
+            // «infobase info» (как в list-командах, issue #25) — команда выполняется
+            // с перебором форматов передачи идентификатора кластера (0/1/2), рабочий
+            // формат запоминается в общем кэше форматов по ключу подключения.
+            var formatKey = ClusterFormatKey(parameters, clusterId, "infobase info");
+            var output = await RunListCommandWithFormatFallbackAsync(
+                    parameters, cancellationToken, "infobase info", formatKey,
+                    index => InfobaseInfoArgsByFormat(
+                        index, clusterId, infobaseId, infobaseUser, infobasePassword),
+                    timeout)
+                .ConfigureAwait(false);
             var info = RacOutputParser.ToInfobaseInfo(output);
             LastActionError = info is null ? "Не удалось разобрать вывод rac «infobase info»." : string.Empty;
             return info;

@@ -11,6 +11,38 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.30] — 2026-11-04
+
+### Исправлено
+
+- **«Лицензии»: в окне деталей дублирующий блок распознанных полей (issue #83, @7OH).** Окно
+  деталей лицензии приведено к финальному виду: убраны все распознанные поля — остаются только
+  строка «Файл лицензии» (полный путь к *.lic) и оригинальное содержимое файла как есть;
+  таблица «Установленные лицензии» не изменилась (колонки по-прежнему строятся из распознанных
+  полей), парсер для таблицы не тронут — правится только формирование текста окна
+  ([RingLicenseService.cs](Workspace1C/Services/RingLicenseService.cs)).
+- **«Развернуть тестовую копию»: автоподстановка СУБД для кластерных ИБ не срабатывала
+  (issue #79, @7OH).** rac 8.5.4 в «infobase summary list» отдаёт пустые поля СУБД — данные
+  теперь гарантированно берутся из «infobase info», которая выполняется с перебором форматов
+  аргументов `--cluster` (в т.ч. по имени кластера и порту менеджера) до успешного результата;
+  при неудаче остаётся понятное сообщение с причиной и ручной блок «Данные СУБД источника»
+  ([RacClient.cs](Workspace1C/Services/RacClient.cs),
+  [ClusterInfobaseCredentialsResolver.cs](Workspace1C/Services/ClusterInfobaseCredentialsResolver.cs)).
+- **Массовая выгрузка DT/CF (движок «Конфигуратор»): «Стоп» не гасила процесс 1cv8, блокировка
+  начала сеансов ломала выгрузку, «session terminate» падал на rac 8.5.4 (issue #92, @7OH).**
+  (а) «Стоп» теперь завершает реальные процессы 1cv8/1cv8x64 — лаунчер порождал дочерний
+  процесс, поэтому поиск идёт по WMI (командная строка DESIGNER с сужением по outputPath),
+  окно разблокируется; (б) опция «Блокировка начала сеансов» несовместима с движком
+  Конфигуратора — отключается и не применяется (иначе `/DumpIB` не входит в базу «Начало
+  сеанса запрещено»), снятие блокировок после операции выполняется даже при отмене; (в) при
+  ошибке разбора «--infobase-user=…» на rac 8.5.4 «session terminate» автоматически
+  повторяется без кредов ИБ ([BatchOpsPreparationService.cs](Workspace1C/Services/BatchOpsPreparationService.cs),
+  [BatchOperationsViewModel.cs](Workspace1C/ViewModels/BatchOperationsViewModel.cs),
+  [OneCLauncher.DesignerBatch.cs](Workspace1C/Services/OneCLauncher.DesignerBatch.cs),
+  [BatchOperationsWindow.xaml](Workspace1C/Views/BatchOperationsWindow.xaml) /
+  [BatchOperationsWindow.avalonia.cs](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs),
+  [RacClient.cs](Workspace1C/Services/RacClient.cs)).
+
 ## [1.0.1.29] — 2026-11-03
 
 ### Исправлено

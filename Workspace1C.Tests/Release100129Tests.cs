@@ -303,11 +303,10 @@ public sealed class Release100129Tests
         // Длинный ключ и «шапка» файла отсутствуют (issue #83).
         Assert.DoesNotContain("4994596542705901234567890", details);
         Assert.DoesNotContain("{", details);
-        // Строка «Файл лицензии» остаётся.
-        Assert.Contains("Файл лицензии", details);
-        // Дата со временем, без AM/PM.
-        Assert.Contains("Срок действия: 30.09.2026 23:59:59", details);
-        Assert.Contains("Пользователей: 5", details);
+        // Issue #83 (v1.0.1.30): строка «Файл лицензии» — ПЕРВАЯ строка деталей,
+        // распознанные поля перед ней не добавляются (похожие строки внутри
+        // оригинального содержимого файла остаются — это формат файла).
+        Assert.StartsWith("Файл лицензии: ", details, StringComparison.Ordinal);
         // Содержимое — в формате файла.
         Assert.Contains("Рег.Номер: 0000000000", details);
     }

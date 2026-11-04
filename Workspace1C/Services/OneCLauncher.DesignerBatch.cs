@@ -536,26 +536,99 @@ public static partial class OneCLauncher
     /// кнопка «Остановить» окна массовой выгрузки при движке «Конфигуратор» гасит
     /// процесс 1cv8, а не оставляет его висеть. Процесс ищется по токену подключения
     /// базы; возвращает true, если процесс был найден и завершён (или уже отсутствует).
+    /// <para>
+    /// Issue #92 (v1.0.1.30, репорт 7OH «остановить по-прежнему ничего не даёт»):
+    /// 1cv8.exe — ЛАУНЧЕР: родительский процесс, чей <see cref="Process"/>-объект
+    /// зарегистрирован в реестре, может уже завершиться, а фактическая работа идёт
+    /// в порождённом процессе 1cv8/1cv8x64, которого в реестре нет. Поэтому после
+    /// попытки погасить зарегистрированный процесс ДОПОЛНИТЕЛЬНО ищутся и гасятся
+    /// процессы DESIGNER этой базы по командной строке (как в
+    /// <see cref="IsConfiguratorRunningForBase"/>; <paramref name="outputPath"/>,
+    /// если задан, сужает поиск до нашей операции выгрузки — чужой конфигуратор
+    /// пользователя не затрагивается).
+    /// </para>
     /// </summary>
-    public static bool TerminateBatchProcess(Infobase infobase)
+    public static bool TerminateBatchProcess(Infobase infobase, string? outputPath = null)
     {
         var token = GetBaseConnectionToken(infobase);
-        if (string.IsNullOrWhiteSpace(token) || !_activeBatchProcesses.TryRemove(token, out var process))
-            return false;
-        if (process is null)
-            return false;
+        var killed = false;
+        if (!string.IsNullOrWhiteSpace(token) && _activeBatchProcesses.TryRemove(token, out var process) &&
+            process is not null)
+        {
+            try
+            {
+                if (!process.HasExited)
+                {
+                    process.Kill(entireProcessTree: true);
+                    process.WaitForExit(3000);
+                }
+                killed = true;
+            }
+            catch
+            {
+                // Лучшее усилие: процесс мог завершиться между проверкой и Kill —
+                // порождённые процессы догоняются поиском по командной строке ниже.
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(token))
+            return killed;
+        return killed | KillConfiguratorProcessesForBase(token, outputPath);
+    }
+
+    /// <summary>
+    /// Гасит процессы 1cv8/1cv8x64 с DESIGNER в командной строке, относящиеся к базе
+    /// <paramref name="baseToken"/> (и к <paramref name="outputPath"/>, если задан).
+    /// Issue #92 (v1.0.1.30): гасятся и порождённые 1cv8-лаунчером процессы, не
+    /// зарегистрированные в <see cref="_activeBatchProcesses"/>. Internal — юнит-тесты.
+    /// </summary>
+    internal static bool KillConfiguratorProcessesForBase(string baseToken, string? outputPath = null)
+    {
         try
         {
-            if (!process.HasExited)
+            using var searcher = new ManagementObjectSearcher(
+                "SELECT ProcessId, CommandLine FROM Win32_Process " +
+                "WHERE Name='1cv8.exe' OR Name='1cv8x64.exe'");
+            var victims = new List<int>();
+            foreach (var obj in searcher.Get())
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(3000);
+                var cmd = obj["CommandLine"] as string ?? string.Empty;
+                if (!cmd.Contains("DESIGNER", StringComparison.OrdinalIgnoreCase) ||
+                    !cmd.Contains(baseToken, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                // Сужение до НАШЕЙ операции: чужой конфигуратор этой же базы не гасим.
+                if (!string.IsNullOrWhiteSpace(outputPath) &&
+                    !cmd.Contains(outputPath, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var pidValue = obj["ProcessId"];
+                if (pidValue is null || !int.TryParse(pidValue.ToString(), out var pid) || pid <= 0)
+                    continue;
+                victims.Add(pid);
             }
-            return true;
+
+            var killed = false;
+            foreach (var pid in victims)
+            {
+                try
+                {
+                    using var victim = Process.GetProcessById(pid);
+                    if (!victim.HasExited)
+                    {
+                        victim.Kill(entireProcessTree: true);
+                        victim.WaitForExit(3000);
+                    }
+                    killed = true;
+                }
+                catch
+                {
+                    // Процесс мог завершиться сам — пробуем следующих.
+                }
+            }
+            return killed;
         }
         catch
         {
-            // Лучшее усилие: процесс мог завершиться между проверкой и Kill.
+            // WMI недоступен — лучшее усилие.
             return false;
         }
     }

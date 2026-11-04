@@ -180,7 +180,8 @@ public sealed class Issue128BatchEngineLicenseRacTests
 
         var details = RingLicenseParser.BuildReadableDetails(license);
 
-        Assert.Contains("Тип лицензии: клиентская", details);
+        // Issue #83 (v1.0.1.30): распознанные поля в текст деталей НЕ попадают.
+        Assert.DoesNotContain("Тип лицензии", details);
         Assert.Contains("строка один", details);
         Assert.Contains("строка два", details);
         Assert.Contains("строка три", details);

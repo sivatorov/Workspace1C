@@ -219,7 +219,8 @@
                     <TextBlock x:Name="PrepareHeader" FontWeight="SemiBold" Margin="0,0,0,2"/>
                     <CheckBox x:Name="PrepareTerminateCheck" Margin="0,1"
                               IsChecked="{Binding PrepareTerminateSessions, UpdateSourceTrigger=PropertyChanged}"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,1">
+                    <StackPanel x:Name="PrepareDenyRow" Orientation="Horizontal" Margin="0,1"
+                                ToolTipService.ShowOnDisabled="True">
                         <CheckBox x:Name="PrepareDenySessionsCheck" VerticalAlignment="Center"
                                   IsChecked="{Binding PrepareDenyNewSessions, UpdateSourceTrigger=PropertyChanged}"/>
                         <TextBlock x:Name="PreparePermissionLabel" VerticalAlignment="Center" Margin="16,0,6,0"/>

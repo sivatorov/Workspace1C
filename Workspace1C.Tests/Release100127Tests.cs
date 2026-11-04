@@ -40,18 +40,18 @@ public sealed class Release100127Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия (актуальная — 1.0.1.29, issue #92/#83/#79) =====================
+    // ===================== Версия (актуальная — 1.0.1.30, issue #92/#83/#79) =====================
 
     [Fact]
     public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.29</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.29</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.29</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.29</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.28", csproj, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.1.30</Version>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>1.0.1.30</AssemblyVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>1.0.1.30</FileVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>1.0.1.30</InformationalVersion>", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("1.0.1.29", csproj, StringComparison.Ordinal);
     }
 
     // ===================== Issue #102: переносимый текст =====================
@@ -206,14 +206,16 @@ public sealed class Release100127Tests
 
         var details = RingLicenseParser.BuildReadableDetails(license);
 
-        Assert.Contains("Тип лицензии: Клиентская", details, StringComparison.Ordinal);
-        Assert.Contains("Версия: 8.3.25.1257", details, StringComparison.Ordinal);
-        Assert.Contains("Владелец: ООО «Ромашка»", details, StringComparison.Ordinal);
-        Assert.Contains("Пользователей: 5", details, StringComparison.Ordinal);
-        Assert.Contains("Срок действия: 07.09.2027", details, StringComparison.Ordinal);
-        Assert.Contains("20260907085731.lic", details, StringComparison.Ordinal);
+        // Issue #83 (v1.0.1.30, 7OH: «строки до "Файл лицензии" лишние»): текст деталей
+        // НАЧИНАЕТСЯ со строки «Файл лицензии: <путь>» — распознанные поля перед ней
+        // не добавляются (они уже есть в колонках таблицы; похожие строки внутри
+        // оригинального содержимого файла остаются — это формат файла).
+        Assert.StartsWith("Файл лицензии: C:\\1C\\licenses\\20260907085731.lic", details, StringComparison.Ordinal);
         // Начальный длинный ключ (20+ символов подряд) вырезан — пожелание п.8 issue #83.
         Assert.DoesNotContain("5DF4B9B9EFB33FE4397AB6C21D4E9F2C", details, StringComparison.Ordinal);
+        // Оригинальное содержимое файла присутствует.
+        Assert.Contains("Рег. номер: 499459654270590-500000000037", details, StringComparison.Ordinal);
+        Assert.Contains("Серия: soft", details, StringComparison.Ordinal);
     }
 
     [Fact]

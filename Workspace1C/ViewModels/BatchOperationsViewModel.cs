@@ -282,7 +282,10 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         TerminateSessions = PrepareTerminateSessions,
         DenyNewSessions = PrepareDenyNewSessions,
         PermissionCode = string.IsNullOrWhiteSpace(PreparePermissionCode) ? null : PreparePermissionCode.Trim(),
-        DenyScheduledJobs = PrepareDenyScheduledJobs
+        DenyScheduledJobs = PrepareDenyScheduledJobs,
+        // Issue #92 (v1.0.1.30): блокировка начала сеансов несовместима с движком
+        // «Конфигуратор» — /DumpIB не может войти в базу («Начало сеанса запрещено»).
+        SessionDenyIncompatible = IsDumpKind && DumpEngine == BatchDumpEngine.Designer
     };
 
     /// <summary>Публичная запись строки в журнал окна (для сообщений сервиса подготовки).</summary>
@@ -759,7 +762,13 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 {
                     try
                     {
-                        var restoreError = await PreparationService!.RestoreAfterAsync(ib, prepareUndo, ct).ConfigureAwait(false);
+                        // Issue #92 (v1.0.1.30, логи 7OH): восстановление выполняется БЕЗ
+                        // токена отмены — раньше при «Остановить» (и при отмене внутри
+                        // rac-команды) снятие блокировок пропускалось, и в базе оставалась
+                        // включённая приложением блокировка. Снятие блокировок — обязательная
+                        // уборка после операции, она должна выполниться при любом исходе.
+                        var restoreError = await PreparationService!.RestoreAfterAsync(
+                            ib, prepareUndo, CancellationToken.None).ConfigureAwait(false);
                         if (restoreError is not null)
                             AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {restoreError}");
                     }
@@ -886,7 +895,9 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 {
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
                               LocalizationManager.T("BatchOps.DesignerProcessStopped"));
-                    OneCLauncher.TerminateBatchProcess(infobase);
+                    // Issue #92 (v1.0.1.30): outputPath сужает поиск порождённых
+                    // процессов 1cv8 до НАШЕЙ операции выгрузки.
+                    OneCLauncher.TerminateBatchProcess(infobase, outputPath);
                     throw new OperationCanceledException(ct);
                 }
                 return null; // общий таймаут (не использовался — Task.Delay бесконечный).
@@ -897,7 +908,7 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         {
             // Кнопка «Остановить»: гасим процесс 1cv8 вместе с деревом потомков
             // (страховка на случай броска отмены из ожидания) — idempotent.
-            OneCLauncher.TerminateBatchProcess(infobase);
+            OneCLauncher.TerminateBatchProcess(infobase, outputPath);
             throw;
         }
         finally

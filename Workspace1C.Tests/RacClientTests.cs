@@ -1427,6 +1427,40 @@ public sealed class RacClientTests
     }
 
     [Fact]
+    public void InfobaseInfoArgsByFormat_AllClusterFormats()
+    {
+        // Issue #79 (v1.0.1.30): «infobase info» выполняется с перебором форматов
+        // передачи идентификатора кластера (как list-команды, issue #25) — форматы
+        // 0/1/2 строят корректные аргументы, креды ИБ сохраняются.
+        var clusterId = Guid.NewGuid();
+        var infobaseId = Guid.NewGuid();
+
+        Assert.Equal(
+            new[] { "infobase", "info", $"--cluster={clusterId}", $"--infobase={infobaseId}", "--infobase-user=u", "--infobase-pwd=p" },
+            RacClient.InfobaseInfoArgsByFormat(0, clusterId, infobaseId, "u", "p"));
+        Assert.Equal(
+            new[] { "infobase", "info", "--cluster", clusterId.ToString(), $"--infobase={infobaseId}" },
+            RacClient.InfobaseInfoArgsByFormat(1, clusterId, infobaseId, null, null));
+        Assert.Equal(
+            new[] { "infobase", "info", clusterId.ToString(), $"--infobase={infobaseId}" },
+            RacClient.InfobaseInfoArgsByFormat(2, clusterId, infobaseId, null, null));
+    }
+
+    [Fact]
+    public void LooksLikeArgumentParseError_MatchesRacParseErrors()
+    {
+        // Issue #92 (v1.0.1.30): rac 8.5.4 на «session terminate --infobase-user=…»
+        // отвечает «Ошибка разбора параметра» — по этому признаку выполняется ретрай
+        // без кредов ИБ; ошибки прав/отмены признаком разбора НЕ являются.
+        Assert.True(RacClient.LooksLikeArgumentParseError(
+            "Ошибка разбора параметра: --infobase-user=Администратор"));
+        Assert.True(RacClient.LooksLikeArgumentParseError("Invalid option: --infobase-user"));
+        Assert.False(RacClient.LooksLikeArgumentParseError("Недостаточно прав пользователя на информационную базу"));
+        Assert.False(RacClient.LooksLikeArgumentParseError(null));
+        Assert.False(RacClient.LooksLikeArgumentParseError(string.Empty));
+    }
+
+    [Fact]
     public void InfobaseDropArgs_FromClusterOnly_NoDropDatabaseFlag()
     {
         var clusterId = Guid.NewGuid();

@@ -27,6 +27,14 @@ public sealed class BatchOpsPreparationOptions
     /// <summary>Блокировать регламентные задания (rac «infobase update --scheduled-jobs-deny=on»).</summary>
     public bool DenyScheduledJobs { get; set; }
 
+    /// <summary>
+    /// Движок операции несовместим с блокировкой начала сеансов (issue #92, v1.0.1.30):
+    /// движок «Конфигуратор» обязан ВОЙТИ в базу, а /DumpIB при --sessions-deny=on
+    /// падает «Начало сеанса с информационной базой запрещено». true — блокировка
+    /// начала сеансов не применяется (с пояснением в журнале).
+    /// </summary>
+    public bool SessionDenyIncompatible { get; set; }
+
     /// <summary>Включена ли хотя бы одна опция подготовки.</summary>
     public bool Any => TerminateSessions || DenyNewSessions || DenyScheduledJobs;
 }
@@ -198,8 +206,9 @@ public sealed class BatchOpsPreparationService
                 var sessions = await _racClient
                     .GetSessionsAsync(parameters, clusterId, infobaseId, ct)
                     .ConfigureAwait(false);
+                var candidates = sessions.Where(s => s.Id != Guid.Empty).ToList();
                 var terminated = 0;
-                foreach (var session in sessions.Where(s => s.Id != Guid.Empty))
+                foreach (var session in candidates)
                 {
                     if (await _racClient.TerminateSessionAsync(
                             parameters, clusterId, session.Id, processId: null,
@@ -208,6 +217,22 @@ public sealed class BatchOpsPreparationService
                 }
                 _log?.Invoke(string.Format(
                     LocalizationManager.T("BatchOps.Prepare.TerminatedFormat"), terminated));
+                // Issue #92 (v1.0.1.30, логи 7OH): если часть сеансов завершить НЕ удалось
+                // (rac 8.5.4 отвергал «session terminate --infobase-user=…»), блокировки
+                // НЕ включаются: сеансы остались, монопольная операция всё равно не пройдёт,
+                // а база осталась бы заблокированной после ошибки.
+                if (candidates.Count > 0 && terminated < candidates.Count)
+                {
+                    return new BatchOpsPreparationResult
+                    {
+                        Success = false,
+                        Error = string.Format(
+                            LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                            string.Format(
+                                LocalizationManager.T("BatchOps.Prepare.TerminateIncompleteFormat"),
+                                terminated, candidates.Count))
+                    };
+                }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
@@ -246,7 +271,14 @@ public sealed class BatchOpsPreparationService
                 // (после операции они будут сняты — безопаснее, чем оставить «навсегда»).
             }
 
-            setSessionsDeny = options.DenyNewSessions && !sessionsDenyNow;
+            // Issue #92 (v1.0.1.30): при движке «Конфигуратор» блокировка начала сеансов
+            // несовместима с операцией (/DumpIB не может войти в базу) — не применяется,
+            // в журнале объяснение. «Завершить сеансы» и «Блокировать регламентные
+            // задания» совместимы и работают как раньше.
+            if (options.DenyNewSessions && options.SessionDenyIncompatible)
+                _log?.Invoke(LocalizationManager.T("BatchOps.Prepare.SessionDenyDesignerLog"));
+
+            setSessionsDeny = options.DenyNewSessions && !sessionsDenyNow && !options.SessionDenyIncompatible;
             setScheduledJobsDeny = options.DenyScheduledJobs && !jobsDenyNow;
             if (setSessionsDeny || setScheduledJobsDeny)
             {

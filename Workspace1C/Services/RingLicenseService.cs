@@ -346,38 +346,26 @@ public static class RingLicenseParser
     }
 
     /// <summary>
-    /// Человекочитаемая выжимка данных лицензии для окна деталей (issue #83, v1.0.1.27):
-    /// тип, версия, владелец, пользователи, срок/дата выдачи, рег. номер, файл —
-    /// БЕЗ начального длинного ключа (20+ символов цифр/букв подряд, с которого
-    /// начинается содержимое *.lic). Internal — юнит-тесты.
+    /// Текст окна деталей лицензии (issue #83, v1.0.1.30 по комментарию 7OH от
+    /// 2026-11-03: «строки до "Файл лицензии" лишние… можно начинать с полного имени
+    /// файла»): распознанные поля (тип/версия/владелец/пользователь/рег. номер/даты)
+    /// НЕ включаются — они уже видны в колонках таблицы лицензий. В окне остаются:
+    /// строка «Файл лицензии: <полный путь>» и ОРИГИНАЛЬНОЕ содержимое файла *.lic
+    /// (в формате файла, без начального длинного ключа и «шапки» — StripFileNoise).
+    /// Internal — юнит-тесты.
     /// </summary>
     internal static string BuildReadableDetails(ProgramLicense license)
     {
         if (license is null)
             return string.Empty;
 
-        var lines = new List<string>();
-        void Add(string label, string value)
+        // Строка «Файл лицензии» — полное имя файла лицензии.
+        var lines = new List<string>
         {
-            if (!string.IsNullOrWhiteSpace(value))
-                lines.Add($"{label}: {value}");
-        }
-
-        Add("Тип лицензии", license.Type);
-        Add("Версия", license.Version);
-        Add("Владелец", license.Owner);
-        Add("Пользователь", license.User);
-        if (license.LicenseCount > 0)
-            lines.Add($"Пользователей: {license.LicenseCount}");
-        Add("Рег. номер", license.RegNumber);
-        Add("Компьютер", license.Computer);
-        if (license.IssueDate is { } issued)
-            lines.Add($"Дата выдачи: {FormatLicDate(issued)}");
-        if (license.ExpiryDate is { } expiry)
-            lines.Add($"Срок действия: {FormatLicDate(expiry)}");
-        Add("Файл лицензии", string.IsNullOrWhiteSpace(license.FilePath)
-            ? license.RawText
-            : license.FilePath);
+            "Файл лицензии: " + (string.IsNullOrWhiteSpace(license.FilePath)
+                ? license.RawText
+                : license.FilePath)
+        };
 
         // Issue #83 (v1.0.1.28): в окне деталей показывается ПОЛНОЕ содержимое файла
         // (RawFullText, с переводами строк), а не однострочная выжимка до 400 символов;
@@ -385,10 +373,9 @@ public static class RingLicenseParser
         var details = string.IsNullOrWhiteSpace(license.RawFullText)
             ? (string.IsNullOrWhiteSpace(license.RawDetails) ? license.RawText : license.RawDetails)
             : license.RawFullText;
-        // Issue #83 (v1.0.1.29, 7OH: «лишние поля — прежде всего весь ключ», «начальная
-        // часть до ключа тоже не нужна — только „Файл лицензии" оставить»): из содержимого
-        // срезаются и начальный длинный ключ, и ВСЯ «шапка» файла до первой содержательной
-        // строки «ключ=значение» (StripFileNoise); остаётся содержимое в формате файла.
+        // Из содержимого срезаются и начальный длинный ключ, и ВСЯ «шапка» файла до
+        // первой содержательной строки «ключ=значение» (StripFileNoise, v1.0.1.29);
+        // остаётся содержимое в формате файла.
         var stripped = StripFileNoise(details);
         if (stripped.Length > 0)
         {

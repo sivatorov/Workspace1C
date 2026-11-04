@@ -136,6 +136,15 @@ namespace Workspace1C
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
                 ? Visibility.Visible : Visibility.Collapsed;
+            // Issue #92 (v1.0.1.30): «Блокировка начала сеансов» несовместима с движком
+            // «Конфигуратор» (/DumpIB не может войти в базу: «Начало сеанса запрещено») —
+            // галочка отключается с подсказкой-объяснением.
+            var designerEngine = _vm.IsDumpKind && _vm.DumpEngine == BatchDumpEngine.Designer;
+            PrepareDenyRow.IsEnabled = !designerEngine;
+            ToolTipService.SetShowOnDisabled(PrepareDenyRow, true);
+            PrepareDenyRow.ToolTip = designerEngine
+                ? MakeWrappingToolTip(LocalizationManager.T("BatchOps.Prepare.SessionDenyDesignerHint"))
+                : null;
             _suppressKindEvents = true;
             KindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
             KindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;

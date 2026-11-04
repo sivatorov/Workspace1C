@@ -24,6 +24,9 @@ public sealed class BatchOpsPreparationServiceTests
         public RacSessionInfo[] Sessions { get; init; } = Array.Empty<RacSessionInfo>();
         public Exception? ClustersError { get; init; }
 
+        // Issue #92 (v1.0.1.30): фейк неудачного «session terminate» (rac отвергает команду).
+        public bool TerminateSucceeds { get; init; } = true;
+
         public List<(Guid Cluster, Guid Session)> Terminated { get; } = new();
         public List<(Guid Cluster, Guid Infobase, RacInfobaseUpdateRequest Request)> Updates { get; } = new();
         public string LastActionError { get; private set; } = string.Empty;
@@ -47,7 +50,7 @@ public sealed class BatchOpsPreparationServiceTests
         public Task<bool> TerminateSessionAsync(RacConnectionParams p, Guid c, Guid s, Guid? pr = null, string? u = null, string? pw = null, CancellationToken ct = default)
         {
             Terminated.Add((c, s));
-            return Task.FromResult(true);
+            return Task.FromResult(TerminateSucceeds);
         }
 
         public Task<bool> UpdateInfobaseAsync(RacConnectionParams p, Guid c, Guid i, RacInfobaseUpdateRequest r, CancellationToken ct = default)
@@ -178,6 +181,66 @@ public sealed class BatchOpsPreparationServiceTests
         Assert.Empty(rac.Updates);
         Assert.False(undo.SetSessionsDeny);
         Assert.False(undo.SetScheduledJobsDeny);
+    }
+
+    [Fact]
+    public async Task ApplyBefore_DesignerEngine_SessionDenyNotApplied()
+    {
+        // Issue #92 (v1.0.1.30): при движке «Конфигуратор» блокировка начала сеансов
+        // НЕ применяется (/DumpIB не может войти в базу: «Начало сеанса запрещено»),
+        // а блокировка регламентных заданий остаётся совместимой.
+        var rac = CreateRac(sessionCount: 0);
+        var log = new List<string>();
+        var service = new BatchOpsPreparationService(rac, log: log.Add);
+        var options = new BatchOpsPreparationOptions
+        {
+            DenyNewSessions = true,
+            DenyScheduledJobs = true,
+            SessionDenyIncompatible = true
+        };
+
+        var undo = await service.ApplyBeforeAsync(ServerBase(), options);
+
+        Assert.NotNull(undo);
+        Assert.True(undo!.Success);
+        var update = Assert.Single(rac.Updates);
+        // sessions-deny не ставится; scheduled-jobs-deny ставится.
+        Assert.Null(update.Request.SessionsDeny);
+        Assert.True(update.Request.ScheduledJobsDeny);
+        Assert.False(undo.SetSessionsDeny);
+        Assert.True(undo.SetScheduledJobsDeny);
+        // В журнале — объяснение, почему блокировка сеансов не применялась.
+        Assert.Contains(log, l => l.Contains("BatchOps.Prepare.SessionDenyDesignerLog"));
+    }
+
+    [Fact]
+    public async Task ApplyBefore_TerminateIncomplete_LocksNotApplied()
+    {
+        // Issue #92 (v1.0.1.30): если «session terminate» не прошёл (rac 8.5.4 отвергает
+        // команду), блокировки НЕ включаются — сеансы остались, база не остаётся
+        // заблокированной после ошибки; основание пропуска — в результате.
+        var rac = new FakeRac
+        {
+            Clusters = new[] { new RacCluster { Id = Guid.NewGuid() } },
+            Summaries = new[]
+            {
+                new RacInfobaseSummary
+                {
+                    InfobaseId = Guid.NewGuid(), Name = "Бухгалтерия",
+                    Dbms = "PostgreSQL", DbServer = "pg-host", DbName = "buh_db"
+                }
+            },
+            Sessions = new[] { new RacSessionInfo { Id = Guid.NewGuid(), User = "Пользователь" } },
+            TerminateSucceeds = false
+        };
+        var service = new BatchOpsPreparationService(rac);
+
+        var undo = await service.ApplyBeforeAsync(ServerBase(), FullOptions());
+
+        Assert.NotNull(undo);
+        Assert.False(undo!.Success);
+        Assert.False(string.IsNullOrWhiteSpace(undo.Error));
+        Assert.Empty(rac.Updates); // блокировки не ставились — восстанавливать нечего.
     }
 
     [Fact]
