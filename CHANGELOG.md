@@ -11,6 +11,27 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.33] — 2026-11-04
+
+### Исправлено
+
+- **«Развернуть тестовую копию»: ошибка при открытии интерфейса на Windows (issue #79,
+  @7OH).** Поле «Имя базы на сервере» добавлялось в дерево элементов окна дважды —
+  внутри строки раскладки «Сервер 1С + Имя базы на сервере» и повторно напрямую в
+  серверную секцию, что вызывало `InvalidOperationException`
+  («Specified element is already the logical child of another element») при построении
+  окна; повторное добавление поля удалено — Avalonia-версия окна была чистой, падала
+  только Windows ([TestDeployWindow.cs](Workspace1C/Views/TestDeployWindow.cs)).
+- **«Развернуть тестовую копию»: в списке типов СУБД оставлены только типы, реально
+  поддерживаемые 1С (issue #79, @7OH).** Список «СУБД» содержит MSSQLServer, PostgreSQL,
+  IBM DB2, OracleDatabase — убраны MySQL и MariaDB (1С их как СУБД информационных баз
+  не поддерживает); ручной блок «Данные СУБД источника» выровнен до тех же 4 типов;
+  значения СУБД из rac/профиля, не входящие в список (например, legacy MySQL/MariaDB),
+  по-прежнему корректно сохраняются и отображаются «как есть»
+  ([TestDeployWindow.cs](Workspace1C/Views/TestDeployWindow.cs) /
+  [TestDeployWindow.Avalonia.cs](Workspace1C/Views/TestDeployWindow.Avalonia.cs),
+  [TestDeployDbmsOption.cs](Workspace1C/Models/TestDeployDbmsOption.cs)).
+
 ## [1.0.1.32] — 2026-11-04
 
 ### Добавлено

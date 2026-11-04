@@ -4279,8 +4279,6 @@
     "TestDeploy.DbmsPostgreSql": "PostgreSQL",
     "TestDeploy.DbmsIbmDb2": "IBM Db2",
     "TestDeploy.DbmsOracleDatabase": "Oracle Database",
-    "TestDeploy.DbmsMySql": "MySQL",
-    "TestDeploy.DbmsMariaDb": "MariaDB",
     "TestDeploy.Engine": "Dump engine:",
     "TestDeploy.EngineDesigner": "Designer",
     "TestDeploy.EngineIbcmd": "ibcmd (no window)",

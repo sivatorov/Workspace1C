@@ -241,7 +241,10 @@ public class TestDeployWindow : Window
                 _dbNameBox.Text = _vm.DbName;
             }
         };
-        _serverPanel.Children.Add(_refBox);
+        // issue #79 (v1.0.1.33): повторное добавление _refBox удалено — поле уже входит
+        // в строку MakeFieldsRow выше; двойное добавление в WPF бросало
+        // InvalidOperationException «Specified element is already the logical child
+        // of another element» при построении окна («ошибка при открытии интерфейса»).
 
         // --- СУБД + Сервер СУБД в одной строке (issue #79, v1.0.1.32, раскладка 7OH п.3);
         // «СУБД» — список выбора (issue #79, репорт 7OH: «СУБД — почему-то является
@@ -391,9 +394,11 @@ public class TestDeployWindow : Window
 
         _sourceDbmsPanel = new StackPanel { Visibility = Visibility.Collapsed };
         _sourceDbmsPanel.Children.Add(MakeLabel("TestDeploy.SourceDbms"));
+        // issue #79 (v1.0.1.33): состав списка выровнен по четырём типам, реально
+        // поддерживаемым 1С (как и ComboBox «СУБД» выше) — на обеих платформах.
         _sourceDbmsCombo = new ComboBox
         {
-            ItemsSource = new[] { "PostgreSQL", "MSSQLServer" },
+            ItemsSource = new[] { "MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase" },
             SelectedItem = string.IsNullOrWhiteSpace(_vm.SourceDbms) ? "MSSQLServer" : _vm.SourceDbms,
             Margin = new Thickness(0, 2, 0, 8)
         };

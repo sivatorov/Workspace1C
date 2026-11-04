@@ -1,0 +1,31 @@
+Release 1.0.1.33: мастер «Развернуть тестовую копию» — починено открытие окна на Windows (регрессия v1.0.1.32) и список СУБД приведён к типам, реально поддерживаемым 1С (#79)
+
+- #79-а: устранено падение «Ошибка при открытии интерфейса» на Windows (регрессия
+  v1.0.1.32, подтверждено diagnostics ZIP @7OH): в WPF TestDeployWindow поле
+  «Имя базы на сервере» (_refBox) добавлялось в дерево элементов дважды — внутри
+  строки MakeFieldsRow («Сервер 1С» + «Имя базы на сервере») и повторно напрямую
+  в _serverPanel — что бросало InvalidOperationException «Specified element is
+  already the logical child of another element» при построении окна; повторное
+  добавление удалено, раскладка в 4 строки сохранена. Avalonia-версия задвоена
+  не была (падала только Windows).
+- #79-б: в списке типов СУБД оставлены только типы, реально поддерживаемые 1С
+  для информационных баз — MSSQLServer, PostgreSQL, IBMDB2, OracleDatabase;
+  убраны MySQL и MariaDB (1С использует их только как веб-серверы публикации,
+  не как СУБД ИБ): TestDeployDbmsOption.Values и KeyFor почищены, doc-комментарий
+  обновлён. Ручной блок «Данные СУБД источника» (_sourceDbmsCombo) выровнен до
+  тех же 4 типов на обеих платформах (в v1.0.1.32 было только 2 значения).
+  Значения СУБД из rac/профиля, не входящие в список (например, legacy
+  MySQL/MariaDB), по-прежнему корректно сохраняются и отображаются «как есть».
+- Локализация: удалены ключи TestDeploy.DbmsMySql и TestDeploy.DbmsMariaDb
+  из ru.json/en.json (неизвестные значения СУБД отображаются «как есть»).
+- Тесты: новый Issue79TestDeployWindowConstructionTests (STA: конструктор WPF
+  окна не бросает исключение, _refBox в логическом дереве ровно один раз);
+  Issue79TestDeployWindowTests — гварды против повторного добавления _refBox
+  (WPF и Avalonia), состав списков СУБД ручного блока (4 типа на обеих
+  платформах), чистка локализационных ключей; TestDeployDbmsOptionsTests —
+  Values ровно 4 поддерживаемых типа, сохранение неизвестного значения;
+  Release100127Tests обновлены под версию 1.0.1.33.
+- Версия 1.0.1.32 -> 1.0.1.33 (csproj: Version/AssemblyVersion/FileVersion/
+  InformationalVersion), CHANGELOG.md, README.md.
+- Служебные файлы релиза: _build_v100133.ps1, план релиза
+  plan-issues-v100133-2026-11-04.md, commit-сообщение.

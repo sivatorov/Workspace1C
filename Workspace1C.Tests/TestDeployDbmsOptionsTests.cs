@@ -20,14 +20,13 @@ public class TestDeployDbmsOptionsTests
     [Fact]
     public void BuildOptions_ContainsAllIbcmdSupportedTypes_InOrder()
     {
-        // Список согласован с планом v1.0.1.32: типы, поддерживаемые ibcmd/rac.
+        // issue #79 (v1.0.1.33): только типы, реально поддерживаемые 1С для
+        // информационных баз — MySQL/MariaDB убраны (1С использует их только как
+        // веб-серверы публикации, не как СУБД ИБ).
         var options = TestDeployDbmsOption.BuildOptions(null, KeyTranslate);
 
         Assert.Equal(
-            new[]
-            {
-                "MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase", "MySQL", "MariaDB"
-            },
+            new[] { "MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase" },
             options.Select(o => o.Value).ToArray());
         // Подписи — по ключам локализации (человекочитаемый текст, не CLR-имя).
         Assert.Equal("TestDeploy.DbmsMssqlServer", options[0].Text);
@@ -35,11 +34,37 @@ public class TestDeployDbmsOptionsTests
     }
 
     [Fact]
+    public void Values_ExcludesMySqlAndMariaDB()
+    {
+        // Регресс-ограничитель issue #79 (7OH, 2026-11-04: «напомню про лишние типы
+        // СУБД»): MySQL и MariaDB не входят в список вариантов.
+        Assert.DoesNotContain("MySQL", TestDeployDbmsOption.Values);
+        Assert.DoesNotContain("MariaDB", TestDeployDbmsOption.Values);
+        Assert.Equal(4, TestDeployDbmsOption.Values.Length);
+    }
+
+    [Fact]
+    public void BuildOptions_MySqlCurrentValue_IsAppendedAsUnknown_NotLost()
+    {
+        // Сохранение неизвестных значений не сломано: MySQL/MariaDB больше не входят
+        // в список, но если rac/профиль вернут их (или иное значение) — опция
+        // добавляется последней и отображается «как есть», ввод не теряется.
+        var mysql = TestDeployDbmsOption.BuildOptions("MySQL", KeyTranslate);
+        Assert.Equal(5, mysql.Count);
+        Assert.Equal("MySQL", mysql[^1].Value);
+        Assert.Equal("MySQL", mysql[^1].Text);
+
+        var maria = TestDeployDbmsOption.BuildOptions("MariaDB", KeyTranslate);
+        Assert.Equal(5, maria.Count);
+        Assert.Equal("MariaDB", maria[^1].Value);
+    }
+
+    [Fact]
     public void BuildOptions_KnownCurrentValue_DoesNotDuplicate()
     {
         var options = TestDeployDbmsOption.BuildOptions("PostgreSQL", KeyTranslate);
 
-        Assert.Equal(6, options.Count);
+        Assert.Equal(4, options.Count);
         Assert.True(options.Count(o => o.Value == "PostgreSQL") == 1);
     }
 
@@ -50,7 +75,7 @@ public class TestDeployDbmsOptionsTests
         // последней опцией — ввод пользователя не теряется (issue #79).
         var options = TestDeployDbmsOption.BuildOptions("ServerODBC", KeyTranslate);
 
-        Assert.Equal(7, options.Count);
+        Assert.Equal(5, options.Count);
         var last = options[^1];
         Assert.Equal("ServerODBC", last.Value);
         Assert.Equal("ServerODBC", last.Text);
@@ -61,8 +86,8 @@ public class TestDeployDbmsOptionsTests
     [InlineData("PostgreSQL ", 1)]
     [InlineData("IBMDB2", 2)]
     [InlineData("oracledatabase", 3)]
-    [InlineData("MySQL", 4)]
-    [InlineData("mariadb", 5)]
+    [InlineData("MySQL", -1)]
+    [InlineData("mariadb", -1)]
     [InlineData("нет такого", -1)]
     [InlineData("", -1)]
     [InlineData(null, -1)]

@@ -398,6 +398,59 @@ public sealed class Issue79TestDeployWindowTests
         Assert.DoesNotContain("TestDeploy.OpenCredentialsWindow", en, StringComparison.Ordinal);
     }
 
+    // ---------------- (7) Регрессия v1.0.1.33: дублирование _refBox и состав СУБД ----------------
+
+    [Fact]
+    public void WpfWindow_RefBoxIsNotAddedToLayoutTwice()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.cs"));
+        // issue #79 (v1.0.1.33, diagnostics ZIP 7OH: InvalidOperationException «Specified
+        // element is already the logical child of another element» в TestDeployWindow..ctor
+        // на строке 244): в v1.0.1.32 _refBox добавлялся в дерево дважды — в строку
+        // MakeFieldsRow (строка 225) и повторно напрямую в _serverPanel (строка 244).
+        // Повторное Children.Add(_refBox) в _serverPanel запрещено: поле входит в раскладку
+        // только внутри MakeFieldsRow («Сервер 1С» + «Имя базы на сервере»).
+        Assert.Contains("_serverPanel.Children.Add(MakeFieldsRow(", code, StringComparison.Ordinal);
+        Assert.Contains("(\"TestDeploy.Ref\", _refBox)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("_serverPanel.Children.Add(_refBox", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaWindow_RefBoxIsAddedToLayoutOnlyOnce()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.Avalonia.cs"));
+        // Avalonia-версия не была задвоена (падала только Windows) — гвард, чтобы дубль
+        // не появился при будущих перекомпоновках: _refBox только внутри FieldsRow.
+        Assert.Contains("_serverPanel.Children.Add(FieldsRow(", code, StringComparison.Ordinal);
+        Assert.Contains("(T(\"TestDeploy.Ref\"), _refBox)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("_serverPanel.Children.Add(_refBox", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DbmsLists_SourceOverrideComboHasFourSupportedTypes_OnBothPlatforms()
+    {
+        // issue #79 (v1.0.1.33): ручной блок «Данные СУБД источника» выровнен по тем же
+        // 4 типам, что и ComboBox «СУБД» (в v1.0.1.32 было только 2 значения).
+        var expected = "\"MSSQLServer\", \"PostgreSQL\", \"IBMDB2\", \"OracleDatabase\"";
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.cs"));
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "TestDeployWindow.Avalonia.cs"));
+        Assert.Contains(expected, wpf, StringComparison.Ordinal);
+        Assert.Contains(expected, avalonia, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Localization_MySqlAndMariaDbKeysRemovedFromRuAndEn()
+    {
+        // issue #79 (v1.0.1.33): MySQL/MariaDB убраны из списка СУБД — ключи подписей
+        // вычищены из локализации (неизвестные значения отображаются «как есть»).
+        var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
+        var en = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "en.json"));
+        Assert.DoesNotContain("TestDeploy.DbmsMySql", ru, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestDeploy.DbmsMariaDb", ru, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestDeploy.DbmsMySql", en, StringComparison.Ordinal);
+        Assert.DoesNotContain("TestDeploy.DbmsMariaDb", en, StringComparison.Ordinal);
+    }
+
     // ---------------- (6) Разовый сценарий без сохранённого профиля СУБД (1.0.1.9) ----------------
 
     private static TestDeployScenario BuildIbcmdScenario(TestDeployViewModel vm, string dbServer, string dbName)

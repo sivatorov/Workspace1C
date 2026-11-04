@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.32-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.33-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.32**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.33**
 (поддерживается **более 5 500 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -202,6 +202,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Тестовая копия: починено открытие интерфейса на Windows и честный список СУБД
+  (1.0.1.33, Windows и Linux)** — в мастере «Развернуть тестовую копию» устранено падение
+  при открытии интерфейса на Windows: поле «Имя базы на сервере» добавлялось в дерево
+  элементов окна дважды, что вызывало `InvalidOperationException` (Avalonia-версия была
+  чистой, падала только Windows, issue #79, @7OH); в списке типов СУБД оставлены только
+  типы, реально поддерживаемые 1С — MSSQLServer, PostgreSQL, IBM DB2, OracleDatabase
+  (убраны MySQL и MariaDB), ручной блок «Данные СУБД источника» выровнен до тех же 4 типов;
+  значения СУБД из rac/профиля, не входящие в список (например, legacy MySQL/MariaDB),
+  по-прежнему корректно сохраняются и отображаются (issue #79, @7OH).
 - **Групповые операции, статичный заголовок массовых операций и мастер тестовой копии
   в 4 строки (1.0.1.32, Windows и Linux)** — для групп и выделенных баз появились
   пункты «Для группы (N)…»/«Для выделенных (N)…»: блокировка/разблокировка сеансов

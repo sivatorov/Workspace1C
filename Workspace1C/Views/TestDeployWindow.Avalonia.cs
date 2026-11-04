@@ -326,7 +326,9 @@ public class TestDeployWindow : ModalWindowBase
         };
         _ibcmdPanel.Children.Add(_sourceDbmsOverrideCheck);
 
-        _sourceDbmsCombo.ItemsSource = new[] { "MSSQLServer", "PostgreSQL" };
+        // issue #79 (v1.0.1.33): состав списка выровнен по четырём типам, реально
+        // поддерживаемым 1С (как и ComboBox «СУБД» выше) — на обеих платформах.
+        _sourceDbmsCombo.ItemsSource = new[] { "MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase" };
         _sourceDbmsCombo.SelectedItem = string.IsNullOrWhiteSpace(_vm.SourceDbms)
             ? "MSSQLServer" : _vm.SourceDbms;
         _sourceDbmsCombo.SelectionChanged += (_, _) =>

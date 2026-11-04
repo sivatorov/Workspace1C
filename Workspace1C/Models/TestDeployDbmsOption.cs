@@ -6,12 +6,15 @@ namespace Workspace1C.Models;
 /// <summary>
 /// Пара «значение/текст» для списка «СУБД» в мастере «Развернуть тестовую копию»
 /// (issue #79, v1.0.1.32, репорт 7OH: «СУБД — почему-то является полем ввода, а не
-/// списком выбора»). Значения — типы, поддерживаемые rac/ibcmd
-/// («infobase create --dbms»): MSSQLServer, PostgreSQL, IBMDB2, OracleDatabase,
-/// MySQL, MariaDB (в договорённости с планом v1.0.1.32 — по образцу списка диалогов
-/// создания базы кластера + MySQL/MariaDB). Переопределение <see cref="ToString"/> —
-/// по образцу <see cref="TestDeployEngineOption"/>: в выпадающем списке показывается
-/// человекочитаемый текст (например, «MS SQL Server»), а не CLR-имя значения.
+/// списком выбора»). Значения — типы, реально поддерживаемые 1С:Предприятие 8 в
+/// качестве СУБД информационных баз (issue #79, v1.0.1.33): MSSQLServer, PostgreSQL,
+/// IBMDB2, OracleDatabase. MySQL и MariaDB убраны — 1С использует их только как
+/// веб-серверы публикации, не как СУБД ИБ; ibcmd/кластер с ними работать не сможет.
+/// Значения из rac/профиля, не входящие в список, сохраняются
+/// (<see cref="BuildOptions"/> добавляет их последней опцией). Переопределение
+/// <see cref="ToString"/> — по образцу <see cref="TestDeployEngineOption"/>: в
+/// выпадающем списке показывается человекочитаемый текст (например, «MS SQL Server»),
+/// а не CLR-имя значения.
 /// </summary>
 public sealed class TestDeployDbmsOption
 {
@@ -32,15 +35,16 @@ public sealed class TestDeployDbmsOption
     /// <summary>Отображаемый текст вместо CLR-имени значения (issue #79).</summary>
     public override string ToString() => Text;
 
-    /// <summary>Поддерживаемые значения «--dbms» (по образцу списков диалогов создания базы кластера).</summary>
+    /// <summary>
+    /// Значения «--dbms», реально поддерживаемые 1С для информационных баз
+    /// (issue #79, v1.0.1.33): без MySQL/MariaDB (см. doc-комментарий класса).
+    /// </summary>
     public static readonly string[] Values =
     {
         RacDbms.MssqlServer,
         RacDbms.PostgreSql,
         RacDbms.IbmDb2,
-        RacDbms.OracleDatabase,
-        "MySQL",
-        "MariaDB"
+        RacDbms.OracleDatabase
     };
 
     /// <summary>
@@ -81,15 +85,16 @@ public sealed class TestDeployDbmsOption
         return -1;
     }
 
-    /// <summary>Ключ локализации подписи по значению «--dbms».</summary>
+    /// <summary>
+    /// Ключ локализации подписи по значению «--dbms». MySQL/MariaDB убраны
+    /// (issue #79, v1.0.1.33); неизвестные значения отображаются «как есть».
+    /// </summary>
     private static string KeyFor(string value) => value switch
     {
         RacDbms.MssqlServer => "TestDeploy.DbmsMssqlServer",
         RacDbms.PostgreSql => "TestDeploy.DbmsPostgreSql",
         RacDbms.IbmDb2 => "TestDeploy.DbmsIbmDb2",
         RacDbms.OracleDatabase => "TestDeploy.DbmsOracleDatabase",
-        "MySQL" => "TestDeploy.DbmsMySql",
-        "MariaDB" => "TestDeploy.DbmsMariaDb",
         _ => value
     };
 }
