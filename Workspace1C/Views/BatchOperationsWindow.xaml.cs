@@ -117,18 +117,10 @@ namespace Workspace1C
         /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
         private void UpdateKindDependentUi()
         {
-            Title = LocalizationManager.T(_vm.Kind switch
-            {
-                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
-                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
-                _ => "BatchOps.TitleLoadCf"
-            });
-            HintText.Text = LocalizationManager.T(_vm.Kind switch
-            {
-                BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
-                BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
-                _ => "BatchOps.HintLoadCf"
-            });
+            // Issue #92 (v1.0.1.31): ключи заголовка/подсказки — единые хелперы VM,
+            // заголовок пересчитывается при КАЖДОМ изменении вида DT/CF.
+            Title = LocalizationManager.T(BatchOperationsViewModel.TitleKeyForKind(_vm.Kind));
+            HintText.Text = LocalizationManager.T(BatchOperationsViewModel.HintKeyForKind(_vm.Kind));
             PathLabel.Text = _vm.PathLabel;
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
             DumpOptionsPanel.Visibility = _vm.IsDumpKind
@@ -183,12 +175,16 @@ namespace Workspace1C
         {
             if (e.PropertyName == nameof(BatchOperationsViewModel.IsRunning))
             {
-                RunButton.IsEnabled = !_vm.IsRunning;
-                BrowseButton.IsEnabled = !_vm.IsRunning;
-                StopButton.IsEnabled = _vm.IsRunning;
-                // Пока идёт прогон, нельзя менять состав выбранных баз.
-                foreach (var item in _vm.Items)
-                    item.IsBusy = _vm.IsRunning;
+                // Issue #92 (v1.0.1.31): PropertyChanged может прийти с фонового потока
+                // (прогон уходит с UI-потока после ConfigureAwait(false)). Обновление
+                // кнопок — ТОЛЬКО на UI-потоке, иначе WPF бросает исключение и состояние
+                // «Выполнить/Остановить» залипает до закрытия окна.
+                if (!Dispatcher.CheckAccess())
+                {
+                    Dispatcher.BeginInvoke(ApplyRunButtonsState);
+                    return;
+                }
+                ApplyRunButtonsState();
             }
             else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel))
             {
@@ -206,6 +202,21 @@ namespace Workspace1C
                 SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
                     ? Visibility.Visible : Visibility.Collapsed;
             }
+        }
+
+        /// <summary>
+        /// Атомарно выставляет состояние кнопок «Выполнить/Остановить/Обзор» и признак
+        /// занятости строк по <see cref="BatchOperationsViewModel.IsRunning"/> (issue #92,
+        /// v1.0.1.31). Вызывается только с UI-потока.
+        /// </summary>
+        private void ApplyRunButtonsState()
+        {
+            RunButton.IsEnabled = !_vm.IsRunning;
+            BrowseButton.IsEnabled = !_vm.IsRunning;
+            StopButton.IsEnabled = _vm.IsRunning;
+            // Пока идёт прогон, нельзя менять состав выбранных баз.
+            foreach (var item in _vm.Items)
+                item.IsBusy = _vm.IsRunning;
         }
 
         // issue #92 (v1.0.1.26): «умный» автоскролл журнала — прокручиваем к последней
@@ -323,6 +334,10 @@ namespace Workspace1C
             {
                 _cts.Dispose();
                 _cts = null;
+                // Issue #92 (v1.0.1.31): страховка от потерянного уведомления — состояние
+                // кнопок синхронизируется с IsRunning при ЛЮБОМ исходе прогона
+                // (успех/ошибка/отмена), «Остановить» гаснет, «Выполнить» возвращается.
+                ApplyRunButtonsState();
             }
         }
 

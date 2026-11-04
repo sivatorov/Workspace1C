@@ -75,4 +75,12 @@ public sealed class ProgramLicense
     /// </summary>
     public string ExpiryDateText =>
         ExpiryDate is { } date ? Services.RingLicenseParser.FormatLicDate(date) : string.Empty;
+
+    /// <summary>
+    /// Количество пользователей/рабочих мест для отображения (issue #83, v1.0.1.31):
+    /// колонка «Пользователей» таблицы WPF биндится именно к этому свойству — раньше
+    /// биндинг указывал на несуществующее «LicenseCountText» и колонка всегда пустовала.
+    /// «0» (лицензия без распознанного количества) — пустая ячейка, а не ноль.
+    /// </summary>
+    public string LicenseCountText => LicenseCount > 0 ? LicenseCount.ToString() : string.Empty;
 }

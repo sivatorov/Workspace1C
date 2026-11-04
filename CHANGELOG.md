@@ -11,6 +11,34 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.31] — 2026-11-04
+
+### Исправлено
+
+- **Массовая выгрузка DT/CF: заголовок окна при переключении DT/CF и состояние кнопок
+  после завершения (issue #92, @7OH).** Заголовок окна массовой выгрузки обновляется
+  при переключении типа выгрузки DT/CF (раньше продолжал показывать прежний тип);
+  после завершения операции кнопки «Выполнить» и «Остановить» приводятся в корректное
+  состояние — «Выполнить» снова активна, «Остановить» неостаётся «зажатой»
+  ([BatchOperationsWindow.xaml.cs](Workspace1C/Views/BatchOperationsWindow.xaml.cs) /
+  [BatchOperationsWindow.Avalonia.cs](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs),
+  [BatchOperationsViewModel.cs](Workspace1C/ViewModels/BatchOperationsViewModel.cs)).
+- **«Серверы 1С» → «Лицензии»: колонка «Пользователей» пустая, широкие колонки
+  «Серийный номер» и «Модуль» (issue #83, @7OH).** Количество пользователей лицензии
+  выведено в колонку «Пользователей» через новое свойство `LicenseCountText`
+  ([RingLicenseService.cs](Workspace1C/Services/RingLicenseService.cs)); парсер лицензий
+  (`RingLicenseParser`) расширен вариантами распознавания «Количество пользователей» из
+  реальных файлов *.lic; колонки «Серийный номер» и «Модуль» в таблице установленных
+  лицензий сужены, чтобы «Пользователей» помещалась на экран (WPF и Avalonia).
+- **«Развернуть тестовую копию»: rac 8.5.4 отдаёт пустые поля ИБ — UTF-16LE-вывод,
+  NUL в разборе и недоступный stdout (issue #79, @7OH).** (а) вывод rac в
+  UTF-16LE теперь распознаётся ([ConsoleOutputDecoder.cs](Workspace1C/Services/ConsoleOutputDecoder.cs));
+  (б) NUL-символы вычищаются в `RacOutputParser.ParseInfo`
+  ([RacOutputParser.cs](Workspace1C/Services/RacOutputParser.cs)); (в) сырой stdout
+  команды rac журналируется в CM_RAC для диагностики; (г) «infobase info» при
+  проблемах с перенаправлением вывода читается через временный файл
+  (`RacClient.TryRunViaFileRedirectAsync`, [RacClient.cs](Workspace1C/Services/RacClient.cs)).
+
 ## [1.0.1.30] — 2026-11-04
 
 ### Исправлено

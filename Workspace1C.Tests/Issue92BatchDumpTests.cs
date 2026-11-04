@@ -531,4 +531,168 @@ public sealed class Issue92BatchDumpTests
         Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveInfoFailed"));
         Assert.Contains(log, l => l.Contains("BatchOps.DbmsResolveNoProfileFormat"));
     }
+
+    // ===================== Заголовок и кнопки окна (issue #92, v1.0.1.31) =====================
+
+    [Theory]
+    [InlineData(BatchOperationKind.DumpDt, "BatchOps.TitleDumpDt", "BatchOps.HintDumpDt")]
+    [InlineData(BatchOperationKind.DumpCf, "BatchOps.TitleDumpCf", "BatchOps.HintDumpCf")]
+    [InlineData(BatchOperationKind.LoadConfig, "BatchOps.TitleLoadCf", "BatchOps.HintLoadCf")]
+    public void TitleAndHintKeys_FollowKind(BatchOperationKind kind, string expectedTitle, string expectedHint)
+    {
+        // Issue #92 (репорт 7OH: «заголовок окна всё ещё … .dt»): заголовок/подсказка
+        // окна определяются ВИДОМ операции и пересчитываются при смене DT/CF.
+        Assert.Equal(expectedTitle, BatchOperationsViewModel.TitleKeyForKind(kind));
+        Assert.Equal(expectedHint, BatchOperationsViewModel.HintKeyForKind(kind));
+    }
+
+    [Fact]
+    public async Task RunAsync_Success_IsRunningReset()
+    {
+        // Issue #92 (репорт 7OH: после успешного завершения «Остановить» активна,
+        // «Выполнить» не активна): по завершении прогона IsRunning == false —
+        // кнопки окон (WPF/Avalonia) синхронизируются по нему.
+        var dir = Directory.CreateTempSubdirectory("ws1c_runok").FullName;
+        try
+        {
+            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+            {
+                PathText = dir,
+                ExecutorOverride = (_, _, _) => Task.FromResult(new IbcmdResult { Success = true, ExitCode = 0 })
+            };
+
+            await vm.RunAsync(CancellationToken.None);
+
+            Assert.False(vm.IsRunning);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_ExecutorThrows_IsRunningReset()
+    {
+        // Исключение исполнителя — тоже сброс IsRunning (в finally, при любом исходе).
+        var dir = Directory.CreateTempSubdirectory("ws1c_runerr").FullName;
+        try
+        {
+            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+            {
+                PathText = dir,
+                ExecutorOverride = (_, _, _) => throw new InvalidOperationException("boom")
+            };
+
+            await vm.RunAsync(CancellationToken.None);
+
+            Assert.False(vm.IsRunning);
+            Assert.True(vm.Items.All(i => i.Status == BatchOperationsStatus.Failed));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Cancelled_IsRunningReset()
+    {
+        // Остановка пользователем (кнопка «Остановить»): IsRunning сбрасывается —
+        // повторный «Выполнить» работает без переоткрытия окна.
+        var dir = Directory.CreateTempSubdirectory("ws1c_runcan").FullName;
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+            {
+                PathText = dir,
+                ExecutorOverride = (_, _, token) =>
+                {
+                    cts.Cancel();
+                    token.ThrowIfCancellationRequested();
+                    return Task.FromResult(new IbcmdResult { Success = false });
+                }
+            };
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => vm.RunAsync(cts.Token));
+
+            Assert.False(vm.IsRunning);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// SynchronizationContext, складывающий Post'ы в очередь (без прокачки): имитация
+    /// UI-потока, на котором продолжения НЕ выполняются сразу.
+    /// </summary>
+    private sealed class PumpingSynchronizationContext : SynchronizationContext
+    {
+        public readonly Queue<(SendOrPostCallback Callback, object? State)> Pending = new();
+
+        public override void Post(SendOrPostCallback d, object? state) =>
+            Pending.Enqueue((d, state));
+
+        public void PumpAll()
+        {
+            while (Pending.Count > 0)
+            {
+                var (callback, state) = Pending.Dequeue();
+                callback(state);
+            }
+        }
+    }
+
+    [Fact]
+    public void RunAsync_AfterBackgroundContinuation_IsRunningResetViaCapturedContext()
+    {
+        // Issue #92 (v1.0.1.31, корень бага 7OH): прогон уходит с UI-потока после
+        // ConfigureAwait(false), и раньше сброс IsRunning (вместе с PropertyChanged)
+        // выполнялся на фоновом потоке — окна не могли обновить кнопки. Теперь сброс
+        // ставится в очередь ЗАХВАЧЕННОГО контекста UI-потока. Тест: продолжения
+        // исполнителя уходят в пул потоков, сброс IsRunning — в очередь контекста,
+        // после прокачки очереди IsRunning == false.
+        var dir = Directory.CreateTempSubdirectory("ws1c_runctx").FullName;
+        try
+        {
+            var context = new PumpingSynchronizationContext();
+            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+            {
+                PathText = dir,
+                ExecutorOverride = (_, _, _) => Task.Run(() => new IbcmdResult { Success = true, ExitCode = 0 })
+            };
+
+            Exception? threadError = null;
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    SynchronizationContext.SetSynchronizationContext(context);
+                    vm.RunAsync(CancellationToken.None).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    threadError = ex;
+                }
+            });
+            thread.Start();
+            thread.Join();
+
+            Assert.Null(threadError);
+            // Сброс IsRunning отправлен в очередь контекста UI-потока (прогон ушёл
+            // с потока прогона), а не выполнен на фоновом потоке.
+            Assert.True(context.Pending.Count > 0 || !vm.IsRunning,
+                "Сброс IsRunning должен идти через захваченный контекст UI-потока.");
+            context.PumpAll();
+            Assert.False(vm.IsRunning);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
 }

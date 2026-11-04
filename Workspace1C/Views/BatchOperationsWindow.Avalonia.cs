@@ -10,6 +10,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -84,12 +85,9 @@ namespace Workspace1C
             // Формат метки времени токена {Дата} — из настроек приложения
             // «Формат даты в имени файла выгрузки» (issue #92, 1.0.1.11).
             _vm.TimestampFormat = timestampFormat;
-            Title = LocalizationManager.T(_vm.Kind switch
-            {
-                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
-                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
-                _ => "BatchOps.TitleLoadCf"
-            });
+            // Issue #92 (v1.0.1.31): ключи заголовка — единые хелперы VM; заголовок
+            // дополнительно пересчитывается при смене вида DT/CF (UpdateKindDependentUi).
+            Title = LocalizationManager.T(BatchOperationsViewModel.TitleKeyForKind(_vm.Kind));
 
             ScrollViewer.SetHorizontalScrollBarVisibility(_itemsList, ScrollBarVisibility.Disabled);
             ScrollViewer.SetHorizontalScrollBarVisibility(_logList, ScrollBarVisibility.Disabled);
@@ -98,12 +96,7 @@ namespace Workspace1C
             // тернарник при открытии на CF показывал подсказку выгрузки в .dt.
             _hint = new TextBlock
             {
-                Text = LocalizationManager.T(kind switch
-                {
-                    BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
-                    BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
-                    _ => "BatchOps.HintLoadCf"
-                }),
+                Text = LocalizationManager.T(BatchOperationsViewModel.HintKeyForKind(kind)),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 10),
                 Opacity = 0.75
@@ -574,18 +567,9 @@ namespace Workspace1C
         /// <summary>Обновляет заголовок, подсказку и подпись поля пути по текущему виду операции.</summary>
         private void UpdateKindDependentUi()
         {
-            Title = LocalizationManager.T(_vm.Kind switch
-            {
-                BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
-                BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
-                _ => "BatchOps.TitleLoadCf"
-            });
-            _hint.Text = LocalizationManager.T(_vm.Kind switch
-            {
-                BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
-                BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
-                _ => "BatchOps.HintLoadCf"
-            });
+            // Issue #92 (v1.0.1.31): заголовок/подсказка следуют за видом DT/CF.
+            Title = LocalizationManager.T(BatchOperationsViewModel.TitleKeyForKind(_vm.Kind));
+            _hint.Text = LocalizationManager.T(BatchOperationsViewModel.HintKeyForKind(_vm.Kind));
             if (_pathLabel is not null)
                 _pathLabel.Text = _vm.PathLabel;
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
@@ -735,6 +719,10 @@ namespace Workspace1C
             {
                 _cts.Dispose();
                 _cts = null;
+                // Issue #92 (v1.0.1.31): страховка от потерянного уведомления — состояние
+                // кнопок синхронизируется с IsRunning при ЛЮБОМ исходе прогона
+                // (успех/ошибка/отмена), «Остановить» гаснет, «Выполнить» возвращается.
+                Dispatcher.UIThread.Post(ApplyRunButtonsState);
             }
         }
 
@@ -742,11 +730,16 @@ namespace Workspace1C
         {
             if (e.PropertyName == nameof(BatchOperationsViewModel.IsRunning))
             {
-                _runButton.IsEnabled = !_vm.IsRunning;
-                _browseButton.IsEnabled = !_vm.IsRunning;
-                _stopButton.IsEnabled = _vm.IsRunning;
-                foreach (var item in _vm.Items)
-                    item.IsBusy = _vm.IsRunning;
+                // Issue #92 (v1.0.1.31): PropertyChanged может прийти с фонового потока
+                // (прогон уходит с UI-потока после ConfigureAwait(false)). Обновление
+                // кнопок — только на UI-потоке, иначе состояние «Выполнить/Остановить»
+                // залипает до закрытия окна.
+                if (!Dispatcher.UIThread.CheckAccess())
+                {
+                    Dispatcher.UIThread.Post(ApplyRunButtonsState);
+                    return;
+                }
+                ApplyRunButtonsState();
             }
             else if (e.PropertyName == nameof(BatchOperationsViewModel.PathLabel) && _pathLabel is not null)
             {
@@ -763,6 +756,20 @@ namespace Workspace1C
             {
                 _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;
             }
+        }
+
+        /// <summary>
+        /// Атомарно выставляет состояние кнопок «Выполнить/Остановить/Обзор» и признак
+        /// занятости строк по <see cref="BatchOperationsViewModel.IsRunning"/> (issue #92,
+        /// v1.0.1.31). Вызывается только с UI-потока.
+        /// </summary>
+        private void ApplyRunButtonsState()
+        {
+            _runButton.IsEnabled = !_vm.IsRunning;
+            _browseButton.IsEnabled = !_vm.IsRunning;
+            _stopButton.IsEnabled = _vm.IsRunning;
+            foreach (var item in _vm.Items)
+                item.IsBusy = _vm.IsRunning;
         }
 
         private void OnLogLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)

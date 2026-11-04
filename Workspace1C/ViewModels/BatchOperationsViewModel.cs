@@ -306,6 +306,26 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Ключ локализации заголовка окна по виду операции (issue #92, v1.0.1.31):
+    /// единый источник для WPF и Avalonia — заголовок пересчитывается при смене
+    /// DT/CF на форме. Internal — юнит-тесты.
+    /// </summary>
+    internal static string TitleKeyForKind(BatchOperationKind kind) => kind switch
+    {
+        BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
+        BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
+        _ => "BatchOps.TitleLoadCf"
+    };
+
+    /// <summary>Ключ локализации подсказки окна по виду операции (issue #92, v1.0.1.31). Internal — юнит-тесты.</summary>
+    internal static string HintKeyForKind(BatchOperationKind kind) => kind switch
+    {
+        BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
+        BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
+        _ => "BatchOps.HintLoadCf"
+    };
+
     public BatchOperationsViewModel(IEnumerable<Infobase> infobases, BatchOperationKind kind)
     {
         _syncContext = SynchronizationContext.Current;
@@ -808,7 +828,15 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             IbcmdService.ProcessStarted -= OnIbcmdProcessStarted;
             // Issue #92 (v1.0.1.21): IsRunning сбрасывается ВСЕГДА — при отмене и любом
             // исключении окно разблокируется (ранее отмена оставляла кнопки заблокированными).
-            IsRunning = false;
+            // Issue #92 (v1.0.1.31, репорт 7OH «после успешного завершения "Остановить"
+            // активна, "Выполнить" — нет»): прогон уходит с UI-потока после первого
+            // ConfigureAwait(false), поэтому PropertyChanged(IsRunning) поднимался
+            // с фонового потока — окна не могли обновить кнопки и состояние залипало.
+            // Сброс выполняется на ЗАХВАЧЕННОМ контексте UI-потока (как AppendLog).
+            if (_syncContext is not null && !ReferenceEquals(SynchronizationContext.Current, _syncContext))
+                _syncContext.Post(_ => IsRunning = false, null);
+            else
+                IsRunning = false;
         }
     }
 

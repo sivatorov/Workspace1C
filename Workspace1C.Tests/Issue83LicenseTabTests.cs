@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using Workspace1C.Models;
 using Workspace1C.Services;
 using Xunit;
 
@@ -296,5 +297,77 @@ public sealed class Issue83LicenseTabTests
         Assert.True(infoAdd >= 0, "Avalonia: добавление вкладки «Информация о кластере» не найдено.");
         Assert.True(licensesAdd < infoAdd,
             "Avalonia: вкладка «Лицензии» должна идти ПЕРЕД «Информация о кластере» (issue #83).");
+    }
+
+    // ===================== Количество пользователей (*.lic, issue #83, v1.0.1.31) =====================
+
+    [Theory]
+    [InlineData("Количество пользователей: 5", 5)]
+    [InlineData("Кол-во пользователей = 3", 3)]
+    [InlineData("Количество пользователей/рабочих мест: 10", 10)]
+    [InlineData("Количество пользователей 5", 5)]
+    [InlineData("Количество пользователей\t5 (пять)", 5)]
+    [InlineData("лицензия выдана на 10 рабочих мест", 10)]
+    [InlineData("Users count: 25", 25)]
+    [InlineData("Seats 8", 8)]
+    public void ParseLicFile_UserCount_RealWorldKeyVariants_AreRecognized(string content, int expected)
+    {
+        // Issue #83 (репорт 7OH: колонка «Пользователей» всё ещё пустая): варианты
+        // написания ключа в реальных файлах — с «:»/«=», с ПРОБЕЛОМ вместо разделителя
+        // и внутри предложения («выдана на 10 рабочих мест»).
+        var license = RingLicenseParser.ParseLicFile(content);
+
+        Assert.Equal(expected, license.LicenseCount);
+    }
+
+    [Fact]
+    public void ParseLicFile_UserCount_Unrecognized_ShowsEmptyCell_NotZero()
+    {
+        // Без распознанного количества — LicenseCountText пустой (пустая ячейка
+        // таблицы), а не «0»; в RawDetails добавляется список ключей файла —
+        // диагностическая подстраховка для следующей ZIP-диагностики.
+        var license = RingLicenseParser.ParseLicFile("НекийСовершенноНовыйКлюч: значение");
+
+        Assert.Equal(0, license.LicenseCount);
+        Assert.Equal(string.Empty, license.LicenseCountText);
+        Assert.Contains("Ключи файла:", license.RawDetails, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LicenseCountText_CountIsPositive_ShowsNumber()
+    {
+        var license = new ProgramLicense { LicenseCount = 5 };
+
+        Assert.Equal("5", license.LicenseCountText);
+    }
+
+    [Fact]
+    public void Wpf_UsersColumn_BindsToExistingProperty()
+    {
+        // Issue #83 (v1.0.1.31): колонка «Пользователей» WPF биндилась к несуществующему
+        // свойству «LicenseCountText» и ВСЕГДА пустовала. Страж: биндинг есть и свойство
+        // существует в модели.
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.xaml"));
+
+        Assert.Contains("Binding=\"{Binding LicenseCountText}\"", xaml, StringComparison.Ordinal);
+        var model = ReadProjectFile(Path.Combine("Workspace1C", "Models", "ProgramLicense.cs"));
+
+        Assert.Contains("public string LicenseCountText", model, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaAndWpf_SerialAndModuleColumns_AreNarrowed()
+    {
+        // Issue #83 (репорт 7OH): колонки «Серийный номер» и «Модуль» чрезмерно
+        // широкие. Avalonia: installedWidths −1.25 (Serial) / −0.65 (Module);
+        // WPF XAML: 1.25* / 0.65*.
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.Avalonia.cs"));
+
+        Assert.Contains("new[] { -1.25, -0.65, 110d, 90d, -1.4, 100d, 80d }", avalonia, StringComparison.Ordinal);
+
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerMonitorWindow.xaml"));
+
+        Assert.Contains("Width=\"1.25*\" MinWidth=\"150\" SortMemberPath=\"SerialNumber\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Width=\"0.65*\" MinWidth=\"90\" SortMemberPath=\"Module\"", xaml, StringComparison.Ordinal);
     }
 }

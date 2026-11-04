@@ -134,6 +134,26 @@ public static class RingLicenseParser
         RegexOptions.Compiled);
 
     /// <summary>
+    /// Запасной проход количества пользователей (issue #83, v1.0.1.31): ключ количества
+    /// БЕЗ разделителя «:»/«=» («Количество пользователей 5», «… выдана на 5 рабочих
+    /// мест», «Users count 5»). Явные формулировки (без короткого «пользователей»/«мест»,
+    /// чтобы не цеплять имя пользователя и прочие числа) + число в пределах строки.
+    /// </summary>
+    private static readonly Regex LicUserCountFallbackRegex = new(
+        @"(?i)(?<key>количество\s+пользователей|кол-во\s+пользователей|число\s+пользователей|" +
+        @"рабочих\s+мест|users\s+count|seats)[^\r\n:=(]{0,30}?(?<value>\d{1,4})",
+        RegexOptions.Compiled);
+
+    /// <summary>
+    /// Запасной проход количества пользователей (issue #83, v1.0.1.31), вариант 2:
+    /// число ПЕРЕД ключом-формулировкой — «лицензия выдана на 10 рабочих мест»,
+    /// «на 5 пользователей».
+    /// </summary>
+    private static readonly Regex LicUserCountPrepositionRegex = new(
+        @"(?i)\bна\s+(?<value>\d{1,4})\s+(?:рабочих\s+мест|пользовател(?:ей|я)|users|seats)",
+        RegexOptions.Compiled);
+
+    /// <summary>
     /// Дата в файле лицензии: dd.MM.yyyy или yyyy-MM-dd, с необязательным временем
     /// «HH:mm[:ss]» (issue #83, v1.0.1.29 — в реальном файле репортёра дата со временем;
     /// ранее время терялось, а UI показывал AM/PM локали ОС).
@@ -221,16 +241,28 @@ public static class RingLicenseParser
         // пользователей» не находился из-за формата/окружения; добавлены варианты
         // написания; сам поиск устойчив к ключу внутри строки — см. FindValue;
         // нечисловое значение → 0, без исключений).
+        // Issue #83 (v1.0.1.31): у реальных файлов пользователя ключ количества может
+        // быть БЕЗ разделителя «:»/«=» («Количество пользователей 5», «… на 5 рабочих
+        // мест») — пара «ключ: значение» не образуется и FindValue не срабатывает.
+        // Добавлен запасной проход LicUserCountFallbackRegex по явным формулировкам.
         var countRaw = FindValue(content,
             "количество пользователей", "кол-во пользователей", "число пользователей",
             "пользователей", "рабочих мест", "мест", "users count", "seats");
-        if (countRaw is not null)
+        var count = ParseLicUserCount(countRaw);
+        if (count is null)
         {
-            var digits = Regex.Replace(countRaw, @"[^\d]", string.Empty);
-            if (digits.Length > 0 &&
-                int.TryParse(digits, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count))
-                license.LicenseCount = count;
+            var fallbackMatch = LicUserCountFallbackRegex.Match(content);
+            if (fallbackMatch.Success)
+                count = ParseLicUserCount(fallbackMatch.Groups["value"].Value);
         }
+        if (count is null)
+        {
+            var prepositionMatch = LicUserCountPrepositionRegex.Match(content);
+            if (prepositionMatch.Success)
+                count = ParseLicUserCount(prepositionMatch.Groups["value"].Value);
+        }
+        if (count is not null)
+            license.LicenseCount = count.Value;
 
         // Дата выдачи: сначала по явным маркерам, чтобы «Срок действия» не подменял её;
         // при отсутствии маркеров — первая дата файла, НЕ равная сроку действия.
@@ -258,6 +290,20 @@ public static class RingLicenseParser
             .Where(l => l.Length > 0));
         if (details.Length > 400)
             details = details.Substring(0, 400) + "…";
+        // Issue #83 (v1.0.1.31): диагностическая подстраховка — когда количество
+        // пользователей не распознано, в выжимку добавляется список ВСЕХ ключей
+        // «ключ: значение» файла: по следующей диагностике сразу видны фактические
+        // формулировки пользователя, не покрытые парсером.
+        if (license.LicenseCount == 0)
+        {
+            var unknownKeys = LicKeyValueRegex.Matches(content)
+                .Select(m => m.Groups["key"].Value.Trim())
+                .Where(k => k.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (unknownKeys.Count > 0)
+                details += "  •  Ключи файла: " + string.Join("; ", unknownKeys);
+        }
         license.RawDetails = details;
         // Issue #83 (v1.0.1.28): ПОЛНОЕ содержимое файла (с переводами строк) —
         // для многострочного окна деталей; RawDetails остаётся однострочной
@@ -279,6 +325,25 @@ public static class RingLicenseParser
             return ParseLicDateValue(match);
         var compact = LicCompactDateRegex.Match(value);
         return compact.Success ? ParseLicCompactDateValue(compact) : null;
+    }
+
+    /// <summary>
+    /// Разбирает значение количества пользователей/рабочих мест (issue #83, v1.0.1.31):
+    /// берёт первое число в строке значения (пробелы/неразрывные пробелы/скобки вокруг —
+    /// не помеха). null — числа нет или оно вне диапазона 1…9999.
+    /// </summary>
+    private static int? ParseLicUserCount(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+        // Первое число в значении («5 (пять)», «5 из 10», «на 5 рабочих мест») —
+        // а не склейка всех цифр строки.
+        var number = Regex.Match(value, @"\d{1,4}");
+        if (!number.Success ||
+            !int.TryParse(number.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count) ||
+            count is < 1 or > 9999)
+            return null;
+        return count;
     }
 
     /// <summary>Разобранный <see cref="LicDateRegex"/>-совпадение в DateTime; null — группа не распознана.

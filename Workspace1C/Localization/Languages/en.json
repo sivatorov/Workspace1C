@@ -978,7 +978,7 @@
     "BatchOps.SearchClear": "Clear search",
     "BatchOps.DumpDtTitle": "Bulk dump to DT/CF",
     "BatchOps.LoadCfTitle": "Bulk load from CF",
-    "BatchOps.TitleDumpDt": "Bulk dump of the base list to .dt files",
+    "BatchOps.TitleDumpDt": "Bulk dump of bases to .dt files",
     "BatchOps.TitleDumpCf": "Bulk dump of base configurations to .cf files",
     "BatchOps.TitleLoadCf": "Load configuration from .cf over a list of bases",
     "BatchOps.HintDumpCf": "Select the bases whose configurations should be dumped to .cf files. A separate file per selected base is created in the chosen folder according to the file name template. The dump runs sequentially via ibcmd, one base at a time.",

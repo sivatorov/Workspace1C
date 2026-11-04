@@ -51,6 +51,25 @@ public static class ConsoleOutputDecoder
         if (bytes is null || bytes.Length == 0)
             return string.Empty;
 
+        // Issue #79 (v1.0.1.31): rac/утилиты 1С в ряде сборок пишут вывод в UTF-16LE
+        // (перенаправление stdout в файл даёт файл с BOM «FF FE» / без BOM). Байты
+        // UTF-16 — с нулевыми байтами, которых НЕТ ни в UTF-8, ни в cp866/cp1251:
+        // прежняя эвристика декодировала такой вывод в mojibake, ключи «infobase
+        // info» не совпадали и свойства базы «не виделись» (issue #79, пустые поля
+        // СУБД при валидном выводе). BOM распознаётся явно; без BOM — по нулевым
+        // байтам (каждый второй байт у преимущественно латинско-кириллического
+        // вывода — NUL).
+        if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
+            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+        if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
+            return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+        if (ContainsZeroBytes(bytes))
+        {
+            // Без BOM, но с NUL-байтами — консольные однобайтовые кодировки NUL не
+            // производят, значит это UTF-16 (практически всегда LE).
+            return Encoding.Unicode.GetString(bytes);
+        }
+
         try
         {
             return StrictUtf8.GetString(bytes);
@@ -92,6 +111,17 @@ public static class ConsoleOutputDecoder
                 count++;
         }
         return count;
+    }
+
+    /// <summary>Есть ли в байтах NUL — признак UTF-16-вывода (issue #79, v1.0.1.31).</summary>
+    private static bool ContainsZeroBytes(byte[] bytes)
+    {
+        foreach (var b in bytes)
+        {
+            if (b == 0)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>

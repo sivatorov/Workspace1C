@@ -1048,7 +1048,55 @@ public sealed class RacClient : IRacClient
                         index, clusterId, infobaseId, infobaseUser, infobasePassword),
                     timeout)
                 .ConfigureAwait(false);
+
+            // Issue #79 (v1.0.1.31): сырой вывод «infobase info» — в CM_RAC (первые
+            // 500 символов): по следующей ZIP-диагностике сразу видно, что фактически
+            // вернул rac (валидные поля / mojibake / пусто) — без повторного прогона
+            // вручную.
+            Log.Info(LogCategory.Rac,
+                $"RAC{SourcePrefix}: infobase info — stdout={output.Length} симв., " +
+                $"начало вывода: «{TruncatePreview(output, 500)}»");
+
             var info = RacOutputParser.ToInfobaseInfo(output);
+
+            // Issue #79 (v1.0.1.31): ответ на вопрос 7OH «нужен ли вывод в файл этой
+            // команды?» — ДА, fallback. Часть сборок rac при перенаправлении stdout в
+            // канал (как делает Process) не отдаёт данные (stdout пуст при exit=0) или
+            // отдаёт их в кодировке, не распознанной парсером. При пустом/нераспознанном
+            // выводе (нет свойств СУБД) команда выполняется ОДИН раз повторно через
+            // shell-редирект «> временный файл», файл читается байтами и декодируется
+            // общим правилом. Только для «infobase info» — list-команды не трогаем.
+            if (info is null ||
+                (string.IsNullOrWhiteSpace(info.Dbms) && string.IsNullOrWhiteSpace(info.DbServer)))
+            {
+                Log.Info(LogCategory.Rac,
+                    $"RAC{SourcePrefix}: infobase info — свойства СУБД в stdout не распознаны " +
+                    "(issue #79), повтор команды с перенаправлением вывода во временный файл.");
+                _clusterFormats.TryGetValue(formatKey, out var knownFormat);
+                var fileOutput = await TryRunViaFileRedirectAsync(
+                        parameters, cancellationToken,
+                        InfobaseInfoArgsByFormat(
+                            knownFormat, clusterId, infobaseId, infobaseUser, infobasePassword),
+                        timeout)
+                    .ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(fileOutput))
+                {
+                    Log.Info(LogCategory.Rac,
+                        $"RAC{SourcePrefix}: infobase info (файл) — stdout={fileOutput.Length} симв., " +
+                        $"начало вывода: «{TruncatePreview(fileOutput, 500)}»");
+                    var fileInfo = RacOutputParser.ToInfobaseInfo(fileOutput);
+                    if (fileInfo is not null &&
+                        (!string.IsNullOrWhiteSpace(fileInfo.Dbms) ||
+                         !string.IsNullOrWhiteSpace(fileInfo.DbServer)))
+                    {
+                        Log.Info(LogCategory.Rac,
+                            "RAC: infobase info — свойства СУБД получены через перенаправление вывода " +
+                            "во временный файл (issue #79).");
+                        info = fileInfo;
+                    }
+                }
+            }
+
             LastActionError = info is null ? "Не удалось разобрать вывод rac «infobase info»." : string.Empty;
             return info;
         }
@@ -1061,6 +1109,118 @@ public sealed class RacClient : IRacClient
         {
             LastActionError = string.IsNullOrWhiteSpace(ex.Message) ? "Неизвестная ошибка rac." : ex.Message;
             return null;
+        }
+    }
+
+    /// <summary>Однострочный фрагмент заданной длины для журнала (issue #79, v1.0.1.31).</summary>
+    private static string TruncatePreview(string output, int maxLength)
+    {
+        var flat = string.Join(
+            " ",
+            output.Split(new[] { '\r', '\n', '\t', '\0' }, StringSplitOptions.RemoveEmptyEntries));
+        flat = flat.Trim();
+        return flat.Length <= maxLength ? flat : flat.Substring(0, maxLength) + "…";
+    }
+
+    /// <summary>
+    /// Повторный запуск rac с перенаправлением вывода во временный файл (issue #79,
+    /// v1.0.1.31): часть сборок rac при перенаправлении stdout в канал (Process) не
+    /// отдаёт данные, а при записи в файл/консоль — отдаёт. Команда выполняется через
+    /// shell («cmd /c … > tmpfile 2>&1» на Windows, «sh -c … > tmpfile 2>&1» на Linux),
+    /// файл читается сырыми байтами и декодируется общим правилом
+    /// <see cref="DecodeRacOutput"/>. Временный файл удаляется в finally. Возврат —
+    /// вывод (может быть пустым) или null при неудаче запуска/таймауте/ненулевом
+    /// коде выхода. Не журналирует командную строку с секретами.
+    /// </summary>
+    internal async Task<string?> TryRunViaFileRedirectAsync(
+        RacConnectionParams parameters, CancellationToken cancellationToken,
+        IReadOnlyList<string> commandArgs, TimeSpan? timeout = null)
+    {
+        var rac = OneCPlatformLocator.FindRacExecutable();
+        if (rac is null || commandArgs.Count == 0)
+            return null;
+
+        var args = BuildArguments(parameters, commandArgs.ToArray());
+        var tmpFile = Path.Combine(Path.GetTempPath(), "ws1c_rac_" + Guid.NewGuid().ToString("N") + ".out");
+        try
+        {
+            // Цитирование токенов: двойные кавычки для cmd, одинарные для sh.
+            var isWindows = OperatingSystem.IsWindows();
+            var quotedArgs = string.Join(" ", args.Select(a => isWindows
+                ? "\"" + a.Replace("\"", "\\\"") + "\""
+                : "'" + a.Replace("'", "'\\''") + "'"));
+            var redirectTarget = isWindows ? tmpFile : tmpFile.Replace('\\', '/');
+            var shellCommand = quotedArgs + " > \"" + redirectTarget + "\" 2>&1";
+
+            var psi = new ProcessStartInfo
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
+            };
+            if (isWindows)
+            {
+                psi.FileName = Environment.GetEnvironmentVariable("ComSpec") ?? "cmd.exe";
+                // «/d /s /c "<команда>"»: /s отключает срезание внешних кавычек cmd,
+                // команда с внутренними кавычками выполняется целиком.
+                psi.ArgumentList.Add("/d");
+                psi.ArgumentList.Add("/s");
+                psi.ArgumentList.Add("/c");
+                psi.ArgumentList.Add("\"" + shellCommand + "\"");
+            }
+            else
+            {
+                psi.FileName = "/bin/sh";
+                psi.ArgumentList.Add("-c");
+                psi.ArgumentList.Add(shellCommand);
+            }
+
+            using var process = new Process { StartInfo = psi };
+            if (!process.Start())
+                return null;
+
+            var effectiveTimeout = timeout ?? CommandTimeout;
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(effectiveTimeout);
+            try
+            {
+                await process.WaitForExitAsync(timeoutCts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                KillProcess(process);
+                if (cancellationToken.IsCancellationRequested)
+                    throw;
+                return null;
+            }
+
+            if (process.ExitCode != 0 || !File.Exists(tmpFile))
+                return null;
+
+            var bytes = await File.ReadAllBytesAsync(tmpFile, CancellationToken.None).ConfigureAwait(false);
+            return DecodeRacOutput(bytes);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception)
+        {
+            // Fallback не должен ломать основной сценарий: любая ошибка — «вывода нет».
+            return null;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tmpFile))
+                    File.Delete(tmpFile);
+            }
+            catch
+            {
+                // Невозможность удалить временный файл не критична.
+            }
         }
     }
 

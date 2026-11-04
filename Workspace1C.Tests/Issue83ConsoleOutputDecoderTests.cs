@@ -74,6 +74,62 @@ public sealed class Issue83ConsoleOutputDecoderTests
         Assert.Equal("ring license list: OK", ConsoleOutputDecoder.Decode(bytes));
     }
 
+    // ===================== UTF-16-вывод rac (issue #79, v1.0.1.31) =====================
+
+    /// <summary>Реалистичный вывод «infobase info» rac 8.5.4 (поля СУБД источника).</summary>
+    private const string RacInfoOutput = """
+        infobase        : 0f6d2b55-5f7d-4d9f-9a0e-1b8a0b1c2d3e
+        name            : erp
+        dbms            : MSSQLServer
+        db-server       : sql01
+        db-name         : erp_db
+        db-user         : sa
+        locale          : ru_RU
+        """;
+
+    [Fact]
+    public void Decode_Utf16LeWithBom_IsReadable()
+    {
+        // Перенаправление «rac … > file» на Windows даёт файл UTF-16LE с BOM «FF FE».
+        var payload = Encoding.Unicode.GetPreamble()
+            .Concat(Encoding.Unicode.GetBytes(RacInfoOutput)).ToArray();
+
+        var decoded = ConsoleOutputDecoder.Decode(payload);
+
+        Assert.Equal(RacInfoOutput, decoded);
+    }
+
+    [Fact]
+    public void Decode_Utf16LeWithoutBom_IsReadable()
+    {
+        // БЕЗ BOM: у преимущественно латинско-кириллического UTF-16LE каждый второй
+        // байт — NUL; однобайтовые кодировки NUL не дают → распознаём UTF-16LE.
+        var bytes = Encoding.Unicode.GetBytes(RacInfoOutput);
+
+        var decoded = ConsoleOutputDecoder.Decode(bytes);
+
+        Assert.Equal(RacInfoOutput, decoded);
+    }
+
+    [Fact]
+    public void Decode_Utf16LeOutput_InfobaseInfo_ParsesDbmsFields()
+    {
+        // Главный сценарий issue #79: rac отдал валидные поля в stdout (UTF-16LE), но
+        // прежняя эвристика (UTF-8 → cp866 → cp1251) превращала вывод в mojibake с
+        // NUL-символами — ключи «dbms»/«db-server» не совпадали и свойства базы
+        // «не виделись». Теперь вывод декодируется и разбирается до полей СУБД.
+        var bytes = Encoding.Unicode.GetBytes(RacInfoOutput);
+
+        var info = RacOutputParser.ToInfobaseInfo(ConsoleOutputDecoder.Decode(bytes));
+
+        Assert.NotNull(info);
+        Assert.Equal("MSSQLServer", info!.Dbms);
+        Assert.Equal("sql01", info.DbServer);
+        Assert.Equal("erp_db", info.DbName);
+        Assert.Equal("sa", info.DbUser);
+        Assert.Equal(Guid.Parse("0f6d2b55-5f7d-4d9f-9a0e-1b8a0b1c2d3e"), info.InfobaseId);
+    }
+
     // ===================== Таблица лицензий из вывода ring =====================
 
     /// <summary>Реалистичный вывод «ring license list» (ring 0.20, ru-локаль),

@@ -177,7 +177,9 @@ public static class RacOutputParser
 
         foreach (var rawLine in output.Split('\n'))
         {
-            var line = rawLine.TrimEnd('\r');
+            // Issue #79 (v1.0.1.31): NUL-символы (остатки UTF-16-вывода, прошедшего
+            // чужую декодировку) ломают сравнение ключей — вычищаются из строки.
+            var line = rawLine.TrimEnd('\r').Replace("\0", string.Empty);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 

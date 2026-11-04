@@ -874,7 +874,10 @@
                              строки и окне деталей). «Серийный номер» кликабельна — окно деталей;
                              «Модуль» кликабельна — открыть папку с файлом лицензии. -->
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="1.4*" MinWidth="160" SortMemberPath="SerialNumber"
+                            <!-- Issue #83 (v1.0.1.31): «Серийный номер» и «Модуль» сужены
+                                 (1.4*→1.25*, 1.1*→0.65*), место отдано «Владельцу» —
+                            аналогично Avalonia (installedWidths −1.25/−0.65/−1.4). -->
+                            <DataGridTemplateColumn Width="1.25*" MinWidth="150" SortMemberPath="SerialNumber"
                                                     Header="{loc:Loc ServerMonitor.Licenses.Columns.Serial}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -883,7 +886,7 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
-                            <DataGridTemplateColumn Width="1.1*" MinWidth="110" SortMemberPath="Module"
+                            <DataGridTemplateColumn Width="0.65*" MinWidth="90" SortMemberPath="Module"
                                                     Header="{loc:Loc ServerMonitor.Licenses.Columns.Module}">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -896,7 +899,7 @@
                                                 Binding="{Binding Type}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <DataGridTextColumn Width="100" MinWidth="80" Header="{loc:Loc ServerMonitor.Licenses.Columns.Version}"
                                                 Binding="{Binding Version}" ElementStyle="{StaticResource CenteredCellText}"/>
-                            <DataGridTextColumn Width="1.1*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Owner}"
+                            <DataGridTextColumn Width="1.4*" MinWidth="110" Header="{loc:Loc ServerMonitor.Licenses.Columns.Owner}"
                                                 Binding="{Binding Owner}" ElementStyle="{StaticResource CenteredCellText}"/>
                             <!-- Issue #83 (v1.0.1.29): «Срок действия» — текст «dd.MM.yyyy HH:mm:ss»
                                  без AM/PM (когда в файле есть время), иначе «dd.MM.yyyy». -->

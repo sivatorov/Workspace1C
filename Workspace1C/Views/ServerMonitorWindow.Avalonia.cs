@@ -586,7 +586,10 @@ namespace Workspace1C
             // лицензий всегда пустовали; данные — в тултипе и окне деталей). Колонки
             // «Серийный номер» (окно деталей) и «Модуль» (открыть папку с файлом)
             // кликабельны — курсор-хенд и акцентный цвет задаются в BuildLicenseList.
-            var installedWidths = new[] { -1.5, -1.0, 110d, 90d, -1.1, 100d, 80d };
+            // Issue #83 (v1.0.1.31, 7OH): «Серийный номер» (−1.5) и «Модуль» (−1.0) были
+            // чрезмерно широкими и сжимали остальные колонки — сужены до −1.25/−0.65,
+            // освободившееся место отдано «Владельцу» (−1.1 → −1.4).
+            var installedWidths = new[] { -1.25, -0.65, 110d, 90d, -1.4, 100d, 80d };
             var installedTable = BuildLicenseList(
                 _vm.InstalledLicenses,
                 new[] { "SerialNumber", "Module", "Type", "Version", "Owner", "ExpiryDate", "LicenseCount" },
