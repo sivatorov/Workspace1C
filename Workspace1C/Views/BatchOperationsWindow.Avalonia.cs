@@ -43,6 +43,12 @@ namespace Workspace1C
         private readonly PasswordBox _sqlPasswordBox = new PasswordBox().Styled(ControlThemes.ModernPasswordBox);
         private readonly TextBlock _hint;
         private readonly TextBlock _summary;
+        // Issue #85 (v1.0.1.32): видозависимые блоки — строка пути и опции «Перед
+        // операцией» скрываются/переименовываются для блокировок сеансов.
+        private Grid? _pathRow;
+        private StackPanel? _preparePanel;
+        private TextBlock? _prepareHeader;
+        private TextBlock? _prepareHint;
         // Поля ввода тематизируются (issue #92, 1.0.1.11: без стиля текст поля
         // рисуется чёрным на тёмном фоне тёмной темы).
         // Поле каталога/файла тематизируется: кроме темы ModernTextBox — прямая
@@ -197,6 +203,7 @@ namespace Workspace1C
             pathRow.Children.Add(pathLabel);
             pathRow.Children.Add(_pathBox);
             pathRow.Children.Add(_browseButton);
+            _pathRow = pathRow;
             // Прямая привязка к кистям темы (как у поля шаблона ниже) — иначе в тёмной
             // схеме текст поля каталога оставался чёрным на тёмном (issue #92).
             ThemeBrushes.Bind(_pathBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
@@ -328,6 +335,7 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 10, 0, 2)
             };
+            _prepareHeader = prepareHeader;
             var prepareTerminateCheck = new CheckBox
             {
                 Content = LocalizationManager.T("BatchOps.Prepare.TerminateSessions"),
@@ -381,6 +389,7 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap,
                 Opacity = 0.75
             };
+            _prepareHint = prepareHint;
             var preparePanel = new StackPanel
             {
                 Children =
@@ -388,6 +397,7 @@ namespace Workspace1C
                     prepareHeader, prepareTerminateCheck, prepareDenyRow, prepareDenyJobsCheck, prepareHint
                 }
             };
+            _preparePanel = preparePanel;
             // Поле «Пароль пользователя СУБД» (issue #92, v1.0.1.26, пожелание 7OH):
             // rac отдаёт логин СУБД (db-user), но не пароль; если у базы нет профиля
             // СУБД — пароль вводится здесь и подставляется в профиль после rac-резолва.
@@ -575,6 +585,24 @@ namespace Workspace1C
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
             if (_dumpOptionsRow is not null)
                 _dumpOptionsRow.IsVisible = _vm.IsDumpKind;
+            // Issue #85 (v1.0.1.32): блокировкам/разблокировке сеансов путь не нужен —
+            // строка каталога/файла скрывается.
+            if (_pathRow is not null)
+                _pathRow.IsVisible = _vm.NeedsPath;
+            // Issue #85: блок опций «Перед операцией» для Блокировки сеансов — это
+            // ПАРАМЕТРЫ блокировки (заголовок меняется); для Разблокировки не нужен.
+            var isLockKind = _vm.Kind == BatchOperationKind.LockSessions;
+            var isUnlockKind = _vm.Kind == BatchOperationKind.UnlockSessions;
+            if (_preparePanel is not null)
+                _preparePanel.IsVisible = !isUnlockKind;
+            if (_prepareHeader is not null)
+                _prepareHeader.Text = LocalizationManager.T(isLockKind
+                    ? "BatchOps.LockOptionsHeader"
+                    : "BatchOps.Prepare.Header");
+            if (_prepareHint is not null)
+                _prepareHint.Text = LocalizationManager.T(isLockKind
+                    ? "BatchOps.Prepare.LockHint"
+                    : "BatchOps.Prepare.Hint");
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             if (_sqlPasswordPanel is not null)
                 _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;

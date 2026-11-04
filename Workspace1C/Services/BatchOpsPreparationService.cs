@@ -376,4 +376,225 @@ public sealed class BatchOpsPreparationService
                 LocalizationManager.T("BatchOps.Prepare.RestoreFailedFormat"), ex.Message);
         }
     }
+
+    /// <summary>
+    /// ПАКЕТНАЯ Блокировка сеансов одной базы (issue #85, v1.0.1.32): rac
+    /// «infobase update --sessions-deny=on» (+ опционально «--scheduled-jobs-deny=on»
+    /// и код разрешения; сеансы завершаются, если включено в <paramref name="options"/>).
+    /// В отличие от <see cref="ApplyBeforeAsync"/> блокировка — САМА операция: после неё
+    /// НИЧЕГО не снимается автоматически. База резолвится в кластере тем же расширенным
+    /// резолвером; для файловой базы — файл блокировки 1cv8.cdn (только блокировка
+    /// начала сеансов). null — успех; иначе текст ошибки для журнала окна.
+    /// </summary>
+    public async Task<string?> LockSessionsAsync(
+        Infobase infobase, BatchOpsPreparationOptions options, CancellationToken ct = default)
+    {
+        if (infobase is null)
+            return LocalizationManager.T("BatchOps.Prepare.Unavailable");
+        options ??= new BatchOpsPreparationOptions();
+        if (!options.Any)
+            return LocalizationManager.T("BatchOps.Lock.NothingSelected");
+
+        // Файловая база: блокировка начала сеансов — файлом 1cv8.cdn (без rac).
+        if (infobase.Connection?.Type == ConnectionType.File)
+        {
+            if (!options.DenyNewSessions)
+                return LocalizationManager.T("BatchOps.Lock.FileNothingToDo");
+            var lockOptions = new SessionLockOptions
+            {
+                StartTime = DateTime.Now,
+                Duration = TimeSpan.FromHours(8),
+                Message = LocalizationManager.T("BatchOps.Prepare.FileLockMessage"),
+                PermissionCode = options.PermissionCode ?? string.Empty
+            };
+            var locked = _fileLock.Lock(infobase, lockOptions);
+            if (!locked.Success)
+                return string.Format(
+                    LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                    locked.ErrorMessage ?? LocalizationManager.T("SessionLock.Failed"));
+            _log?.Invoke(LocalizationManager.T("BatchOps.Prepare.FileLock"));
+            return null;
+        }
+
+        if (infobase.Connection?.Type != ConnectionType.ClientServer)
+            return string.Format(
+                LocalizationManager.T("BatchOps.WebLockNotSupportedFormat"), infobase.Name);
+
+        // Резолв кластера/ИБ (общая логика с подготовкой), затем — опциональное
+        // завершение сеансов и rac «infobase update --sessions-deny=on».
+        var resolution = await ResolveInfobaseAsync(infobase, ct).ConfigureAwait(false);
+        if (resolution is null)
+        {
+            return string.Format(
+                LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                LocalizationManager.T("BatchOps.Prepare.ResolveFailed"));
+        }
+
+        var (clusterId, infobaseId, parameters) = resolution.Value;
+        var (ibUser, ibPassword) = ClusterInfobaseCredentialsResolver.InfobaseAdminCredentials(infobase);
+
+        if (options.TerminateSessions)
+        {
+            var terminateError = await TerminateSessionsAsync(
+                parameters, clusterId, infobaseId, ibUser, ibPassword, ct).ConfigureAwait(false);
+            if (terminateError is not null)
+                return terminateError;
+        }
+
+        // Текущее состояние догружается «infobase info»: scheduled-jobs-deny
+        // администратора сохраняется, свой sessions-deny ставим принудительно.
+        var jobsDenyNow = false;
+        if (options.DenyScheduledJobs)
+        {
+            try
+            {
+                var info = await _racClient.GetInfobaseInfoAsync(
+                    parameters, clusterId, infobaseId,
+                    infobaseUser: ibUser, infobasePassword: ibPassword, ct).ConfigureAwait(false);
+                jobsDenyNow = info?.ScheduledJobsDeny ?? false;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch { /* состояние недоступно — считаем off */ }
+        }
+
+        var request = new RacInfobaseUpdateRequest
+        {
+            SessionsDeny = true,
+            ScheduledJobsDeny = options.DenyScheduledJobs || jobsDenyNow,
+            InfobaseUser = ibUser ?? string.Empty,
+            InfobasePassword = ibPassword ?? string.Empty,
+            PermissionCode = string.IsNullOrEmpty(options.PermissionCode) ? null : options.PermissionCode
+        };
+        var updated = await _racClient.UpdateInfobaseAsync(
+            parameters, clusterId, infobaseId, request, ct).ConfigureAwait(false);
+        return updated
+            ? null
+            : string.Format(
+                LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                _racClient.LastActionError ?? string.Empty);
+    }
+
+    /// <summary>
+    /// ПАКЕТНАЯ Разблокировка сеансов одной базы (issue #85, v1.0.1.32): rac
+    /// «infobase update --sessions-deny=off». Для файловой базы — снятие файла
+    /// блокировки 1cv8.cdn. Блокировка регламентных заданий администратора не
+    /// трогается. null — успех; иначе текст ошибки для журнала окна.
+    /// </summary>
+    public async Task<string?> UnlockSessionsAsync(Infobase infobase, CancellationToken ct = default)
+    {
+        if (infobase is null)
+            return LocalizationManager.T("BatchOps.Prepare.Unavailable");
+
+        if (infobase.Connection?.Type == ConnectionType.File)
+        {
+            var unlocked = _fileLock.Unlock(infobase);
+            if (!unlocked.Success)
+                return string.Format(
+                    LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                    unlocked.ErrorMessage ?? LocalizationManager.T("SessionLock.Failed"));
+            _log?.Invoke(LocalizationManager.T("BatchOps.Prepare.FileUnlocked"));
+            return null;
+        }
+
+        if (infobase.Connection?.Type != ConnectionType.ClientServer)
+            return string.Format(
+                LocalizationManager.T("BatchOps.WebLockNotSupportedFormat"), infobase.Name);
+
+        var resolution = await ResolveInfobaseAsync(infobase, ct).ConfigureAwait(false);
+        if (resolution is null)
+        {
+            return string.Format(
+                LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                LocalizationManager.T("BatchOps.Prepare.ResolveFailed"));
+        }
+
+        var (clusterId, infobaseId, parameters) = resolution.Value;
+        var (ibUser, ibPassword) = ClusterInfobaseCredentialsResolver.InfobaseAdminCredentials(infobase);
+
+        // Регламентные задания: если заблокированы — сохраняем состояние (как
+        // <see cref="RestoreAfterAsync"/>), снимаем только блокировку сеансов.
+        var jobsDenyNow = false;
+        try
+        {
+            var info = await _racClient.GetInfobaseInfoAsync(
+                parameters, clusterId, infobaseId,
+                infobaseUser: ibUser, infobasePassword: ibPassword, ct).ConfigureAwait(false);
+            jobsDenyNow = info?.ScheduledJobsDeny ?? false;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch { /* состояние недоступно — оставляем off */ }
+
+        var request = new RacInfobaseUpdateRequest
+        {
+            SessionsDeny = false,
+            ScheduledJobsDeny = jobsDenyNow,
+            InfobaseUser = ibUser ?? string.Empty,
+            InfobasePassword = ibPassword ?? string.Empty
+        };
+        var updated = await _racClient.UpdateInfobaseAsync(
+            parameters, clusterId, infobaseId, request, ct).ConfigureAwait(false);
+        return updated
+            ? null
+            : string.Format(
+                LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                _racClient.LastActionError ?? string.Empty);
+    }
+
+    /// <summary>
+    /// Резолв базы в кластере для пакетных блокировок (общая часть
+    /// <see cref="LockSessionsAsync"/>/<see cref="UnlockSessionsAsync"/>):
+    /// null — база не найдена (текст для журнала даёт вызывающий код).
+    /// </summary>
+    private async Task<(Guid ClusterId, Guid InfobaseId, RacConnectionParams Parameters)?> ResolveInfobaseAsync(
+        Infobase infobase, CancellationToken ct)
+    {
+        var resolver = new ClusterInfobaseCredentialsResolver(_racClient, _servers, _log);
+        var resolution = await resolver.ResolveDetailedAsync(infobase, ct).ConfigureAwait(false);
+        return resolution.InfobaseId != Guid.Empty && resolution.Profile is not null
+            ? (resolution.ClusterId, resolution.InfobaseId, resolution.Parameters)
+            : null;
+    }
+
+    /// <summary>
+    /// Завершение всех сеансов базы (общая часть <see cref="LockSessionsAsync"/>):
+    /// текст ошибки или null при успехе. По образцу блока завершения
+    /// <see cref="ApplyBeforeAsync"/> (включая v1.0.1.30: незавершённые сеансы — ошибка).
+    /// </summary>
+    private async Task<string?> TerminateSessionsAsync(
+        RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
+        string? ibUser, string? ibPassword, CancellationToken ct)
+    {
+        try
+        {
+            var sessions = await _racClient
+                .GetSessionsAsync(parameters, clusterId, infobaseId, ct)
+                .ConfigureAwait(false);
+            var candidates = sessions.Where(s => s.Id != Guid.Empty).ToList();
+            var terminated = 0;
+            foreach (var session in candidates)
+            {
+                if (await _racClient.TerminateSessionAsync(
+                        parameters, clusterId, session.Id, processId: null,
+                        infobaseUser: ibUser, infobasePassword: ibPassword, ct).ConfigureAwait(false))
+                    terminated++;
+            }
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("BatchOps.Prepare.TerminatedFormat"), terminated));
+            if (candidates.Count > 0 && terminated < candidates.Count)
+                return string.Format(
+                    LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                    string.Format(
+                        LocalizationManager.T("BatchOps.Prepare.TerminateIncompleteFormat"),
+                        terminated, candidates.Count));
+            return null;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            return string.Format(
+                LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
+                string.Format(
+                    LocalizationManager.T("BatchOps.Prepare.TerminateFailedFormat"), ex.Message));
+        }
+    }
 }

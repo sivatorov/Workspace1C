@@ -156,9 +156,10 @@
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
 
             <!-- Путь: каталог выгрузки .dt/.cf или файл конфигурации .cf; ниже — шаблон
-                 имени файла ({Имя}/{Дата}), формат DT/CF и блок «Перед операцией». -->
+                 имени файла ({Имя}/{Дата}), формат DT/CF и блок «Перед операцией».
+                 Строка пути скрывается для блокировок сеансов (issue #85, v1.0.1.32). -->
             <StackPanel Grid.Row="1">
-                <Grid>
+                <Grid x:Name="PathPanel">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
                         <ColumnDefinition Width="*"/>

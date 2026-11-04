@@ -2822,20 +2822,35 @@ public partial class MainViewModel : ViewModelBase
         => ExecuteBatchDumpCore(Infobases.ToList(), kind);
 
     /// <summary>
-    /// Массовая выгрузка выделенных баз в DT/CF с шаблоном имени файла (issue #92):
-    /// пункт «Выгрузить в DT\CF…» блока «Для выделенных (N)…». Вид операции,
-    /// каталог и шаблон читаются из настроек и сохраняются обратно после окна.
+    /// Массовая выгрузка выделенных баз/группы в DT/CF с шаблоном имени файла (issue #92;
+    /// группа — issue #85, v1.0.1.32): пункт «Выгрузить в DT\CF…» блока «Для выделенных
+    /// (N)…»/«Для группы (N)…». Вид операции, каталог и шаблон читаются из настроек
+    /// и сохраняются обратно после окна.
     /// </summary>
     public void ExecuteBatchDumpForSelected()
-        => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: null);
+        => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: null);
 
     /// <summary>
-    /// Массовая загрузка конфигурации из .cf по списку ВЫДЕЛЕННЫХ баз (issue #92,
-    /// v1.0.1.24): пункт «Загрузить из CF…» блока «Для выделенных (N)…». Вид операции
-    /// фиксирован (LoadConfig), чтобы сохранённый вид выгрузки не подставлялся.
+    /// Массовая загрузка конфигурации из .cf по списку ВЫДЕЛЕННЫХ баз/группы (issue #92,
+    /// v1.0.1.24; группа — issue #85): пункт «Загрузить из CF…». Вид операции фиксирован
+    /// (LoadConfig), чтобы сохранённый вид выгрузки не подставлялся.
     /// </summary>
     public void ExecuteBatchLoadCfForSelected()
-        => ExecuteBatchDumpCore(BatchOperationTargets.ToList(), kind: BatchOperationKind.LoadConfig);
+        => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: BatchOperationKind.LoadConfig);
+
+    /// <summary>
+    /// Пакетная Блокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32):
+    /// пункт «Блокировать сеансы…» блока «Для выделенных (N)…»/«Для группы (N)…».
+    /// </summary>
+    public void ExecuteBatchLockSessionsForSelected()
+        => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: BatchOperationKind.LockSessions);
+
+    /// <summary>
+    /// Пакетная Разблокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32):
+    /// пункт «Разблокировать сеансы…» блока «Для выделенных (N)…»/«Для группы (N)…».
+    /// </summary>
+    public void ExecuteBatchUnlockSessionsForSelected()
+        => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: BatchOperationKind.UnlockSessions);
 
     /// <summary>
     /// Общая точка открытия окна массовых операций: подтверждение, подстановка
@@ -2865,6 +2880,8 @@ public partial class MainViewModel : ViewModelBase
                     {
                         BatchOperationKind.DumpDt => LocalizationManager.T("BatchOps.KindDumpDt"),
                         BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
+                        BatchOperationKind.LockSessions => LocalizationManager.T("BatchOps.KindLockSessions"),
+                        BatchOperationKind.UnlockSessions => LocalizationManager.T("BatchOps.KindUnlockSessions"),
                         _ => LocalizationManager.T("BatchOps.KindLoadCf")
                     }),
                 LocalizationManager.T("BatchOps.Title")))

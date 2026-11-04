@@ -535,15 +535,24 @@ public sealed class Issue92BatchDumpTests
     // ===================== Заголовок и кнопки окна (issue #92, v1.0.1.31) =====================
 
     [Theory]
-    [InlineData(BatchOperationKind.DumpDt, "BatchOps.TitleDumpDt", "BatchOps.HintDumpDt")]
-    [InlineData(BatchOperationKind.DumpCf, "BatchOps.TitleDumpCf", "BatchOps.HintDumpCf")]
-    [InlineData(BatchOperationKind.LoadConfig, "BatchOps.TitleLoadCf", "BatchOps.HintLoadCf")]
-    public void TitleAndHintKeys_FollowKind(BatchOperationKind kind, string expectedTitle, string expectedHint)
+    [InlineData(BatchOperationKind.DumpDt, "BatchOps.HintDumpDt")]
+    [InlineData(BatchOperationKind.DumpCf, "BatchOps.HintDumpCf")]
+    [InlineData(BatchOperationKind.LoadConfig, "BatchOps.HintLoadCf")]
+    public void HintKeys_FollowKind(BatchOperationKind kind, string expectedHint)
     {
-        // Issue #92 (репорт 7OH: «заголовок окна всё ещё … .dt»): заголовок/подсказка
-        // окна определяются ВИДОМ операции и пересчитываются при смене DT/CF.
-        Assert.Equal(expectedTitle, BatchOperationsViewModel.TitleKeyForKind(kind));
+        // Issue #92 (v1.0.1.32): подсказка по-прежнему следует за видом операции.
         Assert.Equal(expectedHint, BatchOperationsViewModel.HintKeyForKind(kind));
+    }
+
+    [Fact]
+    public void TitleKeys_StaticForBothDumpKinds()
+    {
+        // Issue #92 (v1.0.1.32, репорт 7OH: «Не переключается заголовок … Может быть
+        // просто сделать заголовок не изменяемым "Выгрузка в DT/CF"?»): для обоих
+        // видов выгрузки — СТАТИЧНЫЙ заголовок, загрузка CF — свой.
+        Assert.Equal("BatchOps.TitleDumpBoth", BatchOperationsViewModel.TitleKeyForKind(BatchOperationKind.DumpDt));
+        Assert.Equal("BatchOps.TitleDumpBoth", BatchOperationsViewModel.TitleKeyForKind(BatchOperationKind.DumpCf));
+        Assert.Equal("BatchOps.TitleLoadCf", BatchOperationsViewModel.TitleKeyForKind(BatchOperationKind.LoadConfig));
     }
 
     [Fact]

@@ -11,7 +11,10 @@ namespace Workspace1C.Services;
 /// <summary>
 /// Вид массовой (пакетной) операции по списку баз (issue #91):
 /// выгрузка каждой базы в файл <c>.dt</c> в выбранный каталог либо загрузка
-/// конфигурации из файла <c>.cf</c> в каждую выбранную базу.
+/// конфигурации из файла <c>.cf</c> в каждую выбранную базу. С v1.0.1.32 (issue #85)
+/// добавлены пакетные Блокировка/Разблокировка сеансов — по запросу leonvlas
+/// «команда "Блокировка" (разблокировка) сеансов информационных баз могла
+/// применяться к группам или к выделенным строкам».
 /// </summary>
 public enum BatchOperationKind
 {
@@ -22,7 +25,13 @@ public enum BatchOperationKind
     DumpCf,
 
     /// <summary>Загрузка конфигурации из .cf по списку баз (ibcmd config load + apply).</summary>
-    LoadConfig
+    LoadConfig,
+
+    /// <summary>Блокировка сеансов списка баз (rac «infobase update --sessions-deny=on», issue #85).</summary>
+    LockSessions,
+
+    /// <summary>Разблокировка сеансов списка баз (rac «infobase update --sessions-deny=off», issue #85).</summary>
+    UnlockSessions
 }
 
 /// <summary>
@@ -232,8 +241,15 @@ public static class BatchOperationsService
     {
         var errors = new List<string>();
         var list = targets?.Where(b => b is not null).ToList() ?? new List<Infobase>();
+        // Issue #85 (v1.0.1.32): блокировке/разблокировке сеансов путь (каталог/файл
+        // .cf) не нужен — пред-валидация параметров пути не выполняется.
+        var isSessionLockKind = kind is BatchOperationKind.LockSessions or BatchOperationKind.UnlockSessions;
 
-        if (kind == BatchOperationKind.DumpDt || kind == BatchOperationKind.DumpCf)
+        if (isSessionLockKind)
+        {
+            // Проверка только по типам баз: веб-базы rac не обслуживает (ниже).
+        }
+        else if (kind == BatchOperationKind.DumpDt || kind == BatchOperationKind.DumpCf)
         {
             if (string.IsNullOrWhiteSpace(path))
                 errors.Add(LocalizationManager.T("BatchOps.NeedDirectory"));
@@ -252,14 +268,17 @@ public static class BatchOperationsService
         {
             if (ib.Connection?.Type == ConnectionType.WebServer)
                 errors.Add(string.Format(
-                    LocalizationManager.T("BatchOps.WebNotSupportedFormat"), ib.Name));
+                    isSessionLockKind
+                        ? LocalizationManager.T("BatchOps.WebLockNotSupportedFormat")
+                        : LocalizationManager.T("BatchOps.WebNotSupportedFormat"),
+                    ib.Name));
         }
 
         // Для клиент-серверных баз ibcmd требует профиль СУБД (как в окне «Развернуть
         // тестовую копию», issue #79): ошибка ДО старта, а не посреди прогона.
         // С автоподстановкой из rac (issue #92) отсутствие профиля не блокирует запуск:
         // резолвер пробует взять данные СУБД из кластера на этапе прогона.
-        if (!allowMissingDbmsProfiles)
+        if (!allowMissingDbmsProfiles && !isSessionLockKind)
         {
             foreach (var ib in list)
             {

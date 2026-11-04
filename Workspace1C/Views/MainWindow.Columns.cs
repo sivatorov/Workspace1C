@@ -111,9 +111,14 @@ namespace Workspace1C
                 .FirstOrDefault(m => string.Equals(m.Tag as string, "Batch", StringComparison.Ordinal));
             if (batchMenu is not null)
             {
-                var batchCount = _viewModel.BatchOperationTargetCount;
+                // Issue #85 (v1.0.1.32): при выделенном узле группы (без мультивыделения)
+                // цели — базы группы (включая вложенные), заголовок — «Для группы (N)…».
+                var batchCount = _viewModel.BatchOperationTargetCountIncludingGroup;
+                var batchTitleKey = _viewModel.IsGroupBatchTarget
+                    ? "Main.BatchForGroup"
+                    : "Main.BatchForSelected";
                 batchMenu.Header = string.Format(
-                    LocalizationManager.T("Main.BatchForSelected"), batchCount);
+                    LocalizationManager.T(batchTitleKey), batchCount);
                 batchMenu.Visibility = batchCount >= 1 && !restricted
                     ? Visibility.Visible
                     : Visibility.Collapsed;
@@ -128,7 +133,7 @@ namespace Workspace1C
             // прохода (в не-restricted режиме общий проход делает все пункты видимыми).
             if (batchMenu is not null && !restricted)
             {
-                batchMenu.Visibility = _viewModel.BatchOperationTargetCount >= 1
+                batchMenu.Visibility = _viewModel.BatchOperationTargetCountIncludingGroup >= 1
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }

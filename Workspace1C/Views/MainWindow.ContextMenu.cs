@@ -339,6 +339,11 @@ public partial class MainWindow
         batchMenu.Items.Add(CreateBatchAction("Main.BatchDumpDtCf", "DatabaseExport", "@SuccessBrush", OnBatchDumpDtCf_Click));
         // Массовая загрузка конфигурации из .cf по списку выделенных баз (issue #92, v1.0.1.24).
         batchMenu.Items.Add(CreateBatchAction("Main.BatchLoadCf", "DatabaseImport", "@WarningBrush", OnBatchLoadCf_Click));
+        // Пакетные Блокировка/Разблокировка сеансов (issue #85, v1.0.1.32, запрос
+        // leonvlas: «команда "Блокировка" (разблокировка) сеансов информационных баз
+        // могла применяться к группам или к выделенным строкам»).
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchLockSessions", "Lock", "@WarningBrush", OnBatchLockSessions_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchUnlockSessions", "LockOpen", "@InfoBrush", OnBatchUnlockSessions_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchCheckAvailability", "CloudCheck", "@InfoBrush", OnBatchCheckAvailability_Click));
         // Массовая замена строк подключения (0.3.9.191, функция 6).
         batchMenu.Items.Add(CreateBatchAction("Main.BatchConnectionReplace", "FindReplace", "@WarningBrush", OnBatchConnectionReplace_Click));

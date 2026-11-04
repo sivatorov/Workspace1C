@@ -11,6 +11,44 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.32] — 2026-11-04
+
+### Добавлено
+
+- **Групповые операции для групп и выделенных баз (issue #85).** В контекстных меню
+  групп и списка баз появились пункты «Для группы (N)…» и «Для выделенных (N)…»:
+  блокировка/разблокировка сеансов (включая завершение сеансов, код разрешения и
+  запрет фоновых заданий; для файловой базы блокировка выполняется через `1cv8.cdn`),
+  выгрузка DT/CF и загрузка CF. Все операции выполняются через единое окно массовых
+  операций с журналом прогресса «N из M»
+  ([BatchOperationsViewModel.cs](Workspace1C/ViewModels/BatchOperationsViewModel.cs),
+  [BatchOperationsWindow.xaml.cs](Workspace1C/Views/BatchOperationsWindow.xaml.cs) /
+  [BatchOperationsWindow.Avalonia.cs](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs)).
+- **Выбор типа СУБД через список в мастере «Развернуть тестовую копию» (issue #79,
+  @7OH).** Тип СУБД теперь выбирается из ComboBox со списком MSSQLServer, PostgreSQL,
+  IBMDB2, OracleDatabase, MySQL, MariaDB; значения, неизвестные списку (пришедшие из
+  rac или профиля), сохраняются и отображаются как есть
+  ([TestDeployWindow.cs](Workspace1C/Views/TestDeployWindow.cs) /
+  [TestDeployWindow.Avalonia.cs](Workspace1C/Views/TestDeployWindow.Avalonia.cs)).
+
+### Исправлено
+
+- **Массовая выгрузка DT/CF: статичный заголовок «Выгрузка в DT/CF» (issue #92,
+  @7OH).** По предложению репортёра заголовок окна массовых операций больше не
+  переключается при смене вида DT/CF — всегда «Выгрузка в DT/CF», единообразно с
+  кнопками вызова инструмента
+  ([BatchOperationsWindow.xaml.cs](Workspace1C/Views/BatchOperationsWindow.xaml.cs) /
+  [BatchOperationsWindow.Avalonia.cs](Workspace1C/Views/BatchOperationsWindow.Avalonia.cs)).
+- **«Развернуть тестовую копию»: перекомпоновка мастера и распознавание вывода
+  rac 8.5.4 (issue #79, @7OH).** Мастер перекомпонован в 4 строки раскладки (по одной
+  строке на поле, WPF и Avalonia); улучшено распознавание вывода rac 8.5.4: сырой
+  stdout журналируется в CM_RAC для диагностики, добавлен fallback-чтение вывода
+  команды из временного файла, парсер вывода стал толерантнее к нестандартным
+  форматам; добавлены новые юнит-тесты
+  ([RacClient.cs](Workspace1C/Services/RacClient.cs),
+  [RacOutputParser.cs](Workspace1C/Services/RacOutputParser.cs),
+  [ConsoleOutputDecoder.cs](Workspace1C/Services/ConsoleOutputDecoder.cs)).
+
 ## [1.0.1.31] — 2026-11-04
 
 ### Исправлено

@@ -1159,21 +1159,39 @@ namespace Workspace1C
             }
         }
 
-        /// <summary>Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).</summary>
+        /// <summary>Массовая выгрузка выделенных баз/группы в DT/CF с шаблоном имени (issue #92; группа — issue #85).</summary>
         private void OnBatchDumpDtCf_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _viewModel.ExecuteBatchDumpForSelected();
             _viewModel.ClearBatchSelection();
         }
 
-        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам (issue #92, v1.0.1.24).</summary>
+        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам/группе (issue #92; группа — issue #85).</summary>
         private void OnBatchLoadCf_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _viewModel.ExecuteBatchLoadCfForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
+        /// <summary>Пакетная блокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32).</summary>
+        private void OnBatchLockSessions_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _viewModel.ExecuteBatchLockSessionsForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
+        /// <summary>Пакетная разблокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32).</summary>
+        private void OnBatchUnlockSessions_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _viewModel.ExecuteBatchUnlockSessionsForSelected();
             _viewModel.ClearBatchSelection();
         }
 

@@ -125,6 +125,22 @@ namespace Workspace1C
             // Опции шаблона и DT/CF видны только у выгрузок (issue #92).
             DumpOptionsPanel.Visibility = _vm.IsDumpKind
                 ? Visibility.Visible : Visibility.Collapsed;
+            // Issue #85 (v1.0.1.32): блокировкам/разблокировке сеансов путь не нужен —
+            // строка каталога/файла скрывается.
+            PathPanel.Visibility = _vm.NeedsPath
+                ? Visibility.Visible : Visibility.Collapsed;
+            // Issue #85: блок опций «Перед операцией» для Блокировки сеансов — это
+            // ПАРАМЕТРЫ блокировки (заголовок меняется); для Разблокировки не нужен.
+            var isLockKind = _vm.Kind == BatchOperationKind.LockSessions;
+            var isUnlockKind = _vm.Kind == BatchOperationKind.UnlockSessions;
+            PreparePanel.Visibility = isUnlockKind
+                ? Visibility.Collapsed : Visibility.Visible;
+            PrepareHeader.Text = LocalizationManager.T(isLockKind
+                ? "BatchOps.LockOptionsHeader"
+                : "BatchOps.Prepare.Header");
+            PrepareHint.Text = LocalizationManager.T(isLockKind
+                ? "BatchOps.Prepare.LockHint"
+                : "BatchOps.Prepare.Hint");
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
                 ? Visibility.Visible : Visibility.Collapsed;

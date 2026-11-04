@@ -34,7 +34,9 @@ public class TestDeployWindow : Window
     private readonly StackPanel _filePanel;
     private readonly TextBox _serverBox;
     private readonly TextBox _refBox;
-    private readonly TextBox _dbmsBox;
+    // «СУБД» — список выбора вместо свободного ввода (issue #79, v1.0.1.32).
+    private readonly ComboBox _dbmsCombo;
+    private IReadOnlyList<TestDeployDbmsOption> _dbmsOptions;
     private readonly TextBox _dbServerBox;
     private readonly TextBox _dbNameBox;
     private readonly TextBox _dbUserBox;
@@ -166,7 +168,9 @@ public class TestDeployWindow : Window
         _targetNameBox.TextChanged += (_, _) => { _vm.TargetName = _targetNameBox.Text; RefreshPreview(); };
         panel.Children.Add(_targetNameBox);
 
-        // --- Режим ---
+        // --- Режим + движок выгрузки (issue #79, v1.0.1.32, раскладка 7OH п.1:
+        // «Движок выгрузки» перенесён в строку с переключателем «Сервер 1С»/«Файловая
+        // база»; подпись TestDeploy.Engine сохранена) ---
         var modeRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
         _serverRadio = new RadioButton
         {
@@ -183,17 +187,43 @@ public class TestDeployWindow : Window
         _fileRadio.Checked += (_, _) => { _vm.IsFileMode = true; UpdateModePanels(); RefreshPreview(); };
         modeRow.Children.Add(_serverRadio);
         modeRow.Children.Add(_fileRadio);
+
+        var engineLabel = new TextBlock
+        {
+            Text = LocalizationManager.T("TestDeploy.Engine"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(24, 0, 8, 0)
+        };
+        modeRow.Children.Add(engineLabel);
+        _engineCombo = new ComboBox
+        {
+            ItemsSource = new[]
+            {
+                new TestDeployEngineOption("Designer", LocalizationManager.T("TestDeploy.EngineDesigner")),
+                new TestDeployEngineOption("Ibcmd", LocalizationManager.T("TestDeploy.EngineIbcmd"))
+            },
+            DisplayMemberPath = "Text",
+            SelectedIndex = _vm.EngineIndex,
+            MinWidth = 170,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        _engineCombo.SelectionChanged += (_, _) =>
+        {
+            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+            UpdateIbcmdPanel();
+        };
+        modeRow.Children.Add(_engineCombo);
         panel.Children.Add(modeRow);
 
         // --- Серверная секция ---
         _serverPanel = new StackPanel();
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.Server"));
-        _serverBox = new TextBox { Text = _vm.ServerAddress, Margin = new Thickness(0, 2, 0, 8) };
+        // --- Сервер 1С + Имя базы на сервере в одной строке (issue #79, v1.0.1.32,
+        // раскладка 7OH п.2) ---
+        _serverBox = new TextBox { Text = _vm.ServerAddress, Margin = new Thickness(0, 2, 0, 0) };
         _serverBox.TextChanged += (_, _) => _vm.ServerAddress = _serverBox.Text;
-        _serverPanel.Children.Add(_serverBox);
-
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.Ref"));
-        _refBox = new TextBox { Text = _vm.DatabaseName, Margin = new Thickness(0, 2, 0, 8) };
+        _refBox = new TextBox { Text = _vm.DatabaseName, Margin = new Thickness(0, 2, 0, 0) };
+        _serverPanel.Children.Add(MakeFieldsRow(
+            ("TestDeploy.Server", _serverBox), ("TestDeploy.Ref", _refBox)));
         _refBox.TextChanged += (_, _) =>
         {
             _vm.DatabaseName = _refBox.Text;
@@ -213,30 +243,35 @@ public class TestDeployWindow : Window
         };
         _serverPanel.Children.Add(_refBox);
 
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.Dbms"));
-        _dbmsBox = new TextBox { Text = _vm.Dbms, Margin = new Thickness(0, 2, 0, 8) };
-        _dbmsBox.TextChanged += (_, _) => _vm.Dbms = _dbmsBox.Text;
-        _serverPanel.Children.Add(_dbmsBox);
-
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.DbServer"));
-        _dbServerBox = new TextBox { Text = _vm.DbServer, Margin = new Thickness(0, 2, 0, 8) };
+        // --- СУБД + Сервер СУБД в одной строке (issue #79, v1.0.1.32, раскладка 7OH п.3);
+        // «СУБД» — список выбора (issue #79, репорт 7OH: «СУБД — почему-то является
+        // полем ввода, а не списком выбора») ---
+        _dbmsOptions = TestDeployDbmsOption.BuildOptions(_vm.Dbms, LocalizationManager.T);
+        _dbmsCombo = new ComboBox
+        {
+            ItemsSource = _dbmsOptions,
+            DisplayMemberPath = "Text",
+            Margin = new Thickness(0, 2, 0, 0)
+        };
+        SelectDbmsComboItem(_vm.Dbms);
+        _dbmsCombo.SelectionChanged += (_, _) =>
+            _vm.Dbms = (_dbmsCombo.SelectedItem as TestDeployDbmsOption)?.Value ?? _vm.Dbms;
+        _dbServerBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbServerBox.TextChanged += (_, _) => _vm.DbServer = _dbServerBox.Text;
-        _serverPanel.Children.Add(_dbServerBox);
+        _serverPanel.Children.Add(MakeFieldsRow(
+            ("TestDeploy.Dbms", _dbmsCombo), ("TestDeploy.DbServer", _dbServerBox)));
 
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.DbName"));
-        _dbNameBox = new TextBox { Text = _vm.DbName, Margin = new Thickness(0, 2, 0, 8) };
+        // --- Имя базы данных в СУБД + Пользователь + Пароль в одной строке
+        // (issue #79, v1.0.1.32, раскладка 7OH п.4) ---
+        _dbNameBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbNameBox.TextChanged += (_, _) => _vm.DbName = _dbNameBox.Text;
-        _serverPanel.Children.Add(_dbNameBox);
-
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.DbUser"));
-        _dbUserBox = new TextBox { Text = _vm.DbUser, Margin = new Thickness(0, 2, 0, 8) };
+        _dbUserBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbUserBox.TextChanged += (_, _) => _vm.DbUser = _dbUserBox.Text;
-        _serverPanel.Children.Add(_dbUserBox);
-
-        _serverPanel.Children.Add(MakeLabel("TestDeploy.DbPassword"));
-        _dbPwdBox = new PasswordBox { Margin = new Thickness(0, 2, 0, 8) };
+        _dbPwdBox = new PasswordBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbPwdBox.PasswordChanged += (_, _) => _vm.DbPassword = _dbPwdBox.Password;
-        _serverPanel.Children.Add(_dbPwdBox);
+        _serverPanel.Children.Add(MakeFieldsRow(
+            ("TestDeploy.DbName", _dbNameBox), ("TestDeploy.DbUser", _dbUserBox),
+            ("TestDeploy.DbPassword", _dbPwdBox)));
 
         // issue #79 (1.0.1.9, 7OH: «Логичнее иметь кнопку "Подставить из профиля" … либо
         // данные из профиля, либо вручную. А выполнять работу по тому, что на форме»):
@@ -255,7 +290,7 @@ public class TestDeployWindow : Window
         {
             if (_vm.AutofillDbmsFromProfile())
             {
-                _dbmsBox.Text = _vm.Dbms;
+                SelectDbmsComboItem(_vm.Dbms);
                 _dbServerBox.Text = _vm.DbServer;
                 _dbNameBox.Text = _vm.DbName;
                 _dbUserBox.Text = _vm.DbUser;
@@ -299,26 +334,8 @@ public class TestDeployWindow : Window
         _filePanel.Children.Add(fileRow);
         panel.Children.Add(_filePanel);
 
-        // --- Движок выгрузки ---
-        panel.Children.Add(MakeLabel("TestDeploy.Engine"));
-        _engineCombo = new ComboBox
-        {
-            ItemsSource = new[]
-            {
-                new TestDeployEngineOption("Designer", LocalizationManager.T("TestDeploy.EngineDesigner")),
-                new TestDeployEngineOption("Ibcmd", LocalizationManager.T("TestDeploy.EngineIbcmd"))
-            },
-            DisplayMemberPath = "Text",
-            SelectedIndex = _vm.EngineIndex,
-            Margin = new Thickness(0, 2, 0, 10)
-        };
-        _engineCombo.SelectionChanged += (_, _) =>
-        {
-            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
-            UpdateIbcmdPanel();
-        };
-        panel.Children.Add(_engineCombo);
-
+        // «Движок выгрузки» перенесён в строку с переключателем типа источника
+        // (issue #79, v1.0.1.32, раскладка 7OH п.1) — здесь блока больше нет.
         // --- Данные для выгрузки через ibcmd (issue #79, 7OH: «То есть я должен закрыть
         // окно со всеми введёнными данными и пойти найти где это вводится?», «А зачем мне
         // отдельно вводить, если все данные вот они — уже введены выше?») ---
@@ -803,6 +820,53 @@ public class TestDeployWindow : Window
         Content = LocalizationManager.T(key),
         Margin = new Thickness(0, 6, 0, 2)
     };
+
+    /// <summary>
+    /// Строка раскладки мастера (issue #79, v1.0.1.32, раскладка 7OH): несколько полей
+    /// «подпись над полем» в одной строке, колонки звездой. Подписи — <see cref="MakeLabel"/>,
+    /// между колонками отступ 12px.
+    /// </summary>
+    private static Grid MakeFieldsRow(params (string LabelKey, System.Windows.FrameworkElement Field)[] fields)
+    {
+        var grid = new Grid();
+        for (var i = 0; i < fields.Length; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var cell = new StackPanel { Margin = new Thickness(0, 0, i < fields.Length - 1 ? 12 : 0, 0) };
+            cell.Children.Add(MakeLabel(fields[i].LabelKey));
+            cell.Children.Add(fields[i].Field);
+            Grid.SetColumn(cell, i);
+            grid.Children.Add(cell);
+        }
+        return grid;
+    }
+
+    /// <summary>
+    /// Выбирает в списке «СУБД» значение: известное — по значению (без учёта регистра);
+    /// неизвестное (например, введённое ранее или подставленное rac-резолвом) —
+    /// добавляется опцией, чтобы не терять ввод (issue #79, v1.0.1.32).
+    /// </summary>
+    private void SelectDbmsComboItem(string? value)
+    {
+        var options = _dbmsOptions;
+        var index = TestDeployDbmsOption.IndexOf(options, value);
+        if (index < 0)
+        {
+            var normalized = (value ?? string.Empty).Trim();
+            if (normalized.Length == 0)
+            {
+                _dbmsCombo.SelectedIndex = 0; // MSSQLServer — значение по умолчанию
+                return;
+            }
+            var extended = new List<TestDeployDbmsOption>(options)
+                { new(normalized, normalized) };
+            index = extended.Count - 1;
+            options = extended;
+            _dbmsOptions = extended;
+            _dbmsCombo.ItemsSource = extended;
+        }
+        _dbmsCombo.SelectedIndex = index;
+    }
 
     private static CheckBox MakeCheckBox(string key, bool isChecked) => new()
     {

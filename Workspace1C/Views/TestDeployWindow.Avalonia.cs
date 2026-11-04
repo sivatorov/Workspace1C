@@ -38,7 +38,9 @@ public class TestDeployWindow : ModalWindowBase
     private readonly StackPanel _filePanel = new() { Spacing = 4 };
     private readonly TextBox _serverBox = new TextBox().Styled(ControlThemes.ModernTextBox);
     private readonly TextBox _refBox = new TextBox().Styled(ControlThemes.ModernTextBox);
-    private readonly ComboBox _dbmsBox = new() { IsEditable = true };
+    // «СУБД» — список выбора вместо свободного ввода (issue #79, v1.0.1.32).
+    private readonly ComboBox _dbmsCombo = new();
+    private IReadOnlyList<TestDeployDbmsOption> _dbmsOptions = TestDeployDbmsOption.BuildOptions(null, LocalizationManager.T);
     private readonly TextBox _dbServerBox = new TextBox().Styled(ControlThemes.ModernTextBox);
     private readonly TextBox _dbNameBox = new TextBox().Styled(ControlThemes.ModernTextBox);
     private readonly TextBox _dbUserBox = new TextBox().Styled(ControlThemes.ModernTextBox);
@@ -165,7 +167,8 @@ public class TestDeployWindow : ModalWindowBase
         _targetNameBox.Text = _vm.TargetName;
         _targetNameBox.TextChanged += (_, _) => { _vm.TargetName = _targetNameBox.Text; RefreshPreview(); };
 
-        // Режим: сервер / файл.
+        // Режим: сервер / файл + «Движок выгрузки» в той же строке (issue #79,
+        // v1.0.1.32, раскладка 7OH п.1; подпись TestDeploy.Engine сохранена).
         _serverRadio.Content = T("TestDeploy.ModeServer");
         _fileRadio.Content = T("TestDeploy.ModeFile");
         _serverRadio.IsChecked = _vm.IsServerMode;
@@ -174,15 +177,30 @@ public class TestDeployWindow : ModalWindowBase
         var modeRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16 };
         modeRow.Children.Add(_serverRadio);
         modeRow.Children.Add(_fileRadio);
+        var engineLabel = new TextBlock { Text = T("TestDeploy.Engine"), VerticalAlignment = VerticalAlignment.Center };
+        ThemeBrushes.Bind(engineLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
+        modeRow.Children.Add(engineLabel);
+        _engineCombo.ItemsSource = new[]
+        {
+            new TestDeployEngineOption("Designer", T("TestDeploy.EngineDesigner")),
+            new TestDeployEngineOption("Ibcmd", T("TestDeploy.EngineIbcmd"))
+        };
+        _engineCombo.SelectedIndex = _vm.EngineIndex;
+        _engineCombo.SelectionChanged += (_, _) =>
+        {
+            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
+            ApplyIbcmdPanel();
+        };
+        modeRow.Children.Add(_engineCombo);
         fields.Children.Add(Field(T("TestDeploy.Mode"), modeRow));
 
-        // --- Серверная секция ---
-        _serverPanel.Children.Add(Field(T("TestDeploy.Server"), _serverBox));
+        // --- Серверная секция (раскладка 7OH, issue #79, v1.0.1.32) ---
+        // П.2: «Сервер 1С» и «Имя базы на сервере» — в одной строке.
         _serverBox.Text = _vm.ServerAddress;
         _serverBox.TextChanged += (_, _) => _vm.ServerAddress = _serverBox.Text;
-
-        _serverPanel.Children.Add(Field(T("TestDeploy.Ref"), _refBox));
         _refBox.Text = _vm.DatabaseName;
+        _serverPanel.Children.Add(FieldsRow(
+            130, (T("TestDeploy.Server"), _serverBox), (T("TestDeploy.Ref"), _refBox)));
         _refBox.TextChanged += (_, _) =>
         {
             _vm.DatabaseName = _refBox.Text;
@@ -200,22 +218,24 @@ public class TestDeployWindow : ModalWindowBase
             }
         };
 
-        _dbmsBox.ItemsSource = new[] { "MSSQLServer", "PostgreSQL", "IBMDB2", "OracleDatabase" };
-        _dbmsBox.SelectedItem = _vm.Dbms;
-        _dbmsBox.SelectionChanged += (_, _) => _vm.Dbms = _dbmsBox.SelectedItem?.ToString() ?? _vm.Dbms;
-        _serverPanel.Children.Add(Field(T("TestDeploy.Dbms"), _dbmsBox));
-
-        _serverPanel.Children.Add(Field(T("TestDeploy.DbServer"), _dbServerBox));
+        // П.3: «СУБД» (список выбора вместо свободного ввода — issue #79) и
+        // «Сервер СУБД» — в одной строке.
+        _dbmsOptions = TestDeployDbmsOption.BuildOptions(_vm.Dbms, T);
+        _dbmsCombo.ItemsSource = _dbmsOptions;
+        SelectDbmsComboItem(_vm.Dbms);
+        _dbmsCombo.SelectionChanged += (_, _) =>
+            _vm.Dbms = (_dbmsCombo.SelectedItem as TestDeployDbmsOption)?.Value ?? _vm.Dbms;
         _dbServerBox.TextChanged += (_, _) => _vm.DbServer = _dbServerBox.Text;
+        _serverPanel.Children.Add(FieldsRow(
+            100, (T("TestDeploy.Dbms"), _dbmsCombo), (T("TestDeploy.DbServer"), _dbServerBox)));
 
-        _serverPanel.Children.Add(Field(T("TestDeploy.DbName"), _dbNameBox));
+        // П.4: «Имя базы данных в СУБД», «Пользователь СУБД» и «Пароль СУБД» — в одной строке.
         _dbNameBox.TextChanged += (_, _) => _vm.DbName = _dbNameBox.Text;
-
-        _serverPanel.Children.Add(Field(T("TestDeploy.DbUser"), _dbUserBox));
         _dbUserBox.TextChanged += (_, _) => _vm.DbUser = _dbUserBox.Text;
-
-        _serverPanel.Children.Add(Field(T("TestDeploy.DbPassword"), _dbPwdBox));
         _dbPwdBox.PasswordChanged += (_, _) => _vm.DbPassword = _dbPwdBox.Password;
+        _serverPanel.Children.Add(FieldsRow(
+            90, (T("TestDeploy.DbName"), _dbNameBox), (T("TestDeploy.DbUser"), _dbUserBox),
+            (T("TestDeploy.DbPassword"), _dbPwdBox)));
 
         // issue #79 (1.0.1.9, 7OH: «Логичнее иметь кнопку "Подставить из профиля" … либо
         // данные из профиля, либо вручную. А выполнять работу по тому, что на форме»):
@@ -228,7 +248,7 @@ public class TestDeployWindow : ModalWindowBase
         {
             if (_vm.AutofillDbmsFromProfile())
             {
-                _dbmsBox.SelectedItem = _vm.Dbms;
+                SelectDbmsComboItem(_vm.Dbms);
                 _dbServerBox.Text = _vm.DbServer;
                 _dbNameBox.Text = _vm.DbName;
                 _dbUserBox.Text = _vm.DbUser;
@@ -252,19 +272,8 @@ public class TestDeployWindow : ModalWindowBase
         _filePathBox.TextChanged += (_, _) => _vm.FilePath = _filePathBox.Text;
         fields.Children.Add(_filePanel);
 
-        // --- Движок выгрузки ---
-        _engineCombo.ItemsSource = new[]
-        {
-            new TestDeployEngineOption("Designer", T("TestDeploy.EngineDesigner")),
-            new TestDeployEngineOption("Ibcmd", T("TestDeploy.EngineIbcmd"))
-        };
-        _engineCombo.SelectedIndex = _vm.EngineIndex;
-        _engineCombo.SelectionChanged += (_, _) =>
-        {
-            _vm.EngineIndex = Math.Max(0, _engineCombo.SelectedIndex);
-            ApplyIbcmdPanel();
-        };
-        fields.Children.Add(Field(T("TestDeploy.Engine"), _engineCombo));
+        // «Движок выгрузки» перенесён в строку с переключателем типа источника
+        // (issue #79, v1.0.1.32, раскладка 7OH п.1) — здесь блока больше нет.
 
         // --- Данные для выгрузки через ibcmd (issue #79) ---
         var ibcmdTitle = new TextBlock { Text = T("TestDeploy.IbcmdCredentials"), FontWeight = FontWeight.SemiBold };
@@ -660,6 +669,64 @@ public class TestDeployWindow : ModalWindowBase
         var row = new StackPanel { Margin = new Thickness(0, 2, 0, 0) };
         row.Children.Add(control);
         return row;
+    }
+
+    /// <summary>
+    /// Строка раскладки мастера (issue #79, v1.0.1.32, раскладка 7OH): несколько пар
+    /// «подпись — поле» в одном ряду. Подпись — колонка фиксированной ширины
+    /// (<paramref name="labelWidth"/>), поле — звездой. Подписи длинные («Имя базы
+    /// данных в СУБД»), поэтому для строки из трёх пар ширина меньше — текст переносится.
+    /// </summary>
+    private static Grid FieldsRow(int labelWidth, params (string Label, Control Field)[] pairs)
+    {
+        var grid = new Grid { ColumnSpacing = 8 };
+        for (var i = 0; i < pairs.Length; i++)
+        {
+            grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(labelWidth)));
+            grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+
+            var labelBlock = new TextBlock
+            {
+                Text = pairs[i].Label,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            ThemeBrushes.Bind(labelBlock, TextBlock.ForegroundProperty, "FormLabelBrush");
+            Grid.SetColumn(labelBlock, i * 2);
+            grid.Children.Add(labelBlock);
+
+            pairs[i].Field.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(pairs[i].Field, i * 2 + 1);
+            grid.Children.Add(pairs[i].Field);
+        }
+        return grid;
+    }
+
+    /// <summary>
+    /// Выбирает в списке «СУБД» значение: известное — по значению (без учёта регистра);
+    /// неизвестное (например, введённое ранее или подставленное rac-резолвом) —
+    /// добавляется опцией, чтобы не терять ввод (issue #79, v1.0.1.32).
+    /// </summary>
+    private void SelectDbmsComboItem(string? value)
+    {
+        var options = _dbmsOptions;
+        var index = TestDeployDbmsOption.IndexOf(options, value);
+        if (index < 0)
+        {
+            var normalized = (value ?? string.Empty).Trim();
+            if (normalized.Length == 0)
+            {
+                _dbmsCombo.SelectedIndex = 0; // MSSQLServer — значение по умолчанию
+                return;
+            }
+            var extended = new List<TestDeployDbmsOption>(options)
+                { new(normalized, normalized) };
+            index = extended.Count - 1;
+            options = extended;
+            _dbmsOptions = extended;
+            _dbmsCombo.ItemsSource = extended;
+        }
+        _dbmsCombo.SelectedIndex = index;
     }
 
     /// <summary>

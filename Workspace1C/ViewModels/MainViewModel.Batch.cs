@@ -253,4 +253,68 @@ public partial class MainViewModel
             : SelectedInfobase is { } single
                 ? new[] { single }
                 : Array.Empty<Infobase>();
+
+    // ================== Групповые операции (issue #85, v1.0.1.32) ==================
+
+    /// <summary>
+    /// Целевые базы пакетных операций с учётом ВЫБРАННОЙ ГРУППЫ (issue #85, запрос
+    /// leonvlas «разрешить выполнять команды для группы»): при мультивыделении —
+    /// выделенные базы; при выделенном узле группы — все базы группы (включая
+    /// вложенные группы); иначе выделенная база. Блок «Для выделенных (N)…» /
+    /// «Для группы (N)…» контекстного меню работает по этим целям.
+    /// </summary>
+    public IReadOnlyList<Infobase> BatchOperationTargetsIncludingGroup =>
+        _batchSelectedIds.Count > 0
+            ? BatchSelectedInfobases
+            : SelectedGroupNode is { Group: not null } groupNode
+                ? GetGroupInfobases(groupNode)
+                : SelectedInfobase is { } singleWithGroup
+                    ? new[] { singleWithGroup }
+                    : Array.Empty<Infobase>();
+
+    /// <summary>Число целевых баз с учётом выбранной группы (для заголовка меню, issue #85).</summary>
+    public int BatchOperationTargetCountIncludingGroup => BatchOperationTargetsIncludingGroup.Count;
+
+    /// <summary>
+    /// Выбран ли узел группы (без мультивыделения) — в меню показывается заголовок
+    /// «Для группы (N)…» вместо «Для выделенных (N)…» (issue #85).
+    /// </summary>
+    public bool IsGroupBatchTarget =>
+        _batchSelectedIds.Count == 0 && SelectedGroupNode is { Group: not null };
+
+    /// <summary>
+    /// Базы группы (включая вложенные группы) по узлу дерева (issue #85): путь узла
+    /// и пути всех узлов-потомков собираются рекурсивно, базы фильтруются по
+    /// нормализованному <see cref="Infobase.Group"/>. Internal — юнит-тесты.
+    /// </summary>
+    internal IReadOnlyList<Infobase> GetGroupInfobases(GroupNodeViewModel groupNode)
+    {
+        if (groupNode?.Group is null)
+            return Array.Empty<Infobase>();
+
+        var rawPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        CollectGroupNodePaths(groupNode, rawPaths);
+        var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in rawPaths)
+        {
+            var normalized = NormalizeGroupPath(path);
+            if (!string.IsNullOrEmpty(normalized))
+                paths.Add(normalized);
+        }
+        if (paths.Count == 0)
+            return Array.Empty<Infobase>();
+
+        return Infobases
+            .Where(ib => !string.IsNullOrWhiteSpace(ib.Group) && paths.Contains(ib.Group.Trim()))
+            .ToList();
+    }
+
+    /// <summary>Полные пути узла группы и всех его потомков (issue #85).</summary>
+    private static void CollectGroupNodePaths(GroupNodeViewModel node, ISet<string> target)
+    {
+        if (node.Group is not null && !string.IsNullOrEmpty(node.FullPath))
+            target.Add(node.FullPath.Trim());
+        foreach (var child in node.Children)
+            CollectGroupNodePaths(child, target);
+    }
 }

@@ -307,22 +307,29 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Ключ локализации заголовка окна по виду операции (issue #92, v1.0.1.31):
-    /// единый источник для WPF и Avalonia — заголовок пересчитывается при смене
-    /// DT/CF на форме. Internal — юнит-тесты.
+    /// Ключ локализации заголовка окна по виду операции. Единый источник для
+    /// WPF и Avalonia. Начиная с v1.0.1.32 (issue #92) для обоих видов выгрузки
+    /// (DT и CF) используется СТАТИЧНЫЙ заголовок «Массовая выгрузка в DT/CF» —
+    /// по предложению репортёра он не зависит от смены вида на форме и единообразен
+    /// с кнопками вызова инструмента. Internal — юнит-тесты.
     /// </summary>
     internal static string TitleKeyForKind(BatchOperationKind kind) => kind switch
     {
-        BatchOperationKind.DumpDt => "BatchOps.TitleDumpDt",
-        BatchOperationKind.DumpCf => "BatchOps.TitleDumpCf",
+        BatchOperationKind.DumpDt => "BatchOps.TitleDumpBoth",
+        BatchOperationKind.DumpCf => "BatchOps.TitleDumpBoth",
+        BatchOperationKind.LockSessions => "BatchOps.TitleLockSessions",
+        BatchOperationKind.UnlockSessions => "BatchOps.TitleUnlockSessions",
         _ => "BatchOps.TitleLoadCf"
     };
 
-    /// <summary>Ключ локализации подсказки окна по виду операции (issue #92, v1.0.1.31). Internal — юнит-тесты.</summary>
+    /// <summary>Ключ локализации подсказки окна по виду операции (issue #92, v1.0.1.31;
+    /// ветки блокировок — issue #85, v1.0.1.32). Internal — юнит-тесты.</summary>
     internal static string HintKeyForKind(BatchOperationKind kind) => kind switch
     {
         BatchOperationKind.DumpDt => "BatchOps.HintDumpDt",
         BatchOperationKind.DumpCf => "BatchOps.HintDumpCf",
+        BatchOperationKind.LockSessions => "BatchOps.HintLockSessions",
+        BatchOperationKind.UnlockSessions => "BatchOps.HintUnlockSessions",
         _ => "BatchOps.HintLoadCf"
     };
 
@@ -448,6 +455,18 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     /// <summary>Это операция выгрузки (в .dt или .cf) — в окне показывается шаблон имени.</summary>
     public bool IsDumpKind => Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf;
 
+    /// <summary>
+    /// Это операция блокировки/разблокировки сеансов (issue #85, v1.0.1.32):
+    /// путь не нужен, опции «Перед операцией» для блокировки — сама операция
+    /// (фаза подготовки перед прогоном пропускается).
+    /// </summary>
+    public bool IsSessionLockOperation =>
+        Kind is BatchOperationKind.LockSessions or BatchOperationKind.UnlockSessions;
+
+    /// <summary>Нужен ли операции путь (каталог выгрузки / файл .cf) — окно скрывает
+    /// строку пути для блокировок сеансов (issue #85).</summary>
+    public bool NeedsPath => !IsSessionLockOperation;
+
     /// <summary>Заголовок поля пути (каталог выгрузки / файл конфигурации).</summary>
     public string PathLabel => Kind == BatchOperationKind.LoadConfig
         ? LocalizationManager.T("BatchOps.PathLabelLoadCf")
@@ -521,6 +540,8 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             {
                 BatchOperationKind.DumpDt => LocalizationManager.T("BatchOps.KindDumpDt"),
                 BatchOperationKind.DumpCf => LocalizationManager.T("BatchOps.KindDumpCf"),
+                BatchOperationKind.LockSessions => LocalizationManager.T("BatchOps.KindLockSessions"),
+                BatchOperationKind.UnlockSessions => LocalizationManager.T("BatchOps.KindUnlockSessions"),
                 _ => LocalizationManager.T("BatchOps.KindLoadCf")
             }));
         // Issue #92 (v1.0.1.28): движок выгрузки виден в журнале — Конфигуратор
@@ -568,7 +589,11 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             // после операции снимаются в finally ниже (и только те, что были off).
             BatchOpsPreparationResult? prepareUndo = null;
             var prepareOptions = BuildPreparationOptions();
-            if (prepareOptions.Any)
+            // Issue #85 (v1.0.1.32): для операций блокировки/разблокировки сеансов
+            // фаза подготовки НЕ выполняется — опции чекбоксов применяются САМОЙ
+            // операцией (иначе «infobase update» ставился бы и тут же снимался
+            // восстановлением после операции).
+            if (prepareOptions.Any && !IsSessionLockOperation)
             {
                 var preparation = PreparationService;
                 if (preparation is null)
@@ -617,16 +642,19 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             try
             {
                 // Целевой путь: для выгрузки — свой файл на каждую базу по шаблону
-                // имени (issue #92); для загрузки .cf — общий файл.
+                // имени (issue #92); для загрузки .cf — общий файл; блокировкам
+                // сеансов путь не нужен (issue #85).
                 var targetPath = Kind switch
                 {
                     BatchOperationKind.DumpDt => BatchOperationsService.BuildDumpFilePath(
                         PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
                     BatchOperationKind.DumpCf => BatchOperationsService.BuildDumpFilePath(
                         PathText, ib.Name, Kind, Template, startedAt, TimestampFormat),
+                    BatchOperationKind.LockSessions or BatchOperationKind.UnlockSessions => string.Empty,
                     _ => PathText.Trim()
                 };
-                AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
+                if (targetPath.Length > 0)
+                    AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» → {targetPath}");
 
                 // Профиль СУБД для клиент-серверной базы (issue #92, v100114): сохранённый
                 // профиль берёт сам <see cref="IbcmdService"/>; если его нет и включена
@@ -640,7 +668,7 @@ public sealed class BatchOperationsViewModel : ViewModelBase
                 // Issue #92 (v1.0.1.28): движку «Конфигуратор» данные СУБД не нужны —
                 // он авторизуется из свойств ИБ, rac-резолв не запускаем вовсе.
                 if (ib.Connection?.Type == ConnectionType.ClientServer && DbmsProfileResolver is not null &&
-                    DumpEngine != BatchDumpEngine.Designer)
+                    DumpEngine != BatchDumpEngine.Designer && !IsSessionLockOperation)
                 {
                     var hasSavedProfile = false;
                     try { hasSavedProfile = DbmsBackupService.Load().Find(ib.Id) is not null; }
@@ -854,6 +882,22 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     private async Task<IbcmdResult> DefaultExecutorAsync(Infobase infobase, string targetPath,
         DbmsBackupProfile? dbmsProfile, CancellationToken ct)
     {
+        // Пакетные Блокировка/Разблокировка сеансов (issue #85, v1.0.1.32):
+        // rac-операции через <see cref="BatchOpsPreparationService"/> — инфраструктура
+        // резолва кластера и «infobase update» та же, что у фазы «Перед операцией».
+        if (Kind is BatchOperationKind.LockSessions or BatchOperationKind.UnlockSessions)
+        {
+            var preparation = PreparationService;
+            if (preparation is null)
+                return IbcmdResult.Fail(LocalizationManager.T("BatchOps.Prepare.Unavailable"));
+            var error = Kind == BatchOperationKind.LockSessions
+                ? await preparation.LockSessionsAsync(infobase, BuildPreparationOptions(), ct).ConfigureAwait(false)
+                : await preparation.UnlockSessionsAsync(infobase, ct).ConfigureAwait(false);
+            return error is null
+                ? new IbcmdResult { Success = true }
+                : IbcmdResult.Fail(error);
+        }
+
         // Конфигуратор — только выгрузки (DumpDt/DumpCf); загрузка .cf остаётся на ibcmd.
         if (DumpEngine == BatchDumpEngine.Designer && Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf)
         {

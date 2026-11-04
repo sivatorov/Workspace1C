@@ -2266,13 +2266,20 @@ namespace Workspace1C
             // Пользовательские действия (0.3.9.198) перестраиваются так же каждый раз.
             menu.Opening += (_, _) =>
             {
-                var count = _vm?.BatchOperationTargetCount ?? 0;
+                var count = _vm?.BatchOperationTargetCountIncludingGroup ?? 0;
                 var restricted = _vm?.IsSystemMenuRestricted ?? false;
                 if (_batchMenu is not null)
                 {
                     // Счёт целей включает и одну выделенную базу без Ctrl (issue #53):
                     // пакетный блок виден при count >= 1 (в режиме «Пользователь» — системный).
-                    _batchMenu.Header = _vm?.BatchMenuTitle ?? _batchMenu.Header;
+                    // Issue #85 (v1.0.1.32): при выделенной группе цели — базы группы,
+                    // заголовок — «Для группы (N)…».
+                    var batchTitleKey = _vm is { IsGroupBatchTarget: true }
+                        ? "Main.BatchForGroup"
+                        : "Main.BatchForSelected";
+                    _batchMenu.Header = _vm is null
+                        ? _batchMenu.Header
+                        : string.Format(LocalizationManager.T(batchTitleKey), count);
                     _batchMenu.IsVisible = !restricted && count >= 1;
                 }
                 if (_customActionsMenu is not null)
@@ -2551,6 +2558,11 @@ namespace Workspace1C
             batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "@SuccessBrush"));
             // Массовая загрузка конфигурации из .cf по списку выделенных баз (issue #92, v1.0.1.24).
             batchMenu.Items.Add(BatchMenuAction("Main.BatchLoadCf", OnBatchLoadCfClick, "IconImport", "@WarningBrush"));
+            // Пакетные Блокировка/Разблокировка сеансов (issue #85, v1.0.1.32, запрос
+            // leonvlas: «команда "Блокировка" (разблокировка) сеансов информационных
+            // баз могла применяться к группам или к выделенным строкам»).
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchLockSessions", OnBatchLockSessionsClick, "IconLock", "@WarningBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchUnlockSessions", OnBatchUnlockSessionsClick, "IconLockOpen", "@InfoBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "@InfoBrush"));
             // Массовая замена строк подключения (0.3.9.191, функция 6): окно с правилом
             // «найти → заменить на» по полям строк подключения выделенных баз.
@@ -2713,21 +2725,39 @@ namespace Workspace1C
             }
         }
 
-        /// <summary>Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).</summary>
+        /// <summary>Массовая выгрузка выделенных баз/группы в DT/CF с шаблоном имени (issue #92; группа — issue #85).</summary>
         private void OnBatchDumpDtCfClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.ExecuteBatchDumpForSelected();
             _vm.ClearBatchSelection();
         }
 
-        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам (issue #92, v1.0.1.24).</summary>
+        /// <summary>Массовая загрузка конфигурации из .cf по выделенным базам/группе (issue #92; группа — issue #85).</summary>
         private void OnBatchLoadCfClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.ExecuteBatchLoadCfForSelected();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>Пакетная блокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32).</summary>
+        private void OnBatchLockSessionsClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _vm.ExecuteBatchLockSessionsForSelected();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>Пакетная разблокировка сеансов выделенных баз/группы (issue #85, v1.0.1.32).</summary>
+        private void OnBatchUnlockSessionsClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _vm.ExecuteBatchUnlockSessionsForSelected();
             _vm.ClearBatchSelection();
         }
 
