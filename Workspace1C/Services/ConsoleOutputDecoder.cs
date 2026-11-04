@@ -59,20 +59,25 @@ public static class ConsoleOutputDecoder
         // СУБД при валидном выводе). BOM распознаётся явно; без BOM — по нулевым
         // байтам (каждый второй байт у преимущественно латинско-кириллического
         // вывода — NUL).
+        // Issue #79 (v1.0.1.34): санкция NUL-символов и BOM (U+FEFF) выполняется в
+        // ЕДИНОЙ точке для всего декодированного вывода (rac, ibcmd, ring): остатки
+        // «чужой» декодировки UTF-16 как однобайтовой кодировки дают в строке
+        // NUL-символы («db\0m\0s» ≠ «dbms»), из-за которых ключи полей не совпадали.
+        // Валидный вывод консольных утилит NUL не содержит — преобразование безопасно.
         if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
-            return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
+            return SanitizeDecodedText(Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2));
         if (bytes.Length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF)
-            return Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2);
+            return SanitizeDecodedText(Encoding.BigEndianUnicode.GetString(bytes, 2, bytes.Length - 2));
         if (ContainsZeroBytes(bytes))
         {
             // Без BOM, но с NUL-байтами — консольные однобайтовые кодировки NUL не
             // производят, значит это UTF-16 (практически всегда LE).
-            return Encoding.Unicode.GetString(bytes);
+            return SanitizeDecodedText(Encoding.Unicode.GetString(bytes));
         }
 
         try
         {
-            return StrictUtf8.GetString(bytes);
+            return SanitizeDecodedText(StrictUtf8.GetString(bytes));
         }
         catch (DecoderFallbackException)
         {
@@ -98,7 +103,24 @@ public static class ConsoleOutputDecoder
         // что давало mojibake «шь Їрщыр» вместо «Имя файла» в выводе ring).
         var bad866 = CountReplacementChars(decoded866);
         var bad1251 = CountReplacementChars(decoded1251);
-        return bad866 <= bad1251 ? decoded866 : decoded1251;
+        return SanitizeDecodedText(bad866 <= bad1251 ? decoded866 : decoded1251);
+    }
+
+    /// <summary>
+    /// Убирает из декодированного текста NUL-символы и BOM (U+FEFF) — остатки
+    /// «чужой» декодировки UTF-16 как однобайтовой кодировки (issue #79, v1.0.1.34).
+    /// Раньше зачистка NUL была только в <see cref="RacOutputParser.ParseInfo"/> —
+    /// остальные потребители вывода (rac/ibcmd/ring) и другие методы парсера
+    /// получали «декодированный, но с NUL-символами» текст, в котором ключи
+    /// «db\0m\0s» не совпадали с «dbms». Валидный вывод консольных утилит NUL
+    /// не содержит — преобразование безопасно. Private — применяется во всех
+    /// ветках <see cref="Decode"/>; внешний код получает уже чистый текст.
+    /// </summary>
+    private static string SanitizeDecodedText(string text)
+    {
+        if (text.IndexOf('\0') < 0 && text.IndexOf('\uFEFF') < 0)
+            return text;
+        return text.Replace("\0", string.Empty).Replace("\uFEFF", string.Empty);
     }
 
     /// <summary>Считает символы замены U+FFFD (признак неверной кодировки).</summary>

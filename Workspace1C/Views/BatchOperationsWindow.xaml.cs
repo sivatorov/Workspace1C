@@ -144,15 +144,23 @@ namespace Workspace1C
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible
                 ? Visibility.Visible : Visibility.Collapsed;
-            // Issue #92 (v1.0.1.30): «Блокировка начала сеансов» несовместима с движком
-            // «Конфигуратор» (/DumpIB не может войти в базу: «Начало сеанса запрещено») —
-            // галочка отключается с подсказкой-объяснением.
+            // Issue #92 (v1.0.1.34, репорт 7OH: при выключенном RAS выгрузка Конфигуратором
+            // падала с rac-ошибкой): фаза подготовки при движке «Конфигуратор» не
+            // выполняется вовсе — все rac-опции «Перед операцией» дизейблятся с
+            // подсказкой-объяснением (для движка ibcmd опции остаются активными).
             var designerEngine = _vm.IsDumpKind && _vm.DumpEngine == BatchDumpEngine.Designer;
+            PrepareTerminateCheck.IsEnabled = !designerEngine;
             PrepareDenyRow.IsEnabled = !designerEngine;
+            PrepareDenyJobsCheck.IsEnabled = !designerEngine;
+            ToolTipService.SetShowOnDisabled(PrepareTerminateCheck, true);
             ToolTipService.SetShowOnDisabled(PrepareDenyRow, true);
-            PrepareDenyRow.ToolTip = designerEngine
-                ? MakeWrappingToolTip(LocalizationManager.T("BatchOps.Prepare.SessionDenyDesignerHint"))
+            ToolTipService.SetShowOnDisabled(PrepareDenyJobsCheck, true);
+            var designerPrepareTip = designerEngine
+                ? MakeWrappingToolTip(LocalizationManager.T("BatchOps.Prepare.DesignerUnavailableHint"))
                 : null;
+            PrepareTerminateCheck.ToolTip = designerPrepareTip;
+            PrepareDenyRow.ToolTip = designerPrepareTip;
+            PrepareDenyJobsCheck.ToolTip = designerPrepareTip;
             _suppressKindEvents = true;
             KindDtRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpDt;
             KindCfRadio.IsChecked = _vm.Kind == BatchOperationKind.DumpCf;

@@ -79,8 +79,32 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// </summary>
     public bool AdviseManualSourceDbms { get; set; }
 
+    /// <summary>
+    /// Логин СУБД «по умолчанию» (issue #79, v1.0.1.34): если rac вернул профиль без
+    /// пользователя (пустой db-user) — подставляется это значение. Мастер «Развернуть
+    /// тестовую копию» передаёт ручные поля «Данные СУБД источника»; rac-значения
+    /// приоритетны, fallback заполняет ТОЛЬКО пустые поля. null/пусто — не подставлять.
+    /// </summary>
+    public string? DbmsUserFallback { get; set; }
+
+    /// <summary>
+    /// Пароль СУБД «по умолчанию» (issue #79, v1.0.1.34): rac пароль СУБД НЕ возвращает
+    /// никогда — профиль уходил в ibcmd с пустым паролем, и подключение к MS SQL падало
+    /// даже при правильно распознанных данных. Мастер передаёт пароль из ручных полей
+    /// «Данные СУБД источника»; подставляется ТОЛЬКО в пустое поле профиля. null/пусто —
+    /// не подставлять.
+    /// </summary>
+    public string? DbmsPasswordFallback { get; set; }
+
     /// <summary>Причина последней неудачи резолва (для понятного сообщения в окне).</summary>
     public string? LastFailureReason { get; private set; }
+
+    /// <summary>
+    /// Применялся ли при последнем резолве fallback логина/пароля СУБД (issue #79,
+    /// v1.0.1.34) — вызывающий код (мастер «Развернуть тестовую копию») пишет в журнал,
+    /// что креды СУБД взяты из полей мастера. Сбрасывается в начале каждого резолва.
+    /// </summary>
+    public bool LastCredentialFallbackApplied { get; private set; }
 
     /// <param name="racClient">Клиент rac (инъекция — для юнит-тестов с фейком).</param>
     /// <param name="servers">Справочник «Сервера управления»: при совпадении хоста базы
@@ -169,6 +193,7 @@ public sealed class ClusterInfobaseCredentialsResolver
         _log?.Invoke(string.Format(
             LocalizationManager.T("BatchOps.DbmsResolveIbCredentialsSource"), ibCredentialsSource));
         LastFailureReason = null;
+        LastCredentialFallbackApplied = false;
         // Issue #92 (v1.0.1.22): причина последней неудачи сборки профиля по НАЙДЕННОЙ
         // базе (пустой dbms в summary + ошибка «infobase info») — для честного итогового
         // сообщения вместо «база не найдена».
@@ -257,7 +282,11 @@ public sealed class ClusterInfobaseCredentialsResolver
                     LocalizationManager.T("BatchOps.DbmsResolveSummaryFieldsFormat"),
                     match.Name?.Trim(), match.Dbms, match.DbServer, match.DbName, match.DbUser));
 
-                var profile = ToProfile(match, infobase!.Id, infobaseName);
+                var profile = ToProfile(match, infobase!.Id, infobaseName,
+                    DbmsUserFallback, DbmsPasswordFallback);
+                if (profile is not null &&
+                    HasAppliedCredentialFallback(profile, DbmsUserFallback, DbmsPasswordFallback))
+                    LastCredentialFallbackApplied = true;
                 // Issue #79 (v1.0.1.30): профиль из «infobase summary list» принимается
                 // ТОЛЬКО когда в нём есть сервер СУБД — rac 8.5.4 отдаёт в summary пустые
                 // dbms/db-server/db-name/db-user, и профиль с хостом-заглушкой «localhost»
@@ -306,7 +335,11 @@ public sealed class ClusterInfobaseCredentialsResolver
                             timeoutCts.Token).ConfigureAwait(false);
                     }
 
-                    profile = info is null ? null : ToProfile(info, infobase.Id, infobaseName);
+                    profile = info is null ? null : ToProfile(info, infobase.Id, infobaseName,
+                        DbmsUserFallback, DbmsPasswordFallback);
+                    if (profile is not null &&
+                        HasAppliedCredentialFallback(profile, DbmsUserFallback, DbmsPasswordFallback))
+                        LastCredentialFallbackApplied = true;
                     if (profile is not null)
                     {
                         _log?.Invoke(string.Format(
@@ -324,7 +357,11 @@ public sealed class ClusterInfobaseCredentialsResolver
 
                     // Issue #79 (v1.0.1.25): тип СУБД неизвестен, но сервер и имя SQL-БД есть —
                     // подставляем тип «по умолчанию» (тип СУБД с формы мастера).
-                    var fallbackProfile = ToProfileWithFallbackDbms(match, info, FallbackDbms, infobase.Id, infobaseName);
+                    var fallbackProfile = ToProfileWithFallbackDbms(match, info, FallbackDbms, infobase.Id, infobaseName,
+                        DbmsUserFallback, DbmsPasswordFallback);
+                    if (fallbackProfile is not null &&
+                        HasAppliedCredentialFallback(fallbackProfile, DbmsUserFallback, DbmsPasswordFallback))
+                        LastCredentialFallbackApplied = true;
                     if (fallbackProfile is not null)
                     {
                         _log?.Invoke(string.Format(
@@ -700,7 +737,8 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// <paramref name="fallbackDbms"/>. Нужен хотя бы сервер СУБД; иначе null.
     /// </summary>
     internal static DbmsBackupProfile? ToProfileWithFallbackDbms(RacInfobaseSummary? summary, RacInfobaseInfo? info,
-        string? fallbackDbms, string? infobaseId, string infobaseName)
+        string? fallbackDbms, string? infobaseId, string infobaseName,
+        string? dbmsUserFallback = null, string? dbmsPasswordFallback = null)
     {
         var dbms = ParseDbms(fallbackDbms);
         if (dbms is null)
@@ -711,7 +749,7 @@ public sealed class ClusterInfobaseCredentialsResolver
         var dbName = !string.IsNullOrWhiteSpace(info?.DbName) ? info!.DbName : summary?.DbName;
         var dbUser = !string.IsNullOrWhiteSpace(info?.DbUser) ? info!.DbUser : summary?.DbUser;
         var (host, port) = ParseDbServer(dbServer);
-        return new DbmsBackupProfile
+        var profile = new DbmsBackupProfile
         {
             InfobaseId = infobaseId ?? string.Empty,
             Dbms = dbms.Value,
@@ -721,6 +759,8 @@ public sealed class ClusterInfobaseCredentialsResolver
             User = dbUser?.Trim() ?? string.Empty,
             Password = string.Empty
         };
+        ApplyDbmsCredentialFallback(profile, dbmsUserFallback, dbmsPasswordFallback);
+        return profile;
     }
 
     /// <summary>
@@ -728,7 +768,8 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// fallback при пустой колонке «dbms» в «infobase summary list» (rac 8.5.4).
     /// Правила те же: поддерживаемые СУБД, пароль остаётся пустым.
     /// </summary>
-    internal static DbmsBackupProfile? ToProfile(RacInfobaseInfo info, string? infobaseId, string infobaseName)
+    internal static DbmsBackupProfile? ToProfile(RacInfobaseInfo info, string? infobaseId, string infobaseName,
+        string? dbmsUserFallback = null, string? dbmsPasswordFallback = null)
     {
         if (info is null)
             return null;
@@ -737,7 +778,7 @@ public sealed class ClusterInfobaseCredentialsResolver
             return null;
 
         var (host, port) = ParseDbServer(info.DbServer);
-        return new DbmsBackupProfile
+        var profile = new DbmsBackupProfile
         {
             InfobaseId = infobaseId ?? string.Empty,
             Dbms = dbms.Value,
@@ -747,6 +788,8 @@ public sealed class ClusterInfobaseCredentialsResolver
             User = info.DbUser?.Trim() ?? string.Empty,
             Password = string.Empty
         };
+        ApplyDbmsCredentialFallback(profile, dbmsUserFallback, dbmsPasswordFallback);
+        return profile;
     }
 
     /// <summary>
@@ -756,7 +799,8 @@ public sealed class ClusterInfobaseCredentialsResolver
     /// сервер 1С именует БД в СУБД так же, как ИБ — берётся имя ИБ. Пароль остаётся пустым
     /// (rac его не возвращает).
     /// </summary>
-    internal static DbmsBackupProfile? ToProfile(RacInfobaseSummary summary, string? infobaseId, string infobaseName)
+    internal static DbmsBackupProfile? ToProfile(RacInfobaseSummary summary, string? infobaseId, string infobaseName,
+        string? dbmsUserFallback = null, string? dbmsPasswordFallback = null)
     {
         if (summary is null)
             return null;
@@ -765,7 +809,7 @@ public sealed class ClusterInfobaseCredentialsResolver
             return null;
 
         var (host, port) = ParseDbServer(summary.DbServer);
-        return new DbmsBackupProfile
+        var profile = new DbmsBackupProfile
         {
             InfobaseId = infobaseId ?? string.Empty,
             Dbms = dbms.Value,
@@ -775,7 +819,44 @@ public sealed class ClusterInfobaseCredentialsResolver
             User = summary.DbUser?.Trim() ?? string.Empty,
             Password = string.Empty
         };
+        ApplyDbmsCredentialFallback(profile, dbmsUserFallback, dbmsPasswordFallback);
+        return profile;
     }
+
+    /// <summary>
+    /// Дополняет пустые логин/пароль профиля СУБД из fallback-значений (issue #79,
+    /// v1.0.1.34): rac-значения приоритетны, fallback заполняет ТОЛЬКО пустые поля
+    /// (пароль rac не возвращает никогда). Возвращает true, если профиль изменён.
+    /// Чистый helper — для юнит-теста.
+    /// </summary>
+    internal static bool ApplyDbmsCredentialFallback(DbmsBackupProfile? profile,
+        string? userFallback, string? passwordFallback)
+    {
+        if (profile is null)
+            return false;
+        var changed = false;
+        if (string.IsNullOrWhiteSpace(profile.User) && !string.IsNullOrWhiteSpace(userFallback))
+        {
+            profile.User = userFallback.Trim();
+            changed = true;
+        }
+        if (string.IsNullOrWhiteSpace(profile.Password) && !string.IsNullOrWhiteSpace(passwordFallback))
+        {
+            profile.Password = passwordFallback;
+            changed = true;
+        }
+        return changed;
+    }
+
+    /// <summary>Применился ли fallback кред СУБД к профилю (issue #79, v1.0.1.34):
+    /// поле профиля совпадает со значением fallback — признак того, что пустое поле
+    /// было заполнено из ручных полей мастера, а не пришло из rac.</summary>
+    private static bool HasAppliedCredentialFallback(DbmsBackupProfile profile,
+        string? userFallback, string? passwordFallback) =>
+        (!string.IsNullOrWhiteSpace(userFallback) &&
+         string.Equals(profile.User, userFallback.Trim(), StringComparison.Ordinal)) ||
+        (!string.IsNullOrWhiteSpace(passwordFallback) &&
+         string.Equals(profile.Password, passwordFallback, StringComparison.Ordinal));
 
     /// <summary>Вид СУБД из значения rac («PostgreSQL», «MSSQLServer», «MS»); null — не поддерживается ibcmd.</summary>
     internal static DbmsKind? ParseDbms(string? dbms) =>

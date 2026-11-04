@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -21,6 +22,22 @@ namespace Workspace1C.Services;
 /// </summary>
 public static class RacOutputParser
 {
+    static RacOutputParser()
+    {
+        // Кодовые страницы 866/1251 нужны для mojibake-вариантов русских ключей
+        // (issue #79, v1.0.1.34); ConsoleOutputDecoder регистрирует провайдер в
+        // своём статическом конструкторе — здесь идемпотентная страховка.
+        try
+        {
+            Encoding.RegisterProvider(System.Text.CodePagesEncodingProvider.Instance);
+        }
+        catch
+        {
+            // Провайдер уже зарегистрирован/недоступен — mojibake-варианты строятся
+            // по доступным кодировкам.
+        }
+    }
+
     /// <summary>
     /// Разделитель для fallback-разбора таблицы без табуляций: 2+ пробела подряд.
     /// Одиночный пробел внутри значения (имя кластера, строка подключения) остаётся
@@ -179,7 +196,9 @@ public static class RacOutputParser
         {
             // Issue #79 (v1.0.1.31): NUL-символы (остатки UTF-16-вывода, прошедшего
             // чужую декодировку) ломают сравнение ключей — вычищаются из строки.
-            var line = rawLine.TrimEnd('\r').Replace("\0", string.Empty);
+            // Issue #79 (v1.0.1.34): вместе с NUL вычищается и BOM (U+FEFF) —
+            // по образцу санкции декодера (<see cref="ConsoleOutputDecoder"/>).
+            var line = rawLine.TrimEnd('\r').Replace("\0", string.Empty).Replace("\uFEFF", string.Empty);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
@@ -295,7 +314,10 @@ public static class RacOutputParser
 
         foreach (var rawLine in (output ?? string.Empty).Split('\n'))
         {
-            var line = rawLine.TrimEnd('\r');
+            // Issue #79 (v1.0.1.34): NUL/BOM-символы вычищаются так же, как в
+            // <see cref="ParseInfo"/>, — ключи «db\0m\0s» не должны отличаться от «dbms»
+            // ни в стартере блока, ни в хранимых ключах.
+            var line = rawLine.TrimEnd('\r').Replace("\0", string.Empty).Replace("\uFEFF", string.Empty);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
@@ -303,7 +325,7 @@ public static class RacOutputParser
             if (colon <= 0)
                 continue;
 
-            var key = line.Substring(0, colon).Trim();
+            var key = NormalizeKey(line.Substring(0, colon));
             if (key.Length == 0)
                 continue;
 
@@ -365,7 +387,10 @@ public static class RacOutputParser
             return false;
         foreach (var rawLine in output.Split('\n'))
         {
-            var line = rawLine.TrimEnd('\r');
+            // Issue #79 (v1.0.1.34): NUL/BOM-символы вычищаются так же, как в
+            // <see cref="ParseInfo"/>, — иначе «к\0л\0ю\0ч : …» не распознаётся
+            // как key-value вывод и fallback не включается.
+            var line = rawLine.TrimEnd('\r').Replace("\0", string.Empty).Replace("\uFEFF", string.Empty);
             if (string.IsNullOrWhiteSpace(line))
                 continue;
             if (line.IndexOf('\t') >= 0)
@@ -1004,16 +1029,115 @@ public static class RacOutputParser
         };
     }
 
-    /// <summary>Значение по ключу без учёта регистра или пустая строка.</summary>
+    /// <summary>
+    /// Русские алиасы ключей rac (issue #79, v1.0.1.34): rac ЛОКАЛИЗУЕТ вывод
+    /// (прецедент — русская справка «Использование:» в <c>RacClient.LooksLikeUsageHelp</c>),
+    /// поэтому на машинах с русской локалью сообщений вместо «dbms» приходит «субд»,
+    /// вместо «db-server» — «сервер бд» и т.д. Маппинг «английский ключ → русские алиасы»;
+    /// применяется ТОЛЬКО когда английский ключ не найден/пуст — исключает коллизии
+    /// с англоязычными значениями.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> RussianKeyAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["infobase"] = new[] { "информационная база" },
+            ["name"] = new[] { "имя" },
+            ["descr"] = new[] { "описание" },
+            ["dbms"] = new[] { "субд", "тип субд" },
+            ["db-server"] = new[] { "сервер бд", "сервер субд" },
+            ["db-name"] = new[] { "имя базы данных", "база данных" },
+            ["db-user"] = new[] { "пользователь бд", "пользователь субд" },
+            ["locale"] = new[] { "локаль" },
+            ["sessions-deny"] = new[] { "блокировка начала сеансов" },
+            ["scheduled-jobs-deny"] = new[] { "блокировка регламентных заданий" },
+            ["hostName"] = new[] { "хост" },
+            ["port"] = new[] { "порт" }
+        };
+
+    /// <summary>Ленивый индекс алиасов с mojibake-вариантами (см. <see cref="BuildKeyAliasIndex"/>).</summary>
+    private static Dictionary<string, string[]>? _keyAliasIndex;
+
+    /// <summary>
+    /// Значение по ключу без учёта регистра или пустая строка. Issue #79 (v1.0.1.34):
+    /// сначала ищется английский ключ, затем русские алиасы (с mojibake-вариантами) —
+    /// локализованный вывод rac распознаётся без изменения маппинга полей.
+    /// </summary>
     private static string Get(IReadOnlyDictionary<string, string> properties, string key)
+    {
+        var value = Lookup(properties, key);
+        if (value.Length > 0)
+            return value;
+
+        foreach (var alias in GetKeyAliases(key))
+        {
+            value = Lookup(properties, alias);
+            if (value.Length > 0)
+                return value;
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>Прямой поиск по словарю: ключи нормализуются (Trim + удаление NUL/BOM) —
+    /// сравнение не ломается на остатках чужой декодировки UTF-16 (issue #79, v1.0.1.34).</summary>
+    private static string Lookup(IReadOnlyDictionary<string, string> properties, string key)
     {
         foreach (var pair in properties)
         {
-            if (string.Equals(pair.Key, key, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(NormalizeKey(pair.Key), NormalizeKey(key), StringComparison.OrdinalIgnoreCase))
                 return pair.Value;
         }
 
         return string.Empty;
+    }
+
+    /// <summary>Нормализация ключа «ключ: значение» вывода rac: Trim + удаление NUL- и
+    /// BOM-символов (issue #79, v1.0.1.34). Чистый helper — применяется при сравнении
+    /// ключей в одном месте.</summary>
+    private static string NormalizeKey(string key) =>
+        key.Trim().Replace("\0", string.Empty).Replace("\uFEFF", string.Empty);
+
+    /// <summary>Алиасы ключа (русские + mojibake-варианты) или пустой массив.</summary>
+    private static string[] GetKeyAliases(string key)
+    {
+        var index = _keyAliasIndex ??= BuildKeyAliasIndex();
+        return index.TryGetValue(key, out var aliases) ? aliases : Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Индекс «ключ → алиасы» из <see cref="RussianKeyAliases"/> плюс mojibake-варианты
+    /// каждого алиаса (issue #79, v1.0.1.34, по образцу <see cref="ConsoleOutputDecoder.FixCp1251ToCp866Mojibake"/>):
+    /// cp866-вывод, декодированный как cp1251, даёт «шь Їрщыр»-подобные ключи — для
+    /// коротких известных ключей перезакодирование cp866 → cp1251 восстанавливает
+    /// соответствие. Чистый helper — построение выполняется однократно.
+    /// </summary>
+    private static Dictionary<string, string[]> BuildKeyAliasIndex()
+    {
+        var index = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var cp866 = Encoding.GetEncoding(866);
+            var cp1251 = Encoding.GetEncoding(1251);
+            foreach (var pair in RussianKeyAliases)
+            {
+                var aliases = new List<string>(pair.Value);
+                foreach (var alias in pair.Value)
+                {
+                    var moji = cp1251.GetString(cp866.GetBytes(alias));
+                    if (moji.Length > 0 && !string.Equals(moji, alias, StringComparison.Ordinal))
+                        aliases.Add(moji);
+                }
+                index[pair.Key] = aliases.ToArray();
+            }
+        }
+        catch
+        {
+            // Провайдер кодовых страниц недоступен (не бывает на Windows/Linux со
+            // стандартным набором пакетов) — алиасы без mojibake-вариантов.
+            foreach (var pair in RussianKeyAliases)
+                index[pair.Key] = pair.Value;
+        }
+        return index;
     }
 
     /// <summary>Значение по ПЕРВОМУ найденному ключу из списка алиасов (регистронезависимо)

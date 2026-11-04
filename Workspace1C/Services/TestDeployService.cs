@@ -506,6 +506,11 @@ public sealed class TestDeployService
             // «infobase info» (права администратора ИБ) и пустого dbms rac 8.5.
             resolver.CredentialOverride = scenario.Credential;
             resolver.FallbackDbms = scenario.Dbms;
+            // Issue #79 (v1.0.1.34): логин/пароль СУБД из ручных полей мастера дополняют
+            // ПУСТЫЕ поля rac-профиля (rac пароль СУБД не возвращает никогда — профиль
+            // уходил в ibcmd с пустым паролем, и подключение к MS SQL падало).
+            resolver.DbmsUserFallback = scenario.SourceDbUser;
+            resolver.DbmsPasswordFallback = scenario.SourceDbPassword;
             // Issue #79 (v1.0.1.29): при неудаче резолва журнал/окно мастера прямо
             // советуют ручные данные СУБД источника ИЛИ движок «Конфигуратор».
             resolver.AdviseManualSourceDbms = true;
@@ -514,6 +519,11 @@ public sealed class TestDeployService
                 var fromRac = await resolver.ResolveAsync(source, ct).ConfigureAwait(false);
                 if (fromRac is not null && !string.IsNullOrWhiteSpace(fromRac.Database))
                 {
+                    // Issue #79 (v1.0.1.34): страховочный merge и для профилей, собранных
+                    // кастомным резолвером — пустые поля дополняются из полей мастера.
+                    // Признак применения fallback учитывает и резолвер (LastCredentialFallbackApplied).
+                    if (MergeSourceDbmsCredentials(fromRac, scenario) || resolver.LastCredentialFallbackApplied)
+                        log?.Invoke(T("TestDeploy.SourceDbmsCredentialsFromMaster"));
                     log?.Invoke(string.Format(T("TestDeploy.SourceDbmsResolvedFormat"),
                         $"{fromRac.Dbms}/{fromRac.Host}/{fromRac.Database}" +
                         (string.IsNullOrEmpty(fromRac.User) ? "" : $"/{fromRac.User}")));
@@ -556,6 +566,32 @@ public sealed class TestDeployService
         return scenario is { UseSourceDbmsOverride: true } &&
                !string.IsNullOrWhiteSpace(scenario.SourceDbServer) &&
                !string.IsNullOrWhiteSpace(scenario.SourceDbName);
+    }
+
+    /// <summary>
+    /// Дополняет профиль СУБД из rac пустыми логином/паролем из ручных полей мастера
+    /// (issue #79, v1.0.1.34): rac-значения приоритетны, поля мастера заполняют ТОЛЬКО
+    /// пустые (пароль rac не возвращает никогда — ibcmd падал на авторизации даже при
+    /// правильно распознанных данных). Возвращает true, если профиль изменён.
+    /// Internal — чистый helper для юнит-теста.
+    /// </summary>
+    internal static bool MergeSourceDbmsCredentials(DbmsBackupProfile? profile, TestDeployScenario? scenario)
+    {
+        if (profile is null || scenario is null)
+            return false;
+        var changed = false;
+        var user = scenario.SourceDbUser?.Trim();
+        if (string.IsNullOrWhiteSpace(profile.User) && !string.IsNullOrWhiteSpace(user))
+        {
+            profile.User = user;
+            changed = true;
+        }
+        if (string.IsNullOrWhiteSpace(profile.Password) && !string.IsNullOrWhiteSpace(scenario.SourceDbPassword))
+        {
+            profile.Password = scenario.SourceDbPassword;
+            changed = true;
+        }
+        return changed;
     }
 
     /// <summary>

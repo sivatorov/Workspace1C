@@ -271,6 +271,15 @@ public sealed class BatchOperationsViewModel : ViewModelBase
     /// </summary>
     public bool IsDbmsPasswordVisible => IsDumpKind && DumpEngine == BatchDumpEngine.Ibcmd;
 
+    /// <summary>
+    /// Выгрузка идёт движком «Конфигуратор» (issue #92, v1.0.1.34): rac не требуется —
+    /// и rac-резолв профиля СУБД, и фаза подготовки «Перед операцией» пропускаются,
+    /// чтобы недоступный RAS не блокировал выгрузку ошибкой соединения.
+    /// </summary>
+    private bool IsDesignerDumpEngine =>
+        Kind is BatchOperationKind.DumpDt or BatchOperationKind.DumpCf &&
+        DumpEngine == BatchDumpEngine.Designer;
+
     /// <summary>Пропускать ли запущенную базу при текущих настройках (issue #92, v1.0.1.25;
     /// v1.0.1.28 — опция «Выгружать и запущенные» действует только для ibcmd).</summary>
     internal bool ShouldSkipRunning(Infobase infobase) =>
@@ -550,6 +559,11 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             DumpEngine == BatchDumpEngine.Designer)
         {
             AppendLog($"[{DateTime.Now:HH:mm:ss}] " + LocalizationManager.T("BatchOps.EngineDesignerLog"));
+            // Issue #92 (v1.0.1.34, репорт 7OH: при выключенном RAS выгрузка Конфигуратором
+            // падала с rac-ошибкой): фаза подготовки «Перед операцией» не выполняется —
+            // rac для Конфигуратора не требуется, пользователь видит почему чекбоксы
+            // подготовки неактивны.
+            AppendLog($"[{DateTime.Now:HH:mm:ss}] " + LocalizationManager.T("BatchOps.PrepareSkippedDesigner"));
         }
 
         // Issue #92 (v1.0.1.21): строка журнала «запущен ibcmd (PID …)» на каждый запуск —
@@ -593,7 +607,11 @@ public sealed class BatchOperationsViewModel : ViewModelBase
             // фаза подготовки НЕ выполняется — опции чекбоксов применяются САМОЙ
             // операцией (иначе «infobase update» ставился бы и тут же снимался
             // восстановлением после операции).
-            if (prepareOptions.Any && !IsSessionLockOperation)
+            // Issue #92 (v1.0.1.34): для выгрузок движком «Конфигуратор» rac-подготовка
+            // НЕ запускается вовсе — Конфигуратор сам держит монопольный доступ к базе,
+            // а rac-ошибка (недоступный RAS) переводила базу в Skipped и выгрузка
+            // не выполнялась. Для движка ibcmd поведение прежнее (сбой → Skipped).
+            if (prepareOptions.Any && !IsSessionLockOperation && !IsDesignerDumpEngine)
             {
                 var preparation = PreparationService;
                 if (preparation is null)

@@ -343,6 +343,9 @@ namespace Workspace1C
             };
             prepareTerminateCheck.Bind(CheckBox.IsCheckedProperty,
                 new Avalonia.Data.Binding("PrepareTerminateSessions") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            // Issue #92 (v1.0.1.34): ссылки на rac-опции подготовки — при движке
+            // «Конфигуратор» все они дизейблятся (см. UpdateKindDependentUi).
+            _prepareTerminateCheck = prepareTerminateCheck;
             var prepareDenySessionsCheck = new CheckBox
             {
                 Content = LocalizationManager.T("BatchOps.Prepare.DenyNewSessions"),
@@ -382,6 +385,8 @@ namespace Workspace1C
             };
             prepareDenyJobsCheck.Bind(CheckBox.IsCheckedProperty,
                 new Avalonia.Data.Binding("PrepareDenyScheduledJobs") { Mode = Avalonia.Data.BindingMode.TwoWay });
+            // Issue #92 (v1.0.1.34): ссылка на rac-опцию подготовки (см. выше).
+            _prepareDenyJobsCheck = prepareDenyJobsCheck;
             var prepareHint = new TextBlock
             {
                 Text = LocalizationManager.T("BatchOps.Prepare.Hint"),
@@ -554,6 +559,8 @@ namespace Workspace1C
         private RadioButton? _kindCfRadio;
         private RadioButton? _engineIbcmdRadio;
         private RadioButton? _engineDesignerRadio;
+        private CheckBox? _prepareTerminateCheck;
+        private CheckBox? _prepareDenyJobsCheck;
         private bool _suppressKindEvents;
 
         /// <summary>
@@ -606,15 +613,30 @@ namespace Workspace1C
             // Блок «Пароль пользователя СУБД» — только для движка ibcmd (issue #92, v1.0.1.28).
             if (_sqlPasswordPanel is not null)
                 _sqlPasswordPanel.IsVisible = _vm.IsDbmsPasswordVisible;
-            // Issue #92 (v1.0.1.30): «Блокировка начала сеансов» несовместима с движком
-            // «Конфигуратор» (/DumpIB не может войти в базу: «Начало сеанса запрещено») —
-            // галочка отключается с подсказкой-объяснением.
+            // Issue #92 (v1.0.1.34, репорт 7OH: при выключенном RAS выгрузка Конфигуратором
+            // падала с rac-ошибкой): фаза подготовки при движке «Конфигуратор» не
+            // выполняется вовсе — все rac-опции «Перед операцией» дизейблятся с
+            // подсказкой-объяснением (для движка ibcmd опции остаются активными).
+            var designerEngine = _vm.IsDumpKind && _vm.DumpEngine == BatchDumpEngine.Designer;
+            if (_prepareTerminateCheck is not null)
+            {
+                _prepareTerminateCheck.IsEnabled = !designerEngine;
+                ToolTip.SetTip(_prepareTerminateCheck, designerEngine
+                    ? MakeWrappingTip(LocalizationManager.T("BatchOps.Prepare.DesignerUnavailableHint"))
+                    : null);
+            }
             if (_prepareDenyRow is not null)
             {
-                var designerEngine = _vm.IsDumpKind && _vm.DumpEngine == BatchDumpEngine.Designer;
                 _prepareDenyRow.IsEnabled = !designerEngine;
                 ToolTip.SetTip(_prepareDenyRow, designerEngine
-                    ? MakeWrappingTip(LocalizationManager.T("BatchOps.Prepare.SessionDenyDesignerHint"))
+                    ? MakeWrappingTip(LocalizationManager.T("BatchOps.Prepare.DesignerUnavailableHint"))
+                    : null);
+            }
+            if (_prepareDenyJobsCheck is not null)
+            {
+                _prepareDenyJobsCheck.IsEnabled = !designerEngine;
+                ToolTip.SetTip(_prepareDenyJobsCheck, designerEngine
+                    ? MakeWrappingTip(LocalizationManager.T("BatchOps.Prepare.DesignerUnavailableHint"))
                     : null);
             }
             _suppressKindEvents = true;
