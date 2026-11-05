@@ -102,6 +102,19 @@ public class TestDeployWindow : Window
         _vm = new TestDeployViewModel(
             source, allInfobases, _groups, proposedName, proposedServer, proposedDbRef, proposedFile);
 
+        // Issue #79 (комментарий 7OH 2026-11-05T11:22): «Просьба сохранять значения окна:
+        // Движок выгрузки, Сервер СУБД, Пользователь СУБД» — значения восстанавливаются
+        // из последнего сценария этой исходной базы (test_deploy.json); сбой хранилища
+        // окно не блокирует.
+        try
+        {
+            _vm.ApplyRememberedWindowValues(TestDeployStore.FindLastForSource(source.Id));
+        }
+        catch
+        {
+            // Хранилище сценариев недоступно — окно открывается со значениями по умолчанию.
+        }
+
         Title = LocalizationManager.T("TestDeploy.Title");
         Width = 760;
         Height = 720;
@@ -259,7 +272,8 @@ public class TestDeployWindow : Window
         SelectDbmsComboItem(_vm.Dbms);
         _dbmsCombo.SelectionChanged += (_, _) =>
             _vm.Dbms = (_dbmsCombo.SelectedItem as TestDeployDbmsOption)?.Value ?? _vm.Dbms;
-        _dbServerBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
+        // Восстановленное значение окна «Сервер СУБД» (issue #79, 2026-11-05).
+        _dbServerBox = new TextBox { Margin = new Thickness(0, 2, 0, 0), Text = _vm.DbServer };
         _dbServerBox.TextChanged += (_, _) => _vm.DbServer = _dbServerBox.Text;
         _serverPanel.Children.Add(MakeFieldsRow(
             ("TestDeploy.Dbms", _dbmsCombo), ("TestDeploy.DbServer", _dbServerBox)));
@@ -268,7 +282,8 @@ public class TestDeployWindow : Window
         // (issue #79, v1.0.1.32, раскладка 7OH п.4) ---
         _dbNameBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbNameBox.TextChanged += (_, _) => _vm.DbName = _dbNameBox.Text;
-        _dbUserBox = new TextBox { Margin = new Thickness(0, 2, 0, 0) };
+        // Восстановленное значение окна «Пользователь СУБД» (issue #79, 2026-11-05).
+        _dbUserBox = new TextBox { Margin = new Thickness(0, 2, 0, 0), Text = _vm.DbUser };
         _dbUserBox.TextChanged += (_, _) => _vm.DbUser = _dbUserBox.Text;
         _dbPwdBox = new PasswordBox { Margin = new Thickness(0, 2, 0, 0) };
         _dbPwdBox.PasswordChanged += (_, _) => _vm.DbPassword = _dbPwdBox.Password;
@@ -749,8 +764,10 @@ public class TestDeployWindow : Window
                 CreatedGroup = groupPlan.NewGroup;
             }
 
-            _logList.Items.Add(LocalizationManager.T(
-                result.TargetCreated ? "TestDeploy.DoneCreated" : "TestDeploy.DoneUpdated"));
+            // Issue #79 (комментарий 7OH 2026-11-05): ключ DoneCreated/DoneUpdated содержит
+            // {0} — имя тестовой базы; раньше подставлялось без string.Format, и в журнале
+            // окна оставался не заполненный плейсхолдер.
+            _logList.Items.Add(TestDeployService.DoneMessage(result));
             DialogResult = true;
         }
         catch (Exception ex)

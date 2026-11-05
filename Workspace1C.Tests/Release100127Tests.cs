@@ -40,18 +40,18 @@ public sealed class Release100127Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия (актуальная — 1.0.1.35, issues #92/#79/#103) =====================
+    // ===================== Версия (актуальная — 1.0.1.37, issues #104/#105/#79/#106) =====================
 
     [Fact]
     public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.35</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.35</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.35</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.35</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.34", csproj, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.1.37</Version>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>1.0.1.37</AssemblyVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>1.0.1.37</FileVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>1.0.1.37</InformationalVersion>", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("1.0.1.36", csproj, StringComparison.Ordinal);
     }
 
     // ===================== Issue #102: переносимый текст =====================

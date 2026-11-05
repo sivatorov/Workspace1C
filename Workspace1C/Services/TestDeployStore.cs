@@ -66,4 +66,26 @@ public static class TestDeployStore
             return null;
         return Load().FirstOrDefault(s => string.Equals(s.Id, id, StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// Последний сценарий исходной базы (issue #79, комментарий 7OH 2026-11-05T11:22:
+    /// «Просьба сохранять значения окна: Движок выгрузки, Сервер СУБД, Пользователь СУБД»).
+    /// Сценарии накапливаются по одному на успешное развёртывание — последним в списке
+    /// хранится самый свежий; используется окном мастера для восстановления значений.
+    /// <paramref name="scenarios"/> — точка подмены списка для юнит-тестов (null — читается
+    /// хранилище). Возвращает null, если сценариев этой базы нет.
+    /// </summary>
+    public static TestDeployScenario? FindLastForSource(
+        string? infobaseId, IReadOnlyList<TestDeployScenario>? scenarios = null)
+    {
+        if (string.IsNullOrWhiteSpace(infobaseId))
+            return null;
+        var list = (IReadOnlyList<TestDeployScenario>)(scenarios ?? (IReadOnlyList<TestDeployScenario>)Load());
+        for (var i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i].MatchesSource(infobaseId))
+                return list[i];
+        }
+        return null;
+    }
 }

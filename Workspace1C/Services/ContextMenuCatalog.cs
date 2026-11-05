@@ -108,7 +108,15 @@ public enum ContextMenuCommandKind
     /// (имя, сервер/файл, движок выгрузки, регламенты, заголовок/цвет, группа «Тест»,
     /// расписание) с выполнением через <c>TestDeployService</c>.
     /// </summary>
-    TestDeploy
+    TestDeploy,
+
+    /// <summary>
+    /// «Массовая загрузка cf через Конфигуратор» (issue #106, автор aepkugesi):
+    /// окно-чеклист баз (группа/мультивыделение), файл .cf и опции перед загрузкой
+    /// (выгрузка .dt, завершение сеансов, блокировка начала сеансов, блокировка
+    /// регламентных заданий). Загрузка — Конфигуратор /LoadCfg + /UpdateDBCfg.
+    /// </summary>
+    MassLoadCf
 }
 
 /// <summary>
@@ -282,6 +290,31 @@ public static class ContextMenuCatalog
         return null;
     }
 
+    /// <summary>
+    /// Применим ли пункт к ВЫБРАННОЙ ГРУППЕ дерева (issue #105, запрос 7OH): для группы
+    /// показываются только команды, которые реально работают с группой — «Для выделенных
+    /// (N)…» (пакетные операции, включая резервные копии и скрипты по базам группы),
+    /// «Пользовательские действия…» (контекст «Группа»), «Добавить базу» (в выбранную
+    /// группу), «Очистить кэш» (с предвыбором баз группы), «Удалить» (группу) и
+    /// «Изменить настройки» (группы). Остальные команды работают только с выделенной
+    /// базой и для группы скрываются (не блокируются).
+    /// </summary>
+    public static bool IsGroupApplicable(ContextMenuCommandKind kind) => kind switch
+    {
+        ContextMenuCommandKind.BatchOperations or
+        ContextMenuCommandKind.CustomActions or
+        ContextMenuCommandKind.AddBase or
+        ContextMenuCommandKind.ClearProgramCache or
+        ContextMenuCommandKind.ClearUserCache or
+        ContextMenuCommandKind.ClearCacheBoth or
+        ContextMenuCommandKind.Delete or
+        ContextMenuCommandKind.EditSettings or
+        // «Массовая загрузка cf» (issue #106): работает и с группой — цели
+        // собираются как в пакетных операциях («Для группы (N)…»).
+        ContextMenuCommandKind.MassLoadCf => true,
+        _ => false
+    };
+
     private static IReadOnlyList<ContextMenuItem> BuildAll()
     {
         return new List<ContextMenuItem>
@@ -358,6 +391,11 @@ public static class ContextMenuCatalog
             // «Список выгрузок» (функция №18, Ctrl+Shift+F7).
             new("ShowExportsList", "Restore.Title", GroupBackup,
                 "DatabaseImport", "IconDatabaseImport", "#3B82F6", ContextMenuCommandKind.ShowExportsList, "HotkeyExportsList"),
+            // «Массовая загрузка cf через Конфигуратор» (issue #106): новый пункт —
+            // при сохранённой компоновке попадёт в «Новинки приложения».
+            new("MassLoadCf", "Main.BatchLoadCfCfg", GroupBackup,
+                "DatabaseImport", "IconDatabaseImport", "#EF4444", ContextMenuCommandKind.MassLoadCf,
+                isNew: true),
 
             // ---- Очистить кэш ----
             new("ClearProgramCache", "Main.ClearProgramCache", GroupClearCache,
@@ -455,7 +493,8 @@ public static class ContextMenuLayouts
                 Item("DumpToDt"),
                 Item("DumpConfigToCf"),
                 Separator(),
-                Item("ShowExportsList")
+                Item("ShowExportsList"),
+                Item("MassLoadCf")
             }),
             Group(ContextMenuCatalog.GroupClearCache, new List<ContextMenuNode>
             {

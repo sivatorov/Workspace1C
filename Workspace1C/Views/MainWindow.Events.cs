@@ -1195,6 +1195,20 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
+        /// <summary>
+        /// Массовая загрузка cf через Конфигуратор по выделенным базам/группе
+        /// (issue #106, автор aepkugesi): опции перед загрузкой (выгрузка .dt,
+        /// завершение сеансов, блокировка начала сеансов, блокировка регламентных
+        /// заданий), загрузка — /LoadCfg + /UpdateDBCfg.
+        /// </summary>
+        private void OnBatchMassLoadCf_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _viewModel.ExecuteMassLoadCfForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
         /// <summary>Проверить доступность баз мультивыделения.</summary>
         private void OnBatchCheckAvailability_Click(object sender, RoutedEventArgs e)
         {

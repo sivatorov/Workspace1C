@@ -31,6 +31,10 @@ public partial class MainWindow
     /// <summary>Отпечаток компоновки, по которой построено текущее меню (для перечитывания при открытии).</summary>
     private string? _rowContextMenuLayoutKey;
 
+    /// <summary>Меню построено для выбранной группы (issue #105): при смене контекста
+    /// (группа ↔ база) меню перестраивается при открытии с фильтрацией неприменимых пунктов.</summary>
+    private bool? _rowContextMenuBuiltForGroup;
+
     /// <summary>
     /// Строит контекстное меню строки базы по каталогу+компоновке (issue #56).
     /// Правка структуры выключена (по умолчанию) — стандартная компоновка; включена —
@@ -53,7 +57,9 @@ public partial class MainWindow
         return menu;
     }
 
-    /// <summary>Наполняет пункты меню по актуальной компоновке и запоминает её отпечаток.</summary>
+    /// <summary>Наполняет пункты меню по актуальной компоновке и запоминает её отпечаток.
+    /// Если меню открывается для выбранной группы — компоновка фильтруется по
+    /// применимости к группе (issue #105).</summary>
     private void PopulateRowContextMenu(ItemCollection target)
     {
         if (target is null)
@@ -65,14 +71,26 @@ public partial class MainWindow
         if (_viewModel is null)
         {
             _rowContextMenuLayoutKey = null;
+            _rowContextMenuBuiltForGroup = null;
             return;
         }
         var store = AppServices.TryGetService<IContextMenuLayoutStore>();
         var layout = ContextMenuResolver.PrepareForMenu(
             ContextMenuResolver.Resolve(new AppSettings { ContextMenuEditingEnabled = _viewModel.ContextMenuEditingEnabled }, store));
-        AppendRowContextNodes(target, layout.Root);
+        // Issue #105 (запрос 7OH): для выбранной группы показываем только применимые
+        // пункты (скрытие, а не блокировка; пустые подменю не показываются).
+        var forGroup = IsRowMenuGroupContext();
+        AppendRowContextNodes(target, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
         _rowContextMenuLayoutKey = LayoutFingerprint(layout);
+        _rowContextMenuBuiltForGroup = forGroup;
     }
+
+    /// <summary>Целевой контекст меню — выбранная группа дерева (без мультивыделения
+    /// и без выделенной базы; узлы-маркеры «Без группы»/«Закреплённые» не считаются).</summary>
+    private bool IsRowMenuGroupContext() =>
+        _viewModel is { } vm &&
+        vm.SelectedInfobase is null &&
+        vm.SelectedGroupNode?.Group is not null;
 
     /// <summary>Рекурсивно добавляет узлы компоновки в целевой список пунктов меню (issue #56).</summary>
     private void AppendRowContextNodes(ItemCollection target, List<ContextMenuNode> nodes)
@@ -322,6 +340,8 @@ public partial class MainWindow
                 item.Command = _viewModel.EditInfobaseCommand; break;
             case ContextMenuCommandKind.Notes:
                 item.Command = _viewModel.ShowBaseNotesCommand; break;
+            case ContextMenuCommandKind.MassLoadCf:
+                item.Command = _viewModel.MassLoadCfCommand; break;
         }
     }
 
@@ -345,6 +365,9 @@ public partial class MainWindow
         batchMenu.Items.Add(CreateBatchAction("Main.BatchLockSessions", "Lock", "@WarningBrush", OnBatchLockSessions_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchUnlockSessions", "LockOpen", "@InfoBrush", OnBatchUnlockSessions_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchCheckAvailability", "CloudCheck", "@InfoBrush", OnBatchCheckAvailability_Click));
+        // Массовая загрузка cf через Конфигуратор (issue #106, автор aepkugesi):
+        // опции перед загрузкой (выгрузка .dt, завершение сеансов, блокировки).
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchLoadCfCfg", "DatabaseImport", "@ErrorBrush", OnBatchMassLoadCf_Click));
         // Массовая замена строк подключения (0.3.9.191, функция 6).
         batchMenu.Items.Add(CreateBatchAction("Main.BatchConnectionReplace", "FindReplace", "@WarningBrush", OnBatchConnectionReplace_Click));
         // Смена платформы выделенных баз (issue #54, переработка по комментарию 7OH):

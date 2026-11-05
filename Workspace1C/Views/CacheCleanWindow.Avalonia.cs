@@ -23,6 +23,10 @@ namespace Workspace1C
     public class CacheCleanWindow : ModalWindowBase
     {
         private readonly List<Infobase> _infobases;
+
+        // Базы, предвыбранные при открытии окна (issue #105): открытие «Очистить кэш»
+        // для выбранной группы — базы группы отмечены по умолчанию.
+        private readonly HashSet<Infobase> _preselected;
         private readonly Dictionary<CheckBox, Infobase> _baseChecks = new();
         private readonly Dictionary<CheckBox, Grid> _baseRows = new();
         private readonly Dictionary<Infobase, TextBlock> _programSizeTexts = new();
@@ -92,7 +96,10 @@ namespace Workspace1C
         /// <param name="infobases">Все доступные информационные базы.</param>
         /// <param name="initialKind">Изначально выбранный тип кэша.</param>
         /// <param name="defaultSelected">База, выбранная по умолчанию (например, выделенная в главном окне).</param>
-        public CacheCleanWindow(IEnumerable<Infobase> infobases, OneCCacheKind initialKind, Infobase? defaultSelected = null)
+        /// <param name="preselected">Базы, отмеченные по умолчанию ДО открытия (issue #105:
+        /// открытие «Очистить кэш» для выбранной группы — базы группы предвыбраны).</param>
+        public CacheCleanWindow(IEnumerable<Infobase> infobases, OneCCacheKind initialKind,
+            Infobase? defaultSelected = null, IEnumerable<Infobase>? preselected = null)
         {
             Title = LocalizationManager.T("CacheClean.Title");
             Width = 580;
@@ -105,6 +112,9 @@ namespace Workspace1C
             CanResize = true;
 
             _infobases = infobases.ToList();
+            _preselected = preselected is null
+                ? new HashSet<Infobase>()
+                : new HashSet<Infobase>(preselected);
 
             // Подпись флажка это просто текст, размер кеша стоит рядом отдельной
             // подписью (CacheCleanWindow.xaml:119-124), а не внутри флажка.
@@ -748,7 +758,7 @@ namespace Workspace1C
                 var check = new CheckBox
                 {
                     Content = ib.Name,
-                    IsChecked = ReferenceEquals(ib, defaultSelected),
+                    IsChecked = ReferenceEquals(ib, defaultSelected) || _preselected.Contains(ib),
                     VerticalContentAlignment = VerticalAlignment.Center
                 };
                 // Тот же местный флажок, что и у типов кеша: в версии для Windows

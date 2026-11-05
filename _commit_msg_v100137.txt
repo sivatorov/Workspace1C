@@ -1,0 +1,44 @@
+Release 1.0.1.37: массовая загрузка CF (Конфигуратор) + исправления окна «Список выгрузок», контекстного меню группы и «Развернуть тестовую копию» (#79, #104, #105, #106)
+
+- #106 (@aepkugesi): новая функция «Массовая загрузка из CF (Конфигуратор)» —
+  загрузка конфигурации из *.cf в список баз пакетной операцией: выбор целей
+  (выделенные базы и/или группа), опции перед загрузкой — выгрузка базы в .dt
+  (как в массовой выгрузке dt), завершение сеансов, блокировка начала сеансов
+  (с кодом разрешения /UC) и блокировка регламентных заданий; все блокировки
+  снимаются после загрузки, в том числе при ошибке. Окна WPF и Avalonia; точки
+  входа: блок пакетных операций, контекстное меню базы/группы (пункт MassLoadCf)
+  и командная палитра; локализация ru/en
+  (MassLoadCfPlanner.cs, MassLoadCfService.cs, MassLoadCfViewModel.cs,
+  MassLoadCfWindow.*, OneCLauncher.DesignerBatch.cs,
+  OneCLauncher.Linux.DesignerBatch.cs). 24 теста (Issue106MassLoadCfTests.cs).
+- #104 (@7OH): окно «Список выгрузок» падало при открытии с NotSupportedException —
+  обновление списка из фонового потока. Из ExportsListViewModel.RefreshAsync
+  убран ConfigureAwait(false), чтобы продолжение выполнялось в UI-потоке.
+  На Windows окно открывается модально с владельцем (win.Owner перед ShowDialog),
+  на Linux модальность подтверждена (ExportsListWindow.*). Регрессионные тесты
+  (ExportsListViewModelTests.cs).
+- #105 (@7OH): в контекстном меню группы неприменимые к группе пункты теперь
+  скрываются, а не блокируются — скрыты «Список выгрузок», «Зарегистрировать
+  COM-коннектор», «Публикация на веб-сервере» и «Связать с конфигурацией»;
+  пустые подменю и лишние разделители не показываются; подменю «Очистить кэш»
+  для группы открывается с предвыбранными базами группы (параметр preselected
+  в CacheCleanWindow.*). Реализация: ContextMenuCatalog.IsGroupApplicable +
+  ContextMenuResolver.FilterForGroup — WPF и Avalonia. 10 тестов
+  (Issue105ContextMenuGroupTests.cs).
+- #79 (@7OH), продолжение:
+  - имя тестовой базы подставляется в итоговое сообщение — «Тестовая копия
+    „…“ создана/обновлена» (TestDeployService.DoneMessage — исправлен
+    незаполненный {0});
+  - в новую тестовую базу переносятся авторизации
+    EnterpriseAuth/ConfiguratorAuth и ConfiguratorUseEnterpriseAuth источника
+    (TestDeployService.ApplySourceAuthSettings);
+  - мастер запоминает последние значения полей «Движок выгрузки», «Сервер СУБД»,
+    «Пользователь СУБД» и восстанавливает их при следующем открытии
+    (TestDeployStore.FindLastForSource +
+    TestDeployViewModel.ApplyRememberedWindowValues).
+  +10 тестов (Issue79TestDeployWindowTests.cs).
+- Версия 1.0.1.36 -> 1.0.1.37 (csproj: Version/AssemblyVersion/FileVersion/
+  InformationalVersion), CHANGELOG.md, README.md.
+- Служебные файлы релиза: _build_v100137.ps1, commit-сообщение, план релиза,
+  логи сборки/публикации, отчёт по issues (_issues_to_work_new.md,
+  _issues_open_new.json).

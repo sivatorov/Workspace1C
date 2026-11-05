@@ -1,0 +1,121 @@
+﻿﻿22:52:10  === Publish artifacts v1.0.1.37 (Windows + Linux), build only ===
+22:52:10  No git add/commit/push, no GitHub release, no Telegram.
+22:52:10  [1/5] Windows: build-windows-single-file.ps1 (WPF, net10.0-windows, win-x64, self-contained single-file)
+==> Конфигурация: Release
+==> RID:          win-x64
+==> Цель:         G:\h\Workspace1C\Workspace1C\dist\win-x64
+==> Restore
+  Определение проектов для восстановления...
+  Все проекты обновлены для восстановления.
+==> Publish (self-contained single-file)
+  Определение проектов для восстановления...
+  Восстановлен G:\h\Workspace1C\Workspace1C\Workspace1C.csproj (за 46 мс).
+C:\Program Files\dotnet\sdk\11.0.100-rc.2.26504.105\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: Вы используете предварительную версию .NET. Дополнительные сведения см. на странице https://aka.ms/dotnet-support-policy [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\OneCLauncher.Designer.cs(14,25): warning CS8669: Заметка к ссылочным типам, допускающим значение NULL, должна использоваться в коде только в контексте заметок "#nullable". Автоматически создаваемый исходный код требует директиву "#nullable" в явном виде. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Converters\PackIconKindConverter.cs(20,20): warning CS8603: Возможно, возврат ссылки, допускающей значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Converters\PackIconKindConverter.cs(21,16): warning CS8603: Возможно, возврат ссылки, допускающей значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ActualReleasesWindow.xaml.cs(89,69): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\UtilitiesMenuEditorViewModel.cs(61,74): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "path" в "void UtilitiesMenuEditorViewModel.ApplyExternalIcon(string path)". [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\TrayMenuEditorViewModel.cs(335,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "item" в "bool Collection<TrayMenuNodeItem>.Remove(TrayMenuNodeItem item)". [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\CommandPaletteWindow.xaml.cs(50,40): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(327,34): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(328,38): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TelegramBotApiClient.cs(81,64): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "ChatId" в "TelegramSendResult.TelegramSendResult(string ChatId, long MessageId)". [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\MainViewModel.Commands.cs(1972,57): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "Task MainViewModel.ExecuteShowTestDeployAsync(Infobase source)". [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(280,73): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(323,82): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(326,86): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(330,74): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C_3d0hbjxw_wpftmp.csproj]
+G:\h\Workspace1C\Workspace1C\Services\OneCLauncher.Designer.cs(14,25): warning CS8669: Заметка к ссылочным типам, допускающим значение NULL, должна использоваться в коде только в контексте заметок "#nullable". Автоматически создаваемый исходный код требует директиву "#nullable" в явном виде. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Converters\PackIconKindConverter.cs(20,20): warning CS8603: Возможно, возврат ссылки, допускающей значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Converters\PackIconKindConverter.cs(21,16): warning CS8603: Возможно, возврат ссылки, допускающей значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ActualReleasesWindow.xaml.cs(89,69): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\CommandPaletteWindow.xaml.cs(50,40): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\UtilitiesMenuEditorViewModel.cs(61,74): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "path" в "void UtilitiesMenuEditorViewModel.ApplyExternalIcon(string path)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\TrayMenuEditorViewModel.cs(335,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "item" в "bool Collection<TrayMenuNodeItem>.Remove(TrayMenuNodeItem item)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(327,34): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(328,38): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\MainViewModel.Commands.cs(1972,57): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "Task MainViewModel.ExecuteShowTestDeployAsync(Infobase source)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(280,73): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(323,82): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(326,86): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.UtilitiesMenu.cs(330,74): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TelegramBotApiClient.cs(81,64): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "ChatId" в "TelegramSendResult.TelegramSendResult(string ChatId, long MessageId)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+  Workspace1C -> G:\h\Workspace1C\Workspace1C\bin\Release\net10.0-windows\win-x64\Workspace1C.dll
+  Workspace1C -> G:\h\Workspace1C\Workspace1C\dist\win-x64\
+    (удаляем лишний файл: \Localization\Languages\en.json)
+    (удаляем лишний файл: \Localization\Languages\ru.json)
+    (удаляем лишнюю папку: \Localization\Languages)
+    (удаляем лишнюю папку: \Localization)
+==> Собран один исполняемый файл:
+    G:\h\Workspace1C\Workspace1C\dist\win-x64\Workspace1C.exe (81.2 MB)
+==> Готово. Запуск: G:\h\Workspace1C\Workspace1C\dist\win-x64\Workspace1C.exe
+22:52:36  Windows build OK (exit 0)
+22:52:36  [2/5] Linux: build-linux-single-file.ps1 (Avalonia, net10.0, linux-x64, self-contained single-file, -p:ForceLinux=true)
+==> Конфигурация: Release
+==> RID:          linux-x64 (кросс-сборка Linux из Windows)
+==> Цель:         G:\h\Workspace1C\Workspace1C\dist\linux-x64
+==> Restore (ForceLinux=true)
+  Определение проектов для восстановления...
+  Восстановлен G:\h\Workspace1C\Workspace1C\Workspace1C.csproj (за 67 мс).
+==> Publish (self-contained single-file, linux)
+  Определение проектов для восстановления...
+  Восстановлен G:\h\Workspace1C\Workspace1C\Workspace1C.csproj (за 80 мс).
+C:\Program Files\dotnet\sdk\11.0.100-rc.2.26504.105\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: Вы используете предварительную версию .NET. Дополнительные сведения см. на странице https://aka.ms/dotnet-support-policy [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\OneCLauncher.Linux.Designer.cs(13,29): warning CS8669: Заметка к ссылочным типам, допускающим значение NULL, должна использоваться в коде только в контексте заметок "#nullable". Автоматически создаваемый исходный код требует директиву "#nullable" в явном виде. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\App.axaml.cs(341,21): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\BaseSelectionWindow.Avalonia.cs(57,83): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowInfo(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ChainRetryWindow.Avalonia.cs(60,13): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ChainRetryWindow.Avalonia.cs(68,13): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ClusterImportWindow.Avalonia.cs(238,44): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowError(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ClusterImportWindow.Avalonia.cs(250,83): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowInfo(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\CommandPaletteWindow.Avalonia.cs(87,50): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "item" в "void ItemsControl.ScrollIntoView(object item)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\CommandPaletteWindow.Avalonia.cs(96,50): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "item" в "void ItemsControl.ScrollIntoView(object item)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\TrayMenuEditorViewModel.cs(335,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "item" в "bool Collection<TrayMenuNodeItem>.Remove(TrayMenuNodeItem item)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\UtilitiesMenuEditorViewModel.cs(61,74): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "path" в "void UtilitiesMenuEditorViewModel.ApplyExternalIcon(string path)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ConnectionReplaceWindow.Avalonia.cs(186,84): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "bool IDialogService.Confirm(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\MainViewModel.Avalonia.cs(1251,9): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\RacInfobaseCreateWindow.Avalonia.cs(209,80): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowWarning(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\RacInfobaseCreateWindow.Avalonia.cs(219,84): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowWarning(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\RacInfobaseCreateWindow.Avalonia.cs(225,82): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "title" в "void IDialogService.ShowWarning(string message, string title = "")". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ScheduledTasksWindow.Avalonia.cs(84,34): warning CS8625: Литерал, равный NULL, не может быть преобразован в ссылочный тип, не допускающий значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\TestDeployWindow.Avalonia.cs(241,62): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\TestDeployWindow.Avalonia.cs(246,58): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\TestDeployWindow.Avalonia.cs(247,58): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ServerMonitorWindow.Avalonia.cs(1224,38): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "IEnumerable<object> Enumerable.Cast<object>(IEnumerable source)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ServerMonitorWindow.Avalonia.cs(995,63): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "IEnumerable<object> Enumerable.Cast<object>(IEnumerable source)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\ServerMonitorWindow.Avalonia.cs(996,37): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "IEnumerable<object> Enumerable.Cast<object>(IEnumerable source)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\MainViewModel.Avalonia.Commands.cs(632,57): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "source" в "Task MainViewModel.ExecuteShowTestDeployAsync(Infobase source)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Views\MainWindow.Avalonia.Events.cs(623,27): warning CS8602: Разыменование вероятной пустой ссылки. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\ViewModels\MainViewModel.Avalonia.SessionLock.cs(166,18): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "owner" в "void Window.Show(Window owner)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(327,34): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TestDeployService.cs(328,38): warning CS8601: Возможно, назначение-ссылка, допускающее значение NULL. [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\TelegramBotApiClient.cs(81,64): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "ChatId" в "TelegramSendResult.TelegramSendResult(string ChatId, long MessageId)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+G:\h\Workspace1C\Workspace1C\Services\OneCLauncher.Linux.Process.cs(267,32): warning CS8604: Возможно, аргумент-ссылка, допускающий значение NULL, для параметра "url" в "bool OneCLauncher.OpenUrl(string url)". [G:\h\Workspace1C\Workspace1C\Workspace1C.csproj]
+  Workspace1C -> G:\h\Workspace1C\Workspace1C\bin\Release\net10.0\linux-x64\Workspace1C.dll
+  Workspace1C -> G:\h\Workspace1C\Workspace1C\dist\linux-x64\
+    (удаляем лишний файл: \Localization\Languages\en.json)
+    (удаляем лишний файл: \Localization\Languages\ru.json)
+    (удаляем лишнюю папку: \Localization\Languages)
+    (удаляем лишнюю папку: \Localization)
+==> Собран один исполняемый файл:
+    G:\h\Workspace1C\Workspace1C\dist\linux-x64\Workspace1C (51 MB)
+==> Готово. Скопируйте на Linux и запустите: ./Workspace1C
+    (предварительно chmod +x, если файловая система не сохранила бит исполнения)
+22:52:55  Linux build OK (exit 0), log: G:\h\Workspace1C\_build_linux_100137.log
+22:52:55  [3/5] Verify artifacts
+22:52:55  -- Windows (dist) --
+22:52:55  Artifact: G:\h\Workspace1C\Workspace1C\dist\win-x64\Workspace1C.exe
+22:52:55    size: 85106919 bytes (81.2 MB)
+22:52:55    FileVersion: 1.0.1.37 (expected 1.0.1.37)
+22:52:55    ProductVersion: 1.0.1.37+9ddde13c5d2ded3dbc1ea0fdb7b24f6177b9a963 (expected 1.0.1.37*)
+22:52:56    SHA-256: D185E8B168586B7E950A61ED692C82E05F6481157A44E5E564FB2E25464C3C8F
+22:52:56  -- Linux (dist) --
+22:52:56  Artifact: G:\h\Workspace1C\Workspace1C\dist\linux-x64\Workspace1C
+22:52:56    size: 53433514 bytes (51 MB)
+22:52:56    SHA-256: A8EC03BB2A508463A9ED98547F092018BEBAB087545150CF21A12B487F9BA8EE
+22:52:56  [4/5] Copy artifacts to G:\h\Workspace1C\publish\out-1.0.1.37
+22:52:56  [5/5] Artifacts in G:\h\Workspace1C\publish\out-1.0.1.37
+22:52:56    Workspace1C-linux-x64  53433514 bytes (51 MB)  SHA-256: A8EC03BB2A508463A9ED98547F092018BEBAB087545150CF21A12B487F9BA8EE
+22:52:56    Workspace1C.exe  85106919 bytes (81.2 MB)  SHA-256: D185E8B168586B7E950A61ED692C82E05F6481157A44E5E564FB2E25464C3C8F
+22:52:56  === DONE: publish\out-1.0.1.37\Workspace1C.exe + Workspace1C-linux-x64 ===

@@ -193,4 +193,95 @@ public static class ContextMenuResolver
             CollectItemIds(node.Children, target);
         }
     }
+
+    /// <summary>
+    /// Фильтрует компоновку для контекстного меню ВЫБРАННОЙ ГРУППЫ (issue #105, запрос 7OH):
+    /// удаляет пункты, неприменимые к группе (<see cref="ContextMenuCatalog.IsGroupApplicable"/>),
+    /// скрывает опустевшие подменю и убирает «висячие»/двойные разделители. Компоновка
+    /// НЕ мутируется: возвращается новый список; исходные узлы-пункты и разделители
+    /// переиспользуются, узлы-группы копируются с отфильтрованными детьми.
+    /// </summary>
+    public static List<ContextMenuNode> FilterForGroup(IEnumerable<ContextMenuNode>? nodes)
+    {
+        var filtered = FilterNodesForGroup(nodes);
+        TrimSeparators(filtered);
+        return filtered;
+    }
+
+    /// <summary>Рекурсивная часть <see cref="FilterForGroup"/>: отбор применимых пунктов и непустых групп.</summary>
+    private static List<ContextMenuNode> FilterNodesForGroup(IEnumerable<ContextMenuNode>? nodes)
+    {
+        var result = new List<ContextMenuNode>();
+        if (nodes is null)
+            return result;
+        foreach (var node in nodes)
+        {
+            if (node is null || !node.Visible)
+                continue;
+            if (string.Equals(node.Kind, "separator", StringComparison.Ordinal))
+            {
+                result.Add(node);
+                continue;
+            }
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+            {
+                // Дети чистятся через FilterForGroup (с удалением «висячих» разделителей)
+                // ДО проверки на пустоту: группа только из разделителей — пустая (issue #105).
+                var children = FilterForGroup(node.Children);
+                if (children.Count == 0)
+                    continue; // пустое подменю не показываем (issue #105)
+                result.Add(new ContextMenuNode
+                {
+                    Kind = node.Kind,
+                    ItemId = node.ItemId,
+                    GroupId = node.GroupId,
+                    CustomTitle = node.CustomTitle,
+                    IconKey = node.IconKey,
+                    IconColor = node.IconColor,
+                    ExternalIconPath = node.ExternalIconPath,
+                    Visible = node.Visible,
+                    SeparatorBefore = node.SeparatorBefore,
+                    Children = children
+                });
+                continue;
+            }
+
+            // Пункт каталога: для группы оставляем только применимые команды; неизвестные
+            // (пользовательские) пункты тоже скрываем — для группы они не определены.
+            var catalogItem = ContextMenuCatalog.Find(node.ItemId);
+            if (catalogItem is null ||
+                !ContextMenuCatalog.IsGroupApplicable(catalogItem.CommandKind))
+                continue;
+            result.Add(node);
+        }
+        return result;
+    }
+
+    /// <summary>Убирает разделители в начале/конце списка и подряд идущие, а также
+    /// дубли флага <c>SeparatorBefore</c> рядом с узлами-разделителями.</summary>
+    private static void TrimSeparators(List<ContextMenuNode> nodes)
+    {
+        for (var i = nodes.Count - 1; i >= 0; i--)
+        {
+            var node = nodes[i];
+            if (!string.Equals(node.Kind, "separator", StringComparison.Ordinal))
+                continue;
+            var prevIsSeparator = i > 0 && IsSeparator(nodes[i - 1]);
+            var atEdge = i == 0 || i == nodes.Count - 1;
+            if (prevIsSeparator || atEdge)
+                nodes.RemoveAt(i);
+        }
+        // После чистки подряд-разделителей: узел сразу после разделителя не должен
+        // дополнительно рисовать SeparatorBefore (двойной разделитель).
+        for (var i = 1; i < nodes.Count; i++)
+        {
+            if (IsSeparator(nodes[i - 1]))
+                nodes[i].SeparatorBefore = false;
+        }
+        if (nodes.Count > 0)
+            nodes[0].SeparatorBefore = false;
+    }
+
+    private static bool IsSeparator(ContextMenuNode node) =>
+        string.Equals(node.Kind, "separator", StringComparison.Ordinal);
 }

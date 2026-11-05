@@ -1298,7 +1298,14 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
 
-        var dialog = new CacheCleanWindow(Infobases, kind, defaultInfobase ?? SelectedInfobase)
+        // Issue #105 (запрос 7OH): «Очистить кэш» для выбранной группы — базы группы
+        // предвыбраны в окне (меньше кликов и список не «на глаз»).
+        var preselectedGroupBases = defaultInfobase is null && SelectedInfobase is null &&
+            SelectedGroupNode?.Group is not null
+                ? GetGroupInfobases(SelectedGroupNode)
+                : null;
+
+        var dialog = new CacheCleanWindow(Infobases, kind, defaultInfobase ?? SelectedInfobase, preselectedGroupBases)
         {
             Owner = Application.Current.MainWindow
         };
@@ -2851,6 +2858,87 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public void ExecuteBatchUnlockSessionsForSelected()
         => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: BatchOperationKind.UnlockSessions);
+
+    // ================== Массовая загрузка cf через Конфигуратор (issue #106) ==================
+
+    private ICommand? _massLoadCfCommand;
+
+    /// <summary>
+    /// Команда «Массовая загрузка cf через Конфигуратор…» (issue #106, автор aepkugesi):
+    /// окно-чеклист баз (группа/мультивыделение — как в пакетных операциях), файл .cf
+    /// и опции перед загрузкой (выгрузка .dt, завершение сеансов, блокировка начала
+    /// сеансов, блокировка регламентных заданий). Загрузка — Конфигуратор
+    /// (/LoadCfg + /UpdateDBCfg) через <see cref="MassLoadCfService"/>.
+    /// </summary>
+    public ICommand MassLoadCfCommand =>
+        _massLoadCfCommand ??= new RelayCommand(_ => ExecuteMassLoadCfForSelected(), _ => Infobases.Any());
+
+    /// <summary>
+    /// Массовая загрузка cf для выделенных баз/группы (issue #106): пункт блока
+    /// «Для выделенных (N)…»/«Для группы (N)…».
+    /// </summary>
+    public void ExecuteMassLoadCfForSelected()
+        => ExecuteMassLoadCfCore(BatchOperationTargetsIncludingGroup.ToList());
+
+    /// <summary>
+    /// Точка открытия окна «Массовая загрузка cf через Конфигуратор» (issue #106):
+    /// подтверждение, подстановка сохранённых значений и сохранение их после окна
+    /// (как в массовых операциях, issue #92).
+    /// </summary>
+    private void ExecuteMassLoadCfCore(IReadOnlyList<Infobase> bases)
+    {
+        if (bases.Count == 0)
+        {
+            _dialogs.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
+                LocalizationManager.T("MassLoadCf.Title"));
+            return;
+        }
+
+        // Настройки читаются из файла: у этой партиальной модели нет кэша AppSettings
+        // (как у Avalonia-версии), прямое чтение/запись через репозиторий.
+        var settings = _repository.LoadSettings() ?? new AppSettings();
+
+        // Безопасность: подтверждение перед массовой операцией по нескольким базам.
+        if (!_dialogs.Confirm(
+                string.Format(LocalizationManager.T("MassLoadCf.ConfirmFormat"), bases.Count),
+                LocalizationManager.T("MassLoadCf.Title")))
+            return;
+
+        var window = new MassLoadCfWindow(bases,
+            settings.BatchLoadCfPath,
+            // Каталог и шаблон .dt-выгрузки — общие с массовой выгрузкой (issue #106:
+            // «выгрузку базы в файл *.dt как в массовой выгрузке в dt»).
+            settings.BatchDumpDirectory,
+            BatchOperationsService.NormalizeSavedTemplate(settings.BatchDumpTemplate),
+            settings.ExportTimestampFormat)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        // Восстановление состояния чекбоксов; код разрешения не сохраняется
+        // (секретоподобное значение — только в памяти сессии).
+        window.ViewModel.DumpDtBefore = settings.BatchLoadCfDumpDt;
+        window.ViewModel.TerminateSessions = settings.BatchOpsTerminateSessions;
+        window.ViewModel.DenyNewSessions = settings.BatchOpsDenyNewSessions;
+        window.ViewModel.DenyScheduledJobs = settings.BatchOpsDenyScheduledJobs;
+        window.ShowDialog();
+
+        // Сохраняем настройки (файл .cf, каталог/шаблон .dt, опции).
+        var vm = window.ViewModel;
+        settings.BatchLoadCfPath = vm.CfFilePath?.Trim() ?? string.Empty;
+        settings.BatchLoadCfDumpDt = vm.DumpDtBefore;
+        settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.DumpTemplate)
+            ? BatchOperationsService.DefaultDumpTemplate : vm.DumpTemplate.Trim();
+        if (vm.DumpDtBefore)
+            settings.BatchDumpDirectory = vm.DumpDirectory?.Trim() ?? string.Empty;
+        settings.BatchOpsTerminateSessions = vm.TerminateSessions;
+        settings.BatchOpsDenyNewSessions = vm.DenyNewSessions;
+        settings.BatchOpsDenyScheduledJobs = vm.DenyScheduledJobs;
+        try { _repository.SaveSettings(settings); }
+        catch
+        {
+            // Ошибка записи настроек не должна ронять окно после успешного прогона.
+        }
+    }
 
     /// <summary>
     /// Общая точка открытия окна массовых операций: подтверждение, подстановка

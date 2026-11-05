@@ -135,9 +135,9 @@ public static partial class OneCLauncher
     /// </summary>
     public static bool RunDesignerBatch(Infobase infobase, DesignerBatchOperation operation, string? outputPath = null,
         BackupCredential? credential = null, int? repositoryVersion = null, int? repositoryReportBegin = null,
-        int? repositoryReportEnd = null)
+        int? repositoryReportEnd = null, string? permissionCode = null)
         => RunDesignerBatch(infobase, operation, outputPath, credential, repositoryVersion,
-            repositoryReportBegin, repositoryReportEnd, out _);
+            repositoryReportBegin, repositoryReportEnd, permissionCode, out _);
 
     /// <summary>
     /// То же, что и основная перегрузка, но при отказе запуска в <paramref name="startError"/>
@@ -147,7 +147,7 @@ public static partial class OneCLauncher
     /// </summary>
     public static bool RunDesignerBatch(Infobase infobase, DesignerBatchOperation operation, string? outputPath,
         BackupCredential? credential, int? repositoryVersion, int? repositoryReportBegin,
-        int? repositoryReportEnd, out string? startError)
+        int? repositoryReportEnd, string? permissionCode, out string? startError)
     {
         startError = null;
         var arch = ResolveArchitecture(infobase.Architecture, infobase.PlatformVersion);
@@ -299,7 +299,9 @@ public static partial class OneCLauncher
         // /Out — путь к временному логу, всегда системный GUID-файл, без пользовательских данных,
         // поэтому экранирование не требуется (вектора инъекции нет).
         var outLog = Path.Combine(Path.GetTempPath(), $"1c_batch_{Guid.NewGuid():N}.log");
-        var arguments = $"DESIGNER {connectionArg}{authArg} {opArg} /DisableStartupDialogs /DisableStartupMessages /Out\"{outLog}\"";
+        // Код разрешения «/UC"код"» (issue #106): Конфигуратор входит в базу с
+        // блокировкой начала сеансов (rac --sessions-deny=on + --permission-code).
+        var arguments = $"DESIGNER {connectionArg}{authArg} {opArg}{PermissionCodeArgument(permissionCode)} /DisableStartupDialogs /DisableStartupMessages /Out\"{outLog}\"";
 
         try
         {
@@ -400,6 +402,18 @@ public static partial class OneCLauncher
             return false;
         }
     }
+
+    /// <summary>
+    /// Ключ кода разрешения «/UC"код"» (issue #106, массовая загрузка cf через
+    /// Конфигуратор): Конфигуратор входит в базу с блокировкой начала сеансов
+    /// (rac «--sessions-deny=on --permission-code=код»). null/пусто — пустой
+    /// суффикс (опция не задана). Значение проверяется как значения операций
+    /// (кавычка в коде недопустима — см. IsSafeCliValue). Internal — юнит-тесты.
+    /// </summary>
+    internal static string PermissionCodeArgument(string? permissionCode)
+        => string.IsNullOrWhiteSpace(permissionCode) || !IsSafeCliValue(permissionCode!.Trim())
+            ? string.Empty
+            : $" /UC\"{permissionCode.Trim()}\"";
 
     /// <summary>
     /// По завершении процесса 1cv8 читает лог /Out, определяет успех операции

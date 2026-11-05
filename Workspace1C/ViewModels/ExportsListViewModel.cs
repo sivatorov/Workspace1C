@@ -102,12 +102,16 @@ public class ExportsListViewModel : ViewModelBase
     /// <summary>
     /// Асинхронное обновление (аудит производительности): сканирование каталогов
     /// (в т.ч. сетевых) выполняется в фоновой задаче, а применение результата к
-    /// <see cref="Items"/> — в исходном (UI) контексте. Продолжение после await
-    /// возвращается в контекст вызывающего (SyncContext не подавляется намеренно).
+    /// <see cref="Items"/> — в исходном (UI) контексте. Контекст вызывающего
+    /// НЕ подавляется (никакого <c>ConfigureAwait(false)</c>): изменение
+    /// <see cref="Items"/> допустимо только в UI-потоке, иначе WPF-привязка
+    /// бросает <see cref="NotSupportedException"/> «CollectionView не поддерживает
+    /// изменения из потока, отличного от потока Dispatcher» (issue #104: окно
+    /// «Список выгрузок» падало при первом обновлении после отрисовки).
     /// </summary>
     public async Task RefreshAsync()
     {
-        var items = await Task.Run(ScanItems).ConfigureAwait(false);
+        var items = await Task.Run(ScanItems);
         Items.Clear();
         foreach (var item in items)
             Items.Add(item);

@@ -803,6 +803,17 @@ public class AppSettings
     /// (после операции снимается автоматически).</summary>
     public bool BatchOpsDenyScheduledJobs { get; set; }
 
+    /// <summary>
+    /// Файл .cf последней массовой загрузки конфигурации через Конфигуратор
+    /// (issue #106); пусто — не задан.
+    /// </summary>
+    public string BatchLoadCfPath { get; set; } = string.Empty;
+
+    /// <summary>Опция «Выгрузить базу в .dt перед загрузкой» массовой загрузки cf
+    /// через Конфигуратор (issue #106). Каталог и шаблон .dt-файла — общие с
+    /// массовой выгрузкой (<see cref="BatchDumpDirectory"/>/<see cref="BatchDumpTemplate"/>).</summary>
+    public bool BatchLoadCfDumpDt { get; set; }
+
     /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
     public string FontFamily { get; set; } = "Segoe UI";
 

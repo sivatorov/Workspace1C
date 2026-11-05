@@ -327,8 +327,53 @@ public sealed class TestDeployService
         target.Connection.User = source.Connection?.User;
         target.Connection.Password = source.Connection?.Password;
         target.Connection.AuthenticationMode = source.Connection?.AuthenticationMode ?? target.Connection.AuthenticationMode;
+        // Issue #79 (комментарий 7OH 2026-11-05T11:22 и 14:03): раздельные авторизации
+        // переносятся ЦЕЛИКОМ — раньше копировались только Connection.User/Password
+        // (Данные для запуска Предприятия), из-за чего блоки EnterpriseAuth/ConfiguratorAuth
+        // в файле списка баз у копии отсутствовали вообще, а вход в Конфигуратор копии
+        // требовал повторного ввода учётных данных.
+        ApplySourceAuthSettings(source, target);
         return null;
     }
+
+    /// <summary>
+    /// Переносит раздельные авторизации источника в целевую запись (issue #79, комментарий
+    /// 7OH 2026-11-05T11:22: «Авторизацию в новую базу перенесло только для Предприятия,
+    /// для Конфигуратора настройки входа не перенесло»; 14:03: «блоки EnterpriseAuth и
+    /// ConfiguratorAuth в файле списка баз отсутствуют вообще, хотя у оригинала были»).
+    /// Копируются <see cref="Infobase.EnterpriseAuth"/>, <see cref="Infobase.ConfiguratorAuth"/>
+    /// и <see cref="Infobase.ConfiguratorUseEnterpriseAuth"/> (глубокая копия — записи
+    /// списка независимы). База после RestoreIB пуста — авторизация Конфигуратора нужна
+    /// для последующих пакетных шагов и запусков копии. Internal — юнит-тесты.
+    /// </summary>
+    internal static void ApplySourceAuthSettings(Infobase source, Infobase target)
+    {
+        target.ConfiguratorUseEnterpriseAuth = source.ConfiguratorUseEnterpriseAuth;
+        target.EnterpriseAuth = CloneAuthSettings(source.EnterpriseAuth);
+        target.ConfiguratorAuth = CloneAuthSettings(source.ConfiguratorAuth);
+    }
+
+    /// <summary>Глубокая копия настроек авторизации (null → null).</summary>
+    private static InfobaseAuthSettings? CloneAuthSettings(InfobaseAuthSettings? auth) =>
+        auth is null
+            ? null
+            : new InfobaseAuthSettings
+            {
+                AuthenticationMode = auth.AuthenticationMode,
+                User = auth.User,
+                Password = auth.Password
+            };
+
+    /// <summary>
+    /// Итоговое сообщение с именем тестовой базы (issue #79, комментарий 7OH 2026-11-05:
+    /// «не подставило имя в сообщение»): ключи TestDeploy.DoneCreated/DoneUpdated содержат
+    /// {0}, но в окнах вызывались без string.Format — в диалоге оставался не заполненный
+    /// плейсхолдер. Единая точка форматирования для окон и ViewModel.
+    /// </summary>
+    public static string DoneMessage(TestDeployResult result) =>
+        string.Format(
+            T(result.TargetCreated ? "TestDeploy.DoneCreated" : "TestDeploy.DoneUpdated"),
+            result.Target?.Name ?? string.Empty);
 
     /// <summary>Выгрузка .dt движком из сценария (конфигуратор или ibcmd). Для ibcmd
     /// передаётся профиль СУБД ИСТОЧНИКА, разрешённый заранее (issue #79, v1.0.1.21).</summary>

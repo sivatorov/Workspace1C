@@ -281,6 +281,28 @@ public sealed class TestDeployViewModel : ViewModelBase
             SourceDbName = _source.Connection?.DatabaseName ?? string.Empty;
     }
 
+    // ---- Восстановление значений окна (issue #79, комментарий 7OH 2026-11-05T11:22) ----
+
+    /// <summary>
+    /// Восстанавливает значения окна из последнего сценария этой исходной базы (issue #79,
+    /// комментарий 7OH 2026-11-05T11:22: «Просьба сохранять значения окна: Движок
+    /// выгрузки, Сервер СУБД, Пользователь СУБД»). Сценарий сохраняется в test_deploy.json
+    /// после каждого успешного развёртывания (<see cref="Services.TestDeployStore"/>);
+    /// пустые значения сценария не затирают подсказки формы. Вызывается окном мастера
+    /// при открытии (обе платформы) до привязки полей.
+    /// </summary>
+    public void ApplyRememberedWindowValues(TestDeployScenario? last)
+    {
+        if (last is null)
+            return;
+        if (last.DumpEngine == BackupEngine.Ibcmd)
+            EngineIndex = 1;
+        if (!string.IsNullOrWhiteSpace(last.DbServer))
+            DbServer = last.DbServer;
+        if (!string.IsNullOrWhiteSpace(last.DbUser))
+            DbUser = last.DbUser;
+    }
+
     // ---- Расписание ----
 
     public bool UseSchedule { get; set; }

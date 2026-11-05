@@ -106,6 +106,19 @@ public class TestDeployWindow : ModalWindowBase
         _vm = new TestDeployViewModel(
             source, allInfobases, _groups, proposedName, proposedServer, proposedDbRef, proposedFile);
 
+        // Issue #79 (комментарий 7OH 2026-11-05T11:22): «Просьба сохранять значения окна:
+        // Движок выгрузки, Сервер СУБД, Пользователь СУБД» — значения восстанавливаются
+        // из последнего сценария этой исходной базы (test_deploy.json); сбой хранилища
+        // окно не блокирует.
+        try
+        {
+            _vm.ApplyRememberedWindowValues(TestDeployStore.FindLastForSource(source.Id));
+        }
+        catch
+        {
+            // Хранилище сценариев недоступно — окно открывается со значениями по умолчанию.
+        }
+
         Title = LocalizationManager.T("TestDeploy.Title");
         Width = 720;
         Height = 700;
@@ -232,6 +245,12 @@ public class TestDeployWindow : ModalWindowBase
         // П.4: «Имя базы данных в СУБД», «Пользователь СУБД» и «Пароль СУБД» — в одной строке.
         _dbNameBox.TextChanged += (_, _) => _vm.DbName = _dbNameBox.Text;
         _dbUserBox.TextChanged += (_, _) => _vm.DbUser = _dbUserBox.Text;
+        // Восстановленные значения окна «Сервер СУБД»/«Пользователь СУБД» (issue #79,
+        // комментарий 7OH 2026-11-05T11:22) — в поля формы при открытии мастера.
+        if (!string.IsNullOrEmpty(_vm.DbServer))
+            _dbServerBox.Text = _vm.DbServer;
+        if (!string.IsNullOrEmpty(_vm.DbUser))
+            _dbUserBox.Text = _vm.DbUser;
         _dbPwdBox.PasswordChanged += (_, _) => _vm.DbPassword = _dbPwdBox.Password;
         _serverPanel.Children.Add(FieldsRow(
             90, (T("TestDeploy.DbName"), _dbNameBox), (T("TestDeploy.DbUser"), _dbUserBox),
@@ -610,8 +629,10 @@ public class TestDeployWindow : ModalWindowBase
                 CreatedGroup = groupPlan.NewGroup;
             }
 
-            _logList.Items.Add(LocalizationManager.T(
-                result.TargetCreated ? "TestDeploy.DoneCreated" : "TestDeploy.DoneUpdated"));
+            // Issue #79 (комментарий 7OH 2026-11-05): ключ DoneCreated/DoneUpdated содержит
+            // {0} — имя тестовой базы; раньше подставлялось без string.Format, и в журнале
+            // окна оставался не заполненный плейсхолдер.
+            _logList.Items.Add(TestDeployService.DoneMessage(result));
             Close();
         }
         catch (Exception ex)

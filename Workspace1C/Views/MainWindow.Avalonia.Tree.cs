@@ -46,6 +46,11 @@ namespace Workspace1C
         /// заголовок и видимость обновляет Opening (issue #56).</summary>
         private MenuItem? _batchMenu;
 
+        /// <summary>Меню построено для выбранной группы (issue #105): при смене контекста
+        /// (группа ↔ база) содержимое меню перестраивается в Opening с фильтрацией
+        /// неприменимых к группе пунктов.</summary>
+        private bool? _rowContextMenuBuiltForGroup;
+
         /// <summary>Строит строку дерева: заголовок группы или карточку базы.</summary>
         private Control BuildTreeRow(object? item)
         {
@@ -2257,7 +2262,11 @@ namespace Workspace1C
             if (layout is null)
                 return menu;
 
-            AppendRowAvaloniaNodes(menu.Items, layout.Root);
+            // Issue #105 (запрос 7OH): для выбранной группы показываем только применимые
+            // пункты (скрытие, а не блокировка; пустые подменю не показываются).
+            var forGroup = IsRowMenuGroupContext();
+            _rowContextMenuBuiltForGroup = forGroup;
+            AppendRowAvaloniaNodes(menu.Items, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
 
             // Заголовок «Для выделенных (N)…» актуален на момент открытия: клики
             // Ctrl/Shift меняют набор между открытиями меню, а само меню живёт
@@ -2266,6 +2275,11 @@ namespace Workspace1C
             // Пользовательские действия (0.3.9.198) перестраиваются так же каждый раз.
             menu.Opening += (_, _) =>
             {
+                // Issue #105: смена целевого контекста (группа ↔ база) между открытиями
+                // меню — содержимое перестраивается с фильтрацией по применимости.
+                if (_vm is not null && _rowContextMenuBuiltForGroup != IsRowMenuGroupContext())
+                    RebuildRowAvaloniaContextMenu(menu);
+
                 var count = _vm?.BatchOperationTargetCountIncludingGroup ?? 0;
                 var restricted = _vm?.IsSystemMenuRestricted ?? false;
                 if (_batchMenu is not null)
@@ -2292,6 +2306,36 @@ namespace Workspace1C
             };
 
             return menu;
+        }
+
+        /// <summary>Целевой контекст меню — выбранная группа дерева (без мультивыделения
+        /// и без выделенной базы; узлы-маркеры «Без группы»/«Закреплённые» не считаются).</summary>
+        private bool IsRowMenuGroupContext() =>
+            _vm is { } vm &&
+            vm.SelectedInfobase is null &&
+            vm.SelectedGroupNode?.Group is not null;
+
+        /// <summary>
+        /// Перестраивает содержимое контекстного меню дерева по актуальной компоновке
+        /// (issue #105): вызывается из Opening при смене целевого контекста (группа ↔ база).
+        /// Для группы узлы компоновки фильтруются по применимости
+        /// (<see cref="ContextMenuResolver.FilterForGroup"/>).
+        /// </summary>
+        private void RebuildRowAvaloniaContextMenu(ContextMenu menu)
+        {
+            if (_vm is null)
+                return;
+            var store = AppServices.TryGetService<IContextMenuLayoutStore>();
+            var layout = ContextMenuResolver.PrepareForMenu(ContextMenuResolver.Resolve(_vm.Settings, store));
+            if (layout is null)
+                return;
+            menu.Items.Clear();
+            _customActionsMenu = null;
+            _customActionsSeparator = null;
+            _batchMenu = null;
+            var forGroup = IsRowMenuGroupContext();
+            _rowContextMenuBuiltForGroup = forGroup;
+            AppendRowAvaloniaNodes(menu.Items, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
         }
 
         /// <summary>Рекурсивно добавляет узлы компоновки контекстного меню в целевой
@@ -2540,6 +2584,8 @@ namespace Workspace1C
                     item.Command = _vm!.EditInfobaseCommand; break;
                 case ContextMenuCommandKind.Notes:
                     item.Command = _vm!.ShowBaseNotesCommand; break;
+                case ContextMenuCommandKind.MassLoadCf:
+                    item.Command = _vm!.MassLoadCfCommand; break;
             }
         }
 
@@ -2564,6 +2610,9 @@ namespace Workspace1C
             batchMenu.Items.Add(BatchMenuAction("Main.BatchLockSessions", OnBatchLockSessionsClick, "IconLock", "@WarningBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchUnlockSessions", OnBatchUnlockSessionsClick, "IconLockOpen", "@InfoBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchCheckAvailability", OnBatchCheckAvailabilityClick, "IconCloudDownload", "@InfoBrush"));
+            // Массовая загрузка cf через Конфигуратор (issue #106, автор aepkugesi):
+            // опции перед загрузкой (выгрузка .dt, завершение сеансов, блокировки).
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchLoadCfCfg", OnBatchMassLoadCfClick, "IconImport", "@ErrorBrush"));
             // Массовая замена строк подключения (0.3.9.191, функция 6): окно с правилом
             // «найти → заменить на» по полям строк подключения выделенных баз.
             batchMenu.Items.Add(BatchMenuAction("Main.BatchConnectionReplace", OnBatchConnectionReplaceClick, "IconFindReplace", "@WarningBrush"));
@@ -2758,6 +2807,20 @@ namespace Workspace1C
             if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.ExecuteBatchUnlockSessionsForSelected();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>
+        /// Массовая загрузка cf через Конфигуратор по выделенным базам/группе
+        /// (issue #106, автор aepkugesi): опции перед загрузкой (выгрузка .dt,
+        /// завершение сеансов, блокировка начала сеансов, блокировка регламентных
+        /// заданий), загрузка — /LoadCfg + /UpdateDBCfg.
+        /// </summary>
+        private void OnBatchMassLoadCfClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _vm.ExecuteMassLoadCfForSelected();
             _vm.ClearBatchSelection();
         }
 

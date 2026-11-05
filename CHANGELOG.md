@@ -11,6 +11,62 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.37] — 2026-11-05
+
+### Добавлено
+
+- **НОВАЯ функция «Массовая загрузка из CF (Конфигуратор)» (issue #106).** Загрузка
+  конфигурации из `*.cf` в список баз пакетной операцией: выбор целей (выделенные
+  базы и/или группа), опции перед загрузкой — выгрузка базы в `.dt` (как в массовой
+  выгрузке dt), завершение сеансов, блокировка начала сеансов (с кодом разрешения
+  `/UC`) и блокировка регламентных заданий; все блокировки снимаются после загрузки,
+  в том числе при ошибке. Окна WPF и Avalonia; точки входа: блок пакетных операций,
+  контекстное меню базы/группы (пункт `MassLoadCf`) и командная палитра;
+  локализация ru/en
+  ([MassLoadCfService.cs](Workspace1C/Services/MassLoadCfService.cs),
+  [MassLoadCfViewModel.cs](Workspace1C/ViewModels/MassLoadCfViewModel.cs),
+  [MassLoadCfWindow.xaml.cs](Workspace1C/Views/MassLoadCfWindow.xaml.cs),
+  [MassLoadCfWindow.Avalonia.cs](Workspace1C/Views/MassLoadCfWindow.Avalonia.cs)).
+  24 теста ([Issue106MassLoadCfTests.cs](Workspace1C.Tests/Issue106MassLoadCfTests.cs)).
+
+### Исправлено
+
+- **Окно «Список выгрузок»: ошибка при открытии (issue #104).** Обновление списка
+  из фонового потока приводило к `NotSupportedException` — из
+  [`ExportsListViewModel.RefreshAsync`](Workspace1C/ViewModels/ExportsListViewModel.cs)
+  убран `ConfigureAwait(false)`, чтобы продолжение выполнялось в UI-потоке.
+  На Windows окно открывается модально с владельцем (`win.Owner` перед `ShowDialog`),
+  на Linux модальность подтверждена
+  ([ExportsListWindow.xaml.cs](Workspace1C/Views/ExportsListWindow.xaml.cs),
+  [ExportsListWindow.Avalonia.cs](Workspace1C/Views/ExportsListWindow.Avalonia.cs)).
+  Регрессионные тесты ([ExportsListViewModelTests.cs](Workspace1C.Tests/ExportsListViewModelTests.cs)).
+- **Контекстное меню группы: неприменимые к группе пункты теперь скрываются,
+  а не блокируются (issue #105).** Для группы скрыты «Список выгрузок»,
+  «Зарегистрировать COM-коннектор», «Публикация на веб-сервере» и «Связать
+  с конфигурацией»; пустые подменю и лишние разделители не показываются;
+  подменю «Очистить кэш» для группы открывается с предвыбранными базами группы
+  (новый параметр `preselected` в
+  [CacheCleanWindow.xaml.cs](Workspace1C/Views/CacheCleanWindow.xaml.cs) и
+  [CacheCleanWindow.Avalonia.cs](Workspace1C/Views/CacheCleanWindow.Avalonia.cs)).
+  Реализация: [`ContextMenuCatalog.IsGroupApplicable`](Workspace1C/Services/ContextMenuCatalog.cs) +
+  [`ContextMenuResolver.FilterForGroup`](Workspace1C/Services/ContextMenuResolver.cs) —
+  WPF и Avalonia. 10 тестов
+  ([Issue105ContextMenuGroupTests.cs](Workspace1C.Tests/Issue105ContextMenuGroupTests.cs)).
+- **«Развернуть тестовую копию», продолжение (issue #79, @7OH):**
+  - имя тестовой базы подставляется в итоговое сообщение —
+    «Тестовая копия „…“ создана/обновлена»
+    ([TestDeployService.DoneMessage](Workspace1C/Services/TestDeployService.cs),
+    исправлен незаполненный `{0}`);
+  - в новую тестовую базу переносятся авторизации `EnterpriseAuth`/`ConfiguratorAuth`
+    и `ConfiguratorUseEnterpriseAuth` источника
+    ([TestDeployService.ApplySourceAuthSettings](Workspace1C/Services/TestDeployService.cs) —
+    блоки появились в файле списка баз);
+  - мастер запоминает последние значения полей «Движок выгрузки», «Сервер СУБД»,
+    «Пользователь СУБД» и восстанавливает их при следующем открытии
+    ([TestDeployStore.FindLastForSource](Workspace1C/Services/TestDeployStore.cs) +
+    [TestDeployViewModel.ApplyRememberedWindowValues](Workspace1C/ViewModels/TestDeployViewModel.cs)).
+  +10 тестов ([Issue79TestDeployWindowTests.cs](Workspace1C.Tests/Issue79TestDeployWindowTests.cs)).
+
 ## [1.0.1.36] — 2026-11-05
 
 ### Исправлено

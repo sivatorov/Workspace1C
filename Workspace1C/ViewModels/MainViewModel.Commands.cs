@@ -1690,6 +1690,8 @@ public string HotkeyEnterprise
             ("palette.backup-scenarios", "Backup.ScenariosTitle", ShowBackupScenariosCommand),
             ("palette.exports", "Restore.Title", ShowExportsListCommand),
             ("palette.actual-releases", "Updates.ActualReleasesTitle", ShowActualReleasesCommand),
+            // Массовая загрузка cf через Конфигуратор (issue #106).
+            ("palette.mass-load-cf", "Main.BatchLoadCfCfg", MassLoadCfCommand),
         }
         .Select(c => new CommandPaletteItem
         {
@@ -1720,6 +1722,7 @@ public string HotkeyEnterprise
             "palette.backup-scenarios" => ShowBackupScenariosCommand,
             "palette.exports" => ShowExportsListCommand,
             "palette.actual-releases" => ShowActualReleasesCommand,
+            "palette.mass-load-cf" => MassLoadCfCommand,
             _ => null
         };
 
@@ -2026,8 +2029,10 @@ public string HotkeyEnterprise
             RefreshRunningFlags();
             _logger.Info($"[testdeploy] «{source.Name}» → «{target.Name}» ({(result.TargetCreated ? "создана" : "обновлена")})");
 
-            var doneMessage = LocalizationManager.T(
-                result.TargetCreated ? "TestDeploy.DoneCreated" : "TestDeploy.DoneUpdated");
+            // Issue #79 (комментарий 7OH 2026-11-05): DoneCreated/DoneUpdated содержат {0} —
+            // имя тестовой базы; раньше показывалось без string.Format («не подставило имя
+            // в сообщение»). Единая точка форматирования — TestDeployService.DoneMessage.
+            var doneMessage = TestDeployService.DoneMessage(result);
             if (result.Warnings.Count > 0)
             {
                 _dialogs.ShowWarning(

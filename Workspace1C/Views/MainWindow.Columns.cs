@@ -89,14 +89,16 @@ namespace Workspace1C
             // Контекстное меню построено кодом (issue #56): при каждом открытии перечитываем
             // резолвер компоновки (как меню «Утилиты») — если компоновка/настройка правки
             // изменились с последней сборки, содержимое обновляется в месте, до batch- и
-            // custom-логики ниже.
+            // custom-логики ниже. Issue #105: меню также перестраивается при смене целевого
+            // контекста (группа ↔ база) — для группы показываются только применимые пункты.
             var contextStore = AppServices.TryGetService<IContextMenuLayoutStore>();
             var contextSettings = new AppSettings
             {
                 ContextMenuEditingEnabled = _viewModel.ContextMenuEditingEnabled
             };
             var contextLayout = ContextMenuResolver.PrepareForMenu(ContextMenuResolver.Resolve(contextSettings, contextStore));
-            if (!string.Equals(_rowContextMenuLayoutKey, LayoutFingerprint(contextLayout), StringComparison.Ordinal))
+            if (!string.Equals(_rowContextMenuLayoutKey, LayoutFingerprint(contextLayout), StringComparison.Ordinal) ||
+                _rowContextMenuBuiltForGroup != IsRowMenuGroupContext())
                 PopulateRowContextMenu(menu.Items);
 
             var restricted = _viewModel.IsSystemMenuRestricted;

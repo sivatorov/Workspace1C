@@ -117,6 +117,7 @@ public sealed class MetadataExplorerService : IMetadataExplorerService
             repositoryVersion: null,
             repositoryReportBegin: null,
             repositoryReportEnd: null,
+            permissionCode: null,
             out var startError);
         if (!started)
         {

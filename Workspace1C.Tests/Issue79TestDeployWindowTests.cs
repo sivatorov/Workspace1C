@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -577,5 +578,236 @@ public sealed class Issue79TestDeployWindowTests
 
         Assert.True(string.IsNullOrWhiteSpace(credential.User));
         Assert.False(credential.UseInfobaseAuth); // ветка `credential is { UseInfobaseAuth: false }`
+    }
+
+    // ---------------- (10) v1.0.1.37: перенос раздельных авторизаций в копию ----------------
+
+    [Fact]
+    public void ApplySourceAuthSettings_CopiesEnterpriseAndConfiguratorAuth()
+    {
+        // issue #79 (7OH 2026-11-05T11:22: «Авторизацию в новую базу перенесло только для
+        // Предприятия, для Конфигуратора настройки входа не перенесло»; 14:03: «блоки
+        // EnterpriseAuth и ConfiguratorAuth в файле списка баз отсутствуют вообще»):
+        // в целевую запись переносятся обе раздельные авторизации и флаг «как для
+        // Предприятия» (в CreateTarget раньше копировались только Connection.User/Password).
+        var source = new Infobase
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = "УТ",
+            ConfiguratorUseEnterpriseAuth = true,
+            EnterpriseAuth = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "admin",
+                Password = "ent-pass"
+            },
+            ConfiguratorAuth = new InfobaseAuthSettings
+            {
+                AuthenticationMode = AuthenticationMode.Credentials,
+                User = "cfg-admin",
+                Password = "cfg-pass"
+            }
+        };
+        var target = new Infobase();
+
+        TestDeployService.ApplySourceAuthSettings(source, target);
+
+        Assert.True(target.ConfiguratorUseEnterpriseAuth);
+        Assert.NotNull(target.EnterpriseAuth);
+        Assert.Equal(AuthenticationMode.Credentials, target.EnterpriseAuth!.AuthenticationMode);
+        Assert.Equal("admin", target.EnterpriseAuth.User);
+        Assert.Equal("ent-pass", target.EnterpriseAuth.Password);
+        Assert.NotNull(target.ConfiguratorAuth);
+        Assert.Equal(AuthenticationMode.Credentials, target.ConfiguratorAuth!.AuthenticationMode);
+        Assert.Equal("cfg-admin", target.ConfiguratorAuth.User);
+        Assert.Equal("cfg-pass", target.ConfiguratorAuth.Password);
+    }
+
+    [Fact]
+    public void ApplySourceAuthSettings_CopiesAreIndependent()
+    {
+        // Глубокая копия: изменение авторизации копии не затрагивает источник
+        // (и наоборот) — записи списка баз независимы.
+        var source = new Infobase
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            EnterpriseAuth = new InfobaseAuthSettings { User = "ent" },
+            ConfiguratorAuth = new InfobaseAuthSettings { User = "cfg" }
+        };
+        var target = new Infobase();
+
+        TestDeployService.ApplySourceAuthSettings(source, target);
+        target.EnterpriseAuth!.User = "changed";
+        target.ConfiguratorAuth!.AuthenticationMode = AuthenticationMode.Windows;
+
+        Assert.Equal("ent", source.EnterpriseAuth!.User);
+        Assert.Equal(AuthenticationMode.Prompt, source.ConfiguratorAuth!.AuthenticationMode);
+    }
+
+    [Fact]
+    public void ApplySourceAuthSettings_NullSourceAuths_TargetGetsNull()
+    {
+        // У источника раздельные авторизации не заданы — в копии тоже null
+        // (не создаются дефолтные «Запрос»-блоки, которых у оригинала не было).
+        var source = new Infobase { Id = Guid.NewGuid().ToString("N") };
+        var target = new Infobase();
+
+        TestDeployService.ApplySourceAuthSettings(source, target);
+
+        Assert.Null(target.EnterpriseAuth);
+        Assert.Null(target.ConfiguratorAuth);
+        Assert.False(target.ConfiguratorUseEnterpriseAuth);
+    }
+
+    // ---------------- (11) v1.0.1.37: имя тестовой базы в итоговом сообщении ----------------
+
+    [Fact]
+    public void DoneMessage_NoLeftoverPlaceholder_CreatedAndUpdated()
+    {
+        // issue #79 (7OH 2026-11-05: «не подставило имя в сообщение»): ключи
+        // DoneCreated/DoneUpdated содержат {0}, но вызывались без string.Format —
+        // в диалоге оставался не заполненный плейсхолдер. Единая точка форматирования
+        // (TestDeployService.DoneMessage) никогда не возвращает «сырой» {0}.
+        var created = TestDeployService.DoneMessage(new TestDeployResult
+        {
+            Success = true,
+            TargetCreated = true,
+            Target = new Infobase { Name = "Тест: Demo 27" }
+        });
+        var updated = TestDeployService.DoneMessage(new TestDeployResult
+        {
+            Success = true,
+            TargetUpdated = true,
+            Target = new Infobase { Name = "Тест: УТ" }
+        });
+
+        Assert.DoesNotContain("{0}", created, StringComparison.Ordinal);
+        Assert.DoesNotContain("{0}", updated, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DoneMessage_KeysHaveNamePlaceholder_CallSitesUseFormatter()
+    {
+        // Ключи локализации содержат {0} (имя тестовой базы), а все четыре места
+        // показа итогового сообщения (обе платформы окон и ViewModel) используют
+        // DoneMessage — прямой вызов T(DoneCreated/DoneUpdated) без string.Format
+        // и есть регрессия «не подставило имя».
+        var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
+        Assert.Contains("\"TestDeploy.DoneCreated\": \"Тестовая копия «{0}» создана.\"", ru, StringComparison.Ordinal);
+        Assert.Contains("\"TestDeploy.DoneUpdated\": \"Тестовая копия «{0}» обновлена.\"", ru, StringComparison.Ordinal);
+
+        foreach (var relativePath in new[]
+                 {
+                     Path.Combine("Workspace1C", "Views", "TestDeployWindow.cs"),
+                     Path.Combine("Workspace1C", "Views", "TestDeployWindow.Avalonia.cs"),
+                     Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Commands.cs"),
+                     Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Avalonia.Commands.cs")
+                 })
+        {
+            var code = ReadProjectFile(relativePath);
+            Assert.True(
+                code.Contains("TestDeployService.DoneMessage(result)", StringComparison.Ordinal),
+                $"Ожидается TestDeployService.DoneMessage(result) в {relativePath}");
+        }
+    }
+
+    // ---------------- (12) v1.0.1.37: восстановление значений окна ----------------
+
+    private static TestDeployScenario MakeScenario(string sourceId, BackupEngine engine, string dbServer, string dbUser)
+        => new()
+        {
+            SourceInfobaseId = sourceId,
+            DumpEngine = engine,
+            DbServer = dbServer,
+            DbUser = dbUser
+        };
+
+    [Fact]
+    public void ApplyRememberedWindowValues_RestoresEngineDbServerDbUser()
+    {
+        // issue #79 (7OH 2026-11-05T11:22: «Просьба сохранять значения окна: Движок
+        // выгрузки, Сервер СУБД, Пользователь СУБД») — значения последнего сценария
+        // исходной базы восстанавливаются при следующем открытии мастера.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        var last = MakeScenario(vm.Source.Id, BackupEngine.Ibcmd, "sqlsrv,1433", "sa");
+
+        vm.ApplyRememberedWindowValues(last);
+
+        Assert.Equal(1, vm.EngineIndex);                       // «Движок выгрузки» — ibcmd
+        Assert.Equal("sqlsrv,1433", vm.DbServer);              // «Сервер СУБД»
+        Assert.Equal("sa", vm.DbUser);                         // «Пользователь СУБД»
+    }
+
+    [Fact]
+    public void ApplyRememberedWindowValues_DesignerEngine_KeepsDefaultIndex()
+    {
+        // Движок «Конфигуратор» в сценарии — индекс формы остаётся дефолтным (0):
+        // возвращать его явно незачем, восстанавливается только ibcmd.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        var last = MakeScenario(vm.Source.Id, BackupEngine.Designer, "sqlsrv", "sa");
+
+        vm.ApplyRememberedWindowValues(last);
+
+        Assert.Equal(0, vm.EngineIndex);
+        Assert.Equal("sqlsrv", vm.DbServer);
+        Assert.Equal("sa", vm.DbUser);
+    }
+
+    [Fact]
+    public void ApplyRememberedWindowValues_EmptyScenarioValues_DoNotOverwriteForm()
+    {
+        // Пустые значения сценария (старый JSON без новых полей) не затирают подсказки.
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+        vm.DbServer = "form-server";
+        vm.DbUser = "form-user";
+        var last = MakeScenario(vm.Source.Id, BackupEngine.Designer, string.Empty, string.Empty);
+
+        vm.ApplyRememberedWindowValues(last);
+
+        Assert.Equal("form-server", vm.DbServer);
+        Assert.Equal("form-user", vm.DbUser);
+    }
+
+    [Fact]
+    public void ApplyRememberedWindowValues_NullScenario_NoChanges()
+    {
+        var vm = MakeVm(databaseName: "ut_base", dbName: "ut_base");
+
+        vm.ApplyRememberedWindowValues(null); // не бросает
+
+        Assert.Equal(0, vm.EngineIndex);
+        Assert.Equal(string.Empty, vm.DbServer);
+        Assert.Equal(string.Empty, vm.DbUser);
+    }
+
+    [Fact]
+    public void FindLastForSource_ReturnsLastScenarioOfSource()
+    {
+        // Сценарии накапливаются по одному на успешное развёртывание — берётся
+        // последний по списку для нужной исходной базы.
+        var sourceId = Guid.NewGuid().ToString("N");
+        var otherId = Guid.NewGuid().ToString("N");
+        var scenarios = new List<TestDeployScenario>
+        {
+            MakeScenario(sourceId, BackupEngine.Designer, "old-server", "old-user"),
+            MakeScenario(otherId, BackupEngine.Ibcmd, "other-server", "other-user"),
+            MakeScenario(sourceId, BackupEngine.Ibcmd, "new-server", "new-user")
+        };
+
+        var last = TestDeployStore.FindLastForSource(sourceId, scenarios);
+
+        Assert.NotNull(last);
+        Assert.Equal("new-server", last!.DbServer);
+        Assert.Equal("new-user", last.DbUser);
+    }
+
+    [Fact]
+    public void FindLastForSource_NoScenariosOrEmptyId_ReturnsNull()
+    {
+        Assert.Null(TestDeployStore.FindLastForSource(Guid.NewGuid().ToString("N"), new List<TestDeployScenario>()));
+        Assert.Null(TestDeployStore.FindLastForSource(null, new List<TestDeployScenario>
+        {
+            MakeScenario(Guid.NewGuid().ToString("N"), BackupEngine.Designer, "s", "u")
+        }));
     }
 }

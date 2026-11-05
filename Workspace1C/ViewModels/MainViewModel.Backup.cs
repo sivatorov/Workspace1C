@@ -69,6 +69,10 @@ public partial class MainViewModel
     private void ExecuteShowExportsList()
     {
         var win = new Workspace1C.ExportsListWindow(SelectedInfobase, this);
+        // Модальный показ с владельцем (issue #104, как issue #291 у «Сценариев
+        // резервирования»): без Owner главное окно могло выходить поверх диалога
+        // при смене активных приложений, перекрывая «Список выгрузок».
+        win.Owner = System.Windows.Application.Current.MainWindow;
         win.ShowDialog();
     }
 
