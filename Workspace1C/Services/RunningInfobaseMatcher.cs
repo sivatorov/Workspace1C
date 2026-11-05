@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -14,7 +15,7 @@ namespace Workspace1C.Services;
 /// </summary>
 public static class RunningInfobaseMatcher
 {
-    /// <summary>Сопоставляет базу с командной строкой процесса 1С.</summary>
+    /// <summary>Сопоставляет базу с командной строкой процесса 1С (прямые ключи /F и /S).</summary>
     public static bool MatchesCommandLine(Infobase infobase, string? commandLine)
     {
         if (infobase?.Connection is null || string.IsNullOrWhiteSpace(commandLine))
@@ -29,6 +30,74 @@ public static class RunningInfobaseMatcher
                 infobase.Connection.DatabaseName ?? ""),
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Двухпроходное сопоставление списка баз с процессами платформы 1С (монитор
+    /// запущенных баз, issue #103): первый проход — прямые ключи подключения (/F, /S);
+    /// второй — ключ /IBName по имени базы. Запуск отладки из Конфигуратора порождает
+    /// клиентский процесс вида <c>ENTERPRISE /IBName <имя></c> без /F//S — раньше
+    /// такие процессы не связывались с базой и значок «Предприятие» не появлялся.
+    /// Матч по /IBName выполняется ТОЛЬКО когда имя базы уникально в списке
+    /// (одинаковые имена в разных серверах/папках не сопоставляются — защита от
+    /// ложных срабатываний). Возвращает словарь «Id базы → сопоставленные процессы».
+    /// </summary>
+    public static IReadOnlyDictionary<string, List<RunningOneCProcess>> MatchProcesses(
+        IEnumerable<Infobase> infobases, IReadOnlyList<RunningOneCProcess> processes)
+    {
+        var result = new Dictionary<string, List<RunningOneCProcess>>();
+        var bases = (infobases ?? Enumerable.Empty<Infobase>())
+            .Where(ib => ib?.Connection is not null && !string.IsNullOrWhiteSpace(ib.Id))
+            .ToList();
+        if (bases.Count == 0 || processes is null || processes.Count == 0)
+            return result;
+
+        // Первый проход: прямые ключи /F//S — самый надёжный признак.
+        var unmatched = new List<RunningOneCProcess>();
+        foreach (var process in processes)
+        {
+            var owner = bases.FirstOrDefault(ib => MatchesCommandLine(ib, process.CommandLine));
+            if (owner is null)
+                unmatched.Add(process);
+            else
+                AddToResult(result, owner.Id, process);
+        }
+
+        // Второй проход: /IBName — запуск отладки из Конфигуратора (issue #103).
+        var uniqueByName = bases
+            .GroupBy(ib => NormalizeName(ib.Name))
+            .Where(g => g.Key.Length > 0 && g.Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        if (uniqueByName.Count == 0)
+            return result;
+
+        foreach (var process in unmatched)
+        {
+            if (!TryExtractValue(process.CommandLine ?? "", "IBName", out var rawName))
+                continue;
+            var name = NormalizeName(rawName);
+            if (name.Length == 0)
+                continue;
+            if (uniqueByName.TryGetValue(name, out var owner))
+                AddToResult(result, owner.Id, process);
+        }
+
+        return result;
+    }
+
+    private static void AddToResult(
+        Dictionary<string, List<RunningOneCProcess>> result, string infobaseId, RunningOneCProcess process)
+    {
+        if (!result.TryGetValue(infobaseId, out var list))
+            result[infobaseId] = list = new List<RunningOneCProcess>();
+        list.Add(process);
+    }
+
+    /// <summary>Нормализация имени для сравнения: trim, без кавычек, регистр не важен.</summary>
+    private static string NormalizeName(string? name)
+    {
+        var n = (name ?? string.Empty).Trim().Trim('"').Trim();
+        return n;
     }
 
     /// <summary>

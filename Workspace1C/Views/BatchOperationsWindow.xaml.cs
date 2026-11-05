@@ -221,6 +221,18 @@ namespace Workspace1C
             {
                 UpdateKindDependentUi();
             }
+            // Issue #92 (v1.0.1.35, репорт 7OH: «поле появляется только при двойном
+            // переключении»): движок выгрузки выставляется вызывающим кодом ПОСЛЕ
+            // конструктора окна (восстановление из настроек). Без этой ветки радиокнопки
+            // движка не ресинхронизировались: в UI оставался отмеченным «ibcmd», а в
+            // модели — «Конфигуратор». Клик по уже отмеченной радиокнопке «ibcmd» события
+            // Checked не даёт — движок молча оставался «Конфигуратор» и поле пароля СУБД
+            // не появлялось. Любое изменение DumpEngine в модели (программное или от
+            // радиокнопки) теперь пересобирает весь видозависимый UI.
+            else if (e.PropertyName == nameof(BatchOperationsViewModel.DumpEngine))
+            {
+                UpdateKindDependentUi();
+            }
             else if (e.PropertyName == nameof(BatchOperationsViewModel.IsDbmsPasswordVisible))
             {
                 SqlPasswordPanel.Visibility = _vm.IsDbmsPasswordVisible

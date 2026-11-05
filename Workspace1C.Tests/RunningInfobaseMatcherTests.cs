@@ -102,4 +102,91 @@ public sealed class RunningInfobaseMatcherTests
         Assert.False(RunningInfobaseMatcher.PathsEqual(@"C:\Bases\ib", @"C:\Bases\ib2"));
         Assert.False(RunningInfobaseMatcher.PathsEqual(null, @"C:\x"));
     }
+
+    // ===================== Issue #103: запуск отладки из Конфигуратора =====================
+
+    private static Infobase NamedBase(string id, string name) => new()
+    {
+        Id = id,
+        Name = name,
+        Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = @"C:\Bases\" + id }
+    };
+
+    private static RunningOneCProcess Process(string commandLine) => new("1cv8c.exe", commandLine);
+
+    [Fact]
+    public void MatchProcesses_DebugLaunchFromConfigurator_MatchesByIbName()
+    {
+        // Отладка из Конфигуратора: клиент запускается «ENTERPRISE /IBName <имя>» без
+        // /F//S — процесс должен связаться с базой по уникальному имени (issue #103).
+        var base1 = NamedBase("f1", "Demo 27");
+        var processes = new[]
+        {
+            Process(@"""C:\Program Files\1cv8\1cv8c.exe"" ENTERPRISE /IBName ""Demo 27"""),
+            Process(@"""C:\Program Files\1cv8\1cv8.exe"" ENTERPRISE /IBName Demo 27 /N Иван")
+        };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1 }, processes);
+
+        Assert.True(matched.TryGetValue("f1", out var list));
+        Assert.Equal(2, list!.Count);
+    }
+
+    [Fact]
+    public void MatchProcesses_DirectKeysTakePriorityOverIbName()
+    {
+        // Процесс с прямым ключом /F не должен попасть во второй проход: база «Файловая»
+        // получает его по /F, а процесс с /IBName другой базы — не сопоставляется никому.
+        var base1 = NamedBase("f1", "Файловая");
+        var base2 = NamedBase("f2", "Другая");
+        var processes = new[]
+        {
+            Process(@"""1cv8c.exe"" ENTERPRISE /F ""C:\Bases\f1"""),
+            Process(@"""1cv8c.exe"" ENTERPRISE /IBName Чужая")
+        };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.True(matched.TryGetValue("f1", out var list1));
+        Assert.Single(list1!);
+        Assert.False(matched.ContainsKey("f2"));
+    }
+
+    [Fact]
+    public void MatchProcesses_DuplicateNames_AreNotMatchedByIbName()
+    {
+        // Одинаковые имена в разных базах — матч по /IBName не выполняется (защита от
+        // ложных срабатываний): процесс не должен «пометить» обе базы запущенными.
+        var base1 = NamedBase("f1", "Бухгалтерия");
+        var base2 = NamedBase("f2", "Бухгалтерия");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName Бухгалтерия") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.Empty(matched);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbNameIsCaseAndQuotesInsensitive()
+    {
+        var base1 = NamedBase("f1", "Demo 27");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName ""demo 27"" /C Разрешение") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1 }, processes);
+
+        Assert.True(matched.TryGetValue("f1", out var list));
+        Assert.Single(list!);
+    }
+
+    [Fact]
+    public void MatchProcesses_EmptyInputs_ReturnEmpty()
+    {
+        var matched1 = RunningInfobaseMatcher.MatchProcesses(Array.Empty<Infobase>(),
+            new[] { Process("1cv8c.exe ENTERPRISE") });
+        Assert.Empty(matched1);
+
+        var matched2 = RunningInfobaseMatcher.MatchProcesses(new[] { NamedBase("f1", "X") },
+            Array.Empty<RunningOneCProcess>());
+        Assert.Empty(matched2);
+    }
 }

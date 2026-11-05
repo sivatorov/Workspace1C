@@ -72,12 +72,18 @@ public partial class MainViewModel
                 Infobases.Where(i => i.IsRunning).Select(i => i.Id),
                 StringComparer.Ordinal);
 
+            // Issue #103 (v1.0.1.35): двухпроходное сопоставление — сначала прямые ключи
+            // /F//S, затем /IBName по имени базы. Запуск отладки из Конфигуратора
+            // порождает клиентский процесс «ENTERPRISE /IBName <имя>» без /F//S —
+            // значок «Предприятие» раньше не появлялся.
+            var matchedByBase = RunningInfobaseMatcher.MatchProcesses(Infobases, processes);
             foreach (var ib in Infobases)
             {
                 // База считается запущенной, если хотя бы один процесс 1С подключён к ней.
-                var matching = processes
-                    .Where(p => RunningInfobaseMatcher.MatchesCommandLine(ib, p.CommandLine))
-                    .ToList();
+                var matching = matchedByBase.TryGetValue(ib.Id, out var list)
+                    ? list
+                    : (System.Collections.Generic.IReadOnlyList<RunningOneCProcess>)
+                        System.Array.Empty<RunningOneCProcess>();
                 var running = matching.Count > 0;
 
                 // issue #310: если среди процессов базы есть «не отвечающий» —

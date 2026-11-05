@@ -493,6 +493,82 @@ public sealed class Issue79RacInfoFixtureTests
         Assert.DoesNotContain("TestDeploy.SourceDbmsCredentialsFromMaster", log);
     }
 
+    [Fact]
+    public async Task ResolveSourceDumpProfileAsync_RacProfile_GetsPasswordFromTargetDbFields()
+    {
+        // Issue #79 (v1.0.1.35, ZIP diagnostics_20261105_082423: профиль из rac ушёл
+        // в ibcmd без пароля): ручной блок «Данные СУБД источника» не заполнен —
+        // fallback логина/пароля берётся из ВИДИМЫХ полей формы «Пользователь СУБД»/
+        // «Пароль СУБД» (у одного SQL-сервера креды совпадают; rac пароль не возвращает
+        // никогда). Унификация с окном массовой выгрузки issue #92, где хватает
+        // одного пароля с формы.
+        var source = new Infobase
+        {
+            Id = "src-1",
+            Name = "Demo_8.3.27",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "srv1c",
+                DatabaseName = "Demo_8.3.27"
+            }
+        };
+        var scenario = new TestDeployScenario
+        {
+            SourceInfobaseId = "src-1",
+            DbUser = "sa",
+            DbPassword = "FormPwd"
+        };
+        var rac = new RacSummaryFakeRacClient();
+        var log = new List<string>();
+        var service = new TestDeployService();
+
+        var (profile, error) = await service.ResolveSourceDumpProfileAsync(
+            source, scenario, log.Add, CancellationToken.None,
+            savedProfileLoader: _ => null,
+            resolverFactory: () => new ClusterInfobaseCredentialsResolver(rac, servers: null, log: null));
+
+        Assert.Null(error);
+        Assert.NotNull(profile);
+        Assert.Equal(DbmsKind.MsSql, profile!.Dbms);
+        Assert.Equal("localhost", profile.Host);
+        Assert.Equal("Demo_8.3.27", profile.Database);
+        Assert.Equal("sa", profile.User);
+        // Пароль СУБД взят из видимых полей формы (rac его не возвращает).
+        Assert.Equal("FormPwd", profile.Password);
+        Assert.Contains("TestDeploy.SourceDbmsCredentialsFromMaster", log);
+    }
+
+    [Fact]
+    public void ResolveDbmsCredentialFallback_SourceFieldsHavePriority()
+    {
+        // Ручные поля «Данные СУБД источника» приоритетнее целевых полей формы.
+        var scenario = new TestDeployScenario
+        {
+            SourceDbUser = "src-user",
+            SourceDbPassword = "src-pwd",
+            DbUser = "target-user",
+            DbPassword = "target-pwd"
+        };
+
+        var (user, password) = TestDeployService.ResolveDbmsCredentialFallback(scenario);
+
+        Assert.Equal("src-user", user);
+        Assert.Equal("src-pwd", password);
+    }
+
+    [Fact]
+    public void ResolveDbmsCredentialFallback_EmptyScenario_ReturnsNulls()
+    {
+        var (user, password) = TestDeployService.ResolveDbmsCredentialFallback(new TestDeployScenario());
+
+        Assert.Null(user);
+        Assert.Null(password);
+        var (nullUser, nullPassword) = TestDeployService.ResolveDbmsCredentialFallback(null);
+        Assert.Null(nullUser);
+        Assert.Null(nullPassword);
+    }
+
     /// <summary>
     /// Фейковый rac-клиент: отдаёт кластер и summary базы с заполненными полями СУБД
     /// (dbms/db-server/db-name/db-user), пароль rac не возвращает — как реальный rac.

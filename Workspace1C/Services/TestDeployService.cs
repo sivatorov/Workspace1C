@@ -509,8 +509,14 @@ public sealed class TestDeployService
             // Issue #79 (v1.0.1.34): логин/пароль СУБД из ручных полей мастера дополняют
             // ПУСТЫЕ поля rac-профиля (rac пароль СУБД не возвращает никогда — профиль
             // уходил в ibcmd с пустым паролем, и подключение к MS SQL падало).
-            resolver.DbmsUserFallback = scenario.SourceDbUser;
-            resolver.DbmsPasswordFallback = scenario.SourceDbPassword;
+            // Issue #79 (v1.0.1.35, ZIP diagnostics_20261105_082423: профиль из rac ушёл
+            // в ibcmd без пароля): если ручной блок «Данные СУБД источника» не заполнен,
+            // fallback берётся из ВИДИМЫХ полей формы «Пользователь СУБД»/«Пароль СУБД» —
+            // у одного SQL-сервера они, как правило, совпадают (унификация с окном
+            // массовой выгрузки issue #92, где хватает одного пароля с формы).
+            var (fallbackUser, fallbackPassword) = ResolveDbmsCredentialFallback(scenario);
+            resolver.DbmsUserFallback = fallbackUser;
+            resolver.DbmsPasswordFallback = fallbackPassword;
             // Issue #79 (v1.0.1.29): при неудаче резолва журнал/окно мастера прямо
             // советуют ручные данные СУБД источника ИЛИ движок «Конфигуратор».
             resolver.AdviseManualSourceDbms = true;
@@ -569,26 +575,49 @@ public sealed class TestDeployService
     }
 
     /// <summary>
-    /// Дополняет профиль СУБД из rac пустыми логином/паролем из ручных полей мастера
+    /// Fallback логина/пароля СУБД для профиля из rac (issue #79, v1.0.1.35): приоритет —
+    /// ручные поля «Данные СУБД источника» (<see cref="TestDeployScenario.SourceDbUser"/>/
+    /// <see cref="TestDeployScenario.SourceDbPassword"/>); при пустых — видимые поля формы
+    /// «Пользователь СУБД»/«Пароль СУБД» (целевые поля, <see cref="TestDeployScenario.DbUser"/>/
+    /// <see cref="TestDeployScenario.DbPassword"/>): у одного SQL-сервера креды совпадают,
+    /// а rac пароль СУБД не возвращает никогда. Internal — чистый helper для юнит-теста.
+    /// </summary>
+    internal static (string? User, string? Password) ResolveDbmsCredentialFallback(TestDeployScenario? scenario)
+    {
+        if (scenario is null)
+            return (null, null);
+        var user = !string.IsNullOrWhiteSpace(scenario.SourceDbUser)
+            ? scenario.SourceDbUser!.Trim()
+            : string.IsNullOrWhiteSpace(scenario.DbUser) ? null : scenario.DbUser!.Trim();
+        var password = !string.IsNullOrWhiteSpace(scenario.SourceDbPassword)
+            ? scenario.SourceDbPassword
+            : string.IsNullOrWhiteSpace(scenario.DbPassword) ? null : scenario.DbPassword;
+        return (user, password);
+    }
+
+    /// <summary>
+    /// Дополняет профиль СУБД из rac пустыми логином/паролем из полей мастера
     /// (issue #79, v1.0.1.34): rac-значения приоритетны, поля мастера заполняют ТОЛЬКО
     /// пустые (пароль rac не возвращает никогда — ibcmd падал на авторизации даже при
-    /// правильно распознанных данных). Возвращает true, если профиль изменён.
-    /// Internal — чистый helper для юнит-теста.
+    /// правильно распознанных данных). Источник кредов — <see cref="ResolveDbmsCredentialFallback"/>
+    /// (с v1.0.1.35 — и видимые поля «Пользователь/Пароль СУБД» формы при пустом ручном блоке).
+    /// Возвращает true, если профиль изменён. Internal — чистый helper для юнит-теста.
     /// </summary>
     internal static bool MergeSourceDbmsCredentials(DbmsBackupProfile? profile, TestDeployScenario? scenario)
     {
         if (profile is null || scenario is null)
             return false;
         var changed = false;
-        var user = scenario.SourceDbUser?.Trim();
+        var (fallbackUser, fallbackPassword) = ResolveDbmsCredentialFallback(scenario);
+        var user = fallbackUser?.Trim();
         if (string.IsNullOrWhiteSpace(profile.User) && !string.IsNullOrWhiteSpace(user))
         {
             profile.User = user;
             changed = true;
         }
-        if (string.IsNullOrWhiteSpace(profile.Password) && !string.IsNullOrWhiteSpace(scenario.SourceDbPassword))
+        if (string.IsNullOrWhiteSpace(profile.Password) && !string.IsNullOrWhiteSpace(fallbackPassword))
         {
-            profile.Password = scenario.SourceDbPassword;
+            profile.Password = fallbackPassword;
             changed = true;
         }
         return changed;
@@ -655,6 +684,13 @@ public sealed class TestDeployService
         // из-за чего rac-проба шла без учётных данных и сообщала «Недостаточно прав»).
         resolver.CredentialOverride = scenario.Credential;
         resolver.FallbackDbms = scenario.Dbms;
+        // Issue #79 (v1.0.1.35): унификация с боевым резолвом — fallback логина/пароля
+        // СУБД (ручные поля «Данные СУБД источника», при пустых — поля СУБД формы)
+        // действует и на шаге pre-валидации, чтобы валидация и выгрузка видели один
+        // и тот же профиль.
+        var (fallbackUser, fallbackPassword) = ResolveDbmsCredentialFallback(scenario);
+        resolver.DbmsUserFallback = fallbackUser;
+        resolver.DbmsPasswordFallback = fallbackPassword;
         // Issue #79 (v1.0.1.29): подсказка о ручных данных СУБД источника при неудаче.
         resolver.AdviseManualSourceDbms = true;
         return await resolver.ResolveAsync(source, ct).ConfigureAwait(false);

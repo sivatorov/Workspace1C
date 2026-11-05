@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -102,6 +104,34 @@ public sealed class Issue128BatchEngineLicenseRacTests
         Assert.True(dumpIbcmd.IsDbmsPasswordVisible);
         Assert.False(dumpDesigner.IsDbmsPasswordVisible);
         Assert.False(load.IsDbmsPasswordVisible);
+    }
+
+    [Fact]
+    public void DumpEngine_Change_RaisesPropertyChangedWithPasswordVisibility()
+    {
+        // Issue #92 (v1.0.1.35, репорт 7OH: «поле появляется только при двойном
+        // переключении»): движок выгрузки выставляется вызывающим кодом ПОСЛЕ
+        // конструктора окна (восстановление из настроек). Окна ресинхронизируют
+        // радиокнопки движка и блок пароля СУБД по PropertyChanged модели — смена
+        // DumpEngine обязана поднимать событие для обоих свойств.
+        var vm = new BatchOperationsViewModel(Array.Empty<Infobase>(), BatchOperationKind.DumpDt);
+        var changes = new List<string>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName ?? string.Empty);
+
+        // Внешняя установка «Конфигуратор» (как ExecuteBatchDumpCore после ctor).
+        vm.DumpEngine = BatchDumpEngine.Designer;
+
+        Assert.Equal(BatchDumpEngine.Designer, vm.DumpEngine);
+        Assert.False(vm.IsDbmsPasswordVisible);
+        Assert.Contains(nameof(BatchOperationsViewModel.DumpEngine), changes);
+        Assert.Contains(nameof(BatchOperationsViewModel.IsDbmsPasswordVisible), changes);
+
+        // Обратное переключение на «ibcmd» — поле пароля снова видимо.
+        vm.DumpEngine = BatchDumpEngine.Ibcmd;
+
+        Assert.Equal(BatchDumpEngine.Ibcmd, vm.DumpEngine);
+        Assert.True(vm.IsDbmsPasswordVisible);
+        Assert.Equal(2, changes.Count(n => n == nameof(BatchOperationsViewModel.IsDbmsPasswordVisible)));
     }
 
     // ===================== Issue #79: повтор rac по типу ошибки =====================
