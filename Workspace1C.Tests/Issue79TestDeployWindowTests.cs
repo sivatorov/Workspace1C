@@ -542,4 +542,40 @@ public sealed class Issue79TestDeployWindowTests
         Assert.Equal("sqlsrv", scenario.DbServer);
         Assert.Equal("ut_base", scenario.DbName);
     }
+
+    // ---------------- (9) v1.0.1.36: RestoreIB в новую пустую базу без кредов ----------------
+
+    [Fact]
+    public void RestoreCredential_NewBase_SuppressesAuth()
+    {
+        // issue #79 (7OH 2026-11-05 10:01): при загрузке .dt в только что созданную
+        // пустую базу «Пользователь ИБ не идентифицирован» — в ней нет пользователей,
+        // поэтому /N и /P в командную строку не должны попадать вовсе.
+        var credential = TestDeployService.BuildRestoreCredential(isNewBase: true);
+
+        Assert.NotNull(credential);
+        Assert.False(credential!.UseInfobaseAuth);
+        Assert.Equal(string.Empty, credential.User);
+        Assert.Equal(string.Empty, credential.Password);
+    }
+
+    [Fact]
+    public void RestoreCredential_ExistingBase_KeepsBaseAuth()
+    {
+        // Обновление существующей копии: пользователи в ней уже есть (пришли из .dt
+        // прошлой загрузки) — авторизация берётся из записи базы/общей, как раньше.
+        Assert.Null(TestDeployService.BuildRestoreCredential(isNewBase: false));
+    }
+
+    [Fact]
+    public void RestoreCredential_SuppressedCredential_ProducesNoAuthArgs()
+    {
+        // Сквозная проверка цепочки, по которой пустой user в подавляющем credential
+        // даёт пустую строку авторизации в RunDesignerBatch (обе платформы):
+        // BuildCredentialsArg отклоняет пустое имя (IsSafeCliValue("") == false).
+        var credential = TestDeployService.BuildRestoreCredential(isNewBase: true)!;
+
+        Assert.True(string.IsNullOrWhiteSpace(credential.User));
+        Assert.False(credential.UseInfobaseAuth); // ветка `credential is { UseInfobaseAuth: false }`
+    }
 }

@@ -184,7 +184,14 @@ public sealed class TestDeployService
                 result.Log.Add(T("TestDeploy.Step.Restore"));
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var restoreError = await RestoreAsync(target, dtPath, cancellationToken).ConfigureAwait(false);
+                // issue #79 (v1.0.1.36): в только что созданную ПУСТУЮ базу пользователей
+                // ИБ ещё нет — любая пара логин/пароль (унаследованная от источника или
+                // общая авторизация приложения) даёт «Пользователь ИБ не идентифицирован»
+                // и модальное окно платформы. Для новой базы RestoreIB запускается БЕЗ
+                // учётных данных; для обновления существующей копии поведение прежнее
+                // (в копии пользователи уже есть — пришли из .dt прошлой загрузки).
+                var restoreError = await RestoreAsync(
+                    target, dtPath, isNewBase: result.TargetCreated, cancellationToken).ConfigureAwait(false);
                 if (restoreError is not null)
                 {
                     // База могла быть создана до сбоя загрузки — предупреждение без автоудаления.
@@ -363,11 +370,24 @@ public sealed class TestDeployService
         return null;
     }
 
+    /// <summary>
+    /// Учётные данные для шага «Загрузка в копию» (issue #79, v1.0.1.36):
+    /// для ТОЛЬКО ЧТО созданной базы — подавляющий credential (пустые User/Password
+    /// при <c>UseInfobaseAuth == false</c>): в пустой базе нет пользователей ИБ, поэтому
+    /// <c>/N</c>/<c>/P</c> в командную строку не попадают (BuildCredentialsArg("") → ""),
+    /// и платформа не пытается аутентифицироваться. Для обновления существующей копии —
+    /// <c>null</c>: авторизация берётся из записи базы/общей авторизации, как раньше.
+    /// </summary>
+    internal static BackupCredential? BuildRestoreCredential(bool isNewBase)
+        => isNewBase
+            ? new BackupCredential { UseInfobaseAuth = false, User = string.Empty, Password = string.Empty }
+            : null;
+
     /// <summary>Загрузка .dt в целевую тестовую базу через RestoreIB (паттерн ServerCloneService).</summary>
-    private async Task<string?> RestoreAsync(Infobase target, string dtPath, CancellationToken ct)
+    private async Task<string?> RestoreAsync(Infobase target, string dtPath, bool isNewBase, CancellationToken ct)
     {
         var started = OneCLauncher.RunDesignerBatch(
-            target, OneCLauncher.DesignerBatchOperation.RestoreIB, dtPath, credential: null);
+            target, OneCLauncher.DesignerBatchOperation.RestoreIB, dtPath, credential: BuildRestoreCredential(isNewBase));
         if (!started)
             return T("Restore.StartFailed");
         var info = await WaitForBatchAsync(
