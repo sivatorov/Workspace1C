@@ -260,27 +260,49 @@ public partial class MainViewModel
     /// Целевые базы пакетных операций с учётом ВЫБРАННОЙ ГРУППЫ (issue #85, запрос
     /// leonvlas «разрешить выполнять команды для группы»): при мультивыделении —
     /// выделенные базы; при выделенном узле группы — все базы группы (включая
-    /// вложенные группы); иначе выделенная база. Блок «Для выделенных (N)…» /
-    /// «Для группы (N)…» контекстного меню работает по этим целям.
+    /// вложенные группы); при выделенном служебном узле «Без группы» — все базы
+    /// без группы (issue #113, v1.0.1.41); иначе выделенная база. Блок
+    /// «Для выделенных (N)…» / «Для группы (N)…» контекстного меню работает
+    /// по этим целям.
     /// </summary>
     public IReadOnlyList<Infobase> BatchOperationTargetsIncludingGroup =>
         _batchSelectedIds.Count > 0
             ? BatchSelectedInfobases
             : SelectedGroupNode is { Group: not null } groupNode
                 ? GetGroupInfobases(groupNode)
-                : SelectedInfobase is { } singleWithGroup
-                    ? new[] { singleWithGroup }
-                    : Array.Empty<Infobase>();
+                : IsNoGroupBatchTarget
+                    ? GetNoGroupInfobases()
+                    : SelectedInfobase is { } singleWithGroup
+                        ? new[] { singleWithGroup }
+                        : Array.Empty<Infobase>();
 
     /// <summary>Число целевых баз с учётом выбранной группы (для заголовка меню, issue #85).</summary>
     public int BatchOperationTargetCountIncludingGroup => BatchOperationTargetsIncludingGroup.Count;
 
     /// <summary>
     /// Выбран ли узел группы (без мультивыделения) — в меню показывается заголовок
-    /// «Для группы (N)…» вместо «Для выделенных (N)…» (issue #85).
+    /// «Для группы (N)…» вместо «Для выделенных (N)…» (issue #85). Узел «Без группы»
+    /// тоже считается групповым контекстом (issue #113, v1.0.1.41).
     /// </summary>
     public bool IsGroupBatchTarget =>
-        _batchSelectedIds.Count == 0 && SelectedGroupNode is { Group: not null };
+        _batchSelectedIds.Count == 0 && (SelectedGroupNode is { Group: not null } || IsNoGroupBatchTarget);
+
+    /// <summary>
+    /// Выбран ли служебный узел «Без группы» (без мультивыделения) — пакетный блок
+    /// работает по базам без группы (issue #113, v1.0.1.41). Прочие спец-узлы без
+    /// модели группы («Закреплённые», «Все базы») сюда не попадают.
+    /// </summary>
+    public bool IsNoGroupBatchTarget =>
+        _batchSelectedIds.Count == 0
+        && SelectedGroupNode is { Group: null } node
+        && string.Equals(node.Marker, GroupNodeViewModel.NoGroupMarker, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Базы без группы (issue #113, v1.0.1.41): <see cref="Infobase.Group"/> пустой.
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal IReadOnlyList<Infobase> GetNoGroupInfobases() =>
+        Infobases.Where(ib => string.IsNullOrWhiteSpace(ib.Group)).ToList();
 
     /// <summary>
     /// Базы группы (включая вложенные группы) по узлу дерева (issue #85): путь узла

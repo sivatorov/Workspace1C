@@ -45,6 +45,18 @@ public sealed class Issue113NoGroupMenuTests
     }
 
     [Fact]
+    public void BatchBlockTargetsNoGroupBases_BothStacks()
+    {
+        // Issue #113 (v1.0.1.41): пакетный блок «Для группы (N)…» работает и для
+        // узла «Без группы» — цели считаются по IsNoGroupBatchTarget, заголовок
+        // берётся из IsGroupBatchTarget (VM), поэтому достаточно стражей по VM.
+        var batch = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Batch.cs"));
+        Assert.Contains("IsNoGroupBatchTarget", batch, StringComparison.Ordinal);
+        Assert.Contains("GroupNodeViewModel.NoGroupMarker", batch, StringComparison.Ordinal);
+        Assert.Contains("GetNoGroupInfobases", batch, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RightClickSelectsNoGroupNode_BothStacks()
     {
         // WPF: ветка NoGroupMarker в OnInfobaseTree_PreviewMouseRightButtonDown.
