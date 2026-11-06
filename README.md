@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.37-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.38-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.37**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.38**
 (поддерживается **более 5 500 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -203,6 +203,12 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Чистка разделителей в меню группы и тёмная тема (1.0.1.38, Windows и Linux)** —
+  в контекстном меню группы после скрытия неприменимых пунктов разделители больше не
+  появляются первым/последним элементом и не дублируются подряд (issue #105, доработка 7OH);
+  в тёмной теме плашки иконок групп стали приглушённо-тёмными, окно «Настройка информационной
+  базы» больше не просвечивает светлым по краям, контекстное меню значка в трее окрашивается
+  в тёмные цвета (issue #107).
 - **Массовая загрузка из CF, контекстное меню группы и «Список выгрузок» (1.0.1.37,
   Windows и Linux)** — новая пакетная операция «Массовая загрузка из CF (Конфигуратор)»:
   загрузка конфигурации из *.cf сразу в список баз с выбором целей (выделенные базы

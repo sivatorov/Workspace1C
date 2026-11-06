@@ -29,24 +29,47 @@ public class GroupColorConverter : IMultiValueConverter
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
         => throw new NotSupportedException();
 
-    public static SolidColorBrush GetBrush(string hex)
+    public static SolidColorBrush GetBrush(string hex) => GetBrush(hex, adaptForDark: false);
+
+    /// <summary>
+    /// Кисть фона плашки группы. При <paramref name="adaptForDark"/> = true (плашка в дереве,
+    /// issue #107) в тёмной теме приложения светлая заливка группы заменяется полупрозрачным
+    /// вариантом того же цвета: поверх тёмного фона она выглядит как приглушённая тёмная
+    /// плашка, сохраняя оттенок группы (иначе светлая плашка «ослепляет» на тёмном фоне).
+    /// </summary>
+    public static SolidColorBrush GetBrush(string hex, bool adaptForDark)
     {
-        return Cache.GetOrAdd(hex ?? "#2D6CDF", key =>
+        var rawKey = hex ?? "#2D6CDF";
+        // Ключ кэша различает обычную и адаптированную кисти одного цвета.
+        var key = adaptForDark ? "\u0001" + rawKey : rawKey;
+        return Cache.GetOrAdd(key, _ =>
         {
-            try
+            var color = ParseColor(rawKey);
+            if (adaptForDark &&
+                Workspace1C.Themes.ThemeManager.CurrentTheme == Workspace1C.Themes.ThemeManager.DarkThemeName &&
+                IsLightColor(color))
             {
-                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(key));
-                if (brush.CanFreeze)
-                    brush.Freeze();
-                return brush;
+                color = Color.FromArgb(DarkChipAlpha, color.R, color.G, color.B);
             }
-            catch
-            {
-                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#2D6CDF"));
-                if (brush.CanFreeze)
-                    brush.Freeze();
-                return brush;
-            }
+            var brush = new SolidColorBrush(color);
+            if (brush.CanFreeze)
+                brush.Freeze();
+            return brush;
         });
     }
+
+    /// <summary>Альфа адаптированной плашки в тёмной теме (~25 %): поверх тёмного фона
+    /// даёт тёмный приглушённый оттенок цвета группы.</summary>
+    private const byte DarkChipAlpha = 64;
+
+    internal static Color ParseColor(string hex)
+    {
+        try { return (Color)ColorConverter.ConvertFromString(hex); }
+        catch { return (Color)ColorConverter.ConvertFromString("#2D6CDF"); }
+    }
+
+    /// <summary>Светлый ли цвет (та же метрика, что в GroupTextColorConverter): светлая
+    /// заливка в тёмной теме заменяется полупрозрачным вариантом (issue #107).</summary>
+    internal static bool IsLightColor(Color color)
+        => 0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B > 150;
 }

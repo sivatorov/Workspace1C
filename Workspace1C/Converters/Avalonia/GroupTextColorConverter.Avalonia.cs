@@ -30,7 +30,17 @@ namespace Workspace1C.Converters
         }
 
         public static SolidColorBrush GetBrush(string? hex)
-            => Cache.GetOrAdd(hex ?? "#2D6CDF", key => IsLight(ParseColor(key)) ? Black : White);
+            => Cache.GetOrAdd(hex ?? "#2D6CDF", key =>
+            {
+                var color = ParseColor(key);
+                // Issue #107: в тёмной теме светлая заливка плашки группы адаптируется
+                // (GroupColorConverter.GetBrush делает её полупрозрачной, тёмной) — текст
+                // на такой плашке должен быть светлым, а не чёрным.
+                if (IsLight(color) &&
+                    Workspace1C.Themes.ThemeManager.CurrentTheme == Workspace1C.Themes.ThemeManager.DarkThemeName)
+                    return White;
+                return IsLight(color) ? Black : White;
+            });
 
         public IList<object?>? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
             => throw new NotSupportedException();

@@ -2303,9 +2303,77 @@ namespace Workspace1C
                     // перестраивается каждый раз, как batch-блок.
                     PopulateCustomActionsMenu();
                 }
+
+                // Чистка «висячих» разделителей (issue #105, доработка 7OH): разделитель
+                // показывается только между двумя видимыми пунктами — в начале/в конце
+                // меню, рядом со скрытыми (batch-блок, пользовательские действия) и
+                // подряд идущие скрываются/схлопываются. Выполняется после установки
+                // финальной видимости пунктов (batch и пользовательские действия).
+                CollapseDanglingSeparators(menu.Items);
             };
 
             return menu;
+        }
+
+        /// <summary>
+        /// Скрывает «висячие» и подряд идущие разделители меню (issue #105, доработка 7OH):
+        /// разделитель отображается, только если сверху и снизу от него есть видимый пункт
+        /// (сквозь любые скрытые); из нескольких показанных подряд остаётся первый.
+        /// Корневой уровень меню, не рекурсивно (подменю чистит резолвер при фильтрации).
+        /// </summary>
+        private static void CollapseDanglingSeparators(ItemCollection items)
+        {
+            var list = items.Cast<Avalonia.Controls.Control>().ToList();
+            var count = list.Count;
+            if (count == 0)
+                return;
+
+            var visibleItem = new bool[count];
+            for (var i = 0; i < count; i++)
+                visibleItem[i] = list[i] is Avalonia.Controls.MenuItem m && m.IsVisible;
+
+            var show = new bool[count];
+            // Шаг 1: у разделителя есть видимый пункт сверху.
+            var seenVisible = false;
+            for (var i = 0; i < count; i++)
+            {
+                if (list[i] is Separator)
+                    show[i] = seenVisible;
+                else if (visibleItem[i])
+                    seenVisible = true;
+            }
+            // Шаг 2: у разделителя есть видимый пункт снизу.
+            seenVisible = false;
+            for (var i = count - 1; i >= 0; i--)
+            {
+                if (list[i] is Separator)
+                    show[i] &= seenVisible;
+                else if (visibleItem[i])
+                    seenVisible = true;
+            }
+            // Шаг 3: из нескольких показанных подряд (без видимого пункта между) — первый.
+            var lastShownIndex = -1;
+            for (var i = 0; i < count; i++)
+            {
+                if (list[i] is not Separator)
+                {
+                    if (visibleItem[i])
+                        lastShownIndex = -1; // между разделителями появился видимый пункт
+                    continue;
+                }
+                if (!show[i])
+                    continue;
+                if (lastShownIndex >= 0)
+                    show[i] = false; // подряд — скрываем второй и далее
+                else
+                    lastShownIndex = i;
+            }
+            // Применяем видимость.
+            for (var i = 0; i < count; i++)
+            {
+                if (list[i] is Separator sep)
+                    sep.IsVisible = show[i];
+            }
         }
 
         /// <summary>Целевой контекст меню — выбранная группа дерева (без мультивыделения

@@ -139,26 +139,78 @@ namespace Workspace1C
                     ? Visibility.Visible
                     : Visibility.Collapsed;
             }
-            // Скрываем разделители, оставшиеся рядом со скрытыми пунктами.
-            if (restricted)
-            {
-                for (var i = items.Count - 1; i >= 0; i--)
-                {
-                    if (items[i] is not Separator sep)
-                        continue;
-                    var prevVisible = items.Take(i).OfType<MenuItem>()
-                        .Any(m => m.Visibility == Visibility.Visible);
-                    var nextVisible = items.Skip(i + 1).OfType<MenuItem>()
-                        .Any(m => m.Visibility == Visibility.Visible);
-                    sep.Visibility = prevVisible && nextVisible ? Visibility.Visible : Visibility.Collapsed;
-                }
-            }
-
             // Пользовательские действия (0.3.9.197): наполняем подменю в конце — после
             // batch-логики и общего прохода видимости. Финальную видимость подменю и его
             // разделителя метод устанавливает явно (в т.ч. в restricted-режиме, где общий
             // проход оставляет Tag="User" видимым).
             PopulateCustomActionsMenu(menu);
+
+            // Чистка «висячих» разделителей (issue #105, доработка 7OH): разделитель
+            // показывается только между двумя видимыми пунктами — в начале/в конце меню,
+            // рядом со скрытыми (batch-блок, пользовательские действия) и подряд идущие
+            // скрываются/схлопываются. Выполняется ПОСЛЕ PopulateCustomActionsMenu —
+            // видимость всех пунктов уже финальная.
+            CollapseDanglingSeparators(items);
+        }
+
+        /// <summary>
+        /// Скрывает «висячие» и подряд идущие разделители меню (issue #105, доработка 7OH):
+        /// разделитель отображается, только если сверху и снизу от него есть видимый пункт
+        /// (сквозь любые скрытые); из нескольких показанных подряд остаётся первый.
+        /// <paramref name="items"/> — снимок пунктов корневого уровня меню (не рекурсивно).
+        /// </summary>
+        private static void CollapseDanglingSeparators(List<object> items)
+        {
+            var count = items.Count;
+            if (count == 0)
+                return;
+
+            var visibleItem = new bool[count];
+            for (var i = 0; i < count; i++)
+                visibleItem[i] = items[i] is MenuItem m && m.Visibility == Visibility.Visible;
+
+            var show = new bool[count];
+            // Шаг 1: у разделителя есть видимый пункт сверху.
+            var seenVisible = false;
+            for (var i = 0; i < count; i++)
+            {
+                if (items[i] is Separator)
+                    show[i] = seenVisible;
+                else if (visibleItem[i])
+                    seenVisible = true;
+            }
+            // Шаг 2: у разделителя есть видимый пункт снизу.
+            seenVisible = false;
+            for (var i = count - 1; i >= 0; i--)
+            {
+                if (items[i] is Separator)
+                    show[i] &= seenVisible;
+                else if (visibleItem[i])
+                    seenVisible = true;
+            }
+            // Шаг 3: из нескольких показанных подряд (без видимого пункта между) — первый.
+            var lastShownIndex = -1;
+            for (var i = 0; i < count; i++)
+            {
+                if (items[i] is not Separator)
+                {
+                    if (visibleItem[i])
+                        lastShownIndex = -1; // между разделителями появился видимый пункт
+                    continue;
+                }
+                if (!show[i])
+                    continue;
+                if (lastShownIndex >= 0)
+                    show[i] = false; // подряд — скрываем второй и далее
+                else
+                    lastShownIndex = i;
+            }
+            // Применяем видимость.
+            for (var i = 0; i < count; i++)
+            {
+                if (items[i] is Separator sep)
+                    sep.Visibility = show[i] ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
         /// <summary>

@@ -101,7 +101,9 @@ public class GroupNodeViewModel : ViewModelBase
             ? (!string.IsNullOrWhiteSpace(group.IconColor) ? group.IconColor : "#FFFFFF")
             : (defaultIconColor ?? "#FFFFFF");
         _icon = group?.Icon ?? defaultIcon ?? string.Empty;
-        HeaderBrush = GroupColorConverter.GetBrush(_color);
+        // Issue #107: плашка фона адаптируется под тёмную тему (светлая заливка
+        // группы становится полупрозрачной, тёмной); цвет иконки — не адаптируется.
+        HeaderBrush = GroupColorConverter.GetBrush(_color, adaptForDark: true);
         HeaderTextBrush = GroupTextColorConverter.GetBrush(_color);
         IconBrush = GroupColorConverter.GetBrush(_iconColor);
         // Обработчики вынесены в поля-делегаты — Detach() (эксперимент A, 1.0.0.34)

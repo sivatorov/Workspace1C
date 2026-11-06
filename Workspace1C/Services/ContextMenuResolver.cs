@@ -271,15 +271,38 @@ public static class ContextMenuResolver
             if (prevIsSeparator || atEdge)
                 nodes.RemoveAt(i);
         }
-        // После чистки подряд-разделителей: узел сразу после разделителя не должен
-        // дополнительно рисовать SeparatorBefore (двойной разделитель).
-        for (var i = 1; i < nodes.Count; i++)
-        {
-            if (IsSeparator(nodes[i - 1]))
-                nodes[i].SeparatorBefore = false;
-        }
+        // Нормализация флагов SeparatorBefore после чистки (issue #105, доработка 7OH):
+        // после удаления пунктов соседние узлы могли остаться с SeparatorBefore=true,
+        // что даёт при построении двойные линии и разделители на краях. Инвариант:
+        // между соседними узлами рисуется максимум один разделитель.
         if (nodes.Count > 0)
             nodes[0].SeparatorBefore = false;
+
+        // Слева направо: узел, следующий за уже рисуемым разделителем (явным узлом
+        // или флагом предыдущего узла), сбрасывает свой флаг.
+        var previousRendersSeparator = false;
+        foreach (var node in nodes)
+        {
+            if (IsSeparator(node))
+            {
+                node.SeparatorBefore = false;
+                previousRendersSeparator = true;
+                continue;
+            }
+            if (node.SeparatorBefore && previousRendersSeparator)
+                node.SeparatorBefore = false;
+            previousRendersSeparator = node.SeparatorBefore;
+        }
+
+        // Справа налево: узел перед явным узлом-разделителем сбрасывает флаг —
+        // иначе разделитель нарисуется дважды (флагом и узлом).
+        for (var i = nodes.Count - 2; i >= 0; i--)
+        {
+            if (IsSeparator(nodes[i]) || !nodes[i].SeparatorBefore)
+                continue;
+            if (IsSeparator(nodes[i + 1]) || nodes[i + 1].SeparatorBefore)
+                nodes[i].SeparatorBefore = false;
+        }
     }
 
     private static bool IsSeparator(ContextMenuNode node) =>

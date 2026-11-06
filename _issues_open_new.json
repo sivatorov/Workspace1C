@@ -1,47 +1,72 @@
 ﻿{
-    "collectedAt":  "2026-11-05T19:07:46.1233938+03:00",
+    "collectedAt":  "2026-11-06T09:54:16.0618007+03:00",
     "repo":  "sivatorov/Workspace1C",
     "versionInfo":  {
-                        "csprojVersion":  "1.0.1.36",
-                        "assemblyVersion":  "1.0.1.36",
-                        "fileVersion":  "1.0.1.36",
+                        "csprojVersion":  "1.0.1.37",
+                        "assemblyVersion":  "1.0.1.37",
+                        "fileVersion":  "1.0.1.37",
                         "changelogPath":  "G:\\h\\Workspace1C\\CHANGELOG.md",
-                        "changelogEntry":  "## [1.0.1.36] — 2026-11-05",
-                        "lastGitTag":  "v1.0.1.36",
-                        "lastReleaseTag":  "v1.0.1.36",
-                        "lastReleaseDate":  "2026-11-05T11:06:33Z"
+                        "changelogEntry":  "## [1.0.1.37] — 2026-11-05",
+                        "lastGitTag":  "v1.0.1.37",
+                        "lastReleaseTag":  "v1.0.1.37",
+                        "lastReleaseDate":  "2026-11-05T19:57:26Z"
                     },
-    "totalOpen":  9,
+    "totalOpen":  8,
     "needsWork":  [
-                      106,
-                      105,
-                      104,
-                      79
+                      107,
+                      105
                   ],
     "ignored":  [
+                    106,
                     103,
-                    102,
                     91,
                     87,
-                    85
+                    85,
+                    79
                 ],
     "issues":  [
+                   {
+                       "Number":  107,
+                       "Title":  "Неисправленные огрехи в тёмной теме",
+                       "Body":  "@sivatorov\n\n\u003e Если у вас осталось что-то не так в тёмной теме — проверьте, пожалуйста, в актуальной версии\n\nПродублирую в новом Issue.\n\n\u003e \u003cdetails\u003e\n\u003e \n\u003e \u003csummary\u003eВыбор родительской группы\u003c/summary\u003e\n\u003e \n\u003e \u003cimg width=\"460\" height=\"620\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/807887d6-739b-4efa-9637-260d36d12464\" /\u003e\n\u003e \n\u003e \u003c/details\u003e\n\u003e \n\u003e \u003cdetails\u003e\n\u003e \n\u003e \u003csummary\u003eНастройка информационной базы (в сравнении с Настройками)\u003c/summary\u003e\n\u003e \n\u003e \u003cimg width=\"1067\" height=\"711\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/ef4834a9-209d-4ca6-a46c-4c2722215dd3\" /\u003e\n\u003e \n\u003e \u003c/details\u003e \n\n _Originally posted by @ArtyoZ in [#26](https://github.com/sivatorov/Workspace1C/issues/26#issuecomment-6570772665)_",
+                       "CreatedAt":  "2026-11-06T06:04:03Z",
+                       "UpdatedAt":  "2026-11-06T06:12:35Z",
+                       "Author":  "ArtyoZ",
+                       "Labels":  [
+
+                                  ],
+                       "CommentCount":  1,
+                       "LastCommentAuthor":  "ArtyoZ",
+                       "NeedsWork":  true,
+                       "Reason":  "последний комментарий от \u0027ArtyoZ\u0027 (не sivatorov)",
+                       "Comments":  [
+                                        {
+                                            "author":  "ArtyoZ",
+                                            "createdAt":  "2026-11-06T06:12:34Z",
+                                            "body":  "@sivatorov\n\nДумаю, что цвет контекстного меню значка в трее тоже сюда... Надо и его в темный цвет покрасить\n\n\u003cdetails\u003e\n\n\u003csummary\u003eКонтекстное меню значка в трее\u003c/summary\u003e\n\n\u003cimg width=\"423\" height=\"622\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/0b944a4f-9f78-439d-bee2-49ff5a773f3f\" /\u003e\n\n\u003c/details\u003e"
+                                        }
+                                    ]
+                   },
                    {
                        "Number":  106,
                        "Title":  "Массовая загрузка cf",
                        "Body":  "Реализовать массовую загрузку в список баз конфигурации базы из файла *.cf через конфигуратор.\nПеред загрузкой конфигурации в форме предусмотреть:\n- блокировку регламентных заданий;\n- блокировку начала сеансов пользователей;\n- завершение сеансов пользователей; \n- выгрузку базы в файл *.dt как в массовой выгрузке в dt.\n\n\n\n",
                        "CreatedAt":  "2026-11-05T12:13:03Z",
-                       "UpdatedAt":  "2026-11-05T12:13:03Z",
+                       "UpdatedAt":  "2026-11-05T19:59:23Z",
                        "Author":  "aepkugesi",
                        "Labels":  [
 
                                   ],
-                       "CommentCount":  0,
-                       "LastCommentAuthor":  null,
-                       "NeedsWork":  true,
-                       "Reason":  "нет комментариев",
+                       "CommentCount":  1,
+                       "LastCommentAuthor":  "sivatorov",
+                       "NeedsWork":  false,
+                       "Reason":  "отработан (последний комментарий от sivatorov)",
                        "Comments":  [
-
+                                        {
+                                            "author":  "sivatorov",
+                                            "createdAt":  "2026-11-05T19:59:23Z",
+                                            "body":  "**Реализовано в [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37)**\r\n\r\n@aepkugesi, спасибо за идею — новая функция «**Массовая загрузка из CF (Конфигуратор)**» готова.\r\n\r\nВ [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37):\r\n\r\n- **загрузка конфигурации из файла `*.cf` в список баз**: цели — выделенные базы и/или группа (блок «Для выделенных/группы (N)…»), чеклист с журналом по каждой базе; ошибка одной базы не прерывает остальные;\r\n- **опции перед загрузкой (по вашему списку)**: выгрузка базы в `.dt` (как в массовой выгрузке dt — тот же каталог/шаблон), завершение сеансов пользователей, блокировка начала сеансов (Конфигуратор входит с кодом разрешения `/UC`), блокировка регламентных заданий;\r\n- **блокировки снимаются после загрузки** — при успехе, ошибке и отмене; регламентные задания возвращаются в исходное состояние;\r\n- **точки входа**: пакетный блок, контекстное меню базы/группы, командная палитра; Windows и Linux; локализация ru/en.\r\n\r\nТесты: `Issue106MassLoadCfTests` (24).\r\n\r\nIssue не закрываю — проверьте на [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37 (Windows и Linux).\r\n"
+                                        }
                                     ]
                    },
                    {
@@ -49,35 +74,26 @@
                        "Title":  "Доступные пункты контекстного меню для группы",
                        "Body":  "Просьба пересмотреть состав доступных (активных) пунктов контекстного меню  для группы.\n\nСейчас на глаз есть лишние, например:\n1. Всё подменю \"Очистить кеш\"\nЛибо надо инструменты открывать с переданными базами для очистки, либо делать недоступным.\nНо лучше передавать.\n2. \"Список выгрузок\"\n3. \"Зарегистрировать COM-коннектор\"\n4. \"Публикация на вёб сервере\"\n5. \"Связать с конфигурацией\"\n\nА в идеале - не просто делать пункты недоступными для группы - а просто не показывать.\nЕсли в подменю не осталось доступных пунктов - само подменю тоже не показывать.\n",
                        "CreatedAt":  "2026-11-05T12:03:21Z",
-                       "UpdatedAt":  "2026-11-05T12:03:21Z",
+                       "UpdatedAt":  "2026-11-06T06:52:13Z",
                        "Author":  "7OH",
                        "Labels":  [
 
                                   ],
-                       "CommentCount":  0,
-                       "LastCommentAuthor":  null,
+                       "CommentCount":  2,
+                       "LastCommentAuthor":  "7OH",
                        "NeedsWork":  true,
-                       "Reason":  "нет комментариев",
+                       "Reason":  "последний комментарий от \u00277OH\u0027 (не sivatorov)",
                        "Comments":  [
-
-                                    ]
-                   },
-                   {
-                       "Number":  104,
-                       "Title":  "Список выгрузок",
-                       "Body":  "Поставить окну модальный режим, как и другим окнам ранее - сейчас его можно перекрыть не сложно основным окном.\n\nПри открытии окна - ошибка\n\n[diagnostics_20261105_145653.zip](https://github.com/user-attachments/files/34424361/diagnostics_20261105_145653.zip)",
-                       "CreatedAt":  "2026-11-05T11:58:05Z",
-                       "UpdatedAt":  "2026-11-05T11:58:05Z",
-                       "Author":  "7OH",
-                       "Labels":  [
-
-                                  ],
-                       "CommentCount":  0,
-                       "LastCommentAuthor":  null,
-                       "NeedsWork":  true,
-                       "Reason":  "нет комментариев",
-                       "Comments":  [
-
+                                        {
+                                            "author":  "sivatorov",
+                                            "createdAt":  "2026-11-05T19:59:21Z",
+                                            "body":  "**Реализовано в [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37)**\r\n\r\n@7OH, спасибо за предложение.\r\n\r\nВ [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37):\r\n\r\n- **пункты, неприменимые к группе, теперь скрываются** (не блокируются): «Список выгрузок», «Зарегистрировать COM-коннектор», «Публикация на веб-сервере», «Связать с конфигурацией»;\r\n- **подменю, в котором не осталось применимых пунктов, не показывается**; лишние разделители убираются;\r\n- **подменю «Очистить кэш» для группы — по вашему предпочтению «лучше передавать»**: окно очистки кэша открывается с предвыбранными базами группы (включая вложенные);\r\n- применимость задаётся в каталоге команд (`ContextMenuCatalog.IsGroupApplicable` + `ContextMenuResolver.FilterForGroup`), поведение одинаково в Windows и Linux.\r\n\r\nТесты: `Issue105ContextMenuGroupTests` (10).\r\n\r\nIssue не закрываю — проверьте на [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37 (Windows и Linux).\r\n"
+                                        },
+                                        {
+                                            "author":  "7OH",
+                                            "createdAt":  "2026-11-06T06:52:13Z",
+                                            "body":  "Красиво - работает.\n\nЕсть просьба \n\n\u003cimg width=\"483\" height=\"241\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/23699c2a-dcf3-46e1-ab21-20f5ee7750ba\" /\u003e\n\nПосле удаления недоступных - удалять разделитель, если:\n1. Он является первым элементом\n2. Он является последним элементом\n3. Если идут несколько подряд разделителей - оставлять только один."
+                                        }
                                     ]
                    },
                    {
@@ -99,28 +115,6 @@
                                             "author":  "sivatorov",
                                             "createdAt":  "2026-11-05T09:35:06Z",
                                             "body":  "**Реализовано в [v1.0.1.35](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.35)**\r\n\r\nЧто сделано:\r\n\r\n- **добавлено отслеживание запуска из Конфигуратора (отладка).** При запуске отладки из Конфигуратора клиент стартует как `ENTERPRISE /IBName \u003cимя базы\u003e` — без ключей `/F` и `/S`, по которым раньше сопоставлялись процессы. Матчер такие процессы не распознавал, и значок «Предприятие» напротив базы не появлялся;\r\n- **двухпроходное сопоставление процессов**: сначала, как и раньше, по ключам `/F` / `/S`; если совпадения нет — второй проход по `/IBName` с сопоставлением по имени базы. Сопоставление по имени выполняется **только при уникальном имени в списке баз**, чтобы не привязать процесс к не той базе при совпадающих именах;\r\n- **значок «Предприятие» теперь показывается и для баз, запущенных отладкой из Конфигуратора** (Windows и Linux);\r\n- добавлены **5 новых тестов** на матчинг процессов `/IBName` (в том числе случаи неуникальных имён).\r\n\r\nПроверять на [v1.0.1.35](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.35): запустить отладку из Конфигуратора — значок «Предприятие» должен появиться напротив соответствующей базы в списке.\r\n\r\nIssue не закрываю — прошу проверить сценарий на v1.0.1.35 и написать, если значок не появляется или появляется не у той базы.\r\n"
-                                        }
-                                    ]
-                   },
-                   {
-                       "Number":  102,
-                       "Title":  "Обрезан текст на некоторых элементах",
-                       "Body":  "Обрезан текст на некоторых элементах окна настроек при минимальной ширине окна:\n\n\u003cdetails\u003e\n\n\u003csummary\u003eРаздел \"Настройки\", тумблер \"Системные уведомления о завершении фоновых операций\"\u003c/summary\u003e\n\n\u003cimg width=\"960\" height=\"480\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/85fe8cd3-8831-4c26-b68e-fac123f786e4\" /\u003e\n\n\u003c/details\u003e\n\n\u003cdetails\u003e\n\n\u003csummary\u003eРаздел \"О программе\", текст на кнопке \"Скопировать техническую информацию\"\u003c/summary\u003e\n\n\u003cimg width=\"960\" height=\"376\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/8d0427c9-1573-406d-a0e5-5ed1adc59e28\" /\u003e\n\n\u003c/details\u003e",
-                       "CreatedAt":  "2026-11-03T06:48:47Z",
-                       "UpdatedAt":  "2026-11-03T11:16:46Z",
-                       "Author":  "ArtyoZ",
-                       "Labels":  [
-
-                                  ],
-                       "CommentCount":  1,
-                       "LastCommentAuthor":  "sivatorov",
-                       "NeedsWork":  false,
-                       "Reason":  "отработан (последний комментарий от sivatorov)",
-                       "Comments":  [
-                                        {
-                                            "author":  "sivatorov",
-                                            "createdAt":  "2026-11-03T11:16:46Z",
-                                            "body":  "**Исправлено в [v1.0.1.27](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.27)**\r\n\r\n@ArtyoZ, спасибо за скриншот — проблема была в жёсткой фиксации размеров элементов, из-за которой длинные подписи обрезались.\r\n\r\nЧто исправлено в [v1.0.1.27](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.27):\r\n\r\n- тумблер «Системные уведомления о завершении фоновых операций» в Настройках — текст теперь переносится на следующую строку и не обрезается;\r\n- кнопки «Скопировать техническую информацию» в «О программе» — подпись теперь переносится, кнопки растянуты по ширине окна.\r\n\r\nИсправлено на обеих платформах (Windows и Linux).\r\n\r\nIssue не закрываю — прошу проверить на [v1.0.1.27](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.27). Если где-то ещё остался обрезанный текст — пришлите скриншот, поправим.\r\n"
                                         }
                                     ]
                    },
@@ -240,15 +234,15 @@
                        "Title":  "Развернуть тестовую копию",
                        "Body":  "Просто скрин оставлю\n\n\u003cimg width=\"1045\" height=\"567\" alt=\"Image\" src=\"https://github.com/user-attachments/assets/941b0393-19b6-45c2-a4c2-34fefcd1a5c8\" /\u003e",
                        "CreatedAt":  "2026-10-28T05:04:04Z",
-                       "UpdatedAt":  "2026-11-05T14:03:24Z",
+                       "UpdatedAt":  "2026-11-05T19:59:17Z",
                        "Author":  "7OH",
                        "Labels":  [
 
                                   ],
-                       "CommentCount":  54,
-                       "LastCommentAuthor":  "7OH",
-                       "NeedsWork":  true,
-                       "Reason":  "последний комментарий от \u00277OH\u0027 (не sivatorov)",
+                       "CommentCount":  55,
+                       "LastCommentAuthor":  "sivatorov",
+                       "NeedsWork":  false,
+                       "Reason":  "отработан (последний комментарий от sivatorov)",
                        "Comments":  [
                                         {
                                             "author":  "7OH",
@@ -519,6 +513,11 @@
                                             "author":  "7OH",
                                             "createdAt":  "2026-11-05T14:03:23Z",
                                             "body":  "Блоки \nEnterpriseAuth\nи\nConfiguratorAuth\nВ файле списка баз отсутствуют вообще, хотя в у оригинала были"
+                                        },
+                                        {
+                                            "author":  "sivatorov",
+                                            "createdAt":  "2026-11-05T19:59:16Z",
+                                            "body":  "**Исправлено в [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37)**\r\n\r\n@7OH, продолжение работы по развёртыванию тестовых копий — ещё три доработки по вашим замечаниям.\r\n\r\nВ [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37):\r\n\r\n- **имя тестовой базы теперь подставляется в итоговое сообщение** («Тестовая копия „…“ создана/обновлена») — раньше в диалоге оставался незаполненный `{0}` (`TestDeployService.DoneMessage()`, единая точка форматирования для всех 4 мест показа);\r\n- **в новую тестовую базу переносятся авторизации источника**: `EnterpriseAuth`, `ConfiguratorAuth` и `ConfiguratorUseEnterpriseAuth` (`ApplySourceAuthSettings`) — блоки `EnterpriseAuth`/`ConfiguratorAuth` теперь появляются в файле списка баз, вход в Конфигуратор копии работает без повторного ввода;\r\n- **мастер запоминает последние значения** «Движок выгрузки», «Сервер СУБД», «Пользователь СУБД» и восстанавливает их при следующем открытии (`TestDeployStore.FindLastForSource` + `ApplyRememberedWindowValues`; сценарий, как и раньше, сохраняется после успешного развёртывания).\r\n\r\nРегрессионные тесты: **+10** в `Issue79TestDeployWindowTests`.\r\n\r\nIssue не закрываю — проверьте на [v1.0.1.37](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37) (Windows и Linux).\r\n\r\nРелиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.37 (Windows и Linux).\r\n"
                                         }
                                     ]
                    }

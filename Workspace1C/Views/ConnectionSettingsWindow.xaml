@@ -274,7 +274,10 @@
 
     </Window.Resources>
 
-    <Grid>
+    <!-- Issue #107: непрозрачный фон корневой сетки — иначе сквозь полупрозрачную
+         «стеклянную» подложку окна в тёмной теме по краям и снизу просвечивает
+         светлый системный backdrop (acrylic/mica светлой темы Windows). -->
+    <Grid Background="{DynamicResource ContentBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>

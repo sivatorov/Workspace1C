@@ -776,7 +776,13 @@ namespace Workspace1C
 
 
 
-        /// <summary>Современный рендерер меню трея (скругление, hover, светлый фон).</summary>
+        /// <summary>Активна ли тёмная тема приложения (для палитры меню трея, issue #107).
+        /// Читается при каждом рендере, поэтому смена темы «на лету» сразу красит меню.</summary>
+        internal static bool TrayMenuIsDark =>
+            Workspace1C.Themes.ThemeManager.CurrentTheme == Workspace1C.Themes.ThemeManager.DarkThemeName;
+
+        /// <summary>Современный рендерер меню трея (скругление, hover; палитра
+        /// выбирается по активной теме — светлый/тёмный вариант, issue #107).</summary>
         private sealed class ModernTrayMenuRenderer : Forms.ToolStripProfessionalRenderer
         {
             public ModernTrayMenuRenderer() : base(new ModernTrayColorTable())
@@ -793,7 +799,10 @@ namespace Workspace1C
                 }
 
                 var rect = new Drawing.Rectangle(2, 0, e.Item.Width - 4, e.Item.Height);
-                using var b = new Drawing.SolidBrush(Drawing.Color.FromArgb(239, 246, 255));
+                // Светлая тема: светло-голубой hover; тёмная (issue #107): slate-700.
+                using var b = new Drawing.SolidBrush(TrayMenuIsDark
+                    ? Drawing.Color.FromArgb(51, 65, 85)
+                    : Drawing.Color.FromArgb(239, 246, 255));
                 e.Graphics.SmoothingMode = Drawing.Drawing2D.SmoothingMode.AntiAlias;
                 using var path = RoundedRect(rect, 6);
                 e.Graphics.FillPath(b, path);
@@ -802,15 +811,21 @@ namespace Workspace1C
             protected override void OnRenderItemText(Forms.ToolStripItemTextRenderEventArgs e)
             {
                 e.TextColor = e.Item is Forms.ToolStripLabel
-                    ? Drawing.Color.FromArgb(100, 116, 139)
-                    : Drawing.Color.FromArgb(30, 41, 59);
+                    ? (TrayMenuIsDark
+                        ? Drawing.Color.FromArgb(148, 163, 184)   // slate-400 — заголовки блоков
+                        : Drawing.Color.FromArgb(100, 116, 139))
+                    : (TrayMenuIsDark
+                        ? Drawing.Color.FromArgb(241, 245, 249)   // slate-100 — текст пунктов
+                        : Drawing.Color.FromArgb(30, 41, 59));
                 base.OnRenderItemText(e);
             }
 
             protected override void OnRenderSeparator(Forms.ToolStripSeparatorRenderEventArgs e)
             {
                 var y = e.Item.Height / 2;
-                using var pen = new Drawing.Pen(Drawing.Color.FromArgb(226, 232, 240));
+                using var pen = new Drawing.Pen(TrayMenuIsDark
+                    ? Drawing.Color.FromArgb(51, 65, 85)
+                    : Drawing.Color.FromArgb(226, 232, 240));
                 e.Graphics.DrawLine(pen, 28, y, e.Item.Width - 8, y);
             }
 
@@ -827,21 +842,38 @@ namespace Workspace1C
             }
         }
 
+        /// <summary>Цветовая таблица меню трея: палитра выбирается по активной теме
+        /// приложения (светлая/тёмная — issue #107). Значения читаются при каждом
+        /// рендере, поэтому смена темы «на лету» сразу перекрашивает меню.</summary>
         private sealed class ModernTrayColorTable : Forms.ProfessionalColorTable
         {
-            public override Drawing.Color MenuBorder => Drawing.Color.FromArgb(226, 232, 240);
+            // Тёмная палитра (issue #107): фон #1E293B (ContentBackground тёмной темы),
+            // hover #334155, границы #334155, текст задаёт OnRenderItemText рендерера.
+            public override Drawing.Color MenuBorder => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(51, 65, 85)
+                : Drawing.Color.FromArgb(226, 232, 240);
             public override Drawing.Color MenuItemBorder => Drawing.Color.Transparent;
-            public override Drawing.Color MenuItemSelected => Drawing.Color.FromArgb(239, 246, 255);
-            public override Drawing.Color MenuItemSelectedGradientBegin => Drawing.Color.FromArgb(239, 246, 255);
-            public override Drawing.Color MenuItemSelectedGradientEnd => Drawing.Color.FromArgb(239, 246, 255);
-            public override Drawing.Color MenuItemPressedGradientBegin => Drawing.Color.FromArgb(219, 234, 254);
-            public override Drawing.Color MenuItemPressedGradientEnd => Drawing.Color.FromArgb(219, 234, 254);
-            public override Drawing.Color ImageMarginGradientBegin => Drawing.Color.FromArgb(248, 250, 252);
-            public override Drawing.Color ImageMarginGradientMiddle => Drawing.Color.FromArgb(248, 250, 252);
-            public override Drawing.Color ImageMarginGradientEnd => Drawing.Color.FromArgb(248, 250, 252);
-            public override Drawing.Color ToolStripDropDownBackground => Drawing.Color.FromArgb(255, 255, 255);
-            public override Drawing.Color SeparatorDark => Drawing.Color.FromArgb(226, 232, 240);
-            public override Drawing.Color SeparatorLight => Drawing.Color.FromArgb(241, 245, 249);
+            public override Drawing.Color MenuItemSelected => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(51, 65, 85)
+                : Drawing.Color.FromArgb(239, 246, 255);
+            public override Drawing.Color MenuItemSelectedGradientBegin => MenuItemSelected;
+            public override Drawing.Color MenuItemSelectedGradientEnd => MenuItemSelected;
+            public override Drawing.Color MenuItemPressedGradientBegin => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(51, 65, 85)
+                : Drawing.Color.FromArgb(219, 234, 254);
+            public override Drawing.Color MenuItemPressedGradientEnd => MenuItemPressedGradientBegin;
+            public override Drawing.Color ImageMarginGradientBegin => ToolStripDropDownBackground;
+            public override Drawing.Color ImageMarginGradientMiddle => ToolStripDropDownBackground;
+            public override Drawing.Color ImageMarginGradientEnd => ToolStripDropDownBackground;
+            public override Drawing.Color ToolStripDropDownBackground => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(30, 41, 59)
+                : Drawing.Color.FromArgb(255, 255, 255);
+            public override Drawing.Color SeparatorDark => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(51, 65, 85)
+                : Drawing.Color.FromArgb(226, 232, 240);
+            public override Drawing.Color SeparatorLight => TrayMenuIsDark
+                ? Drawing.Color.FromArgb(51, 65, 85)
+                : Drawing.Color.FromArgb(241, 245, 249);
         }
 
 

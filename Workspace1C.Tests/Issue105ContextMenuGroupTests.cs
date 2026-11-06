@@ -242,6 +242,87 @@ public sealed class Issue105ContextMenuGroupTests
         Assert.Contains("EditSettings", CollectItemIds(filtered));
     }
 
+    [Fact]
+    public void FilterForGroup_CollapsesConsecutiveSeparatorBefore()
+    {
+        // Доработка 7OH к issue #105 (v1.0.1.38): после удаления пунктов между узлами
+        // с флагом SeparatorBefore могут оказаться два соседних узла с флагом —
+        // при построении это двойная линия; остаётся только первый флаг.
+        var layout = new ContextMenuLayout
+        {
+            Root = new List<ContextMenuNode>
+            {
+                ContextMenuLayouts.Item("BatchOperations"),
+                ContextMenuLayouts.Item("LaunchEnterprise", separatorBefore: true), // скроется
+                ContextMenuLayouts.Item("Notes", separatorBefore: true),            // скроется
+                ContextMenuLayouts.Item("Delete", separatorBefore: true),
+                ContextMenuLayouts.Item("EditSettings")
+            }
+        };
+
+        var filtered = ContextMenuResolver.FilterForGroup(layout.Root);
+
+        var separators = filtered.Count(IsSeparator);
+        var flagged = filtered.Count(n => n.SeparatorBefore);
+        Assert.Equal(1, separators + flagged); // одна линия между пунктами, не больше
+        Assert.Equal(0, separators);
+        var ids = CollectItemIds(filtered);
+        Assert.DoesNotContain("LaunchEnterprise", ids);
+        Assert.DoesNotContain("Notes", ids);
+        Assert.Contains("Delete", ids);
+    }
+
+    [Fact]
+    public void FilterForGroup_ClearsSeparatorBeforeBeforeExplicitSeparator()
+    {
+        // Доработка 7OH к issue #105 (v1.0.1.38): узел с SeparatorBefore перед явным
+        // узлом-разделителем дал бы двойную линию — флаг сбрасывается, остаётся узел.
+        var layout = new ContextMenuLayout
+        {
+            Root = new List<ContextMenuNode>
+            {
+                ContextMenuLayouts.Item("BatchOperations"),
+                ContextMenuLayouts.Item("LaunchEnterprise", separatorBefore: true), // скроется,
+                // но флаг «переехал» бы на соседний узел:
+                ContextMenuLayouts.Item("EditSettings", separatorBefore: true),
+                ContextMenuLayouts.Separator(),
+                ContextMenuLayouts.Item("Delete")
+            }
+        };
+
+        var filtered = ContextMenuResolver.FilterForGroup(layout.Root);
+
+        // Ровно одна линия между EditSettings и Delete (явный разделитель); флаг узла
+        // перед явным разделителем сброшен — двойных линий нет.
+        var flagged = filtered.Count(n => n.SeparatorBefore);
+        var separators = filtered.Count(IsSeparator);
+        Assert.Equal(0, flagged);
+        Assert.Equal(1, separators);
+        Assert.False(filtered[1].SeparatorBefore); // узел перед явным разделителем
+        Assert.Equal("EditSettings", filtered[1].ItemId);
+    }
+
+    [Fact]
+    public void FilterForGroup_SeparatorNodeWithSeparatorBeforeFlagCleared()
+    {
+        // Узел-разделитель с проставленным флагом SeparatorBefore (пользовательская
+        // компоновка) не должен рисовать двойную линию: флаг у разделителя сбрасывается.
+        var layout = new ContextMenuLayout
+        {
+            Root = new List<ContextMenuNode>
+            {
+                ContextMenuLayouts.Item("BatchOperations"),
+                new ContextMenuNode { Kind = "separator", SeparatorBefore = true },
+                ContextMenuLayouts.Item("Delete")
+            }
+        };
+
+        var filtered = ContextMenuResolver.FilterForGroup(layout.Root);
+
+        Assert.All(filtered, n => Assert.False(n.SeparatorBefore));
+        Assert.Equal(1, filtered.Count(IsSeparator));
+    }
+
     private static bool IsGroup(ContextMenuNode node) =>
         string.Equals(node.Kind, "group", StringComparison.Ordinal);
 
