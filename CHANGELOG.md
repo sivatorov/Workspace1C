@@ -11,6 +11,41 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.42] — 2026-11-06
+
+### Исправлено
+
+- **Ложная «Внутренняя ошибка» на шаге регламентных заданий «Развернуть тестовую
+  копию» (issue #79, отзыв 7OH).** После успешной загрузки .dt в клиент-серверную
+  копию операция выключения регламентных заданий (COM) падала с «Внутренней ошибкой»
+  («что-то не может прочитать»), хотя блокировка по факту устанавливалась: COM-скрипт
+  `ScheduledJobsService` валил операцию целиком, если не удавалось прочитать свойства
+  хотя бы одного задания (клиент-серверная база сразу после RestoreIB).
+  - В [`ScheduledJobsService.cs`](Workspace1C/Services/ScheduledJobsService.cs) операция
+    `setall` обрабатывает каждое задание в собственном try/catch: сбой чтения одного
+    задания не прерывает обработку остальных, сбои собираются в новом ключе `errors`;
+    новая операция `verify` (только чтение) и `ScheduledJobsService.VerifyAsync` позволяют
+    проверить фактическое состояние блокировки; `JInfo` читает `Metadata` «мягко».
+  - В [`TestDeployService.cs`](Workspace1C/Services/TestDeployService.cs) новая чистая
+    функция `EvaluateJobsStep` классифицирует исход шага: сбой операции + подтверждённая
+    повторным чтением блокировка → **успех с предупреждением** и деталями в журнале
+    (не ложная ошибка); частичные пропуски → успех с перечнем сбоев; реальный сбой —
+    прежний warning с расшифровкой. Новые ключи локализации ru/en
+    (`JobsDisabledWithSkips`, `JobsDisabledVerified`, `JobsVerifyHint`, `JobsVerifyRemaining`).
+- **Журнал окна «Развернуть тестовую копию» в ZIP-диагностике (issue #79, отзыв 7OH).**
+  Ранее ZIP-диагностика содержала только общий журнал приложения — журналы немодальных
+  окон (включая журнал шагов и стек ошибки развёртывания) в архив не попадали, поэтому
+  по ZIP 7OH невозможно было увидеть причину. Новый
+  [`WindowJournalService.cs`](Workspace1C/Services/WindowJournalService.cs) пишет журналы
+  окон в `logs/windows/testdeploy-YYYYMMDD.log` (ротация 5 МБ, переживает падение
+  приложения); [`TestDeployWindow.cs`](Workspace1C/Views/TestDeployWindow.cs) и
+  [`TestDeployWindow.Avalonia.cs`](Workspace1C/Views/TestDeployWindow.Avalonia.cs) ведут
+  журнал через хелпер `LogLine`;
+  [`DiagnosticsBundleService.cs`](Workspace1C/Services/DiagnosticsBundleService.cs)
+  включает `logs/windows/*.log` в ZIP.
+  Тесты: [Issue79ScheduledJobsResilienceTests.cs](Workspace1C.Tests/Issue79ScheduledJobsResilienceTests.cs)
+  (13 тестов), `DiagnosticsBundleServiceTests.CreateBundle_IncludesWindowJournals`.
+
 ## [1.0.1.41] — 2026-11-06
 
 ### Исправлено

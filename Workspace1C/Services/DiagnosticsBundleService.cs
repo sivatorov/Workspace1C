@@ -43,9 +43,10 @@ public static class DiagnosticsBundleService
         string? logDirectory = null,
         string? tempDirectory = null,
         string? appDataDirectory = null,
-        DateTime? timestamp = null)
+        DateTime? timestamp = null,
+        IReadOnlyList<string>? windowJournalFiles = null)
         => Task.Run(() => CreateBundle(
-            outputDirectory, logDirectory, tempDirectory, appDataDirectory, timestamp));
+            outputDirectory, logDirectory, tempDirectory, appDataDirectory, timestamp, windowJournalFiles));
 
     /// <summary>Синхронное тело сборки (см. <see cref="CreateBundleAsync"/>).</summary>
     public static BundleResult CreateBundle(
@@ -53,7 +54,8 @@ public static class DiagnosticsBundleService
         string? logDirectory = null,
         string? tempDirectory = null,
         string? appDataDirectory = null,
-        DateTime? timestamp = null)
+        DateTime? timestamp = null,
+        IReadOnlyList<string>? windowJournalFiles = null)
     {
         var stamp = (timestamp ?? DateTime.Now).ToString("yyyyMMdd_HHmmss");
         var outDir = outputDirectory ?? DefaultOutputDirectory;
@@ -93,6 +95,32 @@ public static class DiagnosticsBundleService
             entries.Add(("cm_modal_trace.log", modalTrace));
         else
             warnings.Add("cm_modal_trace.log not found: " + modalTrace);
+
+        // 2.5. Журналы немодальных окон (issue #79, v1.0.1.42): logs/windows/*.log
+        // (в т.ч. журнал окна «Развернуть тестовую копию» со стеком ошибки шага).
+        // null — реальные файлы WindowJournalService; список — для тестируемости.
+        try
+        {
+            var journals = windowJournalFiles ?? WindowJournalService.EnumerateJournalFiles();
+            foreach (var file in journals)
+            {
+                if (!File.Exists(file))
+                {
+                    warnings.Add("window journal not found: " + file);
+                    continue;
+                }
+                if (new FileInfo(file).Length > MaxEntryBytes)
+                {
+                    warnings.Add("window journal too large, skipped: " + file);
+                    continue;
+                }
+                entries.Add((Path.Combine("logs", "windows", Path.GetFileName(file)), file));
+            }
+        }
+        catch (Exception ex)
+        {
+            warnings.Add("window journals enumeration failed: " + ex.Message);
+        }
 
         // 3. Конфиг диагностических флагов trace.json (issue #347) из каталога данных.
         var dataDir = appDataDirectory ?? PlatformPaths.AppDataDirectory;

@@ -543,6 +543,12 @@ public sealed class TestDeployService
     /// Выключение всех регламентных заданий в копии (<see cref="ScheduledJobsService"/>, 1.0.0.85).
     /// На Linux COM-механизм недоступен — фиксируется в журнале, развёртывание не прерывается.
     /// Секреты не логируются; текст ошибки замаскирован службой скриптов.
+    /// <para>Issue #79 (v1.0.1.42, диагностика 7OH): сбой чтения COM на клиент-серверной
+    /// базе сразу после RestoreIB («Внутренняя ошибка») не считается ошибкой шага, если
+    /// повторная проверка (<see cref="ScheduledJobsService.VerifyAsync"/>) подтвердила,
+    /// что все задания фактически выключены, — в этом случае фиксируется warning с
+    /// деталями, развёртывание продолжается. Реальный сбой (задания остались включёнными
+    /// или проверка не удалась) — прежний warning с расшифровкой.</para>
     /// </summary>
     private async Task DisableScheduledJobsAsync(Infobase target, TestDeployResult result)
     {
@@ -552,31 +558,121 @@ public sealed class TestDeployService
             return;
         }
 
+        ScheduledJobsResult jobs;
         try
         {
-            var jobs = await ScheduledJobsService.SetAllAsync(target, use: false).ConfigureAwait(false);
-            if (jobs.Success)
-            {
-                result.Log.Add(string.Format(T("TestDeploy.JobsDisabled"), target.Name, jobs.Changed));
-            }
-            else
-            {
-                // «Внутренняя ошибка» от COM-скрипта расшифровывается (issue #79, v1.0.1.40).
-                var warning = string.Format(
-                    T("TestDeploy.JobsDisableWarning"), target.Name,
-                    ExplainComInternalError(jobs.Error ?? string.Empty));
-                result.Log.Add(warning);
-                result.Warnings.Add(warning);
-            }
+            jobs = await ScheduledJobsService.SetAllAsync(target, use: false).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             _logger?.Warn($"Не удалось выключить регламентные задания в тестовой копии «{target.Name}»: {ex.Message}");
-            var warning = string.Format(T("TestDeploy.JobsDisableWarning"), target.Name,
-                ExplainComInternalError(ex.Message));
-            result.Log.Add(warning);
-            result.Warnings.Add(warning);
+            jobs = ScheduledJobsResult.Fail(ex.Message);
         }
+
+        var outcome = EvaluateJobsStep(target.Name, jobs,
+            ct => ScheduledJobsService.VerifyOverride is not null
+                ? ScheduledJobsService.VerifyOverride(target, ct).ConfigureAwait(false).GetAwaiter().GetResult()
+                : ScheduledJobsService.VerifyAsync(target, ct).ConfigureAwait(false).GetAwaiter().GetResult(),
+            CancellationToken.None);
+
+        foreach (var line in outcome.LogLines)
+            result.Log.Add(line);
+        if (outcome.Warning is not null)
+        {
+            result.Log.Add(outcome.Warning);
+            result.Warnings.Add(outcome.Warning);
+        }
+    }
+
+    /// <summary>Исход шага «Выключение регламентных заданий» (issue #79, v1.0.1.42):
+    /// <see cref="Disabled"/> — блокировка фактически применена; <see cref="Warning"/> —
+    /// предупреждение для пользователя (null — нет); <see cref="LogLines"/> — строки
+    /// журнала без предупреждения (оно добавляется вызывающим кодом).</summary>
+    internal sealed record JobsStepOutcome(bool Disabled, string? Warning, IReadOnlyList<string> LogLines);
+
+    /// <summary>
+    /// Классификация исхода шага регламентных заданий (issue #79, v1.0.1.42), чистая
+    /// функция — покрыта юнит-тестами без COM:
+    /// <list type="bullet">
+    /// <item>операция успешна и сбоев per-job нет — успех;</item>
+    /// <item>операция успешна, но часть заданий пропущена из-за сбоев чтения — успех
+    /// с перечнем сбоев в журнале (пропущенные задания уже не помешают тестовой копии);</item>
+    /// <item>операция упала целиком — повторная проверка <paramref name="verify"/>:
+    /// если все задания выключены фактически, это ложная ошибка чтения — успех с
+    /// предупреждением и деталями в журнале; иначе — реальный сбой (warning).</item>
+    /// </list>
+    /// </summary>
+    /// <param name="targetName">Имя тестовой копии (для сообщений).</param>
+    /// <param name="jobs">Результат операции «выключить все».</param>
+    /// <param name="verify">Повторная проверка фактического состояния (null — недоступна).</param>
+    /// <param name="ct">Отмена проверки.</param>
+    internal static JobsStepOutcome EvaluateJobsStep(
+        string targetName,
+        ScheduledJobsResult jobs,
+        Func<CancellationToken, ScheduledJobsResult>? verify,
+        CancellationToken ct)
+    {
+        if (jobs.Success)
+        {
+            if (jobs.Errors.Count == 0)
+            {
+                return new JobsStepOutcome(true, null, new[]
+                {
+                    string.Format(T("TestDeploy.JobsDisabled"), targetName, jobs.Changed)
+                });
+            }
+
+            // Частичный успех: блокировка применена к большинству заданий, сбойные
+            // перечислены в журнале (детали важнее «Внутренней ошибки» целиком).
+            var lines = new List<string>
+            {
+                string.Format(T("TestDeploy.JobsDisabledWithSkips"), targetName, jobs.Changed, jobs.Errors.Count)
+            };
+            lines.AddRange(jobs.Errors);
+            return new JobsStepOutcome(true, null, lines);
+        }
+
+        // Операция упала целиком: проверяем фактическое состояние повторным чтением.
+        ScheduledJobsResult? state = null;
+        if (verify is not null)
+        {
+            try
+            {
+                state = verify(ct);
+            }
+            catch (Exception ex)
+            {
+                state = ScheduledJobsResult.Fail(ex.Message);
+            }
+        }
+
+        var originalError = ExplainComInternalError(jobs.Error ?? string.Empty);
+
+        // Все задания выключены фактически — «Внутренняя ошибка» была ложной:
+        // фиксируем успех с предупреждением, детали ошибки остаются в журнале.
+        if (state is { Success: true } && state.Enabled == 0 && state.Errors.Count == 0)
+        {
+            return new JobsStepOutcome(true, null, new[]
+            {
+                string.Format(T("TestDeploy.JobsDisabledVerified"), targetName, originalError)
+            });
+        }
+
+        // Реальный сбой: предупреждение + при возможности пояснение от проверки.
+        var failureLines = new List<string>();
+        if (state is { Success: true })
+        {
+            failureLines.Add(string.Format(
+                T("TestDeploy.JobsVerifyRemaining"), state.Enabled));
+        }
+        else if (state is not null)
+        {
+            failureLines.Add(string.Format(
+                T("TestDeploy.JobsVerifyHint"), ExplainComInternalError(state.Error ?? string.Empty)));
+        }
+
+        var warning = string.Format(T("TestDeploy.JobsDisableWarning"), targetName, originalError);
+        return new JobsStepOutcome(false, warning, failureLines);
     }
 
     /// <summary>

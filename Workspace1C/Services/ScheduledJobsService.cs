@@ -62,6 +62,16 @@ public sealed class ScheduledJobsResult
     /// <summary>Задание найдено (операция над одним заданием).</summary>
     public bool Found { get; init; } = true;
 
+    /// <summary>Сбои по отдельным заданиям (issue #79, v1.0.1.42): операция
+    /// «выключить все» продолжается после сбоя чтения одного задания (COM
+    /// «Внутренняя ошибка» на клиент-серверной базе сразу после RestoreIB),
+    /// сбои собираются в этот список, а не валят операцию целиком.</summary>
+    public IReadOnlyList<string> Errors { get; init; } = Array.Empty<string>();
+
+    /// <summary>Сколько заданий осталось включёнными (операция «verify»,
+    /// issue #79, v1.0.1.42 — проверка фактического состояния после сбоя).</summary>
+    public int Enabled { get; init; }
+
     public static ScheduledJobsResult Fail(string? error) => new() { Error = error };
 }
 
@@ -77,16 +87,22 @@ public static class ScheduledJobsService
     public static readonly TimeSpan OperationTimeout = TimeSpan.FromMinutes(3);
 
     /// <summary>
-    /// Тело скрипта: операции <c>list</c>, <c>setuse</c> (одно задание по UUID) и
-    /// <c>setall</c> (все задания; <c>keep</c> — имена метаданных, которые не трогать).
+    /// Тело скрипта: операции <c>list</c>, <c>setuse</c> (одно задание по UUID),
+    /// <c>setall</c> (все задания; <c>keep</c> — имена метаданных, которые не трогать)
+    /// и <c>verify</c> (только чтение: сколько заданий осталось включёнными,
+    /// issue #79, v1.0.1.42).
     /// Свойства последнего выполнения читаются «мягко»: в части версий платформы
-    /// <c>LastJob</c> во внешнем соединении недоступен.
+    /// <c>LastJob</c> во внешнем соединении недоступен. В <c>setall</c> и <c>verify</c>
+    /// каждый задание обрабатывается в собственном try/catch: сбой чтения одного
+    /// задания (COM «Внутренняя ошибка» на клиент-серверной базе сразу после
+    /// RestoreIB) не валит операцию целиком — сбои собираются в ключе <c>errors</c>.
     /// </summary>
     public const string OperationBody = @"
 function Try-G($o,$n){try{G $o $n}catch{$null}}
 function JInfo($c,$j){
-$md=G $j 'Metadata'
-$i=@{uuid=[string](M $c 'String' (G $j 'UUID'));name=[string](G $md 'Name');synonym=[string](Try-G $md 'Synonym');descr=[string](G $j 'Description');key=[string](G $j 'Key');use=[bool](G $j 'Use');predef=[bool](G $j 'Predefined');schedule='';state='';start='';error=''}
+$md=Try-G $j 'Metadata';$name=''
+if($null -ne $md -and $md -is [System.__ComObject]){try{$name=[string](G $md 'Name')}catch{$name=''}}
+$i=@{uuid=[string](M $c 'String' (G $j 'UUID'));name=$name;synonym=[string](Try-G $md 'Synonym');descr=[string](G $j 'Description');key=[string](G $j 'Key');use=[bool](G $j 'Use');predef=[bool](G $j 'Predefined');schedule='';state='';start='';error=''}
 try{$i.schedule=[string](M $c 'String' (G $j 'Schedule'))}catch{}
 $lj=Try-G $j 'LastJob'
 if($null -ne $lj -and $lj -is [System.__ComObject]){
@@ -108,11 +124,18 @@ $ch=0;if([bool](G $j 'Use') -ne [bool]$q.use){S $j 'Use' ([bool]$q.use);[void](M
 return @{found=$true;changed=$ch}}
 'setall'{
 $keep=@($q.keep|ForEach-Object{[string]$_})
-$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$ch=0
-for($i=0;$i -lt $n;$i++){$j=M $arr 'Get' $i;$name=[string](G (G $j 'Metadata') 'Name')
+$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$ch=0;$errs=New-Object System.Collections.ArrayList
+for($i=0;$i -lt $n;$i++){
+try{$j=M $arr 'Get' $i;$name=[string](G (G $j 'Metadata') 'Name')
 if($keep -contains $name){continue}
 if([bool](G $j 'Use') -ne [bool]$q.use){S $j 'Use' ([bool]$q.use);[void](M $j 'Write');$ch++}}
-return @{changed=$ch;total=$n}}
+catch{[void]$errs.Add(@{index=$i;error=(Err $_)})}}
+return @{changed=$ch;total=$n;errors=$errs}}
+'verify'{
+$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$en=0;$errs=New-Object System.Collections.ArrayList
+for($i=0;$i -lt $n;$i++){
+try{if([bool](G (M $arr 'Get' $i) 'Use')){$en++}}catch{[void]$errs.Add(@{index=$i;error=(Err $_)})}}
+return @{enabled=$en;total=$n;errors=$errs}}
 default{throw ('Unknown operation: '+[string]$q.op)}
 }}
 ";
@@ -160,7 +183,9 @@ default{throw ('Unknown operation: '+[string]$q.op)}
                 Changed = GetInt(data, "changed")
             }, ct);
 
-    /// <summary>Включает/выключает все задания базы, кроме перечисленных в <paramref name="keep"/>.</summary>
+    /// <summary>Включает/выключает все задания базы, кроме перечисленных в <paramref name="keep"/>.
+    /// Сбои чтения отдельных заданий не валят операцию (issue #79, v1.0.1.42):
+    /// они собираются в <see cref="ScheduledJobsResult.Errors"/>.</summary>
     public static Task<ScheduledJobsResult> SetAllAsync(Infobase infobase, bool use, IReadOnlyList<string>? keep = null,
         CancellationToken ct = default) =>
         RunAsync(infobase, new Dictionary<string, object?>
@@ -169,7 +194,48 @@ default{throw ('Unknown operation: '+[string]$q.op)}
                 ["use"] = use,
                 ["keep"] = keep ?? Array.Empty<string>()
             },
-            data => new ScheduledJobsResult { Success = true, Changed = GetInt(data, "changed") }, ct);
+            data => new ScheduledJobsResult
+            {
+                Success = true,
+                Changed = GetInt(data, "changed"),
+                Errors = ParseErrors(data)
+            }, ct);
+
+    /// <summary>
+    /// Проверка фактического состояния заданий БЕЗ записи (issue #79, v1.0.1.42):
+    /// сколько заданий осталось включёнными. Используется после сбоя операции
+    /// «выключить все», чтобы отличить ложную ошибку (блокировка фактически
+    /// применена) от реального сбоя.
+    /// </summary>
+    public static Task<ScheduledJobsResult> VerifyAsync(Infobase infobase, CancellationToken ct = default) =>
+        RunAsync(infobase, new Dictionary<string, object?> { ["op"] = "verify" },
+            data => new ScheduledJobsResult
+            {
+                Success = true,
+                Enabled = GetInt(data, "enabled"),
+                Errors = ParseErrors(data)
+            }, ct);
+
+    /// <summary>Подмена операции verify в юнит-тестах (null — реальный вызов).</summary>
+    internal static Func<Infobase, CancellationToken, Task<ScheduledJobsResult>>? VerifyOverride;
+
+    /// <summary>Разбор списка сбоев per-job из ответа скрипта (issue #79, v1.0.1.42):
+    /// каждый элемент — «задание N: текст ошибки».</summary>
+    public static List<string> ParseErrors(JsonElement data)
+    {
+        var result = new List<string>();
+        foreach (var item in ComScriptRunner.GetObjectList(data, "errors"))
+        {
+            var error = ComScriptRunner.GetString(item, "error");
+            if (string.IsNullOrWhiteSpace(error))
+                continue;
+            var index = GetInt(item, "index");
+            result.Add(index > 0
+                ? $"задание {index}: {error}"
+                : error);
+        }
+        return result;
+    }
 
     private static async Task<ScheduledJobsResult> RunAsync(Infobase infobase, Dictionary<string, object?> parameters,
         Func<JsonElement, ScheduledJobsResult> map, CancellationToken ct)

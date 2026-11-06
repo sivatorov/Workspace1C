@@ -574,14 +574,14 @@ public class TestDeployWindow : ModalWindowBase
         // и её шаги журналируются в окно мастера. Журнал очищается ДО валидации, чтобы
         // строки пробы не пропали после старта сценария.
         _logList.Items.Clear();
-        _logList.Items.Add(LocalizationManager.T("TestDeploy.Started"));
+        LogLine(LocalizationManager.T("TestDeploy.Started"));
 
         // Коллбэк журнала приходит и из фоновых потоков rac-пробы — marshal на UI-поток.
         void AddPreValidationLog(string line)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                _logList.Items.Add(line);
+                LogLine(line);
                 _logList.ScrollIntoView(line);
             });
         }
@@ -610,7 +610,7 @@ public class TestDeployWindow : ModalWindowBase
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    _logList.Items.Add(line);
+                    LogLine(line);
                     _logList.ScrollIntoView(line);
                 });
             }
@@ -619,18 +619,18 @@ public class TestDeployWindow : ModalWindowBase
                 scenario, _vm.Source, _vm.AllInfobases, _groups, log: AddLogLine);
 
             foreach (var line in result.Log)
-                _logList.Items.Add(line);
+                LogLine(line);
 
             if (!result.Success)
             {
-                _logList.Items.Add(result.ErrorMessage ?? LocalizationManager.T("Schedule.RunFailed"));
+                LogLine(result.ErrorMessage ?? LocalizationManager.T("Schedule.RunFailed"));
                 _dialogs.ShowError(result.ErrorMessage ?? LocalizationManager.T("Schedule.RunFailed"),
                     LocalizationManager.T("TestDeploy.Title"));
                 return;
             }
 
             foreach (var warning in result.Warnings)
-                _logList.Items.Add(warning);
+                LogLine(warning);
 
             // Issue #79 (v1.0.1.40, diagnostics 7OH 2026-11-06): сбой финализации
             // (файл сценариев/планировщик) происходил ПОСЛЕ успешного развёртывания
@@ -647,9 +647,9 @@ public class TestDeployWindow : ModalWindowBase
                 var finalizeMessage = string.Format(
                     LocalizationManager.T("TestDeploy.FinalizeFailed"),
                     finalizeEx.GetType().FullName, finalizeEx.Message);
-                _logList.Items.Add(finalizeMessage);
+                LogLine(finalizeMessage);
                 if (!string.IsNullOrWhiteSpace(finalizeEx.StackTrace))
-                    _logList.Items.Add(finalizeEx.StackTrace);
+                    LogLine(finalizeEx.StackTrace);
                 _logList.ScrollIntoView(finalizeMessage);
                 _dialogs.ShowWarning(finalizeMessage, LocalizationManager.T("TestDeploy.Title"));
                 return;
@@ -666,7 +666,7 @@ public class TestDeployWindow : ModalWindowBase
             // Issue #79 (комментарий 7OH 2026-11-05): ключ DoneCreated/DoneUpdated содержит
             // {0} — имя тестовой базы; раньше подставлялось без string.Format, и в журнале
             // окна оставался не заполненный плейсхолдер.
-            _logList.Items.Add(TestDeployService.DoneMessage(result));
+            LogLine(TestDeployService.DoneMessage(result));
 
             // Немодальное окно (issue #79): подписчик применяет результат до закрытия.
             DeployCompleted?.Invoke(this);
@@ -677,9 +677,9 @@ public class TestDeployWindow : ModalWindowBase
         {
             // Issue #79 (v1.0.1.40): в журнал окна пишутся тип и стек — «голое»
             // сообщение («Внутренняя ошибка…») в ZIP-диагностике ничего не даёт.
-            _logList.Items.Add(ex.GetType().FullName + ": " + ex.Message);
+            LogLine(ex.GetType().FullName + ": " + ex.Message);
             if (!string.IsNullOrWhiteSpace(ex.StackTrace))
-                _logList.Items.Add(ex.StackTrace);
+                LogLine(ex.StackTrace);
             _dialogs.ShowError(ex.Message, LocalizationManager.T("TestDeploy.Title"));
         }
         finally
@@ -687,6 +687,20 @@ public class TestDeployWindow : ModalWindowBase
             _busy = false;
             _runButton.IsEnabled = true;
         }
+    }
+
+    /// <summary>
+    /// Добавляет строку в журнал окна и дублирует её в файл журналов окон
+    /// (issue #79, v1.0.1.42): раньше журнал окна жил только в памяти UI и
+    /// не попадал в ZIP-диагностику; теперь <see cref="WindowJournalService"/>
+    /// пишет его в <c>logs/windows/testdeploy-*.log</c>, файл включается
+    /// в архив <see cref="DiagnosticsBundleService"/> — журнал переживает
+    /// падение приложения и доступен поддержке.
+    /// </summary>
+    private void LogLine(string line)
+    {
+        _logList.Items.Add(line);
+        WindowJournalService.Append("testdeploy", line);
     }
 
     private static string SuggestRef(string sourceDb, IEnumerable<Infobase> allInfobases)
