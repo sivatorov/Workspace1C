@@ -637,14 +637,40 @@ public partial class MainViewModel : ViewModelBase
         if (source?.Connection is null)
             return System.Threading.Tasks.Task.CompletedTask;
 
-        var window = new Workspace1C.TestDeployWindow(source, _allInfobases.ToList(), _groups.ToList());
-        if (!window.ShowDialogSync(OwnerWindow()) || window.Scenario is null || window.DeployResult is null)
+        // Issue #79: окно развёртывания показывается НЕМОДАЛЬНО (по аналогии с
+        // «Серверы 1С») — пока копия создаётся, можно открыть базу и работать.
+        // Одно окно на базу-источник: повторный вызов активирует существующее.
+        var desktopLifetime = Avalonia.Application.Current?.ApplicationLifetime
+            as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+        var existingWindow = desktopLifetime?.Windows
+            .OfType<Workspace1C.TestDeployWindow>()
+            .FirstOrDefault(w => ReferenceEquals(w.Source, source));
+        if (existingWindow is not null)
+        {
+            existingWindow.Activate();
             return System.Threading.Tasks.Task.CompletedTask;
+        }
 
+        var window = new Workspace1C.TestDeployWindow(source, _allInfobases.ToList(), _groups.ToList());
+        window.DeployCompleted += ApplyTestDeployResult;
+        window.Show();
+        return System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Применяет результат успешного развёртывания из немодального окна (issue #79):
+    /// добавляет/обновляет тестовую базу в списке, группу «Тест», сохраняет и
+    /// показывает итоговое сообщение. Пост-обработка идентична прежней модальной.
+    /// </summary>
+    private void ApplyTestDeployResult(Workspace1C.TestDeployWindow window)
+    {
+        var source = window.Source;
         var result = window.DeployResult;
+        if (result is null)
+            return;
         var target = result.Target;
         if (target is null)
-            return System.Threading.Tasks.Task.CompletedTask;
+            return;
 
         try
         {
@@ -706,8 +732,6 @@ public partial class MainViewModel : ViewModelBase
             _logger.Error("Ошибка применения результата развёртывания тестовой копии", ex);
             _dialog.ShowError(ex.Message, LocalizationManager.T("TestDeploy.Title"));
         }
-
-        return System.Threading.Tasks.Task.CompletedTask;
     }
 }
 #endif

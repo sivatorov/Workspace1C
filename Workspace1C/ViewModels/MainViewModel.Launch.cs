@@ -683,6 +683,8 @@ public partial class MainViewModel : ViewModelBase
         s.AddTimestampToExportFileName = _addTimestampToExportFileName;
         s.ExportTimestampFormat = _exportTimestampFormat;
         s.CloseToTray = _closeToTray;
+        // Тема приложения следует за режимом ОС (issue #108).
+        s.ThemeFollowsOs = _themeFollowsOs;
         s.AfterLaunchAction = _afterLaunchAction;
         s.ShowTrayIcon = _showTrayIcon;
         s.ShowSystemNotifications = _showSystemNotifications;

@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Localization;
@@ -179,6 +180,11 @@ public sealed class MassLoadCfService
 
         ct.ThrowIfCancellationRequested();
         var cfPath = options.CfFilePath.Trim();
+        // Защита (issue #106): файл .cf мог исчезнуть или стать недоступным в середине
+        // прогона (переименован, антивирус, сеть) — даём понятную ошибку по базе вместо
+        // малопонимаемого сбоя самого Конфигуратора.
+        if (!File.Exists(cfPath))
+            return MassLoadCfBaseResult.Fail(LocalizationManager.T("BatchOps.CfNotFound"));
         _log?.Invoke(string.Format(
             LocalizationManager.T("MassLoadCf.LogLoadFormat"), infobase.Name, cfPath));
         var loadError = await RunDesignerStepAsync(
@@ -208,9 +214,13 @@ public sealed class MassLoadCfService
             // Тестовый режим: результат фейка — ЗАВЕРШЁННАЯ операция (успех/ошибка),
             // ожидание по событию DesignerBatchCompleted не выполняется.
             var completed = await runner(infobase, operation, path, permissionCode, ct).ConfigureAwait(false);
-            return completed.Success
-                ? null
-                : completed.Error ?? LocalizationManager.T("Backup.StartFailed");
+            if (completed.Success)
+                return null;
+            // Пустое сообщение ошибки подменяем понятным текстом (issue #106):
+            // без этого сбой выглядел как пустая причина в статусе базы.
+            return string.IsNullOrWhiteSpace(completed.Error)
+                ? LocalizationManager.T("Backup.StartFailed")
+                : completed.Error!;
         }
 
         var started = LaunchDesigner(infobase, operation, path, permissionCode);
@@ -242,9 +252,17 @@ public sealed class MassLoadCfService
             }
 
             var info = tcs.Task.Result;
-            return info is { Success: true }
-                ? null
-                : info?.ErrorMessage ?? LocalizationManager.T("Backup.Failed");
+            if (info is { Success: true })
+                return null;
+
+            // Информативность ошибок (issue #106): если лог Конфигуратора не дал текста,
+            // добавляем код возврата процесса — без него все сбои выглядели одинаково.
+            var error = (info?.ErrorMessage ?? string.Empty).Trim();
+            if (error.Length == 0)
+                error = string.Format(
+                    LocalizationManager.T("MassLoadCf.DesignerFailedWithExitCode"),
+                    info?.ExitCode ?? -1);
+            return error;
         }
         catch (OperationCanceledException)
         {

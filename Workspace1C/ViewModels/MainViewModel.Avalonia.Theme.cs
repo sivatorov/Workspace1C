@@ -1,4 +1,5 @@
 #if LINUX
+using Avalonia.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Themes;
@@ -63,6 +64,59 @@ public partial class MainViewModel : ViewModelBase
     {
         // Схема одна (несёт обе палитры): переключение темы лишь выбирает палитру.
         ApplySchemeForTheme(ThemeManager.CurrentTheme != ThemeManager.DarkThemeName);
+    }
+
+    // ---- Синхронизация темы с режимом ОС (issue #108) ----
+    // Опция действует на Windows; на Linux OsThemeWatcher — заглушка (режим приложений
+    // рабочего стола не определяется), галочка сохраняется, но не влияет на тему.
+
+    /// <summary>
+    /// «Тема приложения следует за режимом ОС»: при смене тёмного/светлого режима
+    /// приложений в ОС переключать базовый вариант темы. Ручная смена остаётся.
+    /// </summary>
+    public bool ThemeFollowsOs
+    {
+        get => _settings.ThemeFollowsOs;
+        set
+        {
+            if (_settings.ThemeFollowsOs == value)
+                return;
+            _settings.ThemeFollowsOs = value;
+            OnPropertyChanged(nameof(ThemeFollowsOs));
+            UpdateOsThemeWatcher();
+            SaveSettingsSilently();
+        }
+    }
+
+    /// <summary>
+    /// Включает/выключает наблюдатель режима ОС в соответствии с опцией. Повторные
+    /// вызовы безопасны: двойная подписка исключена.
+    /// </summary>
+    private void UpdateOsThemeWatcher()
+    {
+        Services.OsThemeWatcher.AppsThemeChanged -= OnOsAppsThemeChanged;
+        if (_settings.ThemeFollowsOs)
+        {
+            Services.OsThemeWatcher.Start();
+            Services.OsThemeWatcher.AppsThemeChanged += OnOsAppsThemeChanged;
+        }
+        else
+        {
+            Services.OsThemeWatcher.Stop();
+        }
+    }
+
+    /// <summary>Обработчик смены режима приложений ОС: переключает вариант темы.</summary>
+    private void OnOsAppsThemeChanged(bool dark)
+    {
+        // Тяжёлое переключение темы — через диспетчер UI-потока. На Linux событие
+        // не приходит (OsThemeWatcher — заглушка), обработчик оставлен для симметрии.
+        Dispatcher.UIThread.Post(() =>
+        {
+            if ((ThemeManager.CurrentTheme == ThemeManager.DarkThemeName) == dark)
+                return;
+            ApplySchemeForTheme(dark);
+        });
     }
 
     /// <summary>Применяет выбранный вариант темы (светлую/тёмную), не меняя схему.</summary>

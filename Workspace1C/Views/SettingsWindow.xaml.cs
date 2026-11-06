@@ -764,6 +764,10 @@ namespace Workspace1C
                 && int.TryParse(MaxLaunchHistoryDepthBox.Text, out var historyDepth))
                 _viewModel.MaxLaunchHistoryPerBase = historyDepth;
 
+            // Тема приложения следует за режимом ОС (issue #108): опция применяется
+            // сразу — наблюдатель подписывается/отписывается в сеттере свойства.
+            _viewModel.ThemeFollowsOs = ThemeFollowsOsCheck?.IsChecked == true;
+
             _viewModel.ApplyAppBehaviorSettings(
                 AllowMultipleInstancesCheck.IsChecked ?? false,
                 CheckForUpdatesOnStartupCheck?.IsChecked ?? true,

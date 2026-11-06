@@ -344,6 +344,44 @@ public sealed class Issue106MassLoadCfTests : IDisposable
         Assert.Equal(OneCLauncher.DesignerBatchOperation.DumpIB, load.Operation);
     }
 
+    // ======================= Защитные улучшения v1.0.1.39 (issue #106) =======================
+
+    [Fact]
+    public async Task Service_CfFileMissingMidRun_FailsWithoutDesignerCall()
+    {
+        // Файл .cf существовал при пред-валидации, но исчез в середине прогона
+        // (переименован, удалён, сеть) — понятная ошибка вместо сбоя Конфигуратора.
+        File.Delete(_cfFile);
+        var calls = new List<DesignerCall>();
+        var service = new MassLoadCfService();
+        service.RunnerOverride = (ib, op, path, code, token) =>
+        {
+            calls.Add(new DesignerCall(op, path, code));
+            return Task.FromResult(MassLoadCfRunnerResult.Ok());
+        };
+
+        var result = await RunServiceAsync(service, ServerBase(), new MassLoadCfOptions { CfFilePath = _cfFile });
+
+        Assert.False(result.Success);
+        Assert.NotEmpty(result.Error);
+        Assert.Empty(calls);
+    }
+
+    [Fact]
+    public async Task Service_DesignerFailureWithEmptyMessage_FallsBackToText()
+    {
+        // Фейк-раннер вернул провал с пустым сообщением — сервис не должен отдать
+        // пустую причину в статус базы (информативность ошибок, issue #106).
+        var service = new MassLoadCfService();
+        service.RunnerOverride = (_, _, _, _, _) =>
+            Task.FromResult(MassLoadCfRunnerResult.Fail(""));
+
+        var result = await RunServiceAsync(service, ServerBase(), new MassLoadCfOptions { CfFilePath = _cfFile });
+
+        Assert.False(result.Success);
+        Assert.False(string.IsNullOrWhiteSpace(result.Error));
+    }
+
     [Fact]
     public async Task Service_WithoutPreparation_PrepareOptionsFail()
     {

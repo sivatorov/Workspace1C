@@ -170,13 +170,76 @@ public partial class MainViewModel : ViewModelBase
     private void ApplySchemeForTheme(bool dark)
     {
         _savedTheme = dark ? Themes.ThemeManager.DarkThemeName : Themes.ThemeManager.LightThemeName;
-        // Убеждаемся, что активная схема применена, затем задаём вариант темы.
+        // Убеждаемся, что активная схема применена, затем задаёт вариант темы.
         Themes.ThemeManager.ApplyScheme(_activeColorScheme ?? Models.ColorScheme.CreateLight());
         Themes.ThemeManager.ApplyTheme(dark);
         // Переключение базового варианта не меняет полноценную тему (её Id остаётся),
         // но выбор должен сохраниться в настройках.
         _fullTheme = Themes.ThemeManager.CurrentFullTheme?.Id ?? _fullTheme;
         LogTheme($"ApplySchemeForTheme(dark={dark}) -> active='{_activeColorScheme?.Name}'");
+    }
+
+    // ---- Синхронизация темы с режимом ОС (issue #108, Windows) ----
+
+    /// <summary>
+    /// «Тема приложения следует за режимом ОС»: при смене тёмного/светлого режима
+    /// приложений в Windows переключать базовый вариант темы. Ручная смена темы
+    /// остаётся доступной; опция управляется галочкой «Поведение и язык».
+    /// </summary>
+    public bool ThemeFollowsOs
+    {
+        get => _themeFollowsOs;
+        set
+        {
+            if (SetProperty(ref _themeFollowsOs, value))
+            {
+                UpdateOsThemeWatcher();
+                ScheduleSaveSettings();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Включает/выключает наблюдатель режима ОС в соответствии с опцией. Повторные
+    /// вызовы (в том числе из LoadSettings) безопасны: двойная подписка исключена.
+    /// </summary>
+    private void UpdateOsThemeWatcher()
+    {
+        Services.OsThemeWatcher.AppsThemeChanged -= OnOsAppsThemeChanged;
+        if (_themeFollowsOs)
+        {
+            Services.OsThemeWatcher.Start();
+            Services.OsThemeWatcher.AppsThemeChanged += OnOsAppsThemeChanged;
+            _osThemeWatcherActive = true;
+        }
+        else if (_osThemeWatcherActive)
+        {
+            Services.OsThemeWatcher.Stop();
+            _osThemeWatcherActive = false;
+        }
+    }
+
+    /// <summary>Обработчик смены режима приложений ОС: переключает вариант темы.</summary>
+    private void OnOsAppsThemeChanged(bool dark)
+    {
+        try
+        {
+            // SystemEvents поднимает событие на UI-потоке (подписка установлена из UI),
+            // но тяжёлое переключение темы отдаём диспетчеру, чтобы не блокировать поток.
+            Dispatcher.CurrentDispatcher.BeginInvoke(new Action(() =>
+            {
+                // Применяем только при реальной смене варианта (без лишней перерисовки).
+                if (IsDarkTheme(Themes.ThemeManager.CurrentTheme) == dark)
+                    return;
+                ApplySchemeForTheme(dark);
+                SaveSettings();
+                LogTheme($"OsAppsThemeChanged -> dark={dark}");
+            }));
+        }
+        catch (Exception ex)
+        {
+            LogTheme($"OsAppsThemeChanged error: {ex.Message}");
+        }
     }
 
     /// <summary>

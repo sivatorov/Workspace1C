@@ -397,6 +397,14 @@
                                         <TextBlock Text="{loc:Loc Settings.General.EscapeToTray}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
+                                <!-- Issue #108: тема приложения следует за режимом ОС
+                                     (Windows, AppsUseLightTheme). -->
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ThemeFollowsOsCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="ThemeLightDark" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.ThemeFollowsOs}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
                                 <!-- Issue #102: длинная подпись должна переноситься — Grid (Auto,*) вместо
                                      горизонтального StackPanel, который отдаёт TextBlock бесконечную ширину. -->
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowSystemNotificationsCheck" Margin="0,0,0,6">

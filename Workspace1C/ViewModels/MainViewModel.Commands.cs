@@ -1972,19 +1972,42 @@ public string HotkeyEnterprise
             async _ => await ExecuteShowTestDeployAsync(SelectedInfobase),
             _ => SelectedInfobase?.Connection?.Type is ConnectionType.File or ConnectionType.ClientServer);
 
-    private async Task ExecuteShowTestDeployAsync(Infobase source)
+    private Task ExecuteShowTestDeployAsync(Infobase source)
     {
         if (source?.Connection is null)
-            return;
+            return Task.CompletedTask;
+
+        // Issue #79: окно развёртывания показывается НЕМОДАЛЬНО (по аналогии с
+        // «Серверы 1С») — пока копия создаётся, можно открыть базу и работать.
+        // Одно окно на базу-источник: повторный вызов активирует существующее.
+        var existingWindow = Application.Current.Windows.OfType<TestDeployWindow>()
+            .FirstOrDefault(w => ReferenceEquals(w.Source, source));
+        if (existingWindow is not null)
+        {
+            existingWindow.Activate();
+            return Task.CompletedTask;
+        }
 
         var window = new TestDeployWindow(source, Infobases.ToList(), Groups.ToList())
         {
             Owner = Application.Current.MainWindow
         };
-        if (window.ShowDialog() != true || window.Scenario is null || window.DeployResult is null)
-            return;
+        window.DeployCompleted += ApplyTestDeployResult;
+        window.Show();
+        return Task.CompletedTask;
+    }
 
+    /// <summary>
+    /// Применяет результат успешного развёртывания из немодального окна (issue #79):
+    /// добавляет/обновляет тестовую базу в списке, группу «Тест», сохраняет и
+    /// показывает итоговое сообщение. Пост-обработка идентична прежней модальной.
+    /// </summary>
+    private void ApplyTestDeployResult(TestDeployWindow window)
+    {
+        var source = window.Source;
         var result = window.DeployResult;
+        if (result is null)
+            return;
         var target = result.Target;
         if (target is null)
             return;

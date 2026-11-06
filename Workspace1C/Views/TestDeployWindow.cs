@@ -72,6 +72,35 @@ public class TestDeployWindow : Window
     private readonly PasswordBox _sourceDbPwdBox;
 
     private bool _busy;
+    /// <summary>Закрытие разрешено программно (успешное завершение операции, issue #79).</summary>
+    private bool _closeAllowed;
+
+    /// <summary>База-источник развёртывания (для поиска открытого окна, issue #79).</summary>
+    public Infobase Source => _vm.Source;
+
+    /// <summary>Идёт ли развёртывание прямо сейчас (немодальный показ, issue #79).</summary>
+    public bool DeployRunning => _busy;
+
+    /// <summary>
+    /// Успешное завершение развёртывания (issue #79: окно показывается НЕМОДАЛЬНО,
+    /// по аналогии с «Серверы 1С», — базу можно запустить, пока копия создаётся).
+    /// Подписчик (MainViewModel) применяет результат: добавляет/обновляет тестовую
+    /// базу в списке. Вызывается после заполнения
+    /// <see cref="Scenario"/>/<see cref="DeployResult"/>, до закрытия окна.
+    /// </summary>
+    public event Action<TestDeployWindow>? DeployCompleted;
+
+    /// <summary>
+    /// Немодальный показ (issue #79): закрытие пользователем во время развёртывания
+    /// отменяем — операция продолжается, окно остаётся открытым до завершения
+    /// (журнал нужен пользователю). Программное закрытие при успехе разрешено.
+    /// </summary>
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        if (_busy && !_closeAllowed)
+            e.Cancel = true;
+        base.OnClosing(e);
+    }
 
     /// <summary>Сценарий (заполняется и сохраняется при успешном развёртывании).</summary>
     public TestDeployScenario? Scenario { get; private set; }
@@ -768,7 +797,23 @@ public class TestDeployWindow : Window
             // {0} — имя тестовой базы; раньше подставлялось без string.Format, и в журнале
             // окна оставался не заполненный плейсхолдер.
             _logList.Items.Add(TestDeployService.DoneMessage(result));
-            DialogResult = true;
+
+            // Немодальное окно (issue #79): подписчик применяет результат до закрытия.
+            // Программное закрытие разрешаем до снятия _busy (иначе OnClosing отменит).
+            _closeAllowed = true;
+            DeployCompleted?.Invoke(this);
+
+            // DialogResult допустим только при модальном показе (ShowDialog); при
+            // немодальном Show() установка бросает InvalidOperationException —
+            // просто закрываем окно.
+            try
+            {
+                DialogResult = true;
+            }
+            catch (InvalidOperationException)
+            {
+                Close();
+            }
         }
         catch (Exception ex)
         {

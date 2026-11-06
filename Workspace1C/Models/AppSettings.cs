@@ -63,6 +63,13 @@ public class AppSettings
     public string Theme { get; set; } = string.Empty;
 
     /// <summary>
+    /// Тема приложения следует за режимом ОС (issue #108): при смене тёмного/светлого
+    /// режима в Windows переключать светлый/тёмный вариант темы приложения. По умолчанию
+    /// ЛОЖЬ — ручной выбор сохраняется. Действует только на Windows (см. OsThemeWatcher).
+    /// </summary>
+    public bool ThemeFollowsOs { get; set; }
+
+    /// <summary>
     /// Идентификатор полноценной темы (см. <see cref="Themes.ThemeCatalog"/>): "light",
     /// "dark", "blue", "green" или пусто. Пусто — используется устаревшее поле
     /// <see cref="Theme"/> (обратная совместимость, см. <see cref="NormalizeThemeSelection"/>).

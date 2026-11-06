@@ -478,16 +478,22 @@ namespace Workspace1C
             // сразу при следующем старте — один раз (только свежие пропуски).
             var catchUpCheck = SettingsSwitch(
                 "Settings.General.CatchUpMissedTasks", _viewModel.CatchUpMissedTasks, "IconHistory", "@PurpleAccentBrush");
+            // Тема приложения следует за режимом ОС (issue #108): на Linux наблюдатель
+            // режима ОС — заглушка, галочка сохраняется, но не влияет на тему.
+            var themeFollowsOsCheck = SettingsSwitch(
+                "Settings.ThemeFollowsOs", _viewModel.ThemeFollowsOs, "IconTheme", "@InfoBrush");
             trayIconCheck.Margin = new Thickness(0, 0, 0, 6);
             closeToTrayCheck.Margin = new Thickness(0, 0, 0, 6);
             escapeToTrayCheck.Margin = new Thickness(0, 0, 0, 6);
             notificationsCheck.Margin = new Thickness(0, 0, 0, 6);
             catchUpCheck.Margin = new Thickness(0, 0, 0, 6);
+            themeFollowsOsCheck.Margin = new Thickness(0, 0, 0, 6);
             settingsBehavior.Children.Add(trayIconCheck);
             settingsBehavior.Children.Add(closeToTrayCheck);
             settingsBehavior.Children.Add(escapeToTrayCheck);
             settingsBehavior.Children.Add(notificationsCheck);
             settingsBehavior.Children.Add(catchUpCheck);
+            settingsBehavior.Children.Add(themeFollowsOsCheck);
 
 
             // Параметры текущей сессии
@@ -3546,6 +3552,9 @@ namespace Workspace1C
                     closeToTrayCheck.IsChecked == true,
                     escapeToTrayCheck.IsChecked == true,
                     notificationsCheck.IsChecked == true);
+                // Тема приложения следует за режимом ОС (issue #108): применяется
+                // сразу — наблюдатель подписывается/отписывается в сеттере свойства.
+                _viewModel.ThemeFollowsOs = themeFollowsOsCheck.IsChecked == true;
                 // Догоняющее выполнение пропущенных заданий (функция №7).
                 _viewModel.ApplyScheduleSettings(catchUpCheck.IsChecked == true);
                 _viewModel.ApplyTemplateCatalogPaths(templatePaths);

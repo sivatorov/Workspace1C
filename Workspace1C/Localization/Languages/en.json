@@ -835,6 +835,8 @@
     "Settings.General.ShowTrayIcon": "Icon in the notification area",
     "Settings.General.CloseToTray": "Minimize to tray on close",
     "Settings.General.EscapeToTray": "Minimize to tray on Esc",
+    "Settings.ThemeFollowsOs": "App theme follows the OS color mode",
+    "MassLoadCf.DesignerFailedWithExitCode": "Designer exited with an error (exit code {0})",
     "Settings.General.ShowSystemNotifications": "System notifications about completed background operations (backup, scheduled task, application update)",
     "Settings.General.CatchUpMissedTasks": "Run missed scheduled tasks on startup",
     "Settings.General.CatchUpMissedTasksTooltip": "If the computer was off when a task was due, the program runs the task immediately on the next startup — once. Not applied to application updates (the updater finds them on its own); misses older than 7 days are not caught up.",

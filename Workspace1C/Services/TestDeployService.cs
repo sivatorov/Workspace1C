@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Localization;
@@ -241,7 +242,17 @@ public sealed class TestDeployService
             catch (Exception ex)
             {
                 _logger?.Error("Ошибка развёртывания тестовой копии", ex);
-                result.ErrorMessage = Fail(T("TestDeploy.Step.Unknown"), ex.Message);
+                // Диагностика (issue #79, репорт 7OH): общая ошибка с голым ex.Message
+                // («Внутренняя ошибка…») не позволяла понять ни шаг, ни причину.
+                // В сообщение добавляем цепочку InnerException, а в журнал окна —
+                // тип исключения и стек (журнал показывается окном и попадает
+                // в ZIP-диагностику).
+                var message = DescribeException(ex);
+                result.ErrorMessage = Fail(T("TestDeploy.Step.Unknown"), message);
+                result.Log.Add(result.ErrorMessage);
+                result.Log.Add(ex.GetType().FullName + ": " + ex.Message);
+                if (!string.IsNullOrWhiteSpace(ex.StackTrace))
+                    result.Log.Add(ex.StackTrace);
                 return result;
             }
             finally
@@ -249,6 +260,23 @@ public sealed class TestDeployService
                 TryDeleteDirectory(tmpRoot);
             }
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Разворачивает исключение в понятное сообщение: текст + цепочка InnerException
+    /// (issue #79: «Внутренняя ошибка …» с одним уровнем не позволяла понять причину,
+    /// например когда реальная причина сидит в InnerException у TargetInvocationException).
+    /// </summary>
+    private static string DescribeException(Exception ex)
+    {
+        var sb = new StringBuilder(ex.Message);
+        var inner = ex.InnerException;
+        while (inner is not null)
+        {
+            sb.Append(" → ").Append(inner.Message);
+            inner = inner.InnerException;
+        }
+        return sb.ToString();
     }
 
     /// <summary>

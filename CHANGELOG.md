@@ -11,6 +11,54 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.39] — 2026-11-06
+
+### Добавлено
+
+- **Настройка «Тема приложения следует за режимом ОС» (issue #108).** Новая галочка
+  в Настройки → «Поведение и язык» (по умолчанию ЛОЖЬ): при смене тёмного/светлого
+  режима приложений в Windows приложение автоматически переключает светлый/тёмный
+  вариант темы (ручная смена остаётся доступной). Учитывается гибридный режим
+  персонализации «Настраиваемый» — читается «Режим приложений по умолчанию»
+  (`AppsUseLightTheme`), смена отслеживается через `SystemEvents.UserPreferenceChanged`
+  (новый [OsThemeWatcher.cs](Workspace1C/Services/OsThemeWatcher.cs)); на Linux опция
+  сохраняется, но пока не влияет на тему. Тесты:
+  [OsThemeWatcherTests.cs](Workspace1C.Tests/OsThemeWatcherTests.cs).
+
+### Исправлено
+
+- **Очистка кэша при переносе кэша 1С ссылкой (junction/symlink) (issue #109, автор
+  Nodon84).** Пользователи, перенёсшие кэш платформы на другой диск через
+  `mklink /j` (`%APPDATA%\1C\1Cv82`, `%LOCALAPPDATA%\1C\1cv8`), получали нулевые
+  размеры и неработающую очистку: рекурсия .NET (`SearchOption.AllDirectories`) не
+  заходит в reparse points. Теперь размер считается по цели ссылки (ручная рекурсия
+  с защитой от циклов через канонизацию целей ссылок), а удаление каталога-ссылки
+  очищает только СОДЕРЖИМОЕ цели — сама ссылка не переименовывается и не удаляется,
+  перенесённый кэш продолжает работать
+  ([OneCCacheCleaner.cs](Workspace1C/Services/OneCCacheCleaner.cs)). Тесты на реальных
+  junction/symlink ([OneCCacheCleanerJunctionTests.cs](Workspace1C.Tests/OneCCacheCleanerJunctionTests.cs)).
+- **«Развернуть тестовую копию»: информативная диагностика внутренних ошибок
+  (issue #79, репорт 7OH).** Общий обработчик ошибок теперь добавляет к сообщению
+  цепочку `InnerException`, а в журнал окна (и ZIP-диагностику) — тип исключения
+  и стек ([TestDeployService.cs](Workspace1C/Services/TestDeployService.cs)).
+- **«Развернуть тестовую копию»: окно немодальное (issue #79).** Мастер развёртывания
+  показывается как обычное окно (по аналогии с «Серверы 1С») — пока копия создаётся,
+  можно запустить базу и работать; одно окно на базу-источник (повторный вызов
+  активирует существующее), закрытие во время развёртывания блокируется до завершения
+  операции; результат применяется командой главного окна по завершении
+  ([TestDeployWindow.cs](Workspace1C/Views/TestDeployWindow.cs) WPF,
+  [TestDeployWindow.Avalonia.cs](Workspace1C/Views/TestDeployWindow.Avalonia.cs),
+  [MainViewModel.Commands.cs](Workspace1C/ViewModels/MainViewModel.Commands.cs),
+  [MainViewModel.Avalonia.Commands.cs](Workspace1C/ViewModels/MainViewModel.Avalonia.Commands.cs)).
+
+### Изменено
+
+- **Массовая загрузка из CF: защитные улучшения (issue #106).** Файл `.cf` проверяется
+  повторно перед загрузкой каждой базы (понятная ошибка, если файл исчез в середине
+  прогона); при пустом тексте ошибки Конфигуратора в сообщение добавляется код возврата
+  процесса ([MassLoadCfService.cs](Workspace1C/Services/MassLoadCfService.cs)).
+  Тесты: [Issue106MassLoadCfTests.cs](Workspace1C.Tests/Issue106MassLoadCfTests.cs).
+
 ## [1.0.1.38] — 2026-11-06
 
 ### Исправлено

@@ -201,6 +201,9 @@ namespace Workspace1C
                 CloseToTrayCheck.IsChecked = _viewModel.CloseToTray;
             if (EscapeToTrayCheck != null)
                 EscapeToTrayCheck.IsChecked = _viewModel.EscapeToTray;
+            // Тема приложения следует за режимом ОС (issue #108).
+            if (ThemeFollowsOsCheck != null)
+                ThemeFollowsOsCheck.IsChecked = _viewModel.ThemeFollowsOs;
             if (ShowSystemNotificationsCheck != null)
                 ShowSystemNotificationsCheck.IsChecked = _viewModel.ShowSystemNotifications;
             if (CatchUpMissedTasksCheck != null)

@@ -768,13 +768,27 @@ public static class OneCCacheCleaner
     /// <summary>
     /// Рекурсивно вычисляет суммарный размер всех файлов в каталоге (в байтах).
     /// Ошибки доступа к отдельным файлам игнорируются.
+    /// <para>
+    /// Рекурсия выполняется вручную, а не через <c>SearchOption.AllDirectories</c>:
+    /// встроенная рекурсия .NET не заходит в reparse points (junction/symlink), из-за
+    /// чего размер кэша, перенесённого на другой диск ссылкой (issue #109), считался
+    /// нулевым. Здесь ссылки обходятся по их цели; защита от циклов — множество
+    /// уже посещённых полных путей.
+    /// </para>
     /// </summary>
-    private static long GetDirectorySize(string path)
+    /// <remarks>internal (не private): юнит-тесты junction/symlink (issue #109) в Workspace1C.Tests.</remarks>
+    internal static long GetDirectorySize(string path)
+        => GetDirectorySize(path, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+    private static long GetDirectorySize(string path, HashSet<string> visited)
     {
         long total = 0;
         try
         {
-            foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+            if (!visited.Add(ResolveCanonicalPath(path)))
+                return 0;
+
+            foreach (var file in Directory.EnumerateFiles(path, "*"))
             {
                 try
                 {
@@ -785,6 +799,18 @@ public static class OneCCacheCleaner
                     // Игнорируем недоступные файлы (могут быть заняты запущенной 1С).
                 }
             }
+
+            foreach (var dir in Directory.EnumerateDirectories(path, "*"))
+            {
+                try
+                {
+                    total += GetDirectorySize(dir, visited);
+                }
+                catch
+                {
+                    // Игнорируем недоступные подкаталоги.
+                }
+            }
         }
         catch
         {
@@ -792,6 +818,32 @@ public static class OneCCacheCleaner
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// Канонический путь каталога для защиты от циклов при обходе ссылок: для reparse
+    /// points (junction/symlink) возвращается финальная цель ссылки, иначе — сам путь.
+    /// Ссылки могут достигаться по разным путям («real\sub» и «link\sub», где link —
+    /// ссылка на real), и без канонизации цикл не распознаётся (issue #109).
+    /// </summary>
+    private static string ResolveCanonicalPath(string path)
+    {
+        try
+        {
+            var info = new DirectoryInfo(path);
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                var final = info.ResolveLinkTarget(returnFinalTarget: true);
+                if (final is not null && !string.IsNullOrEmpty(final.FullName))
+                    return NormalizePathForCompare(final.FullName);
+            }
+        }
+        catch
+        {
+            // Недоступный каталог — используем путь как есть.
+        }
+
+        return NormalizePathForCompare(path);
     }
 
     /// <summary>
@@ -872,14 +924,28 @@ public static class OneCCacheCleaner
     /// (<c><имя>.deleting_<guid></c>), у всех файлов рекурсивно снимается атрибут
     /// ReadOnly (платформа кладёт в кеш файлы с этим атрибутом, из-за которого обычное
     /// рекурсивное удаление падает с UnauthorizedAccessException), после чего каталог удаляется.
+    /// <para>
+    /// Если каталог — ссылка (junction/symlink, issue #109: пользователь перенёс кэш 1С
+    /// на другой диск через <c>mklink /j</c>), ссылка НЕ переименовывается и НЕ удаляется —
+    /// очищается только содержимое её цели. Иначе пользователь потерял бы ссылку и весь
+    /// перенесённый кэш перестал бы быть виден ни платформе, ни приложению.
+    /// </para>
     /// </summary>
-    /// <returns>True, если каталог был найден и удалён; иначе False.</returns>
-    private static bool TryDeleteDirectory(string path)
+    /// <returns>True, если каталог был найден и удалён (или очищен как ссылка); иначе False.</returns>
+    /// <remarks>internal (не private): юнит-тесты junction/symlink (issue #109) в Workspace1C.Tests.</remarks>
+    internal static bool TryDeleteDirectory(string path)
     {
         try
         {
             if (!Directory.Exists(path))
                 return false;
+
+            // Ссылка (junction/symlink) не переименовывается и не удаляется — удаляем
+            // только содержимое цели (issue #109). Вызывается для каталогов кеша баз,
+            // которые по построению не совпадают с корнями кэша (GetCacheRoots),
+            // поэтому сами корни со ссылками здесь недостижимы.
+            if (IsReparsePoint(path))
+                return TryDeleteDirectoryContents(path);
 
             // Переименовываем каталог во временное имя — это мгновенная операция,
             // и если удаление прервётся, каталог больше не будет найден как кеш базы.
@@ -896,6 +962,82 @@ public static class OneCCacheCleaner
             // Игнорируем ошибки (каталог может быть занят запущенной 1С или
             // отсутствовать); считаем, что каталог не удалён.
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Определяет, является ли каталог ссылкой (junction/symlink/reparse point).
+    /// </summary>
+    /// <remarks>internal (не private): юнит-тесты junction/symlink (issue #109) в Workspace1C.Tests.</remarks>
+    internal static bool IsReparsePoint(string path)
+    {
+        try
+        {
+            var info = new DirectoryInfo(path);
+            return (info.Attributes & FileAttributes.ReparsePoint) != 0
+                || info.LinkTarget is not null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Очищает содержимое каталога-ссылки (issue #109): удаляет все вложенные файлы
+    /// и каталоги, не затрагивая саму ссылку. Вложенные ссылки удаляются как ссылки
+    /// (цель не затрагивается), обычные каталоги — рекурсивно.
+    /// </summary>
+    private static bool TryDeleteDirectoryContents(string path)
+    {
+        try
+        {
+            string[] children;
+            try { children = Directory.GetFileSystemEntries(path); }
+            catch { return false; }
+
+            foreach (var child in children)
+                TryDeleteAnyEntry(child);
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Удаляет файл, каталог или ссылку. Ссылка (junction/symlink) удаляется как ссылка —
+    /// её цель не затрагивается; обычный каталог удаляется рекурсивно со снятием ReadOnly.
+    /// </summary>
+    private static void TryDeleteAnyEntry(string path)
+    {
+        try
+        {
+            if (File.Exists(path) && !Directory.Exists(path))
+            {
+                try { File.SetAttributes(path, FileAttributes.Normal); } catch { }
+                File.Delete(path);
+                return;
+            }
+
+            if (Directory.Exists(path))
+            {
+                if (IsReparsePoint(path))
+                {
+                    // Directory.Delete без recursive удаляет только саму ссылку.
+                    Directory.Delete(path, recursive: false);
+                    return;
+                }
+
+                ClearReadOnlyAttributes(path);
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        catch
+        {
+            // Игнорируем ошибки (элемент может быть занят запущенной 1С).
         }
     }
 

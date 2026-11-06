@@ -63,6 +63,10 @@ public partial class MainViewModel : ViewModelBase
     private bool _allowMultipleInstances;
     private bool _checkForUpdatesOnStartup = true;
     private bool _autoUpdateEnabled = true;
+    /// <summary>Тема приложения следует за режимом ОС (issue #108, Windows).</summary>
+    private bool _themeFollowsOs;
+    /// <summary>Признак подписки наблюдателя режима ОС (issue #108).</summary>
+    private bool _osThemeWatcherActive;
     // Настраиваемый шаблон имени COM-коннектора 1С (issue #175). Пустая строка —
     // стандартные ProgID V85/V83/V82/V81.COMConnector.
     private string _comConnectorNameTemplate = "";
@@ -604,6 +608,9 @@ public partial class MainViewModel : ViewModelBase
         _showTrayIcon = settings.ShowTrayIcon;
         _showSystemNotifications = settings.ShowSystemNotifications;
         _catchUpMissedTasks = settings.CatchUpMissedTasks;
+        // Тема приложения следует за режимом ОС (issue #108).
+        _themeFollowsOs = settings.ThemeFollowsOs;
+        UpdateOsThemeWatcher();
         _maintenanceFreeSpaceWarningGb = Math.Max(0, settings.MaintenanceFreeSpaceWarningGb);
         _escapeToTray = settings.EscapeToTray;
         // Подтверждение выполнения пользовательских действий (функция 7, 0.3.9.197).

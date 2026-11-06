@@ -85,6 +85,20 @@ public class TestDeployWindow : ModalWindowBase
     /// <summary>Результат развёртывания (заполняется при успехе).</summary>
     public TestDeployResult? DeployResult { get; private set; }
 
+    /// <summary>База-источник развёртывания (для поиска открытого окна, issue #79).</summary>
+    public Infobase Source => _vm.Source;
+
+    /// <summary>Идёт ли развёртывание прямо сейчас (немодальный показ, issue #79).</summary>
+    public bool DeployRunning => _busy;
+
+    /// <summary>
+    /// Успешное завершение развёртывания (issue #79: окно показывается НЕМОДАЛЬНО,
+    /// по аналогии с «Серверы 1С»). Подписчик (MainViewModel) применяет результат:
+    /// добавляет/обновляет тестовую базу в списке. Вызывается после заполнения
+    /// <see cref="Scenario"/>/<see cref="DeployResult"/>, до закрытия окна.
+    /// </summary>
+    public event Action<TestDeployWindow>? DeployCompleted;
+
     /// <summary>Созданная группа «Тест» (null — группа уже была или добавление выключено).</summary>
     public Group? CreatedGroup { get; private set; }
 
@@ -633,6 +647,10 @@ public class TestDeployWindow : ModalWindowBase
             // {0} — имя тестовой базы; раньше подставлялось без string.Format, и в журнале
             // окна оставался не заполненный плейсхолдер.
             _logList.Items.Add(TestDeployService.DoneMessage(result));
+
+            // Немодальное окно (issue #79): подписчик применяет результат до закрытия.
+            DeployCompleted?.Invoke(this);
+
             Close();
         }
         catch (Exception ex)
