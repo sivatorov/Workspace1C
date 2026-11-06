@@ -138,6 +138,15 @@ namespace Workspace1C
             if (_isDragging || _dragPayload is null || _vm is null)
                 return;
 
+            // Issue #112: при активном поиске/фильтре дерево пересобрано в плоский
+            // список — перетаскивание не запускаем, чтобы ghost-payload после
+            // снятия фильтра не перенёс базу в «Без группы».
+            if (!string.IsNullOrEmpty(_vm.SearchText))
+            {
+                _dragPayload = null;
+                return;
+            }
+
             var point = e.GetCurrentPoint(this);
             if (!point.Properties.IsLeftButtonPressed)
             {

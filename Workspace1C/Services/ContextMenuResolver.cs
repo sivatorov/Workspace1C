@@ -200,16 +200,19 @@ public static class ContextMenuResolver
     /// скрывает опустевшие подменю и убирает «висячие»/двойные разделители. Компоновка
     /// НЕ мутируется: возвращается новый список; исходные узлы-пункты и разделители
     /// переиспользуются, узлы-группы копируются с отфильтрованными детьми.
+    /// <para>Issue #113: <paramref name="isNoGroup"/> = true для служебного узла «Без группы» —
+    /// пункты, требующие реальной группы (удаление группы), скрываются: у узла нет модели
+    /// группы, и команда удаления для него была бы пустой.</para>
     /// </summary>
-    public static List<ContextMenuNode> FilterForGroup(IEnumerable<ContextMenuNode>? nodes)
+    public static List<ContextMenuNode> FilterForGroup(IEnumerable<ContextMenuNode>? nodes, bool isNoGroup = false)
     {
-        var filtered = FilterNodesForGroup(nodes);
+        var filtered = FilterNodesForGroup(nodes, isNoGroup);
         TrimSeparators(filtered);
         return filtered;
     }
 
     /// <summary>Рекурсивная часть <see cref="FilterForGroup"/>: отбор применимых пунктов и непустых групп.</summary>
-    private static List<ContextMenuNode> FilterNodesForGroup(IEnumerable<ContextMenuNode>? nodes)
+    private static List<ContextMenuNode> FilterNodesForGroup(IEnumerable<ContextMenuNode>? nodes, bool isNoGroup)
     {
         var result = new List<ContextMenuNode>();
         if (nodes is null)
@@ -227,7 +230,7 @@ public static class ContextMenuResolver
             {
                 // Дети чистятся через FilterForGroup (с удалением «висячих» разделителей)
                 // ДО проверки на пустоту: группа только из разделителей — пустая (issue #105).
-                var children = FilterForGroup(node.Children);
+                var children = FilterForGroup(node.Children, isNoGroup);
                 if (children.Count == 0)
                     continue; // пустое подменю не показываем (issue #105)
                 result.Add(new ContextMenuNode
@@ -251,6 +254,10 @@ public static class ContextMenuResolver
             var catalogItem = ContextMenuCatalog.Find(node.ItemId);
             if (catalogItem is null ||
                 !ContextMenuCatalog.IsGroupApplicable(catalogItem.CommandKind))
+                continue;
+            // Issue #113: узел «Без группы» не имеет модели группы — «Удалить» (группы)
+            // для него был бы пустой командой, скрываем.
+            if (isNoGroup && catalogItem.CommandKind == ContextMenuCommandKind.Delete)
                 continue;
             result.Add(node);
         }

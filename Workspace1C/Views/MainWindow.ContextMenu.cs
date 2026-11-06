@@ -80,17 +80,27 @@ public partial class MainWindow
         // Issue #105 (запрос 7OH): для выбранной группы показываем только применимые
         // пункты (скрытие, а не блокировка; пустые подменю не показываются).
         var forGroup = IsRowMenuGroupContext();
-        AppendRowContextNodes(target, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
+        var isNoGroup = forGroup && IsRowMenuNoGroupContext(_viewModel!);
+        AppendRowContextNodes(target,
+            forGroup ? ContextMenuResolver.FilterForGroup(layout.Root, isNoGroup) : layout.Root);
         _rowContextMenuLayoutKey = LayoutFingerprint(layout);
         _rowContextMenuBuiltForGroup = forGroup;
     }
 
     /// <summary>Целевой контекст меню — выбранная группа дерева (без мультивыделения
-    /// и без выделенной базы; узлы-маркеры «Без группы»/«Закреплённые» не считаются).</summary>
+    /// и без выделенной базы). Узел «Закреплённые» не считается; узел «Без группы»
+    /// считается групповым контекстом (issue #113): для него доступны групповые
+    /// операции (очистка кэша баз группы, пакетные операции), кроме требующих
+    /// реальной группы (удаление).</summary>
     private bool IsRowMenuGroupContext() =>
         _viewModel is { } vm &&
         vm.SelectedInfobase is null &&
-        vm.SelectedGroupNode?.Group is not null;
+        (vm.SelectedGroupNode?.Group is not null || IsRowMenuNoGroupContext(vm));
+
+    /// <summary>Выбран служебный узел «Без группы» (Group == null, маркер NoGroup).</summary>
+    private static bool IsRowMenuNoGroupContext(ViewModels.MainViewModel vm) =>
+        vm.SelectedGroupNode is { Group: null } node &&
+        string.Equals(node.Marker, ViewModels.GroupNodeViewModel.NoGroupMarker, StringComparison.Ordinal);
 
     /// <summary>Рекурсивно добавляет узлы компоновки в целевой список пунктов меню (issue #56).</summary>
     private void AppendRowContextNodes(ItemCollection target, List<ContextMenuNode> nodes)
@@ -328,6 +338,11 @@ public partial class MainWindow
                 item.Command = _viewModel.ClearUserCacheCommand; break;
             case ContextMenuCommandKind.ClearCacheBoth:
                 item.Command = _viewModel.ClearCacheBothCommand; break;
+            // Открытие папок кеша (issue #110).
+            case ContextMenuCommandKind.OpenProgramCacheFolder:
+                item.Command = _viewModel.OpenProgramCacheFolderCommand; break;
+            case ContextMenuCommandKind.OpenUserCacheFolder:
+                item.Command = _viewModel.OpenUserCacheFolderCommand; break;
             case ContextMenuCommandKind.Delete:
                 item.Command = _viewModel.DeleteInfobaseCommand; break;
             case ContextMenuCommandKind.FindInList:

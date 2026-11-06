@@ -947,6 +947,15 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Команда одновременной очистки программного и пользовательского кеша 1С.</summary>
     public ICommand ClearCacheBothCommand { get; }
 
+    /// <summary>Команда открытия папки программного кеша 1С (issue #110).</summary>
+    public ICommand OpenProgramCacheFolderCommand { get; }
+
+    /// <summary>Команда открытия папки пользовательского кеша 1С (issue #110).</summary>
+    public ICommand OpenUserCacheFolderCommand { get; }
+
+    /// <summary>Команда копирования ИД выделенной базы в буфер обмена (issue #110, строка состояния).</summary>
+    public ICommand CopyInfobaseIdCommand { get; }
+
     /// <summary>Открыть каталог файловой базы в проводнике.</summary>
     public ICommand OpenInfobaseFolderCommand { get; }
 

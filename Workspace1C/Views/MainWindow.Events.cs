@@ -692,6 +692,12 @@ namespace Workspace1C
                 return;
             }
 
+            // Issue #112: ПКМ по дереву отменяет «призрак» перетаскивания — payload,
+            // запомненный в ЛКМ-MouseDown, не должен переживать контекстное меню
+            // и срабатывать drop-ом после закрытия меню/снятия фильтра.
+            _draggedData = null;
+            _dragStartPoint = default;
+
             // Если клик попал по строке базы или группы, выделяем её. Модификаторы
             // Ctrl/Shift намеренно игнорируются: они меняют мультивыделение только
             // при ЛЕВОМ клике (OnInfobaseTree_PreviewMouseLeftButtonDown), а правый
@@ -712,6 +718,16 @@ namespace Workspace1C
                     treeViewItem.IsSelected = true;
                     _viewModel.SelectedInfobase = null;
                     _viewModel.SelectedGroupNode = groupNode;
+                    break;
+                // Issue #113: служебный узел «Без группы» (Group == null, маркер NoGroup)
+                // тоже выделяется по ПКМ — иначе меню строится по предыдущему контексту
+                // (группе или базе), а команды применяются не к тому элементу.
+                case GroupNodeViewModel noGroupNode
+                        when noGroupNode.Group is null &&
+                             string.Equals(noGroupNode.Marker, GroupNodeViewModel.NoGroupMarker, StringComparison.Ordinal):
+                    treeViewItem.IsSelected = true;
+                    _viewModel.SelectedInfobase = null;
+                    _viewModel.SelectedGroupNode = noGroupNode;
                     break;
             }
         }

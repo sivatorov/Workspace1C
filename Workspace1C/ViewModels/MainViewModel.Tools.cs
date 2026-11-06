@@ -1386,6 +1386,67 @@ public partial class MainViewModel : ViewModelBase
         };
     }
 
+    /// <summary>
+    /// Открывает все найденные каталоги кеша базы в проводнике (issue #110): каталогов
+    /// может быть несколько (программный и пользовательский корни, дополнительные
+    /// корни из настроек, легаси 1Cv82). Ничего не найдено — информационное сообщение.
+    /// </summary>
+    /// <param name="kind">Тип кеша (программный/пользовательский).</param>
+    /// <param name="target">База из строки меню (если указана), иначе выделенная.</param>
+    private void OpenCacheFolder(OneCCacheKind kind, Infobase? target = null)
+    {
+        var ib = target ?? SelectedInfobase;
+        if (ib is null)
+            return;
+
+        try
+        {
+            var dirs = Services.OneCCacheCleaner.GetCacheDirectories(ib, kind);
+            if (dirs.Count == 0)
+            {
+                _dialogs.ShowInfo(
+                    string.Format(LocalizationManager.T("Main.CacheFolderNotFound"), ib.Name),
+                    LocalizationManager.T("Main.OpenCatalogTitle"));
+                return;
+            }
+
+            var opened = 0;
+            foreach (var dir in dirs)
+            {
+                if (Services.CacheFolderOpener.TryOpenDirectory(dir))
+                    opened++;
+            }
+
+            _logger.Info($"Открытие папок кеша «{ib.Name}» (kind={kind}): найдено={dirs.Count}, открыто={opened}");
+        }
+        catch (Exception ex)
+        {
+            _dialogs.ShowError(
+                string.Format(LocalizationManager.T("Main.ErrCacheClear"), ex.Message),
+                LocalizationManager.T("Main.CacheErrorTitle"));
+        }
+    }
+
+    /// <summary>Копирует ИД базы в буфер обмена (issue #110, строка состояния).</summary>
+    private void CopyInfobaseId(object? parameter)
+    {
+        var ib = parameter as Infobase ?? SelectedInfobase;
+        if (ib is null || string.IsNullOrWhiteSpace(ib.Id))
+            return;
+
+        try
+        {
+            Clipboard.SetText(ib.Id);
+            _logger.Info($"ИД базы «{ib.Name}» скопирован в буфер обмена ({ib.Id})");
+        }
+        catch (Exception ex)
+        {
+            _dialogs.ShowError(
+                string.Format(LocalizationManager.T("Main.ErrCopyConnection"), ex.Message),
+                LocalizationManager.T("Main.CopyErrorTitle"));
+        }
+    }
+
     /// <summary>Открывает каталог файловой ИБ в проводнике Windows.</summary>
     private void OpenInfobaseFolder(object? parameter)
     {
@@ -2318,6 +2379,20 @@ public partial class MainViewModel : ViewModelBase
     {
         var targetPath = groupFullPath ?? string.Empty;
         var targetNorm = NormalizeGroupPath(targetPath);
+
+        // Диагностика issue #112: перенос в «Без группы» журналируется со стеком
+        // вызова — по diagnostics-ZIP видно, какой механизм записал Group = ""
+        // (DnD-ghost, стабилизация выделения, пакетная операция и т.п.).
+        if (string.IsNullOrEmpty(targetNorm))
+        {
+            _logger.Warn($"[move] «{infobase.Name}» (Id={infobase.Id}) → «Без группы»; " +
+                         $"была в: «{infobase.Group}»;\n{Environment.StackTrace}");
+        }
+        else
+        {
+            _logger.Info($"[move] «{infobase.Name}» → «{targetNorm}» (была в «{infobase.Group}»)");
+        }
+
         infobase.Group = string.IsNullOrEmpty(targetNorm) ? targetPath : targetNorm;
 
         // Соседи в целевой группе (кроме переносимой).

@@ -82,6 +82,9 @@ public partial class MainViewModel : ViewModelBase
     public ICommand QuickClearCacheCommand { get; private set; } = null!;
     public ICommand ClearCacheCommand { get; private set; } = null!;
     public ICommand ClearProgramCacheCommand { get; private set; } = null!;
+    public ICommand OpenProgramCacheFolderCommand { get; private set; } = null!;
+    public ICommand OpenUserCacheFolderCommand { get; private set; } = null!;
+    public ICommand CopyInfobaseIdCommand { get; private set; } = null!;
     public ICommand DumpInfobaseDtCommand { get; private set; } = null!;
     public ICommand DumpConfigurationCfCommand { get; private set; } = null!;
     public ICommand RefreshConfigurationInfoCommand { get; private set; } = null!;
@@ -188,6 +191,18 @@ public partial class MainViewModel : ViewModelBase
         ClearCacheCommand = new RelayCommand(p => OpenCacheClean(OneCCacheKind.All, p as Infobase),
             p => p is Infobase ? true : Infobases.Count > 0);
         ClearProgramCacheCommand = new RelayCommand(_ => OpenCacheClean(OneCCacheKind.Program));
+        // «Открыть папку кеша» (issue #110): все найденные каталоги кеша базы —
+        // в файловом менеджере.
+        OpenProgramCacheFolderCommand = new RelayCommand(
+            p => OpenCacheFolder(OneCCacheKind.Program, p as Infobase),
+            p => p is Infobase ? true : Infobases.Count > 0);
+        OpenUserCacheFolderCommand = new RelayCommand(
+            p => OpenCacheFolder(OneCCacheKind.User, p as Infobase),
+            p => p is Infobase ? true : Infobases.Count > 0);
+        // Копирование ИД базы из строки состояния (issue #110).
+        CopyInfobaseIdCommand = new RelayCommand(
+            _ => CopyInfobaseId(),
+            _ => SelectedInfobase is { } ib && !string.IsNullOrWhiteSpace(ib.Id));
         DumpInfobaseDtCommand = new RelayCommand(DumpInfobaseDt);
         DumpConfigurationCfCommand = new RelayCommand(DumpConfigurationCf);
         RefreshConfigurationInfoCommand = new RelayCommand(RefreshConfigurationInfo);

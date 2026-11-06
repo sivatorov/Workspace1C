@@ -116,7 +116,9 @@ internal static class TraceFlagsFormat
         "CM_IBASES",
         "CM_JOBS",
         "CM_THEMES",
-        "CM_PUBLISH"
+        "CM_PUBLISH",
+        // Очистка кеша 1С (issue #109, v1.0.1.40): диагностика «нулей».
+        "CM_CACHE"
     };
 
     /// <summary>

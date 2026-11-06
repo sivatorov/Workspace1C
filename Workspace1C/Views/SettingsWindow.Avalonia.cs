@@ -2384,6 +2384,21 @@ namespace Workspace1C
             loadTemplates.Margin = new Thickness(0, 0, 0, 4);
             basesTemplatesPanel.Children.Add(templateButtons);
 
+            // Дополнительные каталоги кеша 1С (issue #109): один путь в строке,
+            // как в версии для Windows (SettingsWindow.xaml, GroupBox «CacheRoots»).
+            var cacheRootsBox = new TextBox
+            {
+                Text = string.Join(Environment.NewLine, _viewModel.AdditionalCacheRoots),
+                MinHeight = 60,
+                MaxHeight = 140,
+                AcceptsReturn = true,
+                TextWrapping = TextWrapping.NoWrap,
+                Watermark = LocalizationManager.T("Settings.CacheRoots.Tooltip")
+            };
+            basesTemplatesPanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.CacheRoots")));
+            basesTemplatesPanel.Children.Add(Hint(LocalizationManager.T("Settings.CacheRoots.Hint")));
+            basesTemplatesPanel.Children.Add(cacheRootsBox);
+
             // Операции со списком баз целиком: выгрузка и загрузка JSON,
             // разовый импорт из ibases.v8i.
             basesListPanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.IbaseList")));
@@ -3558,6 +3573,10 @@ namespace Workspace1C
                 // Догоняющее выполнение пропущенных заданий (функция №7).
                 _viewModel.ApplyScheduleSettings(catchUpCheck.IsChecked == true);
                 _viewModel.ApplyTemplateCatalogPaths(templatePaths);
+                // Дополнительные каталоги кеша 1С (issue #109): один путь в строке;
+                // пустые строки и дубликаты отбрасываются в SetAdditionalCacheRoots.
+                _viewModel.SetAdditionalCacheRoots((cacheRootsBox.Text ?? string.Empty)
+                    .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries));
                 ApplyExportFileNameSettings();
 
                 _viewModel.AfterLaunchAction = afterLaunchBox.SelectedIndex switch

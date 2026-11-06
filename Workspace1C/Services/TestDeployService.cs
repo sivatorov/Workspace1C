@@ -203,35 +203,69 @@ public sealed class TestDeployService
                 }
 
                 // ---- Шаг 5: выключение регламентных заданий в копии (1.0.0.85). ----
+                // Issue #79 (v1.0.1.40): каждый шаг обёрнут в локальный try/catch —
+                // ошибка видна с именем шага (а не TestDeploy.Step.Unknown), в журнал
+                // окна попадают тип и стек исключения.
                 if (scenario.DisableScheduledJobs)
                 {
                     log?.Invoke(T("TestDeploy.Step.DisableJobs"));
                     result.Log.Add(T("TestDeploy.Step.DisableJobs"));
-                    await DisableScheduledJobsAsync(target, result).ConfigureAwait(false);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        await DisableScheduledJobsAsync(target, result).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.Error("Ошибка шага «Выключение регламентных заданий»", ex);
+                        RecordStepFailure(result, T("TestDeploy.Step.DisableJobs"), ex);
+                        return result;
+                    }
                 }
 
                 // ---- Шаг 6: отличительные признаки (заголовок/группа/цвет). ----
-                if (scenario.ChangeTitle || scenario.ChangeColor)
+                try
                 {
-                    log?.Invoke(T("TestDeploy.Step.Markers"));
-                    result.Log.Add(T("TestDeploy.Step.Markers"));
+                    if (scenario.ChangeTitle || scenario.ChangeColor)
+                    {
+                        log?.Invoke(T("TestDeploy.Step.Markers"));
+                        result.Log.Add(T("TestDeploy.Step.Markers"));
+                    }
+
+                    target.Name = targetName;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Error("Ошибка шага «Отличительные признаки»", ex);
+                    RecordStepFailure(result, T("TestDeploy.Step.Markers"), ex);
+                    return result;
                 }
 
-                target.Name = targetName;
-                if (scenario.AddToTestGroup && !string.IsNullOrWhiteSpace(groupPlan.GroupPath))
+                // ---- Шаг 7: включение копии в группу «Тест». ----
+                try
                 {
-                    target.Group = groupPlan.GroupPath;
-                    result.GroupPath = groupPlan.GroupPath;
+                    if (scenario.AddToTestGroup && !string.IsNullOrWhiteSpace(groupPlan.GroupPath))
+                    {
+                        target.Group = groupPlan.GroupPath;
+                        result.GroupPath = groupPlan.GroupPath;
+                    }
+
+                    log?.Invoke(T("TestDeploy.Step.AddToGroup"));
+                    result.Log.Add(
+                        scenario.AddToTestGroup && !string.IsNullOrWhiteSpace(groupPlan.GroupPath)
+                            ? string.Format(T("TestDeploy.AddedToGroup"), groupPlan.GroupPath)
+                            : T("TestDeploy.GroupDisabled"));
+
+                    result.Success = true;
+                    result.Target = target;
+                }
+                catch (Exception ex)
+                {
+                    _logger?.Error("Ошибка шага «Добавление в группу»", ex);
+                    RecordStepFailure(result, T("TestDeploy.Step.AddToGroup"), ex);
+                    return result;
                 }
 
-                log?.Invoke(T("TestDeploy.Step.AddToGroup"));
-                result.Log.Add(
-                    scenario.AddToTestGroup && !string.IsNullOrWhiteSpace(groupPlan.GroupPath)
-                        ? string.Format(T("TestDeploy.AddedToGroup"), groupPlan.GroupPath)
-                        : T("TestDeploy.GroupDisabled"));
-
-                result.Success = true;
-                result.Target = target;
                 return result;
             }
             catch (OperationCanceledException)
@@ -246,13 +280,9 @@ public sealed class TestDeployService
                 // («Внутренняя ошибка…») не позволяла понять ни шаг, ни причину.
                 // В сообщение добавляем цепочку InnerException, а в журнал окна —
                 // тип исключения и стек (журнал показывается окном и попадает
-                // в ZIP-диагностику).
-                var message = DescribeException(ex);
-                result.ErrorMessage = Fail(T("TestDeploy.Step.Unknown"), message);
-                result.Log.Add(result.ErrorMessage);
-                result.Log.Add(ex.GetType().FullName + ": " + ex.Message);
-                if (!string.IsNullOrWhiteSpace(ex.StackTrace))
-                    result.Log.Add(ex.StackTrace);
+                // в ZIP-диагностику). Общий catch остаётся страховкой: шаги 5–7
+                // имеют собственные catch (issue #79, v1.0.1.40).
+                RecordStepFailure(result, T("TestDeploy.Step.Unknown"), ex);
                 return result;
             }
             finally
@@ -266,6 +296,8 @@ public sealed class TestDeployService
     /// Разворачивает исключение в понятное сообщение: текст + цепочка InnerException
     /// (issue #79: «Внутренняя ошибка …» с одним уровнем не позволяла понять причину,
     /// например когда реальная причина сидит в InnerException у TargetInvocationException).
+    /// Типовая COM-ошибка платформы «Внутренняя ошибка» дополняется расшифровкой
+    /// (<see cref="ExplainComInternalError"/>, issue #79, v1.0.1.40).
     /// </summary>
     private static string DescribeException(Exception ex)
     {
@@ -276,7 +308,42 @@ public sealed class TestDeployService
             sb.Append(" → ").Append(inner.Message);
             inner = inner.InnerException;
         }
-        return sb.ToString();
+        return ExplainComInternalError(sb.ToString());
+    }
+
+    /// <summary>
+    /// Формирует ошибку шага и пишет тип/стек исключения в журнал окна
+    /// (issue #79, v1.0.1.40): имя шага видно в любом сообщении, а не только
+    /// TestDeploy.Step.Unknown в общем catch.
+    /// </summary>
+    private static void RecordStepFailure(TestDeployResult result, string stepTitle, Exception ex)
+    {
+        var message = DescribeException(ex);
+        result.ErrorMessage = Fail(stepTitle, message);
+        result.Log.Add(result.ErrorMessage);
+        result.Log.Add(ex.GetType().FullName + ": " + ex.Message);
+        if (!string.IsNullOrWhiteSpace(ex.StackTrace))
+            result.Log.Add(ex.StackTrace);
+    }
+
+    /// <summary>
+    /// Расшифровка типовой COM-ошибки 1С «Внутренняя ошибка» (issue #79, v1.0.1.40):
+    /// платформа возвращает её без деталей при разрыве COM-соединения; к сообщению
+    /// добавляется пояснение и подсказка, чтобы пользователь понимал, куда смотреть
+    /// дальше (журнал регистрации/платформы, перезапуск сеанса сервера 1С).
+    /// </summary>
+    internal static string ExplainComInternalError(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return message;
+
+        var trimmed = message.Trim();
+        if (trimmed.StartsWith("Внутренняя ошибка", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("Internal error", StringComparison.OrdinalIgnoreCase))
+        {
+            return message + " " + T("TestDeploy.InternalErrorHint");
+        }
+        return message;
     }
 
     /// <summary>
@@ -494,8 +561,10 @@ public sealed class TestDeployService
             }
             else
             {
+                // «Внутренняя ошибка» от COM-скрипта расшифровывается (issue #79, v1.0.1.40).
                 var warning = string.Format(
-                    T("TestDeploy.JobsDisableWarning"), target.Name, jobs.Error ?? string.Empty);
+                    T("TestDeploy.JobsDisableWarning"), target.Name,
+                    ExplainComInternalError(jobs.Error ?? string.Empty));
                 result.Log.Add(warning);
                 result.Warnings.Add(warning);
             }
@@ -503,7 +572,8 @@ public sealed class TestDeployService
         catch (Exception ex)
         {
             _logger?.Warn($"Не удалось выключить регламентные задания в тестовой копии «{target.Name}»: {ex.Message}");
-            var warning = string.Format(T("TestDeploy.JobsDisableWarning"), target.Name, ex.Message);
+            var warning = string.Format(T("TestDeploy.JobsDisableWarning"), target.Name,
+                ExplainComInternalError(ex.Message));
             result.Log.Add(warning);
             result.Warnings.Add(warning);
         }

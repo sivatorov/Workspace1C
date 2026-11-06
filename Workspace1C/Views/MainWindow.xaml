@@ -3139,12 +3139,24 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                <!-- ИД базы (issue #110): двойной клик по строке состояния копирует ИД
+                     выделенной базы; в контекстном меню — явный пункт. -->
                 <TextBlock Grid.Column="0" Text="{Binding StatusBarInfo}"
                            Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
                            TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                            ToolTip="{Binding StatusBarInfo}">
+                    <TextBlock.InputBindings>
+                        <MouseBinding Gesture="LeftDoubleClick" Command="{Binding CopyInfobaseIdCommand}"/>
+                    </TextBlock.InputBindings>
                     <TextBlock.ContextMenu>
                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
+                            <MenuItem Header="{loc:Loc Main.StatusIdCopy}"
+                                      Command="{Binding CopyInfobaseIdCommand}"
+                                      Style="{DynamicResource ModernMenuItem}">
+                                <MenuItem.Icon>
+                                    <materialDesign:PackIcon Kind="Identifier" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem Header="{loc:Loc Main.CopyPath}"
                                       Command="{Binding CopyConnectionStringCommand}"
                                       Style="{DynamicResource ModernMenuItem}">

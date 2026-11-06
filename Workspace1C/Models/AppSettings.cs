@@ -486,6 +486,14 @@ public class AppSettings
     /// <summary>Ширина колонки «Пользовательский» в окне «Очистка кэша» (0 — по умолчанию).</summary>
     public double CacheCleanUserColumnWidth { get; set; }
 
+    /// <summary>
+    /// Дополнительные корни кеша 1С (issue #109): каталоги, где пользователь хранит кеш
+    /// платформы в нестандартном расположении (перенос копированием, junction на уровне
+    /// родителя). Очистка и подсчёт размера выполняются дополнительно к штатным корням
+    /// платформы и легаси-корням 1Cv82. По умолчанию пусто.
+    /// </summary>
+    public List<string> AdditionalCacheRoots { get; set; } = new();
+
     /// <summary>Сохранённая ширина окна приложения (0 — по умолчанию).</summary>
     public double WindowWidth { get; set; }
 

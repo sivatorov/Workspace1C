@@ -617,6 +617,8 @@ public partial class MainViewModel : ViewModelBase
         s.CollapsedGroups = _collapsedGroups.ToList();
         s.InstalledPlatformVersions = _installedPlatformVersions;
         s.AdditionalPlatformSearchPaths = _additionalPlatformSearchPaths;
+        // Дополнительные корни кеша 1С (issue #109).
+        s.AdditionalCacheRoots = _additionalCacheRoots.ToList();
         s.NameColumnWidth = _nameColumnWidth;
         s.VersionColumnWidth = _versionColumnWidth;
         s.LaunchModeColumnWidth = _launchModeColumnWidth;

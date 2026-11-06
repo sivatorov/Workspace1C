@@ -782,8 +782,30 @@ public class TestDeployWindow : Window
                 _logList.Items.Add(warning);
 
             // Фиксируем сценарий (для задания по расписанию) и результат.
-            TestDeployStore.Upsert(scenario);
-            TestDeployScheduleHelper.RegisterTask(scenario);
+            // Issue #79 (v1.0.1.40, diagnostics 7OH 2026-11-06): сбой финализации
+            // (файл сценариев/планировщик) происходил ПОСЛЕ успешного развёртывания
+            // и показывался как ошибка всего процесса. Теперь он не роняет результат:
+            // тип и стек пишутся в журнал окна, пользователю показывается
+            // предупреждение, окно не закрывается — сценарий видно.
+            try
+            {
+                TestDeployStore.Upsert(scenario);
+                TestDeployScheduleHelper.RegisterTask(scenario);
+            }
+            catch (Exception finalizeEx)
+            {
+                _logList.Items.Add(string.Format(
+                    LocalizationManager.T("TestDeploy.FinalizeFailed"),
+                    finalizeEx.GetType().FullName, finalizeEx.Message));
+                if (!string.IsNullOrWhiteSpace(finalizeEx.StackTrace))
+                    _logList.Items.Add(finalizeEx.StackTrace);
+                _logList.ScrollIntoView(_logList.Items[_logList.Items.Count - 1]);
+                _dialogs.ShowWarning(
+                    string.Format(LocalizationManager.T("TestDeploy.FinalizeFailed"),
+                        finalizeEx.GetType().FullName, finalizeEx.Message),
+                    LocalizationManager.T("TestDeploy.Title"));
+                return;
+            }
 
             Scenario = scenario;
             DeployResult = result;
@@ -817,6 +839,12 @@ public class TestDeployWindow : Window
         }
         catch (Exception ex)
         {
+            // Issue #79 (v1.0.1.40): в журнал окна пишутся тип и стек — «голое»
+            // сообщение («Внутренняя ошибка…») в ZIP-диагностике ничего не даёт.
+            _logList.Items.Add(ex.GetType().FullName + ": " + ex.Message);
+            if (!string.IsNullOrWhiteSpace(ex.StackTrace))
+                _logList.Items.Add(ex.StackTrace);
+            _logList.ScrollIntoView(_logList.Items[_logList.Items.Count - 1]);
             _dialogs.ShowError(ex.Message, LocalizationManager.T("TestDeploy.Title"));
         }
         finally

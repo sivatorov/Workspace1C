@@ -62,6 +62,11 @@ public static class LogCategory
     /// в список). Выключено по умолчанию, как все категории.</summary>
     public const string Publish = "CM_PUBLISH";
 
+    /// <summary>CM_CACHE: очистка кеша 1С (issue #109): проверенные корни кеша
+    /// (включая дополнительные из настроек и легаси 1Cv82), число найденных
+    /// каталогов кеша баз и результаты очистки — для диагностики «нулей».</summary>
+    public const string Cache = "CM_CACHE";
+
     /// <summary>Все категории направлений вкладки «Логирование» (порядок вывода)
     /// — в терминах issue #80. Существовавшие до неё диагностические флаги
     /// (CM_COLUMNS, CM_MENUCLOSE и др.) выводятся отдельной группой «Диагностика».</summary>
@@ -74,7 +79,8 @@ public static class LogCategory
         Ibases,
         Jobs,
         Themes,
-        Publish
+        Publish,
+        Cache
     };
 
     /// <summary>

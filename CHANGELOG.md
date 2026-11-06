@@ -11,6 +11,87 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.40] — 2026-11-06
+
+### Добавлено
+
+- **Копирование ИД базы и открытие папок кеша из меню (issue #110, автор 7OH).** ИД базы
+  в строке состояния главного окна копируется в буфер обмена: двойным кликом по строке
+  или через пункт контекстного меню «Копировать ИД базы». В подменю «Очистить кэш»
+  добавлены пункты «Открыть папку программного кеша» и «Открыть папку пользовательского
+  кеша» — открываются все найденные папки кеша базы; если папок нет, показывается
+  информационное сообщение
+  ([ContextMenuCatalog.cs](Workspace1C/Services/ContextMenuCatalog.cs),
+  [CacheFolderOpener.cs](Workspace1C/Services/CacheFolderOpener.cs),
+  [MainViewModel.Tools.cs](Workspace1C/ViewModels/MainViewModel.Tools.cs),
+  [MainViewModel.Avalonia.Tools.cs](Workspace1C/ViewModels/MainViewModel.Avalonia.Tools.cs),
+  [MainWindow.ContextMenu.cs](Workspace1C/Views/MainWindow.ContextMenu.cs),
+  [MainWindow.Avalonia.Tree.cs](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Тесты: [Issue110CacheFolderMenuTests.cs](Workspace1C.Tests/Issue110CacheFolderMenuTests.cs).
+- **Дополнительные пользовательские корни кеша в настройках (issue #109, автор Nodon84).**
+  Новая настройка «Дополнительные каталоги кеша 1С» (Настройки → секция очистки кэша):
+  указанные пути добавляются к стандартным корням при поиске, подсчёте размеров и очистке —
+  кеш, перенесённый на другой диск копированием, теперь находится и очищается
+  ([AppSettings.cs](Workspace1C/Models/AppSettings.cs), `AppSettings.AdditionalCacheRoots`,
+  [SettingsWindow.xaml](Workspace1C/Views/SettingsWindow.xaml) /
+  [SettingsWindow.xaml.cs](Workspace1C/Views/SettingsWindow.xaml.cs),
+  [SettingsWindow.Avalonia.cs](Workspace1C/Views/SettingsWindow.Avalonia.cs)).
+  Добавлены легаси-корни платформы 8.2 (`1Cv82`). Поиск кеша логируется в журнал
+  (флаг диагностики `CM_CACHE`): видно, какие корни проверялись и сколько каталогов
+  найдено ([OneCCacheCleaner.cs](Workspace1C/Services/OneCCacheCleaner.cs),
+  [LogCategory.cs](Workspace1C/Services/LogCategory.cs)).
+  Тесты: [Issue109_110CacheTests.cs](Workspace1C.Tests/Issue109_110CacheTests.cs).
+
+### Исправлено
+
+- **«Развернуть тестовую копию»: пошаговый перехват ошибок финальных шагов и защита
+  финализации (issue #79, репорт 7OH).** Финальные шаги после загрузки .dt (отключение
+  регламентных заданий, маркеры, добавление в группу) обёрнуты в пошаговый перехват:
+  в сообщении об ошибке и журнале видно имя шага, в журнал пишется стек. Сбой финализации
+  (сохранение сценария, регистрация задачи планировщика) в обоих окнах больше не роняет
+  успешно выполненное развёртывание. Типовая COM-ошибка «Внутренняя ошибка» расшифровывается
+  с подсказкой о вероятных причинах
+  ([TestDeployService.cs](Workspace1C/Services/TestDeployService.cs),
+  [TestDeployWindow.cs](Workspace1C/Views/TestDeployWindow.cs),
+  [TestDeployWindow.Avalonia.cs](Workspace1C/Views/TestDeployWindow.Avalonia.cs)).
+  Тесты: [Issue79StepFailureTests.cs](Workspace1C.Tests/Issue79StepFailureTests.cs).
+- **Удалённые глобальные сочетания клавиш восстанавливались при перезапуске (issue #111).**
+  Пустое сохранённое значение «Показать главное окно» больше не подменяется дефолтом
+  `Ctrl+Alt+W` при загрузке настроек: удалённая пользователем глобальная клавиша остаётся
+  удалённой после перезапуска (дефолт для свежих установок задаёт свойство
+  `AppSettings.GlobalShowWindowHotkey`); исправлено на WPF, Avalonia и при смене профиля
+  ([MainViewModel.cs](Workspace1C/ViewModels/MainViewModel.cs),
+  [MainViewModel.Avalonia.cs](Workspace1C/ViewModels/MainViewModel.Avalonia.cs),
+  [MainViewModel.SwitchUser.cs](Workspace1C/ViewModels/MainViewModel.SwitchUser.cs)).
+  Тесты: [Issue111GlobalHotkeyPersistTests.cs](Workspace1C.Tests/Issue111GlobalHotkeyPersistTests.cs).
+- **База «вылетала в Без группы» после поиска + ПКМ + ЛКМ + снятия фильтра (issue #112).**
+  Состояние перетаскивания сбрасывается при правом клике и открытии контекстного меню,
+  drag не стартует при активном поиске — ложный drop с пустой целью больше не переносит
+  базу в «Без группы». Переносы баз логируются в журнал для диагностики
+  ([MainWindow.DragDrop.cs](Workspace1C/Views/MainWindow.DragDrop.cs),
+  [MainWindow.Avalonia.DragDrop.cs](Workspace1C/Views/MainWindow.Avalonia.DragDrop.cs)).
+- **Контекстное меню служебной группы «Без группы» (issue #113).** Правый клик выделяет
+  узел «Без группы» (и «Закреплённые»), меню строится как групповой контекст с фильтрацией
+  неприменимых пунктов: показаны пакетные операции и оформление узла, скрыты пункты,
+  требующие реальной группы (удаление/переименование группы) — WPF и Avalonia
+  ([MainWindow.Events.cs](Workspace1C/Views/MainWindow.Events.cs),
+  [MainWindow.ContextMenu.cs](Workspace1C/Views/MainWindow.ContextMenu.cs),
+  [ContextMenuResolver.cs](Workspace1C/Services/ContextMenuResolver.cs),
+  [MainWindow.Avalonia.Tree.cs](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Тесты: [Issue113NoGroupMenuTests.cs](Workspace1C.Tests/Issue113NoGroupMenuTests.cs).
+
+### Изменено
+
+- **Тесты**: добавлены
+  [Issue79StepFailureTests.cs](Workspace1C.Tests/Issue79StepFailureTests.cs),
+  [Issue109_110CacheTests.cs](Workspace1C.Tests/Issue109_110CacheTests.cs),
+  [Issue110CacheFolderMenuTests.cs](Workspace1C.Tests/Issue110CacheFolderMenuTests.cs),
+  [Issue111GlobalHotkeyPersistTests.cs](Workspace1C.Tests/Issue111GlobalHotkeyPersistTests.cs),
+  [Issue113NoGroupMenuTests.cs](Workspace1C.Tests/Issue113NoGroupMenuTests.cs);
+  обновлены [LoggingCategoriesTests.cs](Workspace1C.Tests/LoggingCategoriesTests.cs)
+  и [ContextMenuResolverTests.cs](Workspace1C.Tests/ContextMenuResolverTests.cs);
+  всего проходят **5 893** теста.
+
 ## [1.0.1.39] — 2026-11-06
 
 ### Добавлено

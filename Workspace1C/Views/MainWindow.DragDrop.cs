@@ -73,6 +73,17 @@ namespace Workspace1C
             if (e.LeftButton != MouseButtonState.Pressed || _isDragging || _draggedData is null)
                 return;
 
+            // Issue #112: при активном поиске/фильтре дерево пересобрано в плоский
+            // список — перетаскивание не запускаем. Ghost-payload (запомненный
+            // ранее в MouseDown и не очищенный при ПКМ-меню/пересборке) после
+            // снятия фильтра мог «выстрелить» drop-ом в «Без группы» и увезти
+            // базу из её группы.
+            if (!string.IsNullOrEmpty(_viewModel.SearchText))
+            {
+                _draggedData = null;
+                return;
+            }
+
             var pos = e.GetPosition(null);
             if (Math.Abs(pos.X - _dragStartPoint.X) < SystemParameters.MinimumHorizontalDragDistance
                 && Math.Abs(pos.Y - _dragStartPoint.Y) < SystemParameters.MinimumVerticalDragDistance)

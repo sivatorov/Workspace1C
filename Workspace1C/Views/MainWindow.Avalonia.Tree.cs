@@ -2264,9 +2264,12 @@ namespace Workspace1C
 
             // Issue #105 (запрос 7OH): для выбранной группы показываем только применимые
             // пункты (скрытие, а не блокировка; пустые подменю не показываются).
+            // Issue #113: узел «Без группы» — тоже групповой контекст, но «Удалить» скрыт.
             var forGroup = IsRowMenuGroupContext();
             _rowContextMenuBuiltForGroup = forGroup;
-            AppendRowAvaloniaNodes(menu.Items, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
+            var isNoGroup = forGroup && IsRowMenuNoGroupContext(_vm);
+            AppendRowAvaloniaNodes(menu.Items,
+                forGroup ? ContextMenuResolver.FilterForGroup(layout.Root, isNoGroup) : layout.Root);
 
             // Заголовок «Для выделенных (N)…» актуален на момент открытия: клики
             // Ctrl/Shift меняют набор между открытиями меню, а само меню живёт
@@ -2377,11 +2380,19 @@ namespace Workspace1C
         }
 
         /// <summary>Целевой контекст меню — выбранная группа дерева (без мультивыделения
-        /// и без выделенной базы; узлы-маркеры «Без группы»/«Закреплённые» не считаются).</summary>
+        /// и без выделенной базы). Узел «Закреплённые» не считается; узел «Без группы»
+        /// считается групповым контекстом (issue #113): для него доступны групповые
+        /// операции (очистка кэша баз группы, пакетные операции), кроме требующих
+        /// реальной группы (удаление).</summary>
         private bool IsRowMenuGroupContext() =>
             _vm is { } vm &&
             vm.SelectedInfobase is null &&
-            vm.SelectedGroupNode?.Group is not null;
+            (vm.SelectedGroupNode?.Group is not null || IsRowMenuNoGroupContext(vm));
+
+        /// <summary>Выбран служебный узел «Без группы» (Group == null, маркер NoGroup).</summary>
+        private static bool IsRowMenuNoGroupContext(ViewModels.MainViewModel vm) =>
+            vm.SelectedGroupNode is { Group: null } node &&
+            string.Equals(node.Marker, GroupNodeViewModel.NoGroupMarker, StringComparison.Ordinal);
 
         /// <summary>
         /// Перестраивает содержимое контекстного меню дерева по актуальной компоновке
@@ -2402,8 +2413,10 @@ namespace Workspace1C
             _customActionsSeparator = null;
             _batchMenu = null;
             var forGroup = IsRowMenuGroupContext();
+            var isNoGroup = forGroup && IsRowMenuNoGroupContext(_vm);
             _rowContextMenuBuiltForGroup = forGroup;
-            AppendRowAvaloniaNodes(menu.Items, forGroup ? ContextMenuResolver.FilterForGroup(layout.Root) : layout.Root);
+            AppendRowAvaloniaNodes(menu.Items,
+                forGroup ? ContextMenuResolver.FilterForGroup(layout.Root, isNoGroup) : layout.Root);
         }
 
         /// <summary>Рекурсивно добавляет узлы компоновки контекстного меню в целевой
@@ -2640,6 +2653,11 @@ namespace Workspace1C
                     item.Command = _vm!.ClearUserCacheCommand; break;
                 case ContextMenuCommandKind.ClearCacheBoth:
                     item.Command = _vm!.ClearCacheBothCommand; break;
+                // Открытие папок кеша (issue #110).
+                case ContextMenuCommandKind.OpenProgramCacheFolder:
+                    item.Command = _vm!.OpenProgramCacheFolderCommand; break;
+                case ContextMenuCommandKind.OpenUserCacheFolder:
+                    item.Command = _vm!.OpenUserCacheFolderCommand; break;
                 case ContextMenuCommandKind.Delete:
                     item.Command = _vm!.DeleteInfobaseCommand; break;
                 case ContextMenuCommandKind.FindInList:

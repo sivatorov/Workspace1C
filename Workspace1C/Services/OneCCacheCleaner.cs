@@ -34,6 +34,55 @@ public enum OneCCacheKind
 /// </summary>
 public static class OneCCacheCleaner
 {
+    // Дополнительные корни кеша из настроек пользователя (issue #109): каталоги, где 1С
+    // хранит кеш в нестандартном расположении (перенос копированием, junction на уровне
+    // родителя «1C» и т.п.). Применяются дополнительно к штатным корням платформы;
+    // заполнение — Settings.SetAdditionalCacheRoots → OneCCacheCleaner.SetAdditionalRoots.
+    private static readonly object s_additionalRootsLock = new();
+    private static List<string> s_additionalRoots = new();
+
+    /// <summary>
+    /// Задаёт дополнительные корни кеша 1С (issue #109). Вызывается при старте приложения
+    /// и после изменения настроек. Пустые/нулевые значения игнорируются, дубликаты
+    /// (без учёта регистра) убираются. Null сбрасывает список.
+    /// </summary>
+    public static void SetAdditionalRoots(IEnumerable<string?>? roots)
+    {
+        var normalized = (roots ?? Enumerable.Empty<string?>())
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => r!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        lock (s_additionalRootsLock)
+        {
+            s_additionalRoots = normalized;
+        }
+    }
+
+    /// <summary>Снимок дополнительных корней (для тестов и диагностики).</summary>
+    internal static IReadOnlyList<string> GetAdditionalRootsSnapshot()
+    {
+        lock (s_additionalRootsLock)
+        {
+            return s_additionalRoots.ToList();
+        }
+    }
+
+    /// <summary>
+    /// Возвращает все реально существующие каталоги кеша указанной базы (issue #110):
+    /// публичная обёртка над перечислением кеша для команд «Открыть папку кеша».
+    /// Пути дедуплицированы и отсортированы.
+    /// </summary>
+    public static IReadOnlyList<string> GetCacheDirectories(Infobase infobase, OneCCacheKind kind)
+    {
+        if (infobase is null || kind == OneCCacheKind.None)
+            return Array.Empty<string>();
+        return EnumerateCacheDirectories(infobase, kind)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     /// <summary>
     /// Очищает программный и пользовательский кеш 1С для указанной информационной базы.
     /// </summary>
@@ -715,7 +764,14 @@ public static class OneCCacheCleaner
             return 0;
 
         long total = 0;
-        foreach (var dir in EnumerateCacheDirectories(infobase, kind).Distinct())
+        var dirs = EnumerateCacheDirectories(infobase, kind).Distinct().ToList();
+        // Диагностика «нулей» (issue #109): при включённой категории CM_CACHE журнал
+        // показывает, какие корни проверялись и сколько каталогов кеша найдено —
+        // чтобы по diagnostics-ZIP сразу было видно, где искали и почему 0.
+        Log.Info(LogCategory.Cache,
+            $"CACHE size «{infobase.Name}» kind={kind}: найдено каталогов={dirs.Count}, " +
+            $"корни=[{string.Join("; ", GetCacheRoots(kind))}]");
+        foreach (var dir in dirs)
             total += GetDirectorySize(dir);
 
         return total;
@@ -855,7 +911,9 @@ public static class OneCCacheCleaner
     /// по карте IdConnStrMap (см. <see cref="EnumerateProfileRootOrphans"/>), поэтому
     /// служебные каталоги платформы под очистку не попадают (issue #178).
     /// </param>
-    private static IEnumerable<string> GetCacheRoots(OneCCacheKind kind, bool forOrphanScan = false)
+    /// <remarks>internal (не private): юнит-тесты доп. корней и легаси 1Cv82 (issue #109)
+    /// в Workspace1C.Tests проверяют состав корней.</remarks>
+    internal static IEnumerable<string> GetCacheRoots(OneCCacheKind kind, bool forOrphanScan = false)
     {
         var roots = new List<string>();
 
@@ -912,9 +970,35 @@ public static class OneCCacheCleaner
         {
             var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             if (!string.IsNullOrEmpty(appData))
+            {
                 roots.Add(Path.Combine(appData, "1C", "1cv8"));
+                // Легаси-корень платформы 8.2 (issue #109): часть старых установок
+                // держит кеш в 1Cv82.
+                roots.Add(Path.Combine(appData, "1C", "1Cv82"));
+            }
+        }
+
+        // Легаси-корень платформы 8.2 для программного кеша (issue #109).
+        if (kind.HasFlag(OneCCacheKind.Program))
+        {
+            var localAppDataLegacy = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrEmpty(localAppDataLegacy))
+                roots.Add(Path.Combine(localAppDataLegacy, "1C", "1Cv82"));
         }
 #endif
+
+        // Дополнительные корни из настроек пользователя (issue #109): ищем в них кеш
+        // любого типа — пользователь объявил каталог как корень кеша 1С целиком.
+        if (kind != OneCCacheKind.None)
+        {
+            string[] additional;
+            lock (s_additionalRootsLock)
+            {
+                additional = s_additionalRoots.ToArray();
+            }
+            foreach (var root in additional)
+                roots.Add(root);
+        }
 
         return roots;
     }

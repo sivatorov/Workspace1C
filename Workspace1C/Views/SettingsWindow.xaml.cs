@@ -177,6 +177,9 @@ namespace Workspace1C
             if (HotkeyZoomResetBox != null)
                 HotkeyZoomResetBox.Value = viewModel.HotkeyZoomReset;
             _settings = new SettingsViewModel(viewModel);
+            // Дополнительные каталоги кеша 1С (issue #109): один путь в строке.
+            if (AdditionalCacheRootsBox != null)
+                AdditionalCacheRootsBox.Text = string.Join(Environment.NewLine, viewModel.AdditionalCacheRoots);
             _installedPlatformVersions = new List<string>(viewModel.InstalledPlatformVersions);
             foreach (var path in viewModel.AdditionalPlatformSearchPaths)
                 _additionalPlatformPaths.Add(path);
@@ -571,6 +574,11 @@ namespace Workspace1C
             // Сохраняем версии платформы и дополнительные пути поиска.
             _viewModel.SetAdditionalPlatformSearchPaths(_additionalPlatformPaths);
             _viewModel.SetInstalledPlatformVersions(_installedPlatformVersions);
+
+            // Дополнительные каталоги кеша 1С (issue #109): разбор текстового поля —
+            // один путь в строке; пустые строки и дубликаты отбрасываются.
+            _viewModel.SetAdditionalCacheRoots((AdditionalCacheRootsBox?.Text ?? string.Empty)
+                .Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries));
 
             // Режим «Разрядности по умолчанию» (Настройки → Платформы).
             _viewModel.ApplyDefaultArchitecture(DefaultArchComboBox.SelectedIndex switch

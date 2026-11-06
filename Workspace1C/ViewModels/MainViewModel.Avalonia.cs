@@ -325,14 +325,15 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Глобальная горячая клавиша «показать главное окно» (issue #82): работает из трея,
-    /// свёрнутого или находящегося на заднем плане окна. По умолчанию Ctrl+Alt+W.
-    /// Применяется без перезапуска — окно перерегистрирует X11-захват по PropertyChanged.
+    /// свёрнутого или находящегося на заднем плане окна. По умолчанию Ctrl+Alt+W
+    /// (дефолт задаёт свойство AppSettings.GlobalShowWindowHotkey для свежих установок).
+    /// Issue #111: пустое сохранённое значение возвращается как есть — «клавиша снята»,
+    /// дефолт не подставляется. Применяется без перезапуска — окно перерегистрирует
+    /// X11-захват по PropertyChanged.
     /// </summary>
     public string GlobalShowWindowHotkey
     {
-        get => string.IsNullOrWhiteSpace(_settings.GlobalShowWindowHotkey)
-            ? Services.GlobalHotkeyLogic.DefaultGesture
-            : _settings.GlobalShowWindowHotkey;
+        get => _settings.GlobalShowWindowHotkey ?? string.Empty;
         set
         {
             var normalized = Services.GlobalHotkeyLogic.Normalize(value);
@@ -795,6 +796,9 @@ public partial class MainViewModel : ViewModelBase
             ApplyDefaultArchitecture();
             ApplyAdditionalSearchPaths();
             ApplyTemplateCatalogPaths();
+            // Дополнительные корни кеша 1С (issue #109): применяются к статическому
+            // OneCCacheCleaner при загрузке настроек.
+            Services.OneCCacheCleaner.SetAdditionalRoots(_settings.AdditionalCacheRoots);
 
             OnPropertyChanged(nameof(GroupByGroup));
             OnPropertyChanged(nameof(ShowEmptyGroups));
@@ -2147,6 +2151,20 @@ public partial class MainViewModel : ViewModelBase
     {
         var targetPath = groupFullPath ?? string.Empty;
         var targetNorm = NormalizeGroupPath(targetPath);
+
+        // Диагностика issue #112: перенос в «Без группы» журналируется со стеком
+        // вызова — по diagnostics-ZIP видно, какой механизм записал Group = ""
+        // (DnD-ghost, стабилизация выделения, пакетная операция и т.п.).
+        if (string.IsNullOrEmpty(targetNorm))
+        {
+            _logger.Warn($"[move] «{infobase.Name}» (Id={infobase.Id}) → «Без группы»; " +
+                         $"была в: «{infobase.Group}»;\n{Environment.StackTrace}");
+        }
+        else
+        {
+            _logger.Info($"[move] «{infobase.Name}» → «{targetNorm}» (была в «{infobase.Group}»)");
+        }
+
         infobase.Group = string.IsNullOrEmpty(targetNorm) ? targetPath : targetNorm;
 
         var siblings = _allInfobases

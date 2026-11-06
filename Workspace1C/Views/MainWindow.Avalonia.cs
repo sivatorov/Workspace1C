@@ -2179,8 +2179,16 @@ namespace Workspace1C
             if (_vm is not null)
             {
                 var statusMenu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
+                // Копирование ИД базы (issue #110): явный пункт меню + двойной клик.
+                statusMenu.Items.Add(MenuAction("Main.StatusIdCopy", _vm.CopyInfobaseIdCommand, iconKey: "IconCopy"));
                 statusMenu.Items.Add(MenuAction("Main.CopyPath", _vm.CopyConnectionStringCommand, iconKey: "IconCopy"));
                 _statusInfo.ContextMenu = statusMenu;
+                // Двойной клик по строке состояния — копировать ИД выделенной базы.
+                _statusInfo.DoubleTapped += (_, _) =>
+                {
+                    if (_vm.CopyInfobaseIdCommand.CanExecute(null))
+                        _vm.CopyInfobaseIdCommand.Execute(null);
+                };
             }
             grid.Children.Add(_statusInfo);
             Grid.SetColumn(_statusInfo, 0);

@@ -64,7 +64,10 @@ public sealed class LoggingCategoriesTests : IDisposable
                 "CM_IBASES", "CM_JOBS", "CM_THEMES",
                 // Issue #63 (комментарий 7OH 2026-10-28 «давайте отладку и тут
                 // включать подробную»): направление «Публикация на веб-сервере».
-                "CM_PUBLISH"
+                "CM_PUBLISH",
+                // Issue #109 (v1.0.1.40): направление «Очистка кеша 1С» —
+                // диагностика «нулей» пользовательского кеша.
+                "CM_CACHE"
             },
             LogCategory.DirectionCategories);
 

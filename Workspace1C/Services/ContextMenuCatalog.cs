@@ -85,6 +85,12 @@ public enum ContextMenuCommandKind
     /// <summary>Очистка программного и пользовательского кэша (Ctrl+Shift+C).</summary>
     ClearCacheBoth,
 
+    /// <summary>Открыть папку программного кеша выбранной базы (issue #110).</summary>
+    OpenProgramCacheFolder,
+
+    /// <summary>Открыть папку пользовательского кеша выбранной базы (issue #110).</summary>
+    OpenUserCacheFolder,
+
     /// <summary>Удалить базу из списка.</summary>
     Delete,
 
@@ -307,6 +313,9 @@ public static class ContextMenuCatalog
         ContextMenuCommandKind.ClearProgramCache or
         ContextMenuCommandKind.ClearUserCache or
         ContextMenuCommandKind.ClearCacheBoth or
+        // Открытие папок кеша (issue #110): работает и для баз группы.
+        ContextMenuCommandKind.OpenProgramCacheFolder or
+        ContextMenuCommandKind.OpenUserCacheFolder or
         ContextMenuCommandKind.Delete or
         ContextMenuCommandKind.EditSettings or
         // «Массовая загрузка cf» (issue #106): работает и с группой — цели
@@ -405,6 +414,15 @@ public static class ContextMenuCatalog
             // Хоткей Ctrl+Shift+C показан на пункте «Программный и пользовательский».
             new("ClearCacheBoth", "Main.ClearCacheBoth", GroupClearCache,
                 "Broom", "IconBroom", "#14B8A6", ContextMenuCommandKind.ClearCacheBoth, "HotkeyClearCache"),
+            // «Открыть папку кеша» (issue #110): все найденные каталоги кеша базы
+            // открываются в проводнике/файловом менеджере; новые пункты — при
+            // сохранённой компоновке попадают в «Новинки приложения».
+            new("OpenProgramCacheFolder", "Main.OpenProgramCacheFolder", GroupClearCache,
+                "FolderOpen", "IconFolderOpen", "#0EA5E9", ContextMenuCommandKind.OpenProgramCacheFolder,
+                isNew: true),
+            new("OpenUserCacheFolder", "Main.OpenUserCacheFolder", GroupClearCache,
+                "FolderOpen", "IconFolderOpen", "#0EA5E9", ContextMenuCommandKind.OpenUserCacheFolder,
+                isNew: true),
 
             // ---- Низ меню ----
             // «Удалить» отделён разделителями сверху и снизу (issue #242).
@@ -501,7 +519,11 @@ public static class ContextMenuLayouts
                 Item("ClearProgramCache"),
                 Item("ClearUserCache"),
                 Separator(),
-                Item("ClearCacheBoth")
+                Item("ClearCacheBoth"),
+                // Открытие папок кеша (issue #110) — после пунктов очистки.
+                Separator(),
+                Item("OpenProgramCacheFolder"),
+                Item("OpenUserCacheFolder")
             }),
             Separator(),
             Item("Delete"),

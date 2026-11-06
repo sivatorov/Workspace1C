@@ -48,6 +48,8 @@ public partial class MainViewModel : ViewModelBase
     private readonly HashSet<string> _collapsedGroups = new(StringComparer.OrdinalIgnoreCase);
     private List<string> _installedPlatformVersions = new();
     private List<string> _additionalPlatformSearchPaths = new();
+    // Дополнительные корни кеша 1С (issue #109).
+    private List<string> _additionalCacheRoots = new();
     private double _nameColumnWidth;
     private double _versionColumnWidth;
     private double _launchModeColumnWidth;
@@ -691,9 +693,18 @@ public partial class MainViewModel : ViewModelBase
         // «Собрать диагностику» (issue #99, v1.0.1.23): по умолчанию пусто — не назначена.
         _hotkeyCollectDiagnostics = settings.HotkeyCollectDiagnostics?.Trim() ?? "";
         // Глобальная горячая клавиша «показать главное окно» (issue #82).
+        // Issue #111: пустое сохранённое значение («клавиша снята») НЕ заменяем дефолтом —
+        // иначе пользовательское «пусто» теряется при каждом перезапуске. Дефолт Ctrl+Alt+W
+        // для свежих установок даёт свойство AppSettings.GlobalShowWindowHotkey.
         _globalShowWindowHotkey = Services.GlobalHotkeyLogic.Normalize(settings.GlobalShowWindowHotkey);
-        if (string.IsNullOrEmpty(_globalShowWindowHotkey))
-            _globalShowWindowHotkey = Services.GlobalHotkeyLogic.DefaultGesture;
+        // Дополнительные корни кеша 1С (issue #109): применяются к статическому
+        // OneCCacheCleaner при загрузке настроек (старт, смена профиля).
+        _additionalCacheRoots = settings.AdditionalCacheRoots?
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList() ?? new List<string>();
+        Services.OneCCacheCleaner.SetAdditionalRoots(_additionalCacheRoots);
         _sortField = string.IsNullOrWhiteSpace(settings.SortField) ? "Name" : settings.SortField;
         _sortAscending = settings.SortAscending;
         _lastSelectedInfobaseId = settings.LastSelectedInfobaseId ?? string.Empty;
@@ -849,6 +860,18 @@ public partial class MainViewModel : ViewModelBase
         ClearProgramCacheCommand = new RelayCommand(_ => OpenCacheClean(OneCCacheKind.Program));
         ClearUserCacheCommand = new RelayCommand(_ => OpenCacheClean(OneCCacheKind.User));
         ClearCacheBothCommand = new RelayCommand(_ => OpenCacheClean(OneCCacheKind.All));
+        // «Открыть папку кеша» (issue #110): все найденные каталоги кеша базы —
+        // в проводнике/файловом менеджере.
+        OpenProgramCacheFolderCommand = new RelayCommand(
+            p => OpenCacheFolder(OneCCacheKind.Program, p as Infobase),
+            p => p is Infobase ? true : Infobases.Count > 0);
+        OpenUserCacheFolderCommand = new RelayCommand(
+            p => OpenCacheFolder(OneCCacheKind.User, p as Infobase),
+            p => p is Infobase ? true : Infobases.Count > 0);
+        // Копирование ИД базы из строки состояния (issue #110).
+        CopyInfobaseIdCommand = new RelayCommand(
+            CopyInfobaseId,
+            _ => SelectedInfobase is { } ib && !string.IsNullOrWhiteSpace(ib.Id));
         OpenInfobaseFolderCommand = new RelayCommand(OpenInfobaseFolder,
             _ => SelectedInfobase?.Connection.Type == ConnectionType.File);
         CreateDesktopShortcutCommand = new RelayCommand(CreateDesktopShortcut, _ => SelectedInfobase != null);
@@ -1397,6 +1420,24 @@ public partial class MainViewModel : ViewModelBase
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList() ?? new List<string>();
         PlatformVersionService.SetAdditionalSearchPaths(_additionalPlatformSearchPaths);
+        SaveSettings();
+    }
+
+    /// <summary>Дополнительные корни кеша 1С (issue #109) — как задал пользователь.</summary>
+    public IReadOnlyList<string> AdditionalCacheRoots => _additionalCacheRoots;
+
+    /// <summary>
+    /// Сохраняет дополнительные каталоги кеша 1С (issue #109) и применяет их к
+    /// статическому <see cref="Services.OneCCacheCleaner"/> без перезапуска.
+    /// </summary>
+    public void SetAdditionalCacheRoots(IEnumerable<string?>? paths)
+    {
+        _additionalCacheRoots = (paths ?? Enumerable.Empty<string?>())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Services.OneCCacheCleaner.SetAdditionalRoots(_additionalCacheRoots);
         SaveSettings();
     }
 

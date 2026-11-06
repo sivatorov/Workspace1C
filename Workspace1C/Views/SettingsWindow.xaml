@@ -2244,6 +2244,23 @@
                                       HorizontalAlignment="Left" VerticalAlignment="Center"/>
                         </Grid>
                     </GroupBox>
+
+                    <!-- Дополнительные каталоги кеша 1С (issue #109) -->
+                    <GroupBox Header="{loc:Loc Settings.CacheRoots}" Padding="10,8" Margin="0,0,0,8">
+                        <StackPanel>
+                            <TextBlock Text="{loc:Loc Settings.CacheRoots.Hint}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <TextBox x:Name="AdditionalCacheRootsBox"
+                                     MinHeight="60" MaxHeight="140"
+                                     AcceptsReturn="True" VerticalScrollBarVisibility="Auto"
+                                     TextWrapping="NoWrap"
+                                     Background="{DynamicResource CardBackgroundBrush}"
+                                     BorderBrush="{DynamicResource BorderBrushColor}"
+                                     FontSize="13"
+                                     ToolTip="{loc:Loc Settings.CacheRoots.Tooltip}"/>
+                        </StackPanel>
+                    </GroupBox>
                     </StackPanel>
                     </ScrollViewer>
                 </Grid>

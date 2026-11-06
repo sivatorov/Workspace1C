@@ -961,6 +961,24 @@ public partial class MainViewModel : ViewModelBase
     private void ApplyTemplateCatalogPaths() =>
         OneCTemplateService.SetUserTemplatePaths(_settings.TemplateCatalogPaths);
 
+    /// <summary>Дополнительные корни кеша 1С (issue #109) — как задал пользователь.</summary>
+    public IReadOnlyList<string> AdditionalCacheRoots => _settings.AdditionalCacheRoots;
+
+    /// <summary>
+    /// Сохраняет дополнительные каталоги кеша 1С (issue #109) и применяет их к
+    /// статическому <see cref="Services.OneCCacheCleaner"/> без перезапуска.
+    /// </summary>
+    public void SetAdditionalCacheRoots(IEnumerable<string?>? paths)
+    {
+        _settings.AdditionalCacheRoots = (paths ?? Enumerable.Empty<string?>())
+            .Where(p => !string.IsNullOrWhiteSpace(p))
+            .Select(p => p!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Services.OneCCacheCleaner.SetAdditionalRoots(_settings.AdditionalCacheRoots);
+        SaveSettingsSilently();
+    }
+
     /// <summary>
     /// Каталоги шаблонов, известные самой платформе: из её настроек и
     /// стандартный tmplts. Кнопка «Из 1С» на вкладке «Базы» заполняет
@@ -1544,6 +1562,73 @@ public partial class MainViewModel : ViewModelBase
         };
     }
 
+    /// <summary>
+    /// Открывает все найденные каталоги кеша базы в файловом менеджере (issue #110):
+    /// каталогов может быть несколько (программный и пользовательский корни,
+    /// дополнительные корни из настроек, легаси 1Cv82). Ничего не найдено —
+    /// информационное сообщение.
+    /// </summary>
+    /// <param name="kind">Тип кеша (программный/пользовательский).</param>
+    /// <param name="target">База из строки меню (если указана), иначе выделенная.</param>
+    private void OpenCacheFolder(OneCCacheKind kind, Infobase? target = null)
+    {
+        var ib = target ?? SelectedInfobase;
+        if (ib is null)
+            return;
+
+        try
+        {
+            var dirs = OneCCacheCleaner.GetCacheDirectories(ib, kind);
+            if (dirs.Count == 0)
+            {
+                _dialog.ShowInfo(
+                    string.Format(LocalizationManager.T("Main.CacheFolderNotFound"), ib.Name),
+                    LocalizationManager.T("Main.OpenCatalogTitle"));
+                return;
+            }
+
+            var opened = 0;
+            foreach (var dir in dirs)
+            {
+                if (CacheFolderOpener.TryOpenDirectory(dir))
+                    opened++;
+            }
+
+            _logger.Info($"Открытие папок кеша «{ib.Name}» (kind={kind}): найдено={dirs.Count}, открыто={opened}");
+        }
+        catch (Exception ex)
+        {
+            _dialog.ShowError(
+                string.Format(LocalizationManager.T("Main.ErrCacheClear"), ex.Message),
+                LocalizationManager.T("Main.CacheErrorTitle"));
+        }
+    }
+
+    /// <summary>Копирует ИД базы в буфер обмена (issue #110, строка состояния).</summary>
+    private void CopyInfobaseId()
+    {
+        if (SelectedInfobase is not Infobase ib || string.IsNullOrWhiteSpace(ib.Id))
+            return;
+
+        try
+        {
+            var lifetime = Avalonia.Application.Current?.ApplicationLifetime
+                as Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime;
+            var clipboard = lifetime?.MainWindow?.Clipboard;
+            if (clipboard is null)
+            {
+                _logger.Warn("Буфер обмена недоступен (нет активного окна).");
+                return;
+            }
+            _ = clipboard.SetTextAsync(ib.Id);
+            _logger.Info($"ИД базы «{ib.Name}» скопирован в буфер обмена ({ib.Id})");
+        }
+        catch (Exception ex)
+        {
+            _logger.Warn($"Не удалось скопировать ИД базы: {ex.Message}");
+        }
+    }
+
     private void RaiseCommandCanExecuteChanged()
     {
         (LaunchEnterpriseCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -1559,6 +1644,9 @@ public partial class MainViewModel : ViewModelBase
         (ClearProgramCacheCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (ClearUserCacheCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (ClearCacheBothCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (OpenProgramCacheFolderCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (OpenUserCacheFolderCommand as RelayCommand)?.RaiseCanExecuteChanged();
+        (CopyInfobaseIdCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (RepositoryBatchUpdateCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (RepositoryBrowserCommand as RelayCommand)?.RaiseCanExecuteChanged();
     }

@@ -632,8 +632,28 @@ public class TestDeployWindow : ModalWindowBase
             foreach (var warning in result.Warnings)
                 _logList.Items.Add(warning);
 
-            TestDeployStore.Upsert(scenario);
-            TestDeployScheduleHelper.RegisterTask(scenario);
+            // Issue #79 (v1.0.1.40, diagnostics 7OH 2026-11-06): сбой финализации
+            // (файл сценариев/планировщик) происходил ПОСЛЕ успешного развёртывания
+            // и показывался как ошибка всего процесса. Теперь он не роняет результат:
+            // тип и стек пишутся в журнал окна, пользователю показывается
+            // предупреждение, окно не закрывается — сценарий видно.
+            try
+            {
+                TestDeployStore.Upsert(scenario);
+                TestDeployScheduleHelper.RegisterTask(scenario);
+            }
+            catch (Exception finalizeEx)
+            {
+                var finalizeMessage = string.Format(
+                    LocalizationManager.T("TestDeploy.FinalizeFailed"),
+                    finalizeEx.GetType().FullName, finalizeEx.Message);
+                _logList.Items.Add(finalizeMessage);
+                if (!string.IsNullOrWhiteSpace(finalizeEx.StackTrace))
+                    _logList.Items.Add(finalizeEx.StackTrace);
+                _logList.ScrollIntoView(finalizeMessage);
+                _dialogs.ShowWarning(finalizeMessage, LocalizationManager.T("TestDeploy.Title"));
+                return;
+            }
 
             Scenario = scenario;
             DeployResult = result;
@@ -655,6 +675,11 @@ public class TestDeployWindow : ModalWindowBase
         }
         catch (Exception ex)
         {
+            // Issue #79 (v1.0.1.40): в журнал окна пишутся тип и стек — «голое»
+            // сообщение («Внутренняя ошибка…») в ZIP-диагностике ничего не даёт.
+            _logList.Items.Add(ex.GetType().FullName + ": " + ex.Message);
+            if (!string.IsNullOrWhiteSpace(ex.StackTrace))
+                _logList.Items.Add(ex.StackTrace);
             _dialogs.ShowError(ex.Message, LocalizationManager.T("TestDeploy.Title"));
         }
         finally
