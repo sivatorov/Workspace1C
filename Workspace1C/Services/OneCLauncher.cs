@@ -105,31 +105,33 @@ public static partial class OneCLauncher
     /// </summary>
     /// <param name="infobase">Информационная база.</param>
     /// <param name="mode">Режим запуска (Предприятие или Конфигуратор).</param>
+    /// <param name="monopol">Монопольный запуск Предприятия (/M, issue #85, v1.0.1.43).
+    /// Для «Конфигуратора» и веб-клиента игнорируется.</param>
     /// <returns>true, если запуск успешно инициирован.</returns>
-    public static bool Launch(Infobase infobase, OneCLaunchMode mode, bool runAsAdmin = false)
+    public static bool Launch(Infobase infobase, OneCLaunchMode mode, bool runAsAdmin = false, bool monopol = false)
     {
         // В режиме «Конфигуратор» тип клиента не применяется.
         if (mode == OneCLaunchMode.Configurator)
             return Launch(infobase, mode, OneCClientType.Thin, GetArchitecture(infobase), runAsAdmin);
 
-        // Веб-клиент запускается через браузер.
+        // Веб-клиент запускается через браузер (монопольный режим неприменим).
         if (string.Equals(infobase.LaunchMode, "Веб-клиент", StringComparison.OrdinalIgnoreCase))
             return LaunchWebClient(infobase);
 
         // Автоматический режим — платформа сама выбирает клиент (без /RunMode).
         if (string.Equals(infobase.LaunchMode, "Автоматический", StringComparison.OrdinalIgnoreCase))
-            return Launch(infobase, mode, null, GetArchitecture(infobase), runAsAdmin);
+            return Launch(infobase, mode, null, GetArchitecture(infobase), runAsAdmin, monopol);
 
         // Толстый клиент в обычных формах.
         if (string.Equals(infobase.LaunchMode, "Толстый клиент (обычные формы)", StringComparison.OrdinalIgnoreCase))
-            return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Ordinary, GetArchitecture(infobase), runAsAdmin);
+            return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Ordinary, GetArchitecture(infobase), runAsAdmin, monopol);
 
         // Толстый клиент (управляемые формы) — по умолчанию «Толстый клиент».
         if (string.Equals(infobase.LaunchMode, "Толстый клиент", StringComparison.OrdinalIgnoreCase))
-            return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin);
+            return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin, monopol);
 
         // По умолчанию — тонкий клиент (управляемые формы).
-        return Launch(infobase, mode, OneCClientType.Thin, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin);
+        return Launch(infobase, mode, OneCClientType.Thin, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin, monopol);
     }
 
     /// <summary>
@@ -327,9 +329,11 @@ public static partial class OneCLauncher
     /// <param name="mode">Режим запуска (Предприятие или Конфигуратор).</param>
     /// <param name="clientType">Тип клиента (тонкий или толстый). null — автоматический выбор платформой.</param>
     /// <param name="architecture">Разрядность (32 или 64 бита).</param>
+    /// <param name="monopol">Монопольный запуск Предприятия (/M, issue #85, v1.0.1.43).</param>
     /// <returns>true, если запуск успешно инициирован.</returns>
-    public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType, OneCArchitecture architecture, bool runAsAdmin = false)
-        => Launch(infobase, mode, clientType, null, architecture, runAsAdmin);
+    public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType,
+        OneCArchitecture architecture, bool runAsAdmin = false, bool monopol = false)
+        => Launch(infobase, mode, clientType, null, architecture, runAsAdmin, monopol);
 
     /// <summary>
     /// Запускает платформу 1С для указанной информационной базы с заданным
@@ -342,8 +346,11 @@ public static partial class OneCLauncher
     /// <param name="clientType">Тип клиента (тонкий или толстый). null — автоматический выбор платформой.</param>
     /// <param name="runMode">Режим форм (управляемые/обычные). null — из типа клиента.</param>
     /// <param name="architecture">Разрядность (32 или 64 бита).</param>
+    /// <param name="monopol">Монопольный запуск Предприятия (/M, issue #85, v1.0.1.43).
+    /// Применяется только в режиме «Предприятие» (см. <see cref="BuildArguments"/>).</param>
     /// <returns>true, если запуск успешно инициирован.</returns>
-    public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType, OneCRunMode? runMode, OneCArchitecture architecture, bool runAsAdmin = false)
+    public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType,
+        OneCRunMode? runMode, OneCArchitecture architecture, bool runAsAdmin = false, bool monopol = false)
     {
         // База, расположенная на веб-сервере, подключается только тонким клиентом (/WS).
         // Толстый клиент 1cv8.exe не понимает /WS и при запуске открывает стандартное
@@ -368,7 +375,7 @@ public static partial class OneCLauncher
             return false;
         }
 
-        var arguments = BuildArguments(infobase, mode, clientType, runMode);
+        var arguments = BuildArguments(infobase, mode, clientType, runMode, monopol);
 
         try
         {

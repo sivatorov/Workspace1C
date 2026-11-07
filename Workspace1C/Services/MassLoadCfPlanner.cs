@@ -8,6 +8,22 @@ using Workspace1C.Models;
 namespace Workspace1C.Services;
 
 /// <summary>
+/// Источник обновления конфигурации в массовом режиме (issue #85, v1.0.1.43):
+/// файл поставки .cf (issue #106) или хранилище конфигурации базы.
+/// </summary>
+public enum MassLoadCfSource
+{
+    /// <summary>Файл поставки .cf — Конфигуратор /LoadCfg"path.cf" + /UpdateDBCfg (issue #106).</summary>
+    CfFile,
+
+    /// <summary>Хранилище конфигурации базы — Конфигуратор /ConfigurationRepositoryUpdateCfg
+    /// + /UpdateDBCfg (<see cref="OneCLauncher.DesignerBatchOperation.RepositoryUpdate"/>).
+    /// Адрес/логин/пароль хранилища берутся из свойств базы; у целей без настроенного
+    /// хранилища валидация блокирует старт.</summary>
+    Repository
+}
+
+/// <summary>
 /// Шаг массовой загрузки конфигурации из .cf через Конфигуратор по одной базе
 /// (issue #106). Порядок выполнения шагов по базе задаётся
 /// <see cref="MassLoadCfPlanner.PlanSteps"/>.
@@ -22,6 +38,10 @@ public enum MassLoadCfStep
 
     /// <summary>Загрузка конфигурации из .cf (Конфигуратор, /LoadCfg + /UpdateDBCfg).</summary>
     LoadCf,
+
+    /// <summary>Обновление конфигурации из хранилища (Конфигуратор,
+    /// /ConfigurationRepositoryUpdateCfg + /UpdateDBCfg; issue #85, v1.0.1.43).</summary>
+    RepositoryUpdate,
 
     /// <summary>Снятие блокировок, установленных шагом <see cref="Prepare"/>.</summary>
     Restore
@@ -39,6 +59,15 @@ public sealed class MassLoadCfOptions
 {
     /// <summary>Файл .cf, загружаемый в каждую выбранную базу.</summary>
     public string CfFilePath { get; set; } = string.Empty;
+
+    /// <summary>Источник обновления (issue #85, v1.0.1.43): файл .cf (по умолчанию,
+    /// issue #106) или хранилище конфигурации.</summary>
+    public MassLoadCfSource Source { get; set; } = MassLoadCfSource.CfFile;
+
+    /// <summary>Запустить Предприятие монопольно (/M) после успешного обновления
+    /// базы (issue #85, v1.0.1.43): применяется после снятия блокировок шага Restore;
+    /// ошибка запуска — предупреждение в журнале, не ошибка обновления.</summary>
+    public bool LaunchEnterpriseMonopol { get; set; }
 
     /// <summary>Выгрузить базу в .dt перед загрузкой (страховочная копия данных).</summary>
     public bool DumpDtBefore { get; set; }
@@ -90,6 +119,20 @@ public static class MassLoadCfPlanner
     /// в план не попадают; <see cref="MassLoadCfStep.LoadCf"/> есть всегда.
     /// Internal — юнит-тесты.
     /// </summary>
+    /// <summary>
+    /// Разбор сохранённого источника обновления (настройка <c>BatchLoadCfSource</c>,
+    /// issue #85, v1.0.1.43): «Repository» → хранилище, остальное (в т.ч. пусто) —
+    /// файл .cf (дефолт issue #106).
+    /// </summary>
+    public static MassLoadCfSource ParseSource(string? value)
+        => string.Equals(value?.Trim(), "Repository", StringComparison.OrdinalIgnoreCase)
+            ? MassLoadCfSource.Repository
+            : MassLoadCfSource.CfFile;
+
+    /// <summary>Обратное преобразование <see cref="ParseSource"/> для сохранения в настройки.</summary>
+    public static string SourceToString(MassLoadCfSource source)
+        => source == MassLoadCfSource.Repository ? "Repository" : "CfFile";
+
     internal static IReadOnlyList<MassLoadCfStep> PlanSteps(MassLoadCfOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
@@ -98,7 +141,11 @@ public static class MassLoadCfPlanner
             steps.Add(MassLoadCfStep.Prepare);
         if (options.DumpDtBefore)
             steps.Add(MassLoadCfStep.DumpDt);
-        steps.Add(MassLoadCfStep.LoadCf);
+        // Источник обновления (issue #85, v1.0.1.43): файл .cf (issue #106) или
+        // хранилище конфигурации — шаг RepositoryUpdate вместо LoadCf.
+        steps.Add(options.Source == MassLoadCfSource.Repository
+            ? MassLoadCfStep.RepositoryUpdate
+            : MassLoadCfStep.LoadCf);
         if (options.HasPrepareOptions)
             steps.Add(MassLoadCfStep.Restore);
         return steps;
@@ -155,13 +202,20 @@ public static class MassLoadCfPlanner
             return errors;
         }
 
+        var repositorySource = options.Source == MassLoadCfSource.Repository;
+
+        // Файл .cf требуется ТОЛЬКО для источника «Файл поставки»: для хранилища
+        // конфигурации путь не нужен — адрес берётся из свойств базы (issue #85).
         var cfPath = options.CfFilePath?.Trim() ?? string.Empty;
-        if (string.IsNullOrWhiteSpace(cfPath))
-            errors.Add(LocalizationManager.T("BatchOps.NeedCfFile"));
-        else if (!File.Exists(cfPath))
-            errors.Add(LocalizationManager.T("BatchOps.CfNotFound"));
-        else if (!string.Equals(Path.GetExtension(cfPath), ".cf", StringComparison.OrdinalIgnoreCase))
-            errors.Add(LocalizationManager.T("MassLoadCf.NotCfFile"));
+        if (!repositorySource)
+        {
+            if (string.IsNullOrWhiteSpace(cfPath))
+                errors.Add(LocalizationManager.T("BatchOps.NeedCfFile"));
+            else if (!File.Exists(cfPath))
+                errors.Add(LocalizationManager.T("BatchOps.CfNotFound"));
+            else if (!string.Equals(Path.GetExtension(cfPath), ".cf", StringComparison.OrdinalIgnoreCase))
+                errors.Add(LocalizationManager.T("MassLoadCf.NotCfFile"));
+        }
 
         if (options.DumpDtBefore)
         {
@@ -177,6 +231,13 @@ public static class MassLoadCfPlanner
             if (ib.Connection?.Type == ConnectionType.WebServer)
                 errors.Add(string.Format(
                     LocalizationManager.T("BatchOps.WebNotSupportedFormat"), ib.Name));
+
+            // Источник «Хранилище конфигурации» (issue #85, v1.0.1.43): у каждой цели
+            // должно быть настроено хранилище — иначе блокируем старт с перечнем баз
+            // ДО запуска конфигураторов (понятная ошибка вместо сбоя каждой операции).
+            if (repositorySource && !(ib.Repository?.HasServer ?? false))
+                errors.Add(string.Format(
+                    LocalizationManager.T("MassLoadCf.RepoNotConfiguredFormat"), ib.Name));
         }
 
         return errors;

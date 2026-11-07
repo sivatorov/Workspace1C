@@ -11,6 +11,71 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.43] — 2026-11-07
+
+### Добавлено
+
+- **Групповой запуск «Предприятие» и «Конфигуратор» (issue #85, запрос leonvlas
+  «для запуска предприятий и конфигураторов не работает?»).** В блоке
+  «Для выделенных (N)…»/«Для группы (N)…» добавлены пункты «Запустить Предприятие»
+  и «Запустить Конфигуратор» (после «Добавить в избранное», перед «Резервированием»).
+  Работают для мультивыделения, выбранной группы (включая вложенные) и узла «Без
+  группы» — цели берутся из `BatchOperationTargetsIncludingGroup`. Перед запуском —
+  подтверждение («Базы запускаются последовательно, по одной»), затем последовательный
+  запуск каждой базы через `OneCLauncher.Launch` (тип клиента, разрядность и режим форм
+  резолвятся индивидуально по настройкам базы, как при одиночном запуске). Ошибка одной
+  базы (не найдена платформа, сбой старта) не прерывает остальные; итог — сводка
+  «Запущено: X из N» в строке состояния, при сбоях — диалог с перечнем баз. Между
+  запусками пауза 300 мс, чтобы платформа успевала стартовать на «старых» машинах.
+  Запуск не ждёт закрытия процессов — сценарий «открыть сразу все нужные базы» работает.
+  ([MainViewModel.Avalonia.Tools.cs](Workspace1C/ViewModels/MainViewModel.Avalonia.Tools.cs),
+  [MainViewModel.Tools.cs](Workspace1C/ViewModels/MainViewModel.Tools.cs),
+  [MainWindow.Avalonia.Tree.cs](Workspace1C/Views/MainWindow.Avalonia.Tree.cs),
+  [MainWindow.ContextMenu.cs](Workspace1C/Views/MainWindow.ContextMenu.cs),
+  [MainWindow.Events.cs](Workspace1C/Views/MainWindow.Events.cs)).
+- **Источник «Хранилище конфигурации» в массовом обновлении через Конфигуратор
+  (issue #85, этап B).** Окно «Массовая загрузка cf через Конфигуратор» (issue #106)
+  переименовано в «Массовое обновление конфигурации через Конфигуратор» и получило
+  переключатель источника: «Файл .cf (поставка)» — как раньше (/LoadCfg +
+  /UpdateDBCfg), либо «Хранилище конфигурации» — пакетное обновление из хранилищ
+  (/ConfigurationRepositoryUpdateCfg + /UpdateDBCfg,
+  `DesignerBatchOperation.RepositoryUpdate`); адрес/логин/пароль хранилища берутся
+  из свойств каждой базы. Опции «Перед загрузкой» (выгрузка .dt, завершение сеансов,
+  блокировки) работают одинаково для обоих источников; базы без настроенного хранилища
+  блокируются валидацией до старта с перечнем баз. Выбранный источник сохраняется
+  в настройках (`BatchLoadCfSource`).
+  ([MassLoadCfPlanner.cs](Workspace1C/Services/MassLoadCfPlanner.cs) —
+  `MassLoadCfSource`, шаг `RepositoryUpdate`,
+  [MassLoadCfService.cs](Workspace1C/Services/MassLoadCfService.cs),
+  [MassLoadCfViewModel.cs](Workspace1C/ViewModels/MassLoadCfViewModel.cs),
+  [MassLoadCfWindow.Avalonia.cs](Workspace1C/Views/MassLoadCfWindow.Avalonia.cs),
+  [MassLoadCfWindow.xaml](Workspace1C/Views/MassLoadCfWindow.xaml)).
+- **Запуск Предприятия монопольно (/M) после успешного обновления (issue #85, этап C).**
+  Новый параметр `monopol` в `OneCLauncher.Launch` (Windows + Linux): ключ `/M`
+  добавляется в конец строки запуска Предприятия (для Конфигуратора игнорируется).
+  В окне массового обновления — опция «Запустить Предприятие монопольно (/M) после
+  обновления»: после успешного обновления базы и автоматического снятия блокировок
+  запускается Предприятие с /M; ошибка запуска — предупреждение в журнале, не ошибка
+  обновления. Опция сохраняется в настройках (`BatchLoadCfMonopol`).
+  ([OneCLauncher.cs](Workspace1C/Services/OneCLauncher.cs),
+  [OneCLauncher.Linux.Process.cs](Workspace1C/Services/OneCLauncher.Linux.Process.cs),
+  [OneCLauncher.Arguments.Shared.cs](Workspace1C/Services/OneCLauncher.Arguments.Shared.cs),
+  [MassLoadCfViewModel.cs](Workspace1C/ViewModels/MassLoadCfViewModel.cs)).
+  Тесты: [Issue85MassUpdatePlannerTests.cs](Workspace1C.Tests/Issue85MassUpdatePlannerTests.cs)
+  (10 тестов: план шагов, валидация, разбор источника),
+  [Issue85MonopolArgumentsTests.cs](Workspace1C.Tests/Issue85MonopolArgumentsTests.cs)
+  (4 теста: /M в аргументах Предприятия, игнор для Конфигуратора).
+
+### Изменено
+
+- Окно «Массовая загрузка cf через Конфигуратор» переименовано в «Массовое обновление
+  конфигурации через Конфигуратор» (ru/en): теперь поддерживает два источника обновления
+  — файл поставки .cf и хранилище конфигурации (issue #85).
+- Ограничения (осознанные, issue #85): групповой запуск Конфигуратора сознательно не
+  проверяет «уже открытый конфигуратор этой базы» (иначе сценарий «открыть все базы
+  в конфигураторе» не работает); пакетные патчи (.cfe) и автозапуск доп. действий
+  после обновления — в следующих выпусках.
+
 ## [1.0.1.42] — 2026-11-06
 
 ### Исправлено

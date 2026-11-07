@@ -33,6 +33,8 @@ public sealed class MassLoadCfViewModel : ViewModelBase
     private bool _denyNewSessions;
     private string _permissionCode = string.Empty;
     private bool _denyScheduledJobs;
+    private MassLoadCfSource _source = MassLoadCfSource.CfFile;
+    private bool _launchEnterpriseMonopol;
 
     /// <summary>
     /// Подмена запуска Конфигуратора для юнит-тестов (без реальной 1С) —
@@ -40,6 +42,13 @@ public sealed class MassLoadCfViewModel : ViewModelBase
     /// </summary>
     internal Func<Infobase, OneCLauncher.DesignerBatchOperation, string, string?, CancellationToken,
         Task<MassLoadCfRunnerResult>>? RunnerOverride { get; set; }
+
+    /// <summary>
+    /// Подмена запуска Предприятия после успешного обновления (юнит-тесты, монопольная
+    /// опция issue #85, v1.0.1.43): база → результат запуска. null — реальный запуск
+    /// <see cref="OneCLauncher.Launch"/> (/M).
+    /// </summary>
+    internal Func<Infobase, bool>? EnterpriseLaunchOverride { get; set; }
 
     public MassLoadCfViewModel(IEnumerable<Infobase> infobases, BatchOpsPreparationService? preparation = null)
     {
@@ -128,6 +137,22 @@ public sealed class MassLoadCfViewModel : ViewModelBase
         set => SetProperty(ref _cfFilePath, value ?? string.Empty);
     }
 
+    /// <summary>Источник обновления (issue #85, v1.0.1.43): файл .cf или хранилище
+    /// конфигурации. По умолчанию — файл .cf (issue #106).</summary>
+    public MassLoadCfSource Source
+    {
+        get => _source;
+        set => SetProperty(ref _source, value);
+    }
+
+    /// <summary>Запустить Предприятие монопольно (/M) после успешного обновления
+    /// базы (issue #85, v1.0.1.43). Ошибка запуска — предупреждение в журнале.</summary>
+    public bool LaunchEnterpriseMonopol
+    {
+        get => _launchEnterpriseMonopol;
+        set => SetProperty(ref _launchEnterpriseMonopol, value);
+    }
+
     /// <summary>Выгрузить базу в .dt перед загрузкой (страховочная копия данных).</summary>
     public bool DumpDtBefore
     {
@@ -189,6 +214,8 @@ public sealed class MassLoadCfViewModel : ViewModelBase
     internal MassLoadCfOptions BuildOptions() => new()
     {
         CfFilePath = CfFilePath?.Trim() ?? string.Empty,
+        Source = Source,
+        LaunchEnterpriseMonopol = LaunchEnterpriseMonopol,
         DumpDtBefore = DumpDtBefore,
         DumpDirectory = DumpDirectory?.Trim() ?? string.Empty,
         DumpTemplate = string.IsNullOrWhiteSpace(DumpTemplate)
@@ -245,10 +272,18 @@ public sealed class MassLoadCfViewModel : ViewModelBase
 
             AppendLog(string.Format(
                 LocalizationManager.T("BatchOps.StartedFormat"), selected.Count,
-                LocalizationManager.T("MassLoadCf.KindName")));
+                LocalizationManager.T(options.Source == MassLoadCfSource.Repository
+                    ? "MassLoadCf.KindNameRepository"
+                    : "MassLoadCf.KindName")));
             if (options.DenyNewSessions && string.IsNullOrWhiteSpace(options.PermissionCode))
                 AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
                           LocalizationManager.T("MassLoadCf.PermissionCodeHintLog"));
+            if (options.Source == MassLoadCfSource.Repository)
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
+                          LocalizationManager.T("MassLoadCf.RepositorySourceLog"));
+            if (options.LaunchEnterpriseMonopol)
+                AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
+                          LocalizationManager.T("MassLaunch.MonopolHintLog"));
             if (options.DumpDtBefore)
                 AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
                           LocalizationManager.T("MassLoadCf.DumpDtEnabledLog"));
@@ -306,6 +341,13 @@ public sealed class MassLoadCfViewModel : ViewModelBase
                         result.Warning ?? result.DtPath ?? LocalizationManager.T("BatchOps.OperationOk"));
                     item.DurationText = FormatElapsed(elapsed);
                     AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — {LocalizationManager.T("BatchOps.OperationOk")} ({FormatElapsed(elapsed)})");
+
+                    // Монопольный запуск Предприятия (/M) после успешного обновления
+                    // (issue #85, v1.0.1.43): выполняется ПОСЛЕ снятия блокировок Restore
+                    // (внутри Service.RunAsync). Ошибка запуска — предупреждение в журнале,
+                    // не ошибка обновления: база уже успешно обновлена.
+                    if (options.LaunchEnterpriseMonopol)
+                        AppendLog($"[{DateTime.Now:HH:mm:ss}] «{ib.Name}» — " + LaunchEnterpriseMonopolInternal(ib));
                 }
                 else
                 {
@@ -360,6 +402,23 @@ public sealed class MassLoadCfViewModel : ViewModelBase
             LogLines.Add(line);
             OnPropertyChanged(nameof(LogLines));
         }, null);
+    }
+
+    /// <summary>
+    /// Монопольный запуск Предприятия одной базы (/M, issue #85, v1.0.1.43):
+    /// реальный запуск через <see cref="OneCLauncher.Launch"/> (клиент/разрядность/
+    /// режим форм резолвятся внутри лаунчера, как при одиночном запуске) или подмена
+    /// <see cref="EnterpriseLaunchOverride"/> (юнит-тесты). Возвращает строку журнала
+    /// с результатом — ошибка запуска НЕ ошибка обновления.
+    /// </summary>
+    private string LaunchEnterpriseMonopolInternal(Infobase ib)
+    {
+        var launched = EnterpriseLaunchOverride is not null
+            ? EnterpriseLaunchOverride(ib)
+            : OneCLauncher.Launch(ib, OneCLaunchMode.Enterprise, monopol: true);
+        return launched
+            ? LocalizationManager.T("MassLaunch.MonopolStarted")
+            : LocalizationManager.T("MassLaunch.MonopolFailed");
     }
 
     /// <summary>Форматирует интервал времени «м:сс» (как в массовых операциях).</summary>

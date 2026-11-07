@@ -829,6 +829,15 @@ public class AppSettings
     /// массовой выгрузкой (<see cref="BatchDumpDirectory"/>/<see cref="BatchDumpTemplate"/>).</summary>
     public bool BatchLoadCfDumpDt { get; set; }
 
+    /// <summary>Источник обновления в массовом окне (issue #85, v1.0.1.43):
+    /// «CfFile» — файл поставки .cf (issue #106), «Repository» — хранилище
+    /// конфигурации базы. Разбор — <see cref="Workspace1C.Services.MassLoadCfSource"/>.</summary>
+    public string BatchLoadCfSource { get; set; } = "CfFile";
+
+    /// <summary>Опция «Запустить Предприятие монопольно (/M) после успешного
+    /// обновления» (issue #85, v1.0.1.43).</summary>
+    public bool BatchLoadCfMonopol { get; set; }
+
     /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
     public string FontFamily { get; set; } = "Segoe UI";
 

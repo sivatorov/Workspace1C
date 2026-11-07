@@ -14,7 +14,7 @@ namespace Workspace1C.Services
         // Запуск базы
         // ====================================================================
 
-        public static bool Launch(Infobase infobase, OneCLaunchMode mode, bool runAsAdmin = false)
+        public static bool Launch(Infobase infobase, OneCLaunchMode mode, bool runAsAdmin = false, bool monopol = false)
         {
             if (mode == OneCLaunchMode.Configurator)
                 return Launch(infobase, mode, OneCClientType.Thin, GetArchitecture(infobase), runAsAdmin);
@@ -23,21 +23,28 @@ namespace Workspace1C.Services
                 return LaunchWebClient(infobase);
 
             if (string.Equals(infobase.LaunchMode, "Автоматический", StringComparison.OrdinalIgnoreCase))
-                return Launch(infobase, mode, null, GetArchitecture(infobase), runAsAdmin);
+                return Launch(infobase, mode, null, GetArchitecture(infobase), runAsAdmin, monopol);
 
             if (string.Equals(infobase.LaunchMode, "Толстый клиент (обычные формы)", StringComparison.OrdinalIgnoreCase))
-                return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Ordinary, GetArchitecture(infobase), runAsAdmin);
+                return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Ordinary, GetArchitecture(infobase), runAsAdmin, monopol);
 
             if (string.Equals(infobase.LaunchMode, "Толстый клиент", StringComparison.OrdinalIgnoreCase))
-                return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin);
+                return Launch(infobase, mode, OneCClientType.Thick, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin, monopol);
 
-            return Launch(infobase, mode, OneCClientType.Thin, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin);
+            return Launch(infobase, mode, OneCClientType.Thin, OneCRunMode.Managed, GetArchitecture(infobase), runAsAdmin, monopol);
         }
 
-        public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType, OneCArchitecture architecture, bool runAsAdmin = false)
-            => Launch(infobase, mode, clientType, null, architecture, runAsAdmin);
+        public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType,
+            OneCArchitecture architecture, bool runAsAdmin = false, bool monopol = false)
+            => Launch(infobase, mode, clientType, null, architecture, runAsAdmin, monopol);
 
-        public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType, OneCRunMode? runMode, OneCArchitecture architecture, bool runAsAdmin = false)
+        /// <summary>
+        /// Запускает платформу 1С; <paramref name="monopol"/> — монопольный запуск
+        /// Предприятия (/M, issue #85, v1.0.1.43), применяется только в режиме
+        /// «Предприятие» (см. <see cref="BuildArguments"/>).
+        /// </summary>
+        public static bool Launch(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType,
+            OneCRunMode? runMode, OneCArchitecture architecture, bool runAsAdmin = false, bool monopol = false)
         {
             // База, расположенная на веб-сервере, подключается только тонким клиентом (/WS).
             // 1cv8 (толстый клиент) не понимает /WS и при запуске открывает стандартное
@@ -71,7 +78,7 @@ namespace Workspace1C.Services
             // передавал бы кавычки платформе дословно — поведение 1С при этом не гарантировано,
             // поэтому осознанно не переводим (защита от инъекции реализована на уровне значений,
             // см. IsSafeCliValue).
-            var arguments = BuildArguments(infobase, mode, clientType, runMode);
+            var arguments = BuildArguments(infobase, mode, clientType, runMode, monopol);
 
             try
             {

@@ -2685,6 +2685,11 @@ namespace Workspace1C
             batchMenu.Items.Add(BatchMenuAction("Main.BatchAssignTag", OnBatchAssignTagClick, "IconTag", "@InfoBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchMoveToGroup", OnBatchMoveToGroupClick, "IconFolder", "@InfoBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchAddFavorites", OnBatchAddFavoritesClick, "IconStar", "@WarningBrush"));
+            // Групповой запуск Предприятие/Конфигуратор (issue #85, v1.0.1.43):
+            // последовательный запуск всех целей блока — сценарий «открыть сразу
+            // все нужные базы»; подтверждение, сводка, ошибки не прерывают остальные.
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchRunEnterprise", OnBatchRunEnterpriseClick, "IconPlay", "@SuccessBrush"));
+            batchMenu.Items.Add(BatchMenuAction("Main.BatchRunConfigurator", OnBatchRunConfiguratorClick, "IconSettings", "@InfoBrush"));
             batchMenu.Items.Add(BatchMenuAction("Main.BatchRunBackup", OnBatchRunBackupClick, "IconDatabaseExport", "@SuccessBrush"));
             // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
             batchMenu.Items.Add(BatchMenuAction("Main.BatchDumpDtCf", OnBatchDumpDtCfClick, "IconDatabaseExport", "@SuccessBrush"));
@@ -2839,6 +2844,30 @@ namespace Workspace1C
             if (_vm is null || _vm.BatchOperationTargetCount == 0)
                 return;
             _vm.AddBatchToFavorites();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>
+        /// Групповой запуск «Предприятие» по выделенным базам/группе
+        /// (issue #85, v1.0.1.43): подтверждение, последовательный запуск, сводка.
+        /// </summary>
+        private void OnBatchRunEnterpriseClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _vm.ExecuteBatchLaunchEnterpriseForSelected();
+            _vm.ClearBatchSelection();
+        }
+
+        /// <summary>
+        /// Групповой запуск «Конфигуратор» по выделенным базам/группе
+        /// (issue #85, v1.0.1.43): подтверждение, последовательный запуск, сводка.
+        /// </summary>
+        private void OnBatchRunConfiguratorClick()
+        {
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _vm.ExecuteBatchLaunchConfiguratorForSelected();
             _vm.ClearBatchSelection();
         }
 

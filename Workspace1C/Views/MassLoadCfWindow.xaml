@@ -153,6 +153,15 @@
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
 
             <StackPanel Grid.Row="1">
+                <!-- Источник обновления (issue #85, v1.0.1.43): файл поставки .cf
+                     или хранилище конфигурации (адрес/логин/пароль — из свойств базы). -->
+                <StackPanel x:Name="SourcePanel" Margin="0,0,0,8">
+                    <TextBlock x:Name="SourceHeader" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <RadioButton x:Name="SourceCfRadio" GroupName="massLoadCfSource" Margin="0,1"
+                                 IsChecked="True"/>
+                    <RadioButton x:Name="SourceRepoRadio" GroupName="massLoadCfSource" Margin="0,1"/>
+                </StackPanel>
+
                 <!-- Файл конфигурации .cf. -->
                 <Grid x:Name="CfPathPanel">
                     <Grid.ColumnDefinitions>
@@ -220,6 +229,11 @@
                     <TextBlock x:Name="PrepareHint" FontSize="11" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
+
+                <!-- Монопольный запуск Предприятия (/M) после успешного обновления
+                     (issue #85, v1.0.1.43): блокировки снимаются перед запуском. -->
+                <CheckBox x:Name="MonopolCheck" Margin="0,10,0,0"
+                          IsChecked="{Binding LaunchEnterpriseMonopol, UpdateSourceTrigger=PropertyChanged}"/>
             </StackPanel>
 
             <TextBlock x:Name="LogHeader" Grid.Row="2" Margin="0,14,0,6" FontWeight="SemiBold"

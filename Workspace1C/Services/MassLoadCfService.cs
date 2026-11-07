@@ -179,6 +179,23 @@ public sealed class MassLoadCfService
         }
 
         ct.ThrowIfCancellationRequested();
+
+        // Источник обновления (issue #85, v1.0.1.43): файл поставки .cf (/LoadCfg)
+        // или хранилище конфигурации (/ConfigurationRepositoryUpdateCfg + /UpdateDBCfg,
+        // DesignerBatchOperation.RepositoryUpdate) — адрес/логин/пароль хранилища
+        // собираются в RunDesignerBatch из свойств базы, путь-заглушка не нужен.
+        if (plan.Contains(MassLoadCfStep.RepositoryUpdate))
+        {
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("MassLoadCf.LogRepoUpdateFormat"), infobase.Name));
+            var updateError = await RunDesignerStepAsync(
+                infobase, OneCLauncher.DesignerBatchOperation.RepositoryUpdate, null, options, ct)
+                .ConfigureAwait(false);
+            return updateError is null
+                ? MassLoadCfBaseResult.Ok(dtPath)
+                : MassLoadCfBaseResult.Fail(updateError, dtPath);
+        }
+
         var cfPath = options.CfFilePath.Trim();
         // Защита (issue #106): файл .cf мог исчезнуть или стать недоступным в середине
         // прогона (переименован, антивирус, сеть) — даём понятную ошибку по базе вместо

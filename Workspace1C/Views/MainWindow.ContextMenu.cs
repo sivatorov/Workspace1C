@@ -369,6 +369,11 @@ public partial class MainWindow
         batchMenu.Items.Add(CreateBatchAction("Main.BatchAssignTag", "Tag", "@InfoBrush", OnBatchAssignTag_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchMoveToGroup", "FolderMove", "@InfoBrush", OnBatchMoveToGroup_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchAddFavorites", "Star", "@WarningBrush", OnBatchAddFavorites_Click));
+        // Групповой запуск Предприятие/Конфигуратор (issue #85, v1.0.1.43):
+        // последовательный запуск всех целей блока — сценарий «открыть сразу
+        // все нужные базы»; подтверждение, сводка, ошибки не прерывают остальные.
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchRunEnterprise", "Play", "@SuccessBrush", OnBatchRunEnterprise_Click));
+        batchMenu.Items.Add(CreateBatchAction("Main.BatchRunConfigurator", "Settings", "@InfoBrush", OnBatchRunConfigurator_Click));
         batchMenu.Items.Add(CreateBatchAction("Main.BatchRunBackup", "DatabaseExport", "@SuccessBrush", OnBatchRunBackup_Click));
         // Массовая выгрузка выделенных баз в DT/CF с шаблоном имени (issue #92).
         batchMenu.Items.Add(CreateBatchAction("Main.BatchDumpDtCf", "DatabaseExport", "@SuccessBrush", OnBatchDumpDtCf_Click));

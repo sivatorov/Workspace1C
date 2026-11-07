@@ -1740,6 +1740,81 @@ public partial class MainViewModel : ViewModelBase
     public void ExecuteBatchUnlockSessionsForSelected()
         => ExecuteBatchDumpCore(BatchOperationTargetsIncludingGroup.ToList(), kind: BatchOperationKind.UnlockSessions);
 
+    // ================== Групповой запуск Предприятие/Конфигуратор (issue #85, v1.0.1.43) ==================
+
+    /// <summary>
+    /// Пауза между последовательными запусками (мс): платформа должна успеть
+    /// стартовать на «старых» машинах; ошибки одной базы не прерывают остальные.
+    /// </summary>
+    private const int BatchLaunchDelayMs = 300;
+
+    /// <summary>Подмена запуска для юнит-тестов (без реальной 1С): база и режим →
+    /// результат запуска. null — реальный <see cref="OneCLauncher.Launch"/>.</summary>
+    internal Func<Infobase, OneCLaunchMode, bool>? BatchLaunchOverride { get; set; }
+
+    /// <summary>
+    /// Групповой запуск «Предприятие» для выделенных баз/группы (issue #85, v1.0.1.43):
+    /// пункт «Запустить Предприятие» блока «Для выделенных (N)…»/«Для группы (N)…».
+    /// </summary>
+    public void ExecuteBatchLaunchEnterpriseForSelected()
+        => ExecuteBatchLaunchCore(BatchOperationTargetsIncludingGroup.ToList(), OneCLaunchMode.Enterprise);
+
+    /// <summary>
+    /// Групповой запуск «Конфигуратор» для выделенных баз/группы (issue #85, v1.0.1.43):
+    /// пункт «Запустить Конфигуратор» блока «Для выделенных (N)…»/«Для группы (N)…».
+    /// </summary>
+    public void ExecuteBatchLaunchConfiguratorForSelected()
+        => ExecuteBatchLaunchCore(BatchOperationTargetsIncludingGroup.ToList(), OneCLaunchMode.Configurator);
+
+    /// <summary>
+    /// Общий алгоритм группового запуска (issue #85, v1.0.1.43): подтверждение →
+    /// последовательный запуск каждой цели (<see cref="OneCLauncher.Launch"/> — клиент,
+    /// разрядность и режим форм резолвятся индивидуально по настройкам базы) → сводка
+    /// в строке состояния; при сбоях — диалог с перечнем баз. Ошибка одной базы не
+    /// прерывает остальные; запуск НЕ ждёт закрытия процессов (интерактивный запуск,
+    /// а не пакетная операция).
+    /// </summary>
+    private void ExecuteBatchLaunchCore(IReadOnlyList<Infobase> bases, OneCLaunchMode mode)
+    {
+        if (bases.Count == 0)
+        {
+            _dialog.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
+                LocalizationManager.T("BatchLaunch.Title"));
+            return;
+        }
+
+        // Безопасность: подтверждение перед запуском по нескольким базам.
+        var confirmKey = mode == OneCLaunchMode.Enterprise
+            ? "BatchLaunch.ConfirmEnterprise"
+            : "BatchLaunch.ConfirmConfigurator";
+        if (!_dialog.Confirm(
+                string.Format(LocalizationManager.T(confirmKey), bases.Count),
+                LocalizationManager.T("BatchLaunch.Title")))
+            return;
+
+        var launch = BatchLaunchOverride ?? ((ib, m) => OneCLauncher.Launch(ib, m));
+        var failures = new List<string>();
+        var ok = 0;
+        for (var i = 0; i < bases.Count; i++)
+        {
+            if (i > 0 && BatchLaunchDelayMs > 0)
+                System.Threading.Thread.Sleep(BatchLaunchDelayMs);
+            var ib = bases[i];
+            if (launch(ib, mode))
+                ok++;
+            else
+                failures.Add(ib.Name);
+        }
+
+        ShowTemporaryStatusMessage(string.Format(
+            LocalizationManager.T("BatchLaunch.SummaryFormat"), ok, bases.Count));
+        if (failures.Count > 0)
+            _dialog.ShowInfo(string.Format(
+                LocalizationManager.T("BatchLaunch.PartialErrorsFormat"),
+                ok, bases.Count, string.Join(", ", failures)),
+                LocalizationManager.T("BatchLaunch.Title"));
+    }
+
     // ================== Массовая загрузка cf через Конфигуратор (issue #106) ==================
 
     private System.Windows.Input.ICommand? _massLoadCfCommand;
@@ -1790,6 +1865,8 @@ public partial class MainViewModel : ViewModelBase
             _settings.ExportTimestampFormat);
         // Восстановление состояния чекбоксов; код разрешения не сохраняется
         // (секретоподобное значение — только в памяти сессии).
+        window.ViewModel.Source = MassLoadCfPlanner.ParseSource(_settings.BatchLoadCfSource);
+        window.ViewModel.LaunchEnterpriseMonopol = _settings.BatchLoadCfMonopol;
         window.ViewModel.DumpDtBefore = _settings.BatchLoadCfDumpDt;
         window.ViewModel.TerminateSessions = _settings.BatchOpsTerminateSessions;
         window.ViewModel.DenyNewSessions = _settings.BatchOpsDenyNewSessions;
@@ -1799,6 +1876,8 @@ public partial class MainViewModel : ViewModelBase
         // Сохраняем настройки (файл .cf, каталог/шаблон .dt, опции).
         var vm = window.ViewModel;
         _settings.BatchLoadCfPath = vm.CfFilePath?.Trim() ?? string.Empty;
+        _settings.BatchLoadCfSource = MassLoadCfPlanner.SourceToString(vm.Source);
+        _settings.BatchLoadCfMonopol = vm.LaunchEnterpriseMonopol;
         _settings.BatchLoadCfDumpDt = vm.DumpDtBefore;
         _settings.BatchDumpTemplate = string.IsNullOrWhiteSpace(vm.DumpTemplate)
             ? BatchOperationsService.DefaultDumpTemplate : vm.DumpTemplate.Trim();

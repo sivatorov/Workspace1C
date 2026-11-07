@@ -1157,6 +1157,30 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
+        /// <summary>
+        /// Групповой запуск «Предприятие» по выделенным базам/группе
+        /// (issue #85, v1.0.1.43): подтверждение, последовательный запуск, сводка.
+        /// </summary>
+        private void OnBatchRunEnterprise_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _viewModel.ExecuteBatchLaunchEnterpriseForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
+        /// <summary>
+        /// Групповой запуск «Конфигуратор» по выделенным базам/группе
+        /// (issue #85, v1.0.1.43): подтверждение, последовательный запуск, сводка.
+        /// </summary>
+        private void OnBatchRunConfigurator_Click(object sender, RoutedEventArgs e)
+        {
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
+                return;
+            _viewModel.ExecuteBatchLaunchConfiguratorForSelected();
+            _viewModel.ClearBatchSelection();
+        }
+
         /// <summary>Выполнить сценарий резервирования для всех баз мультивыделения.</summary>
         private async void OnBatchRunBackup_Click(object sender, RoutedEventArgs e)
         {

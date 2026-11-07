@@ -46,6 +46,8 @@ namespace Workspace1C
         private readonly TextBox _dumpDirBox = new TextBox().Styled(ControlThemes.ModernTextBox);
         private readonly TextBox _templateBox = new TextBox().Styled(ControlThemes.ModernTextBox);
         private readonly TextBox _permissionBox = new TextBox().Styled(ControlThemes.ModernTextBox);
+        private readonly RadioButton _sourceCfRadio = new();
+        private readonly RadioButton _sourceRepoRadio = new();
         private readonly Button _runButton = new();
         private readonly Button _browseCfButton = new();
         private readonly Button _browseDirButton = new();
@@ -322,7 +324,47 @@ namespace Workspace1C
                     prepareHeader, prepareTerminateCheck, prepareDenyRow, prepareDenyJobsCheck, prepareHint
                 }
             };
-            var pathStack = new StackPanel { Children = { cfPathRow, _dumpDtCheck, _dumpDtOptionsRow, preparePanel } };
+            // Источник обновления (issue #85, v1.0.1.43): файл поставки .cf или
+            // хранилище конфигурации (адрес/логин/пароль — из свойств базы).
+            var sourceHeader = new TextBlock
+            {
+                Text = LocalizationManager.T("MassLoadCf.SourceHeader"),
+                FontWeight = FontWeight.SemiBold,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+            _sourceCfRadio.Content = LocalizationManager.T("MassLoadCf.SourceCfFile");
+            _sourceRepoRadio.Content = LocalizationManager.T("MassLoadCf.SourceRepository");
+            _sourceCfRadio.IsChecked = true;
+            _sourceCfRadio.Checked += (_, _) =>
+            {
+                _vm.Source = MassLoadCfSource.CfFile;
+                cfPathRow.IsVisible = true;
+            };
+            _sourceRepoRadio.Checked += (_, _) =>
+            {
+                _vm.Source = MassLoadCfSource.Repository;
+                cfPathRow.IsVisible = false;
+            };
+            var sourceRow = new StackPanel { Children = { sourceHeader, _sourceCfRadio, _sourceRepoRadio } };
+
+            // Монопольный запуск Предприятия (/M) после успешного обновления
+            // (issue #85, v1.0.1.43): блокировки снимаются перед запуском автоматически.
+            var monopolCheck = new CheckBox
+            {
+                Content = new TextBlock
+                {
+                    Text = LocalizationManager.T("MassLaunch.MonopolLaunch"),
+                    TextWrapping = TextWrapping.Wrap
+                },
+                Margin = new Thickness(0, 10, 0, 0)
+            };
+            monopolCheck.Bind(CheckBox.IsCheckedProperty,
+                new Avalonia.Data.Binding("LaunchEnterpriseMonopol") { Mode = Avalonia.Data.BindingMode.TwoWay });
+
+            var pathStack = new StackPanel
+            {
+                Children = { sourceRow, cfPathRow, _dumpDtCheck, _dumpDtOptionsRow, preparePanel, monopolCheck }
+            };
 
             var logHeader = new TextBlock
             {

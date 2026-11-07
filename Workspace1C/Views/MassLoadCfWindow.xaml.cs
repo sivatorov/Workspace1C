@@ -53,6 +53,21 @@ namespace Workspace1C
 
             Title = LocalizationManager.T("MassLoadCf.Title");
             HintText.Text = LocalizationManager.T("MassLoadCf.Hint");
+            // Источник обновления (issue #85, v1.0.1.43): файл .cf или хранилище конфигурации.
+            SourceHeader.Text = LocalizationManager.T("MassLoadCf.SourceHeader");
+            SourceCfRadio.Content = LocalizationManager.T("MassLoadCf.SourceCfFile");
+            SourceRepoRadio.Content = LocalizationManager.T("MassLoadCf.SourceRepository");
+            MonopolCheck.Content = LocalizationManager.T("MassLaunch.MonopolLaunch");
+            SourceCfRadio.Checked += (_, _) =>
+            {
+                _vm.Source = MassLoadCfSource.CfFile;
+                CfPathPanel.Visibility = Visibility.Visible;
+            };
+            SourceRepoRadio.Checked += (_, _) =>
+            {
+                _vm.Source = MassLoadCfSource.Repository;
+                CfPathPanel.Visibility = Visibility.Collapsed;
+            };
             CfPathLabel.Text = LocalizationManager.T("BatchOps.PathLabelLoadCf");
             DumpDtCheck.Content = LocalizationManager.T("MassLoadCf.DumpDtBefore");
             DumpDirLabel.Text = LocalizationManager.T("BatchOps.PathLabelDumpDt");

@@ -177,7 +177,10 @@ public static partial class OneCLauncher
     }
 
     /// <summary>Формирует аргументы командной строки для запуска 1С.</summary>
-    internal static string BuildArguments(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType, OneCRunMode? runMode)
+    /// <param name="monopol">Монопольный запуск Предприятия (/M, issue #85, v1.0.1.43).
+    /// Применяется только в режиме «Предприятие»; для «Конфигуратора» игнорируется.</param>
+    internal static string BuildArguments(Infobase infobase, OneCLaunchMode mode, OneCClientType? clientType,
+        OneCRunMode? runMode, bool monopol = false)
     {
         var modeArg = mode switch
         {
@@ -328,7 +331,13 @@ public static partial class OneCLauncher
                 arguments += d.HasValue ? $" {d.Key} \"{d.Value}\"" : $" {d.Key}";
             }
         }
-
+    
+        // Монопольный запуск Предприятия (/M, issue #85, v1.0.1.43): ключ добавляется
+        // в конец строки запуска, только в режиме «Предприятие» (для «Конфигуратора»
+        // ключ неприменим и игнорируется). /M требует отсутствия других сеансов базы.
+        if (monopol && mode == OneCLaunchMode.Enterprise)
+            arguments += " /M";
+    
         return arguments;
     }
 
