@@ -202,6 +202,8 @@ public sealed class McpServer
         {
             var data = await tool.Handler(arguments, cancellationToken).ConfigureAwait(false);
             var text = JsonSerializer.Serialize(data, DataJsonOptions);
+            Audit.AuditHub.Write(Audit.AuditActions.McpToolCall, name!, true,
+                arguments?.ToJsonString() ?? string.Empty, Audit.AuditSources.Mcp);
             return McpJsonRpc.SerializeResult(id, new
             {
                 content = new[]
@@ -213,6 +215,8 @@ public sealed class McpServer
         }
         catch (McpToolException ex)
         {
+            Audit.AuditHub.Write(Audit.AuditActions.McpToolCall, name!, false,
+                (arguments?.ToJsonString() ?? string.Empty) + "; " + ex.Message, Audit.AuditSources.Mcp);
             // Логическая ошибка инструмента: контент с isError=true (спецификация MCP).
             return McpJsonRpc.SerializeResult(id, new
             {

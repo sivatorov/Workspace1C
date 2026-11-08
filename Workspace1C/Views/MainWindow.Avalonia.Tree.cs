@@ -2199,6 +2199,9 @@ namespace Workspace1C
                 case UtilitiesMenuCommandKind.ShowLicense:
                     item.Click += (_, _) => new LicenseWindow().ShowDialogSync(this);
                     break;
+                case UtilitiesMenuCommandKind.External:
+                    item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternal(catalogItem.Id);
+                    break;
                 case UtilitiesMenuCommandKind.CheckForUpdates:
                     item.Click += async (_, _) =>
                     {

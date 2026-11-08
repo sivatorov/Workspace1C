@@ -77,6 +77,8 @@ public static class EditionService
         {
             _current = result;
         }
+        Audit.AuditHub.Write(Audit.AuditActions.LicenseActivate, result.Key.Payload.Owner, true,
+            $"id={result.Key.Payload.Id}; major={result.Key.Payload.Major}");
         Changed?.Invoke(null, EventArgs.Empty);
         return result;
     }
@@ -94,6 +96,7 @@ public static class EditionService
             // Нет прав на удаление — ключ просто перестанет считываться после сброса кэша.
         }
         Reset();
+        Audit.AuditHub.Write(Audit.AuditActions.LicenseDeactivate, MachineIdProvider.Current, true);
         Changed?.Invoke(null, EventArgs.Empty);
     }
 

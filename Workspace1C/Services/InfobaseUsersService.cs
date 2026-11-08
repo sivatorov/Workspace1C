@@ -220,6 +220,18 @@ default{throw ('Unknown operation: '+[string]$q.op)}
     private static async Task<InfobaseUsersResult> RunAsync(Infobase infobase, Dictionary<string, object?> parameters,
         string? extraSecret, Func<JsonElement, InfobaseUsersResult> map, CancellationToken ct)
     {
+        var result = await RunCoreAsync(infobase, parameters, extraSecret, map, ct).ConfigureAwait(false);
+        // Журнал аудита: изменения пользователей (чтение списка и ролей не пишется).
+        var op = parameters.TryGetValue("op", out var o) ? o as string : null;
+        if (op is "upsert" or "password" or "disable" or "delete")
+            Audit.AuditHub.Write(Audit.AuditActions.IbUserChange, infobase?.Name ?? string.Empty, result.Success,
+                $"{op}: {(parameters.TryGetValue("name", out var n) ? n : null)}" + (result.Success ? string.Empty : "; " + result.Error));
+        return result;
+    }
+
+    private static async Task<InfobaseUsersResult> RunCoreAsync(Infobase infobase, Dictionary<string, object?> parameters,
+        string? extraSecret, Func<JsonElement, InfobaseUsersResult> map, CancellationToken ct)
+    {
         if (infobase is null)
             return InfobaseUsersResult.Fail(LocalizationManager.T("IbUsers.NoBase"));
         var connection = ComConnectionInfo.Prepare(infobase);

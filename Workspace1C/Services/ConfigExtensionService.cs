@@ -93,6 +93,15 @@ public static class ConfigExtensionService
     public static async Task<DesignerCommandResult> InstallAsync(Infobase infobase, string cfePath, string extensionName,
         CancellationToken ct = default)
     {
+        var result = await InstallCoreAsync(infobase, cfePath, extensionName, ct).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.ExtensionInstall, infobase?.Name ?? string.Empty, result.Success,
+            $"{extensionName} ← {cfePath}" + (result.Success ? string.Empty : "; " + result.Error));
+        return result;
+    }
+
+    private static async Task<DesignerCommandResult> InstallCoreAsync(Infobase infobase, string cfePath, string extensionName,
+        CancellationToken ct)
+    {
         if (string.IsNullOrWhiteSpace(cfePath) || !File.Exists(cfePath))
             return DesignerCommandResult.Fail(LocalizationManager.T("Extensions.FileNotFound"));
         var args = BuildInstallArguments(cfePath, extensionName);
@@ -164,6 +173,15 @@ public static class ConfigExtensionService
 
     public static async Task<DesignerCommandResult> DeleteAsync(Infobase infobase, string extensionName,
         CancellationToken ct = default)
+    {
+        var result = await DeleteCoreAsync(infobase, extensionName, ct).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.ExtensionDelete, infobase?.Name ?? string.Empty, result.Success,
+            extensionName + (result.Success ? string.Empty : "; " + result.Error));
+        return result;
+    }
+
+    private static async Task<DesignerCommandResult> DeleteCoreAsync(Infobase infobase, string extensionName,
+        CancellationToken ct)
     {
         var args = BuildDeleteArguments(extensionName);
         if (args is null)

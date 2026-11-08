@@ -180,7 +180,39 @@ public sealed class LocalizationManager
     /// встроенного фолбэка интерфейс показывал ключи локализации вместо текстов.
     /// </summary>
     public string Translate(string key)
-        => TranslateFromDictionaries(_current, _builtInEnglishStrings, _builtInRussianStrings, key);
+    {
+        var text = TranslateFromDictionaries(_current, _builtInEnglishStrings, _builtInRussianStrings, key);
+        if (!ReferenceEquals(text, key) || _moduleStrings.Count == 0)
+            return text;
+        // Строки модулей ПРО (2.0): текущий язык → английский → русский.
+        lock (_moduleStrings)
+        {
+            foreach (var code in new[] { CurrentLanguage, BuiltInEnglish, BuiltInRussian })
+                if (_moduleStrings.TryGetValue(code, out var dict) && dict.TryGetValue(key, out var value))
+                    return value;
+        }
+        return key;
+    }
+
+    private readonly Dictionary<string, Dictionary<string, string>> _moduleStrings = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Регистрирует строки модуля (редакция ПРО, 2.0): модули из приватного репозитория
+    /// не могут менять файлы языков, поэтому добавляют свои ключи при старте. Строки
+    /// модуля используются, только если ключа нет во встроенных/внешних словарях.
+    /// </summary>
+    public void RegisterModuleStrings(string languageCode, IReadOnlyDictionary<string, string> strings)
+    {
+        if (string.IsNullOrWhiteSpace(languageCode) || strings is null)
+            return;
+        lock (_moduleStrings)
+        {
+            if (!_moduleStrings.TryGetValue(languageCode, out var dict))
+                _moduleStrings[languageCode] = dict = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var pair in strings)
+                dict[pair.Key] = pair.Value;
+        }
+    }
 
     /// <summary>
     /// Чистое ядро перевода (для юнит-тестов, issue #357): текущий словарь →

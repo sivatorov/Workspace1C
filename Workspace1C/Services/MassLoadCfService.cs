@@ -105,6 +105,15 @@ public sealed class MassLoadCfService
     public async Task<MassLoadCfBaseResult> RunAsync(
         Infobase infobase, MassLoadCfOptions options, CancellationToken ct = default)
     {
+        var result = await RunCoreAsync(infobase, options, ct).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.CfMassLoad, infobase?.Name ?? string.Empty, result.Success,
+            result.Success ? (result.DtPath is null ? string.Empty : "dt: " + result.DtPath) : result.Error);
+        return result;
+    }
+
+    private async Task<MassLoadCfBaseResult> RunCoreAsync(
+        Infobase infobase, MassLoadCfOptions options, CancellationToken ct)
+    {
         ArgumentNullException.ThrowIfNull(infobase);
         ArgumentNullException.ThrowIfNull(options);
 

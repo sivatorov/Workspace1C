@@ -32,6 +32,8 @@ public static class CliEntryPoint
             // Порядок повторяет App.OnStartup (App.xaml.cs, строки 65–80), но без локализации
             // и окна входа: команды читают данные активного профиля напрямую.
             AppServices.Configure();
+            // Журнал аудита: действия этого процесса — из командной строки (или MCP).
+            Audit.AuditHub.DefaultSource = parsed.Kind == CliCommandKind.Mcp ? Audit.AuditSources.Mcp : Audit.AuditSources.Cli;
             try { PortablePaths.EnsurePortableData(); }
             catch { /* портативный режим — вспомогательная возможность */ }
 
@@ -81,6 +83,10 @@ public static class CliEntryPoint
             }
 
             exitCode = CliCommands.Execute(parsed);
+            if (parsed.Kind is not (CliCommandKind.List or CliCommandKind.Help or CliCommandKind.Status
+                or CliCommandKind.LicenseInfo or CliCommandKind.Check))
+                Audit.AuditHub.Write(Audit.AuditActions.CliCommand, parsed.Target ?? string.Empty,
+                    exitCode == CliExitCodes.Success, CommandName(parsed.Kind) + "; exit=" + exitCode);
             return true;
         }
         catch (Exception ex)

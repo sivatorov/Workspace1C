@@ -281,6 +281,10 @@ public sealed class TelegramBotCommandService
     public async Task<string> ExecuteAsync(string text, TelegramBotSettings settings, CancellationToken ct)
     {
         var (command, argument) = SplitCommand(text);
+        // Журнал аудита: команды, которые что-то запускают (справочные команды не пишутся).
+        if (command == "/run")
+            Audit.AuditHub.Write(Audit.AuditActions.TelegramCommand, argument ?? string.Empty, true, text,
+                Audit.AuditSources.Telegram);
         switch (command)
         {
             case "/start":

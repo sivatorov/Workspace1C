@@ -188,6 +188,14 @@ public class BackupService : IBackupService
     /// <inheritdoc />
     public async Task<BackupRunResult> RestoreAsync(Infobase infobase, string filePath, BackupCredential? credential = null)
     {
+        var result = await RestoreCoreAsync(infobase, filePath, credential).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.DtRestore, infobase?.Name ?? string.Empty, result.Success,
+            filePath + (result.Success ? string.Empty : "; " + result.ErrorMessage));
+        return result;
+    }
+
+    private async Task<BackupRunResult> RestoreCoreAsync(Infobase infobase, string filePath, BackupCredential? credential)
+    {
         var result = new BackupRunResult();
         if (infobase is null)
         {

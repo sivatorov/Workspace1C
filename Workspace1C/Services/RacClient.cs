@@ -922,7 +922,11 @@ public sealed class RacClient : IRacClient
     {
         var args = SessionTerminateArgs(clusterId, sessionId, processId, infobaseUser, infobasePassword);
         if (await RunActionAsync(parameters, cancellationToken, args).ConfigureAwait(false))
+        {
+            Audit.AuditHub.Write(Audit.AuditActions.SessionTerminate, $"{parameters?.Address}:{parameters?.Port}", true,
+                $"session={sessionId}");
             return true;
+        }
 
         // Issue #92 (v1.0.1.30, репорт 7OH): rac 8.5.4 отвергает «session terminate»
         // с «Ошибка разбора параметра: --infobase-user=…» — эта версия rac НЕ знает
@@ -935,10 +939,15 @@ public sealed class RacClient : IRacClient
             _logger.Info(
                 "RAC: session terminate отклонил --infobase-user (rac 8.5.4 не знает параметр " +
                 "в этой команде) — повтор без кредов ИБ.");
-            return await RunActionAsync(parameters, cancellationToken,
+            var retried = await RunActionAsync(parameters, cancellationToken,
                 SessionTerminateArgs(clusterId, sessionId, processId)).ConfigureAwait(false);
+            Audit.AuditHub.Write(Audit.AuditActions.SessionTerminate, $"{parameters?.Address}:{parameters?.Port}", retried,
+                $"session={sessionId}" + (retried ? string.Empty : "; " + LastActionError));
+            return retried;
         }
 
+        Audit.AuditHub.Write(Audit.AuditActions.SessionTerminate, $"{parameters?.Address}:{parameters?.Port}", false,
+            $"session={sessionId}; {LastActionError}");
         return false;
     }
 
@@ -1225,12 +1234,17 @@ public sealed class RacClient : IRacClient
     }
 
     /// <inheritdoc />
-    public Task<bool> DropInfobaseAsync(
+    public async Task<bool> DropInfobaseAsync(
         RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
         bool dropDatabase = false, string? infobaseUser = null,
-        string? infobasePassword = null, CancellationToken cancellationToken = default) =>
-        RunActionAsync(parameters, cancellationToken,
-            InfobaseDropArgs(clusterId, infobaseId, dropDatabase, infobaseUser, infobasePassword));
+        string? infobasePassword = null, CancellationToken cancellationToken = default)
+    {
+        var ok = await RunActionAsync(parameters, cancellationToken,
+            InfobaseDropArgs(clusterId, infobaseId, dropDatabase, infobaseUser, infobasePassword)).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.ServerInfobaseDrop, $"{parameters?.Address}:{parameters?.Port}", ok,
+            $"infobase={infobaseId}; dropDatabase={dropDatabase}" + (ok ? string.Empty : "; " + LastActionError));
+        return ok;
+    }
 
     /// <inheritdoc />
     public string LastActionError { get; private set; } = string.Empty;

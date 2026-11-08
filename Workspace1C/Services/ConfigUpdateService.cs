@@ -26,6 +26,14 @@ public class ConfigUpdateService : IConfigUpdateService
     /// <inheritdoc />
     public async Task<BackupRunResult> UpdateConfigAsync(Infobase infobase, string cfgFilePath, BackupCredential? credential = null)
     {
+        var result = await UpdateConfigCoreAsync(infobase, cfgFilePath, credential).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.ConfigUpdate, infobase?.Name ?? string.Empty, result.Success,
+            cfgFilePath + (result.Success ? string.Empty : "; " + result.ErrorMessage));
+        return result;
+    }
+
+    private async Task<BackupRunResult> UpdateConfigCoreAsync(Infobase infobase, string cfgFilePath, BackupCredential? credential)
+    {
         var result = new BackupRunResult();
         if (infobase is null)
         {

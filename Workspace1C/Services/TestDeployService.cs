@@ -43,13 +43,28 @@ public sealed class TestDeployService
     /// а цепочка уже выполненных шагов видна в журнале. Целевая запись списка и группа
     /// «Тест» возвращаются в результате — их сохраняет вызывающий (окно или планировщик).
     /// </summary>
-    public Task<TestDeployResult> DeployAsync(
+    public async Task<TestDeployResult> DeployAsync(
         TestDeployScenario scenario,
         Infobase source,
         IReadOnlyList<Infobase> allInfobases,
         IReadOnlyList<Group>? groups,
         Action<string>? log = null,
         CancellationToken cancellationToken = default)
+    {
+        var result = await DeployCoreAsync(scenario, source, allInfobases, groups, log, cancellationToken)
+            .ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.TestDeploy, scenario?.TargetName ?? string.Empty, result.Success,
+            $"{source?.Name} → {scenario?.TargetName}" + (result.Success ? string.Empty : "; " + result.ErrorMessage));
+        return result;
+    }
+
+    private Task<TestDeployResult> DeployCoreAsync(
+        TestDeployScenario scenario,
+        Infobase source,
+        IReadOnlyList<Infobase> allInfobases,
+        IReadOnlyList<Group>? groups,
+        Action<string>? log,
+        CancellationToken cancellationToken)
     {
         if (scenario is null)
             throw new ArgumentNullException(nameof(scenario));

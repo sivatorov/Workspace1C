@@ -330,6 +330,8 @@ public partial class MainWindow
                 item.Click += (_, _) => OnCheckForUpdatesMenuClick(item, null); break;
             case UtilitiesMenuCommandKind.ShowLicense:
                 item.Click += (_, _) => new LicenseWindow { Owner = this }.ShowDialog(); break;
+            case UtilitiesMenuCommandKind.External:
+                item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternal(catalogItem.Id); break;
             case UtilitiesMenuCommandKind.EventLog:
                 item.Command = _viewModel.EventLogCommand; break;
             case UtilitiesMenuCommandKind.SharedLists:

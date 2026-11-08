@@ -15,6 +15,9 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Окно «Лицензия» редакции ПРО (2.0, docs/pro/PRO-EDITION.md).</summary>
     ShowLicense,
 
+    /// <summary>Пункт модуля ПРО: действие зарегистрировано через <see cref="UtilitiesMenuCatalog.RegisterExternal"/>.</summary>
+    External,
+
     /// <summary>Окно «Актуальные релизы».</summary>
     ShowActualReleases,
 
@@ -347,7 +350,37 @@ public static class UtilitiesMenuCatalog
     };
 
     /// <summary>Все известные пункты меню «Утилиты» в порядке стандартной компоновки.</summary>
-    public static IReadOnlyList<UtilitiesMenuItem> All { get; } = BuildAll();
+    private static readonly IReadOnlyList<UtilitiesMenuItem> BuiltIn = BuildAll();
+    private static readonly List<UtilitiesMenuItem> ExternalItems = new();
+    private static readonly Dictionary<string, Action> ExternalActions = new(StringComparer.Ordinal);
+
+    /// <summary>Все пункты: встроенные и зарегистрированные модулями ПРО.</summary>
+    public static IReadOnlyList<UtilitiesMenuItem> All =>
+        ExternalItems.Count == 0 ? BuiltIn : BuiltIn.Concat(ExternalItems).ToList();
+
+    /// <summary>
+    /// Регистрирует пункт меню модуля ПРО (2.0): <paramref name="item"/> с
+    /// <see cref="UtilitiesMenuCommandKind.External"/>, действие вызывается построителем
+    /// меню WPF/Avalonia. Пункт помечается новинкой и попадает в «Новинки программы»,
+    /// пока пользователь не разместит его сам. Повторная регистрация id заменяет действие.
+    /// </summary>
+    public static void RegisterExternal(UtilitiesMenuItem item, Action execute)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(execute);
+        ExternalItems.RemoveAll(i => string.Equals(i.Id, item.Id, StringComparison.Ordinal));
+        ExternalItems.Add(item);
+        ExternalActions[item.Id] = execute;
+    }
+
+    /// <summary>Выполняет действие внешнего пункта; false — пункт не зарегистрирован.</summary>
+    public static bool ExecuteExternal(string itemId)
+    {
+        if (!ExternalActions.TryGetValue(itemId, out var action))
+            return false;
+        action();
+        return true;
+    }
 
     /// <summary>Возвращает пункт каталога по идентификатору (или null).</summary>
     public static UtilitiesMenuItem? Find(string? id)
