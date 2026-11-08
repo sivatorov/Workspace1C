@@ -32,6 +32,10 @@ namespace Workspace1C
         private readonly TextBox _portBox = new TextBox { Height = 32, VerticalContentAlignment = VerticalAlignment.Center }.Styled(ControlThemes.ModernTextBox);
         private readonly TextBox _userBox = new TextBox { Height = 32, VerticalContentAlignment = VerticalAlignment.Center }.Styled(ControlThemes.ModernTextBox);
         private readonly PasswordBox _passwordBox = new PasswordBox { Height = 32 }.Styled(ControlThemes.ModernPasswordBox);
+        // Быстрый доступ по RDP/SSH (2.0): пусто — хост из поля «Адрес». Пароли не хранятся.
+        private readonly TextBox _rdpHostBox = new TextBox { Height = 32, VerticalContentAlignment = VerticalAlignment.Center }.Styled(ControlThemes.ModernTextBox);
+        private readonly TextBox _rdpUserBox = new TextBox { Height = 32, VerticalContentAlignment = VerticalAlignment.Center }.Styled(ControlThemes.ModernTextBox);
+        private readonly TextBox _sshTargetBox = new TextBox { Height = 32, VerticalContentAlignment = VerticalAlignment.Center }.Styled(ControlThemes.ModernTextBox);
 
         /// <summary>Готовая запись сервера при подтверждении, иначе <c>null</c>.</summary>
         public ManagementServer? Result { get; private set; }
@@ -44,9 +48,9 @@ namespace Workspace1C
 
             Title = T(isNew ? "ServerMonitor.Servers.AddTitle" : "ServerMonitor.Servers.EditTitle");
             Width = 480;
-            Height = 420;
+            Height = 560;
             MinWidth = 440;
-            MinHeight = 400;
+            MinHeight = 540;
             FontSize = 13;
             // Окно фиксированного размера (issue #3): без ресайза и без максимизации.
             CanResize = false;
@@ -57,6 +61,12 @@ namespace Workspace1C
             _portBox.Text = (model is { Port: > 0 } ? model.Port : ManagementServer.DefaultPort).ToString();
             _userBox.Text = model?.User ?? string.Empty;
             _passwordBox.Password = model?.Password ?? string.Empty;
+            _rdpHostBox.Text = model?.RdpHost ?? string.Empty;
+            _rdpUserBox.Text = model?.RdpUser ?? string.Empty;
+            _sshTargetBox.Text = RemoteAccessLauncher.FormatSshTarget(model);
+            ToolTip.SetTip(_rdpHostBox, T("RemoteAccess.RdpHostTooltip"));
+            ToolTip.SetTip(_rdpUserBox, T("RemoteAccess.RdpUserTooltip"));
+            ToolTip.SetTip(_sshTargetBox, T("RemoteAccess.SshTargetTooltip"));
 
             Content = BuildRoot();
 
@@ -131,6 +141,9 @@ namespace Workspace1C
             passwordGrid.Children.Add(revealButton);
 
             panel.Children.Add(MakeFieldRow(T("ServerMonitor.Servers.Password"), passwordGrid));
+            panel.Children.Add(MakeFieldRow(T("RemoteAccess.RdpHost"), _rdpHostBox));
+            panel.Children.Add(MakeFieldRow(T("RemoteAccess.RdpUser"), _rdpUserBox));
+            panel.Children.Add(MakeFieldRow(T("RemoteAccess.SshTarget"), _sshTargetBox));
 
             var buttons = new StackPanel
             {
@@ -203,7 +216,10 @@ namespace Workspace1C
                 Port = port,
                 User = _userBox.Text?.Trim() ?? string.Empty,
                 Password = _passwordBox.Password ?? string.Empty,
+                RdpHost = _rdpHostBox.Text?.Trim() ?? string.Empty,
+                RdpUser = _rdpUserBox.Text?.Trim() ?? string.Empty,
             };
+            RemoteAccessLauncher.ApplySshTarget(Result, _sshTargetBox.Text);
             DialogResult = true;
             Close();
         }

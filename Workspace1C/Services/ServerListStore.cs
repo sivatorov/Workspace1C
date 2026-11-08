@@ -124,6 +124,10 @@ public sealed class ServerListStore : IServerListStore
                 Port = server.Port is >= 1 and <= 65535 ? server.Port : ManagementServer.DefaultPort,
                 User = server.User ?? string.Empty,
                 Password = server.Password ?? string.Empty,
+                RdpHost = (server.RdpHost ?? string.Empty).Trim(),
+                RdpUser = (server.RdpUser ?? string.Empty).Trim(),
+                SshTarget = (server.SshTarget ?? string.Empty).Trim(),
+                SshPort = server.SshPort is >= 1 and <= 65535 ? server.SshPort : 0,
             });
         }
         return result;

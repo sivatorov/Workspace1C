@@ -802,6 +802,24 @@ namespace Workspace1C
             new NetworkDiagnosticsWindow(vm) { Owner = this }.ShowDialog();
         }
 
+        /// <summary>«RDP» (2.0): удалённый рабочий стол выбранного сервера справочника.</summary>
+        private void OnRdp_Click(object sender, RoutedEventArgs e) =>
+            LaunchRemote(RemoteAccessLauncher.LaunchRdp);
+
+        /// <summary>«SSH» (2.0): терминал с ssh-сессией к выбранному серверу справочника.</summary>
+        private void OnSsh_Click(object sender, RoutedEventArgs e) =>
+            LaunchRemote(RemoteAccessLauncher.LaunchSsh);
+
+        private void LaunchRemote(Func<ManagementServer, string?> launch)
+        {
+            var server = _vm.SelectedServer;
+            var error = server is null
+                ? LocalizationManager.T("RemoteAccess.NoServerSelected")
+                : launch(server);
+            if (error is not null)
+                AppServices.TryGetService<IDialogService>()?.ShowWarning(error, Title);
+        }
+
         // ===================== Базы кластера (issue #3) =====================
 
         /// <summary>

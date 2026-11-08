@@ -178,7 +178,8 @@ public sealed class Issue55AdaptiveLayoutTests
     public void ServerEditWindow_LabelColumnAuto_WpfAndAvalonia()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerEditWindow.xaml"));
-        Assert.Equal(5, Count(xaml, "Width=\"Auto\" MinWidth=\"130\""));
+        // 5 полей подключения + 3 поля быстрого доступа RDP/SSH (2.0).
+        Assert.Equal(8, Count(xaml, "Width=\"Auto\" MinWidth=\"130\""));
 
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ServerEditWindow.Avalonia.cs"));
         Assert.Contains("GridLength.Auto) { MinWidth = 130 }", code, StringComparison.Ordinal);

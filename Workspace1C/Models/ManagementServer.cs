@@ -32,6 +32,18 @@ public class ManagementServer
     /// маскируется при журналировании — см. <see cref="Services.SensitiveDataMasker"/>).</summary>
     public string Password { get; set; } = "";
 
+    /// <summary>Адрес для подключения по RDP (host[:port]); пусто — хост из <see cref="Address"/>.</summary>
+    public string RdpHost { get; set; } = "";
+
+    /// <summary>Пользователь RDP (домен\логин); пусто — спросит клиент RDP. Пароль не хранится.</summary>
+    public string RdpUser { get; set; } = "";
+
+    /// <summary>Цель SSH «пользователь@хост» или «хост»; пусто — хост из <see cref="Address"/>.</summary>
+    public string SshTarget { get; set; } = "";
+
+    /// <summary>Порт SSH; 0 — порт по умолчанию (22 или из ~/.ssh/config).</summary>
+    public int SshPort { get; set; }
+
     /// <summary>Отображаемое имя (для списков и подписей): описание, иначе адрес.</summary>
     public override string ToString() =>
         string.IsNullOrWhiteSpace(Description) ? Address : Description;

@@ -438,6 +438,25 @@
                     <TextBlock Text="{loc:Loc ServerMonitor.NetworkDiagnostics}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
+            <!-- Быстрый доступ к серверу по RDP/SSH (2.0): адрес — из карточки сервера. -->
+            <Button x:Name="RdpButton" Style="{StaticResource ModernButton}"
+                    Background="{DynamicResource ItemHoverBrush}" Padding="14,6" Margin="8,0,0,0"
+                    ToolTip="{loc:Loc RemoteAccess.RdpTooltip}"
+                    Click="OnRdp_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="🖥" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc RemoteAccess.Rdp}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
+            <Button x:Name="SshButton" Style="{StaticResource ModernButton}"
+                    Background="{DynamicResource ItemHoverBrush}" Padding="14,6" Margin="8,0,0,0"
+                    ToolTip="{loc:Loc RemoteAccess.SshTooltip}"
+                    Click="OnSsh_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⌨" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc RemoteAccess.Ssh}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
         </StackPanel>
 
         <!-- Вторая строка правой панели (issue #3): выбор кластера, настройка

@@ -333,12 +333,20 @@ namespace Workspace1C
             var diagnosticsButton = BuildActionButton(
                 LocalizationManager.T("ServerMonitor.NetworkDiagnostics"), "🛜", OpenNetworkDiagnostics);
 
+            // Быстрый доступ к серверу по RDP/SSH (2.0): адрес — из карточки сервера.
+            var rdpButton = BuildActionButton(LocalizationManager.T("RemoteAccess.Rdp"), "🖥",
+                () => LaunchRemote(RemoteAccessLauncher.LaunchRdp));
+            ToolTip.SetTip(rdpButton, LocalizationManager.T("RemoteAccess.RdpTooltip"));
+            var sshButton = BuildActionButton(LocalizationManager.T("RemoteAccess.Ssh"), "⌨",
+                () => LaunchRemote(RemoteAccessLauncher.LaunchSsh));
+            ToolTip.SetTip(sshButton, LocalizationManager.T("RemoteAccess.SshTooltip"));
+
             var actionPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 8,
                 Margin = new Thickness(0, 0, 0, 8),
-                Children = { connectButton, refreshButton, diagnosticsButton }
+                Children = { connectButton, refreshButton, diagnosticsButton, rdpButton, sshButton }
             };
 
             // ---- Вторая строка панели: кластер, автообновление, статус подключения. ----
@@ -830,6 +838,16 @@ namespace Workspace1C
         /// с текущими адресом/портом монитора. Не требует успешного подключения rac —
         /// диагностика нужна именно до подключения.
         /// </summary>
+        private void LaunchRemote(Func<ManagementServer, string?> launch)
+        {
+            var server = _vm.SelectedServer;
+            var error = server is null
+                ? LocalizationManager.T("RemoteAccess.NoServerSelected")
+                : launch(server);
+            if (error is not null)
+                AppServices.TryGetService<IDialogService>()?.ShowWarning(error, Title ?? string.Empty);
+        }
+
         private void OpenNetworkDiagnostics()
         {
             var target = NetworkDiagnosticsTargets.FromServerMonitor(_vm.ServerAddress, _vm.ServerPort);

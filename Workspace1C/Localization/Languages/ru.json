@@ -4643,6 +4643,20 @@
     "SettingsSync.Done": "Синхронизация завершена: изменено файлов — {0}, конфликтных резервов — {1}.",
     "SettingsSync.DoneWithErrors": "Синхронизация завершена с ошибками: изменено — {0}, ошибок — {1}.",
     "SettingsSync.ErrorsCount": "Ошибок: {0}",
-    "SettingsSync.ConflictCount": "Конфликтных резервов: {0}"
+    "SettingsSync.ConflictCount": "Конфликтных резервов: {0}",
+    "RemoteAccess.Rdp": "RDP",
+    "RemoteAccess.Ssh": "SSH",
+    "RemoteAccess.RdpTooltip": "Открыть удалённый рабочий стол выбранного сервера (адрес и пользователь — в карточке сервера)",
+    "RemoteAccess.SshTooltip": "Открыть терминал с SSH-сессией к выбранному серверу",
+    "RemoteAccess.RdpHost": "RDP: адрес",
+    "RemoteAccess.RdpUser": "RDP: пользователь",
+    "RemoteAccess.SshTarget": "SSH: подключение",
+    "RemoteAccess.RdpHostTooltip": "Адрес удалённого рабочего стола (host или host:порт). Пусто — хост из поля «Адрес».",
+    "RemoteAccess.RdpUserTooltip": "Пользователь RDP, например DOMAIN\\admin. Пароль не сохраняется — его спросит клиент RDP.",
+    "RemoteAccess.SshTargetTooltip": "user@host, host или user@host:порт. Пусто — хост из поля «Адрес». Вход по паролю или ключу ssh.",
+    "RemoteAccess.NoServerSelected": "Выберите сервер в списке.",
+    "RemoteAccess.NoAddress": "У сервера не задан адрес.",
+    "RemoteAccess.RdpClientNotFound": "Не найден клиент удалённого рабочего стола. Windows: mstsc.exe; Linux: установите xfreerdp (freerdp3-x11 / freerdp2-x11) или Remmina.",
+    "RemoteAccess.SshClientNotFound": "Не удалось открыть терминал с ssh. Windows: включите компонент «Клиент OpenSSH»; Linux: установите openssh-client и любой терминал (gnome-terminal, konsole, xterm)."
   }
 }

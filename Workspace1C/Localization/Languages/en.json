@@ -4644,6 +4644,20 @@
     "SettingsSync.Done": "Sync finished: changed files — {0}, conflict backups — {1}.",
     "SettingsSync.DoneWithErrors": "Sync finished with errors: changed — {0}, errors — {1}.",
     "SettingsSync.ErrorsCount": "Errors: {0}",
-    "SettingsSync.ConflictCount": "Conflict backups: {0}"
+    "SettingsSync.ConflictCount": "Conflict backups: {0}",
+    "RemoteAccess.Rdp": "RDP",
+    "RemoteAccess.Ssh": "SSH",
+    "RemoteAccess.RdpTooltip": "Open a remote desktop session to the selected server (address and user are in the server card)",
+    "RemoteAccess.SshTooltip": "Open a terminal with an SSH session to the selected server",
+    "RemoteAccess.RdpHost": "RDP: address",
+    "RemoteAccess.RdpUser": "RDP: user",
+    "RemoteAccess.SshTarget": "SSH: connection",
+    "RemoteAccess.RdpHostTooltip": "Remote desktop address (host or host:port). Empty — the host from the “Address” field.",
+    "RemoteAccess.RdpUserTooltip": "RDP user, e.g. DOMAIN\\admin. The password is not stored — the RDP client asks for it.",
+    "RemoteAccess.SshTargetTooltip": "user@host, host or user@host:port. Empty — the host from the “Address” field. Password or ssh key login.",
+    "RemoteAccess.NoServerSelected": "Select a server in the list.",
+    "RemoteAccess.NoAddress": "The server has no address.",
+    "RemoteAccess.RdpClientNotFound": "No remote desktop client found. Windows: mstsc.exe; Linux: install xfreerdp (freerdp3-x11 / freerdp2-x11) or Remmina.",
+    "RemoteAccess.SshClientNotFound": "Could not open a terminal with ssh. Windows: enable the “OpenSSH Client” feature; Linux: install openssh-client and any terminal (gnome-terminal, konsole, xterm)."
   }
 }

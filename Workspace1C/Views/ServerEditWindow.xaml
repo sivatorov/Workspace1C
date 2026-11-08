@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="420" Width="480" MinHeight="400" MinWidth="440"
+        Height="540" Width="480" MinHeight="520" MinWidth="440"
         ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
@@ -97,6 +97,43 @@
                         Style="{DynamicResource IconButton}"
                         Content="👁" Click="OnShowPasswordToggle_Click"/>
             </Grid>
+        </Grid>
+
+        <!-- Быстрый доступ по RDP/SSH (2.0): пусто — хост из поля «Адрес». Пароли не хранятся. -->
+        <Grid Margin="0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" MinWidth="130"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{loc:Loc RemoteAccess.RdpHost}"
+                       Style="{StaticResource FieldLabel}"/>
+            <TextBox x:Name="RdpHostBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                     Padding="6,3" VerticalContentAlignment="Center"
+                     ToolTip="{loc:Loc RemoteAccess.RdpHostTooltip}"/>
+        </Grid>
+
+        <Grid Margin="0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" MinWidth="130"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{loc:Loc RemoteAccess.RdpUser}"
+                       Style="{StaticResource FieldLabel}"/>
+            <TextBox x:Name="RdpUserBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                     Padding="6,3" VerticalContentAlignment="Center"
+                     ToolTip="{loc:Loc RemoteAccess.RdpUserTooltip}"/>
+        </Grid>
+
+        <Grid Margin="0,4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" MinWidth="130"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="{loc:Loc RemoteAccess.SshTarget}"
+                       Style="{StaticResource FieldLabel}"/>
+            <TextBox x:Name="SshTargetBox" Grid.Column="1" Style="{StaticResource ModernTextBox}"
+                     Padding="6,3" VerticalContentAlignment="Center"
+                     ToolTip="{loc:Loc RemoteAccess.SshTargetTooltip}"/>
         </Grid>
 
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">

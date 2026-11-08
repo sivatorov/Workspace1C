@@ -45,6 +45,9 @@ public partial class ServerEditWindow : Window
         UserBox.Text = model?.User ?? string.Empty;
         if (model is not null)
             PasswordBox.Password = model.Password ?? string.Empty;
+        RdpHostBox.Text = model?.RdpHost ?? string.Empty;
+        RdpUserBox.Text = model?.RdpUser ?? string.Empty;
+        SshTargetBox.Text = RemoteAccessLauncher.FormatSshTarget(model);
 
         // Фокус в первом поле (описание) — отложенный вызов после показа окна,
         // иначе при ShowDialog() фокус «съедается» до активации окна (паттерн #299).
@@ -111,7 +114,10 @@ public partial class ServerEditWindow : Window
             Password = _isPasswordRevealed
                 ? (PasswordRevealTextBox.Text ?? string.Empty)
                 : (PasswordBox.Password ?? string.Empty),
+            RdpHost = RdpHostBox.Text?.Trim() ?? string.Empty,
+            RdpUser = RdpUserBox.Text?.Trim() ?? string.Empty,
         };
+        RemoteAccessLauncher.ApplySshTarget(Result, SshTargetBox.Text);
         DialogResult = true;
     }
 
