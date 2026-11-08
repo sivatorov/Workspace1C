@@ -227,3 +227,16 @@ public sealed class ProLicensingTests : IDisposable
 public sealed class ProLicensingCollection
 {
 }
+
+/// <summary>Встроенный открытый ключ проверки — корректный ключ ECDSA P-256.</summary>
+public sealed class ProLicensingPublicKeyTests
+{
+    [Fact]
+    public void EmbeddedPublicKey_IsValidP256()
+    {
+        Assert.False(string.IsNullOrWhiteSpace(LicenseVerifier.PublicKey));
+        using var ecdsa = ECDsa.Create();
+        ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(LicenseVerifier.PublicKey), out _);
+        Assert.Equal(256, ecdsa.KeySize);
+    }
+}

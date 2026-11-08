@@ -46,11 +46,13 @@ public static class LicenseVerifier
 {
     /// <summary>
     /// Открытый ключ проверки (SubjectPublicKeyInfo, base64). Пара ключей создаётся
-    /// утилитой выпуска (<c>LicenseIssuer keygen</c>, приватный репозиторий Workspace1C.Pro);
-    /// сюда вставляется только ОТКРЫТАЯ часть. Пусто — все ключи отклоняются
-    /// со статусом <see cref="LicenseStatus.NotConfigured"/>.
+    /// утилитой выпуска (<c>LicenseIssuer keygen</c>, приватный репозиторий Workspace1C.Pro,
+    /// 08.11.2026); здесь только ОТКРЫТАЯ часть. Смена ключа делает недействительными все
+    /// выпущенные ранее лицензии. Пусто — все ключи отклоняются со статусом
+    /// <see cref="LicenseStatus.NotConfigured"/>.
     /// </summary>
-    public const string PublicKey = "";
+    public const string PublicKey =
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEHgLIsq+2ODANmEtpZZi36qBo8VPIGXf/O/auj+kxO0ihpfBpXv1ZKJdQUmv4ZA+0BHxG7fR+uZu4uo5K//rV+w==";
 
     /// <summary>Переопределение открытого ключа (тесты).</summary>
     public static string? PublicKeyOverride { get; set; }
