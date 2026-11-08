@@ -61,10 +61,29 @@ jobs:
     name: Windows (WPF, single-file)
     runs-on: windows-latest
     timeout-minutes: 40
+    env:
+      PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
+      ProSourceDir: ${{ github.workspace }}/pro/src/
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.CHECKOUT_REF }}
+
+      # Модули редакции ПРО (docs/pro/PRO-EDITION.md): приватный репозиторий
+      # Workspace1C.Pro, секрет PRO_REPO_TOKEN — fine-grained PAT с правом чтения.
+      # Без секрета собирается бесплатная редакция (с предупреждением).
+      - name: Модули ПРО (приватный репозиторий)
+        if: env.PRO_REPO_TOKEN != ''
+        uses: actions/checkout@v7
+        with:
+          repository: sivatorov/Workspace1C.Pro
+          token: ${{ env.PRO_REPO_TOKEN }}
+          path: pro
+
+      - name: Предупреждение — сборка без модулей ПРО
+        if: env.PRO_REPO_TOKEN == ''
+        shell: bash
+        run: echo "::warning title=ПРО::Секрет PRO_REPO_TOKEN не задан — собирается бесплатная редакция без модулей ПРО 2.x."
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
@@ -93,10 +112,29 @@ jobs:
     name: Linux (Avalonia, single-file)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PRO_REPO_TOKEN: ${{ secrets.PRO_REPO_TOKEN }}
+      ProSourceDir: ${{ github.workspace }}/pro/src/
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.CHECKOUT_REF }}
+
+      # Модули редакции ПРО (docs/pro/PRO-EDITION.md): приватный репозиторий
+      # Workspace1C.Pro, секрет PRO_REPO_TOKEN — fine-grained PAT с правом чтения.
+      # Без секрета собирается бесплатная редакция (с предупреждением).
+      - name: Модули ПРО (приватный репозиторий)
+        if: env.PRO_REPO_TOKEN != ''
+        uses: actions/checkout@v7
+        with:
+          repository: sivatorov/Workspace1C.Pro
+          token: ${{ env.PRO_REPO_TOKEN }}
+          path: pro
+
+      - name: Предупреждение — сборка без модулей ПРО
+        if: env.PRO_REPO_TOKEN == ''
+        shell: bash
+        run: echo "::warning title=ПРО::Секрет PRO_REPO_TOKEN не задан — собирается бесплатная редакция без модулей ПРО 2.x."
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
