@@ -649,6 +649,9 @@
     <Compile Include="ViewModels\TelegramBotViewModel.cs" />
     <!-- Окно «Лицензия» редакции ПРО 2.x (docs/pro/PRO-EDITION.md): общая ViewModel обеих платформ. -->
     <Compile Include="ViewModels\LicenseViewModel.cs" />
+    <!-- Debounce-хранилище CTS сохранения настроек (issue #96): чистый хелпер без WPF;
+         подключается и на Linux, иначе не компилируются SettingsSaveDebouncerTests. -->
+    <Compile Include="ViewModels\SettingsSaveDebouncer.cs" />
     <Compile Include="ViewModels\DbmsBackupViewModel.cs" />
     <Compile Include="ViewModels\ServerAlertsViewModel.cs" />
     <Compile Include="ViewModels\WebPublishViewModel.cs" />
