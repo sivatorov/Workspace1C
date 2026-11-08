@@ -312,10 +312,24 @@ namespace Workspace1C
                         ThemeManager.ApplyTheme(darkVariant);
                     ThemeManager.ApplyScheme(mergedScheme);
 
+                    // Issue #107: страховка — вариант темы никогда не остаётся Default
+                    // (App.axaml): в этом случае Fluent-контролы резолвили бы цвета
+                    // содержимого по системной теме (на тёмной Linux-системе — белый
+                    // текст кнопок на ярких подложках палитры). ApplyFullTheme уже
+                    // задаёт вариант явно; здесь дохватываем любой ранний выход.
+                    // Дефолт приложения — светлая тема.
+                    if (Application.Current.RequestedThemeVariant == Avalonia.Styling.ThemeVariant.Default)
+                        ThemeManager.ApplyTheme(dark: false);
+
                     // Компактный режим интерфейса (влияет на метрики отступов/иконок,
                     // должен быть установлен до построения главного окна).
                     UiMetrics.Compact = settings.CompactMode;
-                    LogStartupStage(startupLogger, "Тема применена");
+                    // Диагностика (issue #107): фактический вариант, активная тема и
+                    // нормализованный выбор пользователя — в лог старта, чтобы по
+                    // ZIP-диагностике было видно рассогласование варианта/палитры.
+                    LogStartupStage(startupLogger,
+                        $"Тема применена (variant={Application.Current.RequestedThemeVariant}, " +
+                        $"theme={ThemeManager.CurrentTheme}, fullTheme={fullTheme})");
 
                     var mainWindow = AppServices.GetRequiredService<MainWindow>();
                     LogStartupStage(startupLogger, "Главное окно построено");

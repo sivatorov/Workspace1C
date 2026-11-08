@@ -11,6 +11,60 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.44] — 2026-11-08
+
+### Исправлено
+
+- **Строка состояния в Linux: tooltip и контекстное меню на месте и не усечены
+  (issue #114).** Подсказка статус-панели Avalonia показывалась «не совсем там»
+  и обрезалась экраном, контекстное меню — «совсем не там» (pointer-based
+  placement popup на X11 позиционируется неровно). Теперь подсказка —
+  собственный `ToolTip` с `TextWrapping=Wrap` (длинный путь и ИД переносятся
+  и не усекаются), переносом строки перед частью «ID …» (отдельное свойство
+  `StatusBarInfoTip` в [`MainViewModel.Avalonia.Display.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.Display.cs)
+  — сама панель остаётся однострочной) и `ToolTip.SetPlacement(…, Top)` —
+  подсказка открывается над элементом панели. Контекстное меню копирования
+  ИД/пути привязано к строке состояния (`PlacementTarget` + `Placement=Top`,
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs), `BuildStatusBar`).
+  Покрыто страж-тестами [`Issue114StatusBarTooltipTests.cs`](Workspace1C.Tests/Issue114StatusBarTooltipTests.cs).
+- **Linux: дефолтная тема — белый текст кнопок на яркой подложке (issue #107,
+  комментарий 7OH от 2026-11-07).** Причина: при дефолтных настройках
+  `RequestedThemeVariant` оставался `Default` из [App.axaml](Workspace1C/App.axaml),
+  и Fluent-контролы резолвили цвета содержимого по системной теме — на тёмной
+  системе кнопки получали белый текст на ярких подложках светлой палитры.
+  - `ApplyFullTheme` теперь ВСЕГДА задаёт явный вариант (Light/Dark —
+    [`ThemeManager.Avalonia.cs`](Workspace1C/Themes/ThemeManager.Avalonia.cs));
+  - страховка в старте ([App.axaml.cs](Workspace1C/App.axaml.cs)): вариант не
+    остаётся `Default` (дефолт приложения — светлая тема), фактический вариант,
+    активная тема и нормализованный выбор пользователя пишутся в лог старта
+    (диагностика по ZIP-диагностике);
+  - `ApplyColors` перекрывает кисти содержимого Fluent-кнопок
+    (`ButtonForeground*`) цветом текста схемы (`ApplyFluentForeground`) —
+    страховка читаемого текста при любом рассогласовании варианта и палитры.
+  Покрыто страж-тестами [`Issue107LinuxDefaultThemeTests.cs`](Workspace1C.Tests/Issue107LinuxDefaultThemeTests.cs).
+- **«Развернуть тестовую копию»: блокировка регламентных заданий — ДО загрузки
+  данных (issue #79, вопрос 7OH «почему задания выключаются ПОСЛЕ загрузки?»).**
+  Новый шаг `DenyJobs` ([`TestDeployService.TryDenyScheduledJobsAsync`](Workspace1C/Services/TestDeployService.cs)):
+  кластерная галочка `rac infobase update --scheduled-jobs-deny=on` ставится
+  сразу после создания/обнаружения целевой базы, перед RestoreIB — задания
+  вообще не стартуют во время загрузки, а «прогрев» метаданных после загрузки
+  больше не ломает COM-чтение свойств заданий (ложная «Внутренняя ошибка»).
+  Механизм — общий [`BatchOpsPreparationService`](Workspace1C/Services/BatchOpsPreparationService.cs)
+  (как в массовых операциях, issue #92); сбой rac — warning, не ошибка
+  (COM-механизм остаётся fallback). Шаг после загрузки упрощён: при успешной
+  rac-блокировке COM-шаг пропускается (`TestDeploy.JobsSkippedDenyApplied`),
+  verify-подсчёт заданий удалён вместе с ключами `JobsDisabledVerified`/
+  `JobsVerifyHint`/`JobsVerifyRemaining` (ответ на вопрос «что мы считаем?»
+  больше не нужен), `EvaluateJobsStep` упрощена. Шаг работает и на Linux
+  (rac доступен — раньше шаг заданий там просто логировал пропуск). Порядок
+  шагов синхронизирован в [`TestDeployPlanner.DescribeSteps`](Workspace1C/Services/TestDeployPlanner.cs)
+  (предпросмотр мастера), локализация ru/en. Покрыто тестами
+  [`TestDeployDenyJobsStepTests.cs`](Workspace1C.Tests/TestDeployDenyJobsStepTests.cs)
+  (порядок шагов, файловая база, rac-успех/сбой/исключение) и обновлёнными
+  [`Issue79ScheduledJobsResilienceTests.cs`](Workspace1C.Tests/Issue79ScheduledJobsResilienceTests.cs).
+
+---
+
 ## [1.0.1.43] — 2026-11-07
 
 ### Добавлено

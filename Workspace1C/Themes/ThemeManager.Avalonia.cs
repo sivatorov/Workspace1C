@@ -179,6 +179,14 @@ namespace Workspace1C.Themes
             CurrentWindowButtonStyle = ThemeFeatureMap.EffectiveButtonStyle(CurrentFullTheme, WindowButtonStyleOverride);
             CurrentIconSet = ThemeFeatureMap.EffectiveIconSet(CurrentFullTheme, IconSetOverride);
             CurrentTheme = CurrentFullTheme.IsDark ? DarkThemeName : LightThemeName;
+            // Issue #107: базовый вариант задаётся ВСЕГДА явно. ApplyFullTheme раньше не
+            // трогал RequestedThemeVariant — при дефолтных настройках (устаревший Theme
+            // пуст → ResolveDarkVariant == null) вариант оставался Default из App.axaml,
+            // и Fluent-контролы резолвили цвета содержимого по СИСТЕМНОЙ теме: на тёмной
+            // Linux-системе кнопки получали белый текст на ярких подложках светлой
+            // палитры приложения. Легкая тема по умолчанию — поэтому Light при IsDark=false.
+            if (Application.Current is { } app)
+                app.RequestedThemeVariant = CurrentFullTheme.IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
             ApplyScheme(CurrentFullTheme.Scheme);
             ApplyWindowButtonStyle();
             ApplyIconSet();
@@ -573,7 +581,32 @@ namespace Workspace1C.Themes
             // схема может его осветлить (issue #26).
             SetContrastBrush(app, scheme, dark, "SidebarTextBrush", "SidebarColor");
 
+            // Issue #107: кисти содержимого Fluent-кнопок перекрываются цветом текста
+            // схемы — страховка читаемого текста при любом рассогласовании варианта
+            // темы и палитры (см. ApplyFluentForeground).
+            ApplyFluentForeground(app, scheme, dark);
+
             ApplyFluentAccent(app, scheme, dark);
+        }
+
+        /// <summary>
+        /// Перекрывает кисти содержимого Fluent-кнопок цветом текста схемы (issue #107,
+        /// комментарий 7OH 2026-11-07: «куча кнопок с белым текстом при яркой подложке»).
+        /// FluentTheme берёт их из ресурсов варианта темы (ButtonForeground*), и при
+        /// рассогласовании варианта (RequestedThemeVariant=Default на тёмной системе) и
+        /// светлой палитры приложения текст кнопок оставался белым на ярких подложках.
+        /// Ключи — из ControlTheme кнопки Avalonia 11 (FluentTheme); disabled-вариант
+        /// не трогается: приглушённый цвет Fluent читаем в обеих темах.
+        /// </summary>
+        private static void ApplyFluentForeground(Application app, ColorScheme scheme, bool dark)
+        {
+            var hex = scheme.PaletteValue(dark, "TextPrimaryColor");
+            if (string.IsNullOrWhiteSpace(hex) || !TryParseColor(hex, out var color))
+                return;
+            var brush = new SolidColorBrush(color);
+            app.Resources["ButtonForeground"] = brush;
+            app.Resources["ButtonForegroundPointerOver"] = brush;
+            app.Resources["ButtonForegroundPressed"] = brush;
         }
 
         /// <summary>Выставляет кисть, контрастную заданному цвету палитры (WCAG 4.5:1).</summary>

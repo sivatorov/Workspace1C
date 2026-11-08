@@ -35,6 +35,14 @@ public enum TestDeployStepKind
     /// <summary>Загрузка .dt в существующую тестовую ИБ (обновление данных).</summary>
     Update,
 
+    /// <summary>
+    /// Rac-блокировка регламентных заданий ДО загрузки (issue #79, v1.0.1.44:
+    /// <c>infobase update --scheduled-jobs-deny=on</c> сразу после создания/обнаружения
+    /// целевой базы, перед RestoreIB). Только для клиент-серверных целевых баз и при
+    /// включённом «выключить регламентные задания».
+    /// </summary>
+    DenyJobs,
+
     /// <summary>Загрузка .dt в новую тестовую ИБ (RestoreIB).</summary>
     Restore,
 

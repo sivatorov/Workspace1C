@@ -2175,10 +2175,24 @@ namespace Workspace1C
             // Подсказка показывает строку целиком: в нижней панели она обрезается
             // многоточием. Контекстное меню с копированием строки подключения
             // взято из разметки WPF (MainWindow.xaml:2288-2292).
-            _statusInfo.Bind(ToolTip.TipProperty, new Binding("StatusBarInfo"));
+            // Issue #114: собственный ToolTip с TextWrapping=Wrap — длинный путь и
+            // ИД переносятся и не усекаются экраном; текст с переносом строки перед
+            // ИД (StatusBarInfoTip); ToolTip.SetPlacement(…, Top) — подсказка
+            // открывается НАД элементом панели: popup привязан к ней, а не к курсору
+            // (pointer-based placement на X11 позиционируется неровно).
+            var statusTipText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 480 };
+            statusTipText.Bind(TextBlock.TextProperty, new Binding("StatusBarInfoTip"));
+            var statusTip = new ToolTip { Content = statusTipText };
+            ToolTip.SetTip(_statusInfo, statusTip);
+            ToolTip.SetPlacement(_statusInfo, PlacementMode.Top);
             if (_vm is not null)
             {
                 var statusMenu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
+                // Issue #114: якорное размещение — меню открывается над элементом
+                // строки состояния (PlacementTarget), а не у курсора: pointer-based
+                // placement на X11 и есть источник «меню совсем не там».
+                statusMenu.PlacementTarget = _statusInfo;
+                statusMenu.Placement = PlacementMode.Top;
                 // Копирование ИД базы (issue #110): явный пункт меню + двойной клик.
                 statusMenu.Items.Add(MenuAction("Main.StatusIdCopy", _vm.CopyInfobaseIdCommand, iconKey: "IconCopy"));
                 statusMenu.Items.Add(MenuAction("Main.CopyPath", _vm.CopyConnectionStringCommand, iconKey: "IconCopy"));

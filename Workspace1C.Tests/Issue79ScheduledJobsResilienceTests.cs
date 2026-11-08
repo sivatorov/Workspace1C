@@ -105,8 +105,7 @@ public sealed class Issue79ScheduledJobsResilienceTests
     public void EvaluateJobsStep_AllDisabled_NoWarning()
     {
         var jobs = new ScheduledJobsResult { Success = true, Changed = 4 };
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs, verify: null, CancellationToken.None);
+        var outcome = TestDeployService.EvaluateJobsStep("Тест: Demo", jobs);
 
         Assert.True(outcome.Disabled);
         Assert.Null(outcome.Warning);
@@ -122,8 +121,7 @@ public sealed class Issue79ScheduledJobsResilienceTests
             Changed = 3,
             Errors = new[] { "задание 1: Внутренняя ошибка", "задание 4: boom" }
         };
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs, verify: null, CancellationToken.None);
+        var outcome = TestDeployService.EvaluateJobsStep("Тест: Demo", jobs);
 
         // Частичный успех — НЕ ошибка шага: блокировка применена, сбойные в журнале.
         Assert.True(outcome.Disabled);
@@ -132,59 +130,13 @@ public sealed class Issue79ScheduledJobsResilienceTests
     }
 
     [Fact]
-    public void EvaluateJobsStep_OperationFailed_ButVerificationShowsAllDisabled_TreatedAsSuccessWithWarning()
+    public void EvaluateJobsStep_OperationFailed_WarningWithoutVerifyCounting()
     {
-        // Главный сценарий 7OH: операция упала «Внутренней ошибкой», но блокировка
-        // фактически установлена — шаг считается выполненным (warning, не ошибка).
+        // Issue #79 (v1.0.1.44): verify-подсчёт заданий удалён (вопрос 7OH «что мы
+        // считаем?») — при сбое операции фиксируется warning (не ошибка, Success
+        // развёртывания не роняется), без повторного COM-чтения и подсчёта.
         var jobs = ScheduledJobsResult.Fail("Внутренняя ошибка");
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs,
-            verify: _ => new ScheduledJobsResult { Success = true, Enabled = 0 },
-            CancellationToken.None);
-
-        Assert.True(outcome.Disabled);
-        Assert.Null(outcome.Warning);
-        Assert.Single(outcome.LogLines);
-    }
-
-    [Fact]
-    public void EvaluateJobsStep_OperationFailed_VerificationShowsEnabledJobs_RealFailure()
-    {
-        var jobs = ScheduledJobsResult.Fail("Внутренняя ошибка");
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs,
-            verify: _ => new ScheduledJobsResult { Success = true, Enabled = 2 },
-            CancellationToken.None);
-
-        Assert.False(outcome.Disabled);
-        Assert.NotNull(outcome.Warning);
-        // В журнале одна поясняющая строка от проверки (число оставшихся включёнными;
-        // текст локализован, содержимое не проверяем — T() в тестах без Initialize
-        // возвращает ключ).
-        Assert.Single(outcome.LogLines);
-    }
-
-    [Fact]
-    public void EvaluateJobsStep_OperationFailed_VerificationAlsoFails_RealFailureWithHint()
-    {
-        var jobs = ScheduledJobsResult.Fail("Внутренняя ошибка");
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs,
-            verify: _ => ScheduledJobsResult.Fail("Внутренняя ошибка COM-соединения"),
-            CancellationToken.None);
-
-        Assert.False(outcome.Disabled);
-        Assert.NotNull(outcome.Warning);
-        // Пояснение от неудавшейся проверки добавлено в журнал (одна строка).
-        Assert.Single(outcome.LogLines);
-    }
-
-    [Fact]
-    public void EvaluateJobsStep_OperationFailed_NoVerifier_RealFailure()
-    {
-        var jobs = ScheduledJobsResult.Fail("Внутренняя ошибка");
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs, verify: null, CancellationToken.None);
+        var outcome = TestDeployService.EvaluateJobsStep("Тест: Demo", jobs);
 
         Assert.False(outcome.Disabled);
         Assert.NotNull(outcome.Warning);
@@ -192,26 +144,18 @@ public sealed class Issue79ScheduledJobsResilienceTests
     }
 
     [Fact]
-    public void EvaluateJobsStep_VerifierThrows_RealFailureWithoutCrash()
+    public void Service_DenyJobsStep_BeforeRestore_AndComStepSimplified()
     {
-        var jobs = ScheduledJobsResult.Fail("Внутренняя ошибка");
-        var outcome = TestDeployService.EvaluateJobsStep(
-            "Тест: Demo", jobs,
-            verify: _ => throw new InvalidOperationException("verify crashed"),
-            CancellationToken.None);
-
-        Assert.False(outcome.Disabled);
-        Assert.NotNull(outcome.Warning);
-    }
-
-    [Fact]
-    public void Service_DisableJobsStep_UsesEvaluationWithVerification()
-    {
-        // Страж: DisableScheduledJobsAsync идёт через EvaluateJobsStep и verify.
+        // Страж (issue #79, v1.0.1.44): rac-блокировка регламентных заданий выполняется
+        // ДО загрузки (шаг DenyJobs перед Restore), а COM-шаг после загрузки упрощён:
+        // EvaluateJobsStep без verify, при успешной rac-блокировке COM пропускается.
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "TestDeployService.cs"));
-        Assert.Contains("EvaluateJobsStep(target.Name, jobs,", code, StringComparison.Ordinal);
-        Assert.Contains("ScheduledJobsService.VerifyAsync", code, StringComparison.Ordinal);
-        Assert.Contains("ScheduledJobsService.VerifyOverride", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.Step.DenyJobs", code, StringComparison.Ordinal);
+        Assert.Contains("TestDeploy.JobsSkippedDenyApplied", code, StringComparison.Ordinal);
+        Assert.Contains("EvaluateJobsStep(target.Name, jobs)", code, StringComparison.Ordinal);
+        Assert.Contains("TryDenyScheduledJobsAsync", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScheduledJobsService.VerifyAsync", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ScheduledJobsService.VerifyOverride", code, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------
@@ -254,16 +198,37 @@ public sealed class Issue79ScheduledJobsResilienceTests
     {
         foreach (var key in new[]
                  {
+                     "TestDeploy.Step.DenyJobs",
                      "TestDeploy.JobsDisabledWithSkips",
-                     "TestDeploy.JobsDisabledVerified",
-                     "TestDeploy.JobsVerifyHint",
-                     "TestDeploy.JobsVerifyRemaining"
+                     "TestDeploy.JobsDenySet",
+                     "TestDeploy.JobsDenyFailed",
+                     "TestDeploy.JobsDenyUnavailable",
+                     "TestDeploy.JobsDenyFileSkipped",
+                     "TestDeploy.JobsSkippedDenyApplied"
                  })
         {
             var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
             var en = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "en.json"));
             Assert.Contains($"\"{key}\":", ru, StringComparison.Ordinal);
             Assert.Contains($"\"{key}\":", en, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void Localization_ObsoleteVerifyKeys_Removed()
+    {
+        // Issue #79 (v1.0.1.44): verify-подсчёт заданий удалён вместе с его ключами.
+        var ru = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "ru.json"));
+        var en = ReadProjectFile(Path.Combine("Workspace1C", "Localization", "Languages", "en.json"));
+        foreach (var key in new[]
+                 {
+                     "TestDeploy.JobsDisabledVerified",
+                     "TestDeploy.JobsVerifyHint",
+                     "TestDeploy.JobsVerifyRemaining"
+                 })
+        {
+            Assert.DoesNotContain($"\"{key}\":", ru, StringComparison.Ordinal);
+            Assert.DoesNotContain($"\"{key}\":", en, StringComparison.Ordinal);
         }
     }
 

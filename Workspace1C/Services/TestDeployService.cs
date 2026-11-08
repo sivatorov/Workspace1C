@@ -180,6 +180,36 @@ public sealed class TestDeployService
                     result.TargetUpdated = true;
                 }
 
+                // ---- Шаг 3.5: rac-блокировка регламентных заданий ДО загрузки
+                // (issue #79, v1.0.1.44, предложение 7OH «задания выключаются ПОСЛЕ
+                // загрузки — надо ставить сразу»): кластерная галочка scheduled-jobs-deny
+                // ставится сразу после создания/обнаружения целевой базы, ДО RestoreIB —
+                // задания вообще не стартуют во время загрузки, а «прогрев» метаданных
+                // после RestoreIB больше не ломает COM-шаг. Ошибка rac — warning, не
+                // ошибка: развёртывание продолжается через COM-механизм после загрузки.
+                bool denyApplied = false;
+                if (scenario.DisableScheduledJobs)
+                {
+                    log?.Invoke(T("TestDeploy.Step.DenyJobs"));
+                    result.Log.Add(T("TestDeploy.Step.DenyJobs"));
+                    cancellationToken.ThrowIfCancellationRequested();
+                    try
+                    {
+                        denyApplied = await TryDenyScheduledJobsAsync(target, result, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.Error("Ошибка шага «Блокировка регламентных заданий»", ex);
+                        var denyWarning = string.Format(T("TestDeploy.JobsDenyFailed"), ex.Message);
+                        result.Log.Add(denyWarning);
+                        result.Warnings.Add(denyWarning);
+                    }
+                }
+
                 // ---- Шаг 4: загрузка .dt в целевую базу (RestoreIB). ----
                 log?.Invoke(T("TestDeploy.Step.Restore"));
                 result.Log.Add(T("TestDeploy.Step.Restore"));
@@ -202,24 +232,37 @@ public sealed class TestDeployService
                     return result;
                 }
 
-                // ---- Шаг 5: выключение регламентных заданий в копии (1.0.0.85). ----
-                // Issue #79 (v1.0.1.40): каждый шаг обёрнут в локальный try/catch —
-                // ошибка видна с именем шага (а не TestDeploy.Step.Unknown), в журнал
-                // окна попадают тип и стек исключения.
+                // ---- Шаг 5: регламентные задания в копии (1.0.0.85; issue #79, v1.0.1.44). ----
+                // Если кластерная блокировка установлена до загрузки — COM-шаг пропускается:
+                // галочка уже держит задания выключенными, и «Внутренняя ошибка» COM при
+                // чтении свойств заданий после RestoreIB больше не возникает. Файловые
+                // базы и сбои rac — прежний устойчивый COM-поток (per-job try/catch,
+                // v1.0.1.40) БЕЗ verify-подсчёта: при сбое COM — warning с расшифровкой
+                // (ExplainComInternalError), развёртывание считается успешным.
                 if (scenario.DisableScheduledJobs)
                 {
                     log?.Invoke(T("TestDeploy.Step.DisableJobs"));
                     result.Log.Add(T("TestDeploy.Step.DisableJobs"));
                     cancellationToken.ThrowIfCancellationRequested();
-                    try
+                    if (denyApplied)
                     {
-                        await DisableScheduledJobsAsync(target, result).ConfigureAwait(false);
+                        result.Log.Add(string.Format(T("TestDeploy.JobsSkippedDenyApplied"), target.Name));
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        _logger?.Error("Ошибка шага «Выключение регламентных заданий»", ex);
-                        RecordStepFailure(result, T("TestDeploy.Step.DisableJobs"), ex);
-                        return result;
+                        // Issue #79 (v1.0.1.40): шаг обёрнут в локальный try/catch —
+                        // ошибка видна с именем шага (а не TestDeploy.Step.Unknown), в
+                        // журнал окна попадают тип и стек исключения.
+                        try
+                        {
+                            await DisableScheduledJobsAsync(target, result).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger?.Error("Ошибка шага «Выключение регламентных заданий»", ex);
+                            RecordStepFailure(result, T("TestDeploy.Step.DisableJobs"), ex);
+                            return result;
+                        }
                     }
                 }
 
@@ -541,14 +584,15 @@ public sealed class TestDeployService
 
     /// <summary>
     /// Выключение всех регламентных заданий в копии (<see cref="ScheduledJobsService"/>, 1.0.0.85).
-    /// На Linux COM-механизм недоступен — фиксируется в журнале, развёртывание не прерывается.
+    /// COM-fallback шага после загрузки: выполняется, когда rac-блокировка ДО загрузки
+    /// не удалась или целевая база файловая (issue #79, v1.0.1.44). На Linux COM-механизм
+    /// недоступен — фиксируется в журнале, развёртывание не прерывается.
     /// Секреты не логируются; текст ошибки замаскирован службой скриптов.
-    /// <para>Issue #79 (v1.0.1.42, диагностика 7OH): сбой чтения COM на клиент-серверной
-    /// базе сразу после RestoreIB («Внутренняя ошибка») не считается ошибкой шага, если
-    /// повторная проверка (<see cref="ScheduledJobsService.VerifyAsync"/>) подтвердила,
-    /// что все задания фактически выключены, — в этом случае фиксируется warning с
-    /// деталями, развёртывание продолжается. Реальный сбой (задания остались включёнными
-    /// или проверка не удалась) — прежний warning с расшифровкой.</para>
+    /// <para>Issue #79 (v1.0.1.44): verify-подсчёт заданий удалён (вопрос 7OH
+    /// «откуда сообщение? что мы пытаемся определить? количество чего?» — это была
+    /// повторная COM-проверка с подсчётом включённых заданий): при сбое операции
+    /// фиксируется warning с расшифровкой (<see cref="ExplainComInternalError"/>),
+    /// развёртывание считается успешным (паритет с v1.0.1.40+).</para>
     /// </summary>
     private async Task DisableScheduledJobsAsync(Infobase target, TestDeployResult result)
     {
@@ -569,11 +613,7 @@ public sealed class TestDeployService
             jobs = ScheduledJobsResult.Fail(ex.Message);
         }
 
-        var outcome = EvaluateJobsStep(target.Name, jobs,
-            ct => ScheduledJobsService.VerifyOverride is not null
-                ? ScheduledJobsService.VerifyOverride(target, ct).ConfigureAwait(false).GetAwaiter().GetResult()
-                : ScheduledJobsService.VerifyAsync(target, ct).ConfigureAwait(false).GetAwaiter().GetResult(),
-            CancellationToken.None);
+        var outcome = EvaluateJobsStep(target.Name, jobs);
 
         foreach (var line in outcome.LogLines)
             result.Log.Add(line);
@@ -584,6 +624,102 @@ public sealed class TestDeployService
         }
     }
 
+    /// <summary>
+    /// Test-override rac-шага блокировки регламентных заданий (issue #79, v1.0.1.44;
+    /// по образцу статического override в <see cref="ScheduledJobsService"/>): подменяет
+    /// <see cref="BatchOpsPreparationService"/> в юнит-тестах. Аргумент — целевая база;
+    /// возвращает (успех, текст ошибки или null). Null — используется боевой rac-путь.
+    /// </summary>
+    internal static Func<Infobase, CancellationToken, Task<(bool Success, string? Error)>>? DenyJobsOverride;
+
+    /// <summary>
+    /// Шаг rac-блокировки регламентных заданий ДО загрузки (issue #79, v1.0.1.44):
+    /// кластерная галочка <c>infobase update --scheduled-jobs-deny=on</c> ставится
+    /// сразу после создания/обнаружения целевой базы, ДО RestoreIB — задания не
+    /// стартуют во время загрузки, а «прогрев» метаданных после RestoreIB больше не
+    /// ломает COM-чтение свойств заданий (последний комментарий 7OH 2026-11-07:
+    /// «Внутренняя ошибка после загрузки всё ещё на месте», вопрос «почему задания
+    /// выключаются ПОСЛЕ загрузки?»). Механизм — <see cref="BatchOpsPreparationService"/>
+    /// (как в массовых операциях, issue #92): резолв кластера/ИБ + infobase update.
+    /// <para>Только для клиент-серверных целевых баз; файловая база — пропуск с
+    /// пояснением в журнале (COM-шаг после загрузки работает как раньше). Ошибка rac —
+    /// НЕ ошибка развёртывания: warning в журнал и в <see cref="TestDeployResult.Warnings"/>,
+    /// развёртывание продолжается. На Linux шаг работает (rac доступен), закрывая и
+    /// Linux-кейс, где раньше шаг заданий просто логировал пропуск.</para>
+    /// Возвращает true, если блокировка установлена кластером.
+    /// </summary>
+    internal static async Task<bool> TryDenyScheduledJobsAsync(Infobase target, TestDeployResult result, CancellationToken ct)
+    {
+        if (target.Connection?.Type != ConnectionType.ClientServer)
+        {
+            result.Log.Add(T("TestDeploy.JobsDenyFileSkipped"));
+            return false;
+        }
+
+        try
+        {
+            if (DenyJobsOverride is not null)
+            {
+                var (ok, error) = await DenyJobsOverride(target, ct).ConfigureAwait(false);
+                return FinishDenyJobsStep(ok, error, result);
+            }
+
+            // rac-клиент/справочник серверов из AppServices; null — DI недоступен
+            // (например, CLI-контекст): COM-fallback после загрузки.
+            var preparation = BatchOpsPreparationService.CreateDefault(msg => result.Log.Add(msg));
+            if (preparation is null)
+            {
+                result.Log.Add(T("TestDeploy.JobsDenyUnavailable"));
+                return false;
+            }
+
+            // Только scheduled-jobs-deny: блокировка НАЧАЛА сеансов несовместима с
+            // загрузкой (RestoreIB обязан войти в базу, issue #92, v1.0.1.30) и потому
+            // не запрашивается вовсе.
+            var outcome = await preparation.ApplyBeforeAsync(
+                target,
+                new BatchOpsPreparationOptions { DenyScheduledJobs = true },
+                ct).ConfigureAwait(false);
+            if (outcome is null)
+            {
+                return FinishDenyJobsStep(false, T("TestDeploy.JobsDenyUnavailable"), result);
+            }
+            if (!outcome.Success)
+            {
+                return FinishDenyJobsStep(false, outcome.Error, result);
+            }
+
+            // Блокировка либо установлена сейчас, либо уже была включена администратором:
+            // в обоих случаях задания держатся выключенными кластером во время загрузки.
+            var denied = outcome.SetScheduledJobsDeny || outcome.WasScheduledJobsDeny;
+            return FinishDenyJobsStep(denied, denied ? null : outcome.Error, result);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            return FinishDenyJobsStep(false, ex.Message, result);
+        }
+    }
+
+    /// <summary>Итог rac-шага блокировки: успех — строка в журнал; сбой — warning в
+    /// журнал и в <see cref="TestDeployResult.Warnings"/> (развёртывание продолжается).</summary>
+    private static bool FinishDenyJobsStep(bool success, string? error, TestDeployResult result)
+    {
+        if (success)
+        {
+            result.Log.Add(T("TestDeploy.JobsDenySet"));
+            return true;
+        }
+
+        var warning = string.Format(T("TestDeploy.JobsDenyFailed"), error ?? string.Empty);
+        result.Log.Add(warning);
+        result.Warnings.Add(warning);
+        return false;
+    }
+
     /// <summary>Исход шага «Выключение регламентных заданий» (issue #79, v1.0.1.42):
     /// <see cref="Disabled"/> — блокировка фактически применена; <see cref="Warning"/> —
     /// предупреждение для пользователя (null — нет); <see cref="LogLines"/> — строки
@@ -591,26 +727,23 @@ public sealed class TestDeployService
     internal sealed record JobsStepOutcome(bool Disabled, string? Warning, IReadOnlyList<string> LogLines);
 
     /// <summary>
-    /// Классификация исхода шага регламентных заданий (issue #79, v1.0.1.42), чистая
-    /// функция — покрыта юнит-тестами без COM:
+    /// Классификация исхода COM-шага регламентных заданий (issue #79), чистая функция —
+    /// покрыта юнит-тестами без COM:
     /// <list type="bullet">
     /// <item>операция успешна и сбоев per-job нет — успех;</item>
     /// <item>операция успешна, но часть заданий пропущена из-за сбоев чтения — успех
     /// с перечнем сбоев в журнале (пропущенные задания уже не помешают тестовой копии);</item>
-    /// <item>операция упала целиком — повторная проверка <paramref name="verify"/>:
-    /// если все задания выключены фактически, это ложная ошибка чтения — успех с
-    /// предупреждением и деталями в журнале; иначе — реальный сбой (warning).</item>
+    /// <item>операция упала целиком (typical «Внутренняя ошибка» COM сразу после
+    /// RestoreIB) — warning с расшифровкой, развёртывание считается успешным
+    /// (паритет с v1.0.1.40+).</item>
     /// </list>
     /// </summary>
     /// <param name="targetName">Имя тестовой копии (для сообщений).</param>
     /// <param name="jobs">Результат операции «выключить все».</param>
-    /// <param name="verify">Повторная проверка фактического состояния (null — недоступна).</param>
-    /// <param name="ct">Отмена проверки.</param>
-    internal static JobsStepOutcome EvaluateJobsStep(
-        string targetName,
-        ScheduledJobsResult jobs,
-        Func<CancellationToken, ScheduledJobsResult>? verify,
-        CancellationToken ct)
+    /// <remarks>Issue #79 (v1.0.1.44): verify-ветка с повторным COM-чтением и подсчётом
+    /// включённых заданий удалена — хрупкая логика сама падала на «прогреве» метаданных
+    /// и не убирала сообщение об ошибке. Подсчёт больше не нужен пользователю.</remarks>
+    internal static JobsStepOutcome EvaluateJobsStep(string targetName, ScheduledJobsResult jobs)
     {
         if (jobs.Success)
         {
@@ -632,47 +765,12 @@ public sealed class TestDeployService
             return new JobsStepOutcome(true, null, lines);
         }
 
-        // Операция упала целиком: проверяем фактическое состояние повторным чтением.
-        ScheduledJobsResult? state = null;
-        if (verify is not null)
-        {
-            try
-            {
-                state = verify(ct);
-            }
-            catch (Exception ex)
-            {
-                state = ScheduledJobsResult.Fail(ex.Message);
-            }
-        }
-
+        // Операция упала целиком: фиксируем warning с расшифровкой типовой
+        // «Внутренней ошибки» — задания, оставшиеся включёнными, не помешают
+        // тестовой копии, и COM-подсчёт «что осталось» больше не выполняется.
         var originalError = ExplainComInternalError(jobs.Error ?? string.Empty);
-
-        // Все задания выключены фактически — «Внутренняя ошибка» была ложной:
-        // фиксируем успех с предупреждением, детали ошибки остаются в журнале.
-        if (state is { Success: true } && state.Enabled == 0 && state.Errors.Count == 0)
-        {
-            return new JobsStepOutcome(true, null, new[]
-            {
-                string.Format(T("TestDeploy.JobsDisabledVerified"), targetName, originalError)
-            });
-        }
-
-        // Реальный сбой: предупреждение + при возможности пояснение от проверки.
-        var failureLines = new List<string>();
-        if (state is { Success: true })
-        {
-            failureLines.Add(string.Format(
-                T("TestDeploy.JobsVerifyRemaining"), state.Enabled));
-        }
-        else if (state is not null)
-        {
-            failureLines.Add(string.Format(
-                T("TestDeploy.JobsVerifyHint"), ExplainComInternalError(state.Error ?? string.Empty)));
-        }
-
         var warning = string.Format(T("TestDeploy.JobsDisableWarning"), targetName, originalError);
-        return new JobsStepOutcome(false, warning, failureLines);
+        return new JobsStepOutcome(false, warning, Array.Empty<string>());
     }
 
     /// <summary>

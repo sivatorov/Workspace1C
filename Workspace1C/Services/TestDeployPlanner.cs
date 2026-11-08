@@ -176,11 +176,15 @@ public static class TestDeployPlanner
         if (existingTarget is null)
         {
             steps.Add(new TestDeployStep(TestDeployStepKind.Create, "TestDeploy.Step.Create"));
+            if (scenario.DisableScheduledJobs && IsClientServerTarget(scenario, existingTarget))
+                steps.Add(new TestDeployStep(TestDeployStepKind.DenyJobs, "TestDeploy.Step.DenyJobs"));
             steps.Add(new TestDeployStep(TestDeployStepKind.Restore, "TestDeploy.Step.Restore"));
         }
         else
         {
             steps.Add(new TestDeployStep(TestDeployStepKind.Update, "TestDeploy.Step.Update"));
+            if (scenario.DisableScheduledJobs && IsClientServerTarget(scenario, existingTarget))
+                steps.Add(new TestDeployStep(TestDeployStepKind.DenyJobs, "TestDeploy.Step.DenyJobs"));
         }
 
         if (scenario.DisableScheduledJobs)
@@ -194,6 +198,18 @@ public static class TestDeployPlanner
 
         return steps;
     }
+
+    /// <summary>
+    /// Целевая база клиент-серверная? (issue #79, v1.0.1.44: rac-блокировка регламентных
+    /// заданий до загрузки выполняется только для таких баз.) Для новой базы — режим
+    /// сценария («на сервере»), для существующей записи — фактический тип подключения
+    /// (сценарий в режиме сервера может быть запущен на обновление файловой копии).
+    /// Internal — юнит-тесты порядка шагов.
+    /// </summary>
+    internal static bool IsClientServerTarget(TestDeployScenario scenario, Infobase? existingTarget)
+        => existingTarget is not null
+            ? existingTarget.Connection?.Type == ConnectionType.ClientServer
+            : scenario.TargetMode == TestDeployTargetMode.Server;
 
     /// <summary>
     /// Строит полный план развёртывания: итоговое имя, существующая/новая база,

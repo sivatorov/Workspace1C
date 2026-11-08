@@ -406,8 +406,24 @@ public partial class MainViewModel : ViewModelBase
     public string StatusBarInfo
     {
         get => _statusBarInfo;
-        set => SetProperty(ref _statusBarInfo, value);
+        set
+        {
+            if (SetProperty(ref _statusBarInfo, value))
+                OnPropertyChanged(nameof(StatusBarInfoTip));
+        }
     }
+
+    /// <summary>
+    /// Текст подсказки статус-панели (issue #114): та же строка, что и <see cref="StatusBarInfo"/>,
+    /// но перед частью «ID …» вставлен перенос строки — в tooltip длинный путь и ИД читаются
+    /// построчно и не усекаются экраном. Сама панель остаётся однострочной: перенос в
+    /// StatusBarInfo сломал бы нижнюю строку. Разделитель и порядок частей — источник
+    /// единый (<see cref="ComposeStatusInfo"/>), поэтому пост-обработка без дублирования состава.
+    /// </summary>
+    public string StatusBarInfoTip
+        => string.IsNullOrEmpty(_statusBarInfo)
+            ? _statusBarInfo
+            : _statusBarInfo.Replace("  ·  ID ", "\nID ");
 
     /// <summary>
     /// Идёт длительная фоновая работа: окно закрывается затемняющим индикатором,

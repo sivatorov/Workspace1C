@@ -160,7 +160,13 @@ public sealed class TestDeployTests
         Assert.Contains(TestDeployStepKind.DisableJobs, kinds);
         Assert.Contains(TestDeployStepKind.Markers, kinds);
         Assert.Contains(TestDeployStepKind.AddToGroup, kinds);
-        Assert.Equal(7, kinds.Count);
+        Assert.Equal(8, kinds.Count);
+        // Issue #79 (v1.0.1.44): rac-блокировка регламентных заданий — между
+        // созданием базы и загрузкой данных.
+        Assert.True(kinds.IndexOf(TestDeployStepKind.DenyJobs) > kinds.IndexOf(TestDeployStepKind.Create),
+            "DenyJobs должен идти после «Создание».");
+        Assert.True(kinds.IndexOf(TestDeployStepKind.DenyJobs) < kinds.IndexOf(TestDeployStepKind.Restore),
+            "DenyJobs должен идти до «Загрузка».");
     }
 
     [Fact]
