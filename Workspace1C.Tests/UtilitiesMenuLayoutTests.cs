@@ -87,7 +87,7 @@ public sealed class UtilitiesMenuLayoutTests
         // (issue #29); импорт и миграция кластера — отдельные пункты (issue #41).
         var expected = new string?[]
         {
-            "ConfigDiff", "MetadataExplorer", "EventLog", "ConfigExtensions", "InfobaseUsers", "InfobaseScheduledJobs",
+            "ConfigDiff", "MetadataExplorer", "EventLog", "ConfigExtensions", "ExternalProcessings", "InfobaseUsers", "InfobaseScheduledJobs",
             "GitVersioning", "TechLog", "ServerAlerts", "DbmsBackup", "TelegramBot", "SharedLists",
             null,
             "RepositoryBatchUpdate", "RepositoryBrowser",

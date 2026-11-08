@@ -208,7 +208,7 @@ return @{files=$out}
     {
         var e = error.Trim();
         if (e.StartsWith("noinfo:", StringComparison.Ordinal))
-            return string.Format(LocalizationManager.T("ExtProc.NoRegistrationInfo"), e["noinfo:".Length..].Trim());
+            return WithDetail("ExtProc.NoRegistrationInfo", e["noinfo:".Length..].Trim());
         return e;
     }
 
@@ -216,12 +216,22 @@ return @{files=$out}
     public static string DescribeWarning(string warning)
     {
         if (warning.StartsWith("kind:", StringComparison.Ordinal))
-            return string.Format(LocalizationManager.T("ExtProc.WarnKind"), warning["kind:".Length..]);
+            return WithDetail("ExtProc.WarnKind", warning["kind:".Length..]);
         if (warning.StartsWith("dest:", StringComparison.Ordinal))
-            return string.Format(LocalizationManager.T("ExtProc.WarnDestination"), warning["dest:".Length..]);
+            return WithDetail("ExtProc.WarnDestination", warning["dest:".Length..]);
         if (warning == "sections")
             return LocalizationManager.T("ExtProc.WarnSections");
         return warning;
+    }
+
+    /// <summary>
+    /// Текст по шаблону с подробностью; если словарь не загружен и шаблон пришёл без «{0}»,
+    /// подробность дописывается — она не должна теряться (как в InfobaseUsersService).
+    /// </summary>
+    private static string WithDetail(string key, string detail)
+    {
+        var text = string.Format(LocalizationManager.T(key), detail);
+        return detail.Length > 0 && !text.Contains(detail, StringComparison.Ordinal) ? text + ": " + detail : text;
     }
 
     /// <summary>Загружает файлы в одну базу (одно COM-соединение на базу).</summary>

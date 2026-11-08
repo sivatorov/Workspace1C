@@ -686,6 +686,7 @@ public static class UtilitiesMenuLayouts
                 Item("MetadataExplorer"),
                 Item("EventLog"),
                 Item("ConfigExtensions"),
+                Item("ExternalProcessings"),
                 Item("InfobaseUsers"),
                 Item("InfobaseScheduledJobs"),
                 Item("GitVersioning"),
