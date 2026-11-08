@@ -8,7 +8,7 @@ namespace Workspace1C;
 /// <summary>
 /// Корневой контейнер зависимостей приложения.
 /// </summary>
-public static class AppServices
+public static partial class AppServices
 {
     public static IServiceProvider Services { get; private set; } = null!;
 
@@ -246,6 +246,10 @@ public static class AppServices
         services.AddSingleton<IAppUpdateService>(sp => sp.GetRequiredService<UpdateService>());
 #endif
 
+        // Модули редакции ПРО (docs/pro/PRO-EDITION.md): реализация есть только в сборке
+        // с приватным репозиторием Workspace1C.Pro; без неё вызов удаляется компилятором.
+        RegisterProModules(services);
+
         Services = services.BuildServiceProvider();
     }
 
@@ -268,4 +272,10 @@ public static class AppServices
             return default;
         }
     }
+
+    /// <summary>
+    /// Регистрация сервисов модулей ПРО. Реализуется в <c>ProModules.cs</c> приватного
+    /// репозитория Workspace1C.Pro (partial-метод без реализации компилятор удаляет).
+    /// </summary>
+    static partial void RegisterProModules(IServiceCollection services);
 }

@@ -647,6 +647,8 @@
     <Compile Include="ViewModels\EventLogViewModel.cs" />
     <Compile Include="ViewModels\SharedListsViewModel.cs" />
     <Compile Include="ViewModels\TelegramBotViewModel.cs" />
+    <!-- Окно «Лицензия» редакции ПРО 2.x (docs/pro/PRO-EDITION.md): общая ViewModel обеих платформ. -->
+    <Compile Include="ViewModels\LicenseViewModel.cs" />
     <Compile Include="ViewModels\DbmsBackupViewModel.cs" />
     <Compile Include="ViewModels\ServerAlertsViewModel.cs" />
     <Compile Include="ViewModels\WebPublishViewModel.cs" />
@@ -876,6 +878,23 @@
     <Compile Include="Views\ModalWindowBase.cs" />
     <!-- Этап 5: полноценные Linux-реализации сервисов 1С (*.Linux.cs включаются
          автоматически дефолтным глобом; WPF-файлы исключены выше). -->
+  </ItemGroup>
+
+  <!--
+    Редакция ПРО (open-core, docs/pro/PRO-EDITION.md). Если рядом с репозиторием лежит
+    клон приватного Workspace1C.Pro (..\..\Workspace1C.Pro\src или путь в ProSourceDir),
+    его исходники компилируются в ту же сборку и определяется символ PRO_MODULES.
+    Без него собирается бесплатная редакция — никаких изменений в сборке.
+  -->
+  <PropertyGroup>
+    <ProSourceDir Condition="'$(ProSourceDir)' == ''">$(MSBuildThisFileDirectory)..\..\Workspace1C.Pro\src\</ProSourceDir>
+    <HasProModules Condition="Exists('$(ProSourceDir)ProModules.cs')">true</HasProModules>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(HasProModules)' == 'true'">
+    <DefineConstants>$(DefineConstants);PRO_MODULES</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(HasProModules)' == 'true'">
+    <Compile Include="$(ProSourceDir)**\*.cs" Link="Pro\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
 </Project>

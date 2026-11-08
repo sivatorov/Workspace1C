@@ -2016,7 +2016,7 @@ namespace Workspace1C
             if (catalogItem is null)
                 return null;
 
-            var item = new MenuItem { Header = LocalizationManager.T(catalogItem.TextKey) };
+            var item = new MenuItem { Header = catalogItem.DisplayText() };
             item.Styled(Themes.ControlThemes.ModernMenuItem);
             if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
             {
@@ -2196,6 +2196,9 @@ namespace Workspace1C
                 case UtilitiesMenuCommandKind.RemoveMissingFileBases:
                     // В Avalonia-версии MainViewModel это методы, а не команды.
                     item.Click += (_, _) => _vm!.RemoveMissingFileBases(); break;
+                case UtilitiesMenuCommandKind.ShowLicense:
+                    item.Click += (_, _) => new LicenseWindow().ShowDialogSync(this);
+                    break;
                 case UtilitiesMenuCommandKind.CheckForUpdates:
                     item.Click += async (_, _) =>
                     {

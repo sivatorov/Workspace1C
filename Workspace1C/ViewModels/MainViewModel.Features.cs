@@ -177,6 +177,9 @@ public partial class MainViewModel
 
     private void ExecuteServerAlerts()
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии — окно «Лицензия».
+        if (!Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.ServerAlerts))
+            return;
         var vm = new ServerAlertsViewModel(AppServices.GetRequiredService<IServerListStore>().Load(), Infobases.ToList(), ServerAlertsService.Load(), AppServices.TryGetService<ServerAlertsService>());
         var window = new ServerAlertsWindow(vm)
         {
@@ -213,6 +216,9 @@ public partial class MainViewModel
 
     private void ExecuteTelegramBot()
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии — окно «Лицензия».
+        if (!Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.TelegramBot))
+            return;
         var vm = new TelegramBotViewModel(TelegramBotCommandService.Load(), !string.IsNullOrWhiteSpace(AppServices.GetRequiredService<INotificationSettingsStore>().Load().TelegramBotToken), AppServices.GetRequiredService<INotificationSettingsStore>().Load().TelegramChatId);
         var window = new TelegramBotWindow(vm)
         {

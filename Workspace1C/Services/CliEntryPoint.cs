@@ -65,6 +65,12 @@ public static class CliEntryPoint
             // (внутри McpServer); сервисы инструментов берутся из AppServices.
             if (parsed.Kind == CliCommandKind.Mcp)
             {
+                // MCP-сервер — функция редакции ПРО (docs/pro/PRO-EDITION.md).
+                if (!Licensing.EditionService.Has(Licensing.ProFeature.Mcp))
+                {
+                    exitCode = CliLicenseCommands.ProRequired(CommandName(parsed.Kind), Licensing.ProFeature.Mcp, parsed.Options.Json);
+                    return true;
+                }
                 var confirmationService = AppServices.TryGetService<TelegramConfirmationService>();
                 var server = new McpServer(
                     output: Console.Out,

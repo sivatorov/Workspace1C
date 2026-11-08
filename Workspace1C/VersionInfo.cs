@@ -21,6 +21,13 @@ public static class VersionInfo
         return StripHash(info) ?? asm.GetName().Version?.ToString() ?? "";
     }
 
+    /// <summary>
+    /// Старшее число версии программы (2 для 2.x.x.x) — по нему проверяется лицензия ПРО
+    /// (docs/pro/PRO-EDITION.md). Берётся из AssemblyVersion, не зависит от суффиксов.
+    /// </summary>
+    public static int Major() =>
+        Assembly.GetExecutingAssembly().GetName().Version?.Major ?? 0;
+
     private static string? StripHash(string? version)
     {
         if (string.IsNullOrWhiteSpace(version))

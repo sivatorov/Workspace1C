@@ -27,10 +27,10 @@ public sealed class UtilitiesMenuLayoutTests
     {
         var layout = UtilitiesMenuLayouts.Default();
 
-        // Корень: 17 узлов — 12 пунктов/групп + 5 узлов-разделителей (issue #374):
+        // Корень: 18 узлов — 13 пунктов/групп + 5 узлов-разделителей (issue #374):
         // перед «Актуальные релизы», «Блокировка приложения», «Информация», «Операции», «Проверить обновления».
         // «Управление службами» (issue #11) стоит сразу после «Серверы 1С».
-        Assert.Equal(17, layout.Root.Count);
+        Assert.Equal(18, layout.Root.Count);
 
         // ---- Верхний уровень ----
         AssertItem(layout.Root[0], "CommandPalette");
@@ -114,6 +114,8 @@ public sealed class UtilitiesMenuLayoutTests
         // ---- «Проверить обновления» в конце, с разделителем ----
         AssertSeparator(layout.Root[15]);
         AssertItem(layout.Root[16], "CheckForUpdates");
+        // ---- «Лицензия…» (2.0, редакция ПРО) — сразу после «Проверить обновления» ----
+        AssertItem(layout.Root[17], "License");
     }
 
     /// <summary>Каталог содержит все пункты стандартной компоновки (ни один ItemId не теряется).</summary>

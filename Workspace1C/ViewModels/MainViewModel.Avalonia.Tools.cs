@@ -1843,6 +1843,9 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void ExecuteMassLoadCfCore(IReadOnlyList<Infobase> bases)
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии — окно «Лицензия».
+        if (!Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.MassLoadCf))
+            return;
         if (bases.Count == 0)
         {
             _dialog.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),
@@ -2271,6 +2274,9 @@ public partial class MainViewModel : ViewModelBase
     private void ExecuteMigrateClusterInfobases(
         ManagementServer? initialSourceServer = null, Guid? initialSourceClusterId = null)
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии — окно «Лицензия».
+        if (!Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.ClusterMigration))
+            return;
         var window = new Workspace1C.ClusterMigrationWindow(
             AppServices.GetRequiredService<IRacClient>(),
             _allInfobases.ToList(),

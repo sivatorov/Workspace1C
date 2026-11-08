@@ -770,6 +770,10 @@ public class SchedulerService : IDisposable
     /// </summary>
     private async Task<BackupRunResult?> RunTestDeployAsync(ScheduledTask task)
     {
+        // Тестовый контур — функция редакции ПРО (docs/pro/PRO-EDITION.md).
+        if (!Licensing.EditionService.Has(Licensing.ProFeature.TestDeploy))
+            return Fail(string.Format(LocalizationManager.T("Pro.RequiredFormat"),
+                LocalizationManager.T(Licensing.ProFeatures.TitleKey(Licensing.ProFeature.TestDeploy))));
         var scenario = TestDeployStore.Get(task.ScenarioId);
         if (scenario is null)
             return Fail(LocalizationManager.T("Schedule.ScenarioNotFound"));

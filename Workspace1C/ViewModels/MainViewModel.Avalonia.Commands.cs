@@ -649,6 +649,9 @@ public partial class MainViewModel : ViewModelBase
 
     private System.Threading.Tasks.Task ExecuteShowTestDeployAsync(Infobase source)
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии — окно «Лицензия».
+        if (!Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.TestDeploy))
+            return System.Threading.Tasks.Task.CompletedTask;
         if (source?.Connection is null)
             return System.Threading.Tasks.Task.CompletedTask;
 

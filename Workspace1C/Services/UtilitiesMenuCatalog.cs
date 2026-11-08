@@ -12,6 +12,9 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Командная палитра (Ctrl+K).</summary>
     CommandPalette,
 
+    /// <summary>Окно «Лицензия» редакции ПРО (2.0, docs/pro/PRO-EDITION.md).</summary>
+    ShowLicense,
+
     /// <summary>Окно «Актуальные релизы».</summary>
     ShowActualReleases,
 
@@ -182,8 +185,10 @@ public sealed class UtilitiesMenuItem
     public UtilitiesMenuItem(string id, string textKey, string defaultGroup,
         string wpfIconKind, string avaloniaIconKey, string iconColor,
         UtilitiesMenuCommandKind commandKind, string? hotkeyKey = null,
-        bool linuxOnly = false, bool isNew = false)
+        bool linuxOnly = false, bool isNew = false,
+        Licensing.ProFeature? requiredFeature = null)
     {
+        RequiredFeature = requiredFeature;
         Id = id;
         TextKey = textKey;
         DefaultGroup = defaultGroup;
@@ -225,6 +230,21 @@ public sealed class UtilitiesMenuItem
 
     /// <summary>Признак «новинка» (для подменю «Новинки программы»).</summary>
     public bool IsNew { get; }
+
+    /// <summary>
+    /// Функция редакции ПРО (2.0): без лицензии пункт помечается «ПРО», а команда
+    /// открывает окно «Лицензия» (проверка — в самой команде через ProGate).
+    /// </summary>
+    public Licensing.ProFeature? RequiredFeature { get; }
+
+    /// <summary>Заголовок пункта с отметкой «ПРО», если функция закрыта лицензией.</summary>
+    public string DisplayText()
+    {
+        var text = Localization.LocalizationManager.T(TextKey);
+        if (RequiredFeature is { } feature && !Licensing.EditionService.Has(feature))
+            text += "  · " + Localization.LocalizationManager.T("Pro.Badge");
+        return text;
+    }
 }
 
 /// <summary>
@@ -552,7 +572,7 @@ public static class UtilitiesMenuCatalog
             // «Мониторинг и оповещения (1.0.0.69)».
             new("ServerAlerts", "Alerts.MenuItem", GroupOperations,
                 "IconMonitoring", "IconMonitoring", "#EF4444", UtilitiesMenuCommandKind.ServerAlerts,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.ServerAlerts),
             // «Резервные копии средствами СУБД (1.0.0.69)».
             new("DbmsBackup", "Dbms.MenuItem", GroupOperations,
                 "IconBackup", "IconBackup", "#16A34A", UtilitiesMenuCommandKind.DbmsBackup,
@@ -560,7 +580,7 @@ public static class UtilitiesMenuCatalog
             // «Команды Telegram-бота (1.0.0.69)».
             new("TelegramBot", "Bot.MenuItem", GroupOperations,
                 "IconPublish", "IconPublish", "#0EA5E9", UtilitiesMenuCommandKind.TelegramBot,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.TelegramBot),
             // «Общие списки баз отдела (1.0.0.69)».
             new("SharedLists", "Shared.MenuItem", GroupOperations,
                 "IconUsers", "IconUsers", "#3B82F6", UtilitiesMenuCommandKind.SharedLists,
@@ -575,7 +595,7 @@ public static class UtilitiesMenuCatalog
                 isNew: true),
             new("BatchLoadCf", "BatchOps.LoadCfTitle", GroupOperations,
                 "DatabaseImport", "IconImport", "#F59E0B", UtilitiesMenuCommandKind.BatchLoadCf,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.MassLoadCf),
             new("ExportCsv", "Utilities.ExportCsv", GroupOperations,
                 "FileDelimited", "IconFileExport", "#22C55E", UtilitiesMenuCommandKind.ExportBasesCsv),
             new("ExportHtml", "Utilities.ExportHtml", GroupOperations,
@@ -601,7 +621,7 @@ public static class UtilitiesMenuCatalog
             // «Новинки программы», пока пользователь не разместит его явно (issue #58).
             new("ClusterMigration", "ClusterMigration.MenuItem", GroupOperations,
                 "DatabaseExport", "IconDatabaseExport", "#16A34A", UtilitiesMenuCommandKind.MigrateClusterInfobases,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.ClusterMigration),
             new("ProcessInspector", "ProcessInspector.Title", GroupOperations,
                 "ApplicationCog", "IconApplicationCog", "#0EA5E9", UtilitiesMenuCommandKind.ProcessInspector),
             new("KillOneCProcesses", "Settings.Bases.KillProcesses", GroupOperations,
@@ -615,7 +635,11 @@ public static class UtilitiesMenuCatalog
 
             // ---- Низ меню ----
             new("CheckForUpdates", "Settings.About.CheckForUpdates", GroupTopLevel,
-                "Update", "IconUpdate", "#3B82F6", UtilitiesMenuCommandKind.CheckForUpdates)
+                "Update", "IconUpdate", "#3B82F6", UtilitiesMenuCommandKind.CheckForUpdates),
+            // «Лицензия…» (2.0, docs/pro/PRO-EDITION.md): редакция, код компьютера, активация ключа.
+            new("License", "Pro.MenuItem", GroupTopLevel,
+                "Key", "IconAccountKey", "#F59E0B", UtilitiesMenuCommandKind.ShowLicense,
+                isNew: true)
         };
     }
 }
@@ -713,7 +737,8 @@ public static class UtilitiesMenuLayouts
                 Item("RemoveMissingFileBases")
             }),
             Separator(),
-            Item("CheckForUpdates")
+            Item("CheckForUpdates"),
+            Item("License")
         };
         return layout;
     }

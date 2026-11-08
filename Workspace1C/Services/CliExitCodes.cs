@@ -23,4 +23,7 @@ public static class CliExitCodes
 
     /// <summary>Таймаут: ответ на подтверждение не получен за отведённое время (--telegram-confirm).</summary>
     public const int Timeout = 5;
+
+    /// <summary>Команда относится к редакции ПРО, а действительной лицензии нет (2.0).</summary>
+    public const int ProRequired = 6;
 }

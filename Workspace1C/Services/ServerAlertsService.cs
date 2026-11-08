@@ -125,6 +125,10 @@ public sealed class ServerAlertsService : IDisposable
 
     private async Task TickAsync()
     {
+        // Мониторинг — функция редакции ПРО (docs/pro/PRO-EDITION.md): без лицензии цикл
+        // пропускается; после активации ключа проверки начинаются со следующего цикла.
+        if (!Licensing.EditionService.Has(Licensing.ProFeature.ServerAlerts))
+            return;
         if (Interlocked.Exchange(ref _running, 1) == 1)
             return;
         // Диагностика источника rac-команд (issue #90): фоновые проверки помечаются

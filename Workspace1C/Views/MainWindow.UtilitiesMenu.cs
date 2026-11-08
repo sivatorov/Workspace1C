@@ -139,7 +139,7 @@ public partial class MainWindow
 
         var item = new MenuItem
         {
-            Header = LocalizationManager.T(catalogItem.TextKey),
+            Header = catalogItem.DisplayText(),
             Style = TryFindResource("ModernMenuItem") as Style,
         };
         item.Icon = ItemIcon(node, catalogItem);
@@ -328,6 +328,8 @@ public partial class MainWindow
                 item.Command = _viewModel.RemoveMissingFileBasesCommand; break;
             case UtilitiesMenuCommandKind.CheckForUpdates:
                 item.Click += (_, _) => OnCheckForUpdatesMenuClick(item, null); break;
+            case UtilitiesMenuCommandKind.ShowLicense:
+                item.Click += (_, _) => new LicenseWindow { Owner = this }.ShowDialog(); break;
             case UtilitiesMenuCommandKind.EventLog:
                 item.Command = _viewModel.EventLogCommand; break;
             case UtilitiesMenuCommandKind.SharedLists:

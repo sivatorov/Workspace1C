@@ -90,7 +90,9 @@ public sealed class TelegramBotCommandService
             {
                 var settings = Load();
                 var channel = _notificationSettings.Load();
-                if (!settings.Enabled || string.IsNullOrWhiteSpace(channel.TelegramBotToken))
+                // Команды бота — функция редакции ПРО (docs/pro/PRO-EDITION.md).
+                if (!settings.Enabled || string.IsNullOrWhiteSpace(channel.TelegramBotToken)
+                    || !Licensing.EditionService.Has(Licensing.ProFeature.TelegramBot))
                 {
                     await Task.Delay(TimeSpan.FromMinutes(1), ct).ConfigureAwait(false);
                     continue;

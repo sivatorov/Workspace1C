@@ -73,6 +73,8 @@ namespace Workspace1C
             {
                 // Загружаем настройки до показа окна, чтобы проверить запрет второго экземпляра.
                 AppServices.Configure();
+                // Окно «Лицензия» для шлюза ПРО-функций (docs/pro/PRO-EDITION.md).
+                Workspace1C.LicenseWindow.RegisterGate();
 
                 // Конфиг отладочных флагов trace.json (issue #347 «Сказ о trace.json»):
                 // создаётся при каждом старте рядом с настройками (при первом старте новой

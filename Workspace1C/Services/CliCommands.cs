@@ -36,6 +36,8 @@ public static class CliCommands
             CliCommandKind.Update => ExecuteUpdate(command, parsed.Options),
             CliCommandKind.Eventlog => ExecuteEventlog(command, parsed.Target!, parsed.Options),
             CliCommandKind.Check => ExecuteCheck(command, parsed.Options),
+            CliCommandKind.LicenseInfo => CliLicenseCommands.Info(command, parsed.Options),
+            CliCommandKind.Activate => CliLicenseCommands.Activate(command, parsed.Options),
             _ => Unsupported(command, parsed.Options)
         };
     }
@@ -565,6 +567,7 @@ public static class CliCommands
     {
         CliCommandKind.TelegramSend => "telegram_send",
         CliCommandKind.TelegramConfirm => "telegram_confirm",
+        CliCommandKind.LicenseInfo => "license_info",
         // Составные имена новых команд п.6 (выпуск 1.0.0.88) — с подчёркиванием.
         _ => kind.ToString().ToLowerInvariant()
     };

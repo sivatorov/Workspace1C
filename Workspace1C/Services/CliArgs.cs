@@ -49,7 +49,13 @@ public enum CliCommandKind
     Eventlog,
 
     /// <summary>Диагностика окружения/конфигурации (--check, выпуск 1.0.0.88).</summary>
-    Check
+    Check,
+
+    /// <summary>Редакция, код компьютера и состояние лицензии ПРО (--license-info, 2.0).</summary>
+    LicenseInfo,
+
+    /// <summary>Активация ключа ПРО (--activate "W1C2.…", 2.0).</summary>
+    Activate
 }
 
 /// <summary>Общие параметры любой команды CLI.</summary>
@@ -245,6 +251,21 @@ public static class CliArgs
             if (string.Equals(key, "--check", StringComparison.OrdinalIgnoreCase))
             {
                 action = CliCommandKind.Check;
+                continue;
+            }
+
+            // ---- Лицензия редакции ПРО (2.0, docs/pro/PRO-EDITION.md): ----
+
+            if (string.Equals(key, "--license-info", StringComparison.OrdinalIgnoreCase))
+            {
+                action = CliCommandKind.LicenseInfo;
+                continue;
+            }
+
+            if (string.Equals(key, "--activate", StringComparison.OrdinalIgnoreCase))
+            {
+                action = CliCommandKind.Activate;
+                options.Text = value ?? ReadNextValue(args, ref i);
                 continue;
             }
 
