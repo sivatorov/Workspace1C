@@ -53,18 +53,10 @@ public sealed class AuditHubTests : IDisposable
     }
 
     [Fact]
-    public void ExternalMenuItem_RegisteredAndExecuted()
+    public void ExternalMenuItem_Unknown_NotExecuted()
     {
-        var executed = 0;
-        var item = new UtilitiesMenuItem("Test.External." + Guid.NewGuid().ToString("N"), "Pro.MenuItem",
-            UtilitiesMenuCatalog.GroupInformation, "History", "IconHistory", "#8B5CF6",
-            UtilitiesMenuCommandKind.External, isNew: true);
-        UtilitiesMenuCatalog.RegisterExternal(item, () => executed++);
-
-        Assert.Same(item, UtilitiesMenuCatalog.Find(item.Id));
-        Assert.Contains(item, UtilitiesMenuCatalog.All);
-        Assert.True(UtilitiesMenuCatalog.ExecuteExternal(item.Id));
-        Assert.Equal(1, executed);
+        // Регистрация внешних пунктов меняет статический каталог меню, который читают
+        // параллельные тесты компоновки, — она проверяется в тестах модулей ПРО.
         Assert.False(UtilitiesMenuCatalog.ExecuteExternal("нет-такого"));
     }
 

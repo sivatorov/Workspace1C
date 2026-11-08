@@ -373,6 +373,13 @@ public static class UtilitiesMenuCatalog
         ExternalActions[item.Id] = execute;
     }
 
+    /// <summary>Убирает внешний пункт (тесты, выгрузка модуля).</summary>
+    public static void UnregisterExternal(string itemId)
+    {
+        ExternalItems.RemoveAll(i => string.Equals(i.Id, itemId, StringComparison.Ordinal));
+        ExternalActions.Remove(itemId);
+    }
+
     /// <summary>Выполняет действие внешнего пункта; false — пункт не зарегистрирован.</summary>
     public static bool ExecuteExternal(string itemId)
     {
