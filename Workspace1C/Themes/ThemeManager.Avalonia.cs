@@ -590,23 +590,62 @@ namespace Workspace1C.Themes
         }
 
         /// <summary>
-        /// Перекрывает кисти содержимого Fluent-кнопок цветом текста схемы (issue #107,
-        /// комментарий 7OH 2026-11-07: «куча кнопок с белым текстом при яркой подложке»).
-        /// FluentTheme берёт их из ресурсов варианта темы (ButtonForeground*), и при
-        /// рассогласовании варианта (RequestedThemeVariant=Default на тёмной системе) и
-        /// светлой палитры приложения текст кнопок оставался белым на ярких подложках.
-        /// Ключи — из ControlTheme кнопки Avalonia 11 (FluentTheme); disabled-вариант
-        /// не трогается: приглушённый цвет Fluent читаем в обеих темах.
+        /// Перекрывает кисти содержимого кнопочных контролов Fluent цветом текста схемы
+        /// (issue #107, комментарий 7OH 2026-11-07: «куча кнопок с белым текстом при яркой
+        /// подложке»; v1.0.1.44 — «Результата не замечено»). FluentTheme v11 берёт их из
+        /// словарей варианта темы (ThemeDictionaries), и при рассогласовании варианта
+        /// (например Default на тёмной системе) и светлой палитры приложения текст
+        /// оставался белым на ярких подложках. Перекрытие ставится в
+        /// <c>Application.Resources</c>, которые по порядку поиска ресурсов Avalonia
+        /// (Application.Resources → Application.Styles) ВЫШЕ словарей FluentTheme, поэтому
+        /// действует всегда. Перечень ключей — по ControlTheme контролов Avalonia 11.3
+        /// (FluentControlResources.xaml): Button (ButtonForeground*), ToggleButton
+        /// (ToggleButtonForeground*, обычные состояния), RepeatButton
+        /// (RepeatButtonForeground*); в v1.0.1.44 покрывался только Button — Toggle- и
+        /// Repeat-кнопки оставались с белым текстом Fluent. Disabled-варианты не трогаются:
+        /// приглушённый цвет Fluent читаем в обеих темах. Для акцентных кнопок Fluent
+        /// (:accent, ключи AccentButtonForeground* — фиксированный белый Fluent в ОБОИХ
+        /// вариантах) текст — WCAG-контраст к фактическому акценту схемы, как
+        /// TextOnAccentBrush: иначе на светлом акценте белый текст нечитаем.
         /// </summary>
         private static void ApplyFluentForeground(Application app, ColorScheme scheme, bool dark)
         {
-            var hex = scheme.PaletteValue(dark, "TextPrimaryColor");
-            if (string.IsNullOrWhiteSpace(hex) || !TryParseColor(hex, out var color))
+            var textHex = scheme.PaletteValue(dark, "TextPrimaryColor");
+            if (string.IsNullOrWhiteSpace(textHex) || !TryParseColor(textHex, out var textColor))
                 return;
-            var brush = new SolidColorBrush(color);
-            app.Resources["ButtonForeground"] = brush;
-            app.Resources["ButtonForegroundPointerOver"] = brush;
-            app.Resources["ButtonForegroundPressed"] = brush;
+            var textBrush = new SolidColorBrush(textColor);
+
+            // Обычные состояния кнопочных контролов Fluent: цвет текста схемы.
+            SetFluentBrushes(app, textBrush,
+                "ButtonForeground",
+                "ButtonForegroundPointerOver",
+                "ButtonForegroundPressed",
+                "ToggleButtonForeground",
+                "ToggleButtonForegroundPointerOver",
+                "ToggleButtonForegroundPressed",
+                "RepeatButtonForeground",
+                "RepeatButtonForegroundPointerOver",
+                "RepeatButtonForegroundPressed");
+
+            // Акцентные кнопки Fluent: контраст к фактическому акценту (WCAG 4.5:1),
+            // а не фиксированный белый Fluent. Если акцента в палитре нет — ключи не
+            // трогаются (остаётся белый Fluent, как раньше).
+            var accentHex = scheme.PaletteValue(dark, "AccentColor");
+            if (!string.IsNullOrWhiteSpace(accentHex) && TryParseColor(accentHex, out _)
+                && TryParseColor(ColorScheme.ContrastTextHex(accentHex), out var onAccentColor))
+            {
+                SetFluentBrushes(app, new SolidColorBrush(onAccentColor),
+                    "AccentButtonForeground",
+                    "AccentButtonForegroundPointerOver",
+                    "AccentButtonForegroundPressed");
+            }
+        }
+
+        /// <summary>Кладёт кисть в ресурсы приложения под перечнем ключей Fluent.</summary>
+        private static void SetFluentBrushes(Application app, IBrush brush, params string[] keys)
+        {
+            foreach (var key in keys)
+                app.Resources[key] = brush;
         }
 
         /// <summary>Выставляет кисть, контрастную заданному цвету палитры (WCAG 4.5:1).</summary>

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.44-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.45-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.44**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.45**
 (поддерживается **более 5 500 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -203,6 +203,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Linux: popup статус-панели у курсора, тёмная тема кнопок (1.0.1.45, Linux)** —
+  tooltip и контекстное меню строки состояния теперь открываются у курсора по оси X
+  (центр popup под курсором с зажимом в границы окна, по-прежнему над панелью по Y —
+  issue #114): раньше оба popup центрировались по элементу панели, растянутой на всю
+  ширину, и всегда показывались «по середине окна». Тёмная тема: перекрытие кистей
+  содержимого кнопок Fluent расширено на Toggle-/Repeat-/акцентные кнопки
+  (`ToggleButtonForeground*`, `RepeatButtonForeground*`, `AccentButtonForeground*` —
+  контраст по WCAG к фактическому акценту) — белый текст на яркой подложке при
+  тёмной системе больше не остаётся ни у одного типа кнопок (issue #107).
 - **Блокировка регламентов до загрузки копии, Linux-фиксы темы и статус-панели (1.0.1.44, Windows и Linux)** —
   в мастере «Развернуть тестовую копию» кластерная галочка блокировки регламентных
   заданий теперь ставится сразу после создания/обнаружения целевой базы — ДО загрузки

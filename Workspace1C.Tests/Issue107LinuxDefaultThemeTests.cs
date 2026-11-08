@@ -40,12 +40,31 @@ public sealed class Issue107LinuxDefaultThemeTests
     public void ApplyColors_OverridesFluentButtonForegroundKeys()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Themes", "ThemeManager.Avalonia.cs"));
-        // Ключи из ControlTheme кнопки Avalonia 11 (FluentTheme) — фиксированный
-        // перечень; disabled-вариант не перекрывается (читаем в обеих темах).
-        Assert.Contains("app.Resources[\"ButtonForeground\"]", code, StringComparison.Ordinal);
-        Assert.Contains("app.Resources[\"ButtonForegroundPointerOver\"]", code, StringComparison.Ordinal);
-        Assert.Contains("app.Resources[\"ButtonForegroundPressed\"]", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("app.Resources[\"ButtonForegroundDisabled\"]", code, StringComparison.Ordinal);
+        // v1.0.1.45 (issue #107, «Результата не замечено»): перекрывается ПОЛНЫЙ набор
+        // кнопочных контролов Fluent по их ControlTheme в Avalonia 11.3
+        // (FluentControlResources.xaml): Button, ToggleButton, RepeatButton.
+        // Ключи задаются через SetFluentBrushes (Application.Resources — они выше
+        // словарей FluentTheme по порядку поиска ресурсов).
+        Assert.Contains("SetFluentBrushes(app,", code, StringComparison.Ordinal);
+        Assert.Contains("\"ButtonForeground\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"ButtonForegroundPointerOver\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"ButtonForegroundPressed\",", code, StringComparison.Ordinal);
+        // v1.0.1.44 покрывал только Button — Toggle-/Repeat-кнопки оставались белыми.
+        Assert.Contains("\"ToggleButtonForeground\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"ToggleButtonForegroundPointerOver\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"ToggleButtonForegroundPressed\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"RepeatButtonForeground\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"RepeatButtonForegroundPointerOver\",", code, StringComparison.Ordinal);
+        Assert.Contains("\"RepeatButtonForegroundPressed\")", code, StringComparison.Ordinal);
+        // Акцентные кнопки Fluent: фиксированный белый Fluent заменяется контрастом
+        // по WCAG к фактическому акценту (как TextOnAccentBrush).
+        Assert.Contains("\"AccentButtonForeground\",", code, StringComparison.Ordinal);
+        Assert.Contains("ColorScheme.ContrastTextHex(accentHex)", code, StringComparison.Ordinal);
+        // Disabled-варианты не перекрываются (приглушённый Fluent читаем в обеих темах).
+        Assert.DoesNotContain("ButtonForegroundDisabled", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToggleButtonForegroundDisabled", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("RepeatButtonForegroundDisabled", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("AccentButtonForegroundDisabled", code, StringComparison.Ordinal);
     }
 
     [Fact]

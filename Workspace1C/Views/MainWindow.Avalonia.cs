@@ -50,6 +50,12 @@ namespace Workspace1C
         private TextBlock _syncMessage = null!;
         private LeveledTreeView _tree = null!;
 
+        // Issue #114: координата курсора по X (в координатах окна) над строкой состояния.
+        // Запоминается в PointerEntered/PointerMoved/PointerPressed на _statusInfo и
+        // используется Custom-размещением tooltip/контекстного меню: popup центрируется
+        // под курсором по X (с зажимом в границы окна), по Y открывается над панелью.
+        private double _statusPointerX;
+
         // Владельцы открытых ToolTip (issue #261). Записываются класс-обработчиком изменения
         // ToolTip.IsOpenProperty и не зависят от того, где физически отрисован попап (в визуальном
         // дереве окна или в оверлейном слое TopLevel), поэтому надёжно закрываются по ESC даже
@@ -2172,27 +2178,43 @@ namespace Workspace1C
             _statusInfo = new TextBlock { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
             ThemeBrushes.Bind(_statusInfo, TextBlock.ForegroundProperty, "SidebarTextBrush");
             _statusInfo.Bind(TextBlock.TextProperty, new Binding("StatusBarInfo"));
+            // Issue #114: запоминаем координату курсора по X (координаты окна) при
+            // входе, движении и нажатии кнопки мыши — по ней Custom-размещение
+            // центрирует tooltip/контекстное меню.
+            _statusInfo.PointerEntered += (_, e) => _statusPointerX = e.GetPosition(this).X;
+            _statusInfo.PointerMoved += (_, e) => _statusPointerX = e.GetPosition(this).X;
+            _statusInfo.PointerPressed += (_, e) => _statusPointerX = e.GetPosition(this).X;
             // Подсказка показывает строку целиком: в нижней панели она обрезается
             // многоточием. Контекстное меню с копированием строки подключения
             // взято из разметки WPF (MainWindow.xaml:2288-2292).
             // Issue #114: собственный ToolTip с TextWrapping=Wrap — длинный путь и
             // ИД переносятся и не усекаются экраном; текст с переносом строки перед
-            // ИД (StatusBarInfoTip); ToolTip.SetPlacement(…, Top) — подсказка
-            // открывается НАД элементом панели: popup привязан к ней, а не к курсору
-            // (pointer-based placement на X11 позиционируется неровно).
+            // ИД (StatusBarInfoTip).
+            // Issue #114 (уточнение 7OH): по X popup должен открываться У КУРСОРА.
+            // Элемент _statusInfo растянут на всю ширину статус-бара, поэтому
+            // PlacementMode.Top центрировал popup по цели — «всегда по середине окна».
+            // Решение: PlacementMode.Custom + CustomPopupPlacementCallback (как у
+            // меню выбора окна загрузок) — центр popup по X ставится под курсор
+            // (_statusPointerX, обновляется в PointerEntered/PointerMoved/
+            // PointerPressed) с зажимом в границы окна (PopupBoundsMath.ClampCenteredX),
+            // по Y popup остаётся НАД элементом панели. AnchorRectangle callback'а —
+            // прямоугольник _statusInfo в координатах окна, Offset прибавляется к
+            // якорной точке (TopLeft).
             var statusTipText = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxWidth = 480 };
             statusTipText.Bind(TextBlock.TextProperty, new Binding("StatusBarInfoTip"));
             var statusTip = new ToolTip { Content = statusTipText };
             ToolTip.SetTip(_statusInfo, statusTip);
-            ToolTip.SetPlacement(_statusInfo, PlacementMode.Top);
+            ToolTip.SetPlacement(_statusInfo, PlacementMode.Custom);
+            ToolTip.SetCustomPopupPlacementCallback(_statusInfo, StatusPopupPlacementCallback);
             if (_vm is not null)
             {
                 var statusMenu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
-                // Issue #114: якорное размещение — меню открывается над элементом
-                // строки состояния (PlacementTarget), а не у курсора: pointer-based
-                // placement на X11 и есть источник «меню совсем не там».
+                // Issue #114 (уточнение 7OH): меню открывается НАД элементом строки
+                // состояния по Y и ПОД КУРСОРОМ по X — Custom-размещение с тем же
+                // callback'ом, что и у tooltip (см. выше).
                 statusMenu.PlacementTarget = _statusInfo;
-                statusMenu.Placement = PlacementMode.Top;
+                statusMenu.Placement = PlacementMode.Custom;
+                statusMenu.CustomPopupPlacementCallback = StatusPopupPlacementCallback;
                 // Копирование ИД базы (issue #110): явный пункт меню + двойной клик.
                 statusMenu.Items.Add(MenuAction("Main.StatusIdCopy", _vm.CopyInfobaseIdCommand, iconKey: "IconCopy"));
                 statusMenu.Items.Add(MenuAction("Main.CopyPath", _vm.CopyConnectionStringCommand, iconKey: "IconCopy"));
@@ -2293,6 +2315,37 @@ namespace Workspace1C
             var bar = new Border { Child = grid, Name = "StatusBarBorder", Padding = new Thickness(12, 6) };
             ThemeBrushes.Bind(bar, Border.BackgroundProperty, "SidebarBrush");
             return bar;
+        }
+
+        /// <summary>
+        /// Custom-размещение popup над строкой состояния с центровкой ПОД КУРСОРОМ
+        /// по оси X (issue #114, уточнение 7OH). Используется и tooltip, и контекстным
+        /// меню элемента <c>_statusInfo</c> (у ToolTip в Avalonia 11 callback —
+        /// attached-свойство на элементе-владельце). По Y popup остаётся НАД элементом
+        /// панели (как в v1.0.1.44 — «по вертикали нормально»), по X центр ставится
+        /// в координату курсора <see cref="_statusPointerX"/> с зажимом в границы окна
+        /// (<see cref="PopupBoundsMath.PlaceAboveCenteredAtCursorClamped"/>): курсор
+        /// остаётся внутри подсказки/меню, popup не выезжает за края окна.
+        /// AnchorRectangle callback'а — прямоугольник цели (PlacementTarget) в
+        /// координатах окна, Offset прибавляется к якорной точке (TopLeft).
+        /// </summary>
+        private void StatusPopupPlacementCallback(CustomPopupPlacement parameters)
+        {
+            var origin = parameters.AnchorRectangle.TopLeft;
+            var (left, top) = PopupBoundsMath.PlaceAboveCenteredAtCursorClamped(
+                origin.X,
+                origin.Y,
+                _statusPointerX,
+                parameters.PopupSize.Width,
+                parameters.PopupSize.Height,
+                Bounds.Width,
+                Bounds.Height,
+                PopupBoundsMath.DefaultMargin,
+                PopupBoundsMath.DefaultGap);
+            parameters.Anchor = PopupAnchor.TopLeft;
+            parameters.Gravity = PopupGravity.BottomRight;
+            parameters.ConstraintAdjustment = PopupPositionerConstraintAdjustment.None;
+            parameters.Offset = new Point(left - origin.X, top - origin.Y);
         }
 
         /// <summary>

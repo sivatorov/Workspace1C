@@ -11,6 +11,47 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.45] — 2026-11-08
+
+### Исправлено
+
+- **Linux: tooltip и контекстное меню строки состояния открываются у курсора
+  по оси X (issue #114, уточнение 7OH).** В v1.0.1.44 по вертикали всё стало
+  нормально, но по горизонтали подсказка и меню всегда открывались «по середине
+  окна»: элемент `_statusInfo` растянут на всю ширину статус-бара, а
+  `PlacementMode.Top` центрирует popup по цели. Теперь оба popup используют
+  `PlacementMode.Custom` с общим callback'ом
+  ([`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)):
+  центр popup по X ставится под курсор (координата запоминается в
+  `PointerEntered`/`PointerMoved`/`PointerPressed` на элементе панели) с зажимом
+  в границы окна — курсор остаётся внутри подсказки/меню, popup не выезжает за
+  края окна; по Y popup остаётся над элементом панели. Геометрия — чистая
+  функция [`PopupBoundsMath.ClampCenteredX`](Workspace1C/Services/PopupBoundsMath.cs)
+  (и `PlaceAboveCenteredAtCursorClamped`), покрыта юнит-тестами; tooltip
+  использует attached-свойство `ToolTip.SetCustomPopupPlacementCallback`
+  (Avalonia 11.3). Страж-тесты обновлены:
+  [`Issue114StatusBarTooltipTests.cs`](Workspace1C.Tests/Issue114StatusBarTooltipTests.cs).
+- **Linux: тёмная тема — белый текст кнопок на яркой подложке (issue #107,
+  комментарий 7OH: «1.0.1.44 — Результата не замечено»).** Перекрытие кистей
+  из v1.0.1.44 покрывало только обычные кнопки (`ButtonForeground*`). В v1.0.1.45
+  набор расширен по ControlTheme контролов Avalonia 11.3
+  ([`ThemeManager.Avalonia.cs`](Workspace1C/Themes/ThemeManager.Avalonia.cs),
+  `ApplyFluentForeground`):
+  - `ToggleButtonForeground*` и `RepeatButtonForeground*` — Toggle- и
+    Repeat-кнопки Fluent больше не остаются с белым текстом Fluent;
+  - `AccentButtonForeground*` — фиксированный белый Fluent (в обоих вариантах
+    темы) заменяется WCAG-контрастом к фактическому акценту схемы, как
+    `TextOnAccentBrush` у кнопок приложения;
+  - перекрытие кладётся в `Application.Resources`, которые по порядку поиска
+    ресурсов Avalonia стоят выше словарей `FluentTheme` — действует всегда;
+  - disabled-варианты не трогаются (приглушённый цвет Fluent читаем в обеих
+    темах); темы кнопок самого приложения (`ModernButton`, `SecondaryButton`,
+    `DangerButton`, `IconButton`) уже задают `Foreground` от кистей схемы —
+    дополнительно проверено. Страж-тесты обновлены:
+    [`Issue107LinuxDefaultThemeTests.cs`](Workspace1C.Tests/Issue107LinuxDefaultThemeTests.cs).
+    Если проблема сохранится — нужен лог старта v1.0.1.45 (ZIP-диагностика):
+    в нём виден фактический `RequestedThemeVariant` и активная тема.
+
 ## [1.0.1.44] — 2026-11-08
 
 ### Исправлено
