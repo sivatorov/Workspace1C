@@ -1,9 +1,0 @@
-Исправлено в версии 1.0.0.82 (Windows и Linux) по последним трём комментариям:
-
-1. **Разрыв соединений и сеансов перед КАЖДЫМ drop** — перед каждым `infobase drop` (и при повторе) гарантированно выполняется разрыв текущих соединений и завершение сеансов именно этой базы: списки `connection list`/`session list` запрашиваются заново до трёх проходов (race-free), чтобы rac не возвращал «Информационная база имеет непустой список соединений» ([`ServerMonitorViewModel.cs`](Workspace1C/ViewModels/ServerMonitorViewModel.cs)).
-2. **Галочка блокировки РЗ при первом запросе** — «Установить блокировку регламентных заданий» видна уже при ПЕРВОМ запросе логина/пароля в диалоге повтора; логика `scheduled-jobs-deny=on` перед завершением сеансов сохраняется ([`RacInfobaseDropRetryWindow.xaml`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml), [`RacInfobaseDropRetryWindow.xaml.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml.cs), [`RacInfobaseDropRetryWindow.Avalonia.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.Avalonia.cs)).
-3. **Копирование флагов блокировок при миграции** — при переносе/копировании баз между кластерами из источника копируются флаги блокировок `scheduled-jobs-deny`/`sessions-deny` (из `infobase summary list`, при отсутствии — через `infobase info`); в `infobase create` передаются ТОЛЬКО фактически выставленные флаги ([`ClusterMigrationService.cs`](Workspace1C/Services/ClusterMigrationService.cs), [`ClusterMigrationViewModel.cs`](Workspace1C/ViewModels/ClusterMigrationViewModel.cs), [`RacClient.cs`](Workspace1C/Services/RacClient.cs)).
-
-Покрыто тестами `ServerMonitorViewModelTests` (+7), `Issue69DropRetryWindowLayoutTests` (+2), `ClusterMigrationViewModelTests` (+2).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.82

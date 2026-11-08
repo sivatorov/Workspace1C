@@ -1,8 +1,0 @@
-Исправлено в версии 1.0.0.78 (Windows и Linux) по последнему комментарию (установить блокировку регламентных заданий галочкой; не выходить после первой неудачной попытки завершения сеансов):
-
-1. **Галочка «Установить блокировку регламентных заданий»** — в диалоге повтора при нажатии «Завершить сеансы и повторить» сначала ставится блокировка регламентных заданий (`RacClient.UpdateInfobaseAsync` с `--scheduled-jobs-deny=on`), затем завершаются сеансы/соединения, затем повторный `infobase drop`; статус-строка показывает промежуточные шаги ([`RacInfobaseDropRetryWindow.xaml`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml), [`DropRetryResult.cs`](Workspace1C/ViewModels/DropRetryResult.cs), [`ServerMonitorViewModel.cs`](Workspace1C/ViewModels/ServerMonitorViewModel.cs)).
-2. **Не выходить после первой неудачной попытки завершения сеансов** — при неудачном завершении цикл не прерывается: диалог показывается снова с пометкой «Повторная попытка завершения сеансов не удалась…», можно нажать «Завершить сеансы и повторить» ещё раз; «Отмена» прерывает удаление ([`RacInfobaseDropRetryWindow.xaml.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml.cs), [`RacInfobaseDropRetryWindow.Avalonia.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.Avalonia.cs), [`ServerMonitorWindow.xaml.cs`](Workspace1C/Views/ServerMonitorWindow.xaml.cs), [`ServerMonitorWindow.Avalonia.cs`](Workspace1C/Views/ServerMonitorWindow.Avalonia.cs)).
-
-Покрыто тестами `ServerMonitorViewModelTests`, `RacClientTests`, `Issue69DropRetryWindowLayoutTests`.
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.78

@@ -209,7 +209,7 @@ jobs:
       # Новость о релизе в Telegram-канал проекта. Шаг выполняется, только если в
       # репозитории задан секрет TELEGRAM_BOT_TOKEN (бот — администратор канала).
       # Канал по умолчанию -1004425443528, переопределяется секретом TELEGRAM_CHAT_ID.
-      # Текст — из _telegram_msg_v1000NN.txt (1.0.0.NN), иначе первые строки заметок.
+      # Текст — из docs/releases/telegram_msg_v1000NN.txt (1.0.0.NN), иначе первые строки заметок.
       # Тестовые prerelease-сборки в Telegram не анонсируются.
       - name: Новость в Telegram
         if: github.event_name != 'release' && env.IS_PRERELEASE != 'true'
@@ -224,7 +224,7 @@ jobs:
           chat="${TG_CHAT:--1004425443528}"
           ver="${{ steps.notes.outputs.version }}"
           head3="${ver%.*}"
-          msg="_telegram_msg_v${head3//./}0${ver##*.}.txt"
+          msg="docs/releases/telegram_msg_v${head3//./}0${ver##*.}.txt"
           url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
           if [ -f "$msg" ]; then
             cp "$msg" dist/tg.txt

@@ -1,6 +1,5 @@
 ## .NET / Visual Studio
 bin/
-tools/
 obj/
 *.user
 *.suo
@@ -9,7 +8,7 @@ obj/
 dist/
 *_wpftmp.csproj
 
-## Build results
+## Результаты сборки
 [Dd]ebug/
 [Rr]elease/
 x64/
@@ -20,13 +19,17 @@ bld/
 [Oo]bj/
 [Ll]og/
 [Ll]ogs/
+publish/
+release-artifacts/
+Workspace1C/publish/
 
-## Visual Studio
+## Visual Studio / VS Code
 .vs/
 .vscode/
 *.VisualState.xml
 TestResult.xml
 [Tt]est[Rr]esult*/
+Workspace1C/Views/Workspace1C_linux.code-workspace
 
 ## NuGet
 *.nupkg
@@ -35,45 +38,41 @@ packages/
 *.nuget.props
 *.nuget.targets
 
-## OS
+## ОС
 Thumbs.db
 Desktop.ini
 .DS_Store
 
-# Артефакты упаковки Linux: собираются скриптами из package/linux,
-# в репозитории нужны только сами скрипты.
+## Артефакты упаковки Linux: в репозитории нужны только скрипты из package/linux
 package/linux/AppDir/
 package/linux/out/
 package/linux/deb/staging/
 package/linux/deb/out/
 
-## ��������� ������ / ��������� �����
-build_out.txt
+## Рабочие файлы разработки (сборки, комментарии к issues, заметки к релизам).
+## Всё временное складывается в .work/ — каталог целиком не попадает в git.
+.work/
 .tmp/
+.tmp_*
+/_*
+
+*.log
+*_out.txt
+build_out.txt
 release_notes_*.md
- 
-# �������᪨�/�६���� 䠩�� ����� 
-analysis_issues*.md 
-selected_issues*.md 
-issues_fresh.md 
-issues_full.json 
-open_issues_full.json 
-_uncommitted.diff 
-cred_input.txt 
-rel_out.txt 
+/plans/
+/_analysis/
+/screenshots/
+TestResults/
+*.trx
+.gh_headers
+cred_input.txt
+rel_out.txt
 PREFLIGHT.md
-_analysis/ 
-Workspace1C/Views/Workspace1C_linux.code-workspace
+27_conf.zip
+/$*
 
-# ���������� ���� �������\
-plans/
-release-artifacts/  
-.gh_headers 
-
-# Publish build artifacts - do not commit
-publish/
-publish/out-*/
-publish/*_linux-x64
-publish/*.log
-publish/_payload.json
-publish/_fetch_debug.txt
+## Ключи лицензирования ПРО: закрытый ключ НИКОГДА не попадает в репозиторий
+*.private.key
+*.pem
+license-issuer/

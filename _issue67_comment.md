@@ -1,8 +1,0 @@
-Исправлено в версии 1.0.0.72 (Windows и Linux) по комментариям:
-
-1. **Резолвер понимает ВСЕ реквизиты базы, включая логин.** Справочник подстановок окна сценария расширен: `%connection.user%` (логин), `%connection.type%`, `%connection.port%`, `%id%`, `%имягруппы%`; кроме того окно понимает все динамические ключи карты (рефлексия по свойствам базы). Логин/пароль теперь соответствуют фактическому запуску: когда у базы нет собственных учётных данных, в карту подставляются решённые для общей авторизации (issue #57) значения ([`ScriptParameterResolver.BuildValueMap`](Workspace1C/Services/ScriptParameterResolver.cs), [`InfobaseAuthResolver`](Workspace1C/Services/InfobaseAuthResolver.cs); запуск сценария и живое превью).
-2. **Кнопка «Выбрать» и диалог переменных.** Под списком подстановок добавлена кнопка **«Выбрать…»** (слева от поясняющей надписи): открывается окно со ВСЕМИ переменными базы — слева итоговое имя переменной, справа её значение для «Базы для примера»; сверху поле поиска по обеим колонкам; снизу «Ок»/«Отмена». По «Ок» и по двойному клику имя переменной вставляется в параметры запуска ([`ScriptTokenPickerViewModel.cs`](Workspace1C/ViewModels/ScriptTokenPickerViewModel.cs), [`ScriptTokenPickerWindow.xaml`](Workspace1C/Views/ScriptTokenPickerWindow.xaml) + [`ScriptTokenPickerWindow.Avalonia.cs`](Workspace1C/Views/ScriptTokenPickerWindow.Avalonia.cs)). Значения паролей маскируются («••••»).
-
-Локализация ru/en; добавлены юнит-тесты `ScriptTokenPickerViewModelTests` и дополнены `ScriptParameterResolverTests`/`ScriptScenarioEditViewModelTests`.
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72

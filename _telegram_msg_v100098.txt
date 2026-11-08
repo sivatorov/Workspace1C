@@ -1,5 +1,0 @@
-Вышел Workspace 1C 1.0.0.98 (Windows и Linux):
-
-• Публикация баз — используемый файл алиасов снова в списке ConfTargets: 1c8Aliases27.conf находится по точному пути Include-строки и номеру из Define OneCPort, каталог публикации и порт/URL подставляются корректно и без ${...} (#63).
-
-Подробности в CHANGELOG: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.98

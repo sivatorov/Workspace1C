@@ -1,7 +1,0 @@
-Исправлено в версии 1.0.0.82 (Windows и Linux) по последнему комментарию (жалоба на ширину окна 1.0.0.79):
-
-**Ширина окна «Настройки»** — после фикса #55 настроечные вкладки «размахнулись»: многие элементы стали шире самого окна, и почти на всех вкладках появилась горизонтальная прокрутка. Принята единая со стратегией #55 политика «минимальные размеры + запрет сужения»: окну «Настройки» задан минимум 960×720 (было 820×620), окну «Настройка информационной базы» — 760×780 (было 680×680), сузить окно мышкой меньше минимума теперь нельзя; при этих размерах всё содержимое вкладок помещается без обрезания и без горизонтальных полос; жёсткие широкие размеры полей заменены на MinWidth со звёздными колонками, длинные подписи переносятся по словам ([`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml), [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs), [`ConnectionSettingsWindow.xaml`](Workspace1C/Views/ConnectionSettingsWindow.xaml), [`ConnectionSettingsWindow.Avalonia.cs`](Workspace1C/Views/ConnectionSettingsWindow.Avalonia.cs)).
-
-Покрыто тестами `Issue71SettingsWindowLayoutTests` (+8).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.82
