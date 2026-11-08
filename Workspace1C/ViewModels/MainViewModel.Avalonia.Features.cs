@@ -47,6 +47,22 @@ public partial class MainViewModel
         window.ShowDialogSync(OwnerWindow());
     }
 
+    // ======================= Внешние отчёты и обработки (issue #91, 2.0) =======================
+
+    private System.Windows.Input.ICommand? _externalProcessingsCommand;
+
+    /// <summary>Команда «Внешние отчёты и обработки…» (на Linux операции недоступны — нет COM).</summary>
+    public System.Windows.Input.ICommand ExternalProcessingsCommand =>
+        _externalProcessingsCommand ??= new RelayCommand(_ => ExecuteExternalProcessings());
+
+    private void ExecuteExternalProcessings()
+    {
+        var preselected = SelectedInfobase is null ? Array.Empty<Infobase>() : new[] { SelectedInfobase };
+        var vm = new ExternalProcessingsViewModel(_allInfobases.ToList(), preselected);
+        var window = new Workspace1C.ExternalProcessingsWindow(vm);
+        window.ShowDialogSync(OwnerWindow());
+    }
+
     // ======================= Пользователи информационных баз (1.0.0.83) =======================
 
     private System.Windows.Input.ICommand? _infobaseUsersCommand;

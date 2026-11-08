@@ -132,6 +132,9 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Расширения конфигурации (.cfe) (1.0.0.69).</summary>
     ConfigExtensions,
 
+    /// <summary>Внешние отчёты и обработки (.epf/.erf) по списку баз (issue #91, 2.0).</summary>
+    ExternalProcessings,
+
     /// <summary>Версионирование конфигурации в Git (1.0.0.69).</summary>
     GitVersioning,
 
@@ -532,6 +535,11 @@ public static class UtilitiesMenuCatalog
             // «Расширения конфигурации» (1.0.0.69): пакетная установка .cfe в отмеченные базы.
             new("ConfigExtensions", "Extensions.MenuItem", GroupOperations,
                 "IconExtension", "IconExtension", "#8B5CF6", UtilitiesMenuCommandKind.ConfigExtensions,
+                isNew: true),
+            // «Внешние отчёты и обработки» (issue #91, 2.0): загрузка .epf/.erf в справочник
+            // «Дополнительные отчёты и обработки» отмеченных баз через COM.
+            new("ExternalProcessings", "ExtProc.MenuItem", GroupOperations,
+                "IconExtension", "IconExtension", "#0EA5E9", UtilitiesMenuCommandKind.ExternalProcessings,
                 isNew: true),
             // «Пользователи информационных баз» (1.0.0.83): список и пакетные операции через COM.
             new("InfobaseUsers", "IbUsers.MenuItem", GroupOperations,

@@ -653,6 +653,8 @@
     <Compile Include="ViewModels\TechLogViewModel.cs" />
     <Compile Include="ViewModels\GitVersioningViewModel.cs" />
     <Compile Include="ViewModels\ExtensionsViewModel.cs" />
+    <!-- «Внешние отчёты и обработки» (issue #91, 2.0): общая ViewModel обеих платформ. -->
+    <Compile Include="ViewModels\ExternalProcessingsViewModel.cs" />
     <Compile Include="ViewModels\InfobaseUsersViewModel.cs" />
     <Compile Include="ViewModels\ScheduledJobsViewModel.cs" />
     <Compile Include="ViewModels\UsageStatisticsRowViewModel.cs" />

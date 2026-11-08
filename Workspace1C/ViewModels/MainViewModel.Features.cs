@@ -54,6 +54,25 @@ public partial class MainViewModel
         window.ShowDialog();
     }
 
+    // ======================= Внешние отчёты и обработки (issue #91, 2.0) =======================
+
+    private ICommand? _externalProcessingsCommand;
+
+    /// <summary>Команда «Внешние отчёты и обработки…»: загрузка .epf/.erf по списку баз.</summary>
+    public ICommand ExternalProcessingsCommand =>
+        _externalProcessingsCommand ??= new RelayCommand(_ => ExecuteExternalProcessings());
+
+    private void ExecuteExternalProcessings()
+    {
+        var preselected = SelectedInfobase is null ? Array.Empty<Infobase>() : new[] { SelectedInfobase };
+        var vm = new ExternalProcessingsViewModel(Infobases.ToList(), preselected);
+        var window = new ExternalProcessingsWindow(vm)
+        {
+            Owner = System.Windows.Application.Current.MainWindow
+        };
+        window.ShowDialog();
+    }
+
     // ======================= Пользователи информационных баз (1.0.0.83) =======================
 
     private ICommand? _infobaseUsersCommand;
