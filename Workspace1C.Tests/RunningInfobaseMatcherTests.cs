@@ -189,4 +189,86 @@ public sealed class RunningInfobaseMatcherTests
             Array.Empty<RunningOneCProcess>());
         Assert.Empty(matched2);
     }
+
+    // ---------------------------------------------------------------- issue #103, 2.0
+
+    [Fact]
+    public void MatchProcesses_DebugChildOfDesigner_MatchedByParent_EvenWithDuplicateNames()
+    {
+        // Две базы с одинаковым именем: проход /IBName не сработает, но клиент отладки —
+        // дочерний процесс Конфигуратора первой базы.
+        var a = NamedBase("a", "База разработки ЗУП");
+        var b = NamedBase("b", "База разработки ЗУП");
+        var designer = new RunningOneCProcess("1cv8.exe", @"""1cv8.exe"" DESIGNER /F ""C:\Bases\a""", true, 100, 1);
+        var client = new RunningOneCProcess("1cv8c.exe", @"""1cv8c.exe"" ENTERPRISE /IBName ""База разработки ЗУП"" /DEBUG -http", true, 200, 100);
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { a, b }, new[] { designer, client });
+
+        Assert.Equal(2, matched["a"].Count);
+        Assert.Contains(client, matched["a"]);
+        Assert.False(matched.ContainsKey("b"));
+    }
+
+    [Fact]
+    public void MatchProcesses_ChildOfUnmatchedParent_StaysUnmatched()
+    {
+        var a = NamedBase("a", "A");
+        var client = new RunningOneCProcess("1cv8c.exe", "1cv8c.exe ENTERPRISE /DEBUG", true, 200, 999);
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { a }, new[] { client });
+        Assert.Empty(matched);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbConnectionString_FileBase()
+    {
+        var a = NamedBase("a", "A");
+        var b = NamedBase("b", "A"); // одинаковые имена — /IBName не поможет
+        var client = Process(@"1cv8c.exe ENTERPRISE /IBConnectionString ""File=""""C:\Bases\b"""";"" /DEBUG -tcp");
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { a, b }, new[] { client });
+
+        Assert.Single(matched);
+        Assert.Contains(client, matched["b"]);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbConnectionString_ServerBase_IgnoresPort()
+    {
+        var server = ServerBase("srv1c:1541", "zup_dev");
+        var client = Process(@"1cv8c.exe ENTERPRISE /IBConnectionString ""Srvr=""""srv1c"""";Ref=""""ZUP_DEV"""";"" /DEBUG -http");
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { server }, new[] { client });
+
+        Assert.Contains(client, matched["s1"]);
+    }
+
+    [Theory]
+    [InlineData(@"/IBConnectionString ""File=""""C:\x"""";""", @"C:\x", null, null)]
+    [InlineData(@"/IBConnectionString File=C:\x; /DEBUG", @"C:\x", null, null)]
+    [InlineData(@"/IBConnectionString ""Srvr=""""s"""";Ref=""""r"""";"" /O Normal", null, "s", "r")]
+    public void ParseIbConnectionString_Forms(string line, string? file, string? srvr, string? reference)
+    {
+        var parsed = RunningInfobaseMatcher.ParseIbConnectionString("1cv8c.exe ENTERPRISE " + line);
+        Assert.NotNull(parsed);
+        Assert.Equal(file, parsed!.Value.File);
+        Assert.Equal(srvr, parsed.Value.Server);
+        Assert.Equal(reference, parsed.Value.Ref);
+    }
+
+    [Fact]
+    public void ParseIbConnectionString_Absent_IsNull()
+    {
+        Assert.Null(RunningInfobaseMatcher.ParseIbConnectionString(@"1cv8c.exe ENTERPRISE /F ""C:\x"""));
+    }
+
+    [Theory]
+    [InlineData("1234 (1cv8c) S 987 1234 1234 0 -1", 987)]
+    [InlineData("1234 (1cv8 (copy) x) R 55 1 1 0", 55)]
+    [InlineData("", 0)]
+    [InlineData(null, 0)]
+    [InlineData("garbage", 0)]
+    public void ParseParentPidFromStat(string? stat, int expected)
+    {
+        Assert.Equal(expected, RunningInfobaseMatcher.ParseParentPidFromStat(stat));
+    }
 }

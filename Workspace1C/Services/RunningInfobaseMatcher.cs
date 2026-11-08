@@ -63,7 +63,16 @@ public static class RunningInfobaseMatcher
                 AddToResult(result, owner.Id, process);
         }
 
-        // Второй проход: /IBName — запуск отладки из Конфигуратора (issue #103).
+        // Второй проход: /IBConnectionString "File=…;" / "Srvr=…;Ref=…;" — так клиент
+        // запускается из Конфигуратора и внешними обработками (issue #103).
+        unmatched = MatchByConnectionString(bases, unmatched, result);
+
+        // Третий проход: родительский процесс. Клиент отладки — дочерний процесс
+        // Конфигуратора; если Конфигуратор уже сопоставлен с базой, клиент принадлежит
+        // той же базе — независимо от совпадения имён (issue #103).
+        unmatched = MatchByParent(processes, unmatched, result);
+
+        // Четвёртый проход: /IBName — только уникальные имена (issue #103, v1.0.1.35).
         var uniqueByName = bases
             .GroupBy(ib => NormalizeName(ib.Name))
             .Where(g => g.Key.Length > 0 && g.Count() == 1)
@@ -83,6 +92,148 @@ public static class RunningInfobaseMatcher
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Проход по ключу <c>/IBConnectionString</c>: строка подключения разбирается на
+    /// <c>File</c> или <c>Srvr</c>+<c>Ref</c> и сравнивается с параметрами баз.
+    /// Возвращает процессы, оставшиеся несопоставленными.
+    /// </summary>
+    private static List<RunningOneCProcess> MatchByConnectionString(
+        List<Infobase> bases, List<RunningOneCProcess> unmatched,
+        Dictionary<string, List<RunningOneCProcess>> result)
+    {
+        var rest = new List<RunningOneCProcess>();
+        foreach (var process in unmatched)
+        {
+            var parsed = ParseIbConnectionString(process.CommandLine);
+            Infobase? owner = null;
+            if (parsed is { } p)
+            {
+                owner = bases.FirstOrDefault(ib => ib.Connection!.Type switch
+                {
+                    ConnectionType.File => p.File is not null && PathsEqual(p.File, ib.Connection.FilePath),
+                    ConnectionType.ClientServer => p.Server is not null && p.Ref is not null
+                        && string.Equals(p.Ref, (ib.Connection.DatabaseName ?? "").Trim(), StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(NormalizeServerHost(p.Server), NormalizeServerHost(ib.Connection.Server ?? ""),
+                            StringComparison.OrdinalIgnoreCase),
+                    _ => false
+                });
+            }
+            if (owner is null)
+                rest.Add(process);
+            else
+                AddToResult(result, owner.Id, process);
+        }
+        return rest;
+    }
+
+    /// <summary>
+    /// Проход по родительскому процессу: несопоставленный процесс, родитель которого
+    /// уже сопоставлен с базой, относится к той же базе. Повторяется, пока находятся
+    /// новые связи (цепочка «Конфигуратор → клиент → дочерний клиент»).
+    /// </summary>
+    private static List<RunningOneCProcess> MatchByParent(
+        IReadOnlyList<RunningOneCProcess> all, List<RunningOneCProcess> unmatched,
+        Dictionary<string, List<RunningOneCProcess>> result)
+    {
+        var ownerByPid = new Dictionary<int, string>();
+        foreach (var pair in result)
+            foreach (var p in pair.Value)
+                if (p.Pid > 0)
+                    ownerByPid[p.Pid] = pair.Key;
+
+        var rest = unmatched;
+        bool changed;
+        do
+        {
+            changed = false;
+            var next = new List<RunningOneCProcess>();
+            foreach (var process in rest)
+            {
+                if (process.ParentPid > 0 && process.Pid != process.ParentPid
+                    && ownerByPid.TryGetValue(process.ParentPid, out var ownerId))
+                {
+                    AddToResult(result, ownerId, process);
+                    if (process.Pid > 0)
+                        ownerByPid[process.Pid] = ownerId;
+                    changed = true;
+                }
+                else
+                {
+                    next.Add(process);
+                }
+            }
+            rest = next;
+        } while (changed && rest.Count > 0);
+        return rest;
+    }
+
+    /// <summary>
+    /// Разбирает значение ключа <c>/IBConnectionString</c> командной строки: возвращает
+    /// каталог файловой базы (<c>File</c>) или сервер и имя базы (<c>Srvr</c>/<c>Ref</c>).
+    /// Значения допускают удвоенные кавычки, как их пишет платформа:
+    /// <c>/IBConnectionString "File=""C:\Bases\ib"";"</c>. null — ключа нет.
+    /// </summary>
+    internal static (string? File, string? Server, string? Ref)? ParseIbConnectionString(string? commandLine)
+    {
+        var line = commandLine ?? string.Empty;
+        var index = line.IndexOf("/IBConnectionString", StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+            return null;
+        var rest = line[(index + "/IBConnectionString".Length)..];
+
+        // Значение — до следующего ключа « /…» вне кавычек.
+        var sb = new System.Text.StringBuilder();
+        var inQuotes = false;
+        for (var i = 0; i < rest.Length; i++)
+        {
+            var ch = rest[i];
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+                continue; // кавычки (в т.ч. удвоенные) в значении не нужны
+            }
+            if (!inQuotes && (ch == '/' || ch == '-') && i > 0 && rest[i - 1] == ' ' && sb.ToString().Trim().Length > 0)
+                break;
+            sb.Append(ch);
+        }
+
+        string? file = null, server = null, reference = null;
+        foreach (var part in sb.ToString().Split(';'))
+        {
+            var eq = part.IndexOf('=');
+            if (eq <= 0)
+                continue;
+            var key = part[..eq].Trim();
+            var value = part[(eq + 1)..].Trim();
+            if (value.Length == 0)
+                continue;
+            if (key.Equals("File", StringComparison.OrdinalIgnoreCase))
+                file = value;
+            else if (key.Equals("Srvr", StringComparison.OrdinalIgnoreCase))
+                server = value;
+            else if (key.Equals("Ref", StringComparison.OrdinalIgnoreCase))
+                reference = value;
+        }
+        return file is null && (server is null || reference is null) ? null : (file, server, reference);
+    }
+
+    /// <summary>
+    /// Родительский PID из содержимого <c>/proc/&lt;pid&gt;/stat</c> (поле 4). Имя процесса
+    /// в скобках может содержать пробелы и скобки, поэтому разбор — после последней «)».
+    /// 0 — разобрать не удалось.
+    /// </summary>
+    public static int ParseParentPidFromStat(string? stat)
+    {
+        if (string.IsNullOrEmpty(stat))
+            return 0;
+        var close = stat.LastIndexOf(')');
+        if (close < 0 || close + 2 >= stat.Length)
+            return 0;
+        var fields = stat[(close + 2)..].Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        // fields[0] — состояние, fields[1] — ppid.
+        return fields.Length > 1 && int.TryParse(fields[1], out var ppid) ? ppid : 0;
     }
 
     private static void AddToResult(

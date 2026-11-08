@@ -20,7 +20,7 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
         try
         {
             using var searcher = new ManagementObjectSearcher(
-                "SELECT Name, CommandLine, ProcessId FROM Win32_Process WHERE Name LIKE '1cv8%'");
+                "SELECT Name, CommandLine, ProcessId, ParentProcessId FROM Win32_Process WHERE Name LIKE '1cv8%'");
             using var objects = searcher.Get();
             foreach (var o in objects)
             {
@@ -37,7 +37,11 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
 
                     // issue #310: «зависший» процесс — точка у имени базы оранжевая/красная.
                     var responding = pid > 0 && IsProcessResponding(pid);
-                    result.Add(new RunningOneCProcess(name, commandLine, responding));
+                    // issue #103: родитель нужен, чтобы связать клиент отладки с базой Конфигуратора.
+                    var parentPid = 0;
+                    if (o["ParentProcessId"] is not null && int.TryParse(o["ParentProcessId"].ToString(), out var parsedParent))
+                        parentPid = parsedParent;
+                    result.Add(new RunningOneCProcess(name, commandLine, responding, pid, parentPid));
                 }
                 catch { /* строка процесса могла исчезнуть — пропускаем */ }
             }

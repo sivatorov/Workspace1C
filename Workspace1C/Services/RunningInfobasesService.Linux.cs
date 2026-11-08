@@ -44,8 +44,11 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
 
                 // issue #310: эвристика «не отвечает» — state 'D' в /proc/<pid>/stat
                 // (uninterruptible sleep); подробности и ограничение — в LinuxProcessStateInspector.
-                var responding = pid <= 0 || LinuxProcessStateInspector.StatIndicatesResponding(ReadStat(pid));
-                result.Add(new RunningOneCProcess(exe, string.Join(" ", args), responding));
+                var stat = pid > 0 ? ReadStat(pid) : null;
+                var responding = pid <= 0 || LinuxProcessStateInspector.StatIndicatesResponding(stat);
+                // issue #103: родитель (поле 4 /proc/<pid>/stat) — связь клиента отладки с Конфигуратором.
+                result.Add(new RunningOneCProcess(exe, string.Join(" ", args), responding, pid,
+                    RunningInfobaseMatcher.ParseParentPidFromStat(stat)));
             }
         }
         catch

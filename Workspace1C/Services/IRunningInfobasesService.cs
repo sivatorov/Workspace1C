@@ -6,7 +6,11 @@ namespace Workspace1C.Services;
 /// <param name="IsResponding">Процесс отвечает на запросы (Windows: <c>Process.Responding</c>;
 /// Linux: эвристика по /proc/<pid>/stat). По умолчанию true — если проверить не удалось,
 /// процесс считается отвечающим.</param>
-public sealed record RunningOneCProcess(string ProcessName, string CommandLine, bool IsResponding = true);
+/// <param name="Pid">Идентификатор процесса; 0 — неизвестен.</param>
+/// <param name="ParentPid">Идентификатор родительского процесса; 0 — неизвестен. Нужен,
+/// чтобы связать с базой клиент, запущенный отладкой из Конфигуратора (issue #103).</param>
+public sealed record RunningOneCProcess(string ProcessName, string CommandLine, bool IsResponding = true,
+    int Pid = 0, int ParentPid = 0);
 
 /// <summary>
 /// Запущенный процесс платформы 1С с подробностями для инспектора процессов.
