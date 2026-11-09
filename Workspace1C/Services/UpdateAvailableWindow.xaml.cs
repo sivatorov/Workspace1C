@@ -113,6 +113,7 @@ public partial class UpdateAvailableWindow : Window
     private async void OnDownloadClick(object sender, RoutedEventArgs e)
     {
         DownloadButton.IsEnabled = false;
+        SkipVersionButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
         OfferPanel.Visibility = Visibility.Collapsed;
         ProgressPanel.Visibility = Visibility.Visible;
@@ -343,6 +344,17 @@ public partial class UpdateAvailableWindow : Window
         {
             // Логирование не должно ломать диалог.
         }
+    }
+
+    /// <summary>
+    /// «Пропустить эту версию» (issue #116): версия запоминается в настройках и не
+    /// будет предлагаться (ни в диалоге, ни ссылкой «Обновить» в подвале), пока не
+    /// выйдет более новая версия.
+    /// </summary>
+    private void OnSkipVersionClick(object sender, RoutedEventArgs e)
+    {
+        _service.SkipVersion(_release);
+        Close();
     }
 
     private void OnCancelClick(object sender, RoutedEventArgs e) => Close();

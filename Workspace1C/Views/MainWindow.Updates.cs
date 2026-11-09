@@ -1,6 +1,8 @@
 #if WINDOWS
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
 
@@ -98,6 +100,17 @@ public partial class MainWindow
             FooterCheckUpdatesLink.Visibility = !hasRelease && manualCheck
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+
+            // Индикатор «!! Обновить» (issue #116): при готовом обновлении ссылка
+            // становится заметной — префикс «!!» и красный цвет DangerBrush; без
+            // релиза возвращаются обычный текст и акцентный цвет.
+            FooterUpdateLink.Text = hasRelease
+                ? "!! " + LocalizationManager.T("Main.Footer.Update")
+                : LocalizationManager.T("Main.Footer.Update");
+            if (hasRelease)
+                FooterUpdateLink.SetResourceReference(TextBlock.ForegroundProperty, "DangerBrush");
+            else
+                FooterUpdateLink.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
         }
         catch
         {

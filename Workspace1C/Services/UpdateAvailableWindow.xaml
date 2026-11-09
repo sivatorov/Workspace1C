@@ -54,10 +54,12 @@
                                               FontSize="12"
                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
 
-                    <!-- Кнопки: «Скачать» слева, «Отмена» справа.
+                    <!-- Кнопки: «Скачать» слева, «Отмена» справа; между ними —
+                         «Пропустить эту версию» (issue #116): версия не будет
+                         предлагаться до выхода более новой.
                          Единый контракт кнопок (issue #26): скачивание — ModernButton
                          (акцентная заливка AccentBrush + контрастный TextOnAccentBrush),
-                         отмена — SecondaryButton (карточка + контур + текст темы).
+                         пропуск и отмена — SecondaryButton (карточка + контур + текст темы).
                          Прежняя жёсткая зелёная кнопка #16A34A с белым текстом убрана. -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                         <Button x:Name="DownloadButton" Width="150" Height="34" Padding="0" IsDefault="True"
@@ -65,6 +67,12 @@
                                 Click="OnDownloadClick">
                             <TextBlock x:Name="DownloadText" Text="{loc:Loc Update.Download}" VerticalAlignment="Center"
                                        FontWeight="SemiBold" FontSize="13"/>
+                        </Button>
+                        <Button x:Name="SkipVersionButton" Width="170" Height="34"
+                                Style="{DynamicResource SecondaryButton}" Margin="0,0,10,0"
+                                ToolTip="{loc:Loc Update.SkipHint}"
+                                Click="OnSkipVersionClick">
+                            <TextBlock x:Name="SkipVersionText" Text="{loc:Loc Update.SkipVersion}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </Button>
                         <Button x:Name="CancelButton" Width="100" Height="34"
                                 Style="{DynamicResource SecondaryButton}"

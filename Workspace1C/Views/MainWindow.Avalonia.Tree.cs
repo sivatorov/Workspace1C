@@ -1265,10 +1265,15 @@ namespace Workspace1C
             string? colorHex = null, string? trailingIconKey = null, bool colorTextToo = true,
             double? iconSize = null, Thickness? widePadding = null, Thickness? narrowPadding = null)
         {
+            // Фон карточки + hover вместо SecondaryButton*: в тёмной теме кисти
+            // SecondaryButton* светлые (#FFF3CD), и подложка кнопок «1С:Стартер»,
+            // «По ссылке», «Выход» не читалась на тёмном фоне (issue #107). Контракт
+            // вторичной кнопки — как у ModalWindowBase.BuildCancelActionButton:
+            // фон карточки, контур и текст темы.
             var btn = new PanelButton(
-                "SecondaryButtonBackgroundBrush",
-                "SecondaryButtonHoverBrush",
-                "SecondaryButtonPressedBrush",
+                "CardBackgroundBrush",
+                "ItemHoverBrush",
+                "ItemHoverBrush",
                 "BorderColorBrush",
                 new CornerRadius(UiMetrics.RadiusMd))
             {
@@ -1311,10 +1316,12 @@ namespace Workspace1C
             string? colorHex = null, string? trailingIconKey = null, bool colorTextToo = true,
             double? iconSize = null, Thickness? widePadding = null, Thickness? narrowPadding = null)
         {
+            // Фон карточки + hover вместо SecondaryButton* (issue #107, см.
+            // комментарий в CompactActionButton).
             var btn = new PanelButton(
-                "SecondaryButtonBackgroundBrush",
-                "SecondaryButtonHoverBrush",
-                "SecondaryButtonPressedBrush",
+                "CardBackgroundBrush",
+                "ItemHoverBrush",
+                "ItemHoverBrush",
                 "BorderColorBrush",
                 new CornerRadius(UiMetrics.RadiusMd))
             {

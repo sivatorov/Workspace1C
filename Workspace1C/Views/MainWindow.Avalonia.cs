@@ -2241,9 +2241,10 @@ namespace Workspace1C
             grid.Children.Add(_syncMessage);
             Grid.SetColumn(_syncMessage, 1);
 
-            // Версия приложения и ссылки обновления (issue #116): клик по версии —
-            // окно «Что нового»; при доступной новой версии — «Обновить», в режимах
-            // «только уведомлять»/«вручную» — «Проверить обновления».
+            // Версия приложения и ссылки обновления (issue #116): ссылки «Обновить»
+            // и «Проверить обновления» стоят СЛЕВА от версии; клик по версии —
+            // окно «Что нового». При доступной новой версии «Обновить» помечается
+            // красным «!!» (RefreshFooterUpdateState).
             var footerPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -2251,23 +2252,10 @@ namespace Workspace1C
                 Margin = new Thickness(16, 0, 0, 0)
             };
 
-            _footerVersionText = new TextBlock
-            {
-                Text = "v" + VersionInfo.Display(),
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-                Cursor = new Cursor(StandardCursorType.Hand)
-            };
-            ThemeBrushes.Bind(_footerVersionText, TextBlock.ForegroundProperty, "SidebarTextBrush");
-            ToolTip.SetTip(_footerVersionText, LocalizationManager.T("Main.Footer.WhatsNewTooltip"));
-            _footerVersionText.PointerReleased += (_, _) => ShowWhatsNewFromFooter();
-            footerPanel.Children.Add(_footerVersionText);
-
             _footerUpdateLink = new TextBlock
             {
                 Text = LocalizationManager.T("Main.Footer.Update"),
                 FontSize = 12,
-                Margin = new Thickness(10, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 IsVisible = false
@@ -2288,6 +2276,19 @@ namespace Workspace1C
             ThemeBrushes.Bind(_footerCheckUpdatesLink, TextBlock.ForegroundProperty, "AccentBrush");
             _footerCheckUpdatesLink.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
             footerPanel.Children.Add(_footerCheckUpdatesLink);
+
+            _footerVersionText = new TextBlock
+            {
+                Text = "v" + VersionInfo.Display(),
+                FontSize = 12,
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            ThemeBrushes.Bind(_footerVersionText, TextBlock.ForegroundProperty, "SidebarTextBrush");
+            ToolTip.SetTip(_footerVersionText, LocalizationManager.T("Main.Footer.WhatsNewTooltip"));
+            _footerVersionText.PointerReleased += (_, _) => ShowWhatsNewFromFooter();
+            footerPanel.Children.Add(_footerVersionText);
 
             grid.Children.Add(footerPanel);
             Grid.SetColumn(footerPanel, 2);
@@ -2410,6 +2411,17 @@ namespace Workspace1C
 
                 _footerUpdateLink.IsVisible = hasRelease;
                 _footerCheckUpdatesLink.IsVisible = !hasRelease && manualCheck;
+
+                // Индикатор «!! Обновить» (issue #116): при готовом обновлении ссылка
+                // становится заметной — префикс «!!» и красный цвет #DC2626 (как у
+                // «Выхода», одинаково в обеих темах); без релиза — обычный текст и
+                // акцентный цвет.
+                _footerUpdateLink.Text = hasRelease
+                    ? "!! " + LocalizationManager.T("Main.Footer.Update")
+                    : LocalizationManager.T("Main.Footer.Update");
+                _footerUpdateLink.Foreground = hasRelease
+                    ? SpecBrush("#DC2626")
+                    : ThemeBrushes.FromSpec("@AccentBrush");
             }
             catch
             {

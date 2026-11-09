@@ -11,6 +11,39 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.48] — 2026-11-09
+
+### Добавлено
+
+- **Индикатор «!! Обновить» в статус-баре и «Пропустить эту версию» (issue #116).**
+  При доступном обновлении ссылка в строке состояния главного окна помечается красным
+  «!!» («!! Обновить») и располагается слева от надписи версии на обеих платформах —
+  WPF ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml)) и Avalonia
+  ([`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)). В диалоге
+  обновления появилась кнопка «Пропустить эту версию»: пропущенный релиз больше не
+  предлагается, но при выходе более новой версии уведомление появляется снова
+  ([`PendingUpdateStore.cs`](Workspace1C/Services/PendingUpdateStore.cs)). Страж-тесты:
+  [`Issue116UpdateModeTests.cs`](Workspace1C.Tests/Issue116UpdateModeTests.cs).
+
+### Исправлено
+
+- **Значок «Предприятие» для серверных баз при запуске отладки из Конфигуратора
+  (issue #103, продолжение).** Конфигуратор запускает клиент с параметром вида
+  `/S"сервер/база"` — ключ без пробела и с прямыми слешами (а также `/S сервер/база`
+  с пробелом). Разбор ключей дополнен этим форматом
+  ([`RunningInfobaseMatcher.cs`](Workspace1C/Services/RunningInfobaseMatcher.cs)):
+  серверная база корректно сопоставляется, и значок запущенного «Предприятия»
+  появляется. Покрыто юнит-тестами
+  ([`RunningInfobaseMatcherTests.cs`](Workspace1C.Tests/RunningInfobaseMatcherTests.cs)).
+- **Тёмная тема: стартовая страница (Linux) и окно «Заметки базы» (issue #107,
+  продолжение).** В Avalonia/Linux кнопки стартовой страницы «1С:Стартер», «По ссылке»
+  и «Выход» больше не имеют светлой подложки в тёмной теме
+  ([`Themes/Controls.axaml`](Workspace1C/Themes/Controls.axaml),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs));
+  в окне «Заметки базы» кнопка «Отмена» приведена к общему стилю вторичных кнопок —
+  WPF ([`BaseNotesWindow.xaml`](Workspace1C/Views/BaseNotesWindow.xaml)) и Avalonia
+  ([`BaseNotesWindow.Avalonia.cs`](Workspace1C/Views/BaseNotesWindow.Avalonia.cs)).
+
 ## [1.0.1.47] — 2026-11-09
 
 ### Добавлено

@@ -20,6 +20,9 @@ internal sealed class MaterialMessageWindowAvalonia : Window
 {
     public bool Confirmed { get; private set; } = true;
 
+    /// <summary>Нажата кнопка пропуска («Пропустить эту версию», issue #116).</summary>
+    public bool SkipClicked { get; private set; }
+
     /// <summary>Ответ дан кнопкой окна, а не закрытием через оконный менеджер.</summary>
     private bool _answered;
 
@@ -31,8 +34,14 @@ internal sealed class MaterialMessageWindowAvalonia : Window
     /// основным сообщением с рендером стилей (заголовки, жирный, списки). При
     /// пустом значении выводится заглушка о недоступном описании.
     /// </param>
+    /// <param name="skipButtonText">
+    /// Необязательный текст третьей кнопки пропуска (issue #116): задаётся для
+    /// диалога обновления, чтобы пользователь мог «пропустить эту версию». При
+    /// пустом значении кнопка не добавляется.
+    /// </param>
     public MaterialMessageWindowAvalonia(
-        string message, string title, MaterialMessageKind kind, string? markdownBody = null)
+        string message, string title, MaterialMessageKind kind, string? markdownBody = null,
+        string? skipButtonText = null)
     {
         Title = title;
         Width = 440;
@@ -114,6 +123,26 @@ internal sealed class MaterialMessageWindowAvalonia : Window
 
         if (kind == MaterialMessageKind.Question)
         {
+            // Кнопка пропуска (issue #116) — вторичная SecondaryButton, между
+            // «Да» и «Нет»; Esc и закрытие крестиком пропуском не считаются.
+            if (!string.IsNullOrWhiteSpace(skipButtonText))
+            {
+                Button skipButton = new()
+                {
+                    Content = skipButtonText,
+                    MinWidth = 120
+                };
+                skipButton.Styled(ControlThemes.SecondaryButton);
+                skipButton.Click += (_, _) =>
+                {
+                    _answered = true;
+                    SkipClicked = true;
+                    Confirmed = false;
+                    Close();
+                };
+                buttonsPanel.Children.Add(skipButton);
+            }
+
             // Отмена — вторичная кнопка SecondaryButton (карточка + контур + текст темы),
             // а не жёсткая тёмная надпись на светлой подложке (issue #26).
             Button cancelButton = new()

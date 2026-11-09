@@ -164,6 +164,62 @@ namespace Workspace1C.Services
             catch { /* подписчик не должен ронять проверку обновлений */ }
         }
 
+        /// <summary>
+        /// Проверяет, была ли версия релиза пропущена пользователем («Пропустить эту
+        /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
+        /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
+        /// «пропущена 1.0.1.48, вышла 1.0.1.49» — обновление снова предлагается.
+        /// </summary>
+        public bool IsSkipped(ReleaseInfo release)
+        {
+            if (release is null)
+                return false;
+            var skipped = LoadSkippedVersion();
+            if (string.IsNullOrWhiteSpace(skipped))
+                return false;
+            // Релиз считается пропущенным, если он НЕ новее пропущенной версии (равен
+            // или старше; нераспознанная пропущенная версия ничего не блокирует).
+            return !GitHubReleaseService.IsNewerThan(release, skipped);
+        }
+
+        /// <summary>
+        /// Записывает версию релиза как «пропущенную» (issue #116) и сбрасывает состояние
+        /// «доступна новая версия» (ссылка «Обновить» в подвале главного окна скрывается).
+        /// </summary>
+        public void SkipVersion(ReleaseInfo release)
+        {
+            if (release is null)
+                return;
+            try
+            {
+                var repository = AppServices.TryGetService<IInfobaseRepository>();
+                if (repository is not null)
+                {
+                    var settings = repository.LoadSettings();
+                    settings.SkippedUpdateVersion = release.TagName?.Trim() ?? string.Empty;
+                    repository.SaveSettings(settings);
+                }
+            }
+            catch
+            {
+                // Не удалось сохранить пропуск — обновление просто предложится снова.
+            }
+            SetAvailableRelease(null);
+        }
+
+        /// <summary>Читает пропущенную версию из настроек; при ошибке — «ничего не пропущено».</summary>
+        private static string? LoadSkippedVersion()
+        {
+            try
+            {
+                return AppServices.TryGetService<IInfobaseRepository>()?.LoadSettings().SkippedUpdateVersion;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public UpdateService(
             GitHubReleaseService gitHub,
             IDialogService dialogs,
@@ -200,6 +256,15 @@ namespace Workspace1C.Services
                 {
                     // Новой версии нет — сбрасываем состояние «доступна версия»
                     // (ссылка «Обновить» в подвале главного окна скрывается).
+                    SetAvailableRelease(null);
+                    return;
+                }
+
+                // Пропущенная версия (issue #116, «Пропустить эту версию») ведёт себя
+                // как «новой версии нет» — во всех режимах, включая автоприменение
+                // InstallOnStartup: пропущенный релиз не ставится молча.
+                if (IsSkipped(release))
+                {
                     SetAvailableRelease(null);
                     return;
                 }
@@ -329,6 +394,14 @@ namespace Workspace1C.Services
                     return;
                 }
 
+                if (IsSkipped(release))
+                {
+                    // Пропущенная версия при ручной проверке не предлагается (issue #116):
+                    // состояние сбрасывается без уведомлений и диалогов.
+                    SetAvailableRelease(null);
+                    return;
+                }
+
                 // Новая версия найдена — фиксируем состояние для ссылки «Обновить»
                 // в подвале главного окна (issue #116).
                 SetAvailableRelease(release);
@@ -450,8 +523,15 @@ namespace Workspace1C.Services
             var summary = current + Environment.NewLine + offered
                 + Environment.NewLine + Environment.NewLine
                 + LocalizationManager.T("Update.DownloadPrompt");
-            var accepted = ConfirmUpdate(summary, release.Body);
-            if (!accepted)
+            var result = ConfirmUpdateWithResult(summary, release.Body);
+            if (result == UpdateDialogResult.Skipped)
+            {
+                // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
+                // пока не выйдет более новая версия.
+                SkipVersion(release);
+                return;
+            }
+            if (result == UpdateDialogResult.Cancelled)
                 return;
 
             // Скачиваем новый бинарник, не блокируя поток интерфейса: диалог показан
@@ -545,8 +625,15 @@ namespace Workspace1C.Services
                 : LocalizationManager.T("Update.AdminPromptGeneric");
 
             // Повышение прав запускаем только после явного согласия пользователя.
-            var accepted = ConfirmUpdate(prompt, release.Body);
-            if (!accepted)
+            var result = ConfirmUpdateWithResult(prompt, release.Body);
+            if (result == UpdateDialogResult.Skipped)
+            {
+                // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
+                // пока не выйдет более новая версия.
+                SkipVersion(release);
+                return;
+            }
+            if (result == UpdateDialogResult.Cancelled)
             {
                 // Отказ — запасной вариант: ссылка на страницу выпуска для ручного обновления.
                 ShowManualUpdateDialog(
@@ -1763,6 +1850,22 @@ rmdir ""$WORK_DIR"" 2>/dev/null || true
             return _dialogs is AvaloniaDialogService avalonia
                 ? avalonia.ConfirmUpdate(summary, body, title)
                 : _dialogs.Confirm(summary, title);
+        }
+
+        /// <summary>
+        /// Как <see cref="ConfirmUpdate"/>, но с кнопкой «Пропустить эту версию»
+        /// (issue #116). Для диалоговой службы без поддержки пропуска кнопка не
+        /// добавляется — возвращается обычный результат «Да/Нет».
+        /// </summary>
+        private UpdateDialogResult ConfirmUpdateWithResult(string summary, string? body)
+        {
+            var title = LocalizationManager.T("Update.NewVersionAvailable");
+            var skipText = LocalizationManager.T("Update.SkipVersion");
+            return _dialogs is AvaloniaDialogService avalonia
+                ? avalonia.ConfirmUpdateWithSkip(summary, body, skipText, title)
+                : _dialogs.Confirm(summary, title)
+                    ? UpdateDialogResult.Confirmed
+                    : UpdateDialogResult.Cancelled;
         }
 
         /// <summary>

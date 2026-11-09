@@ -54,6 +54,37 @@ public sealed class RunningInfobaseMatcherTests
     }
 
     [Theory]
+    // Формат Конфигуратора (issue #103): ключ без пробела, кавычки, прямые слеши.
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S""server1/trade"" /N Иван", true)]
+    [InlineData(@"""1cv8.exe"" DESIGNER /S""server1/trade""", true)]
+    // Пробел + прямые слеши без кавычек.
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S server1/trade /N Иван", true)]
+    // Регресс: классический формат с «\» по-прежнему сопоставляется.
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S ""server1\trade""", true)]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S server1\trade", true)]
+    // Сервер с портом: порт игнорируется, сопоставляется.
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S""server1:1541/trade""", true)]
+    // Негатив: другая база.
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S""other/trade""", false)]
+    public void ServerBase_MatchesSlashSWithForwardSlashes(string commandLine, bool expected)
+    {
+        // issue #103: Конфигуратор запускает клиент серверной базы с ключом
+        // вида /S"server/base" — без пробела между ключом и значением и с
+        // прямыми слешами. Раньше такой формат не сопоставлялся.
+        Assert.Equal(expected, RunningInfobaseMatcher.MatchesCommandLine(ServerBase("server1", "trade"), commandLine));
+    }
+
+    [Fact]
+    public void ServerBase_MixedSeparator_SplitsByLastOne()
+    {
+        // Смешанное значение «host\db/trade»: разделитель — последний из «\»/«/»,
+        // то есть «/»; сервер «host\db», база «trade».
+        Assert.True(RunningInfobaseMatcher.MatchesCommandLine(
+            ServerBase(@"host\db", "trade"),
+            @"""1cv8c.exe"" ENTERPRISE /S""host\db/trade"""));
+    }
+
+    [Theory]
     [InlineData(@"""1cv8c.exe"" ENTERPRISE /S ""server1\trade"" /N Иван", true)]
     [InlineData(@"""1cv8c.exe"" ENTERPRISE /S server1\TRADE", true)]                 // регистр имени базы
     [InlineData(@"""1cv8c.exe"" ENTERPRISE /S ""server1\База с пробелами""", true)]  // кавычки и пробелы в имени

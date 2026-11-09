@@ -54,6 +54,28 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
+        /// Как <see cref="ConfirmUpdate"/>, но с третьей кнопкой «Пропустить эту версию»
+        /// (issue #116): пользователь может отказаться от этой версии — она больше не
+        /// будет предлагаться, пока не выйдет более новая.
+        /// </summary>
+        /// <param name="summary">Краткий текст вопроса (версии и приглашение скачать).</param>
+        /// <param name="markdownBody">Описание релиза в markdown; <c>null</c> скрывает секцию.</param>
+        /// <param name="skipButtonText">Локализованный текст кнопки пропуска.</param>
+        /// <param name="title">Заголовок окна.</param>
+        /// <returns>Кнопка, которой пользователь ответил (Esc/крестик — Cancelled).</returns>
+        public UpdateDialogResult ConfirmUpdateWithSkip(
+            string summary, string? markdownBody, string skipButtonText, string title = "")
+        {
+            var win = new MaterialMessageWindowAvalonia(
+                summary, DefaultTitle(title, "Common.Confirm"), MaterialMessageKind.Question,
+                markdownBody, skipButtonText);
+            ShowModalSync(win);
+            return win.SkipClicked
+                ? UpdateDialogResult.Skipped
+                : win.Confirmed ? UpdateDialogResult.Confirmed : UpdateDialogResult.Cancelled;
+        }
+
+        /// <summary>
         /// Показывает модальное окно с пояснением и кликабельной ссылкой на страницу
         /// выпуска. Используется автообновлением, когда самообновление недоступно
         /// (запуск из пакета AppImage или установка в системный каталог) — вместо
@@ -387,5 +409,18 @@ namespace Workspace1C.Services
     }
 
     internal enum MessageWindowKind { Info, Warning, Error, Question }
+
+    /// <summary>Ответ в диалоге обновления с кнопкой пропуска (issue #116).</summary>
+    // public, а не internal: используется как возвращаемый тип public-метода
+    // AvaloniaDialogService.ConfirmUpdateWithSkip (CS0050 в Linux/Avalonia-сборке).
+    public enum UpdateDialogResult
+    {
+        /// <summary>Пользователь согласился (кнопка «Да»).</summary>
+        Confirmed,
+        /// <summary>Пользователь пропустил версию (кнопка «Пропустить эту версию»).</summary>
+        Skipped,
+        /// <summary>Пользователь отказался (кнопка «Нет», Esc или крестик окна).</summary>
+        Cancelled
+    }
 }
 #endif

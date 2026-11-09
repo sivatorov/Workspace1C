@@ -183,6 +183,8 @@
     "Update.AdminPromptDeb": "The application was installed via a deb package, so updating requires administrator privileges. An authorization request will appear; after applying, the application will be closed and restarted. Continue?",
     "Update.AdminPromptGeneric": "The application is installed in a system directory, so updating requires administrator privileges. An authorization request will appear; after applying, the application will be closed and restarted. Continue?",
     "Update.OpenReleasePage": "Open the release page",
+    "Update.SkipVersion": "Skip this version",
+    "Update.SkipHint": "Do not show until the next version is released",
     "Update.Cancel": "Cancel",
     "Update.Failed": "Failed to open the download page.",
     "Update.CheckFailed": "Failed to check for updates.",

@@ -97,6 +97,62 @@ public sealed class UpdateService : IAppUpdateService
     }
 
     /// <summary>
+    /// Проверяет, была ли версия релиза пропущена пользователем («Пропустить эту
+    /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
+    /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
+    /// «пропущена 1.0.1.48, вышла 1.0.1.49» — обновление снова предлагается.
+    /// </summary>
+    public bool IsSkipped(ReleaseInfo release)
+    {
+        if (release is null)
+            return false;
+        var skipped = LoadSkippedVersion();
+        if (string.IsNullOrWhiteSpace(skipped))
+            return false;
+        // Релиз считается пропущенным, если он НЕ новее пропущенной версии (равен
+        // или старше; нераспознанная пропущенная версия ничего не блокирует).
+        return !GitHubReleaseService.IsNewerThan(release, skipped);
+    }
+
+    /// <summary>
+    /// Записывает версию релиза как «пропущенную» (issue #116) и сбрасывает состояние
+    /// «доступна новая версия» (ссылка «Обновить» в подвале главного окна скрывается).
+    /// </summary>
+    public void SkipVersion(ReleaseInfo release)
+    {
+        if (release is null)
+            return;
+        try
+        {
+            var repository = AppServices.TryGetService<IInfobaseRepository>();
+            if (repository is not null)
+            {
+                var settings = repository.LoadSettings();
+                settings.SkippedUpdateVersion = release.TagName?.Trim() ?? string.Empty;
+                repository.SaveSettings(settings);
+            }
+        }
+        catch
+        {
+            // Не удалось сохранить пропуск — обновление просто предложится снова.
+        }
+        SetAvailableRelease(null);
+    }
+
+    /// <summary>Читает пропущенную версию из настроек; при ошибке — «ничего не пропущено».</summary>
+    private static string? LoadSkippedVersion()
+    {
+        try
+        {
+            return AppServices.TryGetService<IInfobaseRepository>()?.LoadSettings().SkippedUpdateVersion;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Событие прогресса скачивания exe. Значение — проценты 0–100. Если длина файла
     /// заранее неизвестна (сервер не отдал Content-Length), передаётся −1, что означает
     /// «неопределённый прогресс» (индикатор переводится в режим IsIndeterminate).
@@ -150,6 +206,15 @@ public sealed class UpdateService : IAppUpdateService
             {
                 // Новой версии нет — сбрасываем состояние «доступна версия»
                 // (ссылка «Обновить» в подвале главного окна скрывается).
+                SetAvailableRelease(null);
+                return;
+            }
+
+            // Пропущенная версия (issue #116, «Пропустить эту версию») ведёт себя
+            // как «новой версии нет» — во всех режимах, включая автоприменение
+            // InstallOnStartup: пропущенный релиз не ставится молча.
+            if (IsSkipped(release))
+            {
                 SetAvailableRelease(null);
                 return;
             }
@@ -224,6 +289,14 @@ public sealed class UpdateService : IAppUpdateService
                 ShowOnUi(() => _dialogs.ShowInfo(
                     LocalizationManager.T("Update.UpToDate"),
                     LocalizationManager.T(CheckResultTitleKey)));
+                return;
+            }
+
+            if (IsSkipped(release))
+            {
+                // Пропущенная версия при ручной проверке не предлагается (issue #116):
+                // состояние сбрасывается без уведомлений и диалогов.
+                SetAvailableRelease(null);
                 return;
             }
 

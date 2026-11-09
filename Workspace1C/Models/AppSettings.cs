@@ -411,6 +411,14 @@ public class AppSettings
     public string UpdateMode { get; set; } = string.Empty;
 
     /// <summary>
+    /// Версия приложения, пропущенная пользователем кнопкой «Пропустить эту версию»
+    /// в диалоге обновления (issue #116). Пусто — ничего не пропущено. Пропуск
+    /// сам перестаёт действовать, когда выйдет более новая версия (сравнение по
+    /// компаратору версий, см. <see cref="Services.GitHubReleaseService.IsNewerThan"/>).
+    /// </summary>
+    public string SkippedUpdateVersion { get; set; } = string.Empty;
+
+    /// <summary>
     /// Диалог «Что нового» после обновления (v100112, F3): показывать при старте
     /// сводку изменений релиза, если версия приложения изменилась с прошлого запуска.
     /// </summary>
@@ -1249,6 +1257,7 @@ public class AppSettings
         UpdatesLogin ??= string.Empty;
         UpdatesPassword ??= string.Empty;
         ItsAccountId ??= string.Empty;
+        SkippedUpdateVersion ??= string.Empty;
         PlatformDownloadDirectory ??= string.Empty;
         UpdateChainFolder ??= string.Empty;
         UpdateDistributionFolder ??= string.Empty;

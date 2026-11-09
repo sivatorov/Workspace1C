@@ -35,8 +35,10 @@
             <Button x:Name="SaveButton" Content="{loc:Loc Common.Save}" Width="110"
                     Style="{StaticResource ModernButton}" Margin="0,0,8,0" IsDefault="True"
                     Click="OnSaveClick"/>
+            <!-- «Отмена» — вторичная кнопка (фон карточки + контур, hover-рамка),
+                 как во всех диалогах после v1.0.1.46 (issue #107). -->
             <Button x:Name="CancelButton" Content="{loc:Loc Common.Cancel}" Width="110"
-                    Style="{StaticResource ModernButton}" IsCancel="True" Click="OnCancelClick"/>
+                    Style="{StaticResource SecondaryButton}" IsCancel="True" Click="OnCancelClick"/>
         </StackPanel>
 
         <Grid>
