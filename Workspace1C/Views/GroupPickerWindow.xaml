@@ -271,19 +271,19 @@
                         IsEnabled="False" Click="OnSelect_Click" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
-                                                 Foreground="{DynamicResource TextOnAccentBrush}" Margin="0,0,6,0"
+                                                 Margin="0,0,6,0"
                                                  VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Select}" VerticalAlignment="Center"
-                                   FontWeight="SemiBold" Foreground="{DynamicResource TextOnAccentBrush}"/>
+                                   FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource OutlinedButton}" IsCancel="True" Click="OnCancel_Click">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Close" Width="15" Height="15"
-                                                 Foreground="{DynamicResource ButtonTextBrush}" Margin="0,0,6,0"
+                                                 Margin="0,0,6,0"
                                                  VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"
-                                   FontWeight="SemiBold" Foreground="{DynamicResource ButtonTextBrush}"/>
+                                   FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
             </StackPanel>

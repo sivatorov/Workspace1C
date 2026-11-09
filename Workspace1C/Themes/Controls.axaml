@@ -124,8 +124,9 @@
             </ControlTemplate>
         </Setter>
 
+        <!-- Hover вторичной кнопки — только рамка, без заливки (issue #107):
+             унификация с WPF-стилем SecondaryButton в обеих темах. -->
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="{DynamicResource SecondaryButtonHoverSurfaceBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource SecondaryButtonHoverOutlineBrush}"/>
         </Style>
         <Style Selector="^:pressed /template/ Border#PART_Surface">

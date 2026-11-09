@@ -2894,9 +2894,9 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                             <TextBlock Margin="0,0,0,12" Cursor="Hand" TextDecorations="Underline"
                                        Foreground="{DynamicResource AccentBrush}"
-                                       Text="https://infostart.ru/1c/tools/2764888/"
+                                       Text="https://infostart.ru/1c/articles/2825056/"
                                        MouseLeftButtonUp="OnAboutLink_Click"
-                                       Tag="https://infostart.ru/1c/tools/2764888/"/>
+                                       Tag="https://infostart.ru/1c/articles/2825056/"/>
                             <TextBlock Text="{loc:Loc Settings.About.GitHub}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>
                             <TextBlock Cursor="Hand" TextDecorations="Underline"

@@ -4922,7 +4922,7 @@ namespace Workspace1C
             // (SettingsWindow.xaml:1497-1510). В версии для Windows их открывает
             // обработчик под #if WINDOWS, здесь используется системный xdg-open.
             var infostart = LinkBlock(LocalizationManager.T("Settings.About.Infostart"),
-                "https://infostart.ru/1c/tools/2764888/");
+                "https://infostart.ru/1c/articles/2825056/");
             infostart.Margin = new Thickness(0, 0, 0, 12);
             panel.Children.Add(infostart);
             var github = LinkBlock(LocalizationManager.T("Settings.About.GitHub"),

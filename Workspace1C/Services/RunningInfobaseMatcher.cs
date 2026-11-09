@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Workspace1C.Models;
@@ -15,7 +16,12 @@ namespace Workspace1C.Services;
 /// </summary>
 public static class RunningInfobaseMatcher
 {
-    /// <summary>Сопоставляет базу с командной строкой процесса 1С (прямые ключи /F и /S).</summary>
+    /// <summary>
+    /// Сопоставляет базу с командной строкой процесса 1С: сперва прямые ключи /F и /S,
+    /// затем — строка соединения /IBConnectionString (issue #103: запуск отладки
+    /// серверной базы из Конфигуратора передаёт клиенту полную строку соединения).
+    /// Прямые ключи имеют приоритет над /IBConnectionString.
+    /// </summary>
     public static bool MatchesCommandLine(Infobase infobase, string? commandLine)
     {
         if (infobase?.Connection is null || string.IsNullOrWhiteSpace(commandLine))
@@ -23,18 +29,126 @@ public static class RunningInfobaseMatcher
 
         return infobase.Connection.Type switch
         {
-            ConnectionType.File => MatchesValue(commandLine, "F", infobase.Connection.FilePath ?? ""),
+            ConnectionType.File => MatchesValue(commandLine, "F", infobase.Connection.FilePath ?? "")
+                || MatchesIbConnectionString(infobase, commandLine),
             ConnectionType.ClientServer => MatchesServerValue(
-                commandLine,
-                infobase.Connection.Server ?? "",
-                infobase.Connection.DatabaseName ?? ""),
+                    commandLine,
+                    infobase.Connection.Server ?? "",
+                    infobase.Connection.DatabaseName ?? "")
+                || MatchesIbConnectionString(infobase, commandLine),
             _ => false
         };
     }
 
     /// <summary>
+    /// Сопоставление по ключу /IBConnectionString (issue #103): при отладке из
+    /// Конфигуратора клиент серверной базы запускается с полной строкой соединения
+    /// вида «Srvr="host[:port]";Ref="имя";…» (файловая — «File="путь";…»), которую
+    /// прямые ключи /S//F и /IBName не покрывают. Сравнение: Srvr с адресом сервера
+    /// базы (через <see cref="NormalizeServerHost"/>), Ref с именем базы в кластере;
+    /// регистр не важен, порт игнорируется.
+    /// </summary>
+    internal static bool MatchesIbConnectionString(Infobase infobase, string? commandLine)
+    {
+        if (infobase?.Connection is null || string.IsNullOrWhiteSpace(commandLine))
+            return false;
+
+        if (!TryExtractValue(commandLine, "IBConnectionString", out var connectionString))
+            return false;
+
+        var parts = ParseConnectionString(connectionString);
+        return infobase.Connection.Type switch
+        {
+            ConnectionType.ClientServer => MatchesCsServer(
+                parts, infobase.Connection.Server ?? "", infobase.Connection.DatabaseName ?? ""),
+            ConnectionType.File => MatchesCsFile(parts, infobase.Connection.FilePath ?? ""),
+            _ => false
+        };
+    }
+
+    private static bool MatchesCsServer(
+        IReadOnlyDictionary<string, string> parts, string expectedServer, string expectedDbName)
+    {
+        if (!parts.TryGetValue("Srvr", out var srvr) || !parts.TryGetValue("Ref", out var reference))
+            return false;
+
+        var server = (expectedServer ?? "").Trim();
+        var dbName = (expectedDbName ?? "").Trim();
+        if (server.Length == 0 || dbName.Length == 0 || reference.Trim().Length == 0)
+            return false;
+
+        return string.Equals(reference.Trim(), dbName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                NormalizeServerHost(srvr),
+                NormalizeServerHost(server),
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesCsFile(IReadOnlyDictionary<string, string> parts, string expectedPath)
+    {
+        if (!parts.TryGetValue("File", out var file))
+            return false;
+
+        var value = (expectedPath ?? "").Trim();
+        return value.Length > 0 && PathsEqual(file, value);
+    }
+
+    /// <summary>
+    /// Разбирает строку соединения 1С «Ключ="Значение";Ключ2="Значение2";…» в словарь
+    /// (регистр ключей не важен). Учтено 1С-экранирование кавычек внутри значений
+    /// («""» → «"») и «;» внутри значения в кавычках (например пароль); пустые и
+    /// неполные части игнорируются, первый ключ побеждает.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> ParseConnectionString(string connectionString)
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var s = (connectionString ?? "").Trim();
+        if (s.Length == 0)
+            return result;
+
+        // 1С удваивает кавычки внутри значений строки соединения — снимаем
+        // экранирование до разбора.
+        s = s.Replace("\"\"", "\"", StringComparison.Ordinal);
+
+        // Разбивка по «;» вне кавычек: точка с запятой внутри значения
+        // («Pwd="p;ass"») является частью значения.
+        var parts = new List<string>();
+        var current = new System.Text.StringBuilder();
+        var inQuotes = false;
+        foreach (var ch in s)
+        {
+            if (ch == '"')
+                inQuotes = !inQuotes;
+            else if (ch == ';' && !inQuotes)
+            {
+                parts.Add(current.ToString());
+                current.Clear();
+                continue;
+            }
+            current.Append(ch);
+        }
+        parts.Add(current.ToString());
+
+        foreach (var rawPart in parts)
+        {
+            var part = rawPart.Trim();
+            var eq = part.IndexOf('=');
+            if (eq <= 0)
+                continue;
+
+            var key = part[..eq].Trim();
+            var value = part[(eq + 1)..].Trim().Trim('"').Trim();
+            if (key.Length > 0 && !result.ContainsKey(key))
+                result[key] = value;
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Двухпроходное сопоставление списка баз с процессами платформы 1С (монитор
-    /// запущенных баз, issue #103): первый проход — прямые ключи подключения (/F, /S);
+    /// запущенных баз, issue #103): первый проход — прямые ключи подключения (/F, /S,
+    /// а также /IBConnectionString — серверные базы при отладке из Конфигуратора);
     /// второй — ключ /IBName по имени базы. Запуск отладки из Конфигуратора порождает
     /// клиентский процесс вида <c>ENTERPRISE /IBName <имя></c> без /F//S — раньше
     /// такие процессы не связывались с базой и значок «Предприятие» не появлялся.
@@ -206,10 +320,21 @@ public static class RunningInfobaseMatcher
         return (v[..slash].Trim(), v[(slash + 1)..].Trim());
     }
 
-    /// <summary>Снимает порт с адреса сервера («srv:1541» → «srv»); без порта — как есть.</summary>
+    /// <summary>
+    /// Нормализация адреса сервера для сравнения (issue #103): снимает префикс
+    /// протокола («tcp://srv» → «srv», встречается в Srvr строки соединения) и
+    /// порт («srv:1541» → «srv»); применяется симметрично к обеим сторонам
+    /// сравнения — и к значению из cmdline, и к адресу базы в списке.
+    /// </summary>
     private static string NormalizeServerHost(string server)
     {
         var s = (server ?? "").Trim();
+
+        // Префикс протокола: Srvr="tcp://host:1541".
+        var scheme = s.IndexOf("://", StringComparison.Ordinal);
+        if (scheme > 0)
+            s = s[(scheme + 3)..].Trim();
+
         var colon = s.LastIndexOf(':');
         if (colon > 0 && colon < s.Length - 1 && int.TryParse(s[(colon + 1)..], out _))
             return s[..colon].Trim();

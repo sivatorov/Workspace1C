@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.45-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.46-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.45**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.46**
 (поддерживается **более 5 500 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -203,6 +203,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Определение запущенных баз по отладке, тёмные кнопки, актуальная ссылка
+  Инфостарт (1.0.1.46, Windows и Linux)** — значок запущенной базы теперь
+  появляется и у клиент-серверных баз, запущенных по отладке из Конфигуратора:
+  разбор ключа `/IBConnectionString` (`Srvr`/`Ref`/`File`, снятие префикса
+  `tcp://`) вместо `/IBName`, которого Конфигуратор не передаёт (issue #103).
+  В тёмной теме исправлен цвет текста кнопок окна «Выбор родительской группы»
+  (тёмный → светлый), hover вторичных кнопок заменён с заливки на подсветку
+  рамкой, окно «Назначить теги» переведено на `SecondaryButton` (issue #107).
+  Ссылка на статью Инфостарт в окне «О программе» обновлена (issue #115).
 - **Linux: popup статус-панели у курсора, тёмная тема кнопок (1.0.1.45, Linux)** —
   tooltip и контекстное меню строки состояния теперь открываются у курсора по оси X
   (центр popup под курсором с зажимом в границы окна, по-прежнему над панелью по Y —
@@ -1161,9 +1170,9 @@
 > 📌 **Публикация на Infostart:** [страница программы](https://infostart.ru/1c/articles/2825056/)
 
 
-[![Infostart](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)](https://infostart.ru/1c/articles/2764888/)
+[![Infostart](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)](https://infostart.ru/1c/articles/2825056/)
 
-> 📌 **Публикация на Infostart:** [страница программы](https://infostart.ru/1c/articles/2764888/) (первая версия программы под другим названием «Управление конфигурациями 1С»)
+> 📌 **Публикация на Infostart:** [страница программы](https://infostart.ru/1c/articles/2825056/) (первая версия программы под другим названием «Управление конфигурациями 1С»)
 
 ---
 
@@ -1278,7 +1287,7 @@ Linux-порт выполнен и включает Avalonia UI, сервисы 
 
 ## 📜 Лицензия
 
-Проект распространяется с **открытым исходным кодом** и доступен бесплатно. Исходный код размещён в этом репозитории GitHub и в разделе **Файлы** публикации на [Infostart](https://infostart.ru/1c/articles/2764888/). Подробнее — в [`LICENSE`](LICENSE).
+Проект распространяется с **открытым исходным кодом** и доступен бесплатно. Исходный код размещён в этом репозитории GitHub и в разделе **Файлы** публикации на [Infostart](https://infostart.ru/1c/articles/2825056/). Подробнее — в [`LICENSE`](LICENSE).
 
 ---
 

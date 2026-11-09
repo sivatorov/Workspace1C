@@ -114,6 +114,18 @@ public sealed class RunningInfobaseMatcherTests
 
     private static RunningOneCProcess Process(string commandLine) => new("1cv8c.exe", commandLine);
 
+    private static Infobase NamedServerBase(string id, string name, string server, string dbName) => new()
+    {
+        Id = id,
+        Name = name,
+        Connection = new ConnectionSettings
+        {
+            Type = ConnectionType.ClientServer,
+            Server = server,
+            DatabaseName = dbName
+        }
+    };
+
     [Fact]
     public void MatchProcesses_DebugLaunchFromConfigurator_MatchesByIbName()
     {
@@ -188,5 +200,95 @@ public sealed class RunningInfobaseMatcherTests
         var matched2 = RunningInfobaseMatcher.MatchProcesses(new[] { NamedBase("f1", "X") },
             Array.Empty<RunningOneCProcess>());
         Assert.Empty(matched2);
+    }
+
+    // ============ Issue #103: /IBConnectionString (отладка серверных баз из Конфигуратора) ============
+
+    [Theory]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""trade"";""", true)]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""""server1"""";Ref=""""trade"""";""", true)] // 1С-экранирование кавычек
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1:1541"";Ref=""trade"";""", true)]   // порт у сервера
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""tcp://server1:1541"";Ref=""trade"";""", true)] // префикс протокола
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""SERVER1"";Ref=""TRADE"";""", true)]         // регистр
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""other"";""", false)]        // другая база на сервере
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server2"";Ref=""trade"";""", false)]        // тот же Ref на другом сервере
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";""", false)]                      // нет Ref
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE", false)]                                                                // ключа нет вовсе
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /S server1\trade", true)]                                                // прямые ключи не сломаны
+    public void ServerBase_MatchesByIbConnectionString(string commandLine, bool expected)
+    {
+        Assert.Equal(expected, RunningInfobaseMatcher.MatchesCommandLine(ServerBase("server1", "trade"), commandLine));
+    }
+
+    [Theory]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""File=""C:\Bases\ib"";""", true)]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""File=""C:\Bases\other"";""", false)]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""ib"";""", false)] // серверная строка для файловой базы
+    public void FileBase_MatchesByIbConnectionString(string commandLine, bool expected)
+    {
+        Assert.Equal(expected, RunningInfobaseMatcher.MatchesCommandLine(FileBase(@"C:\Bases\ib"), commandLine));
+    }
+
+    [Fact]
+    public void MatchProcesses_IbConnectionString_ServerBaseDuringDebugFromConfigurator()
+    {
+        // Отладка серверной базы из Конфигуратора: клиент получает строку соединения
+        // целиком, без /S и без /IBName — процесс должен связаться с базой (issue #103).
+        var base1 = NamedServerBase("s1", "Trade", "server1", "trade");
+        var processes = new[]
+        {
+            Process(@"""C:\Program Files\1cv8\1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""trade"";""")
+        };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1 }, processes);
+
+        Assert.True(matched.TryGetValue("s1", out var list));
+        Assert.Single(list!);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbConnectionString_DuplicateNames_MatchedWhenServerHintPresent()
+    {
+        // Неуникальные имена баз-«тёзок» на разных серверах: сопоставление выполняется
+        // по уточнению сервера из /IBConnectionString; процесс без уточнения не
+        // сопоставляется никому (защита от ложных срабатываний сохраняется).
+        var base1 = NamedServerBase("s1", "Бухгалтерия", "server1", "trade");
+        var base2 = NamedServerBase("s2", "Бухгалтерия", "server2", "trade");
+        var processes = new[]
+        {
+            Process(@"""1cv8c.exe"" ENTERPRISE /IBName Бухгалтерия /IBConnectionString ""Srvr=""server2"";Ref=""trade"";"""),
+            Process(@"""1cv8c.exe"" ENTERPRISE /IBName Бухгалтерия")
+        };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.True(matched.TryGetValue("s2", out var list2));
+        Assert.Single(list2!);
+        Assert.False(matched.ContainsKey("s1"));
+    }
+
+    [Fact]
+    public void MatchProcesses_DuplicateNames_MatchedWhenSlashSHintPresent()
+    {
+        // То же уточнение через прямой ключ /S у баз-«тёзок».
+        var base1 = NamedServerBase("s1", "Бухгалтерия", "server1", "trade");
+        var base2 = NamedServerBase("s2", "Бухгалтерия", "server2", "trade");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName Бухгалтерия /S server2\trade") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.True(matched.TryGetValue("s2", out var list2));
+        Assert.Single(list2!);
+        Assert.False(matched.ContainsKey("s1"));
+    }
+
+    [Fact]
+    public void ParseConnectionString_HandlesEscapedQuotesAndSemicolonsInValues()
+    {
+        // Рваные строки: 1С-экранирование кавычек и «;» внутри значения в кавычках.
+        var parts = RunningInfobaseMatcher.ParseConnectionString(@"Srvr=""server1"";Ref=""Trade"";Usr=""iv;an"";");
+        Assert.Equal("server1", parts["srvr"]);  // ключи без учёта регистра
+        Assert.Equal("Trade", parts["REF"]);
+        Assert.Equal("iv;an", parts["usr"]);
     }
 }

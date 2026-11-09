@@ -80,9 +80,7 @@
             </Button>
             <Button Width="110"
                     IsCancel="True"
-                    Style="{StaticResource ModernButton}"
-                    Background="{DynamicResource ItemHoverBrush}"
-                    Foreground="{DynamicResource TextPrimaryBrush}">
+                    Style="{StaticResource SecondaryButton}">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
