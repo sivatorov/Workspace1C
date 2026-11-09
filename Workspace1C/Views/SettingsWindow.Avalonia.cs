@@ -399,16 +399,44 @@ namespace Workspace1C
             multipleInstancesCheck.Margin = new Thickness(0, 0, 0, 6);
             settingsBehavior.Children.Add(multipleInstancesCheck);
 
-            // Обновление приложения: обе настройки учитываются при запуске
-            // (App.axaml.cs), но в Linux-сборке их нечем было изменить. Цвет значка
-            // взят из разметки Windows (SettingsWindow.xaml:1269, 1275); значка
-            // Update в наборе Icons.axaml нет, поэтому стоит ближайший IconRefresh.
-            var checkUpdatesCheck = SettingsSwitch("Settings.General.CheckForUpdatesOnStartup", _viewModel.CheckForUpdatesOnStartup, "IconRefresh", "@SuccessBrush", "Settings.General.CheckForUpdatesOnStartupTooltip");
-            var autoUpdateCheck = SettingsSwitch("Settings.General.AutoUpdate", _viewModel.AutoUpdateEnabled, "IconRefresh", "@SuccessBrush", "Settings.General.AutoUpdateTooltip");
-            checkUpdatesCheck.Margin = new Thickness(0, 0, 0, 6);
-            autoUpdateCheck.Margin = new Thickness(0, 0, 0, 6);
-            settingsBehavior.Children.Add(checkUpdatesCheck);
-            settingsBehavior.Children.Add(autoUpdateCheck);
+            // Режим обновления приложения (issue #116): единый ComboBox с четырьмя
+            // вариантами вместо двух переключателей. Цвет значка взят из разметки
+            // Windows; значка Update в наборе Icons.axaml нет, поэтому стоит
+            // ближайший IconRefresh.
+            var updateModeRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            var updateModeIcon = IconHelper.MakeIcon("IconRefresh", UiMetrics.Scaled(16),
+                Themes.ThemeBrushes.FromSpec("@SuccessBrush"));
+            updateModeIcon.Margin = new Thickness(0, 0, 8, 0);
+            updateModeIcon.VerticalAlignment = VerticalAlignment.Center;
+            updateModeRow.Children.Add(updateModeIcon);
+            var updateModeLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("Settings.General.UpdateMode"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            ThemeBrushes.Bind(updateModeLabel, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            updateModeRow.Children.Add(updateModeLabel);
+
+            var updateModeCombo = new ComboBox { MinWidth = 280, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var modeKey in new[]
+                     {
+                         "Settings.General.UpdateMode.InstallOnStartup",
+                         "Settings.General.UpdateMode.DownloadAskInstall",
+                         "Settings.General.UpdateMode.NotifyOnly",
+                         "Settings.General.UpdateMode.Manual"
+                     })
+            {
+                updateModeCombo.Items.Add(new ComboBoxItem
+                {
+                    Content = new TextBlock { Text = LocalizationManager.T(modeKey) }
+                });
+            }
+            // Порядок вариантов совпадает с порядком значений enum AppUpdateMode.
+            updateModeCombo.SelectedIndex = (int)_viewModel.UpdateMode;
+            ToolTip.SetTip(updateModeCombo, LocalizationManager.T("Settings.General.UpdateModeTooltip"));
+            updateModeRow.Children.Add(updateModeCombo);
+            settingsBehavior.Children.Add(updateModeRow);
 
             // Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
             // (первый пункт — «Основная») + кнопка открытия окна справочника.
@@ -3560,8 +3588,9 @@ namespace Workspace1C
                 _viewModel.ApplyBehaviorSettings(
                     multipleInstancesCheck.IsChecked == true,
                     rememberLayoutCheck.IsChecked == true,
-                    checkUpdatesCheck.IsChecked == true,
-                    autoUpdateCheck.IsChecked == true);
+                    updateModeCombo.SelectedIndex >= 0
+                        ? (AppUpdateMode)updateModeCombo.SelectedIndex
+                        : AppUpdateMode.InstallOnStartup);
                 _viewModel.ApplyTraySettings(
                     trayIconCheck.IsChecked == true,
                     closeToTrayCheck.IsChecked == true,

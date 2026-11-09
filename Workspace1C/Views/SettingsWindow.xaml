@@ -363,22 +363,20 @@
                                         <TextBlock Text="{loc:Loc Settings.General.AllowMultipleInstances}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </ToggleButton>
-                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="CheckForUpdatesOnStartupCheck" Margin="0,0,0,6">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.General.CheckForUpdatesOnStartup}" VerticalAlignment="Center"/>
-                                        <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                           HelpText="{loc:Loc Settings.General.CheckForUpdatesOnStartupTooltip}"/>
-                                    </StackPanel>
-                                </ToggleButton>
-                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="AutoUpdateEnabledCheck" Margin="0,0,0,6">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.General.AutoUpdate}" VerticalAlignment="Center"/>
-                                        <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
-                                                           HelpText="{loc:Loc Settings.General.AutoUpdateTooltip}"/>
-                                    </StackPanel>
-                                </ToggleButton>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <materialDesign:PackIcon Kind="Update" Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Settings.General.UpdateMode}" VerticalAlignment="Center"/>
+                                    <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                       HelpText="{loc:Loc Settings.General.UpdateModeTooltip}"/>
+                                    <ComboBox x:Name="UpdateModeComboBox" MinWidth="280" Height="34" Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.InstallOnStartup}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.DownloadAskInstall}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.NotifyOnly}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.Manual}"/>
+                                    </ComboBox>
+                                </StackPanel>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>

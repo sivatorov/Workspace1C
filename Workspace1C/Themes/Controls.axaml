@@ -1274,8 +1274,9 @@
         </Style>
     </ControlTheme>
     <!-- Карточка варианта окна добавления (AddEditWindow.xaml:26): рамка без
-         маркера радиокнопки, у выбранного варианта рамка акцентом толщиной 2
-         и заливка AccentHoverBrush. Это местный стиль автора, он отличается
+         маркера радиокнопки, у выбранного варианта только рамка акцентом толщиной 2
+         (issue #107: заливка AccentHoverBrush убрана — яркий акцент тёмной темы
+         делал светлый текст нечитаемым). Это местный стиль автора, он отличается
          от общей карточки OptionCard, где маркер есть. -->
     <ControlTheme x:Key="AddOptionCard" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand"/>
@@ -1304,7 +1305,6 @@
         <Style Selector="^:checked /template/ Border#PART_Surface">
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
             <Setter Property="BorderThickness" Value="2"/>
-            <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
         </Style>
     </ControlTheme>
 </ResourceDictionary>

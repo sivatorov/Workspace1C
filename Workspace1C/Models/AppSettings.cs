@@ -389,11 +389,26 @@ public class AppSettings
 
     /// <summary>
     /// Проверять наличие обновлений приложения при запуске (GitHub Releases).
+    /// Устаревший флаг (issue #116): оставлен для совместимости со старыми файлами
+    /// настроек и откатом на прежнюю версию, синхронизируется с <see cref="UpdateMode"/>.
     /// </summary>
     public bool CheckForUpdatesOnStartup { get; set; } = true;
 
-    /// <summary>Автоматически устанавливать новые версии без подтверждения (self-update при запуске).</summary>
+    /// <summary>
+    /// Автоматически устанавливать новые версии без подтверждения (self-update при запуске).
+    /// Устаревший флаг (issue #116): оставлен для совместимости со старыми файлами
+    /// настроек и откатом на прежнюю версию, синхронизируется с <see cref="UpdateMode"/>.
+    /// </summary>
     public bool AutoUpdateEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Режим обновления приложения (issue #116): «обновлять при запуске», «загружать
+    /// с предложением установки», «только уведомлять» или «проверять вручную».
+    /// Хранится канонической строкой <see cref="AppUpdateModeHelper.ToStringValue"/>;
+    /// пустое значение означает «не задано» и мигрирует из устаревших флагов
+    /// (см. <see cref="NormalizeUpdateMode"/>).
+    /// </summary>
+    public string UpdateMode { get; set; } = string.Empty;
 
     /// <summary>
     /// Диалог «Что нового» после обновления (v100112, F3): показывать при старте
@@ -1139,6 +1154,62 @@ public class AppSettings
     }
 
     /// <summary>
+    /// Возвращает текущий режим обновления (issue #116) из <see cref="UpdateMode"/>;
+    /// пустое/неизвестное значение трактуется как режим по умолчанию
+    /// (<see cref="AppUpdateModeHelper.Default"/>).
+    /// </summary>
+    public AppUpdateMode GetUpdateMode() => AppUpdateModeHelper.Parse(UpdateMode);
+
+    /// <summary>
+    /// Устанавливает режим обновления (issue #116) и синхронизирует устаревшие флаги
+    /// <see cref="CheckForUpdatesOnStartup"/>/<see cref="AutoUpdateEnabled"/> через
+    /// <see cref="ApplyLegacyUpdateFlags"/>, чтобы старые версии приложения и старый
+    /// код чтения настроек продолжали корректно работать.
+    /// </summary>
+    public void SetUpdateMode(AppUpdateMode mode)
+    {
+        UpdateMode = AppUpdateModeHelper.ToStringValue(mode);
+        ApplyLegacyUpdateFlags();
+    }
+
+    /// <summary>
+    /// Обратная синхронизация устаревших флагов из режима (issue #116):
+    /// <c>AutoUpdateEnabled</c> = только «обновлять при запуске»;
+    /// <c>CheckForUpdatesOnStartup</c> = всё, кроме «проверять вручную».
+    /// </summary>
+    public void ApplyLegacyUpdateFlags()
+    {
+        var (check, auto) = AppUpdateModeHelper.ToLegacyFlags(GetUpdateMode());
+        CheckForUpdatesOnStartup = check;
+        AutoUpdateEnabled = auto;
+    }
+
+    /// <summary>
+    /// Нормализует режим обновления после загрузки файла настроек (issue #116):
+    /// пустое значение мигрирует из устаревших флагов
+    /// <see cref="CheckForUpdatesOnStartup"/>/<see cref="AutoUpdateEnabled"/>
+    /// (у выключивших автообновление режим НЕ становится «обновлять при запуске»),
+    /// затем устаревшие флаги синхронизируются обратно с итоговым режимом.
+    /// Возвращает итоговый режим.
+    /// </summary>
+    public AppUpdateMode NormalizeUpdateMode()
+    {
+        if (string.IsNullOrWhiteSpace(UpdateMode))
+        {
+            // Миграция: старый файл настроек без поля UpdateMode.
+            UpdateMode = AppUpdateModeHelper.ToStringValue(
+                AppUpdateModeHelper.MigrateFromLegacyFlags(CheckForUpdatesOnStartup, AutoUpdateEnabled));
+        }
+        else
+        {
+            // Приводим к канонической строке (устойчивость к опечаткам в JSON).
+            UpdateMode = AppUpdateModeHelper.ToStringValue(AppUpdateModeHelper.Parse(UpdateMode));
+        }
+        ApplyLegacyUpdateFlags();
+        return GetUpdateMode();
+    }
+
+    /// <summary>
     /// Приводит настройки, загруженные из файла, к безопасному состоянию (issue #64).
     /// В легаси-файлах, созданных более ранними версиями приложения, поля-коллекции
     /// могли отсутствовать либо явно содержать <c>null</c>. Десериализация в таком случае
@@ -1188,6 +1259,10 @@ public class AppSettings
         // Единый режим списка (issue #52): старые файлы с флагами ShowFavoritesOnly/
         // ShowRunningOnly мигрируются в ListMode, чтобы обе платформы читали один источник.
         NormalizeListMode();
+
+        // issue #116: режим обновления — миграция из устаревших флагов
+        // CheckForUpdatesOnStartup/AutoUpdateEnabled при отсутствии поля.
+        NormalizeUpdateMode();
     }
 
 }

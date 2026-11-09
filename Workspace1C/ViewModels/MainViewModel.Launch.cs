@@ -631,8 +631,8 @@ public partial class MainViewModel : ViewModelBase
         s.TitleSuffixEnabled = _titleSuffixEnabled;
         s.TitleSuffixTemplate = _titleSuffixTemplate;
         s.AllowMultipleInstances = _allowMultipleInstances;
-        s.CheckForUpdatesOnStartup = _checkForUpdatesOnStartup;
-        s.AutoUpdateEnabled = _autoUpdateEnabled;
+        // issue #116: режим обновления; устаревшие флаги синхронизируются внутри.
+        s.SetUpdateMode(_updateMode);
         s.ComConnectorNameTemplate = _comConnectorNameTemplate;
         s.ComDetectTimeoutMs = _comDetectTimeoutMs;
         s.AvailabilityTcpPrecheckEnabled = _tcpPrecheckEnabled;

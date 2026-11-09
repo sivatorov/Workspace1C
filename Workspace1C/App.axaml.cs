@@ -376,19 +376,19 @@ namespace Workspace1C
                     ShowWhatsNewDialog(settings, mainWindow);
 
                     // Фоновая проверка обновлений (Linux/Avalonia): запускаем после показа
-                    // главного окна, чтобы не задерживать старт. Если пользователь отключил
-                    // проверку в настройках — пропускаем. При обнаружении новой версии всегда
-                    // показывается единый диалог с вопросом о применении обновления.
+                    // главного окна, чтобы не задерживать старт. Режим обновления задаётся
+                    // единой настройкой (issue #116) вместо пары флагов
+                    // CheckForUpdatesOnStartup/AutoUpdateEnabled: при режимах
+                    // InstallOnStartup/DownloadAskInstall/NotifyOnly проверка запускается,
+                    // при Manual — проверка только вручную. Режим ставится всегда, а не
+                    // только вместе с фоновой проверкой: тот же экземпляр службы обслуживает
+                    // кнопку «Проверить обновления» во вкладке «О программе» и подвале
+                    // главного окна.
                     var updateService = AppServices.GetRequiredService<UpdateService>();
-                    // Флаг ставится всегда, а не только вместе с фоновой проверкой: тот же
-                    // экземпляр службы обслуживает кнопку «Проверить обновления» во вкладке
-                    // «О программе». Пока присваивание стояло внутри условия, у выключивших
-                    // проверку при запуске оставалось значение по умолчанию (true), и ручная
-                    // проверка молча скачивала и ставила новую версию с перезапуском, минуя
-                    // вопрос о согласии и вопрос о моменте перезапуска.
-                    updateService.ApplyAutoUpdatePolicy(settings.AutoUpdateEnabled);
+                    var updateMode = settings.GetUpdateMode();
+                    updateService.ApplyUpdateMode(updateMode);
 
-                    if (settings.CheckForUpdatesOnStartup)
+                    if (updateMode != AppUpdateMode.Manual)
                         CheckForUpdatesInBackground(updateService);
 
                     // Задания по расписанию (issue #286): запускаем планировщик после

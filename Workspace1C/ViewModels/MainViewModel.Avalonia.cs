@@ -288,11 +288,9 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public bool RememberWindowLayout => _settings.RememberWindowLayout;
 
-    /// <summary>Проверять наличие обновлений приложения при запуске (GitHub Releases).</summary>
-    public bool CheckForUpdatesOnStartup => _settings.CheckForUpdatesOnStartup;
-
-    /// <summary>Автоматически устанавливать новые версии без подтверждения.</summary>
-    public bool AutoUpdateEnabled => _settings.AutoUpdateEnabled;
+    /// <summary>Режим обновления приложения (issue #116): «обновлять при запуске»,
+    /// «загружать с предложением установки», «только уведомлять» или «вручную».</summary>
+    public AppUpdateMode UpdateMode => _settings.GetUpdateMode();
 
     /// <summary>Идентификатор выбранной учётной записи ИТС (issue #333); пусто — «Основная».</summary>
     public string ItsAccountId
@@ -431,24 +429,23 @@ public partial class MainViewModel : ViewModelBase
     public void ApplyBehaviorSettings(
         bool allowMultipleInstances,
         bool rememberWindowLayout,
-        bool checkForUpdatesOnStartup,
-        bool autoUpdateEnabled)
+        AppUpdateMode updateMode)
     {
         _settings.AllowMultipleInstances = allowMultipleInstances;
         _settings.RememberWindowLayout = rememberWindowLayout;
-        _settings.CheckForUpdatesOnStartup = checkForUpdatesOnStartup;
-        _settings.AutoUpdateEnabled = autoUpdateEnabled;
+        // issue #116: единый режим обновления вместо пары флагов; устаревшие флаги
+        // синхронизируются внутри SetUpdateMode.
+        _settings.SetUpdateMode(updateMode);
         // Служба обновления живёт до перезапуска, а кнопка «Проверить обновления» стоит
-        // в том же окне настроек: без этого снятая галка вступала бы в силу только
+        // в том же окне настроек: без этого смена режима вступала бы в силу только
         // со следующего запуска.
-        AppServices.GetRequiredService<UpdateService>().ApplyAutoUpdatePolicy(autoUpdateEnabled);
+        AppServices.GetRequiredService<UpdateService>().ApplyUpdateMode(updateMode);
         if (!SaveSettingsSafe())
             _dialog.ShowError(LocalizationManager.T("Main.SaveFailedHint"),
                 LocalizationManager.T("Settings.Title"));
         OnPropertyChanged(nameof(AllowMultipleInstances));
         OnPropertyChanged(nameof(RememberWindowLayout));
-        OnPropertyChanged(nameof(CheckForUpdatesOnStartup));
-        OnPropertyChanged(nameof(AutoUpdateEnabled));
+        OnPropertyChanged(nameof(UpdateMode));
     }
 
     /// <summary>Применяет настройки поведения трея и системных уведомлений из окна настроек.</summary>

@@ -186,6 +186,9 @@ namespace Workspace1C
             // и при каждой смене полноценной темы (см. OnThemeChanged в MainWindow.UtilitiesMenu.cs).
             UpdateWindowControlGlyphs();
 
+            // Подвал строки состояния: версия приложения и ссылки обновления (issue #116).
+            InitializeFooterUpdateState();
+
             // issue #340 (0.3.9.308): файл диагностики trace.json (или legacy
             // menuclose_trace.json при его наличии) создаётся при КАЖДОМ старте — startup-
             // запись пишется вне зависимости от действий пользователя (в 0.3.9.306 файл

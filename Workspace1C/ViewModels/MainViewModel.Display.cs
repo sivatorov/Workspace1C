@@ -144,11 +144,9 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Разрешить несколько экземпляров приложения.</summary>
     public bool AllowMultipleInstances => _allowMultipleInstances;
 
-    /// <summary>Проверять наличие обновлений приложения при запуске (GitHub Releases).</summary>
-    public bool CheckForUpdatesOnStartup => _checkForUpdatesOnStartup;
-
-    /// <summary>Автоматически устанавливать новые версии без подтверждения (self-update при запуске).</summary>
-    public bool AutoUpdateEnabled => _autoUpdateEnabled;
+    /// <summary>Режим обновления приложения (issue #116): «обновлять при запуске»,
+    /// «загружать с предложением установки», «только уведомлять» или «вручную».</summary>
+    public AppUpdateMode UpdateMode => _updateMode;
 
     /// <summary>Выбранные теги для фильтра (можно несколько одновременно).</summary>
     public ObservableCollection<string> ActiveTagFilters => _activeTagFilters;

@@ -3167,6 +3167,29 @@
                         </ContextMenu>
                     </TextBlock.ContextMenu>
                 </TextBlock>
+                <!-- Версия приложения и ссылки обновления (issue #116): клик по версии —
+                     окно «Что нового»; при доступной новой версии — ссылка «Обновить»,
+                     в режимах «только уведомлять»/«вручную» — «Проверить обновления».
+                     Видимость ссылок управляется кодом (InitializeFooterUpdateState). -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                    <TextBlock x:Name="FooterVersionText"
+                               Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
+                               VerticalAlignment="Center" Cursor="Hand"
+                               ToolTip="{loc:Loc Main.Footer.WhatsNewTooltip}"
+                               MouseLeftButtonUp="OnFooterVersionClick"/>
+                    <TextBlock x:Name="FooterUpdateLink"
+                               Text="{loc:Loc Main.Footer.Update}"
+                               Foreground="{DynamicResource AccentBrush}" FontSize="12"
+                               VerticalAlignment="Center" Margin="10,0,0,0" Cursor="Hand"
+                               Visibility="Collapsed"
+                               MouseLeftButtonUp="OnFooterUpdateLinkClick"/>
+                    <TextBlock x:Name="FooterCheckUpdatesLink"
+                               Text="{loc:Loc Main.Footer.CheckUpdates}"
+                               Foreground="{DynamicResource AccentBrush}" FontSize="12"
+                               VerticalAlignment="Center" Margin="10,0,0,0" Cursor="Hand"
+                               Visibility="Collapsed"
+                               MouseLeftButtonUp="OnFooterCheckUpdatesLinkClick"/>
+                </StackPanel>
                 <TextBlock Grid.Column="2" Text="{Binding SyncMessage}"
                            Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
                            VerticalAlignment="Center" Margin="16,0,8,0"

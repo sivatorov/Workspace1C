@@ -59,30 +59,97 @@ public static class RunningInfobaseMatcher
         var parts = ParseConnectionString(connectionString);
         return infobase.Connection.Type switch
         {
-            ConnectionType.ClientServer => MatchesCsServer(
-                parts, infobase.Connection.Server ?? "", infobase.Connection.DatabaseName ?? ""),
+            ConnectionType.ClientServer => MatchesCsServer(parts, infobase),
             ConnectionType.File => MatchesCsFile(parts, infobase.Connection.FilePath ?? ""),
             _ => false
         };
     }
 
-    private static bool MatchesCsServer(
-        IReadOnlyDictionary<string, string> parts, string expectedServer, string expectedDbName)
+    /// <summary>
+    /// Сравнение строки соединения из cmdline с карточкой клиент-серверной базы
+    /// (issue #103, расширение):
+    /// <list type="bullet">
+    /// <item>Srvr может быть списком адресов через запятую (отказоустойчивый кластер,
+    /// «Srvr=""host1,host2:1541""») — совпадение с любым адресом списка;</item>
+    /// <item>если <c>DatabaseName</c> в карточке пуст — попытка извлечь Ref/Srvr из
+    /// собственной строки соединения базы (<see cref="ConnectionSettings.ToConnectionString"/>)
+    /// и сравнить Ref↔Ref, Srvr↔Srvr (по любому адресу из списков).</item>
+    /// </list>
+    /// </summary>
+    private static bool MatchesCsServer(IReadOnlyDictionary<string, string> parts, Infobase infobase)
     {
         if (!parts.TryGetValue("Srvr", out var srvr) || !parts.TryGetValue("Ref", out var reference))
             return false;
 
-        var server = (expectedServer ?? "").Trim();
-        var dbName = (expectedDbName ?? "").Trim();
-        if (server.Length == 0 || dbName.Length == 0 || reference.Trim().Length == 0)
+        if (reference.Trim().Length == 0)
             return false;
 
-        return string.Equals(reference.Trim(), dbName, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(
-                NormalizeServerHost(srvr),
-                NormalizeServerHost(server),
-                StringComparison.OrdinalIgnoreCase);
+        var connection = infobase.Connection!;
+        var server = (connection.Server ?? "").Trim();
+        var dbName = (connection.DatabaseName ?? "").Trim();
+
+        if (dbName.Length > 0)
+        {
+            // Обычный случай: Ref сравнивается с DatabaseName, Srvr — с адресом базы
+            // (по любому адресу из списка, порт игнорируется).
+            return ServerListContains(srvr, server)
+                && string.Equals(reference.Trim(), dbName, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Г3 (issue #103): имя базы в кластере в карточке не заполнено — сравниваем
+        // с собственной строкой соединения базы: Ref↔Ref, Srvr↔Srvr. Собственная
+        // строка собирается из полей карточки, поэтому если Ref в ней пуст —
+        // используем отображаемое имя базы, но всегда В ПАРЕ с адресом сервера
+        // (защита от ложных срабатываний сохраняется).
+        if (server.Length == 0)
+            return false;
+
+        var own = ParseConnectionString(connection.ToConnectionString());
+        var ownRef = own.TryGetValue("Ref", out var refValue) ? refValue.Trim() : string.Empty;
+        var expectedRef = ownRef.Length > 0 ? ownRef : NormalizeName(infobase.Name);
+        if (expectedRef.Length == 0)
+            return false;
+        if (!string.Equals(reference.Trim(), expectedRef, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return own.TryGetValue("Srvr", out var ownSrvr) && ownSrvr.Trim().Length > 0
+            ? ServerListsIntersect(srvr, ownSrvr)
+            : ServerListContains(srvr, server);
     }
+
+    /// <summary>True — в списке адресов Srvr (через запятую) есть адрес, совпадающий
+    /// с <paramref name="expectedServer"/> после нормализации (порт/протокол сняты).</summary>
+    private static bool ServerListContains(string srvrList, string expectedServer)
+    {
+        var expected = NormalizeServerHost(expectedServer);
+        if (expected.Length == 0)
+            return false;
+        return SplitServerList(srvrList).Any(addr =>
+            string.Equals(NormalizeServerHost(addr), expected, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>True — списки адресов Srvr пересекаются хотя бы одним адресом
+    /// (после нормализации; issue #103, fallback при пустом DatabaseName).</summary>
+    private static bool ServerListsIntersect(string srvrListA, string srvrListB)
+    {
+        var a = SplitServerList(srvrListA)
+            .Select(NormalizeServerHost)
+            .Where(s => s.Length > 0)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (a.Count == 0)
+            return false;
+        return SplitServerList(srvrListB).Any(addr =>
+        {
+            var n = NormalizeServerHost(addr);
+            return n.Length > 0 && a.Contains(n);
+        });
+    }
+
+    /// <summary>Разбивает значение Srvr на отдельные адреса: разделитель — запятая
+    /// (отказоустойчивый кластер «host1,host2:1541»); пустые элементы отбрасываются.</summary>
+    private static IEnumerable<string> SplitServerList(string srvrList)
+        => (srvrList ?? "")
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private static bool MatchesCsFile(IReadOnlyDictionary<string, string> parts, string expectedPath)
     {
@@ -163,40 +230,102 @@ public static class RunningInfobaseMatcher
         var bases = (infobases ?? Enumerable.Empty<Infobase>())
             .Where(ib => ib?.Connection is not null && !string.IsNullOrWhiteSpace(ib.Id))
             .ToList();
-        if (bases.Count == 0 || processes is null || processes.Count == 0)
+        var processList = processes ?? (IReadOnlyList<RunningOneCProcess>)Array.Empty<RunningOneCProcess>();
+        if (bases.Count == 0 || processList.Count == 0)
             return result;
+
+        // Диагностика (issue #103): при CM_DEBUG_RUNNING_MATCH=1 фиксируем входные
+        // данные матчера — реальные командные строки процессов и параметры баз.
+        if (RunningMatchDebug.IsEnabled)
+        {
+            RunningMatchDebug.Log($"MatchProcesses: bases={bases.Count}, processes={processList.Count}");
+            foreach (var ib in bases)
+                RunningMatchDebug.Log(
+                    $"  base id={ib.Id} name=\"{ib.Name}\" db=\"{ib.Connection.DatabaseName}\" " +
+                    $"server=\"{ib.Connection.Server}\" file=\"{ib.Connection.FilePath}\" type={ib.Connection.Type}");
+            foreach (var p in processList)
+                RunningMatchDebug.Log($"  process exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
+        }
 
         // Первый проход: прямые ключи /F//S — самый надёжный признак.
         var unmatched = new List<RunningOneCProcess>();
-        foreach (var process in processes)
+        foreach (var process in processList)
         {
             var owner = bases.FirstOrDefault(ib => MatchesCommandLine(ib, process.CommandLine));
             if (owner is null)
+            {
                 unmatched.Add(process);
+                if (RunningMatchDebug.IsEnabled)
+                    RunningMatchDebug.Log($"  pass1: NO direct match for exe=\"{process.ProcessName}\"");
+            }
             else
+            {
                 AddToResult(result, owner.Id, process);
+                if (RunningMatchDebug.IsEnabled)
+                    RunningMatchDebug.Log($"  pass1: matched to base id={owner.Id} (direct keys)");
+            }
         }
 
         // Второй проход: /IBName — запуск отладки из Конфигуратора (issue #103).
-        var uniqueByName = bases
-            .GroupBy(ib => NormalizeName(ib.Name))
-            .Where(g => g.Key.Length > 0 && g.Count() == 1)
-            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
-        if (uniqueByName.Count == 0)
-            return result;
+        // Г1 (issue #103): имя процесса может быть как отображаемым именем базы (Name),
+        // так и именем базы в кластере (Connection.DatabaseName), поэтому кандидаты
+        // собираются из ОБОИХ источников; сопоставление — только когда имя однозначно.
+        var nameCandidates = new Dictionary<string, List<Infobase>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var ib in bases)
+        {
+            AddNameCandidate(nameCandidates, NormalizeName(ib.Name), ib);
+            AddNameCandidate(nameCandidates, NormalizeName(ib.Connection.DatabaseName), ib);
+        }
+        if (RunningMatchDebug.IsEnabled)
+        {
+            foreach (var pair in nameCandidates)
+                RunningMatchDebug.Log(
+                    $"  pass2: name \"{pair.Key}\" -> {pair.Value.Count} candidate(s) " +
+                    $"[{string.Join(", ", pair.Value.Select(b => b.Id))}]");
+        }
 
         foreach (var process in unmatched)
         {
             if (!TryExtractValue(process.CommandLine ?? "", "IBName", out var rawName))
+            {
+                if (RunningMatchDebug.IsEnabled)
+                    RunningMatchDebug.Log($"  pass2: no /IBName in exe=\"{process.ProcessName}\"");
                 continue;
+            }
             var name = NormalizeName(rawName);
             if (name.Length == 0)
                 continue;
-            if (uniqueByName.TryGetValue(name, out var owner))
+
+            if (nameCandidates.TryGetValue(name, out var candidates) && candidates.Count == 1)
+            {
+                var owner = candidates[0];
                 AddToResult(result, owner.Id, process);
+                if (RunningMatchDebug.IsEnabled)
+                    RunningMatchDebug.Log($"  pass2: /IBName \"{name}\" matched to base id={owner.Id}");
+            }
+            else if (RunningMatchDebug.IsEnabled)
+            {
+                RunningMatchDebug.Log(
+                    $"  pass2: /IBName \"{name}\" skipped — " +
+                    (candidates is null ? "no candidate" : $"ambiguous ({candidates.Count} candidates)"));
+            }
         }
 
         return result;
+    }
+
+    /// <summary>Добавляет базу в словарь кандидатов по имени (issue #103, Г1).
+    /// Одна база может попасть в список дважды (Name == DatabaseName) — дубликат
+    /// по Id отбрасывается, чтобы не портить проверку уникальности.</summary>
+    private static void AddNameCandidate(
+        Dictionary<string, List<Infobase>> candidates, string name, Infobase infobase)
+    {
+        if (name.Length == 0)
+            return;
+        if (!candidates.TryGetValue(name, out var list))
+            candidates[name] = list = new List<Infobase>();
+        if (!list.Any(b => string.Equals(b.Id, infobase.Id, StringComparison.Ordinal)))
+            list.Add(infobase);
     }
 
     private static void AddToResult(
@@ -286,20 +415,72 @@ public static class RunningInfobaseMatcher
                 continue;
 
             // После ключа допускается кавычка и/или пробел: /F"path", /F "path", /Fpath.
-            var rest = line[index..].TrimStart().TrimStart('"');
+            var rest = line[index..].TrimStart();
 
-            // Значение заканчивается перед следующим ключом «/...» или «-...».
-            var end = rest.Length;
-            for (var i = 1; i < rest.Length; i++)
+            string actual;
+            if (rest.StartsWith('"'))
             {
-                if ((rest[i] == '/' || rest[i] == '-') && (rest[i - 1] == ' ' || rest[i - 1] == '"'))
+                // Прежняя эвристика (сохранена для совместимости): значение до
+                // следующего ключа « /»/« -»; в cmdline одиночные кавычки внутри
+                // значения могут быть ЛИТЕРАЛЬНЫМИ (не удвоенными), поэтому нельзя
+                // безусловно считать первую кавычку закрывающей.
+                var trimmed = rest.TrimStart('"');
+                var heuristicEnd = trimmed.Length;
+                for (var i = 1; i < trimmed.Length; i++)
                 {
-                    end = i;
-                    break;
+                    if ((trimmed[i] == '/' || trimmed[i] == '-') && (trimmed[i - 1] == ' ' || trimmed[i - 1] == '"'))
+                    {
+                        heuristicEnd = i;
+                        break;
+                    }
                 }
+                var heuristic = trimmed[..heuristicEnd].Trim().TrimEnd('"').Trim();
+
+                // Г4 (issue #103): значение в кавычках может содержать « /» и « -»
+                // (например пользователь/пароль внутри /IBConnectionString). Если
+                // прежняя эвристика оборвала значение РАНЬШЕ закрывающей кавычки
+                // (кавычки в значении экранированы удвоением «""»), продолжаем до
+                // закрывающей кавычки — значение извлекается целиком.
+                var closing = -1;
+                var j = 1;
+                while (j < rest.Length)
+                {
+                    if (rest[j] == '"')
+                    {
+                        if (j + 1 < rest.Length && rest[j + 1] == '"')
+                        {
+                            j += 2;
+                            continue;
+                        }
+                        closing = j;
+                        break;
+                    }
+                    j++;
+                }
+
+                // Позиция обрыва эвристики в координатах rest (rest начинается с кавычки).
+                var heuristicCutInRest = heuristicEnd + 1;
+                actual = closing > heuristicCutInRest
+                    ? rest[1..closing].Replace("\"\"", "\"", StringComparison.Ordinal).Trim()
+                    : heuristic;
+            }
+            else
+            {
+                // Значение без кавычек заканчивается перед следующим ключом «/...»
+                // или «-...».
+                var end = rest.Length;
+                for (var i = 1; i < rest.Length; i++)
+                {
+                    if ((rest[i] == '/' || rest[i] == '-') && (rest[i - 1] == ' '))
+                    {
+                        end = i;
+                        break;
+                    }
+                }
+
+                actual = rest[..end].Trim().TrimEnd('"').Trim();
             }
 
-            var actual = rest[..end].Trim().TrimEnd('"').Trim();
             if (actual.Length > 0)
             {
                 value = actual;

@@ -41,10 +41,12 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
+                            <!-- Issue #107: у выбранной карточки только акцентная рамка 2px,
+                                 без заливки AccentHoverBrush — яркий акцент тёмной темы
+                                 делал светлый текст нечитаемым. Фон остаётся CardBackgroundBrush. -->
                             <Trigger Property="IsChecked" Value="True">
                                 <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="OptionBorder" Property="BorderThickness" Value="2"/>
-                                <Setter TargetName="OptionBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>

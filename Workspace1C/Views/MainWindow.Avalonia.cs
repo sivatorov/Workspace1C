@@ -50,6 +50,11 @@ namespace Workspace1C
         private TextBlock _syncMessage = null!;
         private LeveledTreeView _tree = null!;
 
+        // Подвал строки состояния (issue #116): версия приложения и ссылки обновления.
+        private TextBlock _footerVersionText = null!;
+        private TextBlock _footerUpdateLink = null!;
+        private TextBlock _footerCheckUpdatesLink = null!;
+
         // Issue #114: координата курсора по X (в координатах окна) над строкой состояния.
         // Запоминается в PointerEntered/PointerMoved/PointerPressed на _statusInfo и
         // используется Custom-размещением tooltip/контекстного меню: popup центрируется
@@ -2236,11 +2241,62 @@ namespace Workspace1C
             grid.Children.Add(_syncMessage);
             Grid.SetColumn(_syncMessage, 1);
 
+            // Версия приложения и ссылки обновления (issue #116): клик по версии —
+            // окно «Что нового»; при доступной новой версии — «Обновить», в режимах
+            // «только уведомлять»/«вручную» — «Проверить обновления».
+            var footerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(16, 0, 0, 0)
+            };
+
+            _footerVersionText = new TextBlock
+            {
+                Text = "v" + VersionInfo.Display(),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            ThemeBrushes.Bind(_footerVersionText, TextBlock.ForegroundProperty, "SidebarTextBrush");
+            ToolTip.SetTip(_footerVersionText, LocalizationManager.T("Main.Footer.WhatsNewTooltip"));
+            _footerVersionText.PointerReleased += (_, _) => ShowWhatsNewFromFooter();
+            footerPanel.Children.Add(_footerVersionText);
+
+            _footerUpdateLink = new TextBlock
+            {
+                Text = LocalizationManager.T("Main.Footer.Update"),
+                FontSize = 12,
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                IsVisible = false
+            };
+            ThemeBrushes.Bind(_footerUpdateLink, TextBlock.ForegroundProperty, "AccentBrush");
+            _footerUpdateLink.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
+            footerPanel.Children.Add(_footerUpdateLink);
+
+            _footerCheckUpdatesLink = new TextBlock
+            {
+                Text = LocalizationManager.T("Main.Footer.CheckUpdates"),
+                FontSize = 12,
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                IsVisible = false
+            };
+            ThemeBrushes.Bind(_footerCheckUpdatesLink, TextBlock.ForegroundProperty, "AccentBrush");
+            _footerCheckUpdatesLink.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
+            footerPanel.Children.Add(_footerCheckUpdatesLink);
+
+            grid.Children.Add(footerPanel);
+            Grid.SetColumn(footerPanel, 2);
+
             var sessionToggleBtn = StatusBarIconButton("IconRecent");
             ToolTip.SetTip(sessionToggleBtn, LocalizationManager.T("Main.CurrentSession"));
             sessionToggleBtn.Bind(Button.CommandProperty, new Binding("ToggleSessionLaunchPanelCommand"));
             grid.Children.Add(sessionToggleBtn);
-            Grid.SetColumn(sessionToggleBtn, 2);
+            Grid.SetColumn(sessionToggleBtn, 3);
 
             var toggleBtn = StatusBarIconButton("IconPageLayoutSidebarRight");
             // Подсказка меняется вместе с состоянием панели, как в разметке
@@ -2248,7 +2304,7 @@ namespace Workspace1C
             toggleBtn.Bind(ToolTip.TipProperty, new Binding("RightPanelToggleTooltip"));
             toggleBtn.Bind(Button.CommandProperty, new Binding("ToggleRightPanelDetailsCommand"));
             grid.Children.Add(toggleBtn);
-            Grid.SetColumn(toggleBtn, 3);
+            Grid.SetColumn(toggleBtn, 4);
 
             // Индикатор фоновых загрузок (issue #334 п.1): скачивание платформы и цепочек
             // продолжается после закрытия окон; здесь — текст статуса, прогресс и отмена.
@@ -2307,14 +2363,91 @@ namespace Workspace1C
             downloadsPanel.Children.Add(cancelDownloadsBtn);
 
             grid.Children.Add(downloadsPanel);
-            Grid.SetColumn(downloadsPanel, 4);
+            Grid.SetColumn(downloadsPanel, 5);
 
             // Фон панели и цвет текста в разметке заданы явно (MainWindow.xaml:2300):
             // тёмная полоса SidebarBrush с контрастным текстом, а не прозрачная
             // область с обычным текстом.
             var bar = new Border { Child = grid, Name = "StatusBarBorder", Padding = new Thickness(12, 6) };
             ThemeBrushes.Bind(bar, Border.BackgroundProperty, "SidebarBrush");
+
+            // Состояние «доступна новая версия» (issue #116): подписка на службу
+            // обновления. Событие приходит из фоновой проверки (чужой поток) —
+            // обновление UI через Dispatcher.
+            try
+            {
+                var updateService = AppServices.TryGetService<UpdateService>();
+                if (updateService is not null)
+                {
+                    updateService.AvailableReleaseChanged += () =>
+                        Dispatcher.UIThread.Post(RefreshFooterUpdateState);
+                    Dispatcher.UIThread.Post(RefreshFooterUpdateState);
+                }
+            }
+            catch
+            {
+                // Состояние ссылок не критично: остаётся только версия.
+            }
+
             return bar;
+        }
+
+        /// <summary>
+        /// Расставляет видимость ссылок подвала (issue #116): «Обновить» — когда служба
+        /// знает доступный релиз; «Проверить обновления» — в режимах «только уведомлять»
+        /// и «проверять вручную», когда доступного релиза нет.
+        /// </summary>
+        private void RefreshFooterUpdateState()
+        {
+            try
+            {
+                var updateService = AppServices.TryGetService<UpdateService>();
+                if (updateService is null)
+                    return;
+
+                var hasRelease = updateService.AvailableRelease is not null;
+                var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
+
+                _footerUpdateLink.IsVisible = hasRelease;
+                _footerCheckUpdatesLink.IsVisible = !hasRelease && manualCheck;
+            }
+            catch
+            {
+                // Состояние ссылок не критично.
+            }
+        }
+
+        /// <summary>Клик по версии в подвале — окно «Что нового» (issue #116).</summary>
+        private void ShowWhatsNewFromFooter()
+        {
+            try
+            {
+                var settings = AppServices.GetRequiredService<Services.IInfobaseRepository>().LoadSettings();
+                var dialog = new WhatsNewWindow(settings);
+                dialog.ShowDialogSync(this);
+            }
+            catch
+            {
+                // Диалог не должен ронять приложение.
+            }
+        }
+
+        /// <summary>
+        /// Клик по ссылкам «Обновить»/«Проверить обновления» в подвале (issue #116):
+        /// та же ручная проверка, что и в «О программе» — для доступного релиза она
+        /// открывает диалог обновления.
+        /// </summary>
+        private async System.Threading.Tasks.Task RunFooterCheckUpdatesAsync()
+        {
+            try
+            {
+                var updateService = AppServices.GetRequiredService<UpdateService>();
+                await updateService.CheckForUpdatesManualAsync();
+            }
+            catch
+            {
+                // Внутренние ошибки уже показаны в UpdateService; здесь только страхуемся.
+            }
         }
 
         /// <summary>

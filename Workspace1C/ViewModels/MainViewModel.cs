@@ -63,8 +63,9 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Шаблон дополнения заголовка окна (issue #28): %computer_name%, %user_name%, %user_domain%, %computer_ip%, %display_server%.</summary>
     private string _titleSuffixTemplate = "%computer_name%";
     private bool _allowMultipleInstances;
-    private bool _checkForUpdatesOnStartup = true;
-    private bool _autoUpdateEnabled = true;
+    // issue #116: единый режим обновления вместо пары флагов
+    // CheckForUpdatesOnStartup/AutoUpdateEnabled.
+    private AppUpdateMode _updateMode = AppUpdateMode.InstallOnStartup;
     /// <summary>Тема приложения следует за режимом ОС (issue #108, Windows).</summary>
     private bool _themeFollowsOs;
     /// <summary>Признак подписки наблюдателя режима ОС (issue #108).</summary>
@@ -503,8 +504,9 @@ public partial class MainViewModel : ViewModelBase
         _showTags = settings.ShowTags;
         _showTagFilterPanel = settings.ShowTagFilterPanel;
         _allowMultipleInstances = settings.AllowMultipleInstances;
-        _checkForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
-        _autoUpdateEnabled = settings.AutoUpdateEnabled;
+        // issue #116: режим обновления (миграция из старых флагов уже выполнена
+        // в AppSettings.NormalizeForLoad).
+        _updateMode = settings.GetUpdateMode();
         // Правка структуры меню «Утилиты» (issue #374): по умолчанию выключена —
         // меню строится по стандартной компоновке (обратная совместимость).
         _utilitiesMenuEditingEnabled = settings.UtilitiesMenuEditingEnabled;

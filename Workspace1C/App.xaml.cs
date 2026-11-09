@@ -325,18 +325,17 @@ namespace Workspace1C
                 ShowWhatsNewDialog(settings, mainWindow);
 
                 // Фоновая проверка обновлений (Windows/WPF): запускаем после показа
-                // главного окна, чтобы не задерживать старт. Если пользователь отключил
-                // проверку в настройках — пропускаем. Работа выполняется асинхронно,
-                // UI при этом не блокируется.
-                if (settings.CheckForUpdatesOnStartup)
-                {
-                    var updateService = AppServices.GetRequiredService<UpdateService>();
-                    // Передаём флаг автообновления из настроек. При обнаружении новой версии
-                    // фоновая проверка ВСЕГДА покажет единый диалог с вопросом «Перезапустить
-                    // сейчас / Обновить после закрытия», независимо от этого флага.
-                    updateService.AutoUpdateEnabled = settings.AutoUpdateEnabled;
+                // главного окна, чтобы не задерживать старт. Работа выполняется
+                // асинхронно, UI при этом не блокируется. Режим обновления задаётся
+                // единым настройкой (issue #116) вместо пары флагов
+                // CheckForUpdatesOnStartup/AutoUpdateEnabled: при режимах
+                // InstallOnStartup/DownloadAskInstall/NotifyOnly проверка запускается,
+                // при Manual — проверка только вручную.
+                var updateService = AppServices.GetRequiredService<UpdateService>();
+                var updateMode = settings.GetUpdateMode();
+                updateService.ApplyUpdateMode(updateMode);
+                if (updateMode != AppUpdateMode.Manual)
                     CheckForUpdatesInBackground(updateService);
-                }
 
                 // Задания по расписанию (issue #286): запускаем планировщик после входа
                 // в профиль и показа главного окна. Он работает, пока приложение запущено.

@@ -191,10 +191,10 @@ namespace Workspace1C
                 ShowTagFilterPanelCheck.IsChecked = _viewModel.ShowTagFilterPanel;
             if (AllowMultipleInstancesCheck != null)
                 AllowMultipleInstancesCheck.IsChecked = _viewModel.AllowMultipleInstances;
-            if (CheckForUpdatesOnStartupCheck != null)
-                CheckForUpdatesOnStartupCheck.IsChecked = _viewModel.CheckForUpdatesOnStartup;
-            if (AutoUpdateEnabledCheck != null)
-                AutoUpdateEnabledCheck.IsChecked = _viewModel.AutoUpdateEnabled;
+            // Режим обновления (issue #116): порядок вариантов ComboBox совпадает
+            // с порядком значений enum AppUpdateMode.
+            if (UpdateModeComboBox != null)
+                UpdateModeComboBox.SelectedIndex = (int)_viewModel.UpdateMode;
             if (ShowTrayIconCheck != null)
                 ShowTrayIconCheck.IsChecked = _viewModel.ShowTrayIcon;
             if (CloseToTrayCheck != null)

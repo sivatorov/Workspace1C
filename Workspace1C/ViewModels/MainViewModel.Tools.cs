@@ -2707,8 +2707,7 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public void ApplyAppBehaviorSettings(
         bool allowMultipleInstances,
-        bool checkForUpdatesOnStartup,
-        bool autoUpdateEnabled,
+        AppUpdateMode updateMode,
         bool showTagFilterPanel,
         bool closeToTray = false,
         bool showTrayIcon = true,
@@ -2753,8 +2752,7 @@ public partial class MainViewModel : ViewModelBase
         string? hotkeyCollectDiagnostics = null)
     {
         _allowMultipleInstances = allowMultipleInstances;
-        _checkForUpdatesOnStartup = checkForUpdatesOnStartup;
-        _autoUpdateEnabled = autoUpdateEnabled;
+        _updateMode = updateMode;
         _showTagFilterPanel = showTagFilterPanel;
         _closeToTray = closeToTray;
         _showTrayIcon = showTrayIcon;
@@ -2799,8 +2797,7 @@ public partial class MainViewModel : ViewModelBase
         // «Собрать диагностику» (issue #99, v1.0.1.23).
         if (hotkeyCollectDiagnostics != null) HotkeyCollectDiagnostics = hotkeyCollectDiagnostics.Trim();
         OnPropertyChanged(nameof(AllowMultipleInstances));
-        OnPropertyChanged(nameof(CheckForUpdatesOnStartup));
-        OnPropertyChanged(nameof(AutoUpdateEnabled));
+        OnPropertyChanged(nameof(UpdateMode));
         OnPropertyChanged(nameof(ShowTagFilterPanel));
         OnPropertyChanged(nameof(CloseToTray));
         OnPropertyChanged(nameof(ShowTrayIcon));

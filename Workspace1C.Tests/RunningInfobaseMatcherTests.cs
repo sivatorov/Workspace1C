@@ -291,4 +291,164 @@ public sealed class RunningInfobaseMatcherTests
         Assert.Equal("Trade", parts["REF"]);
         Assert.Equal("iv;an", parts["usr"]);
     }
+
+    // ============ Issue #103 (v1.0.1.47): расширение матчинга серверных баз ============
+
+    [Fact]
+    public void MatchProcesses_IbName_MatchesDatabaseName_InsteadOfDisplayName()
+    {
+        // Г1: имя в Конфигураторе = имя базы в кластере (DatabaseName), а не
+        // отображаемое имя — проход /IBName должен сопоставить и такой случай.
+        var base1 = NamedServerBase("s1", "Торговля (внешний)", "server1", "trade_db");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName trade_db") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1 }, processes);
+
+        Assert.True(matched.TryGetValue("s1", out var list));
+        Assert.Single(list!);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbName_MatchesDisplayName_StillWorks()
+    {
+        // Регресс: совпадение с отображаемым именем (прежнее поведение) сохранено.
+        var base1 = NamedServerBase("s1", "Торговля (внешний)", "server1", "trade_db");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName ""Торговля (внешний)""") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1 }, processes);
+
+        Assert.True(matched.TryGetValue("s1", out var list));
+        Assert.Single(list!);
+    }
+
+    [Fact]
+    public void MatchProcesses_IbName_NonUniqueName_ButUniqueDatabaseName_Matches()
+    {
+        // Г1/Г2: отображаемые имена неуникальны (пары «локальный/внешний сервер»),
+        // но имена баз в кластере различаются — сопоставляем по уникальному DatabaseName.
+        var base1 = NamedServerBase("s1", "Бухгалтерия", "server1", "trade1");
+        var base2 = NamedServerBase("s2", "Бухгалтерия", "server2", "trade2");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName trade2") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.True(matched.TryGetValue("s2", out var list2));
+        Assert.Single(list2!);
+        Assert.False(matched.ContainsKey("s1"));
+    }
+
+    [Fact]
+    public void MatchProcesses_IbName_AmbiguousAcrossNameAndDatabaseName_Skipped()
+    {
+        // Имя процесса совпадает и с именем одной базы, и с DatabaseName другой —
+        // неоднозначно, не сопоставляем никому (безопаснее ложных значков).
+        var base1 = NamedServerBase("s1", "Общее имя", "server1", "trade1");
+        var base2 = NamedServerBase("s2", "Другая", "server2", "Общее имя");
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /IBName Общее имя") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { base1, base2 }, processes);
+
+        Assert.Empty(matched);
+    }
+
+    [Theory]
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1,host2:1541"";Ref=""trade"";""", true)]  // любой адрес списка
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""host2,server1"";Ref=""trade"";""", true)]       // порядок не важен
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""host3,host4"";Ref=""trade"";""", false)]      // список без адреса базы
+    [InlineData(@"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""other"";""", false)]          // Ref на другом... другая база
+    public void ServerBase_MatchesByIbConnectionString_ServerList(string commandLine, bool expected)
+    {
+        // Г3: Srvr — список адресов через запятую (отказоустойчивый кластер).
+        Assert.Equal(expected, RunningInfobaseMatcher.MatchesCommandLine(ServerBase("server1", "trade"), commandLine));
+    }
+
+    [Fact]
+    public void ServerBase_EmptyDatabaseName_MatchesByOwnConnectionString()
+    {
+        // Г3: DatabaseName в карточке пуст — сопоставление Ref↔Ref (из отображаемого
+        // имени/собственной строки соединения) в паре с адресом сервера из списка Srvr.
+        var base1 = new Infobase
+        {
+            Id = "s1",
+            Name = "trade",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "server1",
+                DatabaseName = ""
+            }
+        };
+        var commandLine = @"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""host2,server1:1541"";Ref=""trade"";""";
+
+        Assert.True(RunningInfobaseMatcher.MatchesCommandLine(base1, commandLine));
+
+        // Другой Ref на том же сервере — не сопоставляется.
+        var wrongRef = @"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""host2,server1:1541"";Ref=""other"";""";
+        Assert.False(RunningInfobaseMatcher.MatchesCommandLine(base1, wrongRef));
+
+        // Тот же Ref, но ни один адрес списка не совпадает с сервером базы — не сопоставляется.
+        var wrongServer = @"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""host2,host3"";Ref=""trade"";""";
+        Assert.False(RunningInfobaseMatcher.MatchesCommandLine(base1, wrongServer));
+    }
+
+    [Fact]
+    public void TryExtractValue_QuotedValueWithSlashInside_IsExtractedWhole()
+    {
+        // Г4: « /» внутри значения в кавычках (с 1С-экранированием удвоением) не
+        // обрывает извлечение /IBConnectionString — значение берётся до закрывающей
+        // кавычки.
+        var commandLine = @"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""""server1"""";Ref=""""trade"""";Usr=""""iv an /x"""";"" /N Иван";
+        Assert.True(RunningInfobaseMatcher.TryExtractValue(commandLine, "IBConnectionString", out var value));
+        Assert.Contains("Usr=\"iv an /x\"", value);
+
+        var parts = RunningInfobaseMatcher.ParseConnectionString(value);
+        Assert.Equal("server1", parts["Srvr"]);
+        Assert.Equal("trade", parts["Ref"]);
+        Assert.Equal("iv an /x", parts["Usr"]);
+
+        // Регресс: одиночные (не удвоенные) кавычки внутри значения — прежняя
+        // эвристика сохранена, значение не «схлопывается» до Srvr=.
+        var singleQuotes = @"""1cv8c.exe"" ENTERPRISE /IBConnectionString ""Srvr=""server1"";Ref=""trade"";""";
+        Assert.True(RunningInfobaseMatcher.TryExtractValue(singleQuotes, "IBConnectionString", out var value2));
+        var parts2 = RunningInfobaseMatcher.ParseConnectionString(value2);
+        Assert.Equal("server1", parts2["Srvr"]);
+        Assert.Equal("trade", parts2["Ref"]);
+    }
+
+    [Fact]
+    public void MatchProcesses_DirectKeysStillTakePriority()
+    {
+        // Регресс: прямые ключи /F и /S имеют приоритет над /IBConnectionString и /IBName.
+        var fileBase = NamedBase("f1", "Файловая");
+        var serverBase = NamedServerBase("s1", "Серверная", "server1", "trade");
+        var processes = new[]
+        {
+            Process(@"""1cv8c.exe"" ENTERPRISE /F ""C:\Bases\f1"""),
+            Process(@"""1cv8c.exe"" ENTERPRISE /S server1\trade")
+        };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { fileBase, serverBase }, processes);
+
+        Assert.True(matched.TryGetValue("f1", out var list1));
+        Assert.Single(list1!);
+        Assert.True(matched.TryGetValue("s1", out var list2));
+        Assert.Single(list2!);
+    }
+
+    [Fact]
+    public void WebBase_StillNeverMatchesInMatchProcesses()
+    {
+        // Регресс: веб-базы по-прежнему не сопоставляются.
+        var web = new Infobase
+        {
+            Id = "w1",
+            Name = "Веб",
+            Connection = new ConnectionSettings { Type = ConnectionType.WebServer, WebUrl = "http://srv/base" }
+        };
+        var processes = new[] { Process(@"""1cv8c.exe"" ENTERPRISE /WS http://srv/base") };
+
+        var matched = RunningInfobaseMatcher.MatchProcesses(new[] { web }, processes);
+
+        Assert.Empty(matched);
+    }
 }

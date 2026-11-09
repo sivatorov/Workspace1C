@@ -1,6 +1,7 @@
 #if WINDOWS
 using System.Windows;
 using System.Windows.Input;
+using Workspace1C.Models;
 using Workspace1C.Services;
 
 namespace Workspace1C;
@@ -30,6 +31,112 @@ public partial class MainWindow
     /// версия / ошибка / доступно обновление) через UpdateService.
     /// </summary>
     private async void OnCheckForUpdatesMenuClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var updateService = AppServices.GetRequiredService<UpdateService>();
+            await updateService.CheckForUpdatesManualAsync();
+        }
+        catch
+        {
+            // Внутренние ошибки уже показаны в UpdateService; здесь только страхуемся.
+        }
+    }
+
+    // ---- Подвал строки состояния: версия и ссылки обновления (issue #116) ----
+
+    /// <summary>
+    /// Инициализирует блок версии в подвале строки состояния (issue #116): текст
+    /// версии, подписка на смену состояния «доступна новая версия» службы обновления
+    /// и первичная расстановка видимости ссылок «Обновить»/«Проверить обновления».
+    /// </summary>
+    private void InitializeFooterUpdateState()
+    {
+        FooterVersionText.Text = "v" + VersionInfo.Display();
+
+        try
+        {
+            var updateService = AppServices.TryGetService<UpdateService>();
+            if (updateService is not null)
+            {
+                updateService.AvailableReleaseChanged += OnAvailableReleaseChanged;
+                // Событие приходит из фоновой проверки (чужой поток) — обновляем UI
+                // через Dispatcher; первичное состояние расставляем отложенно,
+                // к этому моменту App успеет применить режим обновления.
+                Dispatcher.BeginInvoke(
+                    new Action(RefreshFooterUpdateState),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+            }
+        }
+        catch
+        {
+            // Состояние ссылок не критично: остаётся только версия.
+        }
+    }
+
+    /// <summary>Обработчик смены «доступна новая версия» в службе обновления (issue #116).</summary>
+    private void OnAvailableReleaseChanged()
+        => Dispatcher.Invoke(RefreshFooterUpdateState);
+
+    /// <summary>
+    /// Расставляет видимость ссылок подвала (issue #116): «Обновить» — когда служба
+    /// знает доступный релиз; «Проверить обновления» — в режимах «только уведомлять»
+    /// и «проверять вручную», когда доступного релиза нет.
+    /// </summary>
+    private void RefreshFooterUpdateState()
+    {
+        try
+        {
+            var updateService = AppServices.TryGetService<UpdateService>();
+            if (updateService is null)
+                return;
+
+            var hasRelease = updateService.AvailableRelease is not null;
+            var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
+
+            FooterUpdateLink.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
+            FooterCheckUpdatesLink.Visibility = !hasRelease && manualCheck
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+        catch
+        {
+            // Состояние ссылок не критично.
+        }
+    }
+
+    /// <summary>Клик по версии в подвале — окно «Что нового» (issue #116).</summary>
+    private void OnFooterVersionClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            var settings = AppServices.GetRequiredService<IInfobaseRepository>().LoadSettings();
+            var dialog = new WhatsNewWindow(settings) { Owner = this };
+            dialog.ShowDialog();
+        }
+        catch
+        {
+            // Диалог не должен ронять приложение.
+        }
+    }
+
+    /// <summary>Клик по ссылке «Обновить» в подвале — та же ручная проверка, что и в
+    /// «О программе»: она откроет диалог обновления для доступного релиза (issue #116).</summary>
+    private async void OnFooterUpdateLinkClick(object sender, MouseButtonEventArgs e)
+    {
+        try
+        {
+            var updateService = AppServices.GetRequiredService<UpdateService>();
+            await updateService.CheckForUpdatesManualAsync();
+        }
+        catch
+        {
+            // Внутренние ошибки уже показаны в UpdateService; здесь только страхуемся.
+        }
+    }
+
+    /// <summary>Клик по ссылке «Проверить обновления» в подвале — ручная проверка (issue #116).</summary>
+    private async void OnFooterCheckUpdatesLinkClick(object sender, MouseButtonEventArgs e)
     {
         try
         {

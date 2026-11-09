@@ -776,10 +776,16 @@ namespace Workspace1C
             // сразу — наблюдатель подписывается/отписывается в сеттере свойства.
             _viewModel.ThemeFollowsOs = ThemeFollowsOsCheck?.IsChecked == true;
 
+            // Режим обновления (issue #116): порядок вариантов ComboBox совпадает
+            // с порядком значений enum AppUpdateMode; сбой выбора трактуется как
+            // «обновлять при запуске» (прошлое поведение по умолчанию).
+            var updateMode = UpdateModeComboBox != null && UpdateModeComboBox.SelectedIndex >= 0
+                ? (AppUpdateMode)UpdateModeComboBox.SelectedIndex
+                : AppUpdateMode.InstallOnStartup;
+
             _viewModel.ApplyAppBehaviorSettings(
                 AllowMultipleInstancesCheck.IsChecked ?? false,
-                CheckForUpdatesOnStartupCheck?.IsChecked ?? true,
-                AutoUpdateEnabledCheck?.IsChecked ?? true,
+                updateMode,
                 ShowTagFilterPanelCheck.IsChecked ?? true,
                 CloseToTrayCheck.IsChecked ?? false,
                 ShowTrayIconCheck.IsChecked ?? true,

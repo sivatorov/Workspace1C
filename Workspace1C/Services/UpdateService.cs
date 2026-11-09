@@ -51,8 +51,50 @@ public sealed class UpdateService : IAppUpdateService
     /// выключен — показывается единый диалог <see cref="UpdateAvailableWindow"/>
     /// с вопросом «Перезапустить сейчас / Обновить после закрытия». Значение
     /// устанавливается из настроек при старте приложения в <c>App.OnStartup</c>.
+    /// <para>Устаревший способ управления (issue #116): новые точки входа используют
+    /// <see cref="ApplyUpdateMode(AppUpdateMode)"/>; флаг оставлен для совместимости
+    /// (SchedulerService и прежние вызовы), синхронизирован с <see cref="Mode"/>.</para>
     /// </summary>
     public bool AutoUpdateEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Текущий режим обновления приложения (issue #116). Управляет поведением
+    /// фоновой (<see cref="CheckForUpdatesAsync"/>) и ручной
+    /// (<see cref="CheckForUpdatesManualAsync"/>) проверок.
+    /// </summary>
+    public AppUpdateMode Mode { get; private set; } = AppUpdateMode.InstallOnStartup;
+
+    /// <summary>
+    /// Устанавливает режим обновления (issue #116). Для <see cref="AppUpdateMode.InstallOnStartup"/>
+    /// также ставит устаревший флаг <see cref="AutoUpdateEnabled"/> (совместимость со старым кодом).
+    /// </summary>
+    public void ApplyUpdateMode(AppUpdateMode mode)
+    {
+        Mode = mode;
+        AutoUpdateEnabled = mode == AppUpdateMode.InstallOnStartup;
+    }
+
+    /// <summary>
+    /// Релиз, доступный для установки (issue #116): заполняется фоновой и ручной
+    /// проверками при обнаружении новой версии, сбрасывается, когда новой версии нет
+    /// либо обновление успешно применено. Используется подвалом главного окна
+    /// для показа ссылки «Обновить».
+    /// </summary>
+    public ReleaseInfo? AvailableRelease { get; private set; }
+
+    /// <summary>Событие смены <see cref="AvailableRelease"/> (вызывается из фонового потока;
+    /// подписчик обязан сам перейти в UI-поток).</summary>
+    public event Action? AvailableReleaseChanged;
+
+    /// <summary>Обновляет состояние «доступна новая версия» и уведомляет подписчиков.</summary>
+    private void SetAvailableRelease(ReleaseInfo? release)
+    {
+        if (ReferenceEquals(AvailableRelease, release))
+            return;
+        AvailableRelease = release;
+        try { AvailableReleaseChanged?.Invoke(); }
+        catch { /* подписчик не должен ронять проверку обновлений */ }
+    }
 
     /// <summary>
     /// Событие прогресса скачивания exe. Значение — проценты 0–100. Если длина файла
@@ -105,28 +147,52 @@ public sealed class UpdateService : IAppUpdateService
 
             // Сравниваем с текущей версией приложения.
             if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
-                return;
-
-            // Системное уведомление (функция №4): при молчаливом автообновлении диалог
-            // не показывается, и если окно свёрнуто в трей — пользователь узнает о новой
-            // версии только из уведомления. Когда диалог будет показан (автообновление
-            // выключено), дублировать уведомлением не нужно.
-            if (AutoUpdateEnabled)
             {
-                NotifyUpdateAvailable(release);
-                // Автообновление включено — применяем новую версию без вопросов.
-                await DownloadAndInstallAutoAsync(release).ConfigureAwait(false);
+                // Новой версии нет — сбрасываем состояние «доступна версия»
+                // (ссылка «Обновить» в подвале главного окна скрывается).
+                SetAvailableRelease(null);
                 return;
             }
 
-            var app = Application.Current;
-            if (app is null)
-                return;
+            // Ветвление по режиму обновления (issue #116).
+            switch (Mode)
+            {
+                case AppUpdateMode.InstallOnStartup:
+                    // Системное уведомление (функция №4): при молчаливом автообновлении
+                    // диалог не показывается, и если окно свёрнуто в трей — пользователь
+                    // узнает о новой версии только из уведомления.
+                    NotifyUpdateAvailable(release);
+                    // Применяем новую версию без вопросов.
+                    if (await DownloadAndInstallAutoAsync(release).ConfigureAwait(false))
+                        SetAvailableRelease(null);
+                    return;
 
-            // Автообновление выключено — показываем единый диалог, который сам
-            // скачивает файл и задаёт пользователю вопрос «Перезапустить сейчас /
-            // Обновить после закрытия».
-            await app.Dispatcher.InvokeAsync(() => ShowUpdateDialog(release));
+                case AppUpdateMode.DownloadAskInstall:
+                    // Запоминаем доступный релиз (ссылка «Обновить» в подвале) и
+                    // показываем единый диалог, который сам скачивает файл и задаёт
+                    // вопрос «Перезапустить сейчас / Обновить после закрытия».
+                    SetAvailableRelease(release);
+                    var app = Application.Current;
+                    if (app is null)
+                        return;
+                    await app.Dispatcher.InvokeAsync(() => ShowUpdateDialog(release));
+                    return;
+
+                case AppUpdateMode.NotifyOnly:
+                    // Только уведомление (функция №4): файл НЕ скачивается, диалог
+                    // не показывается. Состояние «доступна версия» остаётся для
+                    // ссылки «Обновить» в подвале главного окна.
+                    SetAvailableRelease(release);
+                    NotifyUpdateAvailable(release);
+                    return;
+
+                case AppUpdateMode.Manual:
+                    // Manual: фоновая проверка при старте не запускается (App не вызывает
+                    // этот метод), но на случай внешнего вызова состояние фиксируем без
+                    // скачивания и диалогов.
+                    SetAvailableRelease(release);
+                    return;
+            }
         }
         catch
         {
@@ -154,13 +220,18 @@ public sealed class UpdateService : IAppUpdateService
 
             if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
             {
+                SetAvailableRelease(null);
                 ShowOnUi(() => _dialogs.ShowInfo(
                     LocalizationManager.T("Update.UpToDate"),
                     LocalizationManager.T(CheckResultTitleKey)));
                 return;
             }
 
-            if (AutoUpdateEnabled)
+            // Новая версия найдена — фиксируем состояние для ссылки «Обновить»
+            // в подвале главного окна (issue #116).
+            SetAvailableRelease(release);
+
+            if (Mode == AppUpdateMode.InstallOnStartup)
             {
                 // issue #22 (1.0.0.28): если тот же файл уже качается (фоновая проверка,
                 // задание UpdateApp) — повторный запуск блокируется предупреждением.
@@ -172,11 +243,15 @@ public sealed class UpdateService : IAppUpdateService
                     return;
                 }
 
-                // Автообновление включено — применяем новую версию без вопросов.
-                await DownloadAndInstallAutoAsync(release).ConfigureAwait(false);
+                // Режим «обновлять при запуске» — применяем новую версию без вопросов.
+                if (await DownloadAndInstallAutoAsync(release).ConfigureAwait(false))
+                    SetAvailableRelease(null);
                 return;
             }
 
+            // Остальные режимы (issue #116) — показываем единый диалог, который сам
+            // скачивает файл и задаёт вопрос «Перезапустить сейчас / Обновить после
+            // закрытия».
             var app = Application.Current;
             if (app is null)
                 return;
