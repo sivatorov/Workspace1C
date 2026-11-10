@@ -27,6 +27,9 @@ namespace Workspace1C
         /// <summary>Нужно физически удалить каталог файловой базы.</summary>
         public bool DeletePhysically { get; private set; }
 
+        /// <summary>Нужно удалить локальный кэш базы (issue #119).</summary>
+        public bool DeleteCache { get; private set; }
+
         public DeleteInfobaseWindow(Infobase infobase)
         {
             AvaloniaXamlLoader.Load(this);
@@ -39,6 +42,7 @@ namespace Workspace1C
 
             FillDetails();
             FillPhysicalSection();
+            FillCacheSection();
 
             this.FindControl<Button>("CancelButton")!.Click += (_, _) => Close();
             this.FindControl<Button>("DeleteButton")!.Click += (_, _) => OnDelete_Click();
@@ -101,11 +105,27 @@ namespace Workspace1C
             hint.Text = LocalizationManager.T("DeleteInfobase.PhysicalUnavailable");
         }
 
+        /// <summary>
+        /// Заполняет секцию удаления кэша (issue #119): показ размера локального кэша
+        /// базы и чекбокс удаления (по умолчанию включён в разметке). Кэш 1С хранится
+        /// у клиента для баз любых типов, поэтому секция видна всегда.
+        /// </summary>
+        private void FillCacheSection()
+        {
+            var cacheCheck = this.FindControl<CheckBox>("CacheCheck")!;
+            var cacheSize = OneCCacheCleaner.GetSize(_infobase, OneCCacheKind.All);
+            cacheCheck.Content = string.Format(
+                LocalizationManager.T("DeleteInfobase.CacheDelete"),
+                Infobase.FormatSize(cacheSize));
+        }
+
         private void OnDelete_Click()
         {
             DeletePhysically = _physicalCheck.IsChecked == true
                                && _physicalPanel.IsVisible
                                && _physicalCheck.IsEnabled;
+
+            DeleteCache = this.FindControl<CheckBox>("CacheCheck")!.IsChecked == true;
 
             if (DeletePhysically)
             {

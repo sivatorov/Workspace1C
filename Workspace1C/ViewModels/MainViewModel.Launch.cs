@@ -240,6 +240,15 @@ public partial class MainViewModel : ViewModelBase
             switch (kind)
             {
                 case LaunchKind.Configurator:
+                    // Issue #120: если окно Конфигуратора этой базы уже открыто —
+                    // активируем его вместо запуска нового экземпляра. Если окно
+                    // не найдено (флаг монитора устарел) или активация не удалась —
+                    // выполняется обычный запуск.
+                    if (await Task.Run(() => TryActivateConfiguratorWindow(ib)))
+                    {
+                        _logger.Info($"Активировано окно Конфигуратора базы «{ib.Name}» вместо запуска нового (issue #120)");
+                        return;
+                    }
                     ok = _launcher.Launch(ib, OneCLaunchMode.Configurator, runAsAdmin);
                     break;
                 case LaunchKind.Thin32:

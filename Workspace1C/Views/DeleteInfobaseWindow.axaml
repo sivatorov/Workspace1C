@@ -15,7 +15,7 @@
                        FontSize="13"
                        CanResize="False"
                        SystemDecorations="None">
-    <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+    <Grid Margin="20" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
 
         <!-- Заголовок со значком предупреждения 28 и отступом 12
              (DeleteInfobaseWindow.xaml:37-41). -->
@@ -76,9 +76,30 @@
                    Foreground="{DynamicResource TextSecondaryBrush}"
                    TextWrapping="Wrap" Margin="0,0,0,12"/>
 
+        <!-- Панель удаления кэша (issue #119): чекбокс включён по умолчанию, размер
+             кэша подставляется кодом за разметкой (DeleteInfobaseWindow.Avalonia.cs).
+             Видна для баз любых типов — кэш 1С хранится локально у клиента. -->
+        <Border Grid.Row="3" x:Name="CachePanel"
+                Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderColorBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <CheckBox x:Name="CacheCheck" IsChecked="True" FontWeight="SemiBold"
+                              VerticalAlignment="Center"/>
+                    <!-- Тот же контрол справки, что и в остальных окнах. -->
+                    <controls:HelpLink x:Name="CacheHelp" VerticalAlignment="Center"
+                                       HelpText="{loc:Loc DeleteInfobase.CacheHelp}"/>
+                </StackPanel>
+                <TextBlock x:Name="CacheHint" Margin="24,6,0,0" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="{loc:Loc DeleteInfobase.CacheHint}"/>
+            </StackPanel>
+        </Border>
+
         <!-- Панель физического удаления выделена красным, как у автора:
-             это необратимое действие, и оно не должно выглядеть рядовой галочкой. -->
-        <Border Grid.Row="3" x:Name="PhysicalPanel"
+              это необратимое действие, и оно не должно выглядеть рядовой галочкой. -->
+        <Border Grid.Row="4" x:Name="PhysicalPanel"
                 Background="{DynamicResource DangerSoftBrush}" BorderBrush="{DynamicResource DangerSoftBorderBrush}"
                 BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
             <StackPanel>
@@ -98,7 +119,7 @@
         </Border>
 
         <!-- Порядок кнопок как в разметке WPF: удаление слева, отмена справа. -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal"
+        <StackPanel Grid.Row="5" Orientation="Horizontal"
                     HorizontalAlignment="Right" Spacing="10">
             <Button x:Name="DeleteButton" Width="140" Height="36" IsDefault="True"
                     CornerRadius="8" HorizontalContentAlignment="Center"

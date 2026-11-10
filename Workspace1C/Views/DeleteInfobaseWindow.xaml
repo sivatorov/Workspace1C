@@ -31,6 +31,7 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
@@ -86,7 +87,26 @@
         <TextBlock Grid.Row="2" Text="{loc:Loc DeleteInfobase.Note}"
                    Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap" Margin="0,0,0,12"/>
 
-        <Border Grid.Row="3" x:Name="PhysicalPanel" Background="{DynamicResource DangerSoftBrush}"
+        <!-- Панель удаления кэша (issue #119): чекбокс включён по умолчанию, размер кэша
+             подставляется кодом за разметкой. Видна для баз любых типов — кэш 1С
+             хранится локально у клиента и для серверных баз тоже. -->
+        <Border Grid.Row="3" x:Name="CachePanel" Background="{DynamicResource CardBackgroundBrush}"
+                BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
+                CornerRadius="8" Padding="12" Margin="0,0,0,16">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <CheckBox x:Name="CacheDeleteCheck" IsChecked="True" FontWeight="SemiBold"
+                              VerticalAlignment="Center"/>
+                    <controls:HelpLink Margin="6,0,0,0"
+                                       HelpText="{loc:Loc DeleteInfobase.CacheHelp}"/>
+                </StackPanel>
+                <TextBlock x:Name="CacheHint" Margin="24,6,0,0" FontSize="12"
+                           Foreground="{DynamicResource TextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="{loc:Loc DeleteInfobase.CacheHint}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="4" x:Name="PhysicalPanel" Background="{DynamicResource DangerSoftBrush}"
                 BorderBrush="{DynamicResource DangerSoftBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,16">
             <StackPanel>
                 <StackPanel Orientation="Horizontal">
@@ -104,7 +124,7 @@
 
         <!-- Единый контракт кнопок (issue #26): удаление — опасная DangerButton
              (красная заливка и белый текст), «Отмена» — вторичная SecondaryButton. -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+        <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right">
             <!-- IsDefault убран (аудит безопасности UI): Enter в диалоге НЕ должен удалять
                  базу — подтверждение только явным щелчком. Esc-отмена уже работает (IsCancel). -->
             <Button Width="140" Height="36" Margin="0,0,10,0" Click="OnDelete_Click"

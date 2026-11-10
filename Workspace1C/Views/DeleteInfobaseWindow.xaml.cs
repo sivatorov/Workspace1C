@@ -22,6 +22,9 @@ namespace Workspace1C
         /// <summary>Нужно физически удалить каталог файловой базы.</summary>
         public bool DeletePhysically { get; private set; }
 
+        /// <summary>Нужно удалить локальный кэш базы (issue #119).</summary>
+        public bool DeleteCache { get; private set; }
+
         public DeleteInfobaseWindow(Infobase infobase)
         {
             InitializeComponent();
@@ -69,6 +72,14 @@ namespace Workspace1C
                 ExistsText.Text = LocalizationManager.T("DeleteInfobase.NonFileOnlyFromList");
                 ExistsText.Foreground = (System.Windows.Media.Brush)FindResource("TextSecondaryBrush");
             }
+
+            // Issue #119: показ размера локального кэша базы и опция его удаления.
+            // Чекбокс включён по умолчанию (CacheDeleteCheck IsChecked="True" в разметке).
+            // Кэш 1С хранится у клиента для баз любых типов, поэтому опция видна всегда.
+            var cacheSize = OneCCacheCleaner.GetSize(infobase, OneCCacheKind.All);
+            CacheDeleteCheck.Content = string.Format(
+                LocalizationManager.T("DeleteInfobase.CacheDelete"),
+                Infobase.FormatSize(cacheSize));
         }
 
         private void OnDelete_Click(object sender, RoutedEventArgs e)
@@ -76,6 +87,8 @@ namespace Workspace1C
             DeletePhysically = PhysicalDeleteCheck.IsChecked == true
                                && PhysicalPanel.Visibility == Visibility.Visible
                                && PhysicalDeleteCheck.IsEnabled;
+
+            DeleteCache = CacheDeleteCheck.IsChecked == true;
 
             if (DeletePhysically)
             {

@@ -486,6 +486,32 @@ namespace Workspace1C
             configuratorChip.Child = configuratorIcon;
             runningIcons.Children.Add(configuratorChip);
 
+            // Issue #120: клик по чипу «Предприятие» — переход к окну уже запущенного
+            // Предприятия; несколько экземпляров — меню выбора окна. Запуск нового
+            // экземпляра остаётся на кнопке «Предприятие». На Linux перечисление окон
+            // не поддержано (OneCWindowActivator возвращает пустой список) — клик тихо
+            // игнорируется (graceful fallback).
+            enterpriseChip.Tapped += (_, e) =>
+            {
+                if (_vm is not { } vm || !ib.IsEnterpriseRunning)
+                    return;
+                e.Handled = true;
+                UiExceptionGuard.Guard(
+                    "MainWindow.Avalonia.RunningChip.Enterprise",
+                    () => OpenRunningWindowPicker(vm, ib, enterpriseChip));
+            };
+
+            // Issue #120: клик по чипу «Конфигуратор» — переход к окну запущенного Конфигуратора.
+            configuratorChip.Tapped += (_, e) =>
+            {
+                if (_vm is not { } vm || !ib.IsConfiguratorRunning)
+                    return;
+                e.Handled = true;
+                UiExceptionGuard.Guard(
+                    "MainWindow.Avalonia.RunningChip.Configurator",
+                    () => vm.ActivateRunningWindow(ib, Workspace1C.Models.RunningKind.Configurator));
+            };
+
             nameRow.Children.Add(name);
             nameRow.Children.Add(runningIcons);
             content.Children.Add(nameRow);
@@ -677,6 +703,36 @@ namespace Workspace1C
             };
 
             return card;
+        }
+
+        /// <summary>
+        /// Issue #120: переход к окну запущенного Предприятия: единственное окно —
+        /// активировать; несколько — меню выбора. На Linux GetRunningWindowsSafe
+        /// возвращает пустой список — действие отсутствует (graceful fallback).
+        /// </summary>
+        private void OpenRunningWindowPicker(ViewModels.MainViewModel vm, Infobase ib, Control chip)
+        {
+            var windows = vm.GetRunningWindowsSafe(ib, Workspace1C.Models.RunningKind.Enterprise);
+            if (windows.Count == 1)
+            {
+                vm.ActivateWindowByHandle(windows[0].Handle);
+                return;
+            }
+            if (windows.Count <= 1)
+                return;
+
+            var menu = new Avalonia.Controls.ContextMenu();
+            foreach (var window in windows)
+            {
+                var captured = window;
+                var item = new Avalonia.Controls.MenuItem
+                {
+                    Header = Services.RunningWindowPlanner.FormatWindowTitle(captured)
+                };
+                item.Click += (_, _) => vm.ActivateWindowByHandle(captured.Handle);
+                menu.Items.Add(item);
+            }
+            menu.Open(chip);
         }
 
         /// <summary>
@@ -2548,7 +2604,9 @@ namespace Workspace1C
                 or ContextMenuCommandKind.LaunchHistory)
                 return null;
 
-            var item = new MenuItem { Header = LocalizationManager.T(catalogItem.TextKey) };
+            // DisplayText(): ключ локализации + отметка «ПРО» для пунктов с
+            // RequiredFeature без лицензии (как в меню «Утилиты», issue #56).
+            var item = new MenuItem { Header = catalogItem.DisplayText() };
             item.Styled(Themes.ControlThemes.ModernMenuItem);
 
             // Иконки пунктов (пара «ключ Icon* → цвет») воспроизводят прежнее

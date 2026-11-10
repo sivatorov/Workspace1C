@@ -11,6 +11,64 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.52] — 2026-11-10
+
+### Добавлено
+
+- **Переход к открытому окну Конфигуратора/Предприятия (issue #120).** По обсуждению
+  в issue (RafaIS, 7OH):
+  - **Конфигуратор** — если окно Конфигуратора для этой базы уже открыто, при запуске
+    (двойной щелчок по базе, кнопка Конфигуратора, запуск из трея, командная палитра)
+    активируется существующее окно вместо запуска нового экземпляра. Точки интеграции:
+    [`MainViewModel.Launch.cs`](Workspace1C/ViewModels/MainViewModel.Launch.cs) (ветка
+    Configurator), [`MainViewModel.Commands.cs`](Workspace1C/ViewModels/MainViewModel.Commands.cs)
+    (трей и палитра), [`MainViewModel.Avalonia.Launch.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.Launch.cs).
+  - **Предприятие** — кнопка запуска продолжает запускать новый экземпляр (несколько
+    экземпляров легитимны); **клик по значку-индикатору «Предприятие»** у базы
+    активирует окно уже запущенного Предприятия, при нескольких запущенных показывает
+    выбор окна (заголовок + PID): WPF — чипы в
+    [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml) +
+    [`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs), Avalonia —
+    [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs).
+    Клик по чипу «Конфигуратор» тоже активирует окно запущенного Конфигуратора.
+  - Механизм: [`OneCWindowActivator.Windows.cs`](Workspace1C/Services/OneCWindowActivator.Windows.cs)
+    дополнен перечислением видимых окон процессов базы с фильтром по режиму запуска
+    ([`RunningKindClassifier.cs`](Workspace1C/Models/RunningKind.cs)) и активацией по
+    хэндлу; чистая логика решения «запуск или активация» вынесена в тестируемый
+    [`RunningWindowPlanner.cs`](Workspace1C/Services/RunningWindowPlanner.cs)
+    (Конфигуратор — активировать открытое окно; индикатор Предприятия — ничего /
+    активировать / выбор окна).
+  - **Linux/Avalonia**: активация чужих окон средствами Window Manager недоступна
+    (X11/Wayland, нужны внешние wmctrl/xdotool) — graceful fallback: перечисление окон
+    возвращает пустой список ([`OneCWindowActivator.Linux.cs`](Workspace1C/Services/OneCWindowActivator.Linux.cs)),
+    выполняется прежний запуск нового экземпляра, клик по индикатору тихо игнорируется.
+  - Тесты: [`Issue120RunningWindowTests.cs`](Workspace1C.Tests/Issue120RunningWindowTests.cs)
+    (решение «запуск/активация/выбор» + сторож-проверки точек интеграции на обеих
+    платформах).
+
+## [1.0.1.51] — 2026-11-10
+
+### Исправлено
+
+- **Кэш базы при удалении (issue #119).** При удалении базы из списка было непонятно,
+  что произойдёт с её кэшем 1С. Диалог удаления
+  ([`DeleteInfobaseWindow.xaml`](Workspace1C/Views/DeleteInfobaseWindow.xaml) — WPF,
+  [`DeleteInfobaseWindow.axaml`](Workspace1C/Views/DeleteInfobaseWindow.axaml) — Avalonia)
+  теперь показывает размер локального кэша базы и содержит опцию «Удалить кэш базы (N)»,
+  включённую по умолчанию. Опция доступна для баз любых типов — кэш 1С хранится у клиента
+  и для клиент-серверных/веб-баз. При подтверждении удаления кэш очищается средствами
+  [`OneCCacheCleaner.cs`](Workspace1C/Services/OneCCacheCleaner.cs) — junction-safe:
+  если кэш перенесён на другой диск ссылкой (junction/symlink), удаляется только
+  содержимое цели, сама ссылка сохраняется. Ошибки очистки кэша не блокируют удаление
+  базы из списка и фиксируются в журнале. Флаг протянут во все точки вызова удаления,
+  включая массовое удаление (WPF
+  [`MainViewModel.Commands.cs`](Workspace1C/ViewModels/MainViewModel.Commands.cs),
+  [`MainViewModel.BatchCommands.cs`](Workspace1C/ViewModels/MainViewModel.BatchCommands.cs);
+  Avalonia [`MainViewModel.Avalonia.Tools.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.Tools.cs),
+  [`MainViewModel.Avalonia.BatchCommands.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.BatchCommands.cs)).
+  Локализация ru/en: строки `DeleteInfobase.Cache*`. Тесты:
+  [`Issue119DeleteCacheTests.cs`](Workspace1C.Tests/Issue119DeleteCacheTests.cs).
+
 ## [1.0.1.50] — 2026-11-10
 
 ### Исправлено

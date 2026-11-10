@@ -1,5 +1,6 @@
 #if LINUX
 using System;
+using System.Collections.Generic;
 using Avalonia.Threading;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -22,6 +23,24 @@ public partial class MainViewModel
     {
         // OneCWindowActivator.Activate возвращает false; тихо пропускаем.
         _ = infobase;
+    }
+
+    /// <summary>
+    /// Перечисление окон 1С на Linux не поддержано (нужны wmctrl/xdotool) —
+    /// список остаётся пустым; graceful fallback issue #120 (обычный запуск,
+    /// клик по индикатору тихо игнорируется).
+    /// </summary>
+    partial void GetRunningWindows(Infobase infobase, RunningKind kind, List<RunningWindowInfo> windows)
+    {
+        _ = infobase;
+        _ = kind;
+        _ = windows;
+    }
+
+    /// <summary>Активация окна по хэндлу на Linux не поддержана — no-op (issue #120).</summary>
+    partial void ActivateWindowHandle(long handle)
+    {
+        _ = handle;
     }
 }
 #endif

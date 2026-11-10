@@ -495,6 +495,80 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #120: клик по чипу «Предприятие» — переход к окну уже запущенного
+        /// 1С:Предприятия этой базы. Запущено несколько экземпляров — меню выбора
+        /// окна. Запуск нового экземпляра остаётся на кнопке «Предприятие»
+        /// (несколько экземпляров Предприятия легитимны — обсуждение issue).
+        /// </summary>
+        private void OnEnterpriseChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not Infobase ib)
+                return;
+            if (!ib.IsEnterpriseRunning)
+                return;
+
+            e.Handled = true;
+            // Перечисление окон идёт через обход процессов — вне UI-потока.
+            System.Threading.Tasks.Task.Run(() => _viewModel.GetRunningWindowsSafe(ib, RunningKind.Enterprise))
+                .ContinueWith(t =>
+                {
+                    var windows = t.Result;
+                    switch (RunningWindowPlanner.PlanEnterpriseIndicator(windows.Count))
+                    {
+                        case RunningWindowAction.ActivateSingle:
+                            _viewModel.ActivateWindowByHandle(windows[0].Handle);
+                            break;
+                        case RunningWindowAction.ShowPicker:
+                            OpenRunningWindowPicker(fe, windows);
+                            break;
+                    }
+                }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
+        }
+
+        /// <summary>Issue #120: клик по чипу «Конфигуратор» — переход к окну запущенного Конфигуратора.</summary>
+        private void OnConfiguratorChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement fe || fe.DataContext is not Infobase ib)
+                return;
+            if (!ib.IsConfiguratorRunning)
+                return;
+
+            e.Handled = true;
+            _viewModel.ActivateRunningWindow(ib, RunningKind.Configurator);
+        }
+
+        /// <summary>
+        /// Issue #120: выбор окна при нескольких запущенных экземплярах
+        /// 1С:Предприятия — контекстное меню у чипа; переход к выбранному окну.
+        /// </summary>
+        private void OpenRunningWindowPicker(FrameworkElement placementTarget,
+            System.Collections.Generic.IReadOnlyList<RunningWindowInfo> windows)
+        {
+            try
+            {
+                var menu = new ContextMenu();
+                foreach (var window in windows)
+                {
+                    var captured = window;
+                    var item = new MenuItem
+                    {
+                        Header = RunningWindowPlanner.FormatWindowTitle(captured)
+                    };
+                    item.Click += (_, _) => _viewModel.ActivateWindowByHandle(captured.Handle);
+                    menu.Items.Add(item);
+                }
+
+                menu.PlacementTarget = placementTarget;
+                menu.Placement = PlacementMode.Bottom;
+                menu.IsOpen = true;
+            }
+            catch
+            {
+                // Показ меню выбора не должен ломать интерфейс.
+            }
+        }
+
+        /// <summary>
         /// Выполняет «двойной клик» по базе (issue #328): действие по настройке
         /// (функция №28 StartManager) — «1С:Предприятие», «Конфигуратор» или
         /// «Ничего». Общая точка для двойного клика мышью и клавиши Enter.

@@ -61,7 +61,20 @@ public partial class MainViewModel : ViewModelBase
             AfterLaunchRequested?.Invoke(action);
     }
 
-    private void Launch(ICommand launchVmCommand, LaunchKind kind) => launchVmCommand.Execute(kind);
+    private void Launch(ICommand launchVmCommand, LaunchKind kind)
+    {
+        // Issue #120: активация открытого окна Конфигуратора вместо нового запуска.
+        // На Linux перечисление/активация окон не поддержаны (нужны wmctrl/xdotool) —
+        // TryActivateConfiguratorWindow всегда возвращает false и выполняется
+        // обычный запуск (graceful fallback).
+        if (kind == LaunchKind.Configurator && TryActivateConfiguratorWindow(SelectedInfobase))
+        {
+            _logger.Info($"Активировано окно Конфигуратора базы «{SelectedInfobase!.Name}» вместо запуска нового (issue #120)");
+            return;
+        }
+
+        launchVmCommand.Execute(kind);
+    }
 
     /// <summary>
     /// Запуск с разовыми параметрами: диалог правит параметры только на один
@@ -153,6 +166,14 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             await RunPreLaunchScriptAsync(ib);
+            // Issue #120: активация открытого окна Конфигуратора; на Linux активация
+            // окон не поддержана — TryActivateConfiguratorWindow вернёт false и
+            // выполнится обычный запуск (graceful fallback).
+            if (configurator && TryActivateConfiguratorWindow(ib))
+            {
+                _logger.Info($"[tray] Активировано окно Конфигуратора базы «{ib.Name}» вместо запуска нового (issue #120)");
+                return;
+            }
             var ok = configurator
                 ? _launcher.Launch(ib, Services.OneCLaunchMode.Configurator)
                 : _launcher.Launch(ib, Services.OneCLaunchMode.Enterprise);

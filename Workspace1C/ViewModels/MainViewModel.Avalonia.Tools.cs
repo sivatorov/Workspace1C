@@ -1112,6 +1112,15 @@ public partial class MainViewModel : ViewModelBase
             }
         }
 
+        // Issue #119: очистка локального кэша базы при удалении из списка (по флагу
+        // диалога, включён по умолчанию). Junction-safe: ссылки не удаляются —
+        // очищается только содержимое цели. Ошибки кэша не блокируют удаление базы.
+        if (dialog.DeleteCache)
+        {
+            var cacheRemoved = OneCCacheCleaner.Clear(ib, OneCCacheKind.All);
+            _logger.Info($"Кэш базы «{ib.Name}» очищен при удалении: каталогов={cacheRemoved}");
+        }
+
         _allInfobases.Remove(ib);
         // Состав списка изменился: слоты избранного пересчитываются, иначе
         // номер остаётся у удалённой базы, а её слот занят навсегда.

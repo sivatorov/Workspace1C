@@ -200,6 +200,14 @@ public partial class MainViewModel
                 }
             }
 
+            // Issue #119: очистка кэша базы при удалении из списка (по флагу диалога,
+            // включён по умолчанию). Junction-safe; ошибки кэша не блокируют удаление.
+            if (dialog.DeleteCache)
+            {
+                var cacheRemoved = OneCCacheCleaner.Clear(ib, OneCCacheKind.All);
+                _logger.Info($"Кэш базы «{ib.Name}» очищен при удалении: каталогов={cacheRemoved}");
+            }
+
             _allInfobases.Remove(ib);
             if (ReferenceEquals(SelectedInfobase, ib))
                 SelectedInfobase = null;

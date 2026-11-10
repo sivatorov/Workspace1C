@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -13,6 +14,14 @@ namespace Workspace1C.Services;
 /// вместо повторного запуска. PID процесса находится сопоставлением командной
 /// строки (<see cref="RunningInfobaseMatcher"/>), затем через Win32-перечисление
 /// окон выбирается видимое главное окно процесса и выводится на передний план.
+/// <para>
+/// Issue #120 «Переход к открытому окну Конфигуратора/Предприятия»: помимо
+/// активации первого окна добавлено перечисление видимых окон процессов базы
+/// (<see cref="GetWindows"/>) с фильтром по режиму запуска
+/// (<see cref="RunningKindClassifier"/>) — на нём построены активация открытого
+/// Конфигуратора вместо повторного запуска и выбор окна при нескольких
+/// запущенных экземплярах Предприятия.
+/// </para>
 /// </summary>
 public static class OneCWindowActivator
 {
@@ -21,22 +30,31 @@ public static class OneCWindowActivator
     /// <summary>Активирует видимое окно процесса 1С, подключённого к базе. Возвращает true при успехе.</summary>
     public static bool Activate(Infobase infobase)
     {
+        // Issue #120: перечисление вынесено в GetWindows — единый механизм для
+        // активации «Только запущенные» (issue #339) и перехода к открытым окнам.
+        var windows = GetWindows(infobase, null);
+        if (windows.Count == 0)
+            return false;
+
+        return Activate(windows[0].Handle);
+    }
+
+    /// <summary>
+    /// Issue #120: перечисляет видимые окна с заголовком процессов 1С, подключённых
+    /// к базе. kind — фильтр по режиму запуска (Предприятие/Конфигуратор через
+    /// <see cref="RunningKindClassifier"/>); null — все процессы базы.
+    /// Служебные окна без заголовка не считаются главными окнами 1С.
+    /// </summary>
+    public static IReadOnlyList<RunningWindowInfo> GetWindows(Infobase infobase, RunningKind? kind)
+    {
         if (infobase is null)
-            return false;
+            return Array.Empty<RunningWindowInfo>();
 
-        var service = AppServices.TryGetService<IRunningInfobasesService>();
-        var details = service?.GetRunningDetails() ?? Array.Empty<RunningOneCProcessDetails>();
-
-        // PID процессов, чья командная строка соответствует базе (как в мониторе).
-        var pids = details
-            .Where(d => RunningInfobaseMatcher.MatchesCommandLine(infobase, d.CommandLine))
-            .Select(d => d.Pid)
-            .Distinct()
-            .ToArray();
+        var pids = GetProcessIds(infobase, kind);
         if (pids.Length == 0)
-            return false;
+            return Array.Empty<RunningWindowInfo>();
 
-        IntPtr? target = null;
+        var windows = new List<RunningWindowInfo>();
         EnumWindows((hWnd, _) =>
         {
             if (!IsWindowVisible(hWnd))
@@ -46,15 +64,49 @@ public static class OneCWindowActivator
             if (Array.IndexOf(pids, (int)pid) < 0)
                 return true;
 
-            target = hWnd;
-            return false; // нашли окно — останавливаем перечисление
+            var length = GetWindowTextLength(hWnd);
+            if (length == 0)
+                return true; // окна без заголовка — служебные, пропускаем
+
+            var buffer = new StringBuilder(length + 1);
+            _ = GetWindowText(hWnd, buffer, buffer.Capacity);
+            var title = buffer.ToString().Trim();
+            if (title.Length == 0)
+                return true;
+
+            windows.Add(new RunningWindowInfo(hWnd.ToInt64(), (int)pid, title));
+            return true;
         }, IntPtr.Zero);
 
-        if (target is not { } handle)
+        return windows;
+    }
+
+    /// <summary>Активирует окно по хэндлу (issue #120): восстановление + передний план.</summary>
+    public static bool Activate(long handle)
+    {
+        if (handle == 0)
             return false;
 
-        ShowWindow(handle, SwRestore);
-        return SetForegroundWindow(handle);
+        var hWnd = new IntPtr(handle);
+        ShowWindow(hWnd, SwRestore);
+        return SetForegroundWindow(hWnd);
+    }
+
+    /// <summary>
+    /// PID процессов 1С, подключённых к базе, с опциональным фильтром по режиму
+    /// запуска (issue #120). Сопоставление командной строки — как в мониторе.
+    /// </summary>
+    private static int[] GetProcessIds(Infobase infobase, RunningKind? kind)
+    {
+        var service = AppServices.TryGetService<IRunningInfobasesService>();
+        var details = service?.GetRunningDetails() ?? Array.Empty<RunningOneCProcessDetails>();
+
+        return details
+            .Where(d => RunningInfobaseMatcher.MatchesCommandLine(infobase, d.CommandLine))
+            .Where(d => kind is null || RunningKindClassifier.Classify(d.ProcessName, d.CommandLine) == kind)
+            .Select(d => d.Pid)
+            .Distinct()
+            .ToArray();
     }
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -73,5 +125,11 @@ public static class OneCWindowActivator
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowTextLength(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr hWnd, System.Text.StringBuilder text, int count);
 }
 #endif

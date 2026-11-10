@@ -476,6 +476,16 @@ public partial class MainViewModel : ViewModelBase
             }
         }
 
+        // Issue #119: очистка локального кэша базы при удалении из списка (по флагу
+        // диалога, включён по умолчанию). Junction-safe: ссылки не удаляются —
+        // очищается только содержимое цели. Ошибки кэша не блокируют удаление базы.
+        if (dlg.DeleteCache)
+        {
+            var cacheRemoved = OneCCacheCleaner.Clear(ib, OneCCacheKind.All);
+            Log.Info(LogCategory.Cache,
+                $"CACHE cleared on delete «{ib.Name}»: удалено каталогов={cacheRemoved}");
+        }
+
         Infobases.Remove(ib);
         if (ReferenceEquals(SelectedInfobase, ib))
             SelectedInfobase = null;
@@ -668,7 +678,16 @@ public partial class MainViewModel : ViewModelBase
 
             bool ok;
             if (isConfigurator)
+            {
+                // Issue #120: активируем открытое окно Конфигуратора этой базы вместо
+                // запуска нового экземпляра; при неудаче — обычный запуск.
+                if (await Task.Run(() => TryActivateConfiguratorWindow(ib)))
+                {
+                    _logger.Info($"[tray] Активировано окно Конфигуратора базы «{ib.Name}» вместо запуска нового (issue #120)");
+                    return;
+                }
                 ok = _launcher.Launch(ib, Services.OneCLaunchMode.Configurator);
+            }
             else
                 ok = LaunchEnterpriseWithSessionOverrides(ib);
 
@@ -1621,6 +1640,13 @@ public string HotkeyEnterprise
         try
         {
             await RunPreLaunchScriptAsync(ib);
+            // Issue #120: активируем открытое окно Конфигуратора этой базы вместо
+            // запуска нового экземпляра; при неудаче — обычный запуск.
+            if (useConfigurator && await Task.Run(() => TryActivateConfiguratorWindow(ib)))
+            {
+                _logger.Info($"[palette] Активировано окно Конфигуратора базы «{ib.Name}» вместо запуска нового (issue #120)");
+                return;
+            }
             var ok = useConfigurator
                 ? _launcher.Launch(ib, Services.OneCLaunchMode.Configurator)
                 : LaunchEnterpriseWithSessionOverrides(ib);

@@ -1896,8 +1896,12 @@
                                                      (EnterpriseRunningStatus / ConfiguratorRunningStatus), а не к общему
                                                      RunningStatus: зависший Конфигуратор красит только свой чип,
                                                      Предприятие остаётся в своём цвете (и наоборот). -->
+                                                <!-- Issue #120: клик по чипу «Предприятие» — переход к окну уже
+                                                     запущенного Предприятия; несколько экземпляров — выбор окна.
+                                                     Запуск нового остаётся на кнопке «Предприятие». -->
                                                 <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1"
-                                                        VerticalAlignment="Center"
+                                                        VerticalAlignment="Center" Cursor="Hand"
+                                                        MouseLeftButtonDown="OnEnterpriseChip_MouseLeftButtonDown"
                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
@@ -1943,8 +1947,11 @@
                                                              VerticalAlignment="Center" Margin="3,0,0,0"
                                                              ToolTip="{loc:Loc Infobase.DebugRunningTooltip}"
                                                              Visibility="{Binding IsEnterpriseDebugRunning, Converter={StaticResource BoolToVis}}"/>
+                                                    <!-- Issue #120: клик по чипу «Конфигуратор» — переход к окну
+                                                         уже запущенного Конфигуратора. -->
                                                     <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
-                                                            VerticalAlignment="Center"
+                                                            VerticalAlignment="Center" Cursor="Hand"
+                                                            MouseLeftButtonDown="OnConfiguratorChip_MouseLeftButtonDown"
                                                             Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">

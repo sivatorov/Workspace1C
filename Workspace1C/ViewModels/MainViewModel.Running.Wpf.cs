@@ -1,5 +1,6 @@
 #if WINDOWS
 using System;
+using System.Collections.Generic;
 using System.Windows;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -40,5 +41,16 @@ public partial class MainViewModel
             }
         });
     }
+
+    /// <summary>
+    /// Перечисление окон 1С базы через EnumWindows с фильтром по режиму запуска
+    /// (issue #120). GetRunningDetails может занять время — вызывать вне UI-потока.
+    /// </summary>
+    partial void GetRunningWindows(Infobase infobase, RunningKind kind, List<RunningWindowInfo> windows)
+        => windows.AddRange(OneCWindowActivator.GetWindows(infobase, kind));
+
+    /// <summary>Активация окна по хэндлу через Win32 (issue #120).</summary>
+    partial void ActivateWindowHandle(long handle)
+        => OneCWindowActivator.Activate(handle);
 }
 #endif

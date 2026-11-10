@@ -180,4 +180,100 @@ public partial class MainViewModel
 
     /// <summary>Выполняет действие в UI-потоке (платформенная реализация).</summary>
     partial void DispatchOnUi(Action action);
+
+    // ===================== Issue #120: переход к открытым окнам 1С =====================
+
+    /// <summary>
+    /// Issue #120: попытка активировать уже открытое окно Конфигуратора базы вместо
+    /// запуска нового экземпляра (двойной щелчок, кнопка, трей, командная палитра).
+    /// Возвращает <c>true</c>, если окно найдено и активировано. При устаревшем флаге
+    /// монитора (окон фактически нет) возвращает <c>false</c> — вызывающий код
+    /// выполняет обычный запуск. На Linux активация окон не поддержана — всегда
+    /// <c>false</c> (graceful fallback: обычный запуск).
+    /// Вызов может занять время (обход процессов) — из UI-потока вызывать через
+    /// <see cref="Task.Run"/>.
+    /// </summary>
+    public bool TryActivateConfiguratorWindow(Infobase? infobase)
+    {
+        if (infobase is null || !infobase.IsConfiguratorRunning)
+            return false;
+        var windows = new List<RunningWindowInfo>();
+        try
+        {
+            GetRunningWindows(infobase, RunningKind.Configurator, windows);
+            if (windows.Count == 0)
+                return false;
+            ActivateWindowByHandle(windows[0].Handle);
+            return true;
+        }
+        catch
+        {
+            // Активация окна не должна ломать запуск: при ошибке — обычный запуск.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Issue #120: безопасное перечисление окон запущенного режима базы.
+    /// Может занять время (WMI/обход процессов) — вызывать вне UI-потока.
+    /// Ошибки тихо превращаются в пустой список (политика монитора запущенных баз).
+    /// </summary>
+    public IReadOnlyList<RunningWindowInfo> GetRunningWindowsSafe(Infobase? infobase, RunningKind kind)
+    {
+        var windows = new List<RunningWindowInfo>();
+        if (infobase is null)
+            return windows;
+        try
+        {
+            GetRunningWindows(infobase, kind, windows);
+        }
+        catch
+        {
+            // Политика монитора: тихая деградация — пустой список.
+        }
+        return windows;
+    }
+
+    /// <summary>Issue #120: активация окна по хэндлу из списка выбора; ошибки игнорируются.</summary>
+    public void ActivateWindowByHandle(long handle)
+    {
+        if (handle == 0)
+            return;
+        try
+        {
+            ActivateWindowHandle(handle);
+        }
+        catch
+        {
+            // Активация окна не должна ломать интерфейс.
+        }
+    }
+
+    /// <summary>
+    /// Issue #120: переход к первому окну запущенного режима базы (используется для
+    /// клика по чипу «Конфигуратор» и как fallback для чипа «Предприятие»).
+    /// Перечисление окон выполняется вне UI-потока.
+    /// </summary>
+    public void ActivateRunningWindow(Infobase? infobase, RunningKind kind)
+    {
+        if (infobase is null)
+            return;
+        Task.Run(() =>
+        {
+            var windows = GetRunningWindowsSafe(infobase, kind);
+            if (windows.Count > 0)
+                ActivateWindowByHandle(windows[0].Handle);
+        });
+    }
+
+    /// <summary>
+    /// Платформенное перечисление окон 1С режима kind, подключённых к базе:
+    /// Windows — EnumWindows + фильтр <see cref="RunningKindClassifier"/> по PID
+    /// процессов базы; Linux — реализация отсутствует, список остаётся пустым
+    /// (активация окон не поддержана, graceful fallback issue #120).
+    /// </summary>
+    partial void GetRunningWindows(Infobase infobase, RunningKind kind, List<RunningWindowInfo> windows);
+
+    /// <summary>Платформенная активация окна по хэндлу (Windows — Win32; Linux — no-op).</summary>
+    partial void ActivateWindowHandle(long handle);
 }
