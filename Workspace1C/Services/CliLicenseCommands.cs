@@ -73,12 +73,19 @@ internal static class CliLicenseCommands
         return CliExitCodes.ProRequired;
     }
 
-    private static System.Collections.Generic.Dictionary<string, bool> ToDictionaryCompat(
+    /// <summary>
+    /// Доступность функций для <c>--license-info</c>. Реализованные — булево значение
+    /// (включена лицензией или нет); нереализованные (только в перечне 2.x) — строка
+    /// статуса «в разработке» вместо булева «доступна» (аудит лицензирования, 2026-11).
+    /// </summary>
+    internal static System.Collections.Generic.Dictionary<string, object> ToDictionaryCompat(
         this System.Collections.Generic.IReadOnlyList<ProFeature> features)
     {
-        var map = new System.Collections.Generic.Dictionary<string, bool>();
+        var map = new System.Collections.Generic.Dictionary<string, object>();
         foreach (var f in features)
-            map[f.ToString()] = EditionService.Has(f);
+            map[f.ToString()] = ProFeatures.IsImplemented(f)
+                ? EditionService.Has(f)
+                : LocalizationManager.T(ProFeatures.StatusKey(f));
         return map;
     }
 }

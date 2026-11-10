@@ -1908,6 +1908,16 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     private void ExecuteBatchDumpCore(IReadOnlyList<Infobase> bases, BatchOperationKind? kind)
     {
+        // Функция редакции ПРО (docs/pro/PRO-EDITION.md): пакетная ЗАГРУЗКА конфигурации
+        // из .cf (kind == LoadConfig) — как одиночная «Массовая загрузка cf через
+        // Конфигуратор» (issue #106), требует лицензию ProFeature.MassLoadCf. Гейт здесь
+        // покрывает оба вызывающих пути: команду «Загрузить конфигурацию из .cf по списку
+        // баз» (BatchLoadCfCommand) и пункт «Загрузить из CF…» блока «Для выделенных»
+        // (ExecuteBatchLoadCfForSelected). Пакетная выгрузка (DumpDt/DumpCf) и
+        // блокировка/разблокировка сеансов НЕ гейтятся.
+        if (kind == BatchOperationKind.LoadConfig
+            && !Workspace1C.Services.Licensing.ProGate.Ensure(Workspace1C.Services.Licensing.ProFeature.MassLoadCf))
+            return;
         if (bases.Count == 0)
         {
             _dialog.ShowInfo(LocalizationManager.T("BatchOps.NoBases"),

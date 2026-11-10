@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using Workspace1C;
+using Workspace1C.Localization;
+using Workspace1C.Models;
 using Workspace1C.Services;
 using Workspace1C.Services.Licensing;
+using Workspace1C.ViewModels;
 using Xunit;
 
 namespace Workspace1C.Tests;
@@ -200,6 +205,34 @@ public sealed class ProLicensingTests : IDisposable
         Assert.False(EditionService.IsPro);
     }
 
+    /// <summary>
+    /// Дефект №4 (аудит активации): UI подписывается на <see cref="EditionService.Changed"/>,
+    /// чтобы пересобрать меню «Утилиты» с актуальными бейджами «· ПРО». Событие обязано
+    /// подниматься и при успешной активации, и при деактивации — иначе UI не узнает о смене.
+    /// </summary>
+    [Fact]
+    public void Edition_Changed_IsRaisedOnActivateAndDeactivate()
+    {
+        var raised = 0;
+        EventHandler handler = (_, _) => raised++;
+        EditionService.Changed += handler;
+        try
+        {
+            // Активация без события (невалидный ключ, ключ не сохраняется) и с событием (валидный).
+            EditionService.Activate("hello");
+            Assert.Equal(0, raised);
+            EditionService.Activate(Issue(VersionInfo.Major(), MachineIdProvider.Current));
+            Assert.Equal(1, raised);
+
+            EditionService.Deactivate();
+            Assert.Equal(2, raised);
+        }
+        finally
+        {
+            EditionService.Changed -= handler;
+        }
+    }
+
     [Fact]
     public void ProFeatures_PublicCoreSplit()
     {
@@ -220,6 +253,139 @@ public sealed class ProLicensingTests : IDisposable
         Assert.Equal(CliCommandKind.Activate, activate!.Kind);
         Assert.Equal("W1C2.abc.def", activate.Options.Text);
     }
+
+    // ---------------------------------------------------------------- планировщик (дефект №5)
+
+    /// <summary>
+    /// Дефект №5 (аудит активации): создание задания планировщика типа TestDeploy
+    /// гейтится лицензией при выборе/сохранении в редакторе задания (ScheduledTaskEditWindow,
+    /// гейт по <see cref="ScheduledTaskEditViewModel.RequiredProFeature"/>), а не только
+    /// при выполнении (SchedulerService.cs). Без лицензии выбор/сохранение запрещены:
+    /// гейт возвращает false и показывает окно «Лицензия».
+    /// </summary>
+    [Fact]
+    public void SchedulerTestDeploy_CreationGate_DeniedWithoutLicense()
+    {
+        Assert.False(EditionService.IsPro);
+        ProFeature? shown = null;
+        var previous = ProGate.ShowLicenseDialog;
+        ProGate.ShowLicenseDialog = f => shown = f;
+        try
+        {
+            var feature = ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy);
+            Assert.NotNull(feature);
+            Assert.False(ProGate.Ensure(feature!.Value));
+            Assert.Equal(ProFeature.TestDeploy, shown);
+        }
+        finally
+        {
+            ProGate.ShowLicenseDialog = previous;
+        }
+    }
+
+    /// <summary>Дефект №5: при активной лицензии выбор/сохранение типа TestDeploy разрешены.</summary>
+    [Fact]
+    public void SchedulerTestDeploy_CreationGate_AllowedWithLicense()
+    {
+        var result = EditionService.Activate(Issue(VersionInfo.Major(), MachineIdProvider.Current));
+        Assert.True(result.IsValid);
+
+        var feature = ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy);
+        Assert.NotNull(feature);
+        Assert.True(EditionService.Has(feature!.Value));
+        Assert.True(ProGate.Ensure(feature.Value));
+    }
+
+    // ------------------------------------------------- реализованность функций (аудит лицензирования, 2026-11)
+
+    /// <summary>
+    /// Аудит лицензирования: реализованы только публичное ядро (ServerAlerts…MassLoadCf)
+    /// и модуль AuditLog; остальные функции перечня 2.x существуют только в enum и
+    /// должны помечаться «в разработке».
+    /// </summary>
+    [Fact]
+    public void ProFeatures_ImplementedSet_MatchesAudit()
+    {
+        // Порядок ключа статуса: реализованные — «доступна», нереализованные — «в разработке».
+        Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.ServerAlerts));
+        Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.AuditLog));
+        Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.Pipelines));
+        Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.CloudBackup));
+
+        ProFeature[] implemented =
+        {
+            ProFeature.ServerAlerts, ProFeature.TelegramBot, ProFeature.Mcp,
+            ProFeature.ClusterMigration, ProFeature.TestDeploy, ProFeature.MassLoadCf,
+            ProFeature.AuditLog
+        };
+        ProFeature[] planned =
+        {
+            ProFeature.Pipelines, ProFeature.MultiBaseQuery, ProFeature.EnvironmentDiff,
+            ProFeature.AutoTests, ProFeature.PerformanceTrends, ProFeature.CloudBackup
+        };
+
+        foreach (var f in implemented)
+            Assert.True(ProFeatures.IsImplemented(f), f + " должен быть реализован");
+        foreach (var f in planned)
+            Assert.False(ProFeatures.IsImplemented(f), f + " должен быть помечен «в разработке»");
+
+        // Перечень покрыт полностью: реализованные + планируемые = все функции.
+        Assert.Equal(ProFeatures.All.Count, implemented.Length + planned.Length);
+    }
+
+    /// <summary>
+    /// Аудит лицензирования: список функций окна «Лицензия» показывает реализованные
+    /// функции как «доступна», нереализованные — «в разработке»; признак реализованности
+    /// не меняет гейт <see cref="EditionService.Has"/>.
+    /// </summary>
+    [Fact]
+    public void LicenseViewModel_FeatureRows_MarkInDevelopment()
+    {
+        Assert.False(EditionService.IsPro); // гейт не трогаем: доступность по-прежнему false без ключа
+
+        var available = LocalizationManager.T("Pro.FeatureStatus.Available");
+        var inDevelopment = LocalizationManager.T("Pro.FeatureStatus.InDevelopment");
+
+        var vm = new LicenseViewModel();
+        Assert.Equal(ProFeatures.All.Count, vm.Features.Count);
+        foreach (var row in vm.Features)
+        {
+            Assert.Equal(!ProFeatures.IsImplemented(row.Feature), row.InDevelopment);
+            Assert.Equal(
+                LocalizationManager.T(ProFeatures.StatusKey(row.Feature)),
+                row.Status);
+            if (ProFeatures.IsImplemented(row.Feature))
+                Assert.Equal(available, row.Status);
+            else
+                Assert.Equal(inDevelopment, row.Status);
+            Assert.Contains(row.Status, row.Display);
+            Assert.Equal("—", row.Mark); // без лицензии функция не включена
+        }
+    }
+
+    /// <summary>
+    /// Аудит лицензирования: в <c>--license-info</c> реализованные функции показываются
+    /// булевым значением доступности, нереализованные — строкой статуса «в разработке».
+    /// </summary>
+    [Fact]
+    public void CliLicenseInfo_FeaturesMap_MarksInDevelopmentAsString()
+    {
+        var map = ProFeatures.All.ToDictionaryCompat();
+        Assert.Equal(ProFeatures.All.Count, map.Count);
+        foreach (var f in ProFeatures.All)
+        {
+            if (ProFeatures.IsImplemented(f))
+            {
+                Assert.IsType<bool>(map[f.ToString()]);
+                Assert.Equal(EditionService.Has(f), (bool)map[f.ToString()]!);
+            }
+            else
+            {
+                Assert.Equal(LocalizationManager.T("Pro.FeatureStatus.InDevelopment"),
+                    map[f.ToString()]);
+            }
+        }
+    }
 }
 
 /// <summary>Тесты лицензирования меняют статическое состояние — выполняются последовательно.</summary>
@@ -238,5 +404,62 @@ public sealed class ProLicensingPublicKeyTests
         using var ecdsa = ECDsa.Create();
         ecdsa.ImportSubjectPublicKeyInfo(Convert.FromBase64String(LicenseVerifier.PublicKey), out _);
         Assert.Equal(256, ecdsa.KeySize);
+    }
+}
+
+/// <summary>
+/// Аудит лицензирования (2026-11): кнопка «Купить» и статусы функций должны быть
+/// локализованы в обоих встроенных языках; Pro.HowToBuy должен указывать цену.
+/// Включён в последовательную коллекцию лицензирования, чтобы не менять параллельный
+/// профиль остальных тестов (общая статика локализации).
+/// </summary>
+[Collection("ProLicensing")]
+public sealed class ProLocalizationKeysTests
+{
+    private static string FindSourceFile(params string[] parts)
+    {
+        // Из bin-каталога тестов поднимаемся до корня репозитория (содержит каталог Workspace1C).
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !Directory.Exists(Path.Combine(dir.FullName, "Workspace1C")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var path = Path.Combine(new[] { dir!.FullName }.Concat(parts).ToArray());
+        Assert.True(File.Exists(path), "Не найден файл: " + path);
+        return path;
+    }
+
+    private static Dictionary<string, string> ReadStrings(string language)
+    {
+        var path = FindSourceFile("Workspace1C", "Localization", "Languages", language + ".json");
+        using var doc = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+        var strings = doc.RootElement.GetProperty("strings");
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var prop in strings.EnumerateObject())
+            result[prop.Name] = prop.Value.GetString() ?? string.Empty;
+        return result;
+    }
+
+    [Fact]
+    public void Pro_Buy_And_FeatureStatus_Keys_ExistInRuAndEn()
+    {
+        foreach (var language in new[] { "ru", "en" })
+        {
+            var strings = ReadStrings(language);
+            Assert.True(strings.ContainsKey("Pro.Buy"), language + ": нет ключа Pro.Buy");
+            Assert.False(string.IsNullOrWhiteSpace(strings["Pro.Buy"]));
+            Assert.True(strings.ContainsKey("Pro.FeatureStatus.Available"),
+                language + ": нет ключа Pro.FeatureStatus.Available");
+            Assert.True(strings.ContainsKey("Pro.FeatureStatus.InDevelopment"),
+                language + ": нет ключа Pro.FeatureStatus.InDevelopment");
+            Assert.NotEqual(strings["Pro.FeatureStatus.Available"], strings["Pro.FeatureStatus.InDevelopment"]);
+        }
+    }
+
+    /// <summary>Pro.HowToBuy и раздел README должны указывать цену 2000 ₽.</summary>
+    [Fact]
+    public void ProHowToBuy_MentionsPrice()
+    {
+        Assert.Contains("2000", ReadStrings("ru")["Pro.HowToBuy"]);
+        Assert.Contains("2,000", ReadStrings("en")["Pro.HowToBuy"]);
     }
 }

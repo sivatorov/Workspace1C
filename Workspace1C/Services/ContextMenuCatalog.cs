@@ -146,11 +146,16 @@ public sealed class ContextMenuItem
     /// <param name="essential">Критичный пункт: не может быть потерян из компоновки
     /// («Пользовательские действия», «Для выделенных» — от них зависит функция 7
     /// и пакетные операции). Резолвер/редактор гарантируют его наличие.</param>
+    /// <param name="requiredFeature">Функция редакции ПРО (2.0): без лицензии пункт
+    /// помечается «ПРО», а команда открывает окно «Лицензия» (проверка — в самой
+    /// команде через ProGate).</param>
     public ContextMenuItem(string id, string textKey, string defaultGroup,
         string wpfIconKind, string avaloniaIconKey, string iconColor,
         ContextMenuCommandKind commandKind, string? hotkeyKey = null,
-        bool linuxOnly = false, bool isNew = false, bool essential = false)
+        bool linuxOnly = false, bool isNew = false, bool essential = false,
+        Licensing.ProFeature? requiredFeature = null)
     {
+        RequiredFeature = requiredFeature;
         Id = id;
         TextKey = textKey;
         DefaultGroup = defaultGroup;
@@ -197,6 +202,21 @@ public sealed class ContextMenuItem
     /// <summary>Критичный пункт: Essential-пункты нельзя потерять из компоновки
     /// (см. <see cref="ContextMenuResolver"/>).</summary>
     public bool Essential { get; }
+
+    /// <summary>
+    /// Функция редакции ПРО (2.0): без лицензии пункт помечается «ПРО», а команда
+    /// открывает окно «Лицензия» (проверка — в самой команде через ProGate).
+    /// </summary>
+    public Licensing.ProFeature? RequiredFeature { get; }
+
+    /// <summary>Заголовок пункта с отметкой «ПРО», если функция закрыта лицензией.</summary>
+    public string DisplayText()
+    {
+        var text = Localization.LocalizationManager.T(TextKey);
+        if (RequiredFeature is { } feature && !Licensing.EditionService.Has(feature))
+            text += "  · " + Localization.LocalizationManager.T("Pro.Badge");
+        return text;
+    }
 }
 
 /// <summary>
@@ -381,7 +401,7 @@ public static class ContextMenuCatalog
             // базы; новый пункт — при сохранённой компоновке попадёт в «Новинки приложения».
             new("TestDeploy", "TestDeploy.MenuItem", GroupAdministration,
                 "CloudUpload", "IconCloudUpload", "#22C55E", ContextMenuCommandKind.TestDeploy,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.TestDeploy),
             // Администрирование ИБ (Этап 6, функция №29): проверка целостности (chdbfl).
             new("CheckIntegrity", "Admin.CheckIntegrity", GroupAdministration,
                 "DatabaseCheck", "IconDatabase", "#10B981", ContextMenuCommandKind.CheckIntegrity, "HotkeyCheckIntegrity"),
@@ -404,7 +424,7 @@ public static class ContextMenuCatalog
             // при сохранённой компоновке попадёт в «Новинки приложения».
             new("MassLoadCf", "Main.BatchLoadCfCfg", GroupBackup,
                 "DatabaseImport", "IconDatabaseImport", "#EF4444", ContextMenuCommandKind.MassLoadCf,
-                isNew: true),
+                isNew: true, requiredFeature: Licensing.ProFeature.MassLoadCf),
 
             // ---- Очистить кэш ----
             new("ClearProgramCache", "Main.ClearProgramCache", GroupClearCache,

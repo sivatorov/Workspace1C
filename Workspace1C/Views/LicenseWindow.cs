@@ -47,7 +47,12 @@ namespace Workspace1C
                 try { Clipboard.SetText(_vm.MachineCode); _vm.StatusText = Localization.LocalizationManager.T("Pro.CodeCopied"); }
                 catch { /* буфер обмена занят другим приложением */ }
             }, 150);
-            machine.Children.Add(WpfUi.Wrap(codeBox, copy));
+            var buy = WpfUi.Button("Pro.Buy", (_, _) =>
+            {
+                // Пошаговая инструкция покупки (цена, контакты, активация) вместо GitHub.
+                new HowToBuyWindow().ShowDialog();
+            }, 110);
+            machine.Children.Add(WpfUi.Wrap(codeBox, copy, buy));
             machine.Children.Add(WpfUi.Label("Pro.HowToBuy"));
             WpfUi.Place(root, WpfUi.Card(machine), 1);
 

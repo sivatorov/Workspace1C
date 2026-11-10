@@ -14,6 +14,8 @@ public sealed class ProFeatureRow
         Title = LocalizationManager.T(ProFeatures.TitleKey(feature));
         Available = available;
         Highlighted = highlighted;
+        InDevelopment = !ProFeatures.IsImplemented(feature);
+        Status = LocalizationManager.T(ProFeatures.StatusKey(feature));
         Mark = available ? "✓" : "—";
     }
 
@@ -22,7 +24,14 @@ public sealed class ProFeatureRow
     public bool Available { get; }
     public bool Highlighted { get; }
     public string Mark { get; }
-    public string Display => (Highlighted ? "▶ " : "   ") + Mark + "  " + Title;
+
+    /// <summary>Функция ещё не реализована (пока только в перечне 2.x).</summary>
+    public bool InDevelopment { get; }
+
+    /// <summary>Локализованный статус функции: «доступна» или «в разработке».</summary>
+    public string Status { get; }
+
+    public string Display => (Highlighted ? "▶ " : "   ") + Mark + "  " + Title + " — " + Status;
 }
 
 /// <summary>

@@ -67,4 +67,39 @@ public static class ProFeatures
     /// в официальной сборке с модулями из приватного репозитория.
     /// </summary>
     public static bool IsInPublicCore(ProFeature feature) => feature <= ProFeature.MassLoadCf;
+
+    /// <summary>
+    /// Функция реализована в коде: публичное ядро плюс модуль журнала аудита (AuditLog)
+    /// официальной сборки. Остальные из перечня 2.x пока только объявлены — в окне
+    /// «Лицензия» и в <c>--license-info</c> они помечаются «в разработке»
+    /// (аудит лицензирования ПРО, 2026-11). Не влияет на <see cref="EditionService.Has"/>.
+    /// </summary>
+    public static bool IsImplemented(ProFeature feature) =>
+        IsInPublicCore(feature) || feature == ProFeature.AuditLog;
+
+    /// <summary>
+    /// Ключ локализации статуса функции: «доступна» (реализована) или
+    /// «в разработке» (пока только в перечне).
+    /// </summary>
+    public static string StatusKey(ProFeature feature) =>
+        IsImplemented(feature) ? "Pro.FeatureStatus.Available" : "Pro.FeatureStatus.InDevelopment";
+
+    /// <summary>
+    /// Ссылка на раздел «ПРО-версия» README репозитория (справочная кнопка
+    /// «Подробнее в README» окна «Как купить ПРО-версию»).
+    /// </summary>
+    public const string BuyUrl = "https://github.com/sivatorov/Workspace1C#-про-версия";
+
+    /// <summary>
+    /// Telegram-канал проекта (контакты покупки: кнопка «Открыть Telegram»
+    /// окна «Как купить ПРО-версию»). Личных реквизитов оплаты в приложении нет —
+    /// оплата обсуждается в канале.
+    /// </summary>
+    public const string TelegramUrl = "https://t.me/Workspace1C";
+
+    /// <summary>
+    /// Issues репозитория (контакты покупки: кнопка «Открыть Issues»
+    /// окна «Как купить ПРО-версию»).
+    /// </summary>
+    public const string IssuesUrl = "https://github.com/sivatorov/Workspace1C/issues";
 }

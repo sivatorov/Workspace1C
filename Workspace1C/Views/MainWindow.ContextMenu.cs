@@ -188,7 +188,9 @@ public partial class MainWindow
 
         var item = new MenuItem
         {
-            Header = LocalizationManager.T(catalogItem.TextKey),
+            // DisplayText(): ключ локализации + отметка «ПРО» для пунктов с
+            // RequiredFeature без лицензии (как в меню «Утилиты», issue #56).
+            Header = catalogItem.DisplayText(),
             Style = TryFindResource("ModernMenuItem") as Style,
             Tag = RowItemTag(catalogItem.CommandKind),
         };

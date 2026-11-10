@@ -235,6 +235,21 @@ public partial class ScheduledTaskEditWindow : Window
 
     private void KindCombo_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
     {
+        // Дефект №5 (аудит активации): тип «Тестовый контур» (TestDeploy) — функция редакции
+        // ПРО (docs/pro/PRO-EDITION.md). Без лицензии выбор запрещён: задание создалось бы,
+        // но SchedulerService при каждом запуске отказывал (гейт при выполнении). При отказе
+        // выбор откатывается к прежнему типу; окно «Лицензия» показывает ProGate.Ensure.
+        var previousOption = e.RemovedItems.OfType<ScheduledTaskOption>().FirstOrDefault();
+        if (previousOption is not null &&
+            previousOption.Value != nameof(ScheduledTaskKind.TestDeploy) &&
+            SelectedKind == ScheduledTaskKind.TestDeploy &&
+            !Workspace1C.Services.Licensing.ProGate.Ensure(
+                ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy)!.Value))
+        {
+            KindCombo.SelectedItem = previousOption;
+            return;
+        }
+
         ApplyKindVisibility();
         // Список «Сценарий» зависит от типа: сценарии резервирования или сценарии
         // «Развернуть тестовую копию» (п.10, 1.0.0.92).
@@ -295,6 +310,14 @@ public partial class ScheduledTaskEditWindow : Window
 
     private void Ok_Click(object sender, RoutedEventArgs e)
     {
+        // Дефект №5 (аудит активации): сохранение задания типа TestDeploy без лицензии
+        // запрещено — задание каждый запуск падало бы в SchedulerService. Окно остаётся
+        // открытым, окно «Лицензии» показывает ProGate.Ensure.
+        if (SelectedKind == ScheduledTaskKind.TestDeploy &&
+            !Workspace1C.Services.Licensing.ProGate.Ensure(
+                ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy)!.Value))
+            return;
+
         _vm.Name = NameBox.Text ?? "";
         _vm.Enabled = EnabledCheck.IsChecked == true;
         _vm.Time = TimeBox.Text ?? "";

@@ -11,6 +11,32 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.53] — 2026-11-10
+
+### Добавлено
+
+- **Окно «Как купить ПРО-версию» (Windows и Linux).** Кнопка «Купить» в окне «Лицензия»
+  открывает пошаговую инструкцию покупки вместо перехода на GitHub:
+  - цена и условия: **2000 ₽**, бессрочная лицензия в рамках версии 2.x, привязка
+    к компьютеру;
+  - кнопка «Скопировать код компьютера» — тот же механизм, что и в окне «Лицензия»
+    ([`HowToBuyViewModel.cs`](Workspace1C/ViewModels/HowToBuyViewModel.cs));
+  - контакты проекта — только Telegram-канал [t.me/Workspace1C](https://t.me/Workspace1C)
+    (кнопка «Открыть Telegram») и [Issues](https://github.com/sivatorov/Workspace1C/issues)
+    репозитория (кнопка «Открыть Issues»); личных платёжных реквизитов в приложении нет —
+    оплата обсуждается с автором в канале;
+  - справочная кнопка «Подробнее в README» (прежняя ссылка
+    [`ProFeatures.BuyUrl`](Workspace1C/Services/Licensing/ProFeature.cs) сохранена)
+    и кнопка «Активировать», ведущая в окно «Лицензия».
+  - Окна: [`HowToBuyWindow.cs`](Workspace1C/Views/HowToBuyWindow.cs) (WPF) и
+    [`HowToBuyWindow.Avalonia.cs`](Workspace1C/Views/HowToBuyWindow.Avalonia.cs);
+    обработчики кнопки «Купить»:
+    [`LicenseWindow.cs`](Workspace1C/Views/LicenseWindow.cs) и
+    [`LicenseWindow.Avalonia.cs`](Workspace1C/Views/LicenseWindow.Avalonia.cs).
+  - Локализация: ключи `Pro.HowToBuy.*` в ru/en; тесты-стражи
+    [`HowToBuyWindowV100153Tests.cs`](Workspace1C.Tests/HowToBuyWindowV100153Tests.cs)
+    (в том числе страж «нет личных реквизитов» в текстах окна).
+
 ## [1.0.1.52] — 2026-11-10
 
 ### Добавлено

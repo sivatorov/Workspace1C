@@ -1,6 +1,7 @@
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Services.Licensing;
 
 namespace Workspace1C.ViewModels;
 
@@ -184,6 +185,18 @@ public class ScheduledTaskEditViewModel : ViewModelBase
     public bool NeedsScenario => Kind is ScheduledTaskKind.Backup
         or ScheduledTaskKind.BackupThenUpdateConfig
         or ScheduledTaskKind.TestDeploy;
+
+    /// <summary>
+    /// Функция редакции ПРО, требуемая для типа задания (дефект №5 аудита активации,
+    /// docs/pro/PRO-EDITION.md): тип TestDeploy — функция <see cref="ProFeature.TestDeploy"/>,
+    /// выполняется только при активной лицензии (<see cref="SchedulerService"/> гейтит
+    /// запуск, SchedulerService.cs). Остальные типы заданий входят в ядро 1.0.x — null.
+    /// Гейт выбора/сохранения в окне задания (ScheduledTaskEditWindow, WPF и Avalonia)
+    /// строится на этом маппинге + <see cref="ProGate.Ensure"/>, чтобы ПРО-задание
+    /// нельзя было создать без лицензии (иначе оно падало бы при каждом запуске).
+    /// </summary>
+    public static ProFeature? RequiredProFeature(ScheduledTaskKind kind) =>
+        kind == ScheduledTaskKind.TestDeploy ? ProFeature.TestDeploy : null;
 
     /// <summary>Нужен ли выбор базы (кроме обновления приложения).</summary>
     public bool NeedsInfobase => Kind is ScheduledTaskKind.Backup

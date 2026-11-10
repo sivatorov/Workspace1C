@@ -121,7 +121,7 @@ public sealed class ScheduledTaskEditWindow : ModalWindowBase
         _kindCombo.ItemsSource = _vm.KindOptions;
         ApplyOptionTemplate(_kindCombo);
         _kindCombo.SelectedItem = _vm.KindOptions.FirstOrDefault(o => o.Value == _vm.Kind.ToString());
-        _kindCombo.SelectionChanged += (_, _) => OnKindChanged();
+        _kindCombo.SelectionChanged += (_, e) => OnKindChanged(e);
         _kindCombo.HorizontalAlignment = HorizontalAlignment.Left;
         _kindCombo.MinWidth = 280;
         panel.Children.Add(_kindCombo);
@@ -388,8 +388,23 @@ public sealed class ScheduledTaskEditWindow : ModalWindowBase
     }
 
     /// <summary>Смена типа задания: обновляет видимость секций и список «Сценарий».</summary>
-    private void OnKindChanged()
+    private void OnKindChanged(SelectionChangedEventArgs? e = null)
     {
+        // Дефект №5 (аудит активации): тип «Тестовый контур» (TestDeploy) — функция редакции
+        // ПРО (docs/pro/PRO-EDITION.md). Без лицензии выбор запрещён: задание создалось бы,
+        // но SchedulerService при каждом запуске отказывал (гейт при выполнении). При отказе
+        // выбор откатывается к прежнему типу; окно «Лицензия» показывает ProGate.Ensure.
+        var previousOption = e?.RemovedItems.OfType<ScheduledTaskOption>().FirstOrDefault();
+        if (previousOption is not null &&
+            previousOption.Value != nameof(ScheduledTaskKind.TestDeploy) &&
+            SelectedKind == ScheduledTaskKind.TestDeploy &&
+            !Workspace1C.Services.Licensing.ProGate.Ensure(
+                ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy)!.Value))
+        {
+            _kindCombo.SelectedItem = previousOption;
+            return;
+        }
+
         ApplyKindVisibility();
         var selected = (_scenarioCombo.SelectedItem as ScheduledTaskOption)?.Value;
         var options = _vm.ScenarioOptions;
@@ -438,6 +453,14 @@ public sealed class ScheduledTaskEditWindow : ModalWindowBase
 
     private void OkClicked()
     {
+        // Дефект №5 (аудит активации): сохранение задания типа TestDeploy без лицензии
+        // запрещено — задание каждый запуск падало бы в SchedulerService. Окно остаётся
+        // открытым, окно «Лицензии» показывает ProGate.Ensure.
+        if (SelectedKind == ScheduledTaskKind.TestDeploy &&
+            !Workspace1C.Services.Licensing.ProGate.Ensure(
+                ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy)!.Value))
+            return;
+
         _vm.Name = _nameBox.Text ?? "";
         _vm.Enabled = _enabledCheck.IsChecked == true;
         _vm.Kind = SelectedKind;

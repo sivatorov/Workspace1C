@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Workspace1C.Models;
+using Workspace1C.Services.Licensing;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -147,5 +148,38 @@ public sealed class ScheduledTaskEditViewModelTests
         vm.Kind = kind;
 
         Assert.False(vm.NeedsRepeat);
+    }
+
+    // ---- Гейт ПРО-типов заданий (дефект №5 аудита активации) ----
+
+    /// <summary>
+    /// Дефект №5 (аудит активации): из типов заданий планировщика только TestDeploy —
+    /// функция редакции ПРО (выполняется при лицензии, гейт в SchedulerService.cs).
+    /// Гейт выбора/сохранения в окне задания строится на этом маппинге.
+    /// </summary>
+    [Fact]
+    public void RequiredProFeature_TestDeployKind_ReturnsTestDeployFeature()
+    {
+        Assert.Equal(ProFeature.TestDeploy,
+            ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy));
+    }
+
+    [Theory]
+    [InlineData(ScheduledTaskKind.Backup)]
+    [InlineData(ScheduledTaskKind.UpdateConfig)]
+    [InlineData(ScheduledTaskKind.BackupThenUpdateConfig)]
+    [InlineData(ScheduledTaskKind.CheckIntegrity)]
+    [InlineData(ScheduledTaskKind.UpdateApp)]
+    [InlineData(ScheduledTaskKind.PlatformUpdateCheck)]
+    [InlineData(ScheduledTaskKind.ConfigurationUpdateCheck)]
+    [InlineData(ScheduledTaskKind.InstallExtension)]
+    [InlineData(ScheduledTaskKind.GitCommitConfig)]
+    [InlineData(ScheduledTaskKind.DbmsBackup)]
+    [InlineData(ScheduledTaskKind.SettingsSync)]
+    public void RequiredProFeature_CoreKinds_ReturnNull(ScheduledTaskKind kind)
+    {
+        // MassLoadCf — ПРО-функция, но это команда контекстного меню/утилит,
+        // а не тип задания планировщика: ПРО-тип задания один — TestDeploy.
+        Assert.Null(ScheduledTaskEditViewModel.RequiredProFeature(kind));
     }
 }

@@ -381,6 +381,16 @@ namespace Workspace1C
             // обновляются на лету. Отписка — при реальном закрытии окна (Closed).
             ThemeManager.ThemeChanged += OnThemeChanged;
             Closed += (_, _) => ThemeManager.ThemeChanged -= OnThemeChanged;
+
+            // Дефект №4 (аудит активации): меню «Утилиты» в Avalonia строится один раз
+            // при построении панели команд, поэтому отметки «· ПРО» в заголовках пунктов
+            // (UtilitiesMenuCatalog.DisplayText → EditionService.IsPro) не обновлялись
+            // после активации/деактивации лицензии без перезапуска. Событие
+            // EditionService.Changed поднимается в потоке активации (может быть фоновым),
+            // поэтому пересборка меню выполняется в UI-потоке. Отписка — при реальном
+            // закрытии окна (Closed), тем же паттерном, что и для ThemeChanged выше.
+            Services.Licensing.EditionService.Changed += OnEditionChanged;
+            Closed += (_, _) => Services.Licensing.EditionService.Changed -= OnEditionChanged;
         }
 
         /// <summary>
@@ -388,10 +398,33 @@ namespace Workspace1C
         /// чтобы иконки и цвета пунктов взялись из актуальных набора и схемы.
         /// </summary>
         private void OnThemeChanged(object? sender, EventArgs e)
+            => RebuildUtilitiesMenu();
+
+        /// <summary>
+        /// Смена лицензии (Дефект №4, аудит активации): активация/деактивация ключа
+        /// меняет отметки «· ПРО» в заголовках пунктов меню «Утилиты»
+        /// (<see cref="Services.UtilitiesMenuCatalog.DisplayText"/>), но меню в Avalonia
+        /// строится один раз — пересобираем его по событию <see cref="Services.Licensing.EditionService.Changed"/>.
+        /// Событие приходит из потока активации (может быть фоновым): построение меню
+        /// выполняется только в UI-потоке.
+        /// </summary>
+        private void OnEditionChanged(object? sender, EventArgs e)
+            => Dispatcher.UIThread.Post(RebuildUtilitiesMenu);
+
+        /// <summary>
+        /// Общая точка пересборки меню «Утилиты» (смена темы, смена лицензии):
+        /// строит меню заново, обновляет и контекстное меню кнопки, и меню, которое
+        /// открывается по левой кнопке (оно хранится в <see cref="_utilitiesMenu"/>,
+        /// иначе обработчик Click открывал бы меню, захваченное при последней сборке
+        /// панели команд, со устаревшими бейджами).
+        /// </summary>
+        private void RebuildUtilitiesMenu()
         {
             if (_utilitiesButton is null)
                 return;
-            _utilitiesButton.ContextMenu = BuildUtilitiesMenu();
+            var menu = BuildUtilitiesMenu();
+            _utilitiesMenu = menu;
+            _utilitiesButton.ContextMenu = menu;
         }
 
         /// <summary>
@@ -564,6 +597,13 @@ namespace Workspace1C
         /// <summary>Кнопка «Утилиты» верхней панели: при смене темы пересобирается её ContextMenu
         /// (Задача 6), поэтому кнопка хранится в поле, а не локально в <c>BuildMainArea</c>.</summary>
         private Button? _utilitiesButton;
+
+        /// <summary>Актуальное меню «Утилиты» (Дефект №4, аудит активации): открывается
+        /// по клику кнопки и пересобирается при смене темы и смене лицензии
+        /// (<see cref="RebuildUtilitiesMenu"/>). Без поля обработчик Click открывал бы
+        /// меню, захваченное при последней сборке панели команд, — бейджи «· ПРО»
+        /// оставались бы устаревшими после активации/деактивации.</summary>
+        private ContextMenu? _utilitiesMenu;
 
         // ======================= Построение UI =======================
 
@@ -862,6 +902,7 @@ namespace Workspace1C
             // Раньше такие команды лежали в контекстном меню базы; теперь собраны в
             // отдельное подменю общей панели, куда в будущем можно добавлять новые.
             var utilitiesMenu = BuildUtilitiesMenu();
+            _utilitiesMenu = utilitiesMenu;
             var utilitiesBtn = new Button
             {
                 // Отдельная иконка (Apps-сетка), чтобы не путать с «Конфигуратором»
@@ -884,7 +925,10 @@ namespace Workspace1C
                     OpenUtilitiesMenuEditorDirectly();
                 }
             };
-            utilitiesBtn.Click += (_, _) => utilitiesMenu.Open(utilitiesBtn);
+            // Открываем актуальное меню из поля (Дефект №4, аудит активации): после
+            // пересборки по смене темы/лицензии клик должен открывать новое меню,
+            // а не захваченный при сборке панели экземпляр.
+            utilitiesBtn.Click += (_, _) => _utilitiesMenu?.Open(utilitiesBtn);
             _utilitiesButton = utilitiesBtn;
             panel.Children.Add(utilitiesBtn);
 

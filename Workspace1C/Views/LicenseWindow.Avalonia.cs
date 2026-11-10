@@ -68,7 +68,12 @@ namespace Workspace1C
                     // Буфер обмена недоступен (Wayland без менеджера буфера) — код можно выделить вручную.
                 }
             }, 150);
-            machine.Children.Add(AvaloniaUi.Wrap(codeBox, copy));
+            var buy = AvaloniaUi.Button("Pro.Buy", (_, _) =>
+            {
+                // Пошаговая инструкция покупки (цена, контакты, активация) вместо GitHub.
+                new HowToBuyWindow().ShowDialogSync(this);
+            }, 110);
+            machine.Children.Add(AvaloniaUi.Wrap(codeBox, copy, buy));
             machine.Children.Add(AvaloniaUi.Label("Pro.HowToBuy"));
             AvaloniaUi.Place(root, AvaloniaUi.Card(machine), 1);
 
