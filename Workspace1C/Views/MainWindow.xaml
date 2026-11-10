@@ -1933,14 +1933,16 @@
                                                     </materialDesign:PackIcon>
                                                     </Border>
                                                     <!-- Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный
-                                                         квадрат WarningBrush (#F59E0B в тёмной палитре, см. также
+                                                         кружок WarningBrush (#F59E0B в тёмной палитре, см. также
                                                          Infobase.EnterpriseDebugMarkerHex) рядом с чипом «Предприятие».
                                                          НЕ красный — красный остался признаком «не отвечает». Виден,
-                                                         когда хотя бы один Enterprise-процесс базы запущен с /DEBUG. -->
-                                                    <Rectangle Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{DynamicResource WarningBrush}"
-                                                               VerticalAlignment="Center" Margin="3,0,0,0"
-                                                               ToolTip="{loc:Loc Infobase.DebugRunningTooltip}"
-                                                               Visibility="{Binding IsEnterpriseDebugRunning, Converter={StaticResource BoolToVis}}"/>
+                                                         когда хотя бы один Enterprise-процесс базы запущен с /DEBUG.
+                                                         Issue #103 (v1.0.1.50): по просьбе 7OH маркер — кружок,
+                                                         как остальные значки-чипы строки (Предприятие/Конфигуратор 18×18). -->
+                                                    <Ellipse Width="10" Height="10" Fill="{DynamicResource WarningBrush}"
+                                                             VerticalAlignment="Center" Margin="3,0,0,0"
+                                                             ToolTip="{loc:Loc Infobase.DebugRunningTooltip}"
+                                                             Visibility="{Binding IsEnterpriseDebugRunning, Converter={StaticResource BoolToVis}}"/>
                                                     <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
                                                             VerticalAlignment="Center"
                                                             Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
@@ -3176,24 +3178,30 @@
                         </ContextMenu>
                     </TextBlock.ContextMenu>
                 </TextBlock>
-                <!-- Версия приложения и ссылки обновления (issue #116): ссылки «Обновить»
-                     и «Проверить обновления» стоят СЛЕВА от версии; клик по версии —
-                     окно «Что нового». При доступной новой версии ссылка «Обновить»
-                     помечается красным «!!» (RefreshFooterUpdateState); видимость
-                     ссылок управляется кодом (InitializeFooterUpdateState). -->
+                <!-- Версия приложения и значок обновления (issue #116, п.3 v1.0.1.50):
+                     значок стоит СЛЕВА от версии; клик по версии — окно «Что нового».
+                     Вместо текстовых ссылок «Обновить»/«Проверить обновления» — один
+                     значок FooterUpdateIcon: синие стрелки синхронизации, когда ручная
+                     проверка доступна (режимы «уведомлять»/«вручную»), и жирные красные
+                     «!!!», когда есть доступный релиз. Три состояния (скрыт / стрелки /
+                     «!!!») переключает RefreshFooterUpdateState; клик — единый
+                     OnFooterUpdateIconClick (ручная проверка: для доступного релиза она
+                     открывает диалог обновления). -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                    <TextBlock x:Name="FooterUpdateLink"
-                               Text="{loc:Loc Main.Footer.Update}"
-                               Foreground="{DynamicResource AccentBrush}" FontSize="12"
-                               VerticalAlignment="Center" Cursor="Hand"
-                               Visibility="Collapsed"
-                               MouseLeftButtonUp="OnFooterUpdateLinkClick"/>
-                    <TextBlock x:Name="FooterCheckUpdatesLink"
-                               Text="{loc:Loc Main.Footer.CheckUpdates}"
-                               Foreground="{DynamicResource AccentBrush}" FontSize="12"
-                               VerticalAlignment="Center" Margin="10,0,0,0" Cursor="Hand"
-                               Visibility="Collapsed"
-                               MouseLeftButtonUp="OnFooterCheckUpdatesLinkClick"/>
+                    <!-- В WPF StackPanel не имеет Spacing: зазор задаётся Margin'ом «!!!». -->
+                    <StackPanel x:Name="FooterUpdateIcon" Orientation="Horizontal"
+                                VerticalAlignment="Center" Cursor="Hand"
+                                Background="Transparent" Visibility="Collapsed"
+                                MouseLeftButtonUp="OnFooterUpdateIconClick">
+                        <materialDesign:PackIcon x:Name="FooterUpdateSyncIcon" Kind="Sync"
+                                                 Width="16" Height="16" VerticalAlignment="Center"
+                                                 Foreground="{DynamicResource AccentBrush}"
+                                                 Visibility="Collapsed"/>
+                        <TextBlock x:Name="FooterUpdateExclaim" Text="!!!" FontSize="13"
+                                   FontWeight="Bold" VerticalAlignment="Center" Margin="4,0,0,0"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
                     <TextBlock x:Name="FooterVersionText"
                                Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
                                VerticalAlignment="Center" Margin="10,0,0,0" Cursor="Hand"

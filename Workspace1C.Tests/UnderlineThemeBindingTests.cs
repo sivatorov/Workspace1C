@@ -71,8 +71,10 @@ public sealed class UnderlineThemeBindingTests
     public void MarkdownRenderer_WpfLinks_AreThemed()
     {
         // WPF-рендер: Hyperlink получает цвет из темы, а не системный синий.
+        // v1.0.1.50 (issue #107): чтение кисти вынесено в общий помощник ThemeBrush
+        // (так же красится FlowDocument TextPrimaryBrush).
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "MarkdownRenderer.cs"));
-        Assert.Contains("TryFindResource(\"AccentBrush\") is Brush accent", code);
+        Assert.Contains("ThemeBrush(\"AccentBrush\") is Brush accent", code);
         Assert.Contains("link.Foreground = accent", code);
     }
 

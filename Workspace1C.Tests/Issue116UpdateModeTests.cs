@@ -187,21 +187,47 @@ public sealed class Issue116UpdateModeTests
     [Fact]
     public void MainWindow_Footer_HasVersionAndCheckUpdatesLink()
     {
-        // WPF: колонка 1 строки состояния — версия (VersionInfo) и ссылка проверки.
+        // WPF: колонка 1 строки состояния — версия (VersionInfo) и значок обновления
+        // (issue #116 п.3 v1.0.1.50): вместо текстовых ссылок — один значок
+        // FooterUpdateIcon со стрелками синхронизации («!!!» при доступном релизе).
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
         Assert.Contains("FooterVersionText", xaml);
-        Assert.Contains("FooterUpdateLink", xaml);
-        Assert.Contains("FooterCheckUpdatesLink", xaml);
-        Assert.Contains("Main.Footer.CheckUpdates", xaml);
+        Assert.Contains("FooterUpdateIcon", xaml);
+        Assert.Contains("FooterUpdateSyncIcon", xaml);
+        Assert.Contains("FooterUpdateExclaim", xaml);
+        Assert.Contains("OnFooterUpdateIconClick", xaml);
         Assert.Contains("Main.Footer.WhatsNewTooltip", xaml);
 
         // Avalonia: те же элементы кодом в BuildStatusBar.
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
         Assert.Contains("_footerVersionText", avalonia);
+        Assert.Contains("_footerUpdateIcon", avalonia);
+        Assert.Contains("_footerUpdateSyncIcon", avalonia);
+        Assert.Contains("_footerUpdateExclaim", avalonia);
         Assert.Contains("VersionInfo.Display()", avalonia);
         Assert.Contains("Main.Footer.CheckUpdates", avalonia);
+        Assert.Contains("Main.Footer.UpdateAvailableTooltip", avalonia);
         Assert.Contains("Main.Footer.WhatsNewTooltip", avalonia);
         Assert.Contains("RefreshFooterUpdateState", avalonia);
+    }
+
+    [Fact]
+    public void MainWindow_Footer_UpdateIcon_HasThreeStates()
+    {
+        // Три состояния значка обновления (issue #116 п.3 v1.0.1.50) на обеих
+        // платформах: скрыт / стрелки синхронизации / «!!!» при доступном релизе.
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
+        Assert.Contains("FooterUpdateIcon.Visibility", wpf);
+        Assert.Contains("FooterUpdateSyncIcon.Visibility", wpf);
+        Assert.Contains("FooterUpdateExclaim.Visibility", wpf);
+        Assert.Contains("Main.Footer.UpdateAvailableTooltip", wpf);
+        Assert.Contains("AvailableRelease", wpf);
+        Assert.Contains("AppUpdateMode.NotifyOnly or AppUpdateMode.Manual", wpf);
+
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("_footerUpdateIcon.IsVisible = hasRelease || manualCheck", avalonia);
+        Assert.Contains("_footerUpdateSyncIcon.IsVisible = !hasRelease", avalonia);
+        Assert.Contains("_footerUpdateExclaim.IsVisible = hasRelease", avalonia);
     }
 
     [Fact]
@@ -238,7 +264,8 @@ public sealed class Issue116UpdateModeTests
                          "Settings.General.UpdateMode.Manual",
                          "Main.Footer.WhatsNewTooltip",
                          "Main.Footer.CheckUpdates",
-                         "Main.Footer.Update"
+                         "Main.Footer.Update",
+                         "Main.Footer.UpdateAvailableTooltip"
                      })
             {
                 Assert.Contains($"\"{key}\"", json);

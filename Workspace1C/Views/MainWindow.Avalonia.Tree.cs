@@ -445,26 +445,26 @@ namespace Workspace1C
             enterpriseChip.Child = enterpriseIcon;
             runningIcons.Children.Add(enterpriseChip);
 
-            // Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный квадрат
+            // Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный кружок
             // WarningBrush (#F59E0B в тёмной палитре, см. Infobase.EnterpriseDebugMarkerHex)
             // рядом с чипом «Предприятие». НЕ красный: красный остался признаком
             // «не отвечает». Виден, когда хотя бы один Enterprise-процесс базы запущен
             // с ключом /DEBUG (свой сеанс).
-            var debugSquare = new Avalonia.Controls.Shapes.Rectangle
+            // Issue #103 (v1.0.1.50): по просьбе 7OH маркер — кружок, как остальные
+            // значки-чипы строки (Предприятие 18×18, Конфигуратор 18×18).
+            var debugCircle = new Avalonia.Controls.Shapes.Ellipse
             {
-                Width = UiMetrics.Scaled(7),
-                Height = UiMetrics.Scaled(7),
-                RadiusX = UiMetrics.Scaled(1),
-                RadiusY = UiMetrics.Scaled(1),
+                Width = UiMetrics.Scaled(10),
+                Height = UiMetrics.Scaled(10),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0),
                 IsVisible = false
             };
-            ThemeBrushes.Bind(debugSquare, Avalonia.Controls.Shapes.Shape.FillProperty, "WarningBrush");
-            ToolTip.SetTip(debugSquare, LocalizationManager.T("Infobase.DebugRunningTooltip"));
-            debugSquare.Bind(Visual.IsVisibleProperty,
+            ThemeBrushes.Bind(debugCircle, Avalonia.Controls.Shapes.Shape.FillProperty, "WarningBrush");
+            ToolTip.SetTip(debugCircle, LocalizationManager.T("Infobase.DebugRunningTooltip"));
+            debugCircle.Bind(Visual.IsVisibleProperty,
                 new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib });
-            runningIcons.Children.Add(debugSquare);
+            runningIcons.Children.Add(debugCircle);
 
             var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), nameof(Infobase.ConfiguratorRunningStatus), leftMargin: 3);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path

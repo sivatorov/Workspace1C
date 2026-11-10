@@ -400,10 +400,22 @@ namespace Workspace1C.Services
                 LineHeight = 18,
                 FontFamily = new FontFamily("Segoe UI")
             };
+            // Issue #107 п.1 (v1.0.1.50): текст «Что нового» обязан следовать теме.
+            // Без явной кисти FlowDocument наследовал дефолт контрола (чёрный), и в
+            // тёмной теме markdown выглядел «тёмным текстом на тёмном фоне». Кисть
+            // берётся из ресурса темы при открытии окна (окна краткоживущие, этого
+            // достаточно). Цвет наследуют все Run/Paragraph/Span, включая
+            // код-блоки и инлайн-код — они остаются читаемыми в тёмной теме.
+            if (Application.Current?.TryFindResource("TextPrimaryBrush") is Brush primary)
+                doc.Foreground = primary;
             foreach (var block in MarkdownParser.Parse(markdown))
                 Append(doc, block);
             return doc;
         }
+
+        /// <summary>Кисть из ресурсов темы или null (issue #107, v1.0.1.50).</summary>
+        private static Brush? ThemeBrush(string key) =>
+            Application.Current?.TryFindResource(key) as Brush;
 
         private static void Append(FlowDocument doc, MdBlock b)
         {
@@ -511,9 +523,9 @@ namespace Workspace1C.Services
                         link.NavigateUri = uri;
                         link.RequestNavigate += OnRequestNavigate;
                     }
-                    // Цвет ссылки из темы (issue #51): системный синий Hyperlink
-                    // не следует теме приложения.
-                    if (Application.Current?.TryFindResource("AccentBrush") is Brush accent)
+                    // Цвет ссылки из темы (issue #51, v1.0.1.50 через общий ThemeBrush):
+                    // системный синий Hyperlink не следует теме приложения.
+                    if (ThemeBrush("AccentBrush") is Brush accent)
                         link.Foreground = accent;
                     AddChildren(link, i.Children);
                     return link;
@@ -588,6 +600,10 @@ namespace Workspace1C.Services
                         FontWeight = FontWeight.Bold,
                         TextWrapping = TextWrapping.Wrap
                     };
+                    // Issue #107 п.1 (v1.0.1.50): текст следует теме — без явной
+                    // привязки TextBlock наследовал дефолт (тёмный) и в тёмной теме
+                    // был «тёмный текст на тёмном фоне».
+                    ThemeBrushes.Bind(heading, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                     heading.FontSize = b.Level switch { 1 => 17.0, 2 => 15.0, _ => 13.5 };
                     foreach (var inl in b.Inlines)
                         AddInline(heading, inl);
@@ -595,6 +611,7 @@ namespace Workspace1C.Services
 
                 case MdBlockKind.Paragraph:
                     var para = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap };
+                    ThemeBrushes.Bind(para, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                     foreach (var inl in b.Inlines)
                         AddInline(para, inl);
                     return para;
@@ -604,6 +621,7 @@ namespace Workspace1C.Services
                     foreach (var item in b.Items)
                     {
                         var tb = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap };
+                        ThemeBrushes.Bind(tb, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                         EnsureInlines(tb).Add(new Run("•  "));
                         foreach (var inl in item)
                             AddInline(tb, inl);
@@ -617,6 +635,7 @@ namespace Workspace1C.Services
                     foreach (var item in b.Items)
                     {
                         var tb = new TextBlock { FontSize = 13, TextWrapping = TextWrapping.Wrap };
+                        ThemeBrushes.Bind(tb, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                         EnsureInlines(tb).Add(new Run(index + ".  "));
                         foreach (var inl in item)
                             AddInline(tb, inl);
@@ -633,6 +652,7 @@ namespace Workspace1C.Services
                         FontSize = 12,
                         TextWrapping = TextWrapping.NoWrap
                     };
+                    ThemeBrushes.Bind(code, TextBlock.ForegroundProperty, "TextPrimaryBrush");
                     return new Border
                     {
                         Background = CodeBrush,

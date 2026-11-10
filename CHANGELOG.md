@@ -11,6 +11,63 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.50] — 2026-11-10
+
+### Исправлено
+
+- **Тёмный текст на тёмном фоне в окне «Что нового» (issue #107 п.1).** Markdown-рендер
+  «Что нового» использовал фиксированные цвета (в тёмной теме текст оставался тёмным и
+  терял читаемость). Все элементы markdown (абзацы, заголовки, списки, таблицы, цитаты,
+  код) теперь красятся кистями темы ([`MarkdownRenderer.cs`](Workspace1C/Services/MarkdownRenderer.cs)):
+  WPF — `FlowDocument.Foreground = TextPrimaryBrush`, ссылки — `AccentBrush`; Avalonia —
+  `TextBlock`-элементы привязаны к `TextPrimaryBrush` через `ThemeBrushes.Bind`. Базовый
+  `Foreground` просмотра изменений в диалоге обновления тоже тематизирован
+  ([`UpdateAvailableWindow.xaml`](Workspace1C/Services/UpdateAvailableWindow.xaml)).
+  Страж-тесты: [`V100150IssuesTests.cs`](Workspace1C.Tests/V100150IssuesTests.cs).
+- **Кнопка «Пропустить эту версию» больше не обрезается (issue #107 п.2).** Кнопке в
+  окне «Доступна новая версия» вместо фиксированной `Width` назначена `MinWidth` — текст
+  «Пропустить эту версию» помещается целиком на обеих платформах
+  ([`UpdateAvailableWindow.xaml`](Workspace1C/Services/UpdateAvailableWindow.xaml)).
+- **Скролл колёсиком в окне изменений (issue #116 п.1).** В «Что нового» вертикальная
+  прокрутка перехватывалась внешним контейнером/отключалась у вложенного
+  `FlowDocumentScrollViewer` — список изменений не скроллился колёсиком мыши. Убраны
+  вложенные скролл-контейнеры: хост окна пуст, код кладёт ровно один скролл-контейнер
+  с `VerticalScrollBarVisibility = Auto` (WPF
+  [`WhatsNewWindow.xaml`](Workspace1C/Views/WhatsNewWindow.xaml) +
+  [`WhatsNewWindow.xaml.cs`](Workspace1C/Views/WhatsNewWindow.xaml.cs), Avalonia
+  [`WhatsNewWindow.Avalonia.cs`](Workspace1C/Views/WhatsNewWindow.Avalonia.cs)).
+- **Маркер запуска под отладкой — янтарный кружок вместо квадрата (issue #103).** Маркер
+  отладки рядом со значком «Предприятие» приведён к кружку цвета `#F59E0B` — той же
+  формы, что у остальных значков чипа базы (WPF
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml), Avalonia
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Детекция не изменилась: ключ `/DEBUG` в командной строке процесса Предприятия
+  (только свой сеанс).
+- **Аудит кисти «Текст на акцентном фоне» (issue #107 п.3).** Проверены все потребители
+  `TextOnAccentBrush`: кисть применяется только к элементам на действительной акцентной
+  подложке (акцентные кнопки, выбранная карточка добавления базы, активные чипы);
+  значки на неакцентном фоне используют штатные кисти темы.
+
+### Добавлено
+
+- **Значок проверки обновлений вместо надписи в статус-баре (issue #116 п.3).** Ссылки
+  «Проверить обновления»/«!! Обновить» в строке состояния главного окна заменены
+  значком слева от версии: в режиме ручной проверки — синие стрелки синхронизации
+  (`AccentBrush`), при доступном обновлении — красные «!!!» (`DangerBrush`), с
+  поясняющим tooltip. Обе платформы: WPF ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml),
+  [`MainWindow.Updates.cs`](Workspace1C/Views/MainWindow.Updates.cs)) и Avalonia
+  ([`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)); локализация
+  ru/en. Периодичность фоновой проверки обновлений вынесена отдельной строкой в
+  настройках ([`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml),
+  [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs)) —
+  сама настройка появилась в v1.0.1.49.
+  Страж-тесты: [`V100150IssuesTests.cs`](Workspace1C.Tests/V100150IssuesTests.cs),
+  [`Issue116UpdateModeTests.cs`](Workspace1C.Tests/Issue116UpdateModeTests.cs).
+
+> Примечание: issues #118 (ошибка «Не найден метод System.__ComObject.Count» в
+> COM-коннекторе) и #117 (расширения конфигурации, п.2–4) ждут проверки авторов —
+> исправления вошли в v1.0.1.49 и перенесены в v1.0.1.50 без изменений кода.
+
 ## [1.0.1.49] — 2026-11-10
 
 ### Исправлено

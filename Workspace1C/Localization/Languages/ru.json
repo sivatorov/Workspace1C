@@ -860,6 +860,7 @@
     "Main.Footer.WhatsNewTooltip": "Что нового",
     "Main.Footer.CheckUpdates": "Проверить обновления",
     "Main.Footer.Update": "Обновить",
+    "Main.Footer.UpdateAvailableTooltip": "Доступна новая версия {0} — нажмите, чтобы проверить и установить",
     "Settings.General.ShowTrayIcon": "Значок в области уведомлений",
     "Settings.General.CloseToTray": "Сворачивать в трей при закрытии",
     "Settings.General.EscapeToTray": "По Esc сворачивать в трей",

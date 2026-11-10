@@ -81,9 +81,11 @@ public partial class MainWindow
         => Dispatcher.Invoke(RefreshFooterUpdateState);
 
     /// <summary>
-    /// Расставляет видимость ссылок подвала (issue #116): «Обновить» — когда служба
-    /// знает доступный релиз; «Проверить обновления» — в режимах «только уведомлять»
-    /// и «проверять вручную», когда доступного релиза нет.
+    /// Расставляет три состояния значка обновления в статус-баре (issue #116,
+    /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие стрелки
+    /// синхронизации — ручная проверка доступна (режимы «только уведомлять» и
+    /// «проверять вручную»), релиза нет; жирные красные «!!!» — есть доступный
+    /// релиз. Tooltip меняется вместе с состоянием; клик — единая ручная проверка.
     /// </summary>
     private void RefreshFooterUpdateState()
     {
@@ -96,25 +98,21 @@ public partial class MainWindow
             var hasRelease = updateService.AvailableRelease is not null;
             var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
 
-            FooterUpdateLink.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
-            FooterCheckUpdatesLink.Visibility = !hasRelease && manualCheck
+            FooterUpdateIcon.Visibility = hasRelease || manualCheck
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+            FooterUpdateSyncIcon.Visibility = !hasRelease ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateExclaim.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
 
-            // Индикатор «!! Обновить» (issue #116): при готовом обновлении ссылка
-            // становится заметной — префикс «!!» и красный цвет DangerBrush; без
-            // релиза возвращаются обычный текст и акцентный цвет.
-            FooterUpdateLink.Text = hasRelease
-                ? "!! " + LocalizationManager.T("Main.Footer.Update")
-                : LocalizationManager.T("Main.Footer.Update");
-            if (hasRelease)
-                FooterUpdateLink.SetResourceReference(TextBlock.ForegroundProperty, "DangerBrush");
-            else
-                FooterUpdateLink.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+            FooterUpdateIcon.ToolTip = hasRelease
+                ? string.Format(
+                    LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
+                    updateService.AvailableRelease!.TagName)
+                : (object)LocalizationManager.T("Main.Footer.CheckUpdates");
         }
         catch
         {
-            // Состояние ссылок не критично.
+            // Состояние значка не критично: остаётся только версия.
         }
     }
 
@@ -133,23 +131,10 @@ public partial class MainWindow
         }
     }
 
-    /// <summary>Клик по ссылке «Обновить» в подвале — та же ручная проверка, что и в
-    /// «О программе»: она откроет диалог обновления для доступного релиза (issue #116).</summary>
-    private async void OnFooterUpdateLinkClick(object sender, MouseButtonEventArgs e)
-    {
-        try
-        {
-            var updateService = AppServices.GetRequiredService<UpdateService>();
-            await updateService.CheckForUpdatesManualAsync();
-        }
-        catch
-        {
-            // Внутренние ошибки уже показаны в UpdateService; здесь только страхуемся.
-        }
-    }
-
-    /// <summary>Клик по ссылке «Проверить обновления» в подвале — ручная проверка (issue #116).</summary>
-    private async void OnFooterCheckUpdatesLinkClick(object sender, MouseButtonEventArgs e)
+    /// <summary>Клик по значку обновления в подвале — та же ручная проверка, что и в
+    /// «О программе»: она откроет диалог обновления для доступного релиза
+    /// (issue #116, п.3 v1.0.1.50).</summary>
+    private async void OnFooterUpdateIconClick(object sender, MouseButtonEventArgs e)
     {
         try
         {

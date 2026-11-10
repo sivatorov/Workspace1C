@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Workspace1C.Localization;
@@ -69,7 +70,15 @@ namespace Workspace1C
             {
                 Padding = new Thickness(14),
                 CornerRadius = new CornerRadius(4),
-                Child = new ScrollViewer { Content = notesPanel }
+                // Issue #116 п.1 (v1.0.1.50): единственный скролл-контейнер карточки —
+                // один ScrollViewer с явной вертикальной прокруткой (Auto), иначе
+                // поведение колеса мыши зависело от дефолтов контейнеров.
+                Child = new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    Content = notesPanel
+                }
             };
             ThemeBrushes.Bind(card, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(card, Border.BorderBrushProperty, "BorderBrush");

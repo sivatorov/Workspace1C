@@ -193,13 +193,18 @@ namespace Workspace1C
 
                 if (string.IsNullOrEmpty(key))
                 {
-                    // Кисть на теме (аудит UI): текст на кнопке-пикере — «текст на акценте»,
-                    // а не фиксированный белый.
+                    // Issue #107 п.3 (v1.0.1.50): глиф «∅» стоит на плитке пикера с
+                    // НЕакцентной подложкой (IconPickerBaseBrush), поэтому «Текст на
+                    // акцентном фоне» применяться к нему не должен — кисть вернута
+                    // к штатной TextPrimaryBrush (соседние Path-иконки красятся
+                    // выбранным цветом иконки, глиф «пусто» — текстом темы).
                     btn.Content = new TextBlock
                     {
                         Text = "∅",
                         FontSize = 14,
-                        Foreground = (TryFindResource("TextOnAccentBrush") as Brush) ?? Brushes.White,
+                        Foreground = (TryFindResource("TextPrimaryBrush") as Brush)
+                            ?? (TryFindResource("TextOnAccentBrush") as Brush)
+                            ?? System.Windows.Media.Brushes.Gray,
                         HorizontalAlignment = HorizontalAlignment.Center,
                         VerticalAlignment = VerticalAlignment.Center
                     };

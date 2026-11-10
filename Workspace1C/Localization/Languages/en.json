@@ -860,6 +860,7 @@
     "Main.Footer.WhatsNewTooltip": "What's new",
     "Main.Footer.CheckUpdates": "Check for updates",
     "Main.Footer.Update": "Update",
+    "Main.Footer.UpdateAvailableTooltip": "New version {0} is available — click to check and install",
     "Settings.General.ShowTrayIcon": "Icon in the notification area",
     "Settings.General.CloseToTray": "Minimize to tray on close",
     "Settings.General.EscapeToTray": "Minimize to tray on Esc",

@@ -30,13 +30,16 @@
         <TextBlock x:Name="TitleText" Grid.Row="0" FontSize="16" FontWeight="SemiBold"
                    Margin="0,0,0,12" TextWrapping="Wrap"/>
 
-        <!-- Сводка изменений релиза: пункты списком, читаемо в обеих темах. -->
+        <!-- Сводка изменений релиза: пункты списком, читаемо в обеих темах.
+             Issue #116 п.1 (v1.0.1.50): вместо постоянного внешнего ScrollViewer —
+             пустой хост; код-обёртка кладёт ОДИН скролл-контейнер (ScrollViewer
+             для краткой сводки или FlowDocumentScrollViewer для markdown-текста
+             GitHub-релиза), иначе колесо мыши перехватывалось вложенным
+             FlowDocumentScrollViewer и текст не скроллился. -->
         <Border Grid.Row="1" Background="{DynamicResource CardBackgroundBrush}"
                 BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
                 Padding="14" CornerRadius="4">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel x:Name="NotesPanel"/>
-            </ScrollViewer>
+            <Grid x:Name="NotesHost"/>
         </Border>
 
         <!-- Кнопки: открыть CHANGELOG на GitHub; галка «показывать при запуске»; закрыть. -->

@@ -52,8 +52,12 @@ namespace Workspace1C
 
         // Подвал строки состояния (issue #116): версия приложения и ссылки обновления.
         private TextBlock _footerVersionText = null!;
-        private TextBlock _footerUpdateLink = null!;
-        private TextBlock _footerCheckUpdatesLink = null!;
+        // Значок обновления в статус-баре (issue #116 п.3 v1.0.1.50): контейнер
+        // со стрелками синхронизации («IconSync», как у синхронизации списка баз)
+        // или жирными красными «!!!» при доступном релизе.
+        private StackPanel _footerUpdateIcon = null!;
+        private Control _footerUpdateSyncIcon = null!;
+        private TextBlock _footerUpdateExclaim = null!;
 
         // Issue #114: координата курсора по X (в координатах окна) над строкой состояния.
         // Запоминается в PointerEntered/PointerMoved/PointerPressed на _statusInfo и
@@ -2241,10 +2245,10 @@ namespace Workspace1C
             grid.Children.Add(_syncMessage);
             Grid.SetColumn(_syncMessage, 1);
 
-            // Версия приложения и ссылки обновления (issue #116): ссылки «Обновить»
-            // и «Проверить обновления» стоят СЛЕВА от версии; клик по версии —
-            // окно «Что нового». При доступной новой версии «Обновить» помечается
-            // красным «!!» (RefreshFooterUpdateState).
+            // Версия приложения и значок обновления (issue #116): значок стоит СЛЕВА
+            // от версии; клик по версии — окно «Что нового». Состояния значка
+            // (скрыт / стрелки синхронизации / красные «!!!») расставляет
+            // RefreshFooterUpdateState.
             var footerPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -2252,30 +2256,33 @@ namespace Workspace1C
                 Margin = new Thickness(16, 0, 0, 0)
             };
 
-            _footerUpdateLink = new TextBlock
+            // Значок обновления (issue #116 п.3 v1.0.1.50): вместо двух текстовых
+            // ссылок — один интерактивный элемент со стрелками синхронизации
+            // («IconSync» — тот же glyph, что у синхронизации списка баз) или
+            // жирными красными «!!!» при доступном релизе. Состояния переключает
+            // RefreshFooterUpdateState; клик — единая ручная проверка.
+            _footerUpdateIcon = new StackPanel
             {
-                Text = LocalizationManager.T("Main.Footer.Update"),
-                FontSize = 12,
+                Orientation = Orientation.Horizontal,
+                Spacing = 4,
                 VerticalAlignment = VerticalAlignment.Center,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 IsVisible = false
             };
-            ThemeBrushes.Bind(_footerUpdateLink, TextBlock.ForegroundProperty, "AccentBrush");
-            _footerUpdateLink.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
-            footerPanel.Children.Add(_footerUpdateLink);
-
-            _footerCheckUpdatesLink = new TextBlock
+            _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(15), "@AccentBrush");
+            _footerUpdateExclaim = new TextBlock
             {
-                Text = LocalizationManager.T("Main.Footer.CheckUpdates"),
-                FontSize = 12,
-                Margin = new Thickness(10, 0, 0, 0),
+                Text = "!!!",
+                FontSize = 13,
+                FontWeight = FontWeight.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
-                Cursor = new Cursor(StandardCursorType.Hand),
                 IsVisible = false
             };
-            ThemeBrushes.Bind(_footerCheckUpdatesLink, TextBlock.ForegroundProperty, "AccentBrush");
-            _footerCheckUpdatesLink.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
-            footerPanel.Children.Add(_footerCheckUpdatesLink);
+            ThemeBrushes.Bind(_footerUpdateExclaim, TextBlock.ForegroundProperty, "DangerBrush");
+            _footerUpdateIcon.Children.Add(_footerUpdateSyncIcon);
+            _footerUpdateIcon.Children.Add(_footerUpdateExclaim);
+            _footerUpdateIcon.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
+            footerPanel.Children.Add(_footerUpdateIcon);
 
             _footerVersionText = new TextBlock
             {
@@ -2394,9 +2401,11 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Расставляет видимость ссылок подвала (issue #116): «Обновить» — когда служба
-        /// знает доступный релиз; «Проверить обновления» — в режимах «только уведомлять»
-        /// и «проверять вручную», когда доступного релиза нет.
+        /// Расставляет три состояния значка обновления в статус-баре (issue #116,
+        /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие
+        /// стрелки синхронизации — ручная проверка доступна (режимы «только
+        /// уведомлять» и «проверять вручную»), релиза нет; жирные красные «!!!» —
+        /// есть доступный релиз. Tooltip меняется вместе с состоянием.
         /// </summary>
         private void RefreshFooterUpdateState()
         {
@@ -2409,23 +2418,19 @@ namespace Workspace1C
                 var hasRelease = updateService.AvailableRelease is not null;
                 var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
 
-                _footerUpdateLink.IsVisible = hasRelease;
-                _footerCheckUpdatesLink.IsVisible = !hasRelease && manualCheck;
+                _footerUpdateIcon.IsVisible = hasRelease || manualCheck;
+                _footerUpdateSyncIcon.IsVisible = !hasRelease;
+                _footerUpdateExclaim.IsVisible = hasRelease;
 
-                // Индикатор «!! Обновить» (issue #116): при готовом обновлении ссылка
-                // становится заметной — префикс «!!» и красный цвет #DC2626 (как у
-                // «Выхода», одинаково в обеих темах); без релиза — обычный текст и
-                // акцентный цвет.
-                _footerUpdateLink.Text = hasRelease
-                    ? "!! " + LocalizationManager.T("Main.Footer.Update")
-                    : LocalizationManager.T("Main.Footer.Update");
-                _footerUpdateLink.Foreground = hasRelease
-                    ? SpecBrush("#DC2626")
-                    : ThemeBrushes.FromSpec("@AccentBrush");
+                ToolTip.SetTip(_footerUpdateIcon, hasRelease
+                    ? string.Format(
+                        LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
+                        updateService.AvailableRelease!.TagName)
+                    : LocalizationManager.T("Main.Footer.CheckUpdates"));
             }
             catch
             {
-                // Состояние ссылок не критично.
+                // Состояние значка не критично: остаётся только версия.
             }
         }
 

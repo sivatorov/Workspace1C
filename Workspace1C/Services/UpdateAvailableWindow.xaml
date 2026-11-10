@@ -68,7 +68,10 @@
                             <TextBlock x:Name="DownloadText" Text="{loc:Loc Update.Download}" VerticalAlignment="Center"
                                        FontWeight="SemiBold" FontSize="13"/>
                         </Button>
-                        <Button x:Name="SkipVersionButton" Width="170" Height="34"
+                        <!-- Issue #107 п.2 (v1.0.1.50): MinWidth вместо Width — кнопка
+                             авторасширяется, «Пропустить эту версию» больше не обрезается
+                             при другом масштабе шрифта/длинных локализациях. -->
+                        <Button x:Name="SkipVersionButton" MinWidth="170" Height="34"
                                 Style="{DynamicResource SecondaryButton}" Margin="0,0,10,0"
                                 ToolTip="{loc:Loc Update.SkipHint}"
                                 Click="OnSkipVersionClick">

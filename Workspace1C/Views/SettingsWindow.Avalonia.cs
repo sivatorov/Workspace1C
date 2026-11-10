@@ -440,6 +440,9 @@ namespace Workspace1C
 
             // Периодичность проверки обновлений (issue #116 п.2, v1.0.1.49): порядок
             // вариантов совпадает с порядком AppSettings.UpdateCheckIntervals.
+            // Issue #116 п.2 v1.0.1.50: ряд идёт ОТДЕЛЬНОЙ строкой вертикальной
+            // компоновки (паритет с WPF-правкой: в разметке SettingsWindow.xaml ряд
+            // вынесен из строки режима обновления и больше не обрезается окном).
             var updateIntervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             var updateIntervalIcon = IconHelper.MakeIcon("IconRefresh", UiMetrics.Scaled(16),
                 Themes.ThemeBrushes.FromSpec("@SuccessBrush"));

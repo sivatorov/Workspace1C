@@ -376,8 +376,14 @@
                                         <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.NotifyOnly}"/>
                                         <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.Manual}"/>
                                     </ComboBox>
-                                    <!-- Периодичность фоновой проверки обновлений (issue #116 п.2, v1.0.1.49). -->
-                                    <TextBlock Text="{loc:Loc Settings.General.UpdateInterval}" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                                </StackPanel>
+                                <!-- Периодичность фоновой проверки обновлений (issue #116 п.2, v1.0.1.49).
+                                     Issue #116 п.2 v1.0.1.50: вынесена на ОТДЕЛЬНУЮ строку — раньше
+                                     метка и комбобокс стояли в одном ряду с режимом обновления и
+                                     обрезались границей окна при минимальной ширине. -->
+                                <StackPanel Orientation="Horizontal" Margin="24,0,0,6">
+                                    <materialDesign:PackIcon Kind="ClockOutline" Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Settings.General.UpdateInterval}" VerticalAlignment="Center"/>
                                     <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
                                                        HelpText="{loc:Loc Settings.General.UpdateIntervalTooltip}"/>
                                     <ComboBox x:Name="UpdateIntervalComboBox" MinWidth="200" Height="34" Margin="10,0,0,0"

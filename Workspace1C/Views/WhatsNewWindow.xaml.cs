@@ -32,17 +32,27 @@ namespace Workspace1C
             ShowOnStartCheck.IsChecked = settings.ShowWhatsNewOnStart;
 
             var notes = WhatsNewService.GetReleaseNotes(version);
-            foreach (var note in notes ?? Array.Empty<string>())
+            if (notes is not null)
             {
-                NotesPanel.Children.Add(new TextBlock
+                // Краткая сводка: один скролл-контейнер (ScrollViewer → StackPanel);
+                // колёсико доходит до содержимого напрямую (issue #116 п.1).
+                var panel = new StackPanel();
+                foreach (var note in notes)
                 {
-                    Text = "• " + note,
-                    TextWrapping = TextWrapping.Wrap,
-                    Margin = new Thickness(0, 0, 0, 8)
+                    panel.Children.Add(new TextBlock
+                    {
+                        Text = "• " + note,
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 0, 0, 8)
+                    });
+                }
+                NotesHost.Children.Add(new ScrollViewer
+                {
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Content = panel
                 });
             }
-
-            if (notes is null)
+            else
             {
                 // Issue #116 п.1: для версии без готовой сводки — fallback на body
                 // GitHub-релиза текущего тега (после показа окна, не в конструкторе).
@@ -60,7 +70,7 @@ namespace Workspace1C
                 var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
                 if (string.IsNullOrWhiteSpace(body))
                 {
-                    NotesPanel.Children.Add(new TextBlock
+                    NotesHost.Children.Add(new TextBlock
                     {
                         Text = LocalizationManager.T("WhatsNew.NotesUnavailable"),
                         TextWrapping = TextWrapping.Wrap,
@@ -69,11 +79,16 @@ namespace Workspace1C
                     });
                     return;
                 }
-                NotesPanel.Children.Clear();
-                NotesPanel.Children.Add(new System.Windows.Controls.FlowDocumentScrollViewer
+                // Markdown-текст GitHub-релиза: FlowDocumentScrollViewer сам является
+                // скролл-контейнером — кладём его в хост НАПРЯМУЮ, без внешнего
+                // ScrollViewer. Раньше вложенный FlowDocumentScrollViewer перехватывал
+                // колесо мыши, и текст не скроллился (issue #116 п.1, v1.0.1.50).
+                NotesHost.Children.Clear();
+                NotesHost.Children.Add(new System.Windows.Controls.FlowDocumentScrollViewer
                 {
                     Document = MarkdownRenderer.ToFlowDocument(body),
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                 });
             }
             catch

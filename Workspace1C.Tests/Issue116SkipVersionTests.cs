@@ -11,8 +11,9 @@ namespace Workspace1C.Tests;
 /// главного окна. Проверяется семантика пропуска через компаратор версий
 /// <see cref="GitHubReleaseService.IsNewerThan"/> (релиз пропущен, когда он НЕ новее
 /// пропущенной версии) и стражи по исходникам: проверка пропуска стоит ДО скачивания
-/// и диалога, кнопка пропуска есть в обоих диалогах, ссылки обновления стоят слева
-/// от версии, при готовом обновлении — префикс «!!».
+/// и диалога, кнопка пропуска есть в обоих диалогах, значок обновления стоит слева
+/// от версии (v1.0.1.50: значок вместо текстовых ссылок), при готовом обновлении —
+/// жирные красные «!!!».
 /// </summary>
 public sealed class Issue116SkipVersionTests
 {
@@ -138,42 +139,45 @@ public sealed class Issue116SkipVersionTests
     // ---- Стражи: подвал главного окна ----
 
     [Fact]
-    public void WpfFooter_UpdateLinkStandsBeforeVersionText()
+    public void WpfFooter_UpdateIconStandsBeforeVersionText()
     {
+        // v1.0.1.50 (issue #116 п.3): вместо ссылок — значок FooterUpdateIcon,
+        // который стоит СЛЕВА от версии.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        var updateIndex = xaml.IndexOf("x:Name=\"FooterUpdateLink\"", StringComparison.Ordinal);
-        var checkIndex = xaml.IndexOf("x:Name=\"FooterCheckUpdatesLink\"", StringComparison.Ordinal);
+        var iconIndex = xaml.IndexOf("x:Name=\"FooterUpdateIcon\"", StringComparison.Ordinal);
         var versionIndex = xaml.IndexOf("x:Name=\"FooterVersionText\"", StringComparison.Ordinal);
-        Assert.True(updateIndex > 0 && checkIndex > 0 && versionIndex > 0,
-            "Ссылки подвала не найдены в MainWindow.xaml");
-        Assert.True(updateIndex < checkIndex && checkIndex < versionIndex,
-            "Ссылки «Обновить»/«Проверить обновления» должны стоять СЛЕВА от версии (issue #116)");
+        Assert.True(iconIndex > 0 && versionIndex > 0,
+            "Значок обновления/версия не найдены в MainWindow.xaml");
+        Assert.True(iconIndex < versionIndex,
+            "Значок обновления должен стоять СЛЕВА от версии (issue #116)");
     }
 
     [Fact]
-    public void AvaloniaFooter_UpdateLinkStandsBeforeVersionText()
+    public void AvaloniaFooter_UpdateIconStandsBeforeVersionText()
     {
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        var updateIndex = source.IndexOf("_footerUpdateLink = new TextBlock", StringComparison.Ordinal);
-        var checkIndex = source.IndexOf("_footerCheckUpdatesLink = new TextBlock", StringComparison.Ordinal);
+        var iconIndex = source.IndexOf("_footerUpdateIcon = new StackPanel", StringComparison.Ordinal);
         var versionIndex = source.IndexOf("_footerVersionText = new TextBlock", StringComparison.Ordinal);
-        Assert.True(updateIndex > 0 && checkIndex > 0 && versionIndex > 0,
+        Assert.True(iconIndex > 0 && versionIndex > 0,
             "Элементы подвала не найдены в MainWindow.Avalonia.cs");
-        Assert.True(updateIndex < checkIndex && checkIndex < versionIndex,
-            "Ссылки «Обновить»/«Проверить обновления» должны стоять СЛЕВА от версии (issue #116)");
+        Assert.True(iconIndex < versionIndex,
+            "Значок обновления должен стоять СЛЕВА от версии (issue #116)");
     }
 
     [Fact]
-    public void FooterRefreshState_BuildsExclamationPrefix()
+    public void FooterRefreshState_BuildsExclamationIndicator()
     {
-        // Индикатор «!! Обновить» при готовом обновлении (issue #116) — обе платформы.
-        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
-        Assert.Contains("\"!! \"", wpf);
+        // v1.0.1.50 (issue #116 п.3): при готовом обновлении значок меняется на
+        // жирные красные «!!!» (обе платформы).
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
+        Assert.Contains("FooterUpdateExclaim", wpf);
+        Assert.Contains("Text=\"!!!\"", wpf);
         Assert.Contains("DangerBrush", wpf);
 
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        Assert.Contains("\"!! \"", avalonia);
-        Assert.Contains("#DC2626", avalonia);
+        Assert.Contains("_footerUpdateExclaim", avalonia);
+        Assert.Contains("Text = \"!!!\"", avalonia);
+        Assert.Contains("\"DangerBrush\"", avalonia);
     }
 
     private static int CountOccurrences(string text, string pattern)
