@@ -43,6 +43,40 @@ public static class RunningInfobaseMatcher
     }
 
     /// <summary>
+    /// Issue #103 (v1.0.1.49): есть ли в командной строке ключ отладки <c>/DEBUG</c>.
+    /// Ключ без значения; должен стоять отдельным токеном (начало строки или
+    /// разделитель перед ним) и не быть префиксом другого ключа: «/DEBUGGER»,
+    /// «/DEBUG-KEY», «/debugkey» и прочие не считаются ключом /DEBUG.
+    /// Регистр не важен; также принимается форма «-DEBUG». Чистая функция,
+    /// покрыта юнит-тестами.
+    /// </summary>
+    public static bool HasDebugKey(string? commandLine)
+    {
+        var line = commandLine ?? string.Empty;
+        foreach (var prefix in new[] { "/", "-" })
+        {
+            var search = prefix + "DEBUG";
+            var i = 0;
+            while ((i = line.IndexOf(search, i, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                // Начало токена: начало строки, пробел/табуляция или кавычка перед ключом.
+                var tokenStart = i == 0
+                    || line[i - 1] == ' ' || line[i - 1] == '\t' || line[i - 1] == '"';
+                i += search.Length;
+                if (!tokenStart)
+                    continue;
+                // Конец токена: конец строки или разделитель — отсекает
+                // «/DEBUGGER», «/DEBUG-KEY» и прочие ключи-продолжения.
+                var tokenEnd = i >= line.Length
+                    || line[i] == ' ' || line[i] == '\t' || line[i] == '"';
+                if (tokenEnd)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Сопоставление по ключу /IBConnectionString (issue #103): при отладке из
     /// Конфигуратора клиент серверной базы запускается с полной строкой соединения
     /// вида «Srvr="host[:port]";Ref="имя";…» (файловая — «File="путь";…»), которую

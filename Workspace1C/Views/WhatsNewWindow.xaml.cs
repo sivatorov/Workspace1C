@@ -16,6 +16,7 @@ namespace Workspace1C
     public partial class WhatsNewWindow : Window
     {
         private readonly Models.AppSettings _settings;
+        private bool _githubFallbackLoaded;
 
         /// <param name="settings">Настройки профиля: читаются галкой, сохраняет вызывающий.</param>
         public WhatsNewWindow(Models.AppSettings settings)
@@ -39,6 +40,46 @@ namespace Workspace1C
                     TextWrapping = TextWrapping.Wrap,
                     Margin = new Thickness(0, 0, 0, 8)
                 });
+            }
+
+            if (notes is null)
+            {
+                // Issue #116 п.1: для версии без готовой сводки — fallback на body
+                // GitHub-релиза текущего тега (после показа окна, не в конструкторе).
+                Loaded += async (_, _) => await LoadGithubNotesAsync();
+            }
+        }
+
+        private async System.Threading.Tasks.Task LoadGithubNotesAsync()
+        {
+            if (_githubFallbackLoaded)
+                return;
+            _githubFallbackLoaded = true;
+            try
+            {
+                var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
+                if (string.IsNullOrWhiteSpace(body))
+                {
+                    NotesPanel.Children.Add(new TextBlock
+                    {
+                        Text = LocalizationManager.T("WhatsNew.NotesUnavailable"),
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        Opacity = 0.7
+                    });
+                    return;
+                }
+                NotesPanel.Children.Clear();
+                NotesPanel.Children.Add(new System.Windows.Controls.FlowDocumentScrollViewer
+                {
+                    Document = MarkdownRenderer.ToFlowDocument(body),
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Disabled
+                });
+            }
+            catch
+            {
+                // Сбой загрузки сводки не роняет диалог: остаётся пустой список и
+                // кнопка «Открыть CHANGELOG на GitHub».
             }
         }
 

@@ -669,6 +669,23 @@ public class ColorScheme
         return whiteContrast > blackContrast ? "#FFFFFF" : "#000000";
     }
 
+    /// <summary>
+    /// Issue #107 п.2: выбор цвета текста на акцентном фоне. Пользовательский цвет
+    /// «Текст на акцентном фоне» (TextOnAccentColor палитры схемы) имеет приоритет,
+    /// если его контраст к фактическому акценту ≥ 3:1; иначе — WCAG-фолбэк
+    /// (<see cref="ContrastTextHex"/>), сохраняющий исправление issue #26 для
+    /// тёмных пользовательских акцентов. <paramref name="customHex"/> = null/пустое
+    /// означает «пользователь цвет не задал» — сразу фолбэк. Чистая функция,
+    /// покрыта юнит-тестами.
+    /// </summary>
+    public static string ResolveTextOnAccentHex(string? customHex, string accentHex)
+    {
+        if (!string.IsNullOrWhiteSpace(customHex) && !string.IsNullOrWhiteSpace(accentHex)
+            && ContrastRatio(customHex, accentHex) >= 3.0)
+            return customHex;
+        return ContrastTextHex(accentHex);
+    }
+
     // ---- Точный RGB-HSV (единый источник для пикеров обеих платформ) ----
     // Раньше WPF и Avalonia конвертировали цвет собственными преобразованиями,
     // а каналы «усекались» при приведении к байту: из-за потери точности при

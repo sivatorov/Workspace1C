@@ -78,4 +78,34 @@ public static class WhatsNewService
 
     /// <summary>Максимум пунктов сводки одного релиза.</summary>
     private const int MaxItems = 10;
+
+    /// <summary>Кэш body GitHub-релиза текущей сессии (ключ — нормализованная версия).</summary>
+    private static readonly Dictionary<string, string> GithubBodyCache = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Issue #116 п.1: fallback «Что нового» — body GitHub-релиза текущей версии,
+    /// когда в <see cref="KnownVersions"/> нет готовой сводки. Тег ищется в двух
+    /// распространённых форматах («v1.0.1.49» и «1.0.1.49»). Успешный результат
+    /// кэшируется на время сессии; при любой ошибке возвращает null.
+    /// </summary>
+    public static async Task<string?> GetGithubReleaseNotesAsync(string version, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return null;
+        var normalized = Normalize(version);
+        if (GithubBodyCache.TryGetValue(normalized, out var cached))
+            return cached;
+
+        var service = new GitHubReleaseService();
+        foreach (var tag in new[] { "v" + version.Trim(), version.Trim() })
+        {
+            var notes = await service.GetReleaseNotesByTagAsync(tag, ct).ConfigureAwait(false);
+            var body = notes?.Body?.Trim();
+            if (string.IsNullOrWhiteSpace(body))
+                continue;
+            GithubBodyCache[normalized] = body;
+            return body;
+        }
+        return null;
+    }
 }

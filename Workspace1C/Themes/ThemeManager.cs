@@ -886,8 +886,10 @@ namespace Workspace1C.Themes
             // Текст на акцентных кнопках и плитках (issue #26): из палитры TextOnAccentColor
             // приходит фиксированный белый и теряет читаемость на тёмных акцентах
             // пользовательских схем (например #AF6B1D — белый даёт лишь 4.25:1).
-            // Пересчитываем по WCAG, как AccentTextBrush.
-            SetContrastBrush(dict, scheme, dark, "TextOnAccentBrush", "AccentColor");
+            // Issue #107 п.2: если пользователь явно задал цвет «Текст на акцентном
+            // фоне» и он читаем (контраст к акценту ≥ 3:1) — берём его как есть;
+            // иначе прежний WCAG-пересчёт (сохраняет исправление issue #26).
+            SetTextOnAccentBrush(dict, scheme, dark);
             // Текст на тёмных панелях (статус-бар, меню выбора окна): контраст по WCAG
             // к фактическому SidebarColor — SidebarBrush всегда тёмный, но пользовательская
             // схема может его осветлить (issue #26).
@@ -903,6 +905,26 @@ namespace Workspace1C.Themes
                 return;
             if (TryParseColor(ColorScheme.ContrastTextHex(hex), out var color))
                 dict[brushKey] = new SolidColorBrush(color);
+        }
+
+        /// <summary>
+        /// Issue #107 п.2: кисть текста на акцентном фоне. Пользовательский цвет
+        /// TextOnAccentColor (отличающийся от встроенного дефолта #FFFFFF, т.е. явно
+        /// заданный в настройках схемы) имеет приоритет при контрасте к фактическому
+        /// акценту ≥ 3:1; иначе прежний WCAG-пересчёт (фолбэк, сохраняющий
+        /// исправление issue #26 для тёмных акцентов).
+        /// </summary>
+        private static void SetTextOnAccentBrush(ResourceDictionary dict, ColorScheme scheme, bool dark)
+        {
+            var accentHex = scheme.PaletteValue(dark, "AccentColor");
+            if (string.IsNullOrWhiteSpace(accentHex) || !TryParseColor(accentHex, out _))
+                return;
+            var customHex = scheme.PaletteValue(dark, "TextOnAccentColor");
+            var isCustom = !string.IsNullOrWhiteSpace(customHex)
+                && !string.Equals(customHex.Trim(), "#FFFFFF", StringComparison.OrdinalIgnoreCase);
+            var chosen = ColorScheme.ResolveTextOnAccentHex(isCustom ? customHex : null, accentHex);
+            if (TryParseColor(chosen, out var color))
+                dict["TextOnAccentBrush"] = new SolidColorBrush(color);
         }
 
         private static bool TryParseColor(string hex, out Color color)

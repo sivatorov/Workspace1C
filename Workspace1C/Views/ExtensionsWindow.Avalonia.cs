@@ -59,6 +59,7 @@ namespace Workspace1C
             AvaloniaUi.Place(root, left, 0, 0);
 
             // ---- Справа ----
+            // Issue #117 п.3: панель списка расширений перенесена ВЫШЕ панели установки.
             var right = AvaloniaUi.Rows(0, 0, -1);
 
             var install = new StackPanel();
@@ -76,7 +77,7 @@ namespace Workspace1C
             useIbcmd.Margin = new Thickness(16, 0, 0, 0);
             install.Children.Add(AvaloniaUi.ButtonRow(installButton, useIbcmd));
             install.Children.Add(AvaloniaUi.Label("Extensions.InstallHint", 11));
-            AvaloniaUi.Place(right, AvaloniaUi.Card(install), 0);
+            AvaloniaUi.Place(right, AvaloniaUi.Card(install), 1);
 
             var listPanel = new StackPanel();
             listPanel.Children.Add(AvaloniaUi.Section("Extensions.ListSection"));
@@ -91,7 +92,7 @@ namespace Workspace1C
             foreach (var b in new[] { refresh, dump, delete })
                 b.Bind(IsEnabledProperty, new Binding(nameof(ExtensionsViewModel.IsIdle)));
             listPanel.Children.Add(AvaloniaUi.ButtonRow(refresh, dump, delete));
-            AvaloniaUi.Place(right, AvaloniaUi.Card(listPanel), 1);
+            AvaloniaUi.Place(right, AvaloniaUi.Card(listPanel), 0);
 
             AvaloniaUi.Place(right, AvaloniaUi.ReadOnlyText(nameof(ExtensionsViewModel.LogText)), 2);
             AvaloniaUi.Place(root, right, 0, 2);
@@ -107,6 +108,9 @@ namespace Workspace1C
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
+            // Issue #117 п.3: тихое получение списка расширений выбранной базы
+            // при открытии окна (fire-and-forget; ошибки гасятся внутри VM).
+            _ = _vm.PrefetchExtensionsAsync();
         }
 
         private static Control BuildTargetRow()

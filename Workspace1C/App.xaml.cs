@@ -334,6 +334,8 @@ namespace Workspace1C
                 var updateService = AppServices.GetRequiredService<UpdateService>();
                 var updateMode = settings.GetUpdateMode();
                 updateService.ApplyUpdateMode(updateMode);
+                // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений.
+                updateService.ApplyInterval(settings.UpdateCheckIntervalMinutes);
                 if (updateMode != AppUpdateMode.Manual)
                     CheckForUpdatesInBackground(updateService);
 

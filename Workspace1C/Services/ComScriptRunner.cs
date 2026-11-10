@@ -77,6 +77,9 @@ function S($o,$n,$v){[void][System.__ComObject].InvokeMember($n,$F::SetProperty,
 function M($o,$n){[System.__ComObject].InvokeMember($n,$F::InvokeMethod,$null,$o,[object[]]$args)}
 function Err($e){$x=$e.Exception;while($x.InnerException){$x=$x.InnerException};[string]$x.Message}
 function Out-R($o){$j=ConvertTo-Json -InputObject $o -Depth 6 -Compress;[Console]::Out.WriteLine('W1CRES '+[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($j)))}
+function N($o){try{$script:opErr='';if($null -eq $o){$script:opErr='object is null';return -1};if($o -isnot [System.__ComObject]){$script:opErr=('not a COM object: '+(OC $o));return -1};return [int](M $o 'Count')}catch{$script:opErr=(Err $_);return -1}}
+function Mt($o,$n){try{$script:opErr='';return (M $o $n @args)}catch{$script:opErr=(Err $_);return $null}}
+function OC($o){try{if($null -eq $o){return 'null'};return [string]$o.GetType().FullName}catch{return 'unknown'}}
 ";
 
     /// <summary>Запуск: подключение и диспетчеризация в <c>Invoke-Op</c>.</summary>

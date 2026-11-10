@@ -438,6 +438,43 @@ namespace Workspace1C
             updateModeRow.Children.Add(updateModeCombo);
             settingsBehavior.Children.Add(updateModeRow);
 
+            // Периодичность проверки обновлений (issue #116 п.2, v1.0.1.49): порядок
+            // вариантов совпадает с порядком AppSettings.UpdateCheckIntervals.
+            var updateIntervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+            var updateIntervalIcon = IconHelper.MakeIcon("IconRefresh", UiMetrics.Scaled(16),
+                Themes.ThemeBrushes.FromSpec("@SuccessBrush"));
+            updateIntervalIcon.Margin = new Thickness(0, 0, 8, 0);
+            updateIntervalIcon.VerticalAlignment = VerticalAlignment.Center;
+            updateIntervalRow.Children.Add(updateIntervalIcon);
+            var updateIntervalLabel = new TextBlock
+            {
+                Text = LocalizationManager.T("Settings.General.UpdateInterval"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            };
+            ThemeBrushes.Bind(updateIntervalLabel, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            updateIntervalRow.Children.Add(updateIntervalLabel);
+            var updateIntervalCombo = new ComboBox { MinWidth = 200, VerticalAlignment = VerticalAlignment.Center };
+            foreach (var intervalKey in new[]
+                     {
+                         "Settings.General.UpdateInterval.OnStartup",
+                         "Settings.General.UpdateInterval.Hourly",
+                         "Settings.General.UpdateInterval.SixHours",
+                         "Settings.General.UpdateInterval.Daily"
+                     })
+            {
+                updateIntervalCombo.Items.Add(new ComboBoxItem
+                {
+                    Content = new TextBlock { Text = LocalizationManager.T(intervalKey) }
+                });
+            }
+            var intervalIndex = Array.IndexOf(
+                Models.AppSettings.UpdateCheckIntervals, _viewModel.UpdateCheckIntervalMinutes);
+            updateIntervalCombo.SelectedIndex = intervalIndex < 0 ? 0 : intervalIndex;
+            ToolTip.SetTip(updateIntervalCombo, LocalizationManager.T("Settings.General.UpdateIntervalTooltip"));
+            updateIntervalRow.Children.Add(updateIntervalCombo);
+            settingsBehavior.Children.Add(updateIntervalRow);
+
             // Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
             // (первый пункт — «Основная») + кнопка открытия окна справочника.
             var itsAccountsContent = new StackPanel();
@@ -3585,12 +3622,19 @@ namespace Workspace1C
                     2 => "Priority",
                     _ => "X64"
                 });
+                // Периодичность проверки обновлений (issue #116 п.2): индекс → минуты;
+                // нет выбора — параметр не меняется (−1).
+                var updateIntervalMinutes = updateIntervalCombo.SelectedIndex >= 0
+                    ? Models.AppSettings.UpdateCheckIntervals[Math.Min(
+                        updateIntervalCombo.SelectedIndex, Models.AppSettings.UpdateCheckIntervals.Length - 1)]
+                    : -1;
                 _viewModel.ApplyBehaviorSettings(
                     multipleInstancesCheck.IsChecked == true,
                     rememberLayoutCheck.IsChecked == true,
                     updateModeCombo.SelectedIndex >= 0
                         ? (AppUpdateMode)updateModeCombo.SelectedIndex
-                        : AppUpdateMode.InstallOnStartup);
+                        : AppUpdateMode.InstallOnStartup,
+                    updateIntervalMinutes);
                 _viewModel.ApplyTraySettings(
                     trayIconCheck.IsChecked == true,
                     closeToTrayCheck.IsChecked == true,

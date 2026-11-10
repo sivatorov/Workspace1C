@@ -114,7 +114,8 @@ function Invoke-Op($c,$q){
 $sj=G $c 'ScheduledJobs'
 switch([string]$q.op){
 'list'{
-$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$list=New-Object System.Collections.ArrayList
+$arr=M $sj 'GetScheduledJobs';$n=N $arr;$list=New-Object System.Collections.ArrayList
+if($n -lt 0){return @{jobs=@();warn='nocount';what='ScheduledJobs.GetScheduledJobs';cls=(OC $arr);err=$script:opErr}}
 for($i=0;$i -lt $n;$i++){[void]$list.Add((JInfo $c (M $arr 'Get' $i)))}
 return @{jobs=$list}}
 'setuse'{
@@ -124,7 +125,8 @@ $ch=0;if([bool](G $j 'Use') -ne [bool]$q.use){S $j 'Use' ([bool]$q.use);[void](M
 return @{found=$true;changed=$ch}}
 'setall'{
 $keep=@($q.keep|ForEach-Object{[string]$_})
-$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$ch=0;$errs=New-Object System.Collections.ArrayList
+$arr=M $sj 'GetScheduledJobs';$n=N $arr;$ch=0;$errs=New-Object System.Collections.ArrayList
+if($n -lt 0){[void]$errs.Add(@{index=-1;error=('nocount: '+(OC $arr)+': '+$script:opErr)});return @{changed=0;total=0;errors=$errs}}
 for($i=0;$i -lt $n;$i++){
 try{$j=M $arr 'Get' $i;$name=[string](G (G $j 'Metadata') 'Name')
 if($keep -contains $name){continue}
@@ -132,7 +134,8 @@ if([bool](G $j 'Use') -ne [bool]$q.use){S $j 'Use' ([bool]$q.use);[void](M $j 'W
 catch{[void]$errs.Add(@{index=$i;error=(Err $_)})}}
 return @{changed=$ch;total=$n;errors=$errs}}
 'verify'{
-$arr=M $sj 'GetScheduledJobs';$n=M $arr 'Count';$en=0;$errs=New-Object System.Collections.ArrayList
+$arr=M $sj 'GetScheduledJobs';$n=N $arr;$en=0;$errs=New-Object System.Collections.ArrayList
+if($n -lt 0){[void]$errs.Add(@{index=-1;error=('nocount: '+(OC $arr)+': '+$script:opErr)});return @{enabled=0;total=0;errors=$errs}}
 for($i=0;$i -lt $n;$i++){
 try{if([bool](G (M $arr 'Get' $i) 'Use')){$en++}}catch{[void]$errs.Add(@{index=$i;error=(Err $_)})}}
 return @{enabled=$en;total=$n;errors=$errs}}

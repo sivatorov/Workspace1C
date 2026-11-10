@@ -2749,10 +2749,31 @@ public partial class MainViewModel : ViewModelBase
         // Отбор «Только запущенные» (issue #339): настраиваемая горячая клавиша.
         string? hotkeyShowRunning = null,
         // «Собрать диагностику» (issue #99, v1.0.1.23): настраиваемая горячая клавиша.
-        string? hotkeyCollectDiagnostics = null)
+        string? hotkeyCollectDiagnostics = null,
+        int updateCheckIntervalMinutes = -1)
     {
         _allowMultipleInstances = allowMultipleInstances;
         _updateMode = updateMode;
+        // issue #116 п.2 (v1.0.1.49): периодичность проверки обновлений (минуты);
+        // -1 — параметр не задан (старые вызовы), значение не менять.
+        if (updateCheckIntervalMinutes >= 0)
+        {
+            _updateCheckIntervalMinutes = AppSettings.NormalizeUpdateInterval(updateCheckIntervalMinutes);
+            OnPropertyChanged(nameof(UpdateCheckIntervalMinutes));
+        }
+        // issue #116 (и п.2 v1.0.1.49): режим и периодичность применяются к службе
+        // обновления сразу — кнопка «Проверить обновления» обслуживается тем же
+        // экземпляром, без перезапуска приложения.
+        try
+        {
+            var updateService = AppServices.GetRequiredService<UpdateService>();
+            updateService.ApplyUpdateMode(updateMode);
+            updateService.ApplyInterval(_updateCheckIntervalMinutes);
+        }
+        catch
+        {
+            // Служба обновления недоступна — применится при следующем запуске.
+        }
         _showTagFilterPanel = showTagFilterPanel;
         _closeToTray = closeToTray;
         _showTrayIcon = showTrayIcon;

@@ -172,13 +172,22 @@ public sealed class ConfigExtensionServiceTests
         Assert.Equal(2, vm.CheckedTargets.Count);
     }
 
+    /// <summary>
+    /// Issue #117 п.2 (v1.0.1.49): имя расширения перезаполняется при КАЖДОМ выборе
+    /// файла, пока пользователь не ввёл имя вручную (см. V100149IssuesTests —
+    /// ручное имя не затирается).
+    /// </summary>
     [Fact]
-    public void ViewModel_CfePathSuggestsNameOnce()
+    public void ViewModel_CfePathRewritesSuggestedNameOnEveryFileChoice()
     {
         var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
         vm.CfePath = "/x/Первое.cfe";
         Assert.Equal("Первое", vm.ExtensionName);
         vm.CfePath = "/x/Второе.cfe";
-        Assert.Equal("Первое", vm.ExtensionName);
+        Assert.Equal("Второе", vm.ExtensionName);
+        // Повторный выбор того же файла после очистки имени перезаполняет его.
+        vm.ExtensionName = "";
+        vm.CfePath = "/x/Второе.cfe";
+        Assert.Equal("Второе", vm.ExtensionName);
     }
 }

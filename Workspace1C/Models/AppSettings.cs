@@ -411,6 +411,14 @@ public class AppSettings
     public string UpdateMode { get; set; } = string.Empty;
 
     /// <summary>
+    /// Периодичность фоновой проверки обновлений в минутах (issue #116 п.2, v1.0.1.49):
+    /// 0 — проверка только при запуске и вручную (значение по умолчанию); 60 — каждый час;
+    /// 360 — каждые 6 часов; 1440 — раз в сутки. Некорректные значения сбрасываются
+    /// в 0 при загрузке (<see cref="NormalizeUpdateInterval"/>).
+    /// </summary>
+    public int UpdateCheckIntervalMinutes { get; set; } = 0;
+
+    /// <summary>
     /// Версия приложения, пропущенная пользователем кнопкой «Пропустить эту версию»
     /// в диалоге обновления (issue #116). Пусто — ничего не пропущено. Пропуск
     /// сам перестаёт действовать, когда выйдет более новая версия (сравнение по
@@ -1272,6 +1280,19 @@ public class AppSettings
         // issue #116: режим обновления — миграция из устаревших флагов
         // CheckForUpdatesOnStartup/AutoUpdateEnabled при отсутствии поля.
         NormalizeUpdateMode();
+
+        // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений —
+        // некорректное значение (не из списка интервалов) сбрасывается в 0.
+        UpdateCheckIntervalMinutes = NormalizeUpdateInterval(UpdateCheckIntervalMinutes);
     }
+
+    /// <summary>Допустимые интервалы фоновой проверки обновлений в минутах
+    /// (issue #116 п.2): только при запуске (0), час, 6 часов, сутки.</summary>
+    public static readonly int[] UpdateCheckIntervals = { 0, 60, 360, 1440 };
+
+    /// <summary>Приводит интервал проверки обновлений (в минутах) к допустимому
+    /// значению; прочие значения (в т.ч. отрицательные) → 0 (только при запуске).</summary>
+    public static int NormalizeUpdateInterval(int minutes) =>
+        Array.IndexOf(UpdateCheckIntervals, minutes) >= 0 ? minutes : 0;
 
 }

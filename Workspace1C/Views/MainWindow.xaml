@@ -1931,10 +1931,19 @@
                                                             </Style>
                                                         </materialDesign:PackIcon.Style>
                                                     </materialDesign:PackIcon>
-                                                </Border>
-                                                <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
-                                                        VerticalAlignment="Center"
-                                                        Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
+                                                    </Border>
+                                                    <!-- Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный
+                                                         квадрат WarningBrush (#F59E0B в тёмной палитре, см. также
+                                                         Infobase.EnterpriseDebugMarkerHex) рядом с чипом «Предприятие».
+                                                         НЕ красный — красный остался признаком «не отвечает». Виден,
+                                                         когда хотя бы один Enterprise-процесс базы запущен с /DEBUG. -->
+                                                    <Rectangle Width="7" Height="7" RadiusX="1" RadiusY="1" Fill="{DynamicResource WarningBrush}"
+                                                               VerticalAlignment="Center" Margin="3,0,0,0"
+                                                               ToolTip="{loc:Loc Infobase.DebugRunningTooltip}"
+                                                               Visibility="{Binding IsEnterpriseDebugRunning, Converter={StaticResource BoolToVis}}"/>
+                                                    <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
+                                                            VerticalAlignment="Center"
+                                                            Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>

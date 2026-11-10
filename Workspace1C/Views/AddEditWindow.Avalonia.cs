@@ -2,6 +2,7 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Workspace1C.Localization;
@@ -106,7 +107,11 @@ namespace Workspace1C
             content.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(36)));
             content.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
 
-            var iconBlock = IconHelper.MakeIcon(iconKey, 24, "AccentColorBrush");
+            // Issue #107 п.1 (v1.0.1.49): значок и описание следуют Foreground карточки —
+            // на акцентной заливке выбранного варианта акцентный значок был бы невидим.
+            var iconBlock = IconHelper.MakeIcon(iconKey, 24, out var iconPath);
+            iconPath.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
+                new Binding(nameof(RadioButton.Foreground)) { Source = radio });
             Grid.SetColumn(iconBlock, 0);
             content.Children.Add(iconBlock);
 
@@ -116,9 +121,11 @@ namespace Workspace1C
             {
                 Text = description,
                 TextWrapping = TextWrapping.Wrap,
-                FontSize = 12
+                FontSize = 12,
+                Opacity = 0.85
             };
-            Themes.ThemeBrushes.Bind(descriptionBlock, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            descriptionBlock.Bind(TextBlock.ForegroundProperty,
+                new Binding(nameof(RadioButton.Foreground)) { Source = radio });
             textPanel.Children.Add(descriptionBlock);
             Grid.SetColumn(textPanel, 1);
             content.Children.Add(textPanel);

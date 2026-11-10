@@ -148,6 +148,10 @@ public partial class MainViewModel : ViewModelBase
     /// «загружать с предложением установки», «только уведомлять» или «вручную».</summary>
     public AppUpdateMode UpdateMode => _updateMode;
 
+    /// <summary>Периодичность фоновой проверки обновлений в минутах (issue #116 п.2):
+    /// 0 — только при запуске и вручную; 60 — час; 360 — 6 часов; 1440 — сутки.</summary>
+    public int UpdateCheckIntervalMinutes => _updateCheckIntervalMinutes;
+
     /// <summary>Выбранные теги для фильтра (можно несколько одновременно).</summary>
     public ObservableCollection<string> ActiveTagFilters => _activeTagFilters;
 

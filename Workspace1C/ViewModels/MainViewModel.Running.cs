@@ -101,6 +101,11 @@ public partial class MainViewModel
                 ib.IsEnterpriseRunning = running && enterpriseProcesses.Count > 0;
                 ib.IsConfiguratorRunning = running && configuratorProcesses.Count > 0;
 
+                // Issue #103 (v1.0.1.49): маркер отладки — хотя бы один Enterprise-процесс
+                // базы запущен с ключом /DEBUG (свой сеанс; см. ограничение в issue).
+                ib.IsEnterpriseDebugRunning = ib.IsEnterpriseRunning &&
+                    enterpriseProcesses.Any(p => RunningInfobaseMatcher.HasDebugKey(p.CommandLine));
+
                 // issue #101: зависание считается ПО РЕЖИМАМ раздельно — зависший
                 // Конфигуратор красит только свой чип, Предприятие остаётся зелёным
                 // (и наоборот). Общий флаг/счётчик (точка у имени базы) сохраняет

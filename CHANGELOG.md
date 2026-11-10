@@ -11,6 +11,104 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.49] — 2026-11-10
+
+### Исправлено
+
+- **Ошибка «Не найден метод System.__ComObject.Count» при работе через COM-коннектор
+  (issue #118).** Все операции с COM-коннектором выполняются во внешнем PowerShell-скрипте
+  ([`ComScriptRunner.cs`](Workspace1C/Services/ComScriptRunner.cs)), где вызов `Count` на
+  коллекции 1С выполнялся безусловно — на некоторых версиях платформы/вариантах коннектора
+  V82/V83 у возвращённого объекта метода нет, и вся операция падала. Добавлены безопасные
+  помощники Prelude (безопасный подсчёт элементов и вызов методов с диагностикой); тела
+  операций «Пользователи информационных баз…»
+  ([`InfobaseUsersService.cs`](Workspace1C/Services/InfobaseUsersService.cs)) и
+  «Регламентные задания ИБ…» ([`ScheduledJobsService.cs`](Workspace1C/Services/ScheduledJobsService.cs))
+  переведены на них: отсутствие `Count` больше не падает, а возвращает понятный ответ
+  с диагностикой. Поведение на «нормальных» платформах не меняется. Покрыто тестами
+  ([`V100149IssuesTests.cs`](Workspace1C.Tests/V100149IssuesTests.cs)).
+- **Автозаполнение имени расширения при выборе файла (issue #117 п.2).** В окне
+  «Расширения конфигурации» имя подставлялось только в пустое поле — при повторном выборе
+  другого `.cfe` оставалось старое имя. Теперь имя перезаполняется при каждом выборе
+  файла, пока пользователь не ввёл его вручную (флаг ручного редактирования в
+  [`ExtensionsViewModel.cs`](Workspace1C/ViewModels/ExtensionsViewModel.cs)); выбор файла
+  в WPF ([`ExtensionsWindow.cs`](Workspace1C/Views/ExtensionsWindow.cs)) и Avalonia
+  ([`ExtensionsWindow.Avalonia.cs`](Workspace1C/Views/ExtensionsWindow.Avalonia.cs))
+  идёт через сеттер VM. Тесты: [`ConfigExtensionServiceTests.cs`](Workspace1C.Tests/ConfigExtensionServiceTests.cs),
+  [`V100149IssuesTests.cs`](Workspace1C.Tests/V100149IssuesTests.cs).
+- **Защита от повторной установки уже установленного расширения (issue #117 п.4).**
+  Перед пакетной установкой отмеченные базы проверяются на наличие расширения с тем же
+  именем ([`ExtensionsViewModel.cs`](Workspace1C/ViewModels/ExtensionsViewModel.cs)):
+  в журнал выводится план («установка» / «уже установлено — будет обновлено») до начала
+  работ; для уже установленных имён сравнение без учёта регистра. Повторная установка
+  легитимна (LoadCfg -Extension = обновление), поэтому операция не блокируется,
+  а помечается.
+- **Окно «Что нового» больше не пустое после установки обновления (issue #116 п.1).**
+  После обновления сводка была захардкожена только для старой версии, и клик по версии
+  в статус-баре открывал пустое окно. Теперь при отсутствии готовой сводки
+  ([`WhatsNewService.cs`](Workspace1C/Services/WhatsNewService.cs)) текст берётся
+  из GitHub-релиза текущей версии (markdown-body через [`GitHubReleaseService.cs`](Workspace1C/Services/GitHubReleaseService.cs)
+  и [`MarkdownRenderer.cs`](Workspace1C/Services/MarkdownRenderer.cs)) — на WPF
+  ([`WhatsNewWindow.xaml.cs`](Workspace1C/Views/WhatsNewWindow.xaml.cs)) и Avalonia
+  ([`WhatsNewWindow.Avalonia.cs`](Workspace1C/Views/WhatsNewWindow.Avalonia.cs));
+  при сетевой ошибке окно остаётся отзывчивым, с кнопкой «CHANGELOG на GitHub».
+- **Пользовательский цвет «Текст на акцентном фоне» снова работает (issue #107 п.2).**
+  Кисть `TextOnAccentBrush` пересчитывалась по WCAG безусловно, перетирая пользовательский
+  цвет из палитры схемы — настройка не имела эффекта. Теперь явное пользовательское
+  значение применяется, если контраст к фактическому акценту ≥ 3:1; иначе сохранён
+  WCAG-фолбэк (исправление issue #26 для тёмных акцентов) — чистая функция выбора цвета
+  [`ColorScheme.ResolveTextOnAccentHex`](Workspace1C/Models/ColorScheme.cs) в обоих
+  ThemeManager ([`ThemeManager.cs`](Workspace1C/Themes/ThemeManager.cs) и
+  [`ThemeManager.Avalonia.cs`](Workspace1C/Themes/ThemeManager.Avalonia.cs)), синхронно
+  с предпросмотром схем. Тесты: [`Issue107AddWindowTests.cs`](Workspace1C.Tests/Issue107AddWindowTests.cs).
+
+### Добавлено
+
+- **Настраиваемая периодичность проверки обновлений (issue #116 п.2).** В настройках
+  появился выбор интервала фоновой проверки: «только при запуске» (как раньше), «каждый
+  час», «каждые 6 часов», «раз в сутки» (`UpdateCheckIntervalMinutes` в
+  [`AppSettings.cs`](Workspace1C/Models/AppSettings.cs) с нормализацией; таймер в
+  [`UpdateService.cs`](Workspace1C/Services/UpdateService.cs) и
+  [`UpdateService.Avalonia.cs`](Workspace1C/Services/UpdateService.Avalonia.cs) — только
+  в режимах, кроме «Проверять вручную», и без повторных уведомлений/установок при уже
+  найденном релизе). UI: WPF [`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml)
+  и Avalonia [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs);
+  локализация ru/en. Тесты: [`V100149IssuesTests.cs`](Workspace1C.Tests/V100149IssuesTests.cs).
+- **Акцентная кнопка «Добавить базу» и акцентная заливка выбранной карточки
+  (issue #107 п.1).** Выбранная карточка окна добавления базы снова заливается акцентом
+  с текстом/значком `TextOnAccentBrush` (рамка акцентом 2px сохранена): WPF
+  ([`AddEditWindow.xaml`](Workspace1C/Views/AddEditWindow.xaml)) и Avalonia
+  ([`Controls.axaml`](Workspace1C/Themes/Controls.axaml)); кнопка меню добавления баз в
+  Avalonia переведена на акцентную заливку
+  ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Читаемость обеспечивает доработка п.2: пользовательский «Текст на акцентном фоне»
+  с достаточным контрастом применяется как есть. Сторож-тесты обновлены:
+  [`Issue107AddWindowTests.cs`](Workspace1C.Tests/Issue107AddWindowTests.cs).
+- **Янтарный маркер-квадрат для баз, запущенных под отладкой (issue #103).** Рядом со
+  значком запущенного «Предприятия» появился квадрат цвета `#F59E0B` (не красный —
+  красный остался признаком «не отвечает»), когда процесс Предприятия запущен с ключом
+  `/DEBUG`: детект ключа [`RunningInfobaseMatcher.HasDebugKey`](Workspace1C/Services/RunningInfobaseMatcher.cs)
+  с защитой от ложных срабатываний (`/DEBUG-KEY` и т.п.), свойство
+  `IsEnterpriseDebugRunning` в [`Infobase.cs`](Workspace1C/Models/Infobase.cs), чипы на
+  WPF ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml)) и Avalonia
+  ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Ограничение: обнаруживается только отладка своего сеанса (ключ виден в командной
+  строке процесса); отладка, подцепленная другим сеансом, платформа не показывает.
+  Тесты: [`V100149IssuesTests.cs`](Workspace1C.Tests/V100149IssuesTests.cs),
+  [`RunningInfobaseMatcherTests.cs`](Workspace1C.Tests/RunningInfobaseMatcherTests.cs).
+- **Список расширений перенесён наверх и загружается заранее (issue #117 п.3).**
+  В окне «Расширения конфигурации» панель «Список расширений выбранной базы» размещена
+  выше панели установки (WPF [`ExtensionsWindow.cs`](Workspace1C/Views/ExtensionsWindow.cs),
+  Avalonia [`ExtensionsWindow.Avalonia.cs`](Workspace1C/Views/ExtensionsWindow.Avalonia.cs)),
+  а список получается автоматически при открытии окна и при смене базы
+  (`PrefetchExtensionsAsync` в [`ExtensionsViewModel.cs`](Workspace1C/ViewModels/ExtensionsViewModel.cs))
+  — вручную обновлять больше не требуется.
+
+> Примечание: issue #117 п.1 (флажки свойств расширения «Безопасный режим», «Защита»,
+> «Активно», «Используется», «Роли» и поле «Назначение») отложено — пакетный режим
+> Конфигуратора и ibcmd не позволяют задавать эти свойства; единственный программный
+> способ — COM-объектная модель (Windows-only), отслеживается как отдельная задача.
+
 ## [1.0.1.48] — 2026-11-09
 
 ### Добавлено

@@ -66,6 +66,9 @@ public partial class MainViewModel : ViewModelBase
     // issue #116: единый режим обновления вместо пары флагов
     // CheckForUpdatesOnStartup/AutoUpdateEnabled.
     private AppUpdateMode _updateMode = AppUpdateMode.InstallOnStartup;
+    // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений, минуты
+    // (0 — только при запуске и вручную).
+    private int _updateCheckIntervalMinutes;
     /// <summary>Тема приложения следует за режимом ОС (issue #108, Windows).</summary>
     private bool _themeFollowsOs;
     /// <summary>Признак подписки наблюдателя режима ОС (issue #108).</summary>
@@ -507,6 +510,8 @@ public partial class MainViewModel : ViewModelBase
         // issue #116: режим обновления (миграция из старых флагов уже выполнена
         // в AppSettings.NormalizeForLoad).
         _updateMode = settings.GetUpdateMode();
+        // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений.
+        _updateCheckIntervalMinutes = AppSettings.NormalizeUpdateInterval(settings.UpdateCheckIntervalMinutes);
         // Правка структуры меню «Утилиты» (issue #374): по умолчанию выключена —
         // меню строится по стандартной компоновке (обратная совместимость).
         _utilitiesMenuEditingEnabled = settings.UtilitiesMenuEditingEnabled;

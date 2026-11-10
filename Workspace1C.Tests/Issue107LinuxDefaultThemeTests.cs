@@ -57,9 +57,12 @@ public sealed class Issue107LinuxDefaultThemeTests
         Assert.Contains("\"RepeatButtonForegroundPointerOver\",", code, StringComparison.Ordinal);
         Assert.Contains("\"RepeatButtonForegroundPressed\")", code, StringComparison.Ordinal);
         // Акцентные кнопки Fluent: фиксированный белый Fluent заменяется контрастом
-        // по WCAG к фактическому акценту (как TextOnAccentBrush).
+        // к фактическому акценту (как TextOnAccentBrush). С v1.0.1.49 (issue #107 п.2)
+        // выбор цвета — через ResolveOnAccentHex: пользовательский TextOnAccentColor
+        // при контрасте ≥ 3:1, иначе WCAG.
         Assert.Contains("\"AccentButtonForeground\",", code, StringComparison.Ordinal);
-        Assert.Contains("ColorScheme.ContrastTextHex(accentHex)", code, StringComparison.Ordinal);
+        Assert.Contains("ResolveOnAccentHex(", code, StringComparison.Ordinal);
+        Assert.Contains("ColorScheme.ResolveTextOnAccentHex(", code, StringComparison.Ordinal);
         // Disabled-варианты не перекрываются (приглушённый Fluent читаем в обеих темах).
         Assert.DoesNotContain("ButtonForegroundDisabled", code, StringComparison.Ordinal);
         Assert.DoesNotContain("ToggleButtonForegroundDisabled", code, StringComparison.Ordinal);

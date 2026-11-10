@@ -55,15 +55,18 @@ $ibu=G $c 'InfoBaseUsers'
 $md=G $c 'Metadata';$rs=G $md 'Roles'
 switch([string]$q.op){
 'list'{
-$arr=M $ibu 'GetUsers';$n=M $arr 'Count';$list=New-Object System.Collections.ArrayList
+$arr=M $ibu 'GetUsers';$n=N $arr;$list=New-Object System.Collections.ArrayList
+if($n -lt 0){return @{users=@();roles=@();warn='nocount';what='InfoBaseUsers.GetUsers';cls=(OC $arr);err=$script:opErr}}
 for($i=0;$i -lt $n;$i++){[void]$list.Add((UInfo (M $arr 'Get' $i)))}
-$rn=M $rs 'Count';$roles=New-Object System.Collections.ArrayList
+$rn=N $rs;$roles=New-Object System.Collections.ArrayList
+if($rn -lt 0){return @{users=$list;roles=@();warn='nocount';what='Metadata.Roles';cls=(OC $rs);err=$script:opErr}}
 for($i=0;$i -lt $rn;$i++){[void]$roles.Add([string](G (M $rs 'Get' $i) 'Name'))}
 return @{users=$list;roles=$roles}}
 'roles'{
 $u=FindU $ibu $q.name;if($null -eq $u){return @{found=$false;roles=@()}}
-$ur=G $u 'Roles';$rn=M $rs 'Count';$roles=New-Object System.Collections.ArrayList
-for($i=0;$i -lt $rn;$i++){$r=M $rs 'Get' $i;if(M $ur 'Contains' $r){[void]$roles.Add([string](G $r 'Name'))}}
+$ur=G $u 'Roles';$rn=N $rs;$roles=New-Object System.Collections.ArrayList
+if($rn -lt 0){return @{found=$true;roles=@();warn='nocount';what='Metadata.Roles';cls=(OC $rs);err=$script:opErr}}
+for($i=0;$i -lt $rn;$i++){$r=M $rs 'Get' $i;$has=$false;try{$has=[bool](M $ur 'Contains' $r)}catch{$has=$false};if($has){[void]$roles.Add([string](G $r 'Name'))}}
 return @{found=$true;roles=$roles}}
 'upsert'{
 $u=FindU $ibu $q.name;$created=$false
@@ -77,7 +80,7 @@ S $u 'ShowInList' ([bool]$q.show)
 $ur=G $u 'Roles'
 if($q.replaceRoles){[void](M $ur 'Clear')}
 $missing=New-Object System.Collections.ArrayList
-foreach($name in @($q.roles)){if([string]::IsNullOrEmpty([string]$name)){continue};$r=M $rs 'Find' ([string]$name);if($null -eq $r -or $r -isnot [System.__ComObject]){[void]$missing.Add([string]$name)}elseif(-not (M $ur 'Contains' $r)){[void](M $ur 'Add' $r)}}
+foreach($name in @($q.roles)){if([string]::IsNullOrEmpty([string]$name)){continue};$r=M $rs 'Find' ([string]$name);if($null -eq $r -or $r -isnot [System.__ComObject]){[void]$missing.Add([string]$name)}else{$has=$false;try{$has=[bool](M $ur 'Contains' $r)}catch{$has=$false};if(-not $has){[void](M $ur 'Add' $r)}}}
 [void](M $u 'Write')
 return @{created=$created;missingRoles=$missing}}
 'password'{

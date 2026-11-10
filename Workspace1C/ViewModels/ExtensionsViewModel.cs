@@ -18,6 +18,8 @@ public sealed class ExtensionsViewModel : ViewModelBase
     private string _searchText = string.Empty;
     private string _cfePath = string.Empty;
     private string _extensionName = string.Empty;
+    // Issue #117 п.2: пользователь вручную правил имя расширения — автоподстановка не перезаписывает его.
+    private bool _extensionNameEdited;
     private string? _selectedExtension;
     private ExtensionTargetRow? _selectedTarget;
     private bool _isBusy;
@@ -75,6 +77,9 @@ public sealed class ExtensionsViewModel : ViewModelBase
                 Extensions.Clear();
                 SelectedExtension = null;
                 OnPropertyChanged(nameof(SelectedBaseText));
+                // Issue #117 п.3: список расширений получается заранее при смене базы
+                // (тихо, без «Обновить»-лога; IsBusy защищает от гонок и двойного запуска).
+                _ = PrefetchExtensionsAsync();
             }
         }
     }
@@ -88,7 +93,13 @@ public sealed class ExtensionsViewModel : ViewModelBase
         get => _cfePath;
         set
         {
-            if (SetProperty(ref _cfePath, value ?? string.Empty) && string.IsNullOrWhiteSpace(_extensionName))
+            // Issue #117 п.2: имя автоподставляется при КАЖДОМ выборе файла (перезаписывает
+            // предыдущее), если пользователь не вводил имя вручную после последнего выбора.
+            // Повторный выбор того же файла после очистки имени тоже перезаполняет его,
+            // поэтому при неизменившемся пути проверяем только флаг ручного ввода.
+            if (!SetProperty(ref _cfePath, value ?? string.Empty) && _extensionNameEdited)
+                return;
+            if (!_extensionNameEdited)
                 ExtensionName = ConfigExtensionService.SuggestName(_cfePath);
         }
     }
@@ -96,7 +107,17 @@ public sealed class ExtensionsViewModel : ViewModelBase
     public string ExtensionName
     {
         get => _extensionName;
-        set => SetProperty(ref _extensionName, value ?? string.Empty);
+        set
+        {
+            var v = value ?? string.Empty;
+            if (!SetProperty(ref _extensionName, v))
+                return;
+            // Ручным вводом считаем любое непустое имя, отличное от автоподстановки
+            // для текущего файла (и выбор расширения из списка). Очистка поля
+            // пользователем снимает признак ручного редактирования.
+            _extensionNameEdited = v.Length > 0 &&
+                !string.Equals(v, ConfigExtensionService.SuggestName(_cfePath), StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     public string? SelectedExtension
@@ -172,16 +193,42 @@ public sealed class ExtensionsViewModel : ViewModelBase
         return _cts.Token;
     }
 
-    /// <summary>Читает список расширений выбранной базы.</summary>
-    public async Task RefreshExtensionsAsync()
+    /// <summary>Читает список расширений выбранной базы (кнопка «Обновить»).</summary>
+    public Task RefreshExtensionsAsync()
+    {
+        if (IsBusy || _selectedTarget is null)
+            return Task.CompletedTask;
+        return ListCoreAsync(quiet: false);
+    }
+
+    /// <summary>
+    /// Issue #117 п.3: тихое получение списка расширений выбранной базы заранее
+    /// (при открытии окна и при смене базы). Ошибки не прерывают работу окна —
+    /// пользователь может нажать «Обновить» и увидеть полный журнал.
+    /// </summary>
+    public async Task PrefetchExtensionsAsync()
     {
         if (IsBusy || _selectedTarget is null)
             return;
-        var row = _selectedTarget;
+        try
+        {
+            await ListCoreAsync(quiet: true);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            AppendLog(string.Format(LocalizationManager.T("Extensions.LogPrefetchFailed"), ex.Message));
+        }
+    }
+
+    private async Task ListCoreAsync(bool quiet)
+    {
+        var row = _selectedTarget!;
         var token = BeginOperation();
         try
         {
-            AppendLog(string.Format(LocalizationManager.T("Extensions.LogListing"), row.Name));
+            if (!quiet)
+                AppendLog(string.Format(LocalizationManager.T("Extensions.LogListing"), row.Name));
             var result = await ConfigExtensionService.ListAsync(row.Infobase, token);
             Extensions.Clear();
             if (!result.Success)
@@ -191,9 +238,10 @@ public sealed class ExtensionsViewModel : ViewModelBase
             }
             foreach (var name in ConfigExtensionService.ParseList(result.Log))
                 Extensions.Add(name);
-            AppendLog(Extensions.Count == 0
-                ? LocalizationManager.T("Extensions.LogNoExtensions")
-                : string.Format(LocalizationManager.T("Extensions.LogFound"), Extensions.Count, string.Join(", ", Extensions)));
+            if (!quiet)
+                AppendLog(Extensions.Count == 0
+                    ? LocalizationManager.T("Extensions.LogNoExtensions")
+                    : string.Format(LocalizationManager.T("Extensions.LogFound"), Extensions.Count, string.Join(", ", Extensions)));
         }
         finally
         {
@@ -227,6 +275,12 @@ public sealed class ExtensionsViewModel : ViewModelBase
         {
             foreach (var row in _allTargets)
                 if (row.IsChecked) row.Status = LocalizationManager.T("Extensions.StatusQueued");
+
+            // Issue #117 п.4: перед установкой (только ветка конфигуратора — у ibcmd список
+            // расширений дёшево не получить) тихо читаем установленные расширения каждой
+            // отмеченной базы и показываем план: «установка» или «уже установлено — обновление».
+            if (!UseIbcmd)
+                await MarkAlreadyInstalledAsync(targets, token);
 
             foreach (var row in targets)
             {
@@ -278,6 +332,43 @@ public sealed class ExtensionsViewModel : ViewModelBase
             return DesignerCommandResult.Fail(LocalizationManager.T("Extensions.FileNotFound"));
         var r = await IbcmdService.InstallExtensionAsync(infobase, CfePath, ExtensionName, token);
         return new DesignerCommandResult { Success = r.Success, ExitCode = r.ExitCode, Log = r.Output, Error = r.Error };
+    }
+
+    /// <summary>
+    /// Issue #117 п.4: для каждой отмеченной базы тихо получает список установленных
+    /// расширений и помечает строки/журнал для имён, которые уже установлены
+    /// (сравнение OrdinalIgnoreCase). Сбой чтения не блокирует установку —
+    /// в журнале появляется предупреждение.
+    /// </summary>
+    private async Task MarkAlreadyInstalledAsync(IReadOnlyList<ExtensionTargetRow> targets, CancellationToken token)
+    {
+        foreach (var row in targets)
+        {
+            if (token.IsCancellationRequested)
+                break;
+            IReadOnlyList<string> installed;
+            try
+            {
+                var listResult = await ConfigExtensionService.ListAsync(row.Infobase, token);
+                installed = listResult.Success
+                    ? ConfigExtensionService.ParseList(listResult.Log)
+                    : new List<string>();
+                if (!listResult.Success)
+                    AppendLog(string.Format(LocalizationManager.T("Extensions.LogPreflightFailed"),
+                        row.Name, listResult.Error ?? LocalizationManager.T("Extensions.Failed")));
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                AppendLog(string.Format(LocalizationManager.T("Extensions.LogPreflightFailed"), row.Name, ex.Message));
+                continue;
+            }
+            if (installed.Contains(ExtensionName, StringComparer.OrdinalIgnoreCase))
+            {
+                row.Status = LocalizationManager.T("Extensions.StatusAlreadyInstalled");
+                AppendLog(string.Format(LocalizationManager.T("Extensions.LogAlreadyInstalled"), ExtensionName, row.Name));
+            }
+        }
     }
 
     /// <summary>Выгружает выбранное расширение выбранной базы в файл.</summary>

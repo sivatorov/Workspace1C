@@ -574,8 +574,10 @@ namespace Workspace1C.Themes
             // Текст на акцентных кнопках и плитках (issue #26): из палитры TextOnAccentColor
             // приходит фиксированный белый и теряет читаемость на тёмных акцентах
             // пользовательских схем (например #AF6B1D — белый даёт лишь 4.25:1).
-            // Пересчитываем по WCAG, как AccentTextBrush.
-            SetContrastBrush(app, scheme, dark, "TextOnAccentBrush", "AccentColor");
+            // Issue #107 п.2: если пользователь явно задал цвет «Текст на акцентном
+            // фоне» и он читаем (контраст к акценту ≥ 3:1) — берём его как есть;
+            // иначе прежний WCAG-пересчёт (сохраняет исправление issue #26).
+            SetTextOnAccentBrush(app, scheme, dark);
             // Текст на тёмных панелях (статус-бар, меню выбора окна): контраст по WCAG
             // к фактическому SidebarColor — SidebarBrush всегда тёмный, но пользовательская
             // схема может его осветлить (issue #26).
@@ -627,12 +629,13 @@ namespace Workspace1C.Themes
                 "RepeatButtonForegroundPointerOver",
                 "RepeatButtonForegroundPressed");
 
-            // Акцентные кнопки Fluent: контраст к фактическому акценту (WCAG 4.5:1),
-            // а не фиксированный белый Fluent. Если акцента в палитре нет — ключи не
-            // трогаются (остаётся белый Fluent, как раньше).
+            // Акцентные кнопки Fluent: тот же выбор цвета, что и TextOnAccentBrush
+            // (issue #107 п.2): пользовательский TextOnAccentColor при контрасте ≥ 3:1,
+            // иначе WCAG-контраст к фактическому акценту. Если акцента в палитре нет —
+            // ключи не трогаются (остаётся белый Fluent, как раньше).
             var accentHex = scheme.PaletteValue(dark, "AccentColor");
             if (!string.IsNullOrWhiteSpace(accentHex) && TryParseColor(accentHex, out _)
-                && TryParseColor(ColorScheme.ContrastTextHex(accentHex), out var onAccentColor))
+                && TryParseColor(ResolveOnAccentHex(scheme, dark, accentHex), out var onAccentColor))
             {
                 SetFluentBrushes(app, new SolidColorBrush(onAccentColor),
                     "AccentButtonForeground",
@@ -657,6 +660,34 @@ namespace Workspace1C.Themes
                 return;
             if (TryParseColor(ColorScheme.ContrastTextHex(hex), out var color))
                 app.Resources[brushKey] = new SolidColorBrush(color);
+        }
+
+        /// <summary>
+        /// Issue #107 п.2: кисть текста на акцентном фоне. Пользовательский цвет
+        /// TextOnAccentColor (отличающийся от встроенного дефолта #FFFFFF, т.е. явно
+        /// заданный в настройках схемы) имеет приоритет при контрасте к фактическому
+        /// акценту ≥ 3:1; иначе прежний WCAG-пересчёт (фолбэк, сохраняющий
+        /// исправление issue #26 для тёмных акцентов).
+        /// </summary>
+        private static void SetTextOnAccentBrush(Application app, ColorScheme scheme, bool dark)
+        {
+            var accentHex = scheme.PaletteValue(dark, "AccentColor");
+            if (string.IsNullOrWhiteSpace(accentHex) || !TryParseColor(accentHex, out _))
+                return;
+            if (TryParseColor(ResolveOnAccentHex(scheme, dark, accentHex), out var color))
+                app.Resources["TextOnAccentBrush"] = new SolidColorBrush(color);
+        }
+
+        /// <summary>
+        /// Issue #107 п.2: выбор HEX цвета текста на акцентном фоне — пользовательский
+        /// TextOnAccentColor (если явно задан) при контрасте ≥ 3:1, иначе WCAG-фолбэк.
+        /// </summary>
+        private static string ResolveOnAccentHex(ColorScheme scheme, bool dark, string accentHex)
+        {
+            var customHex = scheme.PaletteValue(dark, "TextOnAccentColor");
+            var isCustom = !string.IsNullOrWhiteSpace(customHex)
+                && !string.Equals(customHex.Trim(), "#FFFFFF", StringComparison.OrdinalIgnoreCase);
+            return ColorScheme.ResolveTextOnAccentHex(isCustom ? customHex : null, accentHex);
         }
 
         /// <summary>

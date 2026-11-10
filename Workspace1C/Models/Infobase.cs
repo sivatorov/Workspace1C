@@ -163,6 +163,34 @@ public class Infobase : INotifyPropertyChanged
         }
     }
 
+    /// <summary>Цвет маркера «запущено под отладкой» (issue #103, v1.0.1.49):
+    /// янтарно-оранжевый, как маркер отладки в Конфигураторе. НЕ красный —
+    /// красный остался признаком «не отвечает». Константа в одном месте —
+    /// владелец может заменить.</summary>
+    public const string EnterpriseDebugMarkerHex = "#F59E0B";
+
+    private bool _isEnterpriseDebugRunning;
+
+    /// <summary>
+    /// Issue #103 (v1.0.1.49): хотя бы один процесс Предприятия базы запущен с ключом
+    /// <c>/DEBUG</c> (маркер отладки рядом со значком «Предприятие»). Отладка,
+    /// подцепленная другим сеансом конфигуратора, платформа не показывает —
+    /// системное ограничение, согласовано в issue. Значение обновляется фоновым
+    /// монитором вью-модели и в файл списка не сохраняется.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsEnterpriseDebugRunning
+    {
+        get => _isEnterpriseDebugRunning;
+        set
+        {
+            if (SetProperty(ref _isEnterpriseDebugRunning, value))
+            {
+                OnPropertyChanged(nameof(RunningModesTooltip));
+            }
+        }
+    }
+
     private bool _isConfiguratorRunning;
 
     /// <summary>
@@ -239,6 +267,10 @@ public class Infobase : INotifyPropertyChanged
                 return text + ", " + LocalizationManager.T("Infobase.EnterpriseNotRespondingSuffix");
             if (cfgHung)
                 return text + ", " + LocalizationManager.T("Infobase.ConfiguratorNotRespondingSuffix");
+            // Issue #103 (v1.0.1.49): суффикс «под отладкой» — процесс Предприятия
+            // запущен с ключом /DEBUG (свой сеанс).
+            if (IsEnterpriseRunning && IsEnterpriseDebugRunning)
+                return text + ", " + LocalizationManager.T("Infobase.DebugRunningSuffix");
             return text;
         }
     }

@@ -783,6 +783,13 @@ namespace Workspace1C
                 ? (AppUpdateMode)UpdateModeComboBox.SelectedIndex
                 : AppUpdateMode.InstallOnStartup;
 
+            // Периодичность проверки обновлений (issue #116 п.2): индекс варианта → минуты
+            // (порядок совпадает с AppSettings.UpdateCheckIntervals); нет выбора — не менять.
+            var updateInterval = UpdateIntervalComboBox != null && UpdateIntervalComboBox.SelectedIndex >= 0
+                ? AppSettings.UpdateCheckIntervals[Math.Min(
+                    UpdateIntervalComboBox.SelectedIndex, AppSettings.UpdateCheckIntervals.Length - 1)]
+                : -1;
+
             _viewModel.ApplyAppBehaviorSettings(
                 AllowMultipleInstancesCheck.IsChecked ?? false,
                 updateMode,
@@ -822,7 +829,8 @@ namespace Workspace1C
                 hotkeyZoomOut: hkZoomOut,
                 hotkeyZoomReset: hkZoomReset,
                 hotkeyShowRunning: hkShowRunning,
-                hotkeyBookmarksMenu: hkBookmarksMenu);
+                hotkeyBookmarksMenu: hkBookmarksMenu,
+                updateCheckIntervalMinutes: updateInterval);
 
             // Глобальная горячая клавиша «показать главное окно» (issue #82): главное
             // окно перерегистрирует нативный хук по PropertyChanged — без перезапуска.

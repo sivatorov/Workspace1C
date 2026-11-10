@@ -128,6 +128,64 @@ namespace Workspace1C.Services
             Mode = mode;
             AutoUpdateEnabled = mode == AppUpdateMode.InstallOnStartup
                 && !(LinuxRendering.Virtualized || LinuxRendering.SoftwareRender);
+            // issue #116 п.2 (v1.0.1.49): при смене режима пересоздаём таймер
+            // периодической проверки (Manual — таймер не работает).
+            RestartIntervalTimer();
+        }
+
+        // ---- Периодическая проверка обновлений (issue #116 п.2, v1.0.1.49) ----
+
+        private System.Threading.Timer? _intervalTimer;
+        private int _intervalMinutes;
+        private int _periodicCheckBusy;
+
+        /// <summary>
+        /// Устанавливает периодичность фоновой проверки обновлений (issue #116 п.2):
+        /// 0 — только при запуске и вручную (таймер выключен), положительное значение —
+        /// минуты между проверками. Пересоздаёт таймер.
+        /// </summary>
+        public void ApplyInterval(int minutes)
+        {
+            _intervalMinutes = Math.Max(0, minutes);
+            RestartIntervalTimer();
+        }
+
+        private void RestartIntervalTimer()
+        {
+            _intervalTimer?.Dispose();
+            _intervalTimer = null;
+            if (_intervalMinutes <= 0 || Mode == AppUpdateMode.Manual)
+                return;
+            var period = TimeSpan.FromMinutes(_intervalMinutes);
+            _intervalTimer = new System.Threading.Timer(_ => RunPeriodicCheck(), null, period, period);
+        }
+
+        /// <summary>
+        /// Тик периодической проверки (issue #116 п.2). Guard от спама: режим Manual
+        /// не проверяется; пока найденный релиз не обработан (<see cref="AvailableRelease"/>
+        /// заполнен) — повторно не спамим (после «Пропустить эту версию» проверка
+        /// продолжается, пропущенный релиз фильтруется существующей логикой); предыдущая
+        /// проверка не перекрывается.
+        /// </summary>
+        private async void RunPeriodicCheck()
+        {
+            if (Mode == AppUpdateMode.Manual || AvailableRelease is not null)
+                return;
+            if (System.Threading.Interlocked.CompareExchange(ref _periodicCheckBusy, 1, 0) != 0)
+                return;
+            try
+            {
+                Console.WriteLine("[updates] Периодическая проверка обновлений запущена");
+                await CheckForUpdatesAsync().ConfigureAwait(false);
+            }
+            catch
+            {
+                // Фоновая проверка не должна ронять таймер.
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref _periodicCheckBusy, 0);
+            }
         }
 
         /// <summary>

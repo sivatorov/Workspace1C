@@ -302,11 +302,13 @@ namespace Workspace1C
             string V(string key) => scheme.PaletteValue(dark, key);
 
             // Окно: подложка-карточка с рамкой и акцентная шапка. Заголовок на шапке —
-            // контрастный к акценту цвет (TextOnAccentBrush пересчитывается по WCAG
-            // в ThemeManager, issue #26), иначе предпросмотр расходится с реальностью.
+            // тот же цвет, что и TextOnAccentBrush в ThemeManager (issue #26, а с
+            // v1.0.1.49 и issue #107 п.2: пользовательский TextOnAccentColor при
+            // контрасте ≥ 3:1, иначе WCAG), иначе предпросмотр расходится с реальностью.
             PaintBorder(p.Shell, V("CardBackgroundColor"), V("BorderColor"));
             PaintSolid(p.TitleBar, V("AccentColor"));
-            PaintTextBrush(p.TitleText, new SolidColorBrush(ContrastColor(Color.Parse(V("AccentColor")))));
+            PaintTextBrush(p.TitleText,
+                new SolidColorBrush(Color.Parse(OnAccentPreviewHex(scheme, dark))));
 
             // Боковая панель: фон, контрастный текст, подсветка пунктов.
             var sidebar = Color.Parse(V("SidebarColor"));
@@ -346,6 +348,17 @@ namespace Workspace1C
             PaintText(p.ListSelectedText, V("TextPrimaryColor"));
             PaintText(p.ListItem1Text, V("TextPrimaryColor"));
             PaintText(p.ListItem2Text, V("TextPrimaryColor"));
+        }
+
+        /// <summary>Issue #107 п.2: цвет текста на акценте в предпросмотре — та же логика,
+        /// что и TextOnAccentBrush в ThemeManager.</summary>
+        private static string OnAccentPreviewHex(ColorScheme scheme, bool dark)
+        {
+            var customHex = scheme.PaletteValue(dark, "TextOnAccentColor");
+            var isCustom = !string.IsNullOrWhiteSpace(customHex)
+                && !string.Equals(customHex.Trim(), "#FFFFFF", StringComparison.OrdinalIgnoreCase);
+            return ColorScheme.ResolveTextOnAccentHex(isCustom ? customHex : null,
+                scheme.PaletteValue(dark, "AccentColor"));
         }
     }
 }

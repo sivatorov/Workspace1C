@@ -376,6 +376,18 @@
                                         <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.NotifyOnly}"/>
                                         <ComboBoxItem Content="{loc:Loc Settings.General.UpdateMode.Manual}"/>
                                     </ComboBox>
+                                    <!-- Периодичность фоновой проверки обновлений (issue #116 п.2, v1.0.1.49). -->
+                                    <TextBlock Text="{loc:Loc Settings.General.UpdateInterval}" VerticalAlignment="Center" Margin="18,0,0,0"/>
+                                    <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                       HelpText="{loc:Loc Settings.General.UpdateIntervalTooltip}"/>
+                                    <ComboBox x:Name="UpdateIntervalComboBox" MinWidth="200" Height="34" Margin="10,0,0,0"
+                                              VerticalAlignment="Center"
+                                              Style="{StaticResource ModernComboBox}">
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.OnStartup}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.Hourly}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.SixHours}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.Daily}"/>
+                                    </ComboBox>
                                 </StackPanel>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">
                                     <StackPanel Orientation="Horizontal">

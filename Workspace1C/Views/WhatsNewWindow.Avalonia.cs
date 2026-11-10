@@ -23,6 +23,7 @@ namespace Workspace1C
     {
         private readonly Models.AppSettings _settings;
         private readonly CheckBox _showOnStartCheck;
+        private bool _githubFallbackLoaded;
 
         /// <param name="settings">Настройки профиля: читаются галкой, сохраняет вызывающий.</param>
         public WhatsNewWindow(Models.AppSettings settings)
@@ -56,6 +57,13 @@ namespace Workspace1C
                 var item = AvaloniaUi.Text("• " + note, 13);
                 item.Margin = new Thickness(0, 0, 0, 8);
                 notesPanel.Children.Add(item);
+            }
+
+            if (notes is null)
+            {
+                // Issue #116 п.1: для версии без готовой сводки — fallback на body
+                // GitHub-релиза текущего тега (после показа окна, не в конструкторе).
+                Loaded += async (_, _) => await LoadGithubNotesAsync(notesPanel);
             }
             var card = new Border
             {
@@ -94,6 +102,31 @@ namespace Workspace1C
         /// <summary>Применяет галку «Показывать при запуске» к настройкам (сохраняет вызывающий).</summary>
         public void ApplyShowOnStart() =>
             _settings.ShowWhatsNewOnStart = _showOnStartCheck.IsChecked == true;
+
+        private async Task LoadGithubNotesAsync(StackPanel panel)
+        {
+            if (_githubFallbackLoaded)
+                return;
+            _githubFallbackLoaded = true;
+            try
+            {
+                var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
+                if (string.IsNullOrWhiteSpace(body))
+                {
+                    var info = AvaloniaUi.Text(LocalizationManager.T("WhatsNew.NotesUnavailable"), 13);
+                    info.Opacity = 0.7;
+                    panel.Children.Add(info);
+                    return;
+                }
+                panel.Children.Clear();
+                panel.Children.Add(MarkdownRenderer.ToStackPanel(body));
+            }
+            catch
+            {
+                // Сбой загрузки сводки не роняет диалог: остаётся пустой список и
+                // кнопка «Открыть CHANGELOG на GitHub».
+            }
+        }
 
         private static void OpenChangelog()
         {

@@ -22,8 +22,12 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
 
-        <!-- Стиль варианта выбора (радиокнопка с иконкой и описанием) -->
+        <!-- Стиль варианта выбора (радиокнопка с иконкой и описанием). С v1.0.1.49
+             (issue #107 п.1) выбранный вариант снова заливается акцентом — текст и
+             значок следуют Foreground (TextOnAccentBrush, контраст гарантируется
+             ThemeManager: пользовательский цвет при контрасте ≥ 3:1, иначе WCAG). -->
         <Style x:Key="OptionRadioButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
@@ -41,12 +45,15 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
-                            <!-- Issue #107: у выбранной карточки только акцентная рамка 2px,
-                                 без заливки AccentHoverBrush — яркий акцент тёмной темы
-                                 делал светлый текст нечитаемым. Фон остаётся CardBackgroundBrush. -->
+                            <!-- Issue #107 п.1 (v1.0.1.49): выбранный вариант — акцентная заливка
+                                 + рамка 2px, текст/значок — TextOnAccentBrush (читаемость обеспечивает
+                                 ThemeManager, issue #26 + п.2 #107). Заливка AccentHoverBrush
+                                 по-прежнему запрещена (светлый текст нечитаем). -->
                             <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="OptionBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="OptionBorder" Property="BorderThickness" Value="2"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -80,12 +87,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Grid.Column="0" Kind="ClipboardTextOutline" Width="22" Height="22"
-                                             VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                             VerticalAlignment="Center"
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{loc:Loc AddEdit.ExistingBase}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{loc:Loc AddEdit.ExistingBase}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                         <TextBlock Text="{loc:Loc AddEdit.ExistingBaseDescription}"
                                    TextWrapping="Wrap" FontSize="12"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     </StackPanel>
                 </Grid>
             </RadioButton>
@@ -99,12 +108,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Grid.Column="0" Kind="ContentSave" Width="22" Height="22"
-                                             VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                             VerticalAlignment="Center"
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{loc:Loc AddEdit.CreateEmpty}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{loc:Loc AddEdit.CreateEmpty}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                         <TextBlock Text="{loc:Loc AddEdit.CreateEmptyDescription}"
                                    TextWrapping="Wrap" FontSize="12"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     </StackPanel>
                 </Grid>
             </RadioButton>
@@ -118,12 +129,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Grid.Column="0" Kind="CubeOutline" Width="22" Height="22"
-                                             VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                             VerticalAlignment="Center"
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{loc:Loc AddEdit.CreateFromTemplate}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{loc:Loc AddEdit.CreateFromTemplate}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                         <TextBlock Text="{loc:Loc AddEdit.CreateFromTemplateDescription}"
                                    TextWrapping="Wrap" FontSize="12"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     </StackPanel>
                 </Grid>
             </RadioButton>
@@ -137,12 +150,14 @@
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <materialDesign:PackIcon Grid.Column="0" Kind="FolderOutline" Width="22" Height="22"
-                                             VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                                             VerticalAlignment="Center"
+                                             Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="{loc:Loc AddEdit.Group}" FontWeight="SemiBold" FontSize="14"/>
+                        <TextBlock Text="{loc:Loc AddEdit.Group}" FontWeight="SemiBold" FontSize="14"
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                         <TextBlock Text="{loc:Loc AddEdit.GroupDescription}"
                                    TextWrapping="Wrap" FontSize="12"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                   Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}"/>
                     </StackPanel>
                 </Grid>
             </RadioButton>

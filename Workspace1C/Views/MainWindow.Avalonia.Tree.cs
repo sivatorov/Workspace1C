@@ -445,6 +445,27 @@ namespace Workspace1C
             enterpriseChip.Child = enterpriseIcon;
             runningIcons.Children.Add(enterpriseChip);
 
+            // Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный квадрат
+            // WarningBrush (#F59E0B в тёмной палитре, см. Infobase.EnterpriseDebugMarkerHex)
+            // рядом с чипом «Предприятие». НЕ красный: красный остался признаком
+            // «не отвечает». Виден, когда хотя бы один Enterprise-процесс базы запущен
+            // с ключом /DEBUG (свой сеанс).
+            var debugSquare = new Avalonia.Controls.Shapes.Rectangle
+            {
+                Width = UiMetrics.Scaled(7),
+                Height = UiMetrics.Scaled(7),
+                RadiusX = UiMetrics.Scaled(1),
+                RadiusY = UiMetrics.Scaled(1),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0),
+                IsVisible = false
+            };
+            ThemeBrushes.Bind(debugSquare, Avalonia.Controls.Shapes.Shape.FillProperty, "WarningBrush");
+            ToolTip.SetTip(debugSquare, LocalizationManager.T("Infobase.DebugRunningTooltip"));
+            debugSquare.Bind(Visual.IsVisibleProperty,
+                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib });
+            runningIcons.Children.Add(debugSquare);
+
             var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), nameof(Infobase.ConfiguratorRunningStatus), leftMargin: 3);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
             {

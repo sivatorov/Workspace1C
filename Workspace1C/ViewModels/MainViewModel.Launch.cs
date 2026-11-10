@@ -633,6 +633,8 @@ public partial class MainViewModel : ViewModelBase
         s.AllowMultipleInstances = _allowMultipleInstances;
         // issue #116: режим обновления; устаревшие флаги синхронизируются внутри.
         s.SetUpdateMode(_updateMode);
+        // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений.
+        s.UpdateCheckIntervalMinutes = AppSettings.NormalizeUpdateInterval(_updateCheckIntervalMinutes);
         s.ComConnectorNameTemplate = _comConnectorNameTemplate;
         s.ComDetectTimeoutMs = _comDetectTimeoutMs;
         s.AvailabilityTcpPrecheckEnabled = _tcpPrecheckEnabled;

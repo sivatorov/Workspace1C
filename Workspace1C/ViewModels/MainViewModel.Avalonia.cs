@@ -429,24 +429,38 @@ public partial class MainViewModel : ViewModelBase
     public void ApplyBehaviorSettings(
         bool allowMultipleInstances,
         bool rememberWindowLayout,
-        AppUpdateMode updateMode)
+        AppUpdateMode updateMode,
+        int updateCheckIntervalMinutes = -1)
     {
         _settings.AllowMultipleInstances = allowMultipleInstances;
         _settings.RememberWindowLayout = rememberWindowLayout;
         // issue #116: единый режим обновления вместо пары флагов; устаревшие флаги
         // синхронизируются внутри SetUpdateMode.
         _settings.SetUpdateMode(updateMode);
+        // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений
+        // (минуты); −1 — параметр не задан (старые вызовы), значение не менять.
+        if (updateCheckIntervalMinutes >= 0)
+            _settings.UpdateCheckIntervalMinutes =
+                Models.AppSettings.NormalizeUpdateInterval(updateCheckIntervalMinutes);
         // Служба обновления живёт до перезапуска, а кнопка «Проверить обновления» стоит
         // в том же окне настроек: без этого смена режима вступала бы в силу только
         // со следующего запуска.
         AppServices.GetRequiredService<UpdateService>().ApplyUpdateMode(updateMode);
+        // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений —
+        // применяется сразу, не дожидаясь перезапуска.
+        AppServices.GetRequiredService<UpdateService>().ApplyInterval(_settings.UpdateCheckIntervalMinutes);
         if (!SaveSettingsSafe())
             _dialog.ShowError(LocalizationManager.T("Main.SaveFailedHint"),
                 LocalizationManager.T("Settings.Title"));
         OnPropertyChanged(nameof(AllowMultipleInstances));
         OnPropertyChanged(nameof(RememberWindowLayout));
         OnPropertyChanged(nameof(UpdateMode));
+        OnPropertyChanged(nameof(UpdateCheckIntervalMinutes));
     }
+
+    /// <summary>Периодичность фоновой проверки обновлений в минутах (issue #116 п.2):
+    /// 0 — только при запуске и вручную; 60 — час; 360 — 6 часов; 1440 — сутки.</summary>
+    public int UpdateCheckIntervalMinutes => _settings.UpdateCheckIntervalMinutes;
 
     /// <summary>Применяет настройки поведения трея и системных уведомлений из окна настроек.</summary>
     public void ApplyTraySettings(
