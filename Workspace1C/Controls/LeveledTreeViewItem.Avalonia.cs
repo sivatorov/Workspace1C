@@ -149,10 +149,12 @@ namespace Workspace1C.Controls
         }
 
         /// <summary>
-        /// Оформление кнопки разворота по разметке WPF (MainWindow.xaml:1468-1497):
-        /// рамка 22 на 22 со скруглением 5 акцентной кистью, внутри минус у
-        /// развёрнутой группы и плюс у свёрнутой, при наведении заливка акцентом
-        /// и белый знак. Штатная галка Fluent на её месте была расхождением.
+        /// Оформление кнопки разворота по разметке WPF: рамка 22 на 22 со скруглением
+        /// акцентной кистью, при наведении заливка акцентом и белый знак. Штатная
+        /// галка Fluent на её месте была расхождением.
+        /// Issue #123 (v1.0.1.55): внутри шевроны в стиле 1С вместо «+»/«−» —
+        /// квадратные кнопки с плюс/минус выглядели одинаково: свёрнута — шеврон
+        /// вправо («IconChevronRight»), развёрнута — шеврон вниз («IconChevronDown»).
         /// </summary>
         private static ControlTheme ExpanderTheme()
         {
@@ -175,10 +177,10 @@ namespace Workspace1C.Controls
                         // привязкой здесь: ThemeBrushes.Bind ставит значение
                         // приоритетом локального, и стиль состояния, который
                         // слабее, наведение уже не перекрасил бы.
-                        var minus = IconHelper.MakeIcon("IconMinus", 12, out var minusPath);
+                        var minus = IconHelper.MakeIcon("IconChevronDown", 12, out var minusPath);
                         minus.Name = "ЗнакРазвёрнуто";
                         minusPath.Name = "КонтурРазвёрнуто";
-                        var plus = IconHelper.MakeIcon("IconPlus", 12, out var plusPath);
+                        var plus = IconHelper.MakeIcon("IconChevronRight", 12, out var plusPath);
                         plus.Name = "ЗнакСвёрнуто";
                         plusPath.Name = "КонтурСвёрнуто";
 

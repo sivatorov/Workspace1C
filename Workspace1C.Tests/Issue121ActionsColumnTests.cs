@@ -80,9 +80,11 @@ public sealed class Issue121ActionsColumnTests
         var chip = xaml.IndexOf("<Style x:Key=\"RowActionChip\" TargetType=\"Border\">", StringComparison.Ordinal);
         Assert.True(chip > 0, "стиль RowActionChip не найден");
         var chipBlock = xaml[chip..xaml.IndexOf("</Style>", chip, StringComparison.Ordinal)];
-        Assert.Contains("<Setter Property=\"Width\" Value=\"22\"/>", chipBlock, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"Height\" Value=\"22\"/>", chipBlock, StringComparison.Ordinal);
-        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"11\"/>", chipBlock, StringComparison.Ordinal);
+        // Issue #121 (v1.0.1.55): кружок уменьшен до 18 px — пропорция значок/кружок
+        // как у одобренных чипов-индикаторов запуска 18/16.
+        Assert.Contains("<Setter Property=\"Width\" Value=\"18\"/>", chipBlock, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"Height\" Value=\"18\"/>", chipBlock, StringComparison.Ordinal);
+        Assert.Contains("<Setter Property=\"CornerRadius\" Value=\"9\"/>", chipBlock, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource CardBackgroundBrush}", chipBlock, StringComparison.Ordinal);
         Assert.Contains("{DynamicResource BorderBrushColor}", chipBlock, StringComparison.Ordinal);
         // Подсветка при выделении строки — по IsSelected контейнера TreeViewItem.
@@ -101,9 +103,11 @@ public sealed class Issue121ActionsColumnTests
         Assert.Contains("HorizontalAlignment=\"Left\"", rowBlock, StringComparison.Ordinal);
         Assert.Contains("RowActionChipButton", rowBlock, StringComparison.Ordinal);
 
-        // Все три кнопки строки обёрнуты в чипы.
+        // Все три кнопки строки обёрнуты в чипы: две — прямым стилем RowActionChip,
+        // кнопка Предприятия — стилем на основе RowActionChip (размеры из стиля,
+        // issue #121 v1.0.1.55: локальные 22 px сняты, чип 18 px).
         Assert.Equal(3, CountOccurrences(rowBlock, "<Border Style=\"{StaticResource RowActionChip}\"")
-            + CountOccurrences(rowBlock, "<Border BorderThickness=\"1\" CornerRadius=\"11\""));
+            + CountOccurrences(rowBlock, "<Style TargetType=\"Border\" BasedOn=\"{StaticResource RowActionChip}\">"));
         Assert.Contains("Kind=\"Play\"", rowBlock, StringComparison.Ordinal);
         Assert.Contains("Kind=\"Wrench\"", rowBlock, StringComparison.Ordinal);
         Assert.Contains("Kind=\"Broom\"", rowBlock, StringComparison.Ordinal);
@@ -149,9 +153,10 @@ public sealed class Issue121ActionsColumnTests
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
         // Кнопка действия выровнена по левому краю колонки.
         Assert.Contains("HorizontalAlignment = HorizontalAlignment.Left", source, StringComparison.Ordinal);
-        // Круглая подложка-кружок 22 px, кисти по выделению/статусу — конвертером.
-        Assert.Contains("UiMetrics.Scaled(22)", source, StringComparison.Ordinal);
-        Assert.Contains("CornerRadius = new CornerRadius(UiMetrics.Scaled(11))", source, StringComparison.Ordinal);
+        // Круглая подложка-кружок 18 px (issue #121 v1.0.1.55: 22 → 18),
+        // кисти по выделению/статусу — конвертером.
+        Assert.Contains("UiMetrics.Scaled(18)", source, StringComparison.Ordinal);
+        Assert.Contains("CornerRadius = new CornerRadius(UiMetrics.Scaled(9))", source, StringComparison.Ordinal);
         Assert.Contains("RowActionChipBrushConverter", source, StringComparison.Ordinal);
         Assert.Contains("RowActionChipBrushConverter.BackgroundParameter", source, StringComparison.Ordinal);
         Assert.Contains("RowActionChipBrushConverter.BorderParameter", source, StringComparison.Ordinal);

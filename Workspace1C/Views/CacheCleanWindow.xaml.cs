@@ -549,11 +549,24 @@ public partial class CacheCleanWindow : Window
         // Этапы считаются независимо, и каждый присваивает свой текст сразу по готовности,
         // чтобы отказ на одном шаге (например, orphan) не стирал уже посчитанные program/user
         // и не прерывал цикл по базам. Каждый этап логирует собственную ошибку (issue #212).
+        // Issue #109 (v1.0.1.55): этапы запускаются ПАРАЛЛЕЛЬНО — раньше они шли строго
+        // последовательно, и «честный» общий объём (полный обход корней, у 7OH — минуты
+        // на перенесённом кэше) блокировал все остальные строки: окно «вообще не
+        // показывало размеры». Теперь каждая строка обновляется по готовности своего расчёта.
+        var programTask = Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.Program));
+        var userTask = Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User));
+        var orphanTask = Task.Run(() => OneCCacheCleaner.GetOrphanSize(kind, _infobases));
+        var baseTasks = _infobases.Select(ib => (
+            Infobase: ib,
+            Program: Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.Program)),
+            User: Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.User))
+        )).ToList();
+
         try
         {
             // Честный общий объём (issue #109а): все каталоги корней, включая
             // несопоставленные базе, — иначе «15 ГБ» на диске показывались «15 МБ».
-            var program = await Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.Program));
+            var program = await programTask;
             ProgramCacheSizeText.Text = FormatSize(program);
         }
         catch (Exception ex)
@@ -565,7 +578,7 @@ public partial class CacheCleanWindow : Window
         try
         {
             // Честный общий объём (issue #109а) — см. комментарий к блоку «программный».
-            var user = await Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User));
+            var user = await userTask;
             UserCacheSizeText.Text = FormatSize(user);
         }
         catch (Exception ex)
@@ -576,7 +589,7 @@ public partial class CacheCleanWindow : Window
 
         try
         {
-            var orphans = await Task.Run(() => OneCCacheCleaner.GetOrphanSize(kind, _infobases));
+            var orphans = await orphanTask;
             OrphanCacheSizeText.Text = FormatSize(orphans);
         }
         catch (Exception ex)
@@ -585,11 +598,11 @@ public partial class CacheCleanWindow : Window
             ShowSizeError();
         }
 
-        foreach (var ib in _infobases)
+        foreach (var (ib, programTask2, userTask2) in baseTasks)
         {
             try
             {
-                var p = await Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.Program));
+                var p = await programTask2;
                 _programBytes[ib] = p;
                 if (_programSizeTexts.TryGetValue(ib, out var pt)) pt.Text = FormatSize(p);
             }
@@ -600,7 +613,7 @@ public partial class CacheCleanWindow : Window
 
             try
             {
-                var u = await Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.User));
+                var u = await userTask2;
                 _userBytes[ib] = u;
                 if (_userSizeTexts.TryGetValue(ib, out var ut)) ut.Text = FormatSize(u);
             }

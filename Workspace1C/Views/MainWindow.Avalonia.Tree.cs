@@ -203,15 +203,35 @@ namespace Workspace1C
         private Button GroupRowActionButton(GroupNodeViewModel group, string iconKey, string commandPath, string tooltip,
             string? brushKey = null, string? colorHex = null)
         {
+            // Issue #121 (v1.0.1.55): команды группы — в тех же круглых чипах 18/16,
+            // что и кнопки строк баз. Раньше у группы были «голые» значки без кружка:
+            // значки в строках баз начинались с другого отступа («отступ скачет»,
+            // 7OH), и стиль колонки не совпадал. Кисти чипа — как у строк: фон
+            // карточки с тонкой обводкой.
+            Control glyph = colorHex is not null
+                ? IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16), SpecBrush(colorHex))
+                : IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16), brushKey ?? "TextSecondaryBrush");
+            glyph.HorizontalAlignment = HorizontalAlignment.Center;
+            glyph.VerticalAlignment = VerticalAlignment.Center;
+
+            var chip = new Border
+            {
+                Width = UiMetrics.Scaled(18),
+                Height = UiMetrics.Scaled(18),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(9)),
+                BorderThickness = new Thickness(1),
+                Child = glyph
+            };
+            Themes.ThemeBrushes.Bind(chip, Border.BackgroundProperty, "CardBackgroundBrush");
+            Themes.ThemeBrushes.Bind(chip, Border.BorderBrushProperty, "BorderColorBrush");
+
             var button = new Button
             {
-                Content = colorHex is not null
-                    ? IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), SpecBrush(colorHex))
-                    : IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), brushKey ?? "TextSecondaryBrush"),
-                Margin = new Thickness(1, 0),
+                Content = chip,
+                Margin = new Thickness(2, 0),
                 MinWidth = 0,
                 MinHeight = 0,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 CommandParameter = group
             };
@@ -591,7 +611,8 @@ namespace Workspace1C
                 // Issue #121: кнопка запуска Предприятия несёт индикатор занятости
                 // (issue #120/#103), остальные — обычные чипы без подсветки статуса.
                 actions.Children.Add(RowActionButton(ib, "IconPlay", "LaunchEnterpriseCommand", LocalizationManager.T("Main.LaunchEnterpriseTooltip"), enterpriseLaunch: true));
-                actions.Children.Add(RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip")));
+                // Issue #120 (v1.0.1.55): чип Конфигуратора — индикатор запуска, как у Предприятия.
+                actions.Children.Add(RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip"), configuratorLaunch: true));
                 actions.Children.Add(RowActionButton(ib, "IconBroom", "ClearCacheCommand", LocalizationManager.T("Main.ClearCacheTooltip")));
                 // Кнопки живут внутри панели, обрезанной по своей колонке: в узкой
                 // колонке «Действия» лишние значки у автора пропадают, а у нас
@@ -648,8 +669,23 @@ namespace Workspace1C
                 // «Конфигуратор» или «Ничего». Индивидуальное значение ИБ переопределяет
                 // глобальную настройку (см. MainViewModel.ResolveDoubleClickAction).
                 var dblAction = vm.ResolveDoubleClickAction(tappedIb);
+                // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего», если база сейчас
+                // запущена (Предприятие и/или Конфигуратор), двойной щелчок предлагает
+                // выбор окна — в списке и Предприятие, и Конфигуратор.
                 if (dblAction == Workspace1C.Models.DoubleClickAction.None)
+                {
+                    if (tappedIb.IsRunning)
+                        ActivateAllWindowsOrNothing(vm, tappedIb, card);
                     return;
+                }
+                // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
+                // открытому окну Предприятия/Конфигуратора (одно — напрямую, несколько —
+                // выбор окна; окон нет — ничего).
+                if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
+                {
+                    ActivateAllWindowsOrNothing(vm, tappedIb, card);
+                    return;
+                }
                 if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
                     vm.LaunchConfiguratorCommand.Execute(null);
                 else
@@ -685,6 +721,34 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #120 (v1.0.1.55): перечисляет ВСЕ открытые окна базы (Предприятие и
+        /// Конфигуратор) и активирует: одно окно — напрямую, несколько — меню выбора
+        /// у курсора, окон нет — ничего. Используется действием «Активировать окно»,
+        /// двойным щелчком «Ничего» при запущенной базе и вкладкой «Запущенные».
+        /// Перечисление — вне UI-потока, решение — через Dispatcher.
+        /// </summary>
+        internal static void ActivateAllWindowsOrNothing(ViewModels.MainViewModel vm, Infobase ib, Control placement)
+        {
+            System.Threading.Tasks.Task.Run(() => vm.GetRunningWindowsSafeAll(ib))
+                .ContinueWith(t =>
+                {
+                    var windows = t.Result;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        switch (Services.RunningWindowPlanner.PlanAllWindows(windows.Count))
+                        {
+                            case Services.RunningWindowAction.ActivateSingle:
+                                vm.ActivateWindowByHandle(windows[0].Handle);
+                                break;
+                            case Services.RunningWindowAction.ShowPicker:
+                                ShowRunningWindowPicker(vm, windows, placement);
+                                break;
+                        }
+                    });
+                });
+        }
+
+        /// <summary>
         /// Issue #120: меню выбора открытого окна при нескольких запущенных
         /// экземплярах Предприятия. Окна уже перечислены вызывающим кодом (вне
         /// UI-потока); выбор пункта активирует соответствующее окно. Вызывается
@@ -695,6 +759,11 @@ namespace Workspace1C
             System.Collections.Generic.IReadOnlyList<Services.RunningWindowInfo> windows, Control placement)
         {
             var menu = new Avalonia.Controls.ContextMenu();
+            // Issue #120 (v1.0.1.55, 7OH): меню выбора — в стиле текущей темы
+            // (ModernContextMenu, как у всех контекстных меню программы) и У МЕСТА
+            // указателя (PlacementMode.Pointer), а не у края целевого элемента.
+            menu.Styled(Themes.ControlThemes.ModernContextMenu);
+            menu.PlacementMode = Avalonia.Controls.PlacementMode.Pointer;
             foreach (var window in windows)
             {
                 var captured = window;
@@ -869,30 +938,44 @@ namespace Workspace1C
         /// зависший процесс — белый значок на красном чипе.
         /// </param>
         private Control RowActionButton(Infobase ib, string iconKey, string commandPath, string tooltip,
-            string? colorHex = null, bool enterpriseLaunch = false)
+            string? colorHex = null, bool enterpriseLaunch = false, bool configuratorLaunch = false)
         {
             Control glyph;
-            if (enterpriseLaunch)
+            if (enterpriseLaunch || configuratorLaunch)
             {
                 // Issue #120/#103: цвет значка — индикатор запуска: мульти-конвертер
                 // (запущено / статус отклика / отладка). Ручная привязка Fill —
                 // авто-обновление IconHelper по набору иконок отключается.
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), out var glyphPath);
+                // Issue #120 (v1.0.1.55, 7OH): чип Конфигуратора красится так же, как
+                // чип Предприятия («красит только у предприятия» — исправлено):
+                // запущен — оранжевый значок, зависший процесс — белый на красном чипе.
+                // Issue #107 (v1.0.1.55): значок укрупнён 15 → 16 px — пропорция
+                // кружка 22 px, как у одобренных чипов-индикаторов 18/16.
+                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16), out var glyphPath);
                 IconHelper.Untrack(glyphPath);
                 glyphPath.Bind(Avalonia.Controls.Shapes.Path.FillProperty, new MultiBinding
                 {
                     Bindings =
                     {
-                        new Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib },
-                        new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib },
-                        new Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib }
+                        configuratorLaunch
+                            ? new Binding(nameof(Infobase.IsConfiguratorRunning)) { Source = ib }
+                            : new Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib },
+                        configuratorLaunch
+                            ? new Binding(nameof(Infobase.ConfiguratorRunningStatus)) { Source = ib }
+                            : new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib },
+                        // У Конфигуратора нет «отладки» — константа false (триггер отладки не сработает).
+                        configuratorLaunch
+                            ? new Binding { Source = false }
+                            : new Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib }
                     },
                     Converter = new RowActionGlyphBrushConverter()
                 });
             }
             else
             {
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15),
+                // Issue #107 (v1.0.1.55): значок укрупнён 15 → 16 px (кружок 22 px),
+                // центрирование задано ниже явно (HorizontalAlignment/VerticalAlignment).
+                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16),
                     colorHex is null ? "TextSecondaryBrush" : colorHex);
             }
 
@@ -902,11 +985,14 @@ namespace Workspace1C
             // Круглая подложка-кружок (issue #121): единый стиль с чипами индикаторов
             // запуска (BuildRunningChip, issue #101/#103). Кисти — по выделению строки
             // и (у кнопки Предприятия) по статусу зависшего процесса.
+            // Issue #121 (v1.0.1.55): кружок уменьшен 22 → 18 px с значком 16 px —
+            // пропорция как у одобренных чипов-индикаторов 18/16 (7OH: «кружки явно
+            // больше, чем надо»); чип перестаёт распирать низкие строки групп.
             var chip = new Border
             {
-                Width = UiMetrics.Scaled(22),
-                Height = UiMetrics.Scaled(22),
-                CornerRadius = new CornerRadius(UiMetrics.Scaled(11)),
+                Width = UiMetrics.Scaled(18),
+                Height = UiMetrics.Scaled(18),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(9)),
                 BorderThickness = new Thickness(1),
                 Child = glyph
             };
@@ -920,7 +1006,11 @@ namespace Workspace1C
                     AncestorType = typeof(TreeViewItem)
                 }
             };
-            var statusBinding = new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib };
+            // Issue #120 (v1.0.1.55): чип Конфигуратора смотрит на свой статус
+            // (ConfiguratorRunningStatus), чип Предприятия — на свой.
+            var statusBinding = configuratorLaunch
+                ? new Binding(nameof(Infobase.ConfiguratorRunningStatus)) { Source = ib }
+                : new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib };
             chip.Bind(Border.BackgroundProperty, new MultiBinding
             {
                 Bindings = { statusBinding, selectedBinding },

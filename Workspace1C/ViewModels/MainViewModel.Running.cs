@@ -238,6 +238,32 @@ public partial class MainViewModel
     }
 
     /// <summary>
+    /// Issue #120 (v1.0.1.55): безопасное перечисление ВСЕХ открытых окон базы —
+    /// и Предприятия, и Конфигуратора (для действия «Активировать окно», выбора
+    /// при двойном щелчке «Ничего» и вкладки «Запущенные»). Дубликаты по хэндлу
+    /// отфильтровываются; ошибки перечисления — пустой список (политика монитора).
+    /// Может занять время (обход процессов) — вызывать вне UI-потока.
+    /// </summary>
+    public IReadOnlyList<RunningWindowInfo> GetRunningWindowsSafeAll(Infobase? infobase)
+    {
+        if (infobase is null)
+            return Array.Empty<RunningWindowInfo>();
+
+        var combined = new List<RunningWindowInfo>();
+        var seen = new HashSet<long>();
+        foreach (var kind in new[] { RunningKind.Enterprise, RunningKind.Configurator })
+        {
+            foreach (var w in GetRunningWindowsSafe(infobase, kind))
+            {
+                if (seen.Add(w.Handle))
+                    combined.Add(w);
+            }
+        }
+
+        return combined;
+    }
+
+    /// <summary>
     /// Issue #120 (v1.0.1.54): диагностика «индикатор показывает запущенный режим,
     /// но открытых окон не найдено» — именно так выглядела жалоба репортера «клик
     /// не работает, ничего не происходит». Причины: matcher процессов не распознал

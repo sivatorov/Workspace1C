@@ -11,6 +11,82 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.55] — 2026-11-11
+
+### Исправлено
+
+- **Регресс: в окне очистки кэша снова показываются размеры (issue #109, 7OH).**
+  После 1.0.1.54 этапы расчёта в окне очистки шли строго последовательно, и «честный»
+  общий объём (полный рекурсивный обход корней кэша — минуты на перенесённом на другой
+  диск кэше) блокировал все остальные строки: окно «вообще не показывало размеры».
+  Теперь все расчёты (общий программный/пользовательский, остатки, по базам) выполняются
+  параллельно, и каждая строка обновляется по готовности
+  ([`CacheCleanWindow.xaml.cs`](Workspace1C/Views/CacheCleanWindow.xaml.cs),
+  [`CacheCleanWindow.Avalonia.cs`](Workspace1C/Views/CacheCleanWindow.Avalonia.cs));
+  корни кэша сканируются параллельно, а перечисление файлов ускорено —
+  [`OneCCacheCleaner.cs`](Workspace1C/Services/OneCCacheCleaner.cs).
+- **Косые/смещённые значки в чипах колонки «Действия» (issue #107).** Значки были
+  размером 15 px в кружке 22 px без явного центрирования. Теперь значок 16 px с явным
+  центрированием — пропорция «значок/кружок» как у одобренных чипов-индикаторов 18/16
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml) `RowActionIcon`,
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)
+  `RowActionButton`).
+- **Кнопки запуска в правой панели: подсветка hover больше не «наезжает» на контур
+  (issue #122, 7OH).** Квадратная подложка hover занимала всю карточку и прямыми углами
+  выступала за скруглённый контур (CornerRadius 10) — в любом режиме компактности.
+  Подложка скруглена (радиус 9) с отступом 1 px от рамки; стрелки меню тоже
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml); в Avalonia кнопки уже были
+  скруглены).
+
+### Изменено
+
+- **Колонка «Действия»: кружки 22 → 18 px, значки 16 px, команды группы — в тех же
+  чипах (issue #121, 7OH).** Пропорция «кружок/значок» приведена к одобренным
+  чипам-индикаторам запуска 18/16 («кружки явно больше, чем надо, значки надо делать
+  больше»); в Avalonia командам группы добавлены такие же кружки — раньше там были
+  «голые» значки, из-за чего значки в строках начинались с другого отступа
+  («отступ скачет»).
+- **Кнопка разворота групп: шевроны в стиле 1С вместо «+»/«−» (issue #123, ArtyoZ).**
+  Квадратные кнопки с плюс/минус выглядели одинаково и действия было не различить:
+  свёрнута — шеврон вправо, развёрнута — шеврон вниз (WPF
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml), Avalonia
+  [`LeveledTreeViewItem.Avalonia.cs`](Workspace1C/Controls/LeveledTreeViewItem.Avalonia.cs)).
+- **Окно «Что нового» увеличено в полтора раза по обеим осям (issue #116 п.3, 7OH):
+  560×420 → 840×630 (минимум 440×320 → 660×480)** — сводка релиза, галка «Показывать
+  при запуске» и кнопки помещаются без обрезки текста (WPF
+  [`WhatsNewWindow.xaml`](Workspace1C/Views/WhatsNewWindow.xaml), Avalonia
+  [`WhatsNewWindow.Avalonia.cs`](Workspace1C/Views/WhatsNewWindow.Avalonia.cs)).
+- **Кнопка «Открыть CHANGELOG на GitHub» сокращена до «Открыть на GitHub»
+  (issue #116 п.2, 7OH)** — ключ `WhatsNew.OpenChangelog` в ru/en.
+
+### Добавлено
+
+- **Действие «Активировать окно» по двойному щелчку (issue #120, 7OH).** Новый вариант
+  в настройке «Действие по двойному щелчку» (глобально и для отдельной базы): переход
+  к открытому окну Предприятия/Конфигуратора — одно окно активируется напрямую,
+  несколько — выбор окна, окон нет — ничего
+  ([`DoubleClickAction.cs`](Workspace1C/Models/DoubleClickAction.cs)).
+- **Двойной щелчок «Ничего» у запущенной базы предлагает выбор окна (issue #120).**
+  В список попадают и Предприятие, и Конфигуратор ([`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs),
+  [`LeveledTreeView.Avalonia.cs`](Workspace1C/Controls/LeveledTreeView.Avalonia.cs)).
+- **Выбор окна на вкладке «Запущенные» (issue #120).** При нескольких запущенных
+  приложениях базы двойной клик предлагает выбор вместо активации «по очереди».
+- **Пункты выбора окна: «Предприятие/Конфигуратор + время запуска» вместо заголовка
+  окна (issue #120, 7OH).** Гуид/длинный заголовок ничего не говорил пользователю;
+  теперь окно несёт режим запуска и время старта процесса
+  ([`RunningWindowPlanner.cs`](Workspace1C/Services/RunningWindowPlanner.cs),
+  [`OneCWindowActivator.Windows.cs`](Workspace1C/Services/OneCWindowActivator.Windows.cs)).
+- **Список выбора окна открывается у места двойного щелчка и в теме оформления
+  (issue #120, 7OH):** WPF — `PlacementMode.MousePoint` + стиль `ModernContextMenu`,
+  Avalonia — `PlacementMode.Pointer` + тема `ModernContextMenu`
+  ([`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+- **Чип Конфигуратора в колонке «Действия» красится по статусу запуска (issue #120):**
+  запущен — оранжевый значок, зависший процесс — белый значок на красном чипе
+  («красит только у предприятия» — исправлено; WPF
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml), Avalonia
+  [`RowActionButton`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+
 ## [1.0.1.54] — 2026-11-11
 
 ### Исправлено

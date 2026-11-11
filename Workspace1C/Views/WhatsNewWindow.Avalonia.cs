@@ -31,10 +31,12 @@ namespace Workspace1C
         {
             _settings = settings;
             Title = LocalizationManager.T("WhatsNew.Title");
-            Width = 560;
-            Height = 420;
-            MinWidth = 440;
-            MinHeight = 320;
+            // Issue #116 п.3 (v1.0.1.55, 7OH): окно «Что нового» в полтора раза
+            // больше по обеим осям — сводка и нижняя панель не обрезаются.
+            Width = 840;
+            Height = 630;
+            MinWidth = 660;
+            MinHeight = 480;
             FontSize = 13;
             CanResize = true;
 

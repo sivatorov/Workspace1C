@@ -756,6 +756,7 @@ public static class OneCCacheCleaner
 
         long total = 0;
         var seenRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rootsToScan = new List<string>();
         foreach (var root in GetCacheRoots(kind))
         {
             if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
@@ -766,10 +767,26 @@ public static class OneCCacheCleaner
             if (!seenRoots.Add(ResolveCanonicalPath(root)))
                 continue;
 
-            // Свежее множество visited на корень: рекурсия внутри корня защищена
-            // своим набором (циклы через ссылки внутри цели перенесённого кэша).
-            total += GetDirectorySize(root, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+            rootsToScan.Add(root);
         }
+
+        if (rootsToScan.Count == 0)
+            return 0;
+
+        // Issue #109 (v1.0.1.55): корни сканируются параллельно — при перенесённом
+        // на другой диск кэше полный обход одного корня может занимать минуты, и
+        // последовательный обход нескольких корней растягивал расчёт ещё сильнее.
+        // Свежее множество visited на корень: рекурсия внутри корня защищена своим
+        // набором (циклы через ссылки внутри цели перенесённого кэша).
+        if (rootsToScan.Count == 1)
+            return GetDirectorySize(rootsToScan[0], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+
+        var rootTotals = new long[rootsToScan.Count];
+        Parallel.For(0, rootsToScan.Count, i =>
+            rootTotals[i] = GetDirectorySize(rootsToScan[i], new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+
+        foreach (var t in rootTotals)
+            total += t;
 
         return total;
     }
@@ -921,11 +938,18 @@ public static class OneCCacheCleaner
             if (!visited.Add(ResolveCanonicalPath(path)))
                 return 0;
 
-            foreach (var file in Directory.EnumerateFiles(path, "*"))
+            // Issue #109 (v1.0.1.55): EnumerateFiles/EnumerateDirectories DirectoryInfo
+            // возвращают FileInfo/DirectoryInfo с данными, уже собранными при перечислении,
+            // — без повторного обращения к диску на каждый файл, как было с
+            // new FileInfo(path). На больших кэшах (сотни тысяч файлов) это кратно
+            // ускоряет расчёт «честного» общего объёма.
+            var dirInfo = new DirectoryInfo(path);
+
+            foreach (var file in dirInfo.EnumerateFiles("*"))
             {
                 try
                 {
-                    total += new FileInfo(file).Length;
+                    total += file.Length;
                 }
                 catch
                 {
@@ -933,11 +957,11 @@ public static class OneCCacheCleaner
                 }
             }
 
-            foreach (var dir in Directory.EnumerateDirectories(path, "*"))
+            foreach (var dir in dirInfo.EnumerateDirectories("*"))
             {
                 try
                 {
-                    total += GetDirectorySize(dir, visited);
+                    total += GetDirectorySize(dir.FullName, visited);
                 }
                 catch
                 {

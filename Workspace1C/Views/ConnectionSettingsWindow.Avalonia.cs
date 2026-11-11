@@ -1089,13 +1089,17 @@ namespace Workspace1C
                 LocalizationManager.T("Connection.DblClickGlobal"),
                 LocalizationManager.T("Connection.DefaultLaunchEnterprise"),
                 LocalizationManager.T("Connection.DefaultLaunchConfigurator"),
-                LocalizationManager.T("Connection.DblClickNone")
+                LocalizationManager.T("Connection.DblClickNone"),
+                // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
+                // открытому окну Предприятия/Конфигуратора (7OH, обсуждение issue).
+                LocalizationManager.T("Connection.DblClickActivate")
             };
             dblBox.SelectedIndex = (_viewModel.DoubleClickAction ?? string.Empty).Trim() switch
             {
                 Workspace1C.Models.DoubleClickAction.Enterprise => 1,
                 Workspace1C.Models.DoubleClickAction.Configurator => 2,
                 Workspace1C.Models.DoubleClickAction.None => 3,
+                Workspace1C.Models.DoubleClickAction.ActivateWindow => 4,
                 _ => 0
             };
             dblBox.SelectionChanged += (_, _) =>
@@ -1105,6 +1109,7 @@ namespace Workspace1C
                     1 => Workspace1C.Models.DoubleClickAction.Enterprise,
                     2 => Workspace1C.Models.DoubleClickAction.Configurator,
                     3 => Workspace1C.Models.DoubleClickAction.None,
+                    4 => Workspace1C.Models.DoubleClickAction.ActivateWindow,
                     _ => Workspace1C.Models.DoubleClickAction.Default
                 };
             };

@@ -498,13 +498,22 @@ namespace Workspace1C
         /// Issue #120: выбор окна при нескольких запущенных экземплярах
         /// 1С:Предприятия — контекстное меню у строки (двойной щелчок при
         /// запущенном Предприятии); переход к выбранному окну.
+        /// <para>
+        /// Issue #120 (v1.0.1.55, 7OH): меню открывается У МЕСТА двойного щелчка
+        /// (<see cref="PlacementMode.MousePoint"/> — раньше Placement=Bottom уводило
+        /// меню «фиг знает куда» за пределы окна) и в стиле текущей темы
+        /// (ModernContextMenu, как у всех контекстных меню программы).
+        /// </para>
         /// </summary>
         private void OpenRunningWindowPicker(FrameworkElement placementTarget,
             System.Collections.Generic.IReadOnlyList<RunningWindowInfo> windows)
         {
             try
             {
-                var menu = new ContextMenu();
+                var menu = new ContextMenu
+                {
+                    Style = FindResource("ModernContextMenu") as Style
+                };
                 foreach (var window in windows)
                 {
                     var captured = window;
@@ -517,7 +526,7 @@ namespace Workspace1C
                 }
 
                 menu.PlacementTarget = placementTarget;
-                menu.Placement = PlacementMode.Bottom;
+                menu.Placement = PlacementMode.MousePoint;
                 menu.IsOpen = true;
             }
             catch
@@ -536,17 +545,37 @@ namespace Workspace1C
             if (infobase is null)
                 return;
 
-            // Отбор «Только запущенные» (issue #339): вместо глобальной настройки
-            // двойной клик/Enter активируют окно уже запущенной базы.
+            // Отбор «Только запущенные» / вкладка «Запущенные» (issue #339): двойной
+            // клик/Enter активируют окно уже запущенной базы. Issue #120 (v1.0.1.55,
+            // 7OH): при нескольких запущенных приложениях базы (Предприятие и/или
+            // Конфигуратор) — предлагается выбор окна, а не активация «по очереди».
             if (_viewModel.IsListModeRunning && infobase.IsRunning)
             {
-                _viewModel.ActivateRunningInfobase(infobase);
+                ActivateAllWindowsOrNothing(infobase);
                 return;
             }
 
             var dblAction = _viewModel.ResolveDoubleClickAction(infobase);
+
+            // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего», если база сейчас
+            // запущена (Предприятие и/или Конфигуратор), двойной щелчок всё равно
+            // предлагает выбор окна — в список попадают и Предприятие, и Конфигуратор.
             if (dblAction == Workspace1C.Models.DoubleClickAction.None)
+            {
+                if (infobase.IsRunning)
+                    ActivateAllWindowsOrNothing(infobase);
                 return;
+            }
+
+            // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
+            // открытому окну Предприятия/Конфигуратора (одно — напрямую, несколько —
+            // выбор окна; окон нет — ничего).
+            if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
+            {
+                ActivateAllWindowsOrNothing(infobase);
+                return;
+            }
+
             if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator
                 && _viewModel.LaunchConfiguratorCommand.CanExecute(null))
             {
@@ -567,6 +596,32 @@ namespace Workspace1C
                 }
                 _viewModel.LaunchEnterpriseCommand.Execute(null);
             }
+        }
+
+        /// <summary>
+        /// Issue #120 (v1.0.1.55): двойной щелчок при действии «Ничего»/«Активировать
+        /// окно» (и двойной клик на вкладке «Запущенные», 7OH): перечисляются ВСЕ
+        /// открытые окна базы — и Предприятие, и Конфигуратор. Одно окно активируется
+        /// напрямую, несколько — меню выбора у курсора («Предприятие/Конфигуратор +
+        /// время запуска»), окон нет — ничего не происходит (действие «Ничего»).
+        /// Перечисление окон идёт вне UI-потока.
+        /// </summary>
+        private void ActivateAllWindowsOrNothing(Infobase infobase)
+        {
+            System.Threading.Tasks.Task.Run(() => _viewModel.GetRunningWindowsSafeAll(infobase))
+                .ContinueWith(t =>
+                {
+                    var windows = t.Result;
+                    switch (RunningWindowPlanner.PlanAllWindows(windows.Count))
+                    {
+                        case RunningWindowAction.ActivateSingle:
+                            _viewModel.ActivateWindowByHandle(windows[0].Handle);
+                            break;
+                        case RunningWindowAction.ShowPicker:
+                            OpenRunningWindowPicker(this, windows);
+                            break;
+                    }
+                }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         /// <summary>

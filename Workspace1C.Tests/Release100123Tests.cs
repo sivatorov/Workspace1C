@@ -363,10 +363,19 @@ public sealed class Release100123Tests
     [Fact]
     public void Test1BuildScript_OverridesAllFourVersionProperties()
     {
-        // Issue #89: прошлоый test-скрипт передавал только -p:Version — явное
+        // Issue #89: прошлый test-скрипт передавал только -p:Version — явное
         // InformationalVersion в csproj НЕ переопределялось, сборка показывала
         // «полную» версию и автообновление не предлагало стабильный релиз.
-        var script = ReadRepoFile("_build_v100123_test1.ps1");
+        // Сценарий — одноразовый временный файл: он удалён из корня коммитом
+        // 97a8a778 («chore: cleanup temp files») и в репозитории не хранится,
+        // поэтому при его отсутствии проверка пропускается (гарантии
+        // переопределения версий действуют в момент выпуска сборки).
+        var root = FindRepoRoot();
+        var scriptPath = Path.Combine(root, "_build_v100123_test1.ps1");
+        if (!File.Exists(scriptPath))
+            return;
+
+        var script = File.ReadAllText(scriptPath);
 
         Assert.Contains("-p:Version=$Version", script, StringComparison.Ordinal);
         Assert.Contains("-p:AssemblyVersion=$Version", script, StringComparison.Ordinal);

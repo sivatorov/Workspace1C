@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Workspace1C.Models;
 
 namespace Workspace1C.Services;
 
@@ -6,8 +8,19 @@ namespace Workspace1C.Services;
 /// Окно запущенного процесса платформы 1С (issue #120): хэндл для активации,
 /// PID владельца и заголовок. Хэндл платформенно-нейтральный (Windows — HWND
 /// в <see cref="long"/>; на Linux перечисление окон не поддержано и списки пусты).
+/// <para>
+/// Issue #120 (v1.0.1.55, 7OH): в пунктах выбора окна вместо заголовка окна
+/// (GUID/длинная строка) показываются «Предприятие/Конфигуратор + время запуска» —
+/// для этого окно несёт режим запуска (<see cref="Kind"/>) и время старта процесса
+/// (<see cref="StartedAt"/>, из сведений монитора процессов).
+/// </para>
 /// </summary>
-public sealed record RunningWindowInfo(long Handle, int Pid, string Title);
+public sealed record RunningWindowInfo(
+    long Handle,
+    int Pid,
+    string Title,
+    RunningKind Kind = RunningKind.None,
+    DateTime? StartedAt = null);
 
 /// <summary>Решение «запуск нового экземпляра или переход к открытому окну» (issue #120).</summary>
 public enum RunningWindowAction
@@ -73,13 +86,43 @@ public static class RunningWindowPlanner
         };
 
     /// <summary>
-    /// Строка элемента выбора окна: «Заголовок (PID 1234)»; без заголовка — «PID 1234».
+    /// Решение для действия «Активировать окно» (issue #120 v1.0.1.55) и для
+    /// двойного щелчка при действии «Ничего» при запущенной базе: окон нет —
+    /// ничего; одно окно — активировать напрямую; несколько — выбор окна.
+    /// </summary>
+    public static RunningWindowAction PlanAllWindows(int openWindowCount)
+        => openWindowCount switch
+        {
+            <= 0 => RunningWindowAction.None,
+            1 => RunningWindowAction.ActivateSingle,
+            _ => RunningWindowAction.ShowPicker
+        };
+
+    /// <summary>
+    /// Строка элемента выбора окна (issue #120 v1.0.1.55, 7OH): «Предприятие
+    /// (запущено в 12:34:05)» / «Конфигуратор (запущено в 12:34:05)» — вместо
+    /// заголовка окна (GUID/длинная строка), время запуска полезнее. Без режима
+    /// или времени — прежний формат «Заголовок (PID 1234)».
     /// </summary>
     public static string FormatWindowTitle(RunningWindowInfo window)
     {
-        var title = (window.Title ?? string.Empty).Trim();
-        return title.Length > 0
-            ? $"{title} (PID {window.Pid})"
-            : $"PID {window.Pid}";
+        var label = window.Kind switch
+        {
+            RunningKind.Enterprise => Localization.LocalizationManager.T("Running.PickerEnterprise"),
+            RunningKind.Configurator => Localization.LocalizationManager.T("Running.PickerConfigurator"),
+            _ => null
+        };
+
+        if (label is null)
+        {
+            var title = (window.Title ?? string.Empty).Trim();
+            return title.Length > 0
+                ? $"{title} (PID {window.Pid})"
+                : $"PID {window.Pid}";
+        }
+
+        return window.StartedAt is { } started
+            ? $"{label} ({string.Format(Localization.LocalizationManager.T("Running.PickerStartedAt"), started.ToString("HH:mm:ss"))})"
+            : $"{label} (PID {window.Pid})";
     }
 }

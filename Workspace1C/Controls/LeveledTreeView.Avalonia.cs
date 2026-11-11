@@ -521,17 +521,31 @@ namespace Workspace1C.Controls
         {
             vm.SelectedInfobase = ib;
 
-            // Отбор «Только запущенные» (issue #339): вместо глобальной настройки
-            // двойной клик/Enter активируют окно уже запущенной базы.
+            // Отбор «Только запущенные» / вкладка «Запущенные» (issue #339): двойной
+            // клик/Enter активируют окно уже запущенной базы. Issue #120 (v1.0.1.55,
+            // 7OH): при нескольких запущенных приложениях базы — выбор окна.
             if (vm.IsListModeRunning && ib.IsRunning)
             {
-                vm.ActivateRunningInfobase(ib);
+                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
                 return;
             }
 
             var dblAction = vm.ResolveDoubleClickAction(ib);
+            // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего» у запущенной базы —
+            // выбор окна (в списке и Предприятие, и Конфигуратор).
             if (dblAction == Workspace1C.Models.DoubleClickAction.None)
+            {
+                if (ib.IsRunning)
+                    Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
                 return;
+            }
+            // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
+            // открытому окну Предприятия/Конфигуратора.
+            if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
+            {
+                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
+                return;
+            }
             if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
             {
                 // Issue #120: запуск Конфигуратора сам активирует открытое окно

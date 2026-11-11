@@ -44,15 +44,36 @@ public static class OneCWindowActivator
     /// к базе. kind — фильтр по режиму запуска (Предприятие/Конфигуратор через
     /// <see cref="RunningKindClassifier"/>); null — все процессы базы.
     /// Служебные окна без заголовка не считаются главными окнами 1С.
+    /// <para>
+    /// Issue #120 (v1.0.1.55, 7OH): каждое окно несёт режим запуска процесса
+    /// (<see cref="RunningKind"/>) и время старта процесса — в пунктах выбора окна
+    /// показывается «Предприятие/Конфигуратор + время запуска» вместо заголовка.
+    /// </para>
     /// </summary>
     public static IReadOnlyList<RunningWindowInfo> GetWindows(Infobase infobase, RunningKind? kind)
     {
         if (infobase is null)
             return Array.Empty<RunningWindowInfo>();
 
-        var pids = GetProcessIds(infobase, kind);
-        if (pids.Length == 0)
+        // Сведения монитора процессов: режим запуска и время старта по PID
+        // (для пунктов выбора окна «Предприятие/Конфигуратор + время запуска»).
+        var details = AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails()
+            ?? Array.Empty<RunningOneCProcessDetails>();
+        var pidInfo = new Dictionary<int, (RunningKind Kind, DateTime? StartedAt)>();
+        foreach (var d in details)
+        {
+            if (!RunningInfobaseMatcher.MatchesCommandLine(infobase, d.CommandLine))
+                continue;
+            var processKind = RunningKindClassifier.Classify(d.ProcessName, d.CommandLine);
+            if (kind is not null && processKind != kind)
+                continue;
+            pidInfo[d.Pid] = (processKind, d.StartTime);
+        }
+
+        if (pidInfo.Count == 0)
             return Array.Empty<RunningWindowInfo>();
+        var pids = new int[pidInfo.Count];
+        pidInfo.Keys.CopyTo(pids, 0);
 
         var windows = new List<RunningWindowInfo>();
         EnumWindows((hWnd, _) =>
@@ -61,7 +82,7 @@ public static class OneCWindowActivator
                 return true; // продолжаем перечисление
 
             GetWindowThreadProcessId(hWnd, out var pid);
-            if (Array.IndexOf(pids, (int)pid) < 0)
+            if (!pidInfo.TryGetValue((int)pid, out var info))
                 return true;
 
             var length = GetWindowTextLength(hWnd);
@@ -74,7 +95,7 @@ public static class OneCWindowActivator
             if (title.Length == 0)
                 return true;
 
-            windows.Add(new RunningWindowInfo(hWnd.ToInt64(), (int)pid, title));
+            windows.Add(new RunningWindowInfo(hWnd.ToInt64(), (int)pid, title, info.Kind, info.StartedAt));
             return true;
         }, IntPtr.Zero);
 

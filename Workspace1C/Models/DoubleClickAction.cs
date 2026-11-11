@@ -15,6 +15,13 @@ public static class DoubleClickAction
     /// <summary>Ничего не делать.</summary>
     public const string None = "None";
 
+    /// <summary>
+    /// Активировать окно уже запущенного экземпляра (issue #120 v1.0.1.55):
+    /// одно окно — активируется напрямую, несколько — выбор окна
+    /// («Предприятие/Конфигуратор + время запуска»); окон нет — ничего.
+    /// </summary>
+    public const string ActivateWindow = "ActivateWindow";
+
     /// <summary>Пустая строка — использовать глобальную настройку.</summary>
     public const string Default = "";
 
@@ -30,7 +37,7 @@ public static class DoubleClickAction
     public static string Normalize(string? value)
         => value switch
         {
-            Enterprise or Configurator or None => value,
+            Enterprise or Configurator or None or ActivateWindow => value,
             _ => GlobalDefault
         };
 }

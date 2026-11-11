@@ -1224,12 +1224,20 @@
                                  (issue #296): 15 → 13. Работает вместе с ThemeManager.ApplyCompactTree,
                                  который масштабирует отступы и шрифты, но не размеры иконок. -->
                             <Style x:Key="RowActionIcon" TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                <Setter Property="Width" Value="15"/>
-                                <Setter Property="Height" Value="15"/>
+                                <!-- Issue #107 (v1.0.1.55): значки в чипах колонки «Действия» выглядели
+                                     смещёнными/растянутыми: 15 px в кружке 22 px оставляло слишком
+                                     много пустоты, а центрирование не было задано явно (зависело от
+                                     того, как Border разложит ребёнка фиксированного размера). Явно
+                                     центрируем и укрупняем значок до 16 px (13 в компактном режиме) —
+                                     пропорция как у одобренных чипов-индикаторов 18/16. -->
+                                <Setter Property="Width" Value="16"/>
+                                <Setter Property="Height" Value="16"/>
+                                <Setter Property="HorizontalAlignment" Value="Center"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Width" Value="12"/>
-                                        <Setter Property="Height" Value="12"/>
+                                        <Setter Property="Width" Value="13"/>
+                                        <Setter Property="Height" Value="13"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -1275,13 +1283,17 @@
                             </Style>
                             <!-- Issue #121 (v1.0.1.54): круглая подложка-кружок кнопок колонки
                                  «Действия» — единый стиль с индикаторами запуска (issue #101/#103):
-                                 22 px кружок, фон карточки с тонкой обводкой; выделенная строка
-                                 подсвечивает обводку акцентом; зависший процесс Предприятия
-                                 перекрашивает подложку в красный (триггеры у кнопки запуска). -->
+                                 фон карточки с тонкой обводкой; выделенная строка подсвечивает
+                                 обводку акцентом; зависший процесс Предприятия перекрашивает
+                                 подложку в красный (триггеры у кнопки запуска).
+                                 Issue #121 (v1.0.1.55): кружок уменьшен 22 → 18 px с значком 16 px —
+                                 пропорция «кружок/значок» как у одобренных чипов-индикаторов запуска
+                                 18/16 (7OH: «кружки явно больше, чем надо, значки надо делать больше»);
+                                 заодно чип перестаёт распирать низкие строки групп. -->
                             <Style x:Key="RowActionChip" TargetType="Border">
-                                <Setter Property="Width" Value="22"/>
-                                <Setter Property="Height" Value="22"/>
-                                <Setter Property="CornerRadius" Value="11"/>
+                                <Setter Property="Width" Value="18"/>
+                                <Setter Property="Height" Value="18"/>
+                                <Setter Property="CornerRadius" Value="9"/>
                                 <Setter Property="BorderThickness" Value="1"/>
                                 <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
                                 <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
@@ -2103,8 +2115,9 @@
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchEnterpriseTooltip}">
-                                                <Border BorderThickness="1" CornerRadius="11" Width="22" Height="22"
-                                                        VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                                <!-- Issue #121 (v1.0.1.55): локальные размеры 22 px сняты —
+                                                     чип берёт единые 18 px из стиля RowActionChip. -->
+                                                <Border>
                                                     <Border.Style>
                                                         <Style TargetType="Border" BasedOn="{StaticResource RowActionChip}">
                                                             <Style.Triggers>
@@ -2154,10 +2167,44 @@
                                                     CommandParameter="{Binding}"
                                                     Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchConfiguratorSectionTooltip}">
-                                                <Border Style="{StaticResource RowActionChip}">
-                                                    <materialDesign:PackIcon Kind="Wrench"
-                                                                             Style="{StaticResource RowActionIcon}"
-                                                                             Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <!-- Issue #120 (v1.0.1.55, 7OH): чип Конфигуратора красится,
+                                                     как чип Предприятия: запущен — оранжевый значок,
+                                                     зависший процесс — белый значок на красном чипе
+                                                     (раньше значок оставался серым при запущенном
+                                                     Конфигураторе — «красит только у предприятия»). -->
+                                                <Border VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border" BasedOn="{StaticResource RowActionChip}">
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Hung">
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Critical">
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <materialDesign:PackIcon Kind="Wrench">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource RowActionIcon}">
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsConfiguratorRunning}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Hung">
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding ConfiguratorRunningStatus}" Value="Critical">
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
                                                 </Border>
                                             </Button>
                                             <Button Command="{Binding DataContext.ClearCacheCommand, RelativeSource={RelativeSource AncestorType=Window}}"
@@ -2384,7 +2431,10 @@
                                                     <Border x:Name="row" Grid.Column="1" Background="Transparent">
                                                         <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
                                                     </Border>
-                                                    <!-- Кнопка свернуть/развернуть: «+» = группа свёрнута, «−» = развёрнута.
+                                                    <!-- Кнопка свернуть/развернуть (issue #123, v1.0.1.55): шевроны
+                                                         в стиле 1С вместо «+»/«−» — квадратные кнопки с плюс/минус
+                                                         выглядели одинаково и действия было не различить:
+                                                         свёрнута — шеврон вправо, развёрнута — шеврон вниз.
                                                          Видна только у узлов с дочерними элементами (группы). -->
                                                     <Button x:Name="Expander" Grid.Column="0"
                                                             HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -2430,23 +2480,23 @@
                                                                         CornerRadius="4"
                                                                         SnapsToDevicePixels="True">
                                                                     <Grid>
-                                                                        <!-- «−» : группа развёрнута -->
+                                                                        <!-- Развёрнута: шеврон вниз (issue #123) -->
                                                                         <Path x:Name="IconExpanded"
                                                                               Width="12" Height="12"
                                                                               Stretch="Uniform"
                                                                               Fill="{DynamicResource AccentBrush}"
                                                                               HorizontalAlignment="Center"
                                                                               VerticalAlignment="Center"
-                                                                              Data="{DynamicResource IconMinus}"
+                                                                              Data="{DynamicResource IconChevronDown}"
                                                                               Visibility="Visible"/>
-                                                                        <!-- «+» : группа свёрнута -->
+                                                                        <!-- Свёрнута: шеврон вправо (issue #123) -->
                                                                         <Path x:Name="IconCollapsed"
                                                                               Width="12" Height="12"
                                                                               Stretch="Uniform"
                                                                               Fill="{DynamicResource AccentBrush}"
                                                                               HorizontalAlignment="Center"
                                                                               VerticalAlignment="Center"
-                                                                              Data="{DynamicResource IconPlus}"
+                                                                              Data="{DynamicResource IconChevronRight}"
                                                                               Visibility="Collapsed"/>
                                                                     </Grid>
                                                                 </Border>
@@ -2842,7 +2892,12 @@
                                     </Button.ToolTip>
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                            <!-- Issue #122 (v1.0.1.55): подложка hover была квадратной,
+                                                 занимала всю карточку и прямыми углами выступала за её
+                                                 скруглённый контур (CornerRadius 10). Скругляем подложку
+                                                 (радиус 9 - внутри обводки) и добавляем отступ 1px. -->
+                                            <Border x:Name="bd" Background="Transparent" Padding="{TemplateBinding Padding}"
+                                                    CornerRadius="9" Margin="1">
                                                 <ContentPresenter VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -2870,7 +2925,9 @@
                                         Background="Transparent" BorderThickness="0" Padding="0">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="bd" Background="Transparent">
+                                            <!-- Issue #122 (v1.0.1.55): скругляем подложку hover, чтобы
+                                                 подсветка не выступала за скруглённый контур карточки. -->
+                                            <Border x:Name="bd" Background="Transparent" CornerRadius="0,9,9,0">
                                                 <materialDesign:PackIcon Kind="ChevronDown" Width="16" Height="16"
                                                                          Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
@@ -2941,7 +2998,12 @@
                                     </Button.ToolTip>
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="bd" Background="Transparent" Padding="{TemplateBinding Padding}">
+                                            <!-- Issue #122 (v1.0.1.55): подложка hover была квадратной,
+                                                 занимала всю карточку и прямыми углами выступала за её
+                                                 скруглённый контур (CornerRadius 10). Скругляем подложку
+                                                 (радиус 9 - внутри обводки) и добавляем отступ 1px. -->
+                                            <Border x:Name="bd" Background="Transparent" Padding="{TemplateBinding Padding}"
+                                                    CornerRadius="9" Margin="1">
                                                 <ContentPresenter VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -2967,7 +3029,9 @@
                                         Background="Transparent" BorderThickness="0" Padding="0">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
-                                            <Border x:Name="bd" Background="Transparent">
+                                            <!-- Issue #122 (v1.0.1.55): скругляем подложку hover, чтобы
+                                                 подсветка не выступала за скруглённый контур карточки. -->
+                                            <Border x:Name="bd" Background="Transparent" CornerRadius="0,9,9,0">
                                                 <materialDesign:PackIcon Kind="ChevronDown" Width="16" Height="16"
                                                                          Foreground="{DynamicResource TextSecondaryBrush}"
                                                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>

@@ -1,9 +1,12 @@
+<!-- Issue #116 п.3 (v1.0.1.55, 7OH): окно «Что нового» в полтора раза больше
+     по обеим осям — сводка релиза читается целиком, галка «Показывать при
+     запуске» и кнопки помещаются без обрезки текста. -->
 <Window x:Class="Workspace1C.WhatsNewWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="420" Width="560" MinHeight="320" MinWidth="440"
+        Height="630" Width="840" MinHeight="480" MinWidth="660"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
