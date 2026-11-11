@@ -429,8 +429,28 @@ namespace Workspace1C
                 IsVisible = false
             };
             ToolTip.SetTip(runningIcons, ib.RunningModesTooltip);
-            runningIcons.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib });
+            // Issue #121 (v1.0.1.56, предложение 7OH): при включённой колонке
+            // «Действия» индикаторы запуска в наименовании не показываются —
+            // чипы занятости видны на кнопках запуска этой колонки; при
+            // выключенной колонке индикаторы работают как раньше. Реакция на
+            // смену настройки — через PropertyChanged ShowActionsColumn у VM.
+            if (_vm is not null)
+            {
+                runningIcons.Bind(Visual.IsVisibleProperty, new MultiBinding
+                {
+                    Converter = new RunningNameIndicatorConverter(),
+                    Bindings =
+                    {
+                        new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib },
+                        new Avalonia.Data.Binding(nameof(MainViewModel.ShowActionsColumn)) { Source = _vm }
+                    }
+                });
+            }
+            else
+            {
+                runningIcons.Bind(Visual.IsVisibleProperty,
+                    new Avalonia.Data.Binding(nameof(Infobase.IsRunning)) { Source = ib });
+            }
 
             // Подложка-бейдж под значком (issue #101): v1.0.1.24 — Вариант 1 (круглый чип
             // цвета карточки с тонкой обводкой — контраст значку на ЛЮБОМ акценте

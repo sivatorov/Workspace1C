@@ -1292,6 +1292,7 @@
     "CacheClean.SelectAll": "Select all",
     "CacheClean.SelectAllTooltip": "Select all infobases",
     "CacheClean.ClearAll": "Clear all",
+    "CacheClean.TotalRootsTooltip": "Total in cache directories, including caches of unrecognized bases: {0}",
     "CacheClean.ClearAllTooltip": "Deselect all infobases",
     "CacheClean.Clean": "Clear",
     "CacheClean.SizeUnits": "B,KB,MB,GB,TB",

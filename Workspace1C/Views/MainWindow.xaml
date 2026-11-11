@@ -1937,9 +1937,23 @@
                                                  Hung/Critical) чип перекрашивается в красный, значок — в белый. Значок
                                                  «Предприятие» увеличен (16 вместо 10) и отцентрован: прежде Padding 3 при чипе 16
                                                  оставлял значку 8 px из 10 и смещал его; теперь чип 18 без внутренних полей. -->
+                                            <!-- Issue #121 (v1.0.1.56, предложение 7OH): при включённой колонке
+                                                 «Действия» индикаторы запуска в наименовании не показываются —
+                                                 чипы занятости видны на кнопках запуска этой колонки; при
+                                                 выключенной колонке индикаторы работают как раньше
+                                                 (DataTrigger по ShowActionsColumn у окна). -->
                                             <StackPanel Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center"
-                                                        ToolTip="{Binding RunningModesTooltip}"
-                                                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVis}}">
+                                                        ToolTip="{Binding RunningModesTooltip}">
+                                                <StackPanel.Style>
+                                                    <Style TargetType="StackPanel">
+                                                        <Setter Property="Visibility" Value="{Binding IsRunning, Converter={StaticResource BoolToVis}}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding DataContext.ShowActionsColumn, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </StackPanel.Style>
                                                 <!-- issue #101: триггеры чипов привязаны к ПЕР-РЕЖИМНЫМ статусам
                                                      (EnterpriseRunningStatus / ConfiguratorRunningStatus), а не к общему
                                                      RunningStatus: зависший Конфигуратор красит только свой чип,

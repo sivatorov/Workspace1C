@@ -42,15 +42,19 @@ namespace Workspace1C
 
             var version = WhatsNewService.CurrentVersion;
 
-            var root = AvaloniaUi.Rows(0, -1, 0);
-            root.Margin = new Thickness(20);
+            // Issue #124 (v1.0.1.56): корневая компоновка — DockPanel вместо Grid
+            // (Auto/Star/Auto): нижняя панель с галкой «Показывать при запуске»
+            // докится к низу и измеряется до карточки сводки, поэтому при сжатии
+            // окна до минимума не обрезается; сжимается только карточка сводки.
+            var root = new DockPanel { LastChildFill = true, Margin = new Thickness(20) };
 
-            // Заголовок: «Что нового в Workspace 1C <версия>».
+            // Заголовок: «Что нового в Workspace 1C <версия>» (docked Top).
             var title = AvaloniaUi.Text(
                 string.Format(LocalizationManager.T("WhatsNew.TitleFormat"), version),
                 16, bold: true);
             title.Margin = new Thickness(0, 0, 0, 12);
-            AvaloniaUi.Place(root, title, 0);
+            DockPanel.SetDock(title, Dock.Top);
+            root.Children.Add(title);
 
             // Сводка изменений релиза: пункты списком.
             var notesPanel = new StackPanel { Orientation = Orientation.Vertical };
@@ -84,7 +88,7 @@ namespace Workspace1C
             };
             ThemeBrushes.Bind(card, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(card, Border.BorderBrushProperty, "BorderBrush");
-            AvaloniaUi.Place(root, card, 1);
+            // Карточка сводки добавляется ПОСЛЕДНЕЙ — заполняет остаток (LastChildFill).
 
             // Кнопки: галка «показывать при запуске», CHANGELOG на GitHub, закрыть.
             _showOnStartCheck = new CheckBox
@@ -105,8 +109,12 @@ namespace Workspace1C
             bottom.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
             AvaloniaUi.Place(bottom, _showOnStartCheck, 0, 0);
             AvaloniaUi.Place(bottom, buttons, 0, 1);
-            AvaloniaUi.Place(root, bottom, 2);
+            // Нижняя панель докится к низу ДО добавления карточки — не обрезается
+            // при сжатии окна (issue #124, v1.0.1.56).
+            DockPanel.SetDock(bottom, Dock.Bottom);
+            root.Children.Add(bottom);
 
+            root.Children.Add(card);
             Content = root;
         }
 

@@ -1292,6 +1292,7 @@
     "CacheClean.SelectAll": "Выбрать все",
     "CacheClean.SelectAllTooltip": "Выбрать все базы",
     "CacheClean.ClearAll": "Снять все",
+    "CacheClean.TotalRootsTooltip": "Всего в каталогах кэша, включая кэш неопознанных баз: {0}",
     "CacheClean.ClearAllTooltip": "Снять выделение со всех баз",
     "CacheClean.Clean": "Очистить",
     "CacheClean.SizeUnits": "Б,КБ,МБ,ГБ,ТБ",

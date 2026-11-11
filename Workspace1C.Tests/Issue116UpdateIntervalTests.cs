@@ -367,11 +367,13 @@ public sealed class Issue116UpdateIntervalTests
     public void Avalonia_WhatsNewWindow_TextAreaFollowsWindowSize()
     {
         // Окно «Что нового» можно растягивать, и область текста следует за окном:
-        // средняя строка сетки — star (AvaloniaUi.Rows(0, -1, 0)), контент —
-        // единственный ScrollViewer с Auto-прокруткой (issue #116).
+        // корневая компоновка — DockPanel с LastChildFill (issue #124, v1.0.1.56:
+        // нижняя панель докится к низу и не обрезается, карточка сводки заполняет
+        // остаток), контент — единственный ScrollViewer с Auto-прокруткой (issue #116).
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WhatsNewWindow.Avalonia.cs"));
         Assert.Contains("CanResize = true", code);
-        Assert.Contains("AvaloniaUi.Rows(0, -1, 0)", code);
+        Assert.Contains("new DockPanel { LastChildFill = true", code);
+        Assert.Contains("DockPanel.SetDock(bottom, Dock.Bottom)", code);
         Assert.Contains("ScrollBarVisibility.Auto", code);
     }
 }

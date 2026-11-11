@@ -517,6 +517,9 @@ public partial class CacheCleanWindow : Window
     {
         UpdateCount();
         UpdateCleanEnabled();
+        // Issue #109 (v1.0.1.56, 7OH): итог у галок типа кэша — сумма по ОТМЕЧЕННЫМ
+        // базам, пересчитывается при каждой смене отметок.
+        UpdateSelectedTotals();
     }
 
     private void OnCacheKindChanged(object sender, RoutedEventArgs e)
@@ -529,16 +532,23 @@ public partial class CacheCleanWindow : Window
 
     /// <summary>
     /// Вычисляет и отображает размеры программного и пользовательского кеша.
-    /// Итоговые строки показывают честный общий объём кэша в корнях (issue #109а),
-    /// включая несопоставленные базе каталоги; строки по базам — только кэш этих баз.
+    /// Итоговые строки у галок типа кэша показывают ИТОГО ПО ОТМЕЧЕННЫМ БАЗАМ
+    /// (issue #109, v1.0.1.56, 7OH) — то, что реально будет очищено; «честный»
+    /// общий объём корней (issue #109а) сохранён в подсказке при наведении на
+    /// итог. Строки по базам — только кэш этих баз.
     /// Расчёт выполняется в фоновом потоке, чтобы не блокировать интерфейс.
     /// </summary>
     private async Task RefreshCacheSizesAsync()
     {
         ProgramCacheSizeText.Text = "…";
         UserCacheSizeText.Text = "…";
+        _rootProgramTotal = null;
+        _rootUserTotal = null;
+        _programBytes.Clear();
+        _userBytes.Clear();
         foreach (var t in _programSizeTexts.Values) t.Text = "…";
         foreach (var t in _userSizeTexts.Values) t.Text = "…";
+        UpdateSelectedTotals();
 
         // Тип кеша читается ДО Task.Run: CurrentKind обращается к IsChecked переключателей,
         // а свойства элементов WPF доступны только из потока интерфейса. Вызов внутри лямбды
@@ -566,8 +576,10 @@ public partial class CacheCleanWindow : Window
         {
             // Честный общий объём (issue #109а): все каталоги корней, включая
             // несопоставленные базе, — иначе «15 ГБ» на диске показывались «15 МБ».
+            // Показывается в подсказке итога по отмеченным (issue #109 v1.0.1.56).
             var program = await programTask;
-            ProgramCacheSizeText.Text = FormatSize(program);
+            _rootProgramTotal = program;
+            SetRootTotalTooltip(ProgramCacheSizeText, program);
         }
         catch (Exception ex)
         {
@@ -579,7 +591,8 @@ public partial class CacheCleanWindow : Window
         {
             // Честный общий объём (issue #109а) — см. комментарий к блоку «программный».
             var user = await userTask;
-            UserCacheSizeText.Text = FormatSize(user);
+            _rootUserTotal = user;
+            SetRootTotalTooltip(UserCacheSizeText, user);
         }
         catch (Exception ex)
         {
@@ -605,6 +618,7 @@ public partial class CacheCleanWindow : Window
                 var p = await programTask2;
                 _programBytes[ib] = p;
                 if (_programSizeTexts.TryGetValue(ib, out var pt)) pt.Text = FormatSize(p);
+                UpdateSelectedTotals();
             }
             catch (Exception ex)
             {
@@ -616,6 +630,7 @@ public partial class CacheCleanWindow : Window
                 var u = await userTask2;
                 _userBytes[ib] = u;
                 if (_userSizeTexts.TryGetValue(ib, out var ut)) ut.Text = FormatSize(u);
+                UpdateSelectedTotals();
             }
             catch (Exception ex)
             {
@@ -623,6 +638,47 @@ public partial class CacheCleanWindow : Window
             }
         }
     }
+
+    /// <summary>Честный общий объём корней программного кэша (для подсказки), null — ещё считается.</summary>
+    private long? _rootProgramTotal;
+
+    /// <summary>Честный общий объём корней пользовательского кэша (для подсказки), null — ещё считается.</summary>
+    private long? _rootUserTotal;
+
+    /// <summary>
+    /// Итог у галки типа кэша: сумма размеров кэша ОТМЕЧЕННЫХ баз
+    /// (issue #109, v1.0.1.56, 7OH). Пока у хоть одной отмеченной базы размер
+    /// ещё не готов — показывает «…».
+    /// </summary>
+    private void UpdateSelectedTotals()
+    {
+        if (ProgramCacheCheck.IsChecked == true)
+            ProgramCacheSizeText.Text = SumSelectedSizes(_programBytes);
+        if (UserCacheCheck.IsChecked == true)
+            UserCacheSizeText.Text = SumSelectedSizes(_userBytes);
+    }
+
+    /// <summary>Сумма размеров отмеченных баз; «…», если хоть один размер ещё не готов.</summary>
+    private string SumSelectedSizes(Dictionary<Infobase, long> sizes)
+    {
+        long sum = 0;
+        foreach (var kv in _baseChecks)
+        {
+            if (kv.Key.IsChecked != true)
+                continue;
+            if (!sizes.TryGetValue(kv.Value, out var size))
+                return "…";
+            sum += size;
+        }
+        return FormatSize(sum);
+    }
+
+    /// <summary>
+    /// «Честный» общий объём корней кэша (включая кэш неопознанных баз) показывается
+    /// в подсказке при наведении на итог по отмеченным базам (issue #109 v1.0.1.56).
+    /// </summary>
+    private void SetRootTotalTooltip(System.Windows.Controls.TextBlock text, long total)
+        => text.ToolTip = string.Format(LocalizationManager.T("CacheClean.TotalRootsTooltip"), FormatSize(total));
 
     /// <summary>Возвращает тип кеша, выбранный в данный момент (по галкам программного/пользовательского).</summary>
     private OneCCacheKind CurrentKind()
