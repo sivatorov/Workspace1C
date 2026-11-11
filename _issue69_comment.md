@@ -1,8 +1,0 @@
-Добавлено в версии 1.0.0.75 (Windows и Linux) по описанию issue:
-
-1. **Диалог повтора при ошибке удаления из кластера.** Если «infobase drop» не удался (например, база защищена и rac требует аутентификацию администратора ИБ), вместо простого окна с одной кнопкой OK показывается диалог с текстом ошибки, полями **«Логин»** и **«Пароль»** и кнопками **«Повторить попытку»** / **«Отмена»** ([`RacInfobaseDropRetryWindow.xaml`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml), [`RacInfobaseDropRetryWindow.Avalonia.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.Avalonia.cs)).
-2. **Повтор с учётными данными администратора ИБ.** По «Повторить попытку» удаление выполняется ещё раз с введёнными логином/паролем: rac-команда получает `--infobase-user=…`/`--infobase-password=…` (пароль в журнал не пишется) ([`ServerMonitorViewModel.DropSelectedInfobaseAsync`](Workspace1C/ViewModels/ServerMonitorViewModel.cs), [`RacClient.DropInfobaseAsync`](Workspace1C/Services/RacClient.cs), [`IRacClient.cs`](Workspace1C/Services/IRacClient.cs)). При повторной ошибке диалог показывается снова — логин сохраняется, пароль вводится заново; «Отмена» прерывает удаление.
-
-Покрыто тестами `RacClientTests` (аргументы `--infobase-user=`/`--infobase-password=`, пароль не в журнале), `ServerMonitorViewModelTests` (повтор с кредами, «Отмена» не выполняет второй вызов, повторная ошибка — снова диалог), `Issue69DropRetryWindowLayoutTests` (поля Логин/Пароль и кнопки «Повторить попытку»/«Отмена» в окнах WPF и Avalonia).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.75

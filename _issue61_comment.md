@@ -1,8 +1,0 @@
-Исправлено в версии 1.0.0.72 (Windows и Linux) по последним комментариям:
-
-1. **Окно «Изменение сервера» — заголовки полей.** На Linux подписи полей и заголовок окна строились кодом без привязки кисти темы — теперь привязаны к `TextPrimaryBrush` ([`ServerEditWindow.Avalonia.cs`](Workspace1C/Views/ServerEditWindow.Avalonia.cs)); на Windows проверена разметка окна.
-2. **Текст в поле.** Поле показа пароля окна «Изменение сервера» переведено на стиль темы `ModernTextBox` — читаемый текст/фон в обеих темах ([`ServerEditWindow.xaml`](Workspace1C/Views/ServerEditWindow.xaml)).
-
-Проверка читаемости в тёмной теме закреплена расширенными тестами-стражами `Issue61TitleColorsTests` (привязки кистей в Avalonia-коде, стиль поля в WPF-разметке, отсутствие фиксированных тёмных текст-форграундов).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72

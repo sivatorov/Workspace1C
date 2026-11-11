@@ -1,8 +1,0 @@
-Исправлено в версии 1.0.0.72 (Windows и Linux) по комментарию:
-
-1. **Пункт перенесён из «Утилиты» в контекстное меню базы.** «Публикация на веб-сервере» теперь в подменю **«Администрирование»** (над «Историей запусков», с разделителем): удалён из каталога «Утилиты» ([`UtilitiesMenuCatalog.cs`](Workspace1C/Services/UtilitiesMenuCatalog.cs); старые `utilities_menu_layout.json` с пунктом нормализуются) и добавлен в [`ContextMenuCatalog.cs`](Workspace1C/Services/ContextMenuCatalog.cs) (`GroupAdministration`, помечен новым — попадает в «Новинки программы»).
-2. **Парсер конфигов доработан: DocumentRoot и Listen.** Парсер ([`ApacheConfIncludeParser.cs`](Workspace1C/Services/ApacheConfIncludeParser.cs)) разбирает директиву **DocumentRoot** (относительные пути резолвятся; учитывается подкаталог сайта — в примере «c:\Apache\Apache24\htdocs\27\demo_27») и порты **Listen** (`Listen 80`, `Listen 0.0.0.0:8027`, `[::]:8080`); у инстанса появились поля `DocumentRoot`/`ListenPorts` ([`ApacheInstance.cs`](Workspace1C/Models/ApacheInstance.cs)), детектор заполняет их из конфига ([`ApacheInstanceDetector.cs`](Workspace1C/Services/ApacheInstanceDetector.cs)). Каталог публикации окна использует DocumentRoot инстанса, а URL — порт: при Listen ≠ 80 адрес становится `http://localhost:8027/demo_27/` ([`WebPublishViewModel.cs`](Workspace1C/ViewModels/WebPublishViewModel.cs), [`WebPublishService.LocalUrl`](Workspace1C/Services/WebPublishService.cs)).
-
-Локализация ru/en; добавлены юнит-тесты `WebPublishIssue63Tests` (каталоги меню, парсер DocumentRoot/Listen, URL с портом, VM) и обновлены регресс-тесты меню.
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.72

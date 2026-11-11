@@ -1,9 +1,0 @@
-Исправлено в версии 1.0.0.76 (Windows и Linux) по последнему комментарию («раз уж мы подключены к кластеру — надо попытаться закрыть все соединения с этой базой перед удалением»):
-
-1. **Классификатор ошибок удаления из кластера с подсказками.** Текст ошибки rac при неудачном «infobase drop» классифицируется: защищённая ИБ/недостаточно прав (аутентификация), активные сеансы/соединения, сервер СУБД, неизвестная ошибка. Диалог повтора показывает локализованную подсказку по типу ошибки — сразу понятно, что делать ([`DropRetryResult.cs`](Workspace1C/ViewModels/DropRetryResult.cs), [`RacInfobaseDropRetryWindow.xaml`](Workspace1C/Views/RacInfobaseDropRetryWindow.xaml), [`RacInfobaseDropRetryWindow.Avalonia.cs`](Workspace1C/Views/RacInfobaseDropRetryWindow.Avalonia.cs)).
-2. **Кнопка «Завершить сеансы и повторить».** Если база занята сеансами/соединениями, появляется кнопка, которая завершает активные сеансы и соединения **именно этой базы** (disconnect + session terminate), после чего удаление повторяется с кредами администратора ИБ ([`ServerMonitorViewModel.DropSelectedInfobaseAsync`](Workspace1C/ViewModels/ServerMonitorViewModel.cs)).
-3. **Статус повторной неудачи.** Если повторная попытка снова не удалась, в статусе пишется «Повторная попытка удаления не удалась: …» — видно, что это именно повтор, а не первичная ошибка.
-
-Покрыто тестами `ServerMonitorViewModelTests` (классификация ошибок, завершение сеансов, повтор с кредами) и `Issue69DropRetryWindowLayoutTests` (подсказки и кнопка «Завершить сеансы и повторить» в окнах WPF и Avalonia).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.76

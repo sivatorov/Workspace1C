@@ -1,7 +1,0 @@
-Исправлено в версии 1.0.0.82 (Windows и Linux):
-
-**Мультивыделение в «Серверах 1С»: завершение сеансов и разрыв соединений несколькими строками разом** — на вкладках «Сеансы» и «Соединения» монитора серверов строки выделяются группой (Ctrl — инверсия выбора, Shift — диапазон; WPF — DataGrid `SelectionMode=Extended`, Avalonia — ListBox `SelectionMode.Multiple`), а кнопки «Завершить сеанс» и «Разорвать соединение» действуют на ВСЕ выбранные строки: подтверждение запрашивается один раз (указывается количество), rac-команды выполняются последовательно, частичная ошибка не прерывает остальных, в статус-строку выводится сводка «Завершено сеансов: N из M» / «Разорвано соединений: N из M»; при выборе одной строки поведение прежнее, при пустом выделении кнопка недоступна ([`ServerMonitorViewModel.cs`](Workspace1C/ViewModels/ServerMonitorViewModel.cs), [`ServerMonitorWindow.xaml`](Workspace1C/Views/ServerMonitorWindow.xaml), [`ServerMonitorWindow.xaml.cs`](Workspace1C/Views/ServerMonitorWindow.xaml.cs), [`ServerMonitorWindow.Avalonia.cs`](Workspace1C/Views/ServerMonitorWindow.Avalonia.cs)).
-
-Покрыто тестами `ServerMonitorViewModelTests` (+7).
-
-Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.0.82
