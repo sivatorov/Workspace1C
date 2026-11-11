@@ -793,10 +793,12 @@
                                          видимость управляется переключателем ShowActionsColumn,
                                          ширина настраивается перетаскиванием разделителя.
                                          MinWidth не задан намеренно — при скрытии колонка схлопывается в 0;
-                                         минимум 120 гарантирует обработчик перетаскивания, пока колонка видима. -->
+                                         минимум (issue #121, v1.0.1.54) держит обработчик перетаскивания:
+                                         80 — под три круглые кнопки-чипа (MainViewModel.ActionsColumnMinWidth),
+                                         по умолчанию 120 вместо прежних 170 — колонку можно сузить. -->
                                     <ColumnDefinition x:Name="ActionsColumn">
                                         <ColumnDefinition.Width>
-                                            <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="170">
+                                            <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                 <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                                 <Binding Path="DataContext.ActionsColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                             </MultiBinding>
@@ -1271,6 +1273,33 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
+                            <!-- Issue #121 (v1.0.1.54): круглая подложка-кружок кнопок колонки
+                                 «Действия» — единый стиль с индикаторами запуска (issue #101/#103):
+                                 22 px кружок, фон карточки с тонкой обводкой; выделенная строка
+                                 подсвечивает обводку акцентом; зависший процесс Предприятия
+                                 перекрашивает подложку в красный (триггеры у кнопки запуска). -->
+                            <Style x:Key="RowActionChip" TargetType="Border">
+                                <Setter Property="Width" Value="22"/>
+                                <Setter Property="Height" Value="22"/>
+                                <Setter Property="CornerRadius" Value="11"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                <Setter Property="VerticalAlignment" Value="Center"/>
+                                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
+                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                            <!-- Кнопка действия в колонке «Действия» (issue #121): прозрачная,
+                                 контент-размера (весь визуал — чип-кружок внутри), выровнена
+                                 по левому краю колонки. -->
+                            <Style x:Key="RowActionChipButton" TargetType="Button" BasedOn="{StaticResource RowActionButton}">
+                                <Setter Property="Margin" Value="2,0"/>
+                                <Setter Property="HorizontalAlignment" Value="Left"/>
+                            </Style>
                             <!-- Узел группы: заголовок + вложенные подгруппы и базы -->
                             <HierarchicalDataTemplate DataType="{x:Type vm:GroupNodeViewModel}"
                                                       ItemsSource="{Binding Items}">
@@ -1371,11 +1400,11 @@
                                             </ColumnDefinition>
                                             <!-- Колонка «Действия»: команды группы на уровне кнопок строк баз.
                                                  Видимость управляется переключателем ShowActionsColumn.
-                                                 MinWidth не задан намеренно — минимум 120 гарантирует
-                                                 обработчик перетаскивания, пока колонка видима. -->
+                                                 MinWidth не задан намеренно — минимум (issue #121, v1.0.1.54) 80
+                                                 держит обработчик перетаскивания, пока колонка видима. -->
                                             <ColumnDefinition>
                                                 <ColumnDefinition.Width>
-                                                    <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="170">
+                                                    <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                                         <Binding Path="DataContext.ActionsColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                                     </MultiBinding>
@@ -1499,22 +1528,24 @@
                                              редактировать настройки закрепления через то же окно группы;
                                              «Удалить» скрыта у закреплённых и «Без группы» (маркеры Pinned/NoGroup),
                                              т.к. это служебные узлы без модели Group, их нельзя удалять. -->
+                                        <!-- Issue #121 (v1.0.1.54): команды группы — в том же стиле круглых
+                                             чипов, что и кнопки строк, выровнены по левому краю колонки. -->
                                         <StackPanel Grid.Column="7" Orientation="Horizontal"
-                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0">
                                             <Button Command="{Binding DataContext.EditGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Margin="1,0"
                                                     ToolTip="{loc:Loc Main.EditGroupTooltip}"
-                                                    Style="{StaticResource IconButton}">
-                                                <materialDesign:PackIcon Kind="Pencil" Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    Style="{StaticResource RowActionChipButton}">
+                                                <Border Style="{StaticResource RowActionChip}">
+                                                    <materialDesign:PackIcon Kind="Pencil" Style="{StaticResource RowActionIcon}"
+                                                                             Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                </Border>
                                             </Button>
                                             <Button Command="{Binding DataContext.DeleteGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Margin="1,0"
                                                     ToolTip="{loc:Loc Main.DeleteGroupTooltip}">
                                                 <Button.Style>
-                                                    <Style TargetType="Button" BasedOn="{StaticResource RowIconButton}">
+                                                    <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding Marker}" Value="Pinned">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
@@ -1525,8 +1556,10 @@
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Button.Style>
-                                                <materialDesign:PackIcon Kind="Delete" Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="{DynamicResource ErrorBrush}"/>
+                                                <Border Style="{StaticResource RowActionChip}">
+                                                    <materialDesign:PackIcon Kind="Delete" Style="{StaticResource RowActionIcon}"
+                                                                             Foreground="{DynamicResource ErrorBrush}"/>
+                                                </Border>
                                             </Button>
                                         </StackPanel>
                                     </Grid>
@@ -1654,11 +1687,11 @@
                                             </ColumnDefinition>
                                             <!-- Колонка «Действия»: встаёт сразу после «Режим запуска», совпадает с заголовком.
                                                  Видимость управляется переключателем ShowActionsColumn.
-                                                 MinWidth не задан намеренно — минимум 120 гарантирует
-                                                 обработчик перетаскивания, пока колонка видима. -->
+                                                 MinWidth не задан намеренно — минимум (issue #121, v1.0.1.54) 80
+                                                 держит обработчик перетаскивания, пока колонка видима. -->
                                             <ColumnDefinition>
                                                 <ColumnDefinition.Width>
-                                                    <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="170">
+                                                    <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                                         <Binding Path="DataContext.ActionsColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"/>
                                                     </MultiBinding>
@@ -1877,12 +1910,15 @@
                                                        Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <!-- Индикатор «база сейчас запущена»: значки режимов после имени
-                                                 (монитор процессов 1С, MainViewModel.Running). Play — запущено
-                                                 1С:Предприятие (InfoBrush), ключ — запущен Конфигуратор
-                                                 (WarningBrush); показываются независимо. Цвет по статусу
-                                                 отклика процесса (issue #310): WarningBrush — завис,
-                                                 ErrorBrush — не отвечает несколько опросов подряд, пока
-                                                 отвечает — собственный цвет значка. -->
+                                             (монитор процессов 1С, MainViewModel.Running). Play — запущено
+                                             1С:Предприятие, ключ — запущен Конфигуратор (WarningBrush);
+                                             показываются независимо. Issue #103 (v1.0.1.54): цвет
+                                             значка Предприятия кодирует отладку — оранжевый
+                                             (WarningBrush) при обычном запуске, синий (InfoBrush) при
+                                             запуске с /DEBUG. Цвет по статусу отклика процесса
+                                             (issue #310): белый на красном чипе — завис,
+                                             ErrorBrush — не отвечает несколько опросов подряд, пока
+                                             отвечает — собственный цвет значка. -->
                                             <!-- Подложка-бейдж под значком (issue #101): v1.0.1.24 — Вариант 1 (круглый чип
                                                  цвета карточки с обводкой — контраст значку на любом акценте выделения строки);
                                                  v1.0.1.25 — Вариант 4 по выбору 7OH: при зависании процесса (RunningStatus
@@ -1896,18 +1932,25 @@
                                                      (EnterpriseRunningStatus / ConfiguratorRunningStatus), а не к общему
                                                      RunningStatus: зависший Конфигуратор красит только свой чип,
                                                      Предприятие остаётся в своём цвете (и наоборот). -->
-                                                <!-- Issue #120: клик по чипу «Предприятие» — переход к окну уже
-                                                     запущенного Предприятия; несколько экземпляров — выбор окна.
-                                                     Запуск нового остаётся на кнопке «Предприятие». -->
+                                                <!-- Issue #120: чип «Предприятие» — только индикатор занятости, НЕ
+                                                     нажимной (обсуждение issue: «нажимные значки вносят сумятицу»).
+                                                     Переход к открытому окну Предприятия — двойной щелчок по строке
+                                                     (MainWindow.Events.ActivateRunningEnterpriseOrLaunch). -->
                                                 <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1"
-                                                        VerticalAlignment="Center" Cursor="Hand"
-                                                        MouseLeftButtonDown="OnEnterpriseChip_MouseLeftButtonDown"
+                                                        VerticalAlignment="Center"
                                                         Visibility="{Binding IsEnterpriseRunning, Converter={StaticResource BoolToVis}}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
                                                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
                                                             <Style.Triggers>
+                                                                <!-- Issue #103 (v1.0.1.54): подсказка «запущено с отладкой»
+                                                                     переехала с удалённого янтарного маркера на сам чип:
+                                                                     перекрывает унаследованную RunningModesTooltip, пока
+                                                                     процесс Предприятия запущен с /DEBUG. -->
+                                                                <DataTrigger Binding="{Binding IsEnterpriseDebugRunning}" Value="True">
+                                                                    <Setter Property="ToolTip" Value="{loc:Loc Infobase.DebugRunningTooltip}"/>
+                                                                </DataTrigger>
                                                                 <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
                                                                     <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
@@ -1923,8 +1966,17 @@
                                                                              HorizontalAlignment="Center" VerticalAlignment="Center">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                                <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                                                <!-- Issue #103 (v1.0.1.54): цвет значка кодирует отладку —
+                                                                     оранжевый (WarningBrush) при обычном запуске,
+                                                                     синий (InfoBrush) при запуске с /DEBUG; отдельный
+                                                                     янтарный маркер отладки удалён. Триггеры Hung/Critical
+                                                                     идут ПОСЛЕ триггера отладки: зависший процесс
+                                                                     перекрашивает значок в белый независимо от /DEBUG. -->
+                                                                <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
                                                                 <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsEnterpriseDebugRunning}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                                                    </DataTrigger>
                                                                     <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
                                                                         <Setter Property="Foreground" Value="White"/>
                                                                     </DataTrigger>
@@ -1936,22 +1988,11 @@
                                                         </materialDesign:PackIcon.Style>
                                                     </materialDesign:PackIcon>
                                                     </Border>
-                                                    <!-- Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный
-                                                         кружок WarningBrush (#F59E0B в тёмной палитре, см. также
-                                                         Infobase.EnterpriseDebugMarkerHex) рядом с чипом «Предприятие».
-                                                         НЕ красный — красный остался признаком «не отвечает». Виден,
-                                                         когда хотя бы один Enterprise-процесс базы запущен с /DEBUG.
-                                                         Issue #103 (v1.0.1.50): по просьбе 7OH маркер — кружок,
-                                                         как остальные значки-чипы строки (Предприятие/Конфигуратор 18×18). -->
-                                                    <Ellipse Width="10" Height="10" Fill="{DynamicResource WarningBrush}"
-                                                             VerticalAlignment="Center" Margin="3,0,0,0"
-                                                             ToolTip="{loc:Loc Infobase.DebugRunningTooltip}"
-                                                             Visibility="{Binding IsEnterpriseDebugRunning, Converter={StaticResource BoolToVis}}"/>
-                                                    <!-- Issue #120: клик по чипу «Конфигуратор» — переход к окну
-                                                         уже запущенного Конфигуратора. -->
+                                                    <!-- Issue #120: чип «Конфигуратор» — только индикатор, НЕ нажимной.
+                                                         Повторный запуск Конфигуратора (кнопка/двойной щелчок/Enter/трей)
+                                                         активирует уже открытое окно (LaunchCoreAsync). -->
                                                     <Border Width="18" Height="18" CornerRadius="9" BorderThickness="1" Margin="3,0,0,0"
-                                                            VerticalAlignment="Center" Cursor="Hand"
-                                                            MouseLeftButtonDown="OnConfiguratorChip_MouseLeftButtonDown"
+                                                            VerticalAlignment="Center"
                                                             Visibility="{Binding IsConfiguratorRunning, Converter={StaticResource BoolToVis}}">
                                                     <Border.Style>
                                                         <Style TargetType="Border">
@@ -2053,32 +2094,81 @@
                                                    HorizontalAlignment="Left" Margin="6,0,6,0" TextTrimming="CharacterEllipsis"
                                                    ToolTip="{Binding LastModifiedDisplay}"/>
 
-                                        <!-- Колонка «Действия»: встаёт сразу после «Режим запуска»; кнопки управления конкретной базой этой строки -->
+                                        <!-- Колонка «Действия»: встаёт сразу после «Режим запуска»; кнопки управления конкретной базой этой строки.
+                                             Issue #121 (v1.0.1.54): кнопки — круглые чипы (единый стиль с индикаторами запуска,
+                                             issue #101/#103), выровнены по левому краю колонки. -->
                                         <StackPanel Grid.Column="7" Grid.RowSpan="2" Orientation="Horizontal"
-                                                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                    HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0">
                                             <Button Command="{Binding DataContext.LaunchEnterpriseCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowIconButton}" Margin="1,0"
+                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchEnterpriseTooltip}">
-                                                <materialDesign:PackIcon Kind="Play"
-                                                                         Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <Border BorderThickness="1" CornerRadius="11" Width="22" Height="22"
+                                                        VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                                    <Border.Style>
+                                                        <Style TargetType="Border" BasedOn="{StaticResource RowActionChip}">
+                                                            <Style.Triggers>
+                                                                <!-- Issue #120/#103: индикатор занятости на кнопке запуска —
+                                                                     зависший процесс Предприятия красит чип в красный
+                                                                     (значок белеет, как у чипов-индикаторов в строке). -->
+                                                                <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                                <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Critical">
+                                                                    <Setter Property="Background" Value="{DynamicResource ErrorBrush}"/>
+                                                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Border.Style>
+                                                    <materialDesign:PackIcon Kind="Play">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource RowActionIcon}">
+                                                                <!-- Issue #121/#120 (v1.0.1.54): индикатор запуска перенесён
+                                                                     на кнопку запуска. Не запущено — вторичный цвет;
+                                                                     запущено — оранжевый (обычный запуск), синий при /DEBUG
+                                                                     (issue #103); зависший процесс — белый (триггеры
+                                                                     Hung/Critical идут последними — приоритет подсветки). -->
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IsEnterpriseRunning}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding IsEnterpriseDebugRunning}" Value="True">
+                                                                        <Setter Property="Foreground" Value="{DynamicResource InfoBrush}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Hung">
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding EnterpriseRunningStatus}" Value="Critical">
+                                                                        <Setter Property="Foreground" Value="White"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Border>
                                             </Button>
                                             <Button Command="{Binding DataContext.LaunchConfiguratorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowIconButton}" Margin="1,0"
+                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchConfiguratorSectionTooltip}">
-                                                <materialDesign:PackIcon Kind="Wrench"
-                                                                         Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <Border Style="{StaticResource RowActionChip}">
+                                                    <materialDesign:PackIcon Kind="Wrench"
+                                                                             Style="{StaticResource RowActionIcon}"
+                                                                             Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                </Border>
                                             </Button>
                                             <Button Command="{Binding DataContext.ClearCacheCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowIconButton}" Margin="1,0"
+                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.ClearCacheTooltip}">
-                                                <materialDesign:PackIcon Kind="Broom"
-                                                                         Style="{StaticResource RowActionIcon}"
-                                                                         Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <Border Style="{StaticResource RowActionChip}">
+                                                    <materialDesign:PackIcon Kind="Broom"
+                                                                             Style="{StaticResource RowActionIcon}"
+                                                                             Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                </Border>
                                             </Button>
                                         </StackPanel>
 
@@ -3189,13 +3279,16 @@
                      значок стоит СЛЕВА от версии; клик по версии — окно «Что нового».
                      Вместо текстовых ссылок «Обновить»/«Проверить обновления» — один
                      значок FooterUpdateIcon: синие стрелки синхронизации, когда ручная
-                     проверка доступна (режимы «уведомлять»/«вручную»), и жирные красные
-                     «!!!», когда есть доступный релиз. Три состояния (скрыт / стрелки /
-                     «!!!») переключает RefreshFooterUpdateState; клик — единый
-                     OnFooterUpdateIconClick (ручная проверка: для доступного релиза она
-                     открывает диалог обновления). -->
+                     проверка доступна (режимы «уведомлять»/«вручную»), и значок
+                     «внимание» (восклицательный знак в треугольнике) в акцентном цвете,
+                     когда есть доступный релиз (issue #116 v1.0.1.54: красные «!!!»
+                     вводили в заблуждение — красный !! в логах означает серьёзные
+                     ошибки). Три состояния (скрыт / стрелки / «внимание») переключает
+                     RefreshFooterUpdateState; клик — единый OnFooterUpdateIconClick
+                     (ручная проверка: для доступного релиза она открывает диалог
+                     обновления). -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                    <!-- В WPF StackPanel не имеет Spacing: зазор задаётся Margin'ом «!!!». -->
+                    <!-- В WPF StackPanel не имеет Spacing: зазор задаётся Margin'ом значка. -->
                     <StackPanel x:Name="FooterUpdateIcon" Orientation="Horizontal"
                                 VerticalAlignment="Center" Cursor="Hand"
                                 Background="Transparent" Visibility="Collapsed"
@@ -3204,10 +3297,11 @@
                                                  Width="16" Height="16" VerticalAlignment="Center"
                                                  Foreground="{DynamicResource AccentBrush}"
                                                  Visibility="Collapsed"/>
-                        <TextBlock x:Name="FooterUpdateExclaim" Text="!!!" FontSize="13"
-                                   FontWeight="Bold" VerticalAlignment="Center" Margin="4,0,0,0"
-                                   Foreground="{DynamicResource DangerBrush}"
-                                   Visibility="Collapsed"/>
+                        <materialDesign:PackIcon x:Name="FooterUpdateWarnIcon" Kind="Alert"
+                                                 Width="16" Height="16" VerticalAlignment="Center"
+                                                 Margin="4,0,0,0"
+                                                 Foreground="{DynamicResource AccentBrush}"
+                                                 Visibility="Collapsed"/>
                     </StackPanel>
                     <TextBlock x:Name="FooterVersionText"
                                Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"

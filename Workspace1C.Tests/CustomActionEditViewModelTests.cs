@@ -199,8 +199,10 @@ public sealed class CustomActionEditViewModelTests
     public void Validate_OwnHotkeyWhenEditing_IsAllowed()
     {
         // Свой хоткей редактируемого действия (сравнение по Id) конфликтом не считается,
-        // даже если он есть в списке существующих действий.
-        var existing = new CustomAction { Id = "self-id", Name = "Моё", Command = "echo a", Hotkey = "F8" };
+        // даже если он есть в списке существующих действий. Сочетание выбрано заведомо
+        // не системным: при полном прогоне тестов другой тест инициализирует AppServices
+        // реальными настройками профиля, где «F8» может быть занят системно.
+        var existing = new CustomAction { Id = "self-id", Name = "Моё", Command = "echo a", Hotkey = "Ctrl+Shift+Alt+F12" };
         var other = new CustomAction { Id = "other-id", Name = "Чужое", Command = "echo b", Hotkey = "Ctrl+F9" };
 
         var vm = new CustomActionEditViewModel(existing, new[] { existing, other })
@@ -208,7 +210,7 @@ public sealed class CustomActionEditViewModelTests
             Name = "Моё",
             Command = "echo a",
             TimeoutSeconds = 30,
-            Hotkey = "F8" // совпадает только с самим собой
+            Hotkey = "Ctrl+Shift+Alt+F12" // совпадает только с самим собой
         };
 
         Assert.Null(vm.Validate());

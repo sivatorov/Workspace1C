@@ -84,8 +84,11 @@ public partial class MainWindow
     /// Расставляет три состояния значка обновления в статус-баре (issue #116,
     /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие стрелки
     /// синхронизации — ручная проверка доступна (режимы «только уведомлять» и
-    /// «проверять вручную»), релиза нет; жирные красные «!!!» — есть доступный
-    /// релиз. Tooltip меняется вместе с состоянием; клик — единая ручная проверка.
+    /// «проверять вручную»), релиза нет; значок «внимание» (восклицательный знак
+    /// в треугольнике) в акцентном цвете — есть доступный релиз (issue #116
+    /// v1.0.1.54: жирные красные «!!!» вводили в заблуждение — красный «!!»
+    /// в логах означает серьёзные ошибки). Tooltip меняется вместе с состоянием;
+    /// клик — единая ручная проверка.
     /// </summary>
     private void RefreshFooterUpdateState()
     {
@@ -102,7 +105,7 @@ public partial class MainWindow
                 ? Visibility.Visible
                 : Visibility.Collapsed;
             FooterUpdateSyncIcon.Visibility = !hasRelease ? Visibility.Visible : Visibility.Collapsed;
-            FooterUpdateExclaim.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateWarnIcon.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
 
             FooterUpdateIcon.ToolTip = hasRelease
                 ? string.Format(

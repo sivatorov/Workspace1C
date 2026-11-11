@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.53</Version>
-    <AssemblyVersion>1.0.1.53</AssemblyVersion>
-    <FileVersion>1.0.1.53</FileVersion>
-    <InformationalVersion>1.0.1.53</InformationalVersion>
+    <Version>1.0.1.54</Version>
+    <AssemblyVersion>1.0.1.54</AssemblyVersion>
+    <FileVersion>1.0.1.54</FileVersion>
+    <InformationalVersion>1.0.1.54</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -649,7 +649,7 @@
     <Compile Include="ViewModels\TelegramBotViewModel.cs" />
     <!-- Окно «Лицензия» редакции ПРО 2.x (docs/pro/PRO-EDITION.md): общая ViewModel обеих платформ. -->
     <Compile Include="ViewModels\LicenseViewModel.cs" />
-    <!-- Окно «Как купить ПРО-версию» (1.0.1.53): общая ViewModel обеих платформ. -->
+    <!-- Окно «Как купить ПРО-версию» (актуальная 1.0.1.54): общая ViewModel обеих платформ. -->
     <Compile Include="ViewModels\HowToBuyViewModel.cs" />
     <!-- Debounce-хранилище CTS сохранения настроек (issue #96): чистый хелпер без WPF;
          подключается и на Linux, иначе не компилируются SettingsSaveDebouncerTests. -->

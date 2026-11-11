@@ -189,12 +189,13 @@ public sealed class Issue116UpdateModeTests
     {
         // WPF: колонка 1 строки состояния — версия (VersionInfo) и значок обновления
         // (issue #116 п.3 v1.0.1.50): вместо текстовых ссылок — один значок
-        // FooterUpdateIcon со стрелками синхронизации («!!!» при доступном релизе).
+        // FooterUpdateIcon со стрелками синхронизации; при доступном релизе —
+        // значок «внимание» (issue #116 v1.0.1.54: красные «!!!» заменены глифом).
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
         Assert.Contains("FooterVersionText", xaml);
         Assert.Contains("FooterUpdateIcon", xaml);
         Assert.Contains("FooterUpdateSyncIcon", xaml);
-        Assert.Contains("FooterUpdateExclaim", xaml);
+        Assert.Contains("FooterUpdateWarnIcon", xaml);
         Assert.Contains("OnFooterUpdateIconClick", xaml);
         Assert.Contains("Main.Footer.WhatsNewTooltip", xaml);
 
@@ -203,7 +204,7 @@ public sealed class Issue116UpdateModeTests
         Assert.Contains("_footerVersionText", avalonia);
         Assert.Contains("_footerUpdateIcon", avalonia);
         Assert.Contains("_footerUpdateSyncIcon", avalonia);
-        Assert.Contains("_footerUpdateExclaim", avalonia);
+        Assert.Contains("_footerUpdateWarningIcon", avalonia);
         Assert.Contains("VersionInfo.Display()", avalonia);
         Assert.Contains("Main.Footer.CheckUpdates", avalonia);
         Assert.Contains("Main.Footer.UpdateAvailableTooltip", avalonia);
@@ -215,11 +216,12 @@ public sealed class Issue116UpdateModeTests
     public void MainWindow_Footer_UpdateIcon_HasThreeStates()
     {
         // Три состояния значка обновления (issue #116 п.3 v1.0.1.50) на обеих
-        // платформах: скрыт / стрелки синхронизации / «!!!» при доступном релизе.
+        // платформах: скрыт / стрелки синхронизации / значок «внимание» при
+        // доступном релизе (issue #116 v1.0.1.54).
         var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
         Assert.Contains("FooterUpdateIcon.Visibility", wpf);
         Assert.Contains("FooterUpdateSyncIcon.Visibility", wpf);
-        Assert.Contains("FooterUpdateExclaim.Visibility", wpf);
+        Assert.Contains("FooterUpdateWarnIcon.Visibility", wpf);
         Assert.Contains("Main.Footer.UpdateAvailableTooltip", wpf);
         Assert.Contains("AvailableRelease", wpf);
         Assert.Contains("AppUpdateMode.NotifyOnly or AppUpdateMode.Manual", wpf);
@@ -227,7 +229,7 @@ public sealed class Issue116UpdateModeTests
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
         Assert.Contains("_footerUpdateIcon.IsVisible = hasRelease || manualCheck", avalonia);
         Assert.Contains("_footerUpdateSyncIcon.IsVisible = !hasRelease", avalonia);
-        Assert.Contains("_footerUpdateExclaim.IsVisible = hasRelease", avalonia);
+        Assert.Contains("_footerUpdateWarningIcon.IsVisible = hasRelease", avalonia);
     }
 
     [Fact]

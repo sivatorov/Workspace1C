@@ -165,19 +165,19 @@ public sealed class Issue116SkipVersionTests
     }
 
     [Fact]
-    public void FooterRefreshState_BuildsExclamationIndicator()
+    public void FooterRefreshState_BuildsWarningGlyphIndicator()
     {
-        // v1.0.1.50 (issue #116 п.3): при готовом обновлении значок меняется на
-        // жирные красные «!!!» (обе платформы).
+        // v1.0.1.54 (issue #116): при готовом обновлении значок меняется на
+        // «внимание» (восклицательный знак в треугольнике) в акцентном цвете;
+        // красные «!!!» убраны — красный «!!» в логах означает серьёзные ошибки.
         var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        Assert.Contains("FooterUpdateExclaim", wpf);
-        Assert.Contains("Text=\"!!!\"", wpf);
-        Assert.Contains("DangerBrush", wpf);
+        Assert.Contains("FooterUpdateWarnIcon", wpf);
+        Assert.Contains("Kind=\"Alert\"", wpf);
+        Assert.DoesNotContain("Text=\"!!!\"", wpf);
 
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        Assert.Contains("_footerUpdateExclaim", avalonia);
-        Assert.Contains("Text = \"!!!\"", avalonia);
-        Assert.Contains("\"DangerBrush\"", avalonia);
+        Assert.Contains("_footerUpdateWarningIcon = IconHelper.MakeIcon(\"IconWarning\"", avalonia);
+        Assert.DoesNotContain("Text = \"!!!\"", avalonia);
     }
 
     private static int CountOccurrences(string text, string pattern)

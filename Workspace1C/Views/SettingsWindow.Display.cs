@@ -195,13 +195,16 @@ namespace Workspace1C
             // с порядком значений enum AppUpdateMode.
             if (UpdateModeComboBox != null)
                 UpdateModeComboBox.SelectedIndex = (int)_viewModel.UpdateMode;
-            // Периодичность проверки обновлений (issue #116 п.2): порядок вариантов
-            // совпадает с порядком AppSettings.UpdateCheckIntervals.
-            if (UpdateIntervalComboBox != null)
+            // Периодичность проверки обновлений (issue #116 v1.0.1.54): интервал
+            // хранится в минутах и раскладывается на «значение + единица»
+            // (минуты/часы/дни) для поля «Интервал», как в планировщике заданий.
+            if (UpdateIntervalValueBox != null)
             {
-                var intervalIndex = Array.IndexOf(
-                    AppSettings.UpdateCheckIntervals, _viewModel.UpdateCheckIntervalMinutes);
-                UpdateIntervalComboBox.SelectedIndex = intervalIndex < 0 ? 0 : intervalIndex;
+                AppSettings.DecomposeUpdateInterval(
+                    _viewModel.UpdateCheckIntervalMinutes, out var intervalValue, out var intervalUnit);
+                UpdateIntervalValueBox.Text = intervalValue.ToString();
+                if (UpdateIntervalUnitCombo != null)
+                    UpdateIntervalUnitCombo.SelectedIndex = (int)intervalUnit;
             }
             if (ShowTrayIconCheck != null)
                 ShowTrayIconCheck.IsChecked = _viewModel.ShowTrayIcon;

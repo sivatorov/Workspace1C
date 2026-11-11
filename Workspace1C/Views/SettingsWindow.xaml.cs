@@ -783,12 +783,20 @@ namespace Workspace1C
                 ? (AppUpdateMode)UpdateModeComboBox.SelectedIndex
                 : AppUpdateMode.InstallOnStartup;
 
-            // Периодичность проверки обновлений (issue #116 п.2): индекс варианта → минуты
-            // (порядок совпадает с AppSettings.UpdateCheckIntervals); нет выбора — не менять.
-            var updateInterval = UpdateIntervalComboBox != null && UpdateIntervalComboBox.SelectedIndex >= 0
-                ? AppSettings.UpdateCheckIntervals[Math.Min(
-                    UpdateIntervalComboBox.SelectedIndex, AppSettings.UpdateCheckIntervals.Length - 1)]
-                : -1;
+            // Периодичность проверки обновлений (issue #116 v1.0.1.54): «значение +
+            // единица» поля «Интервал» собираются в минуты (ComposeUpdateInterval);
+            // пустое/некорректное значение — параметр не меняется (−1).
+            int updateInterval = -1;
+            if (UpdateIntervalValueBox != null
+                && int.TryParse(UpdateIntervalValueBox.Text?.Trim(), out var intervalValue))
+            {
+                var intervalUnit = UpdateIntervalUnitCombo != null
+                    && UpdateIntervalUnitCombo.SelectedIndex >= 0
+                    && UpdateIntervalUnitCombo.SelectedIndex <= (int)Models.UpdateCheckIntervalUnit.Days
+                    ? (Models.UpdateCheckIntervalUnit)UpdateIntervalUnitCombo.SelectedIndex
+                    : Models.UpdateCheckIntervalUnit.Minutes;
+                updateInterval = AppSettings.ComposeUpdateInterval(intervalValue, intervalUnit);
+            }
 
             _viewModel.ApplyAppBehaviorSettings(
                 AllowMultipleInstancesCheck.IsChecked ?? false,

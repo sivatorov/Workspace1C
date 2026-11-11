@@ -412,9 +412,13 @@ public class AppSettings
 
     /// <summary>
     /// Периодичность фоновой проверки обновлений в минутах (issue #116 п.2, v1.0.1.49):
-    /// 0 — проверка только при запуске и вручную (значение по умолчанию); 60 — каждый час;
-    /// 360 — каждые 6 часов; 1440 — раз в сутки. Некорректные значения сбрасываются
-    /// в 0 при загрузке (<see cref="NormalizeUpdateInterval"/>).
+    /// 0 — проверка только при запуске и вручную (значение по умолчанию); прочие —
+    /// период фоновой проверки. Начиная с v1.0.1.54 (issue #116) интервал задаётся
+    /// в настройках парой «значение + единица» (см. <see cref="DecomposeUpdateInterval"/> /
+    /// <see cref="ComposeUpdateInterval"/>), в файле настроек хранится в минутах —
+    /// старые значения (60/360/1440) остаются валидными, миграция не требуется.
+    /// Отрицательные значения сбрасываются в 0, слишком большие клампятся
+    /// (<see cref="NormalizeUpdateInterval"/>, вызывается при загрузке настроек).
     /// </summary>
     public int UpdateCheckIntervalMinutes { get; set; } = 0;
 
@@ -458,6 +462,15 @@ public class AppSettings
 
     /// <summary>Ширина колонки «Действия» в списке баз (0 — по умолчанию).</summary>
     public double ActionsColumnWidth { get; set; }
+
+    /// <summary>
+    /// Минимальная ширина видимой колонки «Действия» (issue #121, v1.0.1.54): под три
+    /// круглые кнопки-чипа по 22 px (66) с отступами панелей и разделителя. Раньше
+    /// 120 не давали колонке сузиться — «много пустого места ради максимум трёх
+    /// иконок». Константа в модели, потому что минимум нужен и WPF-версии, и
+    /// Avalonia-версии (общий partial MainViewModel разделён по платформам).
+    /// </summary>
+    public const double ActionsColumnMinWidth = 80;
 
     /// <summary>Показывать колонку «Режим запуска» в списке баз.</summary>
     public bool ShowLaunchModeColumn { get; set; } = true;
@@ -1287,12 +1300,95 @@ public class AppSettings
     }
 
     /// <summary>Допустимые интервалы фоновой проверки обновлений в минутах
-    /// (issue #116 п.2): только при запуске (0), час, 6 часов, сутки.</summary>
+    /// (issue #116 п.2, v1.0.1.49): только при запуске (0), час, 6 часов, сутки.
+    /// Устаревший список (issue #116 v1.0.1.54): интервал теперь произвольный
+    /// «значение + единица» (см. <see cref="DecomposeUpdateInterval"/> /
+    /// <see cref="ComposeUpdateInterval"/>); массив оставлен для совместимости
+    /// со старыми файлами настроек и откатом на прежнюю версию.</summary>
     public static readonly int[] UpdateCheckIntervals = { 0, 60, 360, 1440 };
 
-    /// <summary>Приводит интервал проверки обновлений (в минутах) к допустимому
-    /// значению; прочие значения (в т.ч. отрицательные) → 0 (только при запуске).</summary>
-    public static int NormalizeUpdateInterval(int minutes) =>
-        Array.IndexOf(UpdateCheckIntervals, minutes) >= 0 ? minutes : 0;
+    /// <summary>Верхний предел интервала проверки обновлений в минутах
+    /// (issue #116, v1.0.1.54): 30 суток. Большие значения клампятся.</summary>
+    public const int MaxUpdateCheckIntervalMinutes = 30 * 24 * 60;
 
+    /// <summary>
+    /// Приводит интервал проверки обновлений (в минутах) к допустимому значению:
+    /// отрицательные → 0 (только при запуске), значения выше
+    /// <see cref="MaxUpdateCheckIntervalMinutes"/> клампятся к пределу,
+    /// остальные проходят как есть. Раньше (v1.0.1.49–v1.0.1.53) допустимы были
+    /// только значения из <see cref="UpdateCheckIntervals"/> — старые настройки
+    /// (0/60/360/1440) остаются валидными, миграция значений не требуется.
+    /// </summary>
+    public static int NormalizeUpdateInterval(int minutes) =>
+        minutes <= 0 ? 0
+            : minutes > MaxUpdateCheckIntervalMinutes ? MaxUpdateCheckIntervalMinutes
+            : minutes;
+
+    /// <summary>
+    /// Раскладывает интервал проверки обновлений (в минутах) на «значение + единица»
+    /// для поля «Интервал» с выбором периодичности (issue #116, v1.0.1.54, как
+    /// в планировщике заданий): кратные суткам → Дни, кратные часам → Часы,
+    /// остальные → Минуты; 0 → «0 Минуты» (проверка только при запуске и вручную).
+    /// Обратная операция — <see cref="ComposeUpdateInterval"/>.
+    /// </summary>
+    public static void DecomposeUpdateInterval(int minutes, out int value, out UpdateCheckIntervalUnit unit)
+    {
+        if (minutes <= 0)
+        {
+            value = 0;
+            unit = UpdateCheckIntervalUnit.Minutes;
+            return;
+        }
+        if (minutes % (24 * 60) == 0)
+        {
+            value = minutes / (24 * 60);
+            unit = UpdateCheckIntervalUnit.Days;
+        }
+        else if (minutes % 60 == 0)
+        {
+            value = minutes / 60;
+            unit = UpdateCheckIntervalUnit.Hours;
+        }
+        else
+        {
+            value = minutes;
+            unit = UpdateCheckIntervalUnit.Minutes;
+        }
+    }
+
+    /// <summary>
+    /// Собирает интервал проверки обновлений (в минутах) из «значения + единицы»
+    /// поля «Интервал» (issue #116, v1.0.1.54). Значение ≤ 0 → 0 (только при
+    /// запуске); результат клампится к <see cref="MaxUpdateCheckIntervalMinutes"/>.
+    /// </summary>
+    public static int ComposeUpdateInterval(int value, UpdateCheckIntervalUnit unit)
+    {
+        if (value <= 0)
+            return 0;
+        var minutes = unit switch
+        {
+            UpdateCheckIntervalUnit.Hours => value * 60,
+            UpdateCheckIntervalUnit.Days => value * 24 * 60,
+            _ => value
+        };
+        return Math.Min(minutes, MaxUpdateCheckIntervalMinutes);
+    }
+
+}
+
+/// <summary>
+/// Единица измерения периода проверки обновлений (issue #116, v1.0.1.54):
+/// поле «Интервал» + выбор периодичности — как в планировщике заданий
+/// (<see cref="ScheduledTaskRepeatUnit"/>, упрощено до минут/часов/дней).
+/// </summary>
+public enum UpdateCheckIntervalUnit
+{
+    /// <summary>Минуты.</summary>
+    Minutes,
+
+    /// <summary>Часы.</summary>
+    Hours,
+
+    /// <summary>Дни.</summary>
+    Days
 }

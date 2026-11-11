@@ -3,6 +3,9 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using Workspace1C.Models;
+#if WINDOWS
+using Microsoft.Win32;
+#endif
 
 namespace Workspace1C.Services;
 
@@ -396,7 +399,15 @@ public static class OneCCacheCleaner
 
         var db = SanitizeDirPart(conn.DatabaseName);
         if (string.IsNullOrWhiteSpace(db))
-            yield break;
+        {
+            // Issue #109а: у клиент-серверной базы может быть пустое имя БД (строка
+            // соединения без Ref=). Раньше имя каталога вообще не строилось и кэш
+            // такой базы не находился; платформа в этом случае называет каталог по
+            // имени базы из списка — пробуем его как запасной вариант.
+            db = SanitizeDirPart(infobase.Name);
+            if (string.IsNullOrWhiteSpace(db))
+                yield break;
+        }
 
         var server = SanitizeDirPart(conn.Server);
         if (!string.IsNullOrWhiteSpace(server))
@@ -723,6 +734,47 @@ public static class OneCCacheCleaner
     }
 
     /// <summary>
+    /// Вычисляет честный общий объём кэша указанного типа (issue #109а): сумму ВСЕХ
+    /// каталогов в корнях кэша — включая каталоги, не сопоставленные ни одной базе
+    /// (нестандартные имена, «осиротевший» кэш, кэши версий), и служебные файлы платформы.
+    /// <para>
+    /// Используется для строк «общий объём» в окне очистки кэша: прежний расчёт
+    /// <see cref="GetSize(OneCCacheKind, IEnumerable{Infobase})"/> суммировал только
+    /// каталоги, найденные по именам текущих баз, из-за чего окно показывало «15 МБ»
+    /// при фактических 15 ГБ. Размер по базам считается отдельно (см. перегрузки
+    /// <see cref="GetSize"/>).
+    /// </para>
+    /// Корни дедуплицируются канонизацией путей: junction/symlink-дубликаты корней
+    /// (в т. ч. перенесённый на другой диск кэш, issue #109б) считаются один раз.
+    /// </summary>
+    /// <param name="kind">Тип кеша (программный и/или пользовательский).</param>
+    /// <returns>Суммарный размер в байтах.</returns>
+    public static long GetRootTotalSize(OneCCacheKind kind)
+    {
+        if (kind == OneCCacheKind.None)
+            return 0;
+
+        long total = 0;
+        var seenRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var root in GetCacheRoots(kind))
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                continue;
+
+            // Два корня, ведущие в один каталог (например, junction и его цель),
+            // дают один и тот же канонический путь — считаем только первый.
+            if (!seenRoots.Add(ResolveCanonicalPath(root)))
+                continue;
+
+            // Свежее множество visited на корень: рекурсия внутри корня защищена
+            // своим набором (циклы через ссылки внутри цели перенесённого кэша).
+            total += GetDirectorySize(root, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+
+        return total;
+    }
+
+    /// <summary>
     /// Вычисляет суммарный размер кеша указанного типа (программного и/или пользовательского)
     /// по каталогам, принадлежащим текущим информационным базам. Служебные файлы платформы
     /// в корнях кеша (helpsynt.dat, логи и т. п.) не учитываются.
@@ -781,7 +833,9 @@ public static class OneCCacheCleaner
     /// Перечисляет реально существующие каталоги кеша указанной информационной базы
     /// для заданного типа кеша. Имена каталогов берутся из карты IdConnStrMap (GUID
     /// платформы), клиент-серверных имён Srvr__…__Ref__…__, а также ID и имени базы.
-    /// Каталоги ищутся и непосредственно в корне кеша, и в подкаталогах версий.
+    /// Каталоги ищутся и непосредственно в корне кеша, и в подкаталогах версий
+    /// (1cv8\<версия>\<имя>) — включая вложенные каталоги версий глубже одного уровня
+    /// (issue #109а: обход поддерева версий рекурсивно).
     /// </summary>
     private static IEnumerable<string> EnumerateCacheDirectories(Infobase infobase, OneCCacheKind kind)
     {
@@ -794,29 +848,52 @@ public static class OneCCacheCleaner
             if (!Directory.Exists(root))
                 continue;
 
-            // Прямые каталоги кеша в корне.
+            foreach (var dir in EnumerateCacheDirsUnder(root, names, CacheDirScanDepth))
+                yield return dir;
+        }
+    }
+
+    /// <summary>
+    /// Глубина рекурсивного обхода поддерева версий при поиске каталогов кеша
+    /// (1cv8\<версия>\<имя>; вложенные версии 1cv8\<версия>\<версия-подкаталог>\<имя>
+    /// и глубже — issue #109а). Ограничение защищает от бесконечной рекурсии по циклам
+    /// ссылок: реальная раскладка кеша 1С не превышает трёх-четырёх уровней.
+    /// </summary>
+    private const int CacheDirScanDepth = 4;
+
+    /// <summary>
+    /// Обход поддерева кеша под <paramref name="root"/>: прямые каталоги с именами из
+    /// <paramref name="names"/> считаются каталогами кеша, каталоги версий (имя — версия
+    /// платформы) обходятся рекурсивно, остальное игнорируется.
+    /// </summary>
+    private static IEnumerable<string> EnumerateCacheDirsUnder(string root, List<string> names, int depth)
+    {
+        string[] subDirs;
+        try { subDirs = Directory.GetDirectories(root); }
+        catch { yield break; }
+
+        foreach (var sub in subDirs)
+        {
+            var name = Path.GetFileName(sub);
+
+            // Сначала проверяем совпадение с именами каталогов кеша: GUID-имена каталогов
+            // баз состоят только из цифр и дефисов и формально подходят под правило
+            // IsVersionDirName — проверка версии до совпадения имён сделала бы каталоги
+            // баз в корне ненайденными (регресс старого теста issue #109/#110).
             foreach (var n in names)
             {
-                var direct = Path.Combine(root, n);
-                if (Directory.Exists(direct))
-                    yield return direct;
+                if (string.Equals(name, n, StringComparison.OrdinalIgnoreCase))
+                    yield return sub;
             }
 
-            // Каталоги кеша в подкаталогах версий (1cv8\<версия>\<имя>).
-            string[] versionDirs;
-            try { versionDirs = Directory.GetDirectories(root); }
-            catch { continue; }
+            if (!IsVersionDirName(name))
+                continue;
 
-            foreach (var versionDir in versionDirs)
+            // Каталог версии: внутри него лежат кеши баз (и, возможно, вложенные версии).
+            if (depth > 0)
             {
-                if (!IsVersionDirName(Path.GetFileName(versionDir)))
-                    continue;
-                foreach (var n in names)
-                {
-                    var cacheDir = Path.Combine(versionDir, n);
-                    if (Directory.Exists(cacheDir))
-                        yield return cacheDir;
-                }
+                foreach (var nested in EnumerateCacheDirsUnder(sub, names, depth - 1))
+                    yield return nested;
             }
         }
     }
@@ -987,6 +1064,26 @@ public static class OneCCacheCleaner
         }
 #endif
 
+        // Реестровые параметры переноса кэша 1С и переменная среды 1SCACHE (issue #109б,
+        // Windows): кэш, перенесённый на другой диск штатными средствами платформы
+        // (параметры в HKCU/HKLM Software\1C\1Cv8) или через 1SCACHE, раньше не был виден
+        // приложению. Найденные пути — дополнение к AdditionalCacheRoots, не замена;
+        // дубликаты отфильтровываются канонизацией в GetRootTotalSize и Distinct при
+        // перечислении каталогов.
+#if WINDOWS
+        if (kind != OneCCacheKind.None)
+        {
+            foreach (var registryRoot in GetRegistryCacheRoots())
+                roots.Add(registryRoot);
+
+            // Переменная среды 1SCACHE — официально поддерживаемый платформой способ
+            // переноса каталога кэша (значение — полный путь к каталогу кэша).
+            var envCache = Environment.GetEnvironmentVariable("1SCACHE");
+            if (!string.IsNullOrWhiteSpace(envCache))
+                roots.Add(envCache.Trim());
+        }
+#endif
+
         // Дополнительные корни из настроек пользователя (issue #109): ищем в них кеш
         // любого типа — пользователь объявил каталог как корень кеша 1С целиком.
         if (kind != OneCCacheKind.None)
@@ -1001,6 +1098,170 @@ public static class OneCCacheCleaner
         }
 
         return roots;
+    }
+
+#if WINDOWS
+    // Кэш реестровых корней на сеанс: реестр читается один раз (issue #109б).
+    private static readonly object s_registryRootsLock = new();
+    private static IReadOnlyList<string>? s_registryRootsCache;
+
+    /// <summary>
+    /// Базовые ветки реестра, в которых 1С хранит параметры расположения кэша.
+    /// Перебираются варианты написания с «cv8» и «Cv8», как в OneCTemplateService.
+    /// </summary>
+    private static readonly string[] RegistryBaseKeys =
+    {
+        @"Software\1C\1cv8",
+        @"Software\1C\1Cv8",
+        @"Software\1C\1cestart"
+    };
+
+    /// <summary>
+    /// Возвращает корни кэша из реестровых параметров переноса 1С (issue #109б, Windows).
+    /// Считываются строковые значения веток HKCU и HKLM Software\1C\1cv8|1Cv8 (включая
+    /// подветки версий 8.3…, Common и 1cestart), имя которых говорит о расположении кэша
+    /// (CacheLocation, CacheDir и т. п.). Все строковые значения веток дампятся в журнал
+    /// CM_CACHE — по diagnostics-ZIP видно, что нашлось и почему путь не распознан.
+    /// Консервативно: значение добавляется как корень, только если это абсолютный путь
+    /// Windows; результат кэшируется на сеанс.
+    /// </summary>
+    /// <remarks>internal (не private): юнит-тесты кэширования на сеанс в Workspace1C.Tests.</remarks>
+    internal static IReadOnlyList<string> GetRegistryCacheRoots()
+    {
+        lock (s_registryRootsLock)
+        {
+            if (s_registryRootsCache is not null)
+                return s_registryRootsCache;
+
+            var found = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var hive in new[] { Registry.CurrentUser, Registry.LocalMachine })
+            foreach (var basePath in RegistryBaseKeys)
+            foreach (var sub in EnumerateRegistrySubKeys(hive, basePath, RegistryScanDepth))
+            {
+                try
+                {
+                    using var key = hive.OpenSubKey(sub);
+                    if (key is null)
+                        continue;
+
+                    foreach (var name in key.GetValueNames())
+                    {
+                        if (key.GetValue(name) is not string value || string.IsNullOrWhiteSpace(value))
+                            continue;
+
+                        // Диагностика (issue #109б): дамп всех строковых значений веток 1С.
+                        Log.Info(LogCategory.Cache, $"CACHE registry: {sub}\\{name} = {value}");
+
+                        if (!IsCacheLocationValueName(name))
+                            continue;
+
+                        var dir = NormalizeRegistryDir(value);
+                        if (dir is null)
+                        {
+                            Log.Info(LogCategory.Cache,
+                                $"CACHE registry: значение «{name}» не похоже на каталог, пропущено: {value}");
+                            continue;
+                        }
+
+                        // Дедупликация: один путь из разных веток/с разным регистром.
+                        if (!seen.Add(NormalizePathForCompare(dir)))
+                            continue;
+
+                        found.Add(dir);
+                        Log.Info(LogCategory.Cache,
+                            $"CACHE registry root добавлен: {dir} (из {sub}\\{name})");
+                    }
+                }
+                catch
+                {
+                    // Ключ недоступен (права, выгрузка на лету) — пропускаем.
+                }
+            }
+
+            s_registryRootsCache = found;
+            return s_registryRootsCache;
+        }
+    }
+
+    /// <summary>
+    /// Глубина обхода подветок реестра: базовая ветка + версии 8.3.x.x / Common / 1cestart
+    /// и их подветки — реестровые параметры переноса кэша лежат не глубже.
+    /// </summary>
+    private const int RegistryScanDepth = 2;
+
+    /// <summary>
+    /// Перечисляет <paramref name="path"/> и его подветки до глубины <paramref name="depth"/>
+    /// (включительно). Отсутствующие/недоступные ветки пропускаются.
+    /// </summary>
+    private static IEnumerable<string> EnumerateRegistrySubKeys(RegistryKey hive, string path, int depth)
+    {
+        // Материализуем список: yield запрещён в блоке try с catch, а ветка реестра
+        // может исчезнуть/быть недоступна в любой момент — ошибки пропускаются.
+        var results = new List<string>();
+        try
+        {
+            using var key = hive.OpenSubKey(path);
+            if (key is null)
+                return results;
+
+            results.Add(path);
+
+            if (depth > 0)
+            {
+                foreach (var child in key.GetSubKeyNames())
+                {
+                    results.AddRange(EnumerateRegistrySubKeys(hive, path + "\\" + child, depth - 1));
+                }
+            }
+        }
+        catch
+        {
+            // Недоступная ветка — отдаём то, что успели собрать.
+        }
+
+        return results;
+    }
+#endif
+
+    /// <summary>
+    /// Определяет, является ли имя реестрового значения параметром расположения кэша
+    /// (issue #109б). Консервативно: имя должно явно говорить о кэше — CacheLocation,
+    /// CacheDir, CachedDataLocation и т. п. Прочие значения (InstalledLocation,
+    /// DistributionLocation, DefaultVersion и т. д.) корнями кэша не считаются, чтобы
+    /// не очистить лишнее.
+    /// </summary>
+    /// <remarks>internal: юнит-тесты фильтра имён (без реестра) в Workspace1C.Tests.</remarks>
+    internal static bool IsCacheLocationValueName(string? name)
+        => !string.IsNullOrWhiteSpace(name) &&
+           name.Contains("cache", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Нормализует значение реестрового параметра в путь каталога кэша или null, если
+    /// значение не похоже на абсолютный путь Windows (issue #109б, консервативное
+    /// поведение: не распознано — не добавляем в корни очистки).
+    /// </summary>
+    /// <remarks>internal: юнит-тесты нормализации значений в Workspace1C.Tests.</remarks>
+    internal static string? NormalizeRegistryDir(string? value)
+    {
+        var dir = value?.Trim().Trim('"').Trim();
+        if (string.IsNullOrWhiteSpace(dir))
+            return null;
+
+        dir = dir.TrimEnd('\\', '/');
+        if (dir.Length == 0)
+            return null;
+
+        // Абсолютный путь Windows: «X:\…», «X:\» или UNC «\\server\share\…».
+        if (dir.Length == 2 && dir[1] == ':')
+            return dir + Path.DirectorySeparatorChar;
+        if (dir.Length > 2 && dir[1] == ':')
+            return dir;
+        if (dir.StartsWith(@"\\", StringComparison.Ordinal) && dir.Length > 2)
+            return dir;
+
+        return null;
     }
 
     /// <summary>

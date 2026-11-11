@@ -202,7 +202,10 @@ public partial class MainViewModel
         {
             GetRunningWindows(infobase, RunningKind.Configurator, windows);
             if (windows.Count == 0)
+            {
+                LogRunningWindowMiss(infobase, RunningKind.Configurator);
                 return false;
+            }
             ActivateWindowByHandle(windows[0].Handle);
             return true;
         }
@@ -232,6 +235,33 @@ public partial class MainViewModel
             // Политика монитора: тихая деградация — пустой список.
         }
         return windows;
+    }
+
+    /// <summary>
+    /// Issue #120 (v1.0.1.54): диагностика «индикатор показывает запущенный режим,
+    /// но открытых окон не найдено» — именно так выглядела жалоба репортера «клик
+    /// не работает, ничего не происходит». Причины: matcher процессов не распознал
+    /// клиент (тонкий 1cv8c, /S"server/base"), WMI недоступен (права/политика),
+    /// флаг монитора устарел. Запись в журнал делает «ничего не происходит»
+    /// диагностируемым. На Linux перечисление окон не поддержано (список всегда
+    /// пуст) — лог не пишется, чтобы не засорять журнал. Ошибки логирования
+    /// игнорируются (не должны ломать вызывающий код).
+    /// </summary>
+    public void LogRunningWindowMiss(Infobase infobase, RunningKind kind)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+        try
+        {
+            _logger.Info(
+                $"Активация окна {kind}: у базы «{infobase.Name}» установлен флаг запущенного " +
+                "режима, но открытые окна не найдены (matcher процессов / права WMI / устаревший " +
+                "флаг монитора) — выполняется fallback на обычный запуск (issue #120)");
+        }
+        catch
+        {
+            // Логирование не должно ломать активацию/запуск.
+        }
     }
 
     /// <summary>Issue #120: активация окна по хэндлу из списка выбора; ошибки игнорируются.</summary>

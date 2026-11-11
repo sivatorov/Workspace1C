@@ -19,6 +19,7 @@ namespace Workspace1C.Tests;
 /// <item>junction на каталоге версии не ломает ни подсчёт, ни перечисление (Windows).</item>
 /// </list>
 /// </summary>
+[Collection(Workspace1C.Tests.OneCCacheCleanerStaticState.Name)]
 public sealed class Issue109_110CacheTests
 {
     [Fact]

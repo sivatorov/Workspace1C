@@ -21,6 +21,7 @@ namespace Workspace1C.Tests;
 /// удаления; строки локализации ru/en на месте.</item>
 /// </list>
 /// </summary>
+[Collection(Workspace1C.Tests.OneCCacheCleanerStaticState.Name)]
 public sealed class Issue119DeleteCacheTests
 {
     // ===================== Функциональные тесты очистки кэша =====================

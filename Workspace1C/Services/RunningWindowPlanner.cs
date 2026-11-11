@@ -58,6 +58,21 @@ public static class RunningWindowPlanner
         };
 
     /// <summary>
+    /// Issue #120 (v1.0.1.54): решение для двойного щелчка по строке при действии
+    /// «1С:Предприятие» и запущенном Предприятии (обсуждение issue): сначала
+    /// активировать уже открытое окно — одно окно активируется напрямую, несколько —
+    /// выбор окна; окон нет (флаг монитора устарел / перечисление не удалось,
+    /// на Linux список всегда пуст) — обычный запуск нового экземпляра.
+    /// </summary>
+    public static RunningWindowAction PlanEnterpriseDoubleClick(int openWindowCount)
+        => openWindowCount switch
+        {
+            <= 0 => RunningWindowAction.LaunchNew,
+            1 => RunningWindowAction.ActivateSingle,
+            _ => RunningWindowAction.ShowPicker
+        };
+
+    /// <summary>
     /// Строка элемента выбора окна: «Заголовок (PID 1234)»; без заголовка — «PID 1234».
     /// </summary>
     public static string FormatWindowTitle(RunningWindowInfo window)

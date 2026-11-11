@@ -67,7 +67,12 @@ namespace Workspace1C
             _githubFallbackLoaded = true;
             try
             {
+                // Fallback-порядок сводки (issue #116 v1.0.1.54): body GitHub-релиза
+                // текущего тега → локальная секция CHANGELOG.md рядом с exe →
+                // текст-заглушка. Окно никогда не остаётся с пустым содержимым.
                 var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
+                if (string.IsNullOrWhiteSpace(body))
+                    body = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
                 if (string.IsNullOrWhiteSpace(body))
                 {
                     NotesHost.Children.Add(new TextBlock
@@ -93,8 +98,30 @@ namespace Workspace1C
             }
             catch
             {
-                // Сбой загрузки сводки не роняет диалог: остаётся пустой список и
-                // кнопка «Открыть CHANGELOG на GitHub».
+                // Сбой загрузки сводки не роняет диалог; пробуем локальный CHANGELOG,
+                // иначе показываем заглушку (окно никогда не остаётся пустым —
+                // issue #116 v1.0.1.54).
+                var changelog = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
+                NotesHost.Children.Clear();
+                if (!string.IsNullOrWhiteSpace(changelog))
+                {
+                    NotesHost.Children.Add(new System.Windows.Controls.FlowDocumentScrollViewer
+                    {
+                        Document = MarkdownRenderer.ToFlowDocument(changelog),
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                    });
+                }
+                else
+                {
+                    NotesHost.Children.Add(new TextBlock
+                    {
+                        Text = LocalizationManager.T("WhatsNew.NotesUnavailable"),
+                        TextWrapping = TextWrapping.Wrap,
+                        Margin = new Thickness(0, 4, 0, 0),
+                        Opacity = 0.7
+                    });
+                }
             }
         }
 

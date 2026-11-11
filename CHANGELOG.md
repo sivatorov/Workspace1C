@@ -11,6 +11,71 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.54] — 2026-11-11
+
+### Исправлено
+
+- **Честный общий объём кэша в окне очистки (issue #109, «показывает 15 МБ, а на диске
+  15 ГБ»).** Раньше суммировались только каталоги, сопоставленные текущим базам:
+  «осиротевший» кэш и каталоги с нестандартными именами в объём не попадали. Теперь
+  показывается суммарный объём **всех** каталогов в корнях кэша —
+  [`GetRootTotalSize`](Workspace1C/Services/OneCCacheCleaner.cs:752) рекурсивно
+  (junction-safe, [`GetDirectorySize`](Workspace1C/Services/OneCCacheCleaner.cs:913)):
+  WPF — [`CacheCleanWindow.xaml.cs`](Workspace1C/Views/CacheCleanWindow.xaml.cs:555),
+  Avalonia — [`CacheCleanWindow.Avalonia.cs`](Workspace1C/Views/CacheCleanWindow.Avalonia.cs:295).
+- **Серверный кэш, перенесённый штатными средствами платформы, теперь виден (issue #109).**
+  В корни кэша ([`GetCacheRoots`](Workspace1C/Services/OneCCacheCleaner.cs:993))
+  добавляются пути из реестровых параметров переноса (HKCU/HKLM `Software\1C\1Cv8`,
+  [`GetRegistryCacheRoots`](Workspace1C/Services/OneCCacheCleaner.cs:1129)) и из
+  переменной окружения `1SCACHE`
+  ([`OneCCacheCleaner.cs`](Workspace1C/Services/OneCCacheCleaner.cs:1067)); дубликаты
+  отфильтровываются канонизацией. Тесты-стражи:
+  [`Issue109CacheRootTotalTests.cs`](Workspace1C.Tests/Issue109CacheRootTotalTests.cs).
+
+### Изменено
+
+- **Окно обновления: значок «внимание» вместо красных «!!! Обновить» (issue #116).**
+  В статус-баре при доступном релизе показывается значок «внимание» (восклицательный
+  знак в треугольнике, PackIcon `Alert`) в акцентном цвете: WPF —
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3283), Avalonia —
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:2306). Красные
+  «!!!» вводили в заблуждение (красный «!!» в логах означает серьёзные проблемы).
+  Значок `Alert` добавлен во все наборы иконок тем
+  ([`IconsOutline.xaml`](Workspace1C/Themes/IconsOutline.xaml:158),
+  [`IconsMaterial.xaml`](Workspace1C/Themes/IconsMaterial.xaml:170),
+  [`IconsMacOS.xaml`](Workspace1C/Themes/IconsMacOS.xaml:171),
+  [`IconsWindowsXp.xaml`](Workspace1C/Themes/IconsWindowsXp.xaml:171),
+  [`IconsGlass.xaml`](Workspace1C/Themes/IconsGlass.xaml:310)).
+- **Окно подтверждения перезапуска после обновления нельзя растягивать по вертикали
+  (issue #116):** фиксированная высота в DIP в WPF
+  ([`UpdateAvailableWindow.xaml.cs`](Workspace1C/Views/UpdateAvailableWindow.xaml.cs:428))
+  и запрет вертикального ресайза окон обновления в Avalonia
+  ([`MaterialMessageWindow.Avalonia.cs`](Workspace1C/Services/MaterialMessageWindow.Avalonia.cs:50)).
+- **Индикатор предприятия: синий/оранжевый (issue #103).** Отдельный янтарный маркер
+  отладки убран — цвет самого значка «Предприятие» в чипе-индикаторе кодирует состояние:
+  оранжевый — обычный запуск, синий — запуск с `/DEBUG`, белый на красном чипе —
+  зависший процесс: WPF — [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:1915),
+  Avalonia — [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:437)
+  ([`EnterpriseGlyphBrushConverter.Avalonia.cs`](Workspace1C/Converters/Avalonia/EnterpriseGlyphBrushConverter.Avalonia.cs:11)),
+  флаг в модели — [`Infobase.cs`](Workspace1C/Models/Infobase.cs:168). Тесты:
+  [`Issue103EnterpriseGlyphTests.cs`](Workspace1C.Tests/Issue103EnterpriseGlyphTests.cs).
+- **Индикаторы занятости на кнопках запуска (issue #120, доработки):** кнопка запуска
+  Предприятия в колонке «Действия» показывает индикатор запуска — подложка и значок
+  красятся по статусу (обычный запуск/`/DEBUG`/зависание): WPF —
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:2111), Avalonia —
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:866).
+- **Колонка «Действия»: компактная ширина, выравнивание, чипы (issue #121).** Минимальная
+  ширина колонки снижена до 80 px под три круглые кнопки
+  ([`AppSettings.cs`](Workspace1C/Models/AppSettings.cs:473); минимум держат обработчик
+  перетаскивания и кламп сохранённой ширины —
+  [`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs:925),
+  [`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs:104));
+  кнопки — круглые чипы в едином стиле с индикаторами запуска, выровнены по левому краю
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:2098),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:902),
+  кисти чипов — [`RowActionChipBrushConverter.Avalonia.cs`](Workspace1C/Converters/Avalonia/RowActionChipBrushConverter.Avalonia.cs:12)).
+  Тесты: [`Issue121ActionsColumnTests.cs`](Workspace1C.Tests/Issue121ActionsColumnTests.cs).
+
 ## [1.0.1.53] — 2026-11-10
 
 ### Добавлено

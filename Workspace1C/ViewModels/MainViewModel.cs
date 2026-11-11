@@ -554,7 +554,12 @@ public partial class MainViewModel : ViewModelBase
         _showConfigurationVersionColumn = settings.ShowConfigurationVersionColumn;
         _configurationColumnWidth = settings.ConfigurationColumnWidth;
         _configurationVersionColumnWidth = settings.ConfigurationVersionColumnWidth;
-        _actionsColumnWidth = settings.ActionsColumnWidth;
+        // Issue #121: сохранённая ширина клампится к минимуму колонки «Действия» —
+        // настройки от прежних версий (или уменьшенные вручную ниже предела)
+        // не должны оставлять кнопки действий недоступными.
+        _actionsColumnWidth = settings.ActionsColumnWidth > 0
+            ? Math.Max(Models.AppSettings.ActionsColumnMinWidth, settings.ActionsColumnWidth)
+            : 0;
         _showRightPanelDetails = settings.ShowRightPanelDetails;
         _showSessionLaunchPanel = settings.ShowSessionLaunchPanel;
         if (Enum.TryParse<SessionClientMode>(settings.SessionClientMode, true, out var scm))

@@ -79,12 +79,29 @@ public sealed class UtilitiesMenuResolverTests
         Assert.Equal("CommandPalette", layout!.Root[0].ItemId);
     }
 
+    /// <summary>
+    /// Стандартная компоновка с ЯВНО размещёнными всеми пунктами каталога, включая
+    /// внешние пункты модулей ПРО (<see cref="UtilitiesMenuCatalog.RegisterExternal"/>):
+    /// при сборке с модулями у них есть признак «новинка», и тесты с предпосылкой
+    /// «новых пунктов нет» обязаны учитывать их как размещённые.
+    /// </summary>
+    private static UtilitiesMenuLayout DefaultWithAllCatalogItems()
+    {
+        var layout = UtilitiesMenuLayouts.Default();
+        var present = new HashSet<string>(StringComparer.Ordinal);
+        UtilitiesMenuResolver.CollectItemIds(layout.Root, present);
+        foreach (var item in UtilitiesMenuCatalog.All)
+            if (!present.Contains(item.Id))
+                layout.Root.Add(UtilitiesMenuLayouts.Item(item.Id));
+        return layout;
+    }
+
     [Fact]
     public void CollectNewItems_CurrentCatalog_HasNoUnplacedNewItems()
     {
         // В каталоге сейчас нет пунктов с признаком «новинка» (все пункты уже размещены
         // в стандартной компоновке), поэтому «Новинки программы» пустые.
-        var layout = UtilitiesMenuLayouts.Default();
+        var layout = DefaultWithAllCatalogItems();
         var newItems = UtilitiesMenuResolver.CollectNewItems(layout);
         Assert.Empty(newItems);
     }
@@ -122,7 +139,7 @@ public sealed class UtilitiesMenuResolverTests
     public void EnsureNewItemsGroup_NoNewItems_ReturnsSameLayout()
     {
         // Стандартная компоновка содержит все пункты каталога — «Новинки» не добавляются.
-        var layout = UtilitiesMenuLayouts.Default();
+        var layout = DefaultWithAllCatalogItems();
         var result = UtilitiesMenuResolver.EnsureNewItemsGroup(layout);
 
         Assert.Same(layout, result);
@@ -219,7 +236,7 @@ public sealed class UtilitiesMenuResolverTests
         // Все пункты каталога размещены в компоновке — новых нет. Группа «Новинки
         // программы» в рабочем меню скрывается, даже если в файле она помечена
         // видимой: видимость определяется наличием пунктов, а не галочкой (issue #4).
-        var layout = UtilitiesMenuLayouts.Default();
+        var layout = DefaultWithAllCatalogItems();
         var group = new UtilitiesMenuNode
         {
             Kind = "group",
@@ -240,7 +257,7 @@ public sealed class UtilitiesMenuResolverTests
     public void EnsureNewItemsGroup_NoNewItems_NoGroup_ReturnsSameLayout()
     {
         // Новых пунктов нет и группы нет — компоновка не меняется (issue #4).
-        var layout = UtilitiesMenuLayouts.Default();
+        var layout = DefaultWithAllCatalogItems();
 
         var result = UtilitiesMenuResolver.EnsureNewItemsGroup(layout);
 
@@ -305,7 +322,7 @@ public sealed class UtilitiesMenuResolverTests
     {
         // Пустая группа «Новинки» скрывается (все новинки каталога размещены
         // в стандартной компоновке).
-        var layoutEmpty = UtilitiesMenuLayouts.Default();
+        var layoutEmpty = DefaultWithAllCatalogItems();
         layoutEmpty.Root.Add(new UtilitiesMenuNode
         {
             Kind = "group",

@@ -57,7 +57,7 @@ namespace Workspace1C
         // или жирными красными «!!!» при доступном релизе.
         private StackPanel _footerUpdateIcon = null!;
         private Control _footerUpdateSyncIcon = null!;
-        private TextBlock _footerUpdateExclaim = null!;
+        private Control _footerUpdateWarningIcon = null!;
 
         // Issue #114: координата курсора по X (в координатах окна) над строкой состояния.
         // Запоминается в PointerEntered/PointerMoved/PointerPressed на _statusInfo и
@@ -2291,7 +2291,7 @@ namespace Workspace1C
 
             // Версия приложения и значок обновления (issue #116): значок стоит СЛЕВА
             // от версии; клик по версии — окно «Что нового». Состояния значка
-            // (скрыт / стрелки синхронизации / красные «!!!») расставляет
+            // (скрыт / стрелки синхронизации / значок «внимание») расставляет
             // RefreshFooterUpdateState.
             var footerPanel = new StackPanel
             {
@@ -2303,8 +2303,11 @@ namespace Workspace1C
             // Значок обновления (issue #116 п.3 v1.0.1.50): вместо двух текстовых
             // ссылок — один интерактивный элемент со стрелками синхронизации
             // («IconSync» — тот же glyph, что у синхронизации списка баз) или
-            // жирными красными «!!!» при доступном релизе. Состояния переключает
-            // RefreshFooterUpdateState; клик — единая ручная проверка.
+            // значком «внимание» («IconWarning», восклицательный знак в треугольнике)
+            // в акцентном цвете при доступном релизе — issue #116 v1.0.1.54:
+            // красные «!!!» вводили в заблуждение (красный «!!» в логах = серьёзные
+            // ошибки). Состояния переключает RefreshFooterUpdateState; клик —
+            // единая ручная проверка.
             _footerUpdateIcon = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -2314,17 +2317,10 @@ namespace Workspace1C
                 IsVisible = false
             };
             _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(15), "@AccentBrush");
-            _footerUpdateExclaim = new TextBlock
-            {
-                Text = "!!!",
-                FontSize = 13,
-                FontWeight = FontWeight.Bold,
-                VerticalAlignment = VerticalAlignment.Center,
-                IsVisible = false
-            };
-            ThemeBrushes.Bind(_footerUpdateExclaim, TextBlock.ForegroundProperty, "DangerBrush");
+            _footerUpdateWarningIcon = IconHelper.MakeIcon("IconWarning", UiMetrics.Scaled(16), "@AccentBrush");
+            _footerUpdateWarningIcon.IsVisible = false;
             _footerUpdateIcon.Children.Add(_footerUpdateSyncIcon);
-            _footerUpdateIcon.Children.Add(_footerUpdateExclaim);
+            _footerUpdateIcon.Children.Add(_footerUpdateWarningIcon);
             _footerUpdateIcon.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
             footerPanel.Children.Add(_footerUpdateIcon);
 
@@ -2448,8 +2444,9 @@ namespace Workspace1C
         /// Расставляет три состояния значка обновления в статус-баре (issue #116,
         /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие
         /// стрелки синхронизации — ручная проверка доступна (режимы «только
-        /// уведомлять» и «проверять вручную»), релиза нет; жирные красные «!!!» —
-        /// есть доступный релиз. Tooltip меняется вместе с состоянием.
+        /// уведомлять» и «проверять вручную»), релиза нет; значок «внимание» в
+        /// акцентном цвете — есть доступный релиз (issue #116 v1.0.1.54: красные
+        /// «!!!» вводили в заблуждение). Tooltip меняется вместе с состоянием.
         /// </summary>
         private void RefreshFooterUpdateState()
         {
@@ -2464,7 +2461,7 @@ namespace Workspace1C
 
                 _footerUpdateIcon.IsVisible = hasRelease || manualCheck;
                 _footerUpdateSyncIcon.IsVisible = !hasRelease;
-                _footerUpdateExclaim.IsVisible = hasRelease;
+                _footerUpdateWarningIcon.IsVisible = hasRelease;
 
                 ToolTip.SetTip(_footerUpdateIcon, hasRelease
                     ? string.Format(

@@ -266,6 +266,8 @@ namespace Workspace1C
 
         /// <summary>
         /// Вычисляет и отображает размеры программного и пользовательского кеша.
+        /// Итоговые строки показывают честный общий объём кэша в корнях (issue #109а),
+        /// включая несопоставленные базе каталоги; строки по базам — только кэш этих баз.
         /// Расчёт выполняется в фоновом потоке, чтобы не блокировать интерфейс.
         /// </summary>
         private async void RefreshCacheSizes()
@@ -289,7 +291,9 @@ namespace Workspace1C
             // и не прерывал цикл по базам (issue #212).
             try
             {
-                var program = await Task.Run(() => OneCCacheCleaner.GetSize(OneCCacheKind.Program, _infobases));
+                // Честный общий объём (issue #109а): все каталоги корней, включая
+                // несопоставленные базе, — иначе «15 ГБ» на диске показывались «15 МБ».
+                var program = await Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.Program));
                 _programCacheSizeText.Text = FormatSize(program);
             }
             catch (Exception ex)
@@ -300,7 +304,8 @@ namespace Workspace1C
 
             try
             {
-                var user = await Task.Run(() => OneCCacheCleaner.GetSize(OneCCacheKind.User, _infobases));
+                // Честный общий объём (issue #109а) — см. комментарий к блоку «программный».
+                var user = await Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User));
                 _userCacheSizeText.Text = FormatSize(user);
             }
             catch (Exception ex)

@@ -916,11 +916,13 @@ namespace Workspace1C
         private static bool ColumnsTraceEnabled => TraceFlags.IsEnabled(TraceFlags.ColumnsFlag);
 
         /// <summary>
-        /// Минимальная ширина колонки «Действия»: совпадает с MinWidth=120, заданной трём
-        /// ColumnDefinition этой колонки (заголовок, группа, база) в MainWindow.xaml, чтобы
-        /// три кнопки-иконки (Запуск, Конфигуратор, Очистить кеш) оставались доступными.
+        /// Минимальная ширина колонки «Действия» (issue #121, v1.0.1.54): под три круглые
+        /// кнопки-чипа (22 px каждая + отступы). Общий минимум —
+        /// <see cref="Models.AppSettings.ActionsColumnMinWidth"/>; тот же минимум держит
+        /// обработчик перетаскивания и кламп сохранённой ширины при загрузке. Раньше
+        /// 120 оставляли много пустого места и не давали колонке сузиться.
         /// </summary>
-        private const double ActionsColumnMinWidth = 120;
+        private const double ActionsColumnMinWidth = Models.AppSettings.ActionsColumnMinWidth;
 
         /// <summary>
         /// Задаёт контенту списка точную минимальную ширину, равную сумме ширин всех колонок

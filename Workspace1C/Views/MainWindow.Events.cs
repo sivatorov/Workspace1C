@@ -495,51 +495,9 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Issue #120: клик по чипу «Предприятие» — переход к окну уже запущенного
-        /// 1С:Предприятия этой базы. Запущено несколько экземпляров — меню выбора
-        /// окна. Запуск нового экземпляра остаётся на кнопке «Предприятие»
-        /// (несколько экземпляров Предприятия легитимны — обсуждение issue).
-        /// </summary>
-        private void OnEnterpriseChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not FrameworkElement fe || fe.DataContext is not Infobase ib)
-                return;
-            if (!ib.IsEnterpriseRunning)
-                return;
-
-            e.Handled = true;
-            // Перечисление окон идёт через обход процессов — вне UI-потока.
-            System.Threading.Tasks.Task.Run(() => _viewModel.GetRunningWindowsSafe(ib, RunningKind.Enterprise))
-                .ContinueWith(t =>
-                {
-                    var windows = t.Result;
-                    switch (RunningWindowPlanner.PlanEnterpriseIndicator(windows.Count))
-                    {
-                        case RunningWindowAction.ActivateSingle:
-                            _viewModel.ActivateWindowByHandle(windows[0].Handle);
-                            break;
-                        case RunningWindowAction.ShowPicker:
-                            OpenRunningWindowPicker(fe, windows);
-                            break;
-                    }
-                }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
-        }
-
-        /// <summary>Issue #120: клик по чипу «Конфигуратор» — переход к окну запущенного Конфигуратора.</summary>
-        private void OnConfiguratorChip_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            if (sender is not FrameworkElement fe || fe.DataContext is not Infobase ib)
-                return;
-            if (!ib.IsConfiguratorRunning)
-                return;
-
-            e.Handled = true;
-            _viewModel.ActivateRunningWindow(ib, RunningKind.Configurator);
-        }
-
-        /// <summary>
         /// Issue #120: выбор окна при нескольких запущенных экземплярах
-        /// 1С:Предприятия — контекстное меню у чипа; переход к выбранному окну.
+        /// 1С:Предприятия — контекстное меню у строки (двойной щелчок при
+        /// запущенном Предприятии); переход к выбранному окну.
         /// </summary>
         private void OpenRunningWindowPicker(FrameworkElement placementTarget,
             System.Collections.Generic.IReadOnlyList<RunningWindowInfo> windows)
@@ -592,12 +550,58 @@ namespace Workspace1C
             if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator
                 && _viewModel.LaunchConfiguratorCommand.CanExecute(null))
             {
+                // Issue #120: запуск Конфигуратора сам активирует открытое окно
+                // (MainViewModel.LaunchCoreAsync → TryActivateConfiguratorWindow) —
+                // при запущенном Конфигураторе новая сессия не открывается.
                 _viewModel.LaunchConfiguratorCommand.Execute(null);
             }
             else if (_viewModel.LaunchEnterpriseCommand.CanExecute(null))
             {
+                // Issue #120 (v1.0.1.54): при запущенном Предприятии двойной щелчок
+                // сначала активирует уже открытое окно; новый экземпляр запускается
+                // только если запущенного нет (окна не найдены).
+                if (infobase.IsEnterpriseRunning)
+                {
+                    ActivateRunningEnterpriseOrLaunch(infobase);
+                    return;
+                }
                 _viewModel.LaunchEnterpriseCommand.Execute(null);
             }
+        }
+
+        /// <summary>
+        /// Issue #120 (v1.0.1.54): двойной щелчок при запущенном Предприятии —
+        /// активация открытого окна вместо запуска нового экземпляра. Одно окно —
+        /// активируется напрямую; несколько — меню выбора; окон нет (флаг монитора
+        /// устарел, matcher процессов не распознал клиент, WMI недоступен) —
+        /// fallback на обычный запуск + запись в журнал (диагностика «клик не
+        /// работает»). Перечисление окон идёт через обход процессов — вне UI-потока.
+        /// </summary>
+        private void ActivateRunningEnterpriseOrLaunch(Infobase infobase)
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var windows = _viewModel.GetRunningWindowsSafe(infobase, RunningKind.Enterprise);
+                if (windows.Count == 0)
+                    _viewModel.LogRunningWindowMiss(infobase, RunningKind.Enterprise);
+                return windows;
+            })
+            .ContinueWith(t =>
+            {
+                var windows = t.Result;
+                switch (RunningWindowPlanner.PlanEnterpriseDoubleClick(windows.Count))
+                {
+                    case RunningWindowAction.ActivateSingle:
+                        _viewModel.ActivateWindowByHandle(windows[0].Handle);
+                        break;
+                    case RunningWindowAction.ShowPicker:
+                        OpenRunningWindowPicker(this, windows);
+                        break;
+                    default:
+                        _viewModel.LaunchEnterpriseCommand.Execute(null);
+                        break;
+                }
+            }, System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext());
         }
 
         /// <summary>

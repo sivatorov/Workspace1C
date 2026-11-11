@@ -517,7 +517,7 @@ namespace Workspace1C.Controls
         }
 
         /// <summary>Запуск базы тем же действием, что и двойной клик (issue #328).</summary>
-        private static void ActivateInfobaseLikeDoubleClick(MainViewModel vm, Infobase ib)
+        private void ActivateInfobaseLikeDoubleClick(MainViewModel vm, Infobase ib)
         {
             vm.SelectedInfobase = ib;
 
@@ -533,9 +533,61 @@ namespace Workspace1C.Controls
             if (dblAction == Workspace1C.Models.DoubleClickAction.None)
                 return;
             if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
+            {
+                // Issue #120: запуск Конфигуратора сам активирует открытое окно
+                // (MainViewModel.Avalonia.Launch → TryActivateConfiguratorWindow).
                 vm.LaunchConfiguratorCommand.Execute(null);
+            }
+            else if (ib.IsEnterpriseRunning)
+            {
+                // Issue #120 (v1.0.1.54): при запущенном Предприятии двойной щелчок
+                // сначала активирует уже открытое окно; новый экземпляр запускается
+                // только если запущенного нет (окна не найдены).
+                ActivateRunningEnterpriseOrLaunch(vm, ib);
+            }
             else
+            {
                 vm.LaunchEnterpriseCommand.Execute(null);
+            }
+        }
+
+        /// <summary>
+        /// Issue #120 (v1.0.1.54): двойной щелчок при запущенном Предприятии —
+        /// активация открытого окна вместо запуска нового экземпляра. Одно окно —
+        /// активируется напрямую; несколько — меню выбора; окон нет (флаг монитора
+        /// устарел, matcher процессов не распознал клиент, на Linux перечисление
+        /// окон не поддержано и список всегда пуст) — fallback на обычный запуск.
+        /// Перечисление окон идёт через обход процессов — вне UI-потока; применение
+        /// решения (активация/меню/запуск) — через Dispatcher в UI-потоке.
+        /// </summary>
+        private void ActivateRunningEnterpriseOrLaunch(MainViewModel vm, Infobase ib)
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var windows = vm.GetRunningWindowsSafe(ib, Workspace1C.Models.RunningKind.Enterprise);
+                if (windows.Count == 0)
+                    vm.LogRunningWindowMiss(ib, Workspace1C.Models.RunningKind.Enterprise);
+                return windows;
+            })
+            .ContinueWith(t =>
+            {
+                var windows = t.Result;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    switch (Services.RunningWindowPlanner.PlanEnterpriseDoubleClick(windows.Count))
+                    {
+                        case Services.RunningWindowAction.ActivateSingle:
+                            vm.ActivateWindowByHandle(windows[0].Handle);
+                            break;
+                        case Services.RunningWindowAction.ShowPicker:
+                            Workspace1C.MainWindow.ShowRunningWindowPicker(vm, windows, this);
+                            break;
+                        default:
+                            vm.LaunchEnterpriseCommand.Execute(null);
+                            break;
+                    }
+                });
+            });
         }
 
         /// <summary>Фокус клавиатуры сейчас в поле ввода/редакторе (TextBox, ComboBox).</summary>

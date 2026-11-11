@@ -9,9 +9,11 @@ namespace Workspace1C.Tests;
 /// Тесты issue #120 «Переход к открытому окну Конфигуратора/Предприятия»:
 /// чистая логика решения «запуск или активация» (<see cref="RunningWindowPlanner"/>)
 /// и сторож-проверки точек интеграции на обеих платформах (запуск Конфигуратора —
-/// активация открытого окна; клик по значку-индикатору Предприятия — переход
-/// к запущенному окну, при нескольких — выбор; кнопка «Предприятие» продолжает
-/// запускать новый экземпляр). Платформенная EnumWindows-часть — ручная проверка.
+/// активация открытого окна; двойной щелчок при запущенном Предприятии — сначала
+/// активация открытого окна, запуск нового — только если окон нет; кнопка
+/// «Предприятие» продолжает запускать новый экземпляр; чипы-индикаторы — НЕ
+/// нажимные, по консенсусу обсуждения issue). Платформенная EnumWindows-часть —
+/// ручная проверка.
 /// </summary>
 public sealed class Issue120RunningWindowTests
 {
@@ -39,9 +41,27 @@ public sealed class Issue120RunningWindowTests
     public void PlanEnterpriseIndicator_MatchesAgreedIssueBehavior(
         int openWindowCount, RunningWindowAction expected)
     {
-        // Issue #120: Предприятие по кнопке запускает новый экземпляр; переход —
-        // по клику на значке-индикаторе: одно окно — активировать, несколько — выбор.
+        // Issue #120: Предприятие по кнопке запускает новый экземпляр; историческая
+        // точка входа «переход по значку-индикатору»: одно окно — активировать,
+        // несколько — выбор (v1.0.1.54: чипы больше не нажимные, метод сохранён
+        // как чистый API планирования).
         Assert.Equal(expected, RunningWindowPlanner.PlanEnterpriseIndicator(openWindowCount));
+    }
+
+    [Theory]
+    [InlineData(0, RunningWindowAction.LaunchNew)]
+    [InlineData(-1, RunningWindowAction.LaunchNew)]
+    [InlineData(1, RunningWindowAction.ActivateSingle)]
+    [InlineData(2, RunningWindowAction.ShowPicker)]
+    [InlineData(5, RunningWindowAction.ShowPicker)]
+    public void PlanEnterpriseDoubleClick_ActivatesRunningSession_BeforeLaunchingNew(
+        int openWindowCount, RunningWindowAction expected)
+    {
+        // Issue #120 (v1.0.1.54, жалоба RafaIS): двойной щелчок по строке при
+        // запущенном Предприятии должен АКТИВИРОВАТЬ открытый экземпляр, а не
+        // запускать новый. Одно окно — активация; несколько — выбор окна;
+        // окон нет (флаг монитора устарел / перечисление не удалось) — запуск.
+        Assert.Equal(expected, RunningWindowPlanner.PlanEnterpriseDoubleClick(openWindowCount));
     }
 
     [Fact]
@@ -79,21 +99,27 @@ public sealed class Issue120RunningWindowTests
     }
 
     [Fact]
-    public void Wpf_RunningChips_HaveClickHandlersInMarkup()
+    public void Wpf_RunningChips_AreNotClickable()
     {
-        // Issue #120: клик по чипам «Предприятие»/«Конфигуратор» в строке базы
-        // переходит к окну уже запущенного приложения.
+        // Issue #120 (v1.0.1.54, консенсус обсуждения): значки-индикаторы запущенных
+        // режимов НЕ нажимные («нажимные значки вносят сумятицу») — курсор «рука»
+        // и обработчики клика убраны из разметки. Переход к открытому Предприятию —
+        // двойным щелчком по строке; повторный запуск Конфигуратора активирует окно.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        Assert.Contains("OnEnterpriseChip_MouseLeftButtonDown", xaml, StringComparison.Ordinal);
-        Assert.Contains("OnConfiguratorChip_MouseLeftButtonDown", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnEnterpriseChip_MouseLeftButtonDown", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("OnConfiguratorChip_MouseLeftButtonDown", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Wpf_Events_EnterpriseChipClick_UsesPickerDecision()
+    public void Wpf_DoubleClick_TriesEnterpriseWindowActivation_BeforeLaunch()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Events.cs"));
-        // Один запущенный экземпляр — активировать; несколько — выбор окна.
-        Assert.Contains("PlanEnterpriseIndicator", code, StringComparison.Ordinal);
+        // Двойной щелчок при запущенном Предприятии: сначала активация открытого
+        // окна (планирование через PlanEnterpriseDoubleClick), при пустом списке —
+        // fallback на обычный запуск с записью в журнал (диагностика «не работает»).
+        Assert.Contains("ActivateRunningEnterpriseOrLaunch", code, StringComparison.Ordinal);
+        Assert.Contains("PlanEnterpriseDoubleClick", code, StringComparison.Ordinal);
+        Assert.Contains("LogRunningWindowMiss", code, StringComparison.Ordinal);
         Assert.Contains("OpenRunningWindowPicker", code, StringComparison.Ordinal);
         Assert.Contains("FormatWindowTitle", code, StringComparison.Ordinal);
     }
@@ -115,16 +141,37 @@ public sealed class Issue120RunningWindowTests
         Assert.Contains("TryActivateConfiguratorWindow", code, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Running_Miss_IsLoggedForDiagnostics_WhenFlagSetButNoWindows()
+    {
+        // Issue #120 (v1.0.1.54): «клик по индикатору ничего не делает» стал
+        // диагностируемым — при установленном флаге запущенного режима и пустом
+        // списке окон пишется запись в журнал (MainViewModel.LogRunningWindowMiss).
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Running.cs"));
+        Assert.Contains("LogRunningWindowMiss", code, StringComparison.Ordinal);
+        Assert.Contains("OperatingSystem.IsWindows", code, StringComparison.Ordinal);
+    }
+
     // ===================== Сторож: точки интеграции (Avalonia) =====================
 
     [Fact]
-    public void Avalonia_RunningChips_TappedActivatesEnterpriseAndConfigurator()
+    public void Avalonia_RunningChips_AreNotClickable()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
-        Assert.Contains("OpenRunningWindowPicker", code, StringComparison.Ordinal);
-        Assert.Contains("RunningKind.Configurator", code, StringComparison.Ordinal);
-        Assert.Contains("enterpriseChip.Tapped", code, StringComparison.Ordinal);
-        Assert.Contains("configuratorChip.Tapped", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("enterpriseChip.Tapped", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("configuratorChip.Tapped", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_DoubleClick_TriesEnterpriseWindowActivation_BeforeLaunch()
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Controls", "LeveledTreeView.Avalonia.cs"));
+        // Двойной щелчок/Enter при запущенном Предприятии: сначала активация
+        // открытого окна (PlanEnterpriseDoubleClick), fallback — обычный запуск.
+        Assert.Contains("ActivateRunningEnterpriseOrLaunch", code, StringComparison.Ordinal);
+        Assert.Contains("PlanEnterpriseDoubleClick", code, StringComparison.Ordinal);
+        Assert.Contains("LogRunningWindowMiss", code, StringComparison.Ordinal);
+        Assert.Contains("ShowRunningWindowPicker", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -154,5 +201,6 @@ public sealed class Issue120RunningWindowTests
         // Детерминированность: одинаковый вход — одинаковое решение.
         Assert.Equal(RunningWindowPlanner.PlanEnterpriseIndicator(2), RunningWindowPlanner.PlanEnterpriseIndicator(2));
         Assert.Equal(RunningWindowPlanner.PlanConfiguratorLaunch(0), RunningWindowPlanner.PlanConfiguratorLaunch(0));
+        Assert.Equal(RunningWindowPlanner.PlanEnterpriseDoubleClick(1), RunningWindowPlanner.PlanEnterpriseDoubleClick(1));
     }
 }

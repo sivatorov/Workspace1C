@@ -46,6 +46,10 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         Title = title;
         Width = 440;
         SizeToContent = SizeToContent.Height;
+        // Высота окна жёстко фиксирована по контенту: CanResize=false запрещает
+        // перетаскивание границ оконным менеджером, SizeToContent=Height подбирает
+        // высоту по содержимому (issue #116 v1.0.1.54 — окна обновления не должны
+        // растягиваться по вертикали, как WPF-версия UpdateAvailableWindow).
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SystemDecorations = SystemDecorations.Full;

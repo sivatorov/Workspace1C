@@ -381,6 +381,11 @@ public partial class UpdateAvailableWindow : Window
     // Ориентиры сторон для WM_SIZING.
     private const int WmszLeft = 1;
     private const int WmszRight = 2;
+    private const int WmszTop = 3;
+    private const int WmszTopLeft = 4;
+    private const int WmszBottomLeft = 5;
+    private const int WmszBottom = 6;
+    private const int WmszTopRight = 7;
     private const int WmszBottomRight = 8;
 
     [StructLayout(LayoutKind.Sequential)]
@@ -420,6 +425,22 @@ public partial class UpdateAvailableWindow : Window
     }
 
     /// <summary>
+    /// Возвращает фиксированную высоту окна в DIP (device-independent units),
+    /// которую нельзя изменить мышью (issue #116 v1.0.1.54: окно подтверждения
+    /// перезапуска нельзя растягивать по вертикали — «растягивается странно»).
+    /// До первой реальной отрисовки берём значение из <see cref="Window.Height"/>,
+    /// иначе — фактическую высоту окна (подстроенную SizeToContent="Height").
+    /// </summary>
+    private double FixedHeightDips
+    {
+        get
+        {
+            var h = ActualHeight;
+            return h > 0 ? h : Height;
+        }
+    }
+
+    /// <summary>
     /// Текущий DPI-масштаб окна по горизонтали (1.0 = 100%). WPF измеряет размеры
     /// (<see cref="Window.Width"/>, <see cref="FrameworkElement.ActualWidth"/>) в DIP,
     /// а Win32-структуры <see cref="MinMaxInfo"/> и <see cref="RECT"/> (WM_GETMINMAXINFO,
@@ -434,6 +455,16 @@ public partial class UpdateAvailableWindow : Window
         }
     }
 
+    /// <summary>Текущий DPI-масштаб окна по вертикали (см. <see cref="DpiScaleX"/>).</summary>
+    private double DpiScaleY
+    {
+        get
+        {
+            var source = PresentationSource.FromVisual(this);
+            return source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+        }
+    }
+
     /// <summary>
     /// Фиксированная ширина окна в физических пикселях — то значение, которое надо
     /// подставлять в Win32-структуры MINMAXINFO/RECT. Без перевода DIP→px при масштабе
@@ -443,13 +474,21 @@ public partial class UpdateAvailableWindow : Window
     /// </summary>
     private int FixedWidthPx => (int)Math.Round(FixedWidthDips * DpiScaleX);
 
+    /// <summary>Фиксированная высота окна в физических пикселях (см. <see cref="FixedWidthPx"/>,
+    /// issue #116 v1.0.1.54 — запрет вертикального растягивания).</summary>
+    private int FixedHeightPx => (int)Math.Round(FixedHeightDips * DpiScaleY);
+
     /// <summary>
-    /// Перехватывает WM_GETMINMAXINFO и WM_SIZING, жёстко фиксируя ширину окна. Это
-    /// блокирует «схлопывание» окна при перетаскивании правой/левой границы, которое
-    /// обходит ResizeMode="NoResize" из-за кастомного Window-Chrome MaterialDesign
-    /// (issue #162). Высоту не ограничиваем — её подстраивает SizeToContent="Height".
-    /// В Win32-структуры подставляется ширина в физических пикселях (с учётом DPI),
-    /// иначе при масштабе экрана >100% окно принудительно сужалось и обрезало контент.
+    /// Перехватывает WM_GETMINMAXINFO и WM_SIZING, жёстко фиксируя ширину И высоту
+    /// окна. Фиксация ширины блокирует «схлопывание» окна при перетаскивании
+    /// правой/левой границы, которое обходит ResizeMode="NoResize" из-за кастомного
+    /// Window-Chrome MaterialDesign (issue #162). Фиксация высоты запрещает
+    /// вертикальное растягивание окна подтверждения перезапуска (issue #116
+    /// v1.0.1.54: «окна обновления растягиваются странно»); высоту контента
+    /// по-прежнему подстраивает SizeToContent="Height" — программные изменения
+    /// размера под WmGetMinMaxInfo/WmSizing не подпадают. В Win32-структуры
+    /// подставляются физические пиксели (с учётом DPI), иначе при масштабе
+    /// экрана >100% окно принудительно сжималось и обрезало контент.
     /// </summary>
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -459,11 +498,15 @@ public partial class UpdateAvailableWindow : Window
             {
                 var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
 
-                // Ширина фиксирована: MinTrackSize.X == MaxTrackSize.X == фактической ширине,
-                // поэтому изменение ширины мышью невозможно. Значение в физических пикселях.
+                // Ширина и высота фиксированы: MinTrackSize == MaxTrackSize ==
+                // фактическим габаритам, поэтому изменение размера мышью невозможно.
+                // Значения в физических пикселях.
                 int w = FixedWidthPx;
+                int h = FixedHeightPx;
                 mmi.MinTrackSize.X = w;
                 mmi.MaxTrackSize.X = w;
+                mmi.MinTrackSize.Y = h;
+                mmi.MaxTrackSize.Y = h;
                 Marshal.StructureToPtr(mmi, lParam, true);
                 handled = true;
                 break;
@@ -471,17 +514,31 @@ public partial class UpdateAvailableWindow : Window
             case WmSizing:
             {
                 // Дополнительная защита на случай, если кастомный Chrome инициирует изменение
-                // размера в обход MINMAXINFO: принудительно возвращаем фиксированную ширину
-                // (в физических пикселях, чтобы не сузить окно при масштабе >100%).
+                // размера в обход MINMAXINFO: принудительно возвращаем фиксированные ширину
+                // и высоту (в физических пикселях, чтобы не сузить окно при масштабе >100%).
                 var rc = Marshal.PtrToStructure<RECT>(lParam);
                 int w = FixedWidthPx;
+                int h = FixedHeightPx;
                 switch (wParam.ToInt32())
                 {
                     case WmszLeft:
+                    case WmszTopLeft:
+                    case WmszBottomLeft:
                         rc.Left = rc.Right - w;
                         break;
                     default:
                         rc.Right = rc.Left + w;
+                        break;
+                }
+                switch (wParam.ToInt32())
+                {
+                    case WmszTop:
+                    case WmszTopLeft:
+                    case WmszTopRight:
+                        rc.Top = rc.Bottom - h;
+                        break;
+                    default:
+                        rc.Bottom = rc.Top + h;
                         break;
                 }
                 Marshal.StructureToPtr(rc, lParam, true);

@@ -109,10 +109,13 @@ public sealed class V100150IssuesTests
     public void SettingsWindow_UpdateIntervalRow_IsOwnLine_OnBothPlatforms()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml"));
-        Assert.Contains("UpdateIntervalComboBox", xaml);
+        // v1.0.1.54 (issue #116): фиксированный ComboBox заменён парой «значение +
+        // единица» (UpdateIntervalValueBox + UpdateIntervalUnitCombo).
+        Assert.Contains("UpdateIntervalValueBox", xaml);
+        Assert.Contains("UpdateIntervalUnitCombo", xaml);
         // Ряд периода не совмещён в одном StackPanel с UpdateModeComboBox.
         var modeIndex = xaml.IndexOf("UpdateModeComboBox", StringComparison.Ordinal);
-        var intervalIndex = xaml.IndexOf("UpdateIntervalComboBox", StringComparison.Ordinal);
+        var intervalIndex = xaml.IndexOf("UpdateIntervalValueBox", StringComparison.Ordinal);
         Assert.True(modeIndex >= 0 && intervalIndex > modeIndex);
         var between = xaml[modeIndex..intervalIndex];
         Assert.Contains("</StackPanel>", between);
@@ -124,16 +127,8 @@ public sealed class V100150IssuesTests
 
     // ===================== Issue #103: маркер отладки — кружок =====================
 
-    [Fact]
-    public void DebugMarker_IsCircle_OnBothPlatforms()
-    {
-        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        Assert.Contains("<Ellipse Width=\"10\" Height=\"10\" Fill=\"{DynamicResource WarningBrush}\"", xaml);
-        Assert.DoesNotContain("RadiusX=\"1\"", xaml);
-
-        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
-        Assert.Contains("Shapes.Ellipse", avalonia);
-        Assert.DoesNotContain("debugSquare", avalonia);
-        Assert.Contains("debugCircle", avalonia);
-    }
+    // v1.0.1.54: отдельный кружок-маркер отладки удалён на обеих платформах —
+    // цвет значка Предприятия теперь сам кодирует отладку (синий при /DEBUG,
+    // оранжевый без). Актуальные сторож-проверки — в Issue103EnterpriseGlyphTests
+    // (Wpf_DebugMarkerEllipse_Removed / Avalonia_DebugMarkerEllipse_Removed).
 }

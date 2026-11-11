@@ -438,11 +438,11 @@ namespace Workspace1C
             updateModeRow.Children.Add(updateModeCombo);
             settingsBehavior.Children.Add(updateModeRow);
 
-            // Периодичность проверки обновлений (issue #116 п.2, v1.0.1.49): порядок
-            // вариантов совпадает с порядком AppSettings.UpdateCheckIntervals.
-            // Issue #116 п.2 v1.0.1.50: ряд идёт ОТДЕЛЬНОЙ строкой вертикальной
-            // компоновки (паритет с WPF-правкой: в разметке SettingsWindow.xaml ряд
-            // вынесен из строки режима обновления и больше не обрезается окном).
+            // Периодичность проверки обновлений (issue #116 v1.0.1.54): поле «Интервал»
+            // (число) + выбор периодичности (минуты/часы/дни) — как в планировщике
+            // заданий; хранение в минутах (AppSettings.ComposeUpdateInterval /
+            // DecomposeUpdateInterval). Ряд идёт ОТДЕЛЬНОЙ строкой вертикальной
+            // компоновки (issue #116 п.2 v1.0.1.50).
             var updateIntervalRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
             var updateIntervalIcon = IconHelper.MakeIcon("IconRefresh", UiMetrics.Scaled(16),
                 Themes.ThemeBrushes.FromSpec("@SuccessBrush"));
@@ -457,25 +457,41 @@ namespace Workspace1C
             };
             ThemeBrushes.Bind(updateIntervalLabel, TextBlock.ForegroundProperty, "TextPrimaryBrush");
             updateIntervalRow.Children.Add(updateIntervalLabel);
-            var updateIntervalCombo = new ComboBox { MinWidth = 200, VerticalAlignment = VerticalAlignment.Center };
-            foreach (var intervalKey in new[]
+
+            var updateIntervalValueBox = new TextBox
+            {
+                MinWidth = 80,
+                VerticalAlignment = VerticalAlignment.Center,
+                Text = string.Empty
+            };
+            ToolTip.SetTip(updateIntervalValueBox, LocalizationManager.T("Settings.General.UpdateIntervalTooltip"));
+
+            var updateIntervalUnitCombo = new ComboBox
+            {
+                Width = 130,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            foreach (var unitKey in new[]
                      {
-                         "Settings.General.UpdateInterval.OnStartup",
-                         "Settings.General.UpdateInterval.Hourly",
-                         "Settings.General.UpdateInterval.SixHours",
-                         "Settings.General.UpdateInterval.Daily"
+                         "Settings.General.UpdateIntervalUnit.Minutes",
+                         "Settings.General.UpdateIntervalUnit.Hours",
+                         "Settings.General.UpdateIntervalUnit.Days"
                      })
             {
-                updateIntervalCombo.Items.Add(new ComboBoxItem
+                updateIntervalUnitCombo.Items.Add(new ComboBoxItem
                 {
-                    Content = new TextBlock { Text = LocalizationManager.T(intervalKey) }
+                    Content = new TextBlock { Text = LocalizationManager.T(unitKey) }
                 });
             }
-            var intervalIndex = Array.IndexOf(
-                Models.AppSettings.UpdateCheckIntervals, _viewModel.UpdateCheckIntervalMinutes);
-            updateIntervalCombo.SelectedIndex = intervalIndex < 0 ? 0 : intervalIndex;
-            ToolTip.SetTip(updateIntervalCombo, LocalizationManager.T("Settings.General.UpdateIntervalTooltip"));
-            updateIntervalRow.Children.Add(updateIntervalCombo);
+            ToolTip.SetTip(updateIntervalUnitCombo, LocalizationManager.T("Settings.General.UpdateIntervalTooltip"));
+
+            Models.AppSettings.DecomposeUpdateInterval(
+                _viewModel.UpdateCheckIntervalMinutes, out var intervalValue, out var intervalUnit);
+            updateIntervalValueBox.Text = intervalValue.ToString();
+            updateIntervalUnitCombo.SelectedIndex = (int)intervalUnit;
+
+            updateIntervalRow.Children.Add(updateIntervalValueBox);
+            updateIntervalRow.Children.Add(updateIntervalUnitCombo);
             settingsBehavior.Children.Add(updateIntervalRow);
 
             // Учётные данные ИТС (issue #333): выбор записи справочника its_accounts.json
@@ -3625,11 +3641,17 @@ namespace Workspace1C
                     2 => "Priority",
                     _ => "X64"
                 });
-                // Периодичность проверки обновлений (issue #116 п.2): индекс → минуты;
-                // нет выбора — параметр не меняется (−1).
-                var updateIntervalMinutes = updateIntervalCombo.SelectedIndex >= 0
-                    ? Models.AppSettings.UpdateCheckIntervals[Math.Min(
-                        updateIntervalCombo.SelectedIndex, Models.AppSettings.UpdateCheckIntervals.Length - 1)]
+                // Периодичность проверки обновлений (issue #116 v1.0.1.54): «значение +
+                // единица» поля «Интервал» собираются в минуты (ComposeUpdateInterval);
+                // пустое/некорректное значение — параметр не меняется (−1).
+                var updateIntervalMinutes = int.TryParse(
+                        updateIntervalValueBox.Text?.Trim(), out var intervalValue)
+                    ? Models.AppSettings.ComposeUpdateInterval(
+                        intervalValue,
+                        updateIntervalUnitCombo.SelectedIndex >= 0
+                            && updateIntervalUnitCombo.SelectedIndex <= (int)Models.UpdateCheckIntervalUnit.Days
+                            ? (Models.UpdateCheckIntervalUnit)updateIntervalUnitCombo.SelectedIndex
+                            : Models.UpdateCheckIntervalUnit.Minutes)
                     : -1;
                 _viewModel.ApplyBehaviorSettings(
                     multipleInstancesCheck.IsChecked == true,

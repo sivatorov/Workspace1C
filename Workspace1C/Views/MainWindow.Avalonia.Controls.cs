@@ -61,7 +61,10 @@ namespace Workspace1C
                     fit++;
                 }
 
-                var x = Math.Max(0, (finalSize.Width - total) / 2);
+                // Issue #121 (v1.0.1.54): кнопки выровнены по левому краю колонки
+                // «Действия» — центрирование оставляло симметричные пустые поля
+                // в суженной колонке.
+                double x = 0;
                 for (var i = 0; i < Children.Count; i++)
                 {
                     var child = Children[i];

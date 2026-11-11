@@ -18,6 +18,7 @@ namespace Workspace1C.Tests;
 ///    иначе перенос кэша пользователя ломался;
 /// 3. удаление обычного каталога работает как прежде (рекурсивно).
 /// </summary>
+[Collection(Workspace1C.Tests.OneCCacheCleanerStaticState.Name)]
 public class OneCCacheCleanerJunctionTests
 {
     private static string NewTempDir()

@@ -119,7 +119,12 @@ namespace Workspace1C
             _githubFallbackLoaded = true;
             try
             {
+                // Fallback-порядок сводки (issue #116 v1.0.1.54): body GitHub-релиза
+                // текущего тега → локальная секция CHANGELOG.md рядом с exe →
+                // текст-заглушка. Окно никогда не остаётся с пустым содержимым.
                 var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
+                if (string.IsNullOrWhiteSpace(body))
+                    body = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
                 if (string.IsNullOrWhiteSpace(body))
                 {
                     var info = AvaloniaUi.Text(LocalizationManager.T("WhatsNew.NotesUnavailable"), 13);
@@ -132,8 +137,21 @@ namespace Workspace1C
             }
             catch
             {
-                // Сбой загрузки сводки не роняет диалог: остаётся пустой список и
-                // кнопка «Открыть CHANGELOG на GitHub».
+                // Сбой загрузки сводки не роняет диалог: пробуем локальный CHANGELOG,
+                // иначе показываем заглушку (окно никогда не остаётся пустым —
+                // issue #116 v1.0.1.54).
+                panel.Children.Clear();
+                var changelog = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
+                if (!string.IsNullOrWhiteSpace(changelog))
+                {
+                    panel.Children.Add(MarkdownRenderer.ToStackPanel(changelog));
+                }
+                else
+                {
+                    var info = AvaloniaUi.Text(LocalizationManager.T("WhatsNew.NotesUnavailable"), 13);
+                    info.Opacity = 0.7;
+                    panel.Children.Add(info);
+                }
             }
         }
 

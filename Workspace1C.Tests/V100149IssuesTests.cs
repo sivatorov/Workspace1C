@@ -119,29 +119,38 @@ public sealed class V100149IssuesTests
 
     // ---- Issue #116 п.2: периодичность проверки обновлений ----
 
+    // Issue #116 v1.0.1.54: интервал теперь произвольный «значение + единица»,
+    // старые фиксированные значения (0/60/360/1440) остаются валидными.
     [Fact]
-    public void AppSettings_NormalizeUpdateInterval_AcceptsOnlyKnownValues()
+    public void AppSettings_NormalizeUpdateInterval_AcceptsKnownValuesAndClamps()
     {
         Assert.Equal(0, AppSettings.NormalizeUpdateInterval(0));
         Assert.Equal(60, AppSettings.NormalizeUpdateInterval(60));
         Assert.Equal(360, AppSettings.NormalizeUpdateInterval(360));
         Assert.Equal(1440, AppSettings.NormalizeUpdateInterval(1440));
-        // Прочие значения (в т.ч. отрицательные и произвольные) — 0.
+        // Произвольные значения проходят (интервал задаётся числом + единицей),
+        // отрицательные — 0, слишком большие клампятся к 30 суткам.
+        Assert.Equal(15, AppSettings.NormalizeUpdateInterval(15));
+        Assert.Equal(999, AppSettings.NormalizeUpdateInterval(999));
         Assert.Equal(0, AppSettings.NormalizeUpdateInterval(-5));
-        Assert.Equal(0, AppSettings.NormalizeUpdateInterval(15));
-        Assert.Equal(0, AppSettings.NormalizeUpdateInterval(999));
+        Assert.Equal(AppSettings.MaxUpdateCheckIntervalMinutes,
+            AppSettings.NormalizeUpdateInterval(1_000_000));
     }
 
     [Fact]
-    public void AppSettings_LoadResetsInvalidUpdateInterval()
+    public void AppSettings_LoadKeepsKnownUpdateIntervals()
     {
         var settings = new AppSettings { UpdateCheckIntervalMinutes = 777 };
         settings.NormalizeForLoad();
-        Assert.Equal(0, settings.UpdateCheckIntervalMinutes);
+        Assert.Equal(777, settings.UpdateCheckIntervalMinutes);
 
         var valid = new AppSettings { UpdateCheckIntervalMinutes = 360 };
         valid.NormalizeForLoad();
         Assert.Equal(360, valid.UpdateCheckIntervalMinutes);
+
+        var zero = new AppSettings { UpdateCheckIntervalMinutes = -1 };
+        zero.NormalizeForLoad();
+        Assert.Equal(0, zero.UpdateCheckIntervalMinutes);
     }
 
     // ---- Issue #103: ключ отладки /DEBUG ----
@@ -169,11 +178,8 @@ public sealed class V100149IssuesTests
         Assert.False(RunningInfobaseMatcher.HasDebugKey(null));
     }
 
-    [Fact]
-    public void Infobase_EnterpriseDebugMarker_IsAmber_NotRed()
-    {
-        // Маркер отладки — янтарный #F59E0B (согласовано в issue #103);
-        // красный остался признаком «не отвечает».
-        Assert.Equal("#F59E0B", Infobase.EnterpriseDebugMarkerHex);
-    }
+    // v1.0.1.54 (issue #103): константа Infobase.EnterpriseDebugMarkerHex и
+    // отдельный янтарный маркер удалены — цвет значка Предприятия теперь сам
+    // кодирует отладку (синий при /DEBUG, оранжевый без); проверки — в
+    // Issue103EnterpriseGlyphTests.
 }

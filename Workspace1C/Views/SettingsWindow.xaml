@@ -380,19 +380,27 @@
                                 <!-- Периодичность фоновой проверки обновлений (issue #116 п.2, v1.0.1.49).
                                      Issue #116 п.2 v1.0.1.50: вынесена на ОТДЕЛЬНУЮ строку — раньше
                                      метка и комбобокс стояли в одном ряду с режимом обновления и
-                                     обрезались границей окна при минимальной ширине. -->
+                                     обрезались границей окна при минимальной ширине.
+                                     Issue #116 v1.0.1.54: вместо фиксированного списка «час /
+                                     6 часов / сутки» — поле «Интервал» (число) + выбор
+                                     периодичности (минуты/часы/дни), как в планировщике заданий
+                                     (ScheduledTaskEditWindow); хранение — в минутах. -->
                                 <StackPanel Orientation="Horizontal" Margin="24,0,0,6">
                                     <materialDesign:PackIcon Kind="ClockOutline" Width="16" Height="16" Foreground="{DynamicResource SuccessBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                     <TextBlock Text="{loc:Loc Settings.General.UpdateInterval}" VerticalAlignment="Center"/>
                                     <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
                                                        HelpText="{loc:Loc Settings.General.UpdateIntervalTooltip}"/>
-                                    <ComboBox x:Name="UpdateIntervalComboBox" MinWidth="200" Height="34" Margin="10,0,0,0"
+                                    <TextBox x:Name="UpdateIntervalValueBox" Width="80" Height="34" Margin="10,0,0,0"
+                                             VerticalAlignment="Center" VerticalContentAlignment="Center"
+                                             ToolTip="{loc:Loc Settings.General.UpdateIntervalTooltip}"
+                                             Style="{StaticResource ModernTextBox}"/>
+                                    <ComboBox x:Name="UpdateIntervalUnitCombo" Width="130" Height="34" Margin="8,0,0,0"
                                               VerticalAlignment="Center"
+                                              ToolTip="{loc:Loc Settings.General.UpdateIntervalTooltip}"
                                               Style="{StaticResource ModernComboBox}">
-                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.OnStartup}"/>
-                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.Hourly}"/>
-                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.SixHours}"/>
-                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateInterval.Daily}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateIntervalUnit.Minutes}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateIntervalUnit.Hours}"/>
+                                        <ComboBoxItem Content="{loc:Loc Settings.General.UpdateIntervalUnit.Days}"/>
                                     </ComboBox>
                                 </StackPanel>
                                 <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowTrayIconCheck" Margin="0,0,0,6">

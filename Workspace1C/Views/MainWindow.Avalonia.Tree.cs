@@ -434,37 +434,23 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(UiMetrics.Scaled(2), 0, 0, 0)
             };
-            enterpriseIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.EnterpriseRunningStatus))
+            // Issue #103 (v1.0.1.54): цвет значка кодирует отладку — оранжевый
+            // (WarningBrush) при обычном запуске, синий (InfoBrush) при запуске
+            // с /DEBUG (EnterpriseGlyphBrushConverter по статусу отклика И флагу
+            // отладки); при зависании — белый на красном чипе (подсветка занятости,
+            // как у Конфигуратора). Отдельный янтарный маркер отладки удалён.
+            enterpriseIcon.Bind(Avalonia.Controls.Shapes.Path.FillProperty, new MultiBinding
+            {
+                Bindings =
                 {
-                    Source = ib,
-                    Converter = new RunningChipBrushConverter(),
-                    // Базовый цвет значка — кисть темы; при зависании — белый на красном чипе.
-                    ConverterParameter = "glyph:@InfoBrush"
-                });
+                    new Avalonia.Data.Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib },
+                    new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib }
+                },
+                Converter = new EnterpriseGlyphBrushConverter(),
+                ConverterParameter = EnterpriseGlyphBrushConverter.DefaultParameter
+            });
             enterpriseChip.Child = enterpriseIcon;
             runningIcons.Children.Add(enterpriseChip);
-
-            // Issue #103 (v1.0.1.49): маркер «запущено под отладкой» — янтарный кружок
-            // WarningBrush (#F59E0B в тёмной палитре, см. Infobase.EnterpriseDebugMarkerHex)
-            // рядом с чипом «Предприятие». НЕ красный: красный остался признаком
-            // «не отвечает». Виден, когда хотя бы один Enterprise-процесс базы запущен
-            // с ключом /DEBUG (свой сеанс).
-            // Issue #103 (v1.0.1.50): по просьбе 7OH маркер — кружок, как остальные
-            // значки-чипы строки (Предприятие 18×18, Конфигуратор 18×18).
-            var debugCircle = new Avalonia.Controls.Shapes.Ellipse
-            {
-                Width = UiMetrics.Scaled(10),
-                Height = UiMetrics.Scaled(10),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(UiMetrics.Scaled(3), 0, 0, 0),
-                IsVisible = false
-            };
-            ThemeBrushes.Bind(debugCircle, Avalonia.Controls.Shapes.Shape.FillProperty, "WarningBrush");
-            ToolTip.SetTip(debugCircle, LocalizationManager.T("Infobase.DebugRunningTooltip"));
-            debugCircle.Bind(Visual.IsVisibleProperty,
-                new Avalonia.Data.Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib });
-            runningIcons.Children.Add(debugCircle);
 
             var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), nameof(Infobase.ConfiguratorRunningStatus), leftMargin: 3);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
@@ -486,32 +472,12 @@ namespace Workspace1C
             configuratorChip.Child = configuratorIcon;
             runningIcons.Children.Add(configuratorChip);
 
-            // Issue #120: клик по чипу «Предприятие» — переход к окну уже запущенного
-            // Предприятия; несколько экземпляров — меню выбора окна. Запуск нового
-            // экземпляра остаётся на кнопке «Предприятие». На Linux перечисление окон
-            // не поддержано (OneCWindowActivator возвращает пустой список) — клик тихо
-            // игнорируется (graceful fallback).
-            enterpriseChip.Tapped += (_, e) =>
-            {
-                if (_vm is not { } vm || !ib.IsEnterpriseRunning)
-                    return;
-                e.Handled = true;
-                UiExceptionGuard.Guard(
-                    "MainWindow.Avalonia.RunningChip.Enterprise",
-                    () => OpenRunningWindowPicker(vm, ib, enterpriseChip));
-            };
-
-            // Issue #120: клик по чипу «Конфигуратор» — переход к окну запущенного Конфигуратора.
-            configuratorChip.Tapped += (_, e) =>
-            {
-                if (_vm is not { } vm || !ib.IsConfiguratorRunning)
-                    return;
-                e.Handled = true;
-                UiExceptionGuard.Guard(
-                    "MainWindow.Avalonia.RunningChip.Configurator",
-                    () => vm.ActivateRunningWindow(ib, Workspace1C.Models.RunningKind.Configurator));
-            };
-
+            // Issue #120 (v1.0.1.54): чипы «Предприятие»/«Конфигуратор» — только
+            // индикаторы занятости, НЕ нажимные (обсуждение issue: «нажимные значки
+            // вносят сумятицу»). Переход к открытому окну Предприятия — двойной
+            // щелчок по строке (LeveledTreeView.ActivateRunningEnterpriseOrLaunch);
+            // повторный запуск Конфигуратора активирует открытое окно
+            // (MainViewModel.Avalonia.Launch → TryActivateConfiguratorWindow).
             nameRow.Children.Add(name);
             nameRow.Children.Add(runningIcons);
             content.Children.Add(nameRow);
@@ -519,12 +485,23 @@ namespace Workspace1C
             // Подсказка индикатора режимов меняется вместе с составом запущенных
             // процессов (Предприятие/Конфигуратор/оба + «процесс не отвечает»):
             // строка подписана на изменения, пересборка дерева не нужна.
+            // Issue #103 (v1.0.1.54): у чипа Предприятия собственная подсказка
+            // «запущено с отладкой» (переехала с удалённого янтарного маркера),
+            // перекрывающая общую RunningModesTooltip, пока процесс запущен с /DEBUG.
+            void UpdateEnterpriseDebugTooltip()
+                => ToolTip.SetTip(enterpriseChip, ib.IsEnterpriseDebugRunning
+                    ? LocalizationManager.T("Infobase.DebugRunningTooltip")
+                    : null);
+
+            UpdateEnterpriseDebugTooltip();
             card.AddSubscription(() =>
             {
                 void OnRunningModesChanged(object? _, PropertyChangedEventArgs e)
                 {
                     if (e.PropertyName == nameof(Infobase.RunningModesTooltip))
                         ToolTip.SetTip(runningIcons, ib.RunningModesTooltip);
+                    else if (e.PropertyName == nameof(Infobase.IsEnterpriseDebugRunning))
+                        UpdateEnterpriseDebugTooltip();
                 }
 
                 ib.PropertyChanged += OnRunningModesChanged;
@@ -611,7 +588,9 @@ namespace Workspace1C
                 // запуск, конфигуратор, очистка кеша. Правка настроек и удаление
                 // в строке не показываются, они остаются в контекстном меню.
                 actions = new ActionsPanel { Spacing = 1 };
-                actions.Children.Add(RowActionButton(ib, "IconPlay", "LaunchEnterpriseCommand", LocalizationManager.T("Main.LaunchEnterpriseTooltip")));
+                // Issue #121: кнопка запуска Предприятия несёт индикатор занятости
+                // (issue #120/#103), остальные — обычные чипы без подсветки статуса.
+                actions.Children.Add(RowActionButton(ib, "IconPlay", "LaunchEnterpriseCommand", LocalizationManager.T("Main.LaunchEnterpriseTooltip"), enterpriseLaunch: true));
                 actions.Children.Add(RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip")));
                 actions.Children.Add(RowActionButton(ib, "IconBroom", "ClearCacheCommand", LocalizationManager.T("Main.ClearCacheTooltip")));
                 // Кнопки живут внутри панели, обрезанной по своей колонке: в узкой
@@ -706,21 +685,15 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Issue #120: переход к окну запущенного Предприятия: единственное окно —
-        /// активировать; несколько — меню выбора. На Linux GetRunningWindowsSafe
-        /// возвращает пустой список — действие отсутствует (graceful fallback).
+        /// Issue #120: меню выбора открытого окна при нескольких запущенных
+        /// экземплярах Предприятия. Окна уже перечислены вызывающим кодом (вне
+        /// UI-потока); выбор пункта активирует соответствующее окно. Вызывается
+        /// из двойного щелчка строки (LeveledTreeView.ActivateRunningEnterpriseOrLaunch)
+        /// в UI-потоке.
         /// </summary>
-        private void OpenRunningWindowPicker(ViewModels.MainViewModel vm, Infobase ib, Control chip)
+        internal static void ShowRunningWindowPicker(ViewModels.MainViewModel vm,
+            System.Collections.Generic.IReadOnlyList<Services.RunningWindowInfo> windows, Control placement)
         {
-            var windows = vm.GetRunningWindowsSafe(ib, Workspace1C.Models.RunningKind.Enterprise);
-            if (windows.Count == 1)
-            {
-                vm.ActivateWindowByHandle(windows[0].Handle);
-                return;
-            }
-            if (windows.Count <= 1)
-                return;
-
             var menu = new Avalonia.Controls.ContextMenu();
             foreach (var window in windows)
             {
@@ -732,7 +705,7 @@ namespace Workspace1C
                 item.Click += (_, _) => vm.ActivateWindowByHandle(captured.Handle);
                 menu.Items.Add(item);
             }
-            menu.Open(chip);
+            menu.Open(placement);
         }
 
         /// <summary>
@@ -881,25 +854,89 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Кнопка действия в колонке «Действия» строки базы: иконка, команда из вьюмодели,
-        /// параметром служит сама информационная база строки.
+        /// Кнопка действия в колонке «Действия» строки базы: значок в круглой
+        /// подложке-кружке (issue #121, v1.0.1.54: единый стиль с индикаторами запуска —
+        /// кружок + подсветка при выделении строки), команда из вьюмодели, параметром
+        /// служит сама информационная база строки. Кнопка выровнена по левому краю колонки.
         /// </summary>
         /// <param name="colorHex">
         /// Явный цвет значка. У автора кнопки строки вторичного цвета, кроме
         /// удаления: оно красное.
         /// </param>
+        /// <param name="enterpriseLaunch">
+        /// Кнопка запуска Предприятия (issue #120/#103): подложка и значок показывают
+        /// индикатор занятости — оранжевый (обычный запуск) / синий (/DEBUG) значок,
+        /// зависший процесс — белый значок на красном чипе.
+        /// </param>
         private Control RowActionButton(Infobase ib, string iconKey, string commandPath, string tooltip,
-            string? colorHex = null)
+            string? colorHex = null, bool enterpriseLaunch = false)
         {
             Control glyph;
-            if (colorHex is null)
+            if (enterpriseLaunch)
             {
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), "TextSecondaryBrush");
+                // Issue #120/#103: цвет значка — индикатор запуска: мульти-конвертер
+                // (запущено / статус отклика / отладка). Ручная привязка Fill —
+                // авто-обновление IconHelper по набору иконок отключается.
+                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), out var glyphPath);
+                IconHelper.Untrack(glyphPath);
+                glyphPath.Bind(Avalonia.Controls.Shapes.Path.FillProperty, new MultiBinding
+                {
+                    Bindings =
+                    {
+                        new Binding(nameof(Infobase.IsEnterpriseRunning)) { Source = ib },
+                        new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib },
+                        new Binding(nameof(Infobase.IsEnterpriseDebugRunning)) { Source = ib }
+                    },
+                    Converter = new RowActionGlyphBrushConverter()
+                });
             }
             else
             {
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15), SpecBrush(colorHex));
+                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(15),
+                    colorHex is null ? "TextSecondaryBrush" : colorHex);
             }
+
+            glyph.HorizontalAlignment = HorizontalAlignment.Center;
+            glyph.VerticalAlignment = VerticalAlignment.Center;
+
+            // Круглая подложка-кружок (issue #121): единый стиль с чипами индикаторов
+            // запуска (BuildRunningChip, issue #101/#103). Кисти — по выделению строки
+            // и (у кнопки Предприятия) по статусу зависшего процесса.
+            var chip = new Border
+            {
+                Width = UiMetrics.Scaled(22),
+                Height = UiMetrics.Scaled(22),
+                CornerRadius = new CornerRadius(UiMetrics.Scaled(11)),
+                BorderThickness = new Thickness(1),
+                Child = glyph
+            };
+            // Выделение строки: у контейнера TreeViewItem, не у самой базы
+            // (совпадает с выделением фона строки, InfobaseRowCard).
+            var selectedBinding = new Binding("IsSelected")
+            {
+                RelativeSource = new RelativeSource
+                {
+                    Mode = RelativeSourceMode.FindAncestor,
+                    AncestorType = typeof(TreeViewItem)
+                }
+            };
+            var statusBinding = new Binding(nameof(Infobase.EnterpriseRunningStatus)) { Source = ib };
+            chip.Bind(Border.BackgroundProperty, new MultiBinding
+            {
+                Bindings = { statusBinding, selectedBinding },
+                Converter = new RowActionChipBrushConverter(),
+                ConverterParameter = enterpriseLaunch
+                    ? RowActionChipBrushConverter.BackgroundParameter
+                    : RowActionChipBrushConverter.BackgroundPlainParameter
+            });
+            chip.Bind(Border.BorderBrushProperty, new MultiBinding
+            {
+                Bindings = { statusBinding, selectedBinding },
+                Converter = new RowActionChipBrushConverter(),
+                ConverterParameter = enterpriseLaunch
+                    ? RowActionChipBrushConverter.BorderParameter
+                    : RowActionChipBrushConverter.BorderPlainParameter
+            });
 
             // Оформление берёт тема IconButton разметки: у автора все пять команд
             // строки идут этим стилем с полем 1,0 (MainWindow.xaml:1282).
@@ -908,11 +945,12 @@ namespace Workspace1C
             // прозрачный фон её не перебивал.
             var button = new Button
             {
-                Content = glyph,
+                Content = chip,
                 Margin = new Thickness(1, 0),
                 MinWidth = 0,
                 MinHeight = 0,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                // Issue #121: кнопки выровнены по левому краю колонки «Действия».
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 CommandParameter = ib
             };
