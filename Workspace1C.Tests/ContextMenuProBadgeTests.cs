@@ -88,18 +88,32 @@ public sealed class ContextMenuProBadgeTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// Бейдж «· ПРО» на TestDeploy/MassLoadCf — только в сценарии 2.x
+    /// (<see cref="VersionInfo.MajorOverride"/> = 2): в ветке 1.x функции публичного
+    /// ядра бесплатны и бейдж не показывается (issue #106).
+    /// </summary>
     [Fact]
     public void DisplayText_WithoutLicense_ShowsProBadge()
     {
         Assert.False(EditionService.IsPro);
+        VersionInfo.MajorOverride = 2; // поведение 2.x: public core снова требует ключ
+        EditionService.Reset();
+        try
+        {
+            var badge = Localization.LocalizationManager.T("Pro.Badge");
+            var testDeploy = ContextMenuCatalog.Find("TestDeploy")!;
+            var massLoadCf = ContextMenuCatalog.Find("MassLoadCf")!;
 
-        var badge = Localization.LocalizationManager.T("Pro.Badge");
-        var testDeploy = ContextMenuCatalog.Find("TestDeploy")!;
-        var massLoadCf = ContextMenuCatalog.Find("MassLoadCf")!;
-
-        // Тот же формат суффикса, что в UtilitiesMenuItem.DisplayText: «  · ПРО».
-        Assert.EndsWith("  · " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
-        Assert.EndsWith("  · " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
+            // Тот же формат суффикса, что в UtilitiesMenuItem.DisplayText: «  · ПРО».
+            Assert.EndsWith("  · " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
+            Assert.EndsWith("  · " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            VersionInfo.MajorOverride = null;
+            EditionService.Reset();
+        }
     }
 
     [Fact]

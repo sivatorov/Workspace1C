@@ -158,18 +158,26 @@ public sealed class ProLicensingTests : IDisposable
 
     // ---------------------------------------------------------------- редакция
 
+    /// <summary>
+    /// Без ключа в ветке 1.x функции публичного ядра бесплатны (docs/pro/PRO-EDITION.md,
+    /// issue #106), а функции вне ядра закрыты: гейт отказывает и показывает окно «Лицензия».
+    /// </summary>
     [Fact]
     public void Edition_WithoutKey_IsFree_AndGateDenies()
     {
         Assert.False(EditionService.IsPro);
-        Assert.False(EditionService.Has(ProFeature.ServerAlerts));
+        // Public core бесплатен в 1.x (VersionInfo.Major() = 1 для сборок 1.0.x).
+        Assert.True(EditionService.Has(ProFeature.ServerAlerts));
+        Assert.True(EditionService.Has(ProFeature.MassLoadCf));
+        // Функции вне публичного ядра (новые 2.x) остаются закрытыми без ключа.
+        Assert.False(EditionService.Has(ProFeature.Pipelines));
         ProFeature? shown = null;
         var previous = ProGate.ShowLicenseDialog;
         ProGate.ShowLicenseDialog = f => shown = f;
         try
         {
-            Assert.False(ProGate.Ensure(ProFeature.TelegramBot));
-            Assert.Equal(ProFeature.TelegramBot, shown);
+            Assert.False(ProGate.Ensure(ProFeature.Pipelines));
+            Assert.Equal(ProFeature.Pipelines, shown);
         }
         finally
         {
@@ -260,26 +268,38 @@ public sealed class ProLicensingTests : IDisposable
     /// Дефект №5 (аудит активации): создание задания планировщика типа TestDeploy
     /// гейтится лицензией при выборе/сохранении в редакторе задания (ScheduledTaskEditWindow,
     /// гейт по <see cref="ScheduledTaskEditViewModel.RequiredProFeature"/>), а не только
-    /// при выполнении (SchedulerService.cs). Без лицензии выбор/сохранение запрещены:
-    /// гейт возвращает false и показывает окно «Лицензия».
+    /// при выполнении (SchedulerService.cs). TestDeploy — функция публичного ядра и в ветке
+    /// 1.x бесплатна (issue #106), поэтому отказ без лицензии проверяем для сценария 2.x
+    /// (<see cref="VersionInfo.MajorOverride"/> = 2): гейт возвращает false и показывает
+    /// окно «Лицензия».
     /// </summary>
     [Fact]
     public void SchedulerTestDeploy_CreationGate_DeniedWithoutLicense()
     {
         Assert.False(EditionService.IsPro);
-        ProFeature? shown = null;
-        var previous = ProGate.ShowLicenseDialog;
-        ProGate.ShowLicenseDialog = f => shown = f;
+        VersionInfo.MajorOverride = 2; // поведение 2.x: public core снова требует ключ
+        EditionService.Reset();
         try
         {
-            var feature = ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy);
-            Assert.NotNull(feature);
-            Assert.False(ProGate.Ensure(feature!.Value));
-            Assert.Equal(ProFeature.TestDeploy, shown);
+            ProFeature? shown = null;
+            var previous = ProGate.ShowLicenseDialog;
+            ProGate.ShowLicenseDialog = f => shown = f;
+            try
+            {
+                var feature = ScheduledTaskEditViewModel.RequiredProFeature(ScheduledTaskKind.TestDeploy);
+                Assert.NotNull(feature);
+                Assert.False(ProGate.Ensure(feature!.Value));
+                Assert.Equal(ProFeature.TestDeploy, shown);
+            }
+            finally
+            {
+                ProGate.ShowLicenseDialog = previous;
+            }
         }
         finally
         {
-            ProGate.ShowLicenseDialog = previous;
+            VersionInfo.MajorOverride = null;
+            EditionService.Reset();
         }
     }
 
@@ -336,30 +356,41 @@ public sealed class ProLicensingTests : IDisposable
     /// <summary>
     /// Аудит лицензирования: список функций окна «Лицензия» показывает реализованные
     /// функции как «доступна», нереализованные — «в разработке»; признак реализованности
-    /// не меняет гейт <see cref="EditionService.Has"/>.
+    /// не меняет гейт <see cref="EditionService.Has"/>. Сценарий 2.x
+    /// (<see cref="VersionInfo.MajorOverride"/> = 2): без ключа ни одна функция
+    /// не включена — в 1.x функции публичного ядра бесплатны (issue #106).
     /// </summary>
     [Fact]
     public void LicenseViewModel_FeatureRows_MarkInDevelopment()
     {
-        Assert.False(EditionService.IsPro); // гейт не трогаем: доступность по-прежнему false без ключа
-
-        var available = LocalizationManager.T("Pro.FeatureStatus.Available");
-        var inDevelopment = LocalizationManager.T("Pro.FeatureStatus.InDevelopment");
-
-        var vm = new LicenseViewModel();
-        Assert.Equal(ProFeatures.All.Count, vm.Features.Count);
-        foreach (var row in vm.Features)
+        Assert.False(EditionService.IsPro);
+        VersionInfo.MajorOverride = 2; // поведение 2.x: public core снова требует ключ
+        EditionService.Reset();
+        try
         {
-            Assert.Equal(!ProFeatures.IsImplemented(row.Feature), row.InDevelopment);
-            Assert.Equal(
-                LocalizationManager.T(ProFeatures.StatusKey(row.Feature)),
-                row.Status);
-            if (ProFeatures.IsImplemented(row.Feature))
-                Assert.Equal(available, row.Status);
-            else
-                Assert.Equal(inDevelopment, row.Status);
-            Assert.Contains(row.Status, row.Display);
-            Assert.Equal("—", row.Mark); // без лицензии функция не включена
+            var available = LocalizationManager.T("Pro.FeatureStatus.Available");
+            var inDevelopment = LocalizationManager.T("Pro.FeatureStatus.InDevelopment");
+
+            var vm = new LicenseViewModel();
+            Assert.Equal(ProFeatures.All.Count, vm.Features.Count);
+            foreach (var row in vm.Features)
+            {
+                Assert.Equal(!ProFeatures.IsImplemented(row.Feature), row.InDevelopment);
+                Assert.Equal(
+                    LocalizationManager.T(ProFeatures.StatusKey(row.Feature)),
+                    row.Status);
+                if (ProFeatures.IsImplemented(row.Feature))
+                    Assert.Equal(available, row.Status);
+                else
+                    Assert.Equal(inDevelopment, row.Status);
+                Assert.Contains(row.Status, row.Display);
+                Assert.Equal("—", row.Mark); // без лицензии функция не включена
+            }
+        }
+        finally
+        {
+            VersionInfo.MajorOverride = null;
+            EditionService.Reset();
         }
     }
 

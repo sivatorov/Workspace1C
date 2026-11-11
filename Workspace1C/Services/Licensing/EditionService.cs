@@ -57,8 +57,17 @@ public static class EditionService
     /// Доступна ли функция ПРО: нужен действительный ключ и сам код функции в сборке
     /// (функции 1.0.x есть в публичном коде, новые 2.x — только в официальной сборке).
     /// </summary>
-    public static bool Has(ProFeature feature) =>
-        IsPro && (ProFeatures.IsInPublicCore(feature) || HasProModules);
+    /// <remarks>
+    /// Политика лицензирования (docs/pro/PRO-EDITION.md, раздел 2): версии 1.0.x остаются
+    /// под MIT навсегда — функции публичного ядра (ServerAlerts…MassLoadCf, issue #106)
+    /// бесплатны в ветке 1.x; закрытие лицензией появляется только со сборок 2.x.
+    /// </remarks>
+    public static bool Has(ProFeature feature)
+    {
+        if (VersionInfo.Major() < 2 && ProFeatures.IsInPublicCore(feature))
+            return true;
+        return IsPro && (ProFeatures.IsInPublicCore(feature) || HasProModules);
+    }
 
     /// <summary>
     /// Проверяет и сохраняет ключ. Недействительный ключ не сохраняется, текущая

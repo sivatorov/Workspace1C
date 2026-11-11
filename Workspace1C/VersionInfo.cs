@@ -22,11 +22,18 @@ public static class VersionInfo
     }
 
     /// <summary>
+    /// Переопределение старшего числа версии программы (тесты). Не null — значение
+    /// используется вместо AssemblyVersion; в тестах сбрасывать обратно в null
+    /// (по образцу <see cref="Workspace1C.Services.Licensing.LicenseVerifier.PublicKeyOverride"/>).
+    /// </summary>
+    public static int? MajorOverride { get; set; }
+
+    /// <summary>
     /// Старшее число версии программы (2 для 2.x.x.x) — по нему проверяется лицензия ПРО
     /// (docs/pro/PRO-EDITION.md). Берётся из AssemblyVersion, не зависит от суффиксов.
     /// </summary>
     public static int Major() =>
-        Assembly.GetExecutingAssembly().GetName().Version?.Major ?? 0;
+        MajorOverride ?? Assembly.GetExecutingAssembly().GetName().Version?.Major ?? 0;
 
     private static string? StripHash(string? version)
     {
