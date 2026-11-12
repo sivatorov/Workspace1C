@@ -643,11 +643,14 @@ namespace Workspace1C
                 // видна, пока курсор над карточкой строки или запущено Предприятие
                 // (чип-индикатор остаётся видимым без наведения).
                 BindActionsHoverVisibility(launchBtn, card, ib, nameof(Infobase.IsEnterpriseRunning));
-                actions.Children.Add(launchBtn);
+                // Issue #128 (v1.0.1.59, 7OH): кнопки запуска живут в фиксированных
+                // слотах — каждая иконка стоит на своём месте, скрытая кнопка
+                // (Collapsed) не сдвигает соседей.
+                actions.Children.Add(FixedLaunchSlot(launchBtn));
                 // Issue #120 (v1.0.1.55): чип Конфигуратора — индикатор запуска, как у Предприятия.
                 var configuratorBtn = RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip"), configuratorLaunch: true);
                 BindActionsHoverVisibility(configuratorBtn, card, ib, nameof(Infobase.IsConfiguratorRunning));
-                actions.Children.Add(configuratorBtn);
+                actions.Children.Add(FixedLaunchSlot(configuratorBtn));
                 // Служебная кнопка (очистка кеша) индикатора запуска не имеет —
                 // при настройке видна только под курсором.
                 var clearCacheBtn = RowActionButton(ib, "IconBroom", "ClearCacheCommand", LocalizationManager.T("Main.ClearCacheTooltip"));
@@ -998,6 +1001,26 @@ namespace Workspace1C
         /// <param name="ib">База строки: источник признака запущенного режима.</param>
         /// <param name="runningPath">Имя свойства запущенного режима (IsEnterpriseRunning/
         /// IsConfiguratorRunning) или null для служебной кнопки без индикатора.</param>
+        /// <summary>
+        /// Фиксированный слот кнопки запуска в колонке «Действия» (issue #128,
+        /// v1.0.1.59, 7OH): панель постоянной ширины (кружок 18 px + поля кнопки
+        /// 1,0 с двух сторон). В режиме «Действия только при наведении» скрытая
+        /// (Collapsed) кнопка не освобождает слот — соседние иконки не сдвигаются:
+        /// Предприятие всегда первый слот, Конфигуратор — второй.
+        /// </summary>
+        /// <param name="button">Кнопка запуска (Предприятие/Конфигуратор).</param>
+        private static Panel FixedLaunchSlot(Control button)
+        {
+            var slot = new Panel
+            {
+                Width = UiMetrics.Scaled(20),
+                Height = UiMetrics.Scaled(18)
+            };
+            // Кнопка уже выровнена по левому краю и центру вертикали (RowActionButton).
+            slot.Children.Add(button);
+            return slot;
+        }
+
         private void BindActionsHoverVisibility(Control button, InfobaseRowCard card, Infobase ib, string? runningPath)
         {
             if (_vm is null)

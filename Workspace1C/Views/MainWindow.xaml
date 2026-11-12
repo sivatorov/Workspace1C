@@ -2186,7 +2186,11 @@
                                                                     <Condition Binding="{Binding IsMouseOver, ElementName=InfobaseRowBorder}" Value="False"/>
                                                                     <Condition Binding="{Binding IsEnterpriseRunning}" Value="False"/>
                                                                 </MultiDataTrigger.Conditions>
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <!-- Issue #128 (v1.0.1.59, 7OH): Hidden вместо Collapsed —
+                                                                     слот кнопки Предприятия резервируется всегда, каждая
+                                                                     иконка стоит на своём месте (запущенный Конфигуратор
+                                                                     не сдвигается на место Предприятия при скрытии). -->
+                                                                <Setter Property="Visibility" Value="Hidden"/>
                                                             </MultiDataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -2273,7 +2277,10 @@
                                                                     <Condition Binding="{Binding IsMouseOver, ElementName=InfobaseRowBorder}" Value="False"/>
                                                                     <Condition Binding="{Binding IsConfiguratorRunning}" Value="False"/>
                                                                 </MultiDataTrigger.Conditions>
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <!-- Issue #128 (v1.0.1.59, 7OH): Hidden вместо Collapsed —
+                                                                     слот кнопки Конфигуратора резервируется всегда,
+                                                                     иконка стоит на своём месте (вторая после Предприятия). -->
+                                                                <Setter Property="Visibility" Value="Hidden"/>
                                                             </MultiDataTrigger>
                                                         </Style.Triggers>
                                                     </Style>

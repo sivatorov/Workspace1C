@@ -191,6 +191,27 @@ public sealed class Issue128ActionsHoverTests
     }
 
     [Fact]
+    public void Wpf_LaunchButtons_HideWithHiddenToKeepFixedSlots()
+    {
+        // Issue #128 (v1.0.1.59, 7OH): кнопки запуска при hover-only скрываются
+        // через Hidden (слот резервируется, иконки не сдвигаются), а служебная
+        // кнопка очистки кеша — по-прежнему Collapsed.
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
+
+        var enterprise = xaml.IndexOf("<Condition Binding=\"{Binding IsEnterpriseRunning}\" Value=\"False\"/>", StringComparison.Ordinal);
+        Assert.True(enterprise > 0, "триггер кнопки Предприятия не найден");
+        var enterpriseBlock = xaml[enterprise..(enterprise + 900)];
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Hidden\"/>", enterpriseBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Setter Property=\"Visibility\" Value=\"Collapsed\"/>", enterpriseBlock, StringComparison.Ordinal);
+
+        var configurator = xaml.IndexOf("<Condition Binding=\"{Binding IsConfiguratorRunning}\" Value=\"False\"/>", StringComparison.Ordinal);
+        Assert.True(configurator > 0, "триггер кнопки Конфигуратора не найден");
+        var configuratorBlock = xaml[configurator..(configurator + 900)];
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Hidden\"/>", configuratorBlock, StringComparison.Ordinal);
+        Assert.DoesNotContain("<Setter Property=\"Visibility\" Value=\"Collapsed\"/>", configuratorBlock, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Wpf_SettingsWindow_HasActionsHoverOnlyOption()
     {
         // Опция под списком колонок во вкладке «Отображение» → «Колонки».
@@ -221,6 +242,20 @@ public sealed class Issue128ActionsHoverTests
         // Курсор над строкой — IsPointerOver карточки (hover строки целиком).
         Assert.Contains("nameof(InputElement.IsPointerOver)", tree, StringComparison.Ordinal);
         Assert.Contains("nameof(MainViewModel.ActionsHoverOnly)", tree, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_LaunchButtons_LiveInFixedSlots()
+    {
+        // Issue #128 (v1.0.1.59, 7OH): кнопки запуска Предприятия и Конфигуратора
+        // обёрнуты в фиксированные слоты — скрытая (Collapsed) кнопка не сдвигает
+        // соседние иконки, каждая иконка стоит на своём месте.
+        var tree = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
+        Assert.Contains("actions.Children.Add(FixedLaunchSlot(launchBtn));", tree, StringComparison.Ordinal);
+        Assert.Contains("actions.Children.Add(FixedLaunchSlot(configuratorBtn));", tree, StringComparison.Ordinal);
+        Assert.Contains("private static Panel FixedLaunchSlot(Control button)", tree, StringComparison.Ordinal);
+        // Служебная кнопка (очистка кеша) без слота — появляется последней.
+        Assert.Contains("actions.Children.Add(clearCacheBtn);", tree, StringComparison.Ordinal);
     }
 
     [Fact]

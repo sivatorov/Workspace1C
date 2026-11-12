@@ -10,7 +10,9 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Тесты-стражи релиза v1.0.1.58 (issues #116/#117/#120/#123/#125/#126/#127/#128):
+/// Тесты-стражи релиза v1.0.1.59 (issue #128 — фиксированные слоты кнопок запуска
+/// при настройке «Действия только при наведении») и исторические стражи релиза
+/// v1.0.1.58 (issues #116/#117/#120/#123/#125/#126/#127/#128):
 /// - #116: режим «Загружать с предложением установки» реально скачивает обновление
 ///   в фоне, удаляет старый скачанный файл, зелёный индикатор готовности, кнопка «Установить»;
 /// - #117: настоящее имя расширения читается из .cfe (нативный контейнер 1С),
@@ -30,7 +32,7 @@ namespace Workspace1C.Tests;
 ///   полями и FilePath, читабельная выжимка BuildReadableDetails без начального ключа,
 ///   состав/порядок колонок таблицы «Установленные лицензии» на обеих платформах.
 /// </summary>
-public sealed class Release100158Tests
+public sealed class Release100159Tests
 {
     private static string FindRepoRoot()
     {
@@ -52,18 +54,18 @@ public sealed class Release100158Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия (актуальная — 1.0.1.58, issues #116/#117/#120/#123/#125/#126/#127/#128) =====================
+    // ===================== Версия (актуальная — 1.0.1.59, issue #128) =====================
 
     [Fact]
     public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.58</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.58</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.58</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.58</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.57", csproj, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.1.59</Version>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>1.0.1.59</AssemblyVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>1.0.1.59</FileVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>1.0.1.59</InformationalVersion>", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("1.0.1.58", csproj, StringComparison.Ordinal);
     }
 
     // ===================== Issue #102: переносимый текст =====================
