@@ -50,6 +50,10 @@
 
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <!-- Размер значка в кружках запуска по набору иконок (issue #125):
+             «Предприятие» у Fluent/Material и «Конфигуратор» у Material —
+             крупнее, кружок 18 px не меняется. -->
+        <conv:ChipGlyphSizeConverter x:Key="ChipGlyphSize"/>
         <conv:DoubleToGridLengthConverter x:Key="DoubleToGridLength"/>
         <conv:GroupColorConverter x:Key="GroupColorConverter"/>
         <conv:GroupTextColorConverter x:Key="GroupTextColorConverter"/>
@@ -1230,16 +1234,28 @@
                                      того, как Border разложит ребёнка фиксированного размера). Явно
                                      центрируем и укрупняем значок до 16 px (13 в компактном режиме) —
                                      пропорция как у одобренных чипов-индикаторов 18/16. -->
-                                <Setter Property="Width" Value="16"/>
-                                <Setter Property="Height" Value="16"/>
+                                <!-- Issue #125: размер значка задаёт ChipGlyphSize по активному набору
+                                     иконок (спецификация «Вид:Обычный:Компактный»); вид глифа переопределяется
+                                     в стилях кнопок запуска (Enterprise/Configurator), прочие значки — None.
+                                     Кружок 18 px не меняется — у Fluent/Material растёт только значок. -->
                                 <Setter Property="HorizontalAlignment" Value="Center"/>
                                 <Setter Property="VerticalAlignment" Value="Center"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Width" Value="13"/>
-                                        <Setter Property="Height" Value="13"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
+                                <Setter Property="Width">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="None:16:13">
+                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="Height">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="None:16:13">
+                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
                             </Style>
                             <!-- Кнопки звезды/булавки в строке базы (issue #296): собственный
                                  прозрачный шаблон без неявного стиля MaterialDesign, который
@@ -1584,7 +1600,10 @@
                                  PinnedInfobaseItem, issue #314): там тот же шаблон
                                  применяется к реальной базе через ContentControl. -->
                             <DataTemplate x:Key="InfobaseRowTemplate" DataType="{x:Type models:Infobase}">
-                                <Border>
+                                <!-- x:Name нужен триггерам «Действий только при наведении»
+                                     (issue #128): кнопки колонки «Действия» смотрят на
+                                     IsMouseOver корневого Border строки. -->
+                                <Border x:Name="InfobaseRowBorder">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="Transparent"/>
@@ -1988,8 +2007,21 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <materialDesign:PackIcon Kind="Play" Width="16" Height="16"
+                                                    <materialDesign:PackIcon Kind="Play"
                                                                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <!-- Issue #125: значок Предприятия у наборов Fluent и Material
+                                                             Design рисуется крупнее внутри того же кружка (эталон —
+                                                             Windows XP); размер задаёт ChipGlyphSize по набору иконок. -->
+                                                        <materialDesign:PackIcon.Width>
+                                                            <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Enterprise:16">
+                                                                <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                            </MultiBinding>
+                                                        </materialDesign:PackIcon.Width>
+                                                        <materialDesign:PackIcon.Height>
+                                                            <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Enterprise:16">
+                                                                <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                            </MultiBinding>
+                                                        </materialDesign:PackIcon.Height>
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <!-- Issue #103 (v1.0.1.54): цвет значка кодирует отладку —
@@ -2036,8 +2068,21 @@
                                                             </Style.Triggers>
                                                         </Style>
                                                     </Border.Style>
-                                                    <materialDesign:PackIcon Kind="Wrench" Width="12" Height="12"
+                                                    <materialDesign:PackIcon Kind="Wrench"
                                                                              HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                        <!-- Issue #125: только у набора Material Design значок
+                                                             Конфигуратора крупнее; у Fluent и остальных наборов —
+                                                             как раньше. Размер задаёт ChipGlyphSize по набору иконок. -->
+                                                        <materialDesign:PackIcon.Width>
+                                                            <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Configurator:12">
+                                                                <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                            </MultiBinding>
+                                                        </materialDesign:PackIcon.Width>
+                                                        <materialDesign:PackIcon.Height>
+                                                            <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Configurator:12">
+                                                                <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                            </MultiBinding>
+                                                        </materialDesign:PackIcon.Height>
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
                                                                 <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
@@ -2127,8 +2172,25 @@
                                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0">
                                             <Button Command="{Binding DataContext.LaunchEnterpriseCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchEnterpriseTooltip}">
+                                                <!-- Issue #128: при включённой настройке «Действия только
+                                                     при наведении» кнопка видна только когда курсор над
+                                                     строкой (IsMouseOver корневого Border) ЛИБО пока запущено
+                                                     Предприятие — чип-индикатор остаётся видимым без наведения. -->
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
+                                                        <Style.Triggers>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding DataContext.ActionsHoverOnly, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=InfobaseRowBorder}" Value="False"/>
+                                                                    <Condition Binding="{Binding IsEnterpriseRunning}" Value="False"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
                                                 <!-- Issue #121 (v1.0.1.55): локальные размеры 22 px сняты —
                                                      чип берёт единые 18 px из стиля RowActionChip. -->
                                                 <Border>
@@ -2152,6 +2214,24 @@
                                                     <materialDesign:PackIcon Kind="Play">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource RowActionIcon}">
+                                                                <!-- Issue #125: значок Предприятия крупнее у наборов Fluent и
+                                                                     Material Design (спецификация «Enterprise:16:13»). -->
+                                                                <Setter Property="Width">
+                                                                    <Setter.Value>
+                                                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Enterprise:16:13">
+                                                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                                        </MultiBinding>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Setter Property="Height">
+                                                                    <Setter.Value>
+                                                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Enterprise:16:13">
+                                                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                                        </MultiBinding>
+                                                                    </Setter.Value>
+                                                                </Setter>
                                                                 <!-- Issue #121/#120 (v1.0.1.54): индикатор запуска перенесён
                                                                      на кнопку запуска. Не запущено — вторичный цвет;
                                                                      запущено — оранжевый (обычный запуск), синий при /DEBUG
@@ -2179,8 +2259,25 @@
                                             </Button>
                                             <Button Command="{Binding DataContext.LaunchConfiguratorCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.LaunchConfiguratorSectionTooltip}">
+                                                <!-- Issue #128: при включённой настройке «Действия только
+                                                     при наведении» кнопка видна только когда курсор над
+                                                     строкой ЛИБО пока запущен Конфигуратор — чип-индикатор
+                                                     остаётся видимым без наведения. -->
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
+                                                        <Style.Triggers>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding DataContext.ActionsHoverOnly, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=InfobaseRowBorder}" Value="False"/>
+                                                                    <Condition Binding="{Binding IsConfiguratorRunning}" Value="False"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
                                                 <!-- Issue #120 (v1.0.1.55, 7OH): чип Конфигуратора красится,
                                                      как чип Предприятия: запущен — оранжевый значок,
                                                      зависший процесс — белый значок на красном чипе
@@ -2204,6 +2301,24 @@
                                                     <materialDesign:PackIcon Kind="Wrench">
                                                         <materialDesign:PackIcon.Style>
                                                             <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource RowActionIcon}">
+                                                                <!-- Issue #125: значок Конфигуратора крупнее только у набора
+                                                                     Material Design (спецификация «Configurator:16:13»). -->
+                                                                <Setter Property="Width">
+                                                                    <Setter.Value>
+                                                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Configurator:16:13">
+                                                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                                        </MultiBinding>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <Setter Property="Height">
+                                                                    <Setter.Value>
+                                                                        <MultiBinding Converter="{StaticResource ChipGlyphSize}" ConverterParameter="Configurator:16:13">
+                                                                            <Binding Path="Current" Source="{x:Static themes:IconSetState.Instance}"/>
+                                                                            <Binding Path="DataContext.CompactMode" RelativeSource="{RelativeSource AncestorType=Window}"/>
+                                                                        </MultiBinding>
+                                                                    </Setter.Value>
+                                                                </Setter>
                                                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                                                                 <Style.Triggers>
                                                                     <DataTrigger Binding="{Binding IsConfiguratorRunning}" Value="True">
@@ -2223,8 +2338,23 @@
                                             </Button>
                                             <Button Command="{Binding DataContext.ClearCacheCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    Style="{StaticResource RowActionChipButton}"
                                                     ToolTip="{loc:Loc Main.ClearCacheTooltip}">
+                                                <!-- Issue #128: при включённой настройке «Действия только
+                                                     при наведении» служебная кнопка видна только когда
+                                                     курсор над строкой (индикатора запуска у неё нет). -->
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
+                                                        <Style.Triggers>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding DataContext.ActionsHoverOnly, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=InfobaseRowBorder}" Value="False"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
                                                 <Border Style="{StaticResource RowActionChip}">
                                                     <materialDesign:PackIcon Kind="Broom"
                                                                              Style="{StaticResource RowActionIcon}"
@@ -3361,10 +3491,12 @@
                      «внимание» (восклицательный знак в треугольнике) в акцентном цвете,
                      когда есть доступный релиз (issue #116 v1.0.1.54: красные «!!!»
                      вводили в заблуждение — красный !! в логах означает серьёзные
-                     ошибки). Три состояния (скрыт / стрелки / «внимание») переключает
+                     ошибки). Четвёртое состояние (issue #116 v1.0.1.58): зелёная
+                     галочка — файл обновления уже скачан в фоне и готов к установке.
+                     Состояния (скрыт / стрелки / «внимание» / готовность) переключает
                      RefreshFooterUpdateState; клик — единый OnFooterUpdateIconClick
                      (ручная проверка: для доступного релиза она открывает диалог
-                     обновления). -->
+                     обновления, для готового файла — сразу диалог установки). -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                     <!-- В WPF StackPanel не имеет Spacing: зазор задаётся Margin'ом значка. -->
                     <StackPanel x:Name="FooterUpdateIcon" Orientation="Horizontal"
@@ -3379,6 +3511,11 @@
                                                  Width="16" Height="16" VerticalAlignment="Center"
                                                  Margin="4,0,0,0"
                                                  Foreground="{DynamicResource AccentBrush}"
+                                                 Visibility="Collapsed"/>
+                        <materialDesign:PackIcon x:Name="FooterUpdateReadyIcon" Kind="Check"
+                                                 Width="16" Height="16" VerticalAlignment="Center"
+                                                 Margin="4,0,0,0"
+                                                 Foreground="{DynamicResource SuccessBrush}"
                                                  Visibility="Collapsed"/>
                     </StackPanel>
                     <TextBlock x:Name="FooterVersionText"

@@ -182,6 +182,10 @@ namespace Workspace1C
             // списке, что и порядок: флажки заполняются в InitializeColumnOrder.
             ShowNameColumnCheck.IsChecked = true;
 
+            // «Действия только при наведении» (issue #128).
+            if (ActionsHoverOnlyCheck != null)
+                ActionsHoverOnlyCheck.IsChecked = _viewModel.ActionsHoverOnly;
+
             InitializeColumnOrder();
 
             ShowFavoritesButtonCheck.IsChecked = _showFavoritesButton;

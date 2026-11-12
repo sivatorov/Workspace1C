@@ -464,12 +464,17 @@ namespace Workspace1C
             // ConfiguratorRunningStatus), а не к общему RunningStatus: зависший
             // Конфигуратор красит только свой чип, Предприятие остаётся в своём цвете.
             var enterpriseChip = BuildRunningChip(ib, nameof(Infobase.IsEnterpriseRunning), nameof(Infobase.EnterpriseRunningStatus), leftMargin: 0);
+            // Issue #125 (v1.0.1.58): значок Предприятия у наборов Fluent и Material Design
+            // в кружке выглядит мелко (глиф Play в родной сетке 24×24 занимает меньше
+            // места, чем у Windows XP — эталон из обсуждения issue), поэтому рисуется
+            // крупнее. Кружок 18 px не меняется — растёт только отрисовка значка.
+            var enterpriseScale = Themes.ChipGlyphScale.Factor(Themes.IconSetState.Instance.Current, Themes.ChipGlyphKind.Enterprise);
             var enterpriseIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = Avalonia.Media.Geometry.Parse(RunningEnterpriseGlyph),
                 Stretch = Stretch.Uniform,
-                Width = UiMetrics.Scaled(9),
-                Height = UiMetrics.Scaled(11),
+                Width = UiMetrics.Scaled(9) * enterpriseScale,
+                Height = UiMetrics.Scaled(11) * enterpriseScale,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(UiMetrics.Scaled(2), 0, 0, 0)
@@ -493,12 +498,15 @@ namespace Workspace1C
             runningIcons.Children.Add(enterpriseChip);
 
             var configuratorChip = BuildRunningChip(ib, nameof(Infobase.IsConfiguratorRunning), nameof(Infobase.ConfiguratorRunningStatus), leftMargin: 3);
+            // Issue #125: только у набора Material Design значок Конфигуратора крупнее;
+            // у Fluent и остальных наборов — как раньше (Windows XP — эталон без изменений).
+            var configuratorScale = Themes.ChipGlyphScale.Factor(Themes.IconSetState.Instance.Current, Themes.ChipGlyphKind.Configurator);
             var configuratorIcon = new Avalonia.Controls.Shapes.Path
             {
                 Data = IconHelper.Geometry("IconWrench"),
                 Stretch = Stretch.Uniform,
-                Width = UiMetrics.Scaled(10),
-                Height = UiMetrics.Scaled(10),
+                Width = UiMetrics.Scaled(10) * configuratorScale,
+                Height = UiMetrics.Scaled(10) * configuratorScale,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -630,10 +638,21 @@ namespace Workspace1C
                 actions = new ActionsPanel { Spacing = 1 };
                 // Issue #121: кнопка запуска Предприятия несёт индикатор занятости
                 // (issue #120/#103), остальные — обычные чипы без подсветки статуса.
-                actions.Children.Add(RowActionButton(ib, "IconPlay", "LaunchEnterpriseCommand", LocalizationManager.T("Main.LaunchEnterpriseTooltip"), enterpriseLaunch: true));
+                var launchBtn = RowActionButton(ib, "IconPlay", "LaunchEnterpriseCommand", LocalizationManager.T("Main.LaunchEnterpriseTooltip"), enterpriseLaunch: true);
+                // Issue #128: при настройке «Действия только при наведении» кнопка
+                // видна, пока курсор над карточкой строки или запущено Предприятие
+                // (чип-индикатор остаётся видимым без наведения).
+                BindActionsHoverVisibility(launchBtn, card, ib, nameof(Infobase.IsEnterpriseRunning));
+                actions.Children.Add(launchBtn);
                 // Issue #120 (v1.0.1.55): чип Конфигуратора — индикатор запуска, как у Предприятия.
-                actions.Children.Add(RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip"), configuratorLaunch: true));
-                actions.Children.Add(RowActionButton(ib, "IconBroom", "ClearCacheCommand", LocalizationManager.T("Main.ClearCacheTooltip")));
+                var configuratorBtn = RowActionButton(ib, "IconWrench", "LaunchConfiguratorCommand", LocalizationManager.T("Main.LaunchConfiguratorSectionTooltip"), configuratorLaunch: true);
+                BindActionsHoverVisibility(configuratorBtn, card, ib, nameof(Infobase.IsConfiguratorRunning));
+                actions.Children.Add(configuratorBtn);
+                // Служебная кнопка (очистка кеша) индикатора запуска не имеет —
+                // при настройке видна только под курсором.
+                var clearCacheBtn = RowActionButton(ib, "IconBroom", "ClearCacheCommand", LocalizationManager.T("Main.ClearCacheTooltip"));
+                BindActionsHoverVisibility(clearCacheBtn, card, ib, runningPath: null);
+                actions.Children.Add(clearCacheBtn);
                 // Кнопки живут внутри панели, обрезанной по своей колонке: в узкой
                 // колонке «Действия» лишние значки у автора пропадают, а у нас
                 // рисовались поверх колонки «Сервер/База».
@@ -691,19 +710,22 @@ namespace Workspace1C
                 var dblAction = vm.ResolveDoubleClickAction(tappedIb);
                 // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего», если база сейчас
                 // запущена (Предприятие и/или Конфигуратор), двойной щелчок предлагает
-                // выбор окна — в списке и Предприятие, и Конфигуратор.
+                // выбор окна. Issue #120 (v1.0.1.58, RafaIS): меню выбора — только при
+                // отключённой колонке «Действия»; при включённой двойной клик с
+                // «Ничего» ничего не делает (не путает — запуск кнопками).
                 if (dblAction == Workspace1C.Models.DoubleClickAction.None)
                 {
                     if (tappedIb.IsRunning)
-                        ActivateAllWindowsOrNothing(vm, tappedIb, card);
+                        ActivateAllWindowsOrNothing(vm, tappedIb, card, nothingAction: true);
                     return;
                 }
                 // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
                 // открытому окну Предприятия/Конфигуратора (одно — напрямую, несколько —
-                // выбор окна; окон нет — ничего).
+                // выбор окна; окон нет — ничего). Меню выбора — только при отключённой
+                // колонке «Действия» (issue #120 v1.0.1.58, RafaIS).
                 if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
                 {
-                    ActivateAllWindowsOrNothing(vm, tappedIb, card);
+                    ActivateAllWindowsOrNothing(vm, tappedIb, card, nothingAction: false);
                     return;
                 }
                 if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
@@ -747,15 +769,23 @@ namespace Workspace1C
         /// двойным щелчком «Ничего» при запущенной базе и вкладкой «Запущенные».
         /// Перечисление — вне UI-потока, решение — через Dispatcher.
         /// </summary>
-        internal static void ActivateAllWindowsOrNothing(ViewModels.MainViewModel vm, Infobase ib, Control placement)
+        internal static void ActivateAllWindowsOrNothing(
+            ViewModels.MainViewModel vm, Infobase ib, Control placement, bool nothingAction)
         {
+            // Issue #120 (v1.0.1.58, RafaIS): правило показа меню выбора окна —
+            // только при отключённой колонке «Действия» (см. PlanAllWindowsDoubleClick);
+            // «Ничего» при включённой колонке — ничего, «Активировать окно»/вкладка
+            // «Запущенные» — первое окно. На Linux перечисление окон не поддержано
+            // (список пуст) — правило не срабатывает, graceful fallback сохранён.
+            var showActionsColumn = vm.ShowActionsColumn;
             System.Threading.Tasks.Task.Run(() => vm.GetRunningWindowsSafeAll(ib))
                 .ContinueWith(t =>
                 {
                     var windows = t.Result;
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
-                        switch (Services.RunningWindowPlanner.PlanAllWindows(windows.Count))
+                        switch (Services.RunningWindowPlanner.PlanAllWindowsDoubleClick(
+                                    windows.Count, showActionsColumn, nothingAction))
                         {
                             case Services.RunningWindowAction.ActivateSingle:
                                 vm.ActivateWindowByHandle(windows[0].Handle);
@@ -956,10 +986,51 @@ namespace Workspace1C
         /// Кнопка запуска Предприятия (issue #120/#103): подложка и значок показывают
         /// индикатор занятости — оранжевый (обычный запуск) / синий (/DEBUG) значок,
         /// зависший процесс — белый значок на красном чипе.
+        /// <summary>
+        /// «Действия только при наведении» (issue #128): привязывает видимость кнопки
+        /// колонки «Действия» к решению чистого <see cref="ActionsHoverPlanner"/>
+        /// (обёртка — <see cref="RowActionHoverVisibilityConverter"/>): кнопка видна,
+        /// когда настройка выключена, курсор над карточкой строки или запущен
+        /// соответствующий режим (для служебной кнопки — только hover).
+        /// </summary>
+        /// <param name="button">Кнопка колонки «Действия» строки базы.</param>
+        /// <param name="card">Карточка строки: её IsPointerOver — курсор над строкой.</param>
+        /// <param name="ib">База строки: источник признака запущенного режима.</param>
+        /// <param name="runningPath">Имя свойства запущенного режима (IsEnterpriseRunning/
+        /// IsConfiguratorRunning) или null для служебной кнопки без индикатора.</param>
+        private void BindActionsHoverVisibility(Control button, InfobaseRowCard card, Infobase ib, string? runningPath)
+        {
+            if (_vm is null)
+                return;
+            button.Bind(Visual.IsVisibleProperty, new MultiBinding
+            {
+                Converter = new RowActionHoverVisibilityConverter(),
+                Bindings =
+                {
+                    new Binding(nameof(MainViewModel.ActionsHoverOnly)) { Source = _vm },
+                    new Binding(nameof(InputElement.IsPointerOver)) { Source = card },
+                    runningPath is null
+                        ? new Binding { Source = false }
+                        : new Binding(runningPath) { Source = ib }
+                }
+            });
+        }
+
         /// </param>
         private Control RowActionButton(Infobase ib, string iconKey, string commandPath, string tooltip,
             string? colorHex = null, bool enterpriseLaunch = false, bool configuratorLaunch = false)
         {
+            // Issue #125 (v1.0.1.58): масштаб значка внутри кружка по набору иконок —
+            // Предприятие (IconPlay) крупнее у Fluent и Material, Конфигуратор
+            // (IconWrench) — только у Material; прочие значки чипов и остальные
+            // наборы — без изменений (кружок 18 px не меняется).
+            var glyphKind = iconKey switch
+            {
+                "IconPlay" => Themes.ChipGlyphKind.Enterprise,
+                "IconWrench" => Themes.ChipGlyphKind.Configurator,
+                _ => Themes.ChipGlyphKind.None
+            };
+            var glyphSize = Themes.ChipGlyphScale.Scale(UiMetrics.Scaled(16), Themes.IconSetState.Instance.Current, glyphKind);
             Control glyph;
             if (enterpriseLaunch || configuratorLaunch)
             {
@@ -971,7 +1042,7 @@ namespace Workspace1C
                 // запущен — оранжевый значок, зависший процесс — белый на красном чипе.
                 // Issue #107 (v1.0.1.55): значок укрупнён 15 → 16 px — пропорция
                 // кружка 22 px, как у одобренных чипов-индикаторов 18/16.
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16), out var glyphPath);
+                glyph = IconHelper.MakeIcon(iconKey, glyphSize, out var glyphPath);
                 IconHelper.Untrack(glyphPath);
                 glyphPath.Bind(Avalonia.Controls.Shapes.Path.FillProperty, new MultiBinding
                 {
@@ -995,7 +1066,7 @@ namespace Workspace1C
             {
                 // Issue #107 (v1.0.1.55): значок укрупнён 15 → 16 px (кружок 22 px),
                 // центрирование задано ниже явно (HorizontalAlignment/VerticalAlignment).
-                glyph = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(16),
+                glyph = IconHelper.MakeIcon(iconKey, glyphSize,
                     colorHex is null ? "TextSecondaryBrush" : colorHex);
             }
 

@@ -210,6 +210,147 @@ public sealed class UpdateService : IAppUpdateService
         }
     }
 
+    // ---- Готовый к установке файл обновления (issue #116, v1.0.1.58) ----
+
+    /// <summary>
+    /// Релиз, установочный файл которого уже скачан и готов к установке (issue #116).
+    /// Заполняется фоновой загрузкой режима «Загружать с предложением установки»
+    /// (<see cref="StartBackgroundDownload"/>); сбрасывается при применении обновления.
+    /// </summary>
+    public ReleaseInfo? ReadyRelease { get; private set; }
+
+    /// <summary>Путь к скачанному файлу обновления для <see cref="ReadyRelease"/>;
+    /// null — готового файла нет.</summary>
+    public string? ReadyFilePath { get; private set; }
+
+    /// <summary>Событие смены состояния «файл обновления скачан и готов к установке»
+    /// (вызывается из фонового потока; подписчик обязан сам перейти в UI-поток).</summary>
+    public event Action? ReadyStateChanged;
+
+    /// <summary>
+    /// True — установочный файл этого релиза уже скачан и существует на диске
+    /// (issue #116): состояние «готов к установке» отличается от «доступно
+    /// обновление» (файл ещё не скачан).
+    /// </summary>
+    public bool IsReadyFor(ReleaseInfo? release)
+    {
+        if (release is null || ReadyRelease is null || ReadyFilePath is null)
+            return false;
+        if (!string.Equals(ReadyRelease.TagName, release.TagName, StringComparison.Ordinal))
+            return false;
+        try
+        {
+            return File.Exists(ReadyFilePath);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Обновляет состояние «файл обновления скачан» и уведомляет подписчиков.</summary>
+    private void SetReadyState(ReleaseInfo? release, string? path)
+    {
+        if (ReferenceEquals(ReadyRelease, release)
+            && string.Equals(ReadyFilePath, path, StringComparison.Ordinal))
+            return;
+        ReadyRelease = release;
+        ReadyFilePath = path;
+        try { ReadyStateChanged?.Invoke(); }
+        catch { /* подписчик не должен ронять фоновую загрузку */ }
+    }
+
+    /// <summary>
+    /// Запускает фоновую загрузку установочного файла релиза без подтверждения
+    /// (issue #116, режим «Загружать с предложением установки»). Загрузка идёт через
+    /// <see cref="DownloadNewExeCoreAsync"/> — тот же путь, что и в режиме «Обновлять
+    /// при запуске»: единый реестр фоновых загрузок, проверка размера/сигнатуры,
+    /// single-writer. Повторные вызовы при уже идущей или завершённой (готовой)
+    /// загрузке того же релиза ничего не делают.
+    /// </summary>
+    public void StartBackgroundDownload(ReleaseInfo release)
+    {
+        if (release is null || IsReadyFor(release) || IsUpdateDownloadInProgress(release))
+            return;
+        if (string.IsNullOrWhiteSpace(release.DownloadUrl))
+            return;
+        _ = DownloadInBackgroundAsync(release);
+    }
+
+    /// <summary>
+    /// Тело фоновой загрузки (issue #116): по успешном завершении предыдущий
+    /// скачанный файл обновления удаляется
+    /// (<see cref="UpdateDownloadCleanup.RemoveStaleDownload"/>) и публикуется
+    /// состояние «готов к установке» через <see cref="ReadyStateChanged"/>.
+    /// </summary>
+    private async Task DownloadInBackgroundAsync(ReleaseInfo release)
+    {
+        try
+        {
+            var previousReadyPath = ReadyFilePath;
+            var (path, _) = await DownloadNewExeCoreAsync(release).ConfigureAwait(false);
+            if (path is null)
+                return;
+
+            // Успешная загрузка: устаревший скачанный файл обновления больше не нужен.
+            UpdateDownloadCleanup.RemoveStaleDownload(previousReadyPath, path);
+            SetReadyState(release, path);
+        }
+        catch
+        {
+            // Фоновая загрузка не должна ронять приложение.
+        }
+    }
+
+    /// <summary>
+    /// Применяет уже скачанный файл обновления (issue #116): тот же путь, что и
+    /// автообновление — создаётся помощник замены exe (<see cref="ApplyRestartNow"/>)
+    /// и записывается маркер pending_update.json. Закрытие приложения выполняет
+    /// вызывающий (после показа подтверждения), как и в диалоговом пути
+    /// «Перезапустить сейчас». Возвращает true при успехе.
+    /// </summary>
+    public bool ApplyReadyInstall(ReleaseInfo release)
+    {
+        try
+        {
+            if (!IsReadyFor(release))
+                return false;
+            var newExe = ReadyFilePath!;
+            var targetExe = ResolveTargetExe();
+            if (targetExe is null)
+                return false;
+
+            if (!ApplyRestartNow(targetExe, newExe))
+                return false;
+
+            // Маркер об успешном обновлении (issue #10): уведомление о завершении
+            // отправит новая версия при следующем старте.
+            try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
+            catch { /* маркер сервисный — установка не должна срываться */ }
+
+            SetReadyState(null, null);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Открывает диалог обновления для уже скачанного релиза (issue #116): без
+    /// сетевой проверки — файл готов, окно <see cref="UpdateAvailableWindow"/>
+    /// само покажет кнопку «Установить» вместо «Скачать». Клик по значку готовности
+    /// в статус-баре.
+    /// </summary>
+    public void ShowReadyInstallDialog()
+    {
+        var release = ReadyRelease;
+        if (release is null || !IsReadyFor(release))
+            return;
+        ShowUpdateDialog(release);
+    }
+
     /// <summary>
     /// Событие прогресса скачивания exe. Значение — проценты 0–100. Если длина файла
     /// заранее неизвестна (сервер не отдал Content-Length), передаётся −1, что означает
@@ -291,14 +432,14 @@ public sealed class UpdateService : IAppUpdateService
                     return;
 
                 case AppUpdateMode.DownloadAskInstall:
-                    // Запоминаем доступный релиз (ссылка «Обновить» в подвале) и
-                    // показываем единый диалог, который сам скачивает файл и задаёт
-                    // вопрос «Перезапустить сейчас / Обновить после закрытия».
+                    // Фоновая загрузка без подтверждения (issue #116, v1.0.1.58):
+                    // файл обновления скачивается сразу, как в режиме «Обновлять
+                    // при запуске», но установка молча НЕ применяется. Диалог не
+                    // показывается: когда файл готов, значок в статус-баре отражает
+                    // готовность, клик по нему открывает диалог со списком изменений
+                    // и кнопкой «Установить».
                     SetAvailableRelease(release);
-                    var app = Application.Current;
-                    if (app is null)
-                        return;
-                    await app.Dispatcher.InvokeAsync(() => ShowUpdateDialog(release));
+                    StartBackgroundDownload(release);
                     return;
 
                 case AppUpdateMode.NotifyOnly:

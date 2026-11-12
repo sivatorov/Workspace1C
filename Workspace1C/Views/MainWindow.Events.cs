@@ -551,28 +551,31 @@ namespace Workspace1C
             // Конфигуратор) — предлагается выбор окна, а не активация «по очереди».
             if (_viewModel.IsListModeRunning && infobase.IsRunning)
             {
-                ActivateAllWindowsOrNothing(infobase);
+                ActivateAllWindowsOrNothing(infobase, nothingAction: false);
                 return;
             }
 
             var dblAction = _viewModel.ResolveDoubleClickAction(infobase);
 
             // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего», если база сейчас
-            // запущена (Предприятие и/или Конфигуратор), двойной щелчок всё равно
-            // предлагает выбор окна — в список попадают и Предприятие, и Конфигуратор.
+            // запущена (Предприятие и/или Конфигуратор), двойной щелчок предлагает
+            // выбор окна. Issue #120 (v1.0.1.58, RafaIS): меню выбора — только при
+            // отключённой колонке «Действия»; при включённой колонке двойной клик
+            // с «Ничего» ничего не делает (не путает — запуск кнопками).
             if (dblAction == Workspace1C.Models.DoubleClickAction.None)
             {
                 if (infobase.IsRunning)
-                    ActivateAllWindowsOrNothing(infobase);
+                    ActivateAllWindowsOrNothing(infobase, nothingAction: true);
                 return;
             }
 
             // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
             // открытому окну Предприятия/Конфигуратора (одно — напрямую, несколько —
-            // выбор окна; окон нет — ничего).
+            // выбор окна; окон нет — ничего). Меню выбора — только при отключённой
+            // колонке «Действия» (issue #120 v1.0.1.58, RafaIS).
             if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
             {
-                ActivateAllWindowsOrNothing(infobase);
+                ActivateAllWindowsOrNothing(infobase, nothingAction: false);
                 return;
             }
 
@@ -606,13 +609,19 @@ namespace Workspace1C
         /// время запуска»), окон нет — ничего не происходит (действие «Ничего»).
         /// Перечисление окон идёт вне UI-потока.
         /// </summary>
-        private void ActivateAllWindowsOrNothing(Infobase infobase)
+        private void ActivateAllWindowsOrNothing(Infobase infobase, bool nothingAction)
         {
+            // Issue #120 (v1.0.1.58, RafaIS): правило показа меню выбора окна —
+            // только при отключённой колонке «Действия» (см. PlanAllWindowsDoubleClick);
+            // «Ничего» при включённой колонке — ничего, «Активировать окно»/вкладка
+            // «Запущенные» — первое окно.
+            var showActionsColumn = _viewModel.ShowActionsColumn;
             System.Threading.Tasks.Task.Run(() => _viewModel.GetRunningWindowsSafeAll(infobase))
                 .ContinueWith(t =>
                 {
                     var windows = t.Result;
-                    switch (RunningWindowPlanner.PlanAllWindows(windows.Count))
+                    switch (RunningWindowPlanner.PlanAllWindowsDoubleClick(
+                                windows.Count, showActionsColumn, nothingAction))
                     {
                         case RunningWindowAction.ActivateSingle:
                             _viewModel.ActivateWindowByHandle(windows[0].Handle);
@@ -644,7 +653,10 @@ namespace Workspace1C
             .ContinueWith(t =>
             {
                 var windows = t.Result;
-                switch (RunningWindowPlanner.PlanEnterpriseDoubleClick(windows.Count))
+                // Issue #120 (v1.0.1.58, RafaIS): меню выбора окна при двойном щелчке —
+                // только при отключённой колонке «Действия»; при включённой — первое окно.
+                switch (RunningWindowPlanner.PlanEnterpriseDoubleClick(
+                            windows.Count, _viewModel.ShowActionsColumn))
                 {
                     case RunningWindowAction.ActivateSingle:
                         _viewModel.ActivateWindowByHandle(windows[0].Handle);

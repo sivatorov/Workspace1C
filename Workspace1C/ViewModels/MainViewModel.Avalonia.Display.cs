@@ -61,7 +61,8 @@ public partial class MainViewModel : ViewModelBase
         bool showRightPanelDetails, bool showSessionLaunchPanel,
         bool groupByGroup, bool showEmptyGroups,
         List<string>? columnOrder,
-        bool showLastBackupColumn = true)
+        bool showLastBackupColumn = true,
+        bool actionsHoverOnly = false)
     {
         var previousShowFavoritesButton = _settings.ShowFavoritesButton;
         var previousShowPinnedButton = _settings.ShowPinnedButton;
@@ -94,6 +95,7 @@ public partial class MainViewModel : ViewModelBase
         _settings.ShowModifiedColumn = showModifiedColumn;
         _settings.ShowLastBackupColumn = showLastBackupColumn;
         _settings.ShowActionsColumn = showActionsColumn;
+        _settings.ActionsHoverOnly = actionsHoverOnly;
         _settings.ColumnOrder = columnOrder ?? new List<string>();
         _settings.ShowRightPanelDetails = showRightPanelDetails;
         _settings.ShowSessionLaunchPanel = showSessionLaunchPanel;
@@ -130,6 +132,9 @@ public partial class MainViewModel : ViewModelBase
         NotifySessionSettings();
         OnPropertyChanged(nameof(ShowTagFilterPanel));
         OnPropertyChanged(nameof(ShowActionsColumn));
+        // Issue #128: «Действия только при наведении» не влияет на состав дерева —
+        // видимость кнопок обновится через PropertyChanged без пересборки строк.
+        OnPropertyChanged(nameof(ActionsHoverOnly));
         OnPropertyChanged(nameof(ShowRightPanelDetails));
         OnPropertyChanged(nameof(ShowConnectionInfo));
         OnPropertyChanged(nameof(ShowRightPanelHint));
@@ -169,7 +174,8 @@ public partial class MainViewModel : ViewModelBase
             _groupByGroup,
             _showEmptyGroups,
             _settings.ColumnOrder,
-            showLastBackupColumn: key == "LastBackup" ? visible : _settings.ShowLastBackupColumn);
+            showLastBackupColumn: key == "LastBackup" ? visible : _settings.ShowLastBackupColumn,
+            actionsHoverOnly: _settings.ActionsHoverOnly);
     }
 
     /// <summary>
@@ -720,6 +726,13 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>Показывать колонку «Действия» (кнопки запуска/конфигуратора/очистки кеша) в списке баз.</summary>
     public bool ShowActionsColumn => _settings.ShowActionsColumn;
+
+    /// <summary>
+    /// «Действия только при наведении» (issue #128): при включении кнопки колонки
+    /// «Действия» в строке базы видны только под курсором; кнопки запуска остаются
+    /// видимыми, пока база запущена (чипы-индикаторы без наведения).
+    /// </summary>
+    public bool ActionsHoverOnly => _settings.ActionsHoverOnly;
 
     /// <summary>
     /// Состав нижней панели: какие сведения о выбранной базе в неё попадают.

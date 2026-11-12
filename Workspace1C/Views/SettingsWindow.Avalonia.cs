@@ -1517,6 +1517,16 @@ namespace Workspace1C
             orderGrid.Children.Add(orderButtons);
             displayColumns.Children.Add(orderGrid);
 
+            // «Действия только при наведении» (issue #128): кнопки колонки
+            // «Действия» в строке базы показываются только под курсором;
+            // кнопка-чип запущенного режима (Конфигуратор/Предприятие) видна
+            // без наведения, пока процесс работает.
+            var actionsHoverOnlyCheck = DisplayCheck(
+                "Settings.Columns.ActionsHoverOnly", _viewModel.ActionsHoverOnly,
+                "IconPlay", "@WarningBrush");
+            displayColumns.Children.Add(actionsHoverOnlyCheck);
+            displayColumns.Children.Add(Hint(LocalizationManager.T("Settings.Columns.ActionsHoverOnlyHint"), bottom: 12));
+
             displayPanels.Children.Add(Hint(LocalizationManager.T("Settings.Panels.Description"), bottom: 10));
             var rightPanelCheck = DisplayCheck("Settings.Panels.RightPanelDetails", _viewModel.ShowRightPanelDetails, "IconPageLayoutSidebarRight", "@InfoBrush");
             var sessionPanelCheck = DisplayCheck("Settings.Panels.SessionLaunchPanel", _viewModel.ShowSessionLaunchPanel, "IconMonitor", "@PurpleAccentBrush");
@@ -3826,7 +3836,9 @@ namespace Workspace1C
                     // Видимость колонки «Последняя копия» (issue #311): та же
                     // ошибка, что с «Действиями», — флажок читался, но значение
                     // не передавалось, и колонка оставалась видимой всегда.
-                    VisibleOf("LastBackup"));
+                    VisibleOf("LastBackup"),
+                    // «Действия только при наведении» (issue #128).
+                    actionsHoverOnlyCheck.IsChecked == true);
 
                 // «Дополнение заголовка программы» (issue #28).
                 _viewModel.ApplyTitleSuffixSettings(

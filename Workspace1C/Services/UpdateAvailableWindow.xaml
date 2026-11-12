@@ -62,6 +62,18 @@
                          пропуск и отмена — SecondaryButton (карточка + контур + текст темы).
                          Прежняя жёсткая зелёная кнопка #16A34A с белым текстом убрана. -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                        <!-- Issue #116 (v1.0.1.58): когда файл обновления уже скачан в фоне
+                             (режим «Загружать с предложением установки»), вместо «Скачать»
+                             показывается «Установить» — она применяет готовый файл по
+                             существующей логике автообновления. Видимость кнопок
+                             переключает код-бихайнд по состоянию UpdateService. -->
+                        <Button x:Name="InstallButton" Width="150" Height="34" Padding="0"
+                                Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
+                                Visibility="Collapsed"
+                                Click="OnInstallClick">
+                            <TextBlock x:Name="InstallText" Text="{loc:Loc Update.Install}" VerticalAlignment="Center"
+                                       FontWeight="SemiBold" FontSize="13"/>
+                        </Button>
                         <Button x:Name="DownloadButton" Width="150" Height="34" Padding="0" IsDefault="True"
                                 Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
                                 Click="OnDownloadClick">

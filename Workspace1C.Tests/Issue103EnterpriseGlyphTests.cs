@@ -42,8 +42,13 @@ public sealed class Issue103EnterpriseGlyphTests
     public void Wpf_EnterpriseGlyph_ColorEncodesDebugFlag()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        var play = xaml.IndexOf("Kind=\"Play\" Width=\"16\" Height=\"16\"", StringComparison.Ordinal);
+        // Issue #125: фиксированные Width/Height сняты — размер значка задаёт
+        // ChipGlyphSize по активному набору иконок. Якорь — перенос строки после
+        // Kind="Play": это именно чип индикатора наименования, а не другой значок
+        // Play в верхней панели (там атрибуты в одну строку).
+        var play = xaml.IndexOf("Kind=\"Play\"\r\n", StringComparison.Ordinal);
         Assert.True(play > 0, "значок-треугольник Play не найден в чипе Предприятия");
+        Assert.Contains("ConverterParameter=\"Enterprise:16\"", xaml, StringComparison.Ordinal);
 
         var styleStart = xaml.IndexOf("<materialDesign:PackIcon.Style>", play, StringComparison.Ordinal);
         var styleEnd = xaml.IndexOf("</materialDesign:PackIcon.Style>", play, StringComparison.Ordinal);
@@ -72,7 +77,7 @@ public sealed class Issue103EnterpriseGlyphTests
         // Подсказка «запущено с отладкой» переехала с удалённого маркера на сам
         // чип Предприятия (перекрывает унаследованную RunningModesTooltip).
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        var play = xaml.IndexOf("Kind=\"Play\" Width=\"16\" Height=\"16\"", StringComparison.Ordinal);
+        var play = xaml.IndexOf("Kind=\"Play\"\r\n", StringComparison.Ordinal);
         var chip = xaml.LastIndexOf("<Border Width=\"18\" Height=\"18\"", play, StringComparison.Ordinal);
         var chipMarkup = xaml[chip..play];
         Assert.Contains("IsEnterpriseDebugRunning", chipMarkup, StringComparison.Ordinal);

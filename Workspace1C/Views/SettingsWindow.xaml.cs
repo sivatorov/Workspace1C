@@ -631,7 +631,9 @@ namespace Workspace1C
                 ShowEmptyGroupsCheck?.IsChecked ?? false,
                 _columnOrderItems.Select(i => i.Key).ToList(),
                 VisibleOf("Actions"),
-                VisibleOf("LastBackup"));
+                VisibleOf("LastBackup"),
+                // «Действия только при наведении» (issue #128).
+                ActionsHoverOnlyCheck?.IsChecked ?? false);
 
             // «Дополнение заголовка программы» (issue #28).
             _viewModel.ApplyTitleSuffixSettings(

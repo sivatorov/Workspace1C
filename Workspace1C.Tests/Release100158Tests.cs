@@ -10,7 +10,19 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Тесты-стражи релиза v1.0.1.27 (issues #102 и #83):
+/// Тесты-стражи релиза v1.0.1.58 (issues #116/#117/#120/#123/#125/#126/#127/#128):
+/// - #116: режим «Загружать с предложением установки» реально скачивает обновление
+///   в фоне, удаляет старый скачанный файл, зелёный индикатор готовности, кнопка «Установить»;
+/// - #117: настоящее имя расширения читается из .cfe (нативный контейнер 1С),
+///   автоподстановка при выборе файла, защита от установки дубля;
+/// - #120: активация окна не сбивает максимизацию; меню выбора окна — только при
+///   отключённой колонке «Действия»;
+/// - #123: иконки разворачивания/сворачивания групп в наборах Outline/Material/MacOS/
+///   WindowsXp/Glass заменены на двойные шевроны, отличаются от компактного режима;
+/// - #125: увеличены значки в кружках-чипах (Material/Fluent, обе колонки);
+/// - #126: рамка по умолчанию у всех внутренних окон (WindowChromeHelper, opt-out);
+/// - #128: настройка «Действия только при наведении» (ActionsHoverOnly).
+/// Сохранены исторические проверки релиза v1.0.1.27 (issues #102 и #83):
 /// - #102: переносимый текст тумблера «Системные уведомления…» и кнопок «О программе»
 ///   (WPF XAML + Avalonia-код) — Grid с колонкой «*» и TextWrapping="Wrap";
 /// - #83: парсер файла *.lic (Наименование по «:» → Версия/Владелец, «Срок действия»,
@@ -18,7 +30,7 @@ namespace Workspace1C.Tests;
 ///   полями и FilePath, читабельная выжимка BuildReadableDetails без начального ключа,
 ///   состав/порядок колонок таблицы «Установленные лицензии» на обеих платформах.
 /// </summary>
-public sealed class Release100127Tests
+public sealed class Release100158Tests
 {
     private static string FindRepoRoot()
     {
@@ -40,18 +52,18 @@ public sealed class Release100127Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия (актуальная — 1.0.1.57, issues #103/#106/#109/#116/#120/#121/#124) =====================
+    // ===================== Версия (актуальная — 1.0.1.58, issues #116/#117/#120/#123/#125/#126/#127/#128) =====================
 
     [Fact]
     public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.57</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.57</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.57</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.57</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.56", csproj, StringComparison.Ordinal);
+        Assert.Contains("<Version>1.0.1.58</Version>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<AssemblyVersion>1.0.1.58</AssemblyVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<FileVersion>1.0.1.58</FileVersion>", csproj, StringComparison.Ordinal);
+        Assert.Contains("<InformationalVersion>1.0.1.58</InformationalVersion>", csproj, StringComparison.Ordinal);
+        Assert.DoesNotContain("1.0.1.57", csproj, StringComparison.Ordinal);
     }
 
     // ===================== Issue #102: переносимый текст =====================

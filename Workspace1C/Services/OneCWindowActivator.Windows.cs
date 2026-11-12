@@ -27,6 +27,12 @@ public static class OneCWindowActivator
 {
     private const int SwRestore = 9;
 
+    // Issue #120 (v1.0.1.58, 7OH/RafaIS): значения ShowCmd из WINDOWPLACEMENT —
+    // по ним определяется текущее состояние окна перед активацией.
+    private const int SwShowMinimized = 2;
+    private const int SwMinimize = 6;
+    private const int SwShowMinNoActive = 7;
+
     /// <summary>Активирует видимое окно процесса 1С, подключённого к базе. Возвращает true при успехе.</summary>
     public static bool Activate(Infobase infobase)
     {
@@ -102,15 +108,43 @@ public static class OneCWindowActivator
         return windows;
     }
 
-    /// <summary>Активирует окно по хэндлу (issue #120): восстановление + передний план.</summary>
+    /// <summary>
+    /// Активирует окно по хэндлу (issue #120): восстановление + передний план.
+    /// <para>
+    /// Issue #120 (v1.0.1.58, 7OH/RafaIS): безусловный ShowWindow(SW_RESTORE)
+    /// сбивал максимизацию — maximized окно при каждой активации нашим алгоритмом
+    /// разворачивалось в normal. Теперь состояние окна учитывается:
+    /// <list type="bullet">
+    /// <item>maximized (SW_SHOWMAXIMIZED) — окно уже видно, только передний план;</item>
+    /// <item>свернутое (SW_SHOWMINIMIZED/SW_MINIMIZE/SW_SHOWMINNOACTIVE) — SW_RESTORE:
+    /// свернутое ИЗ максимизированного окно restore вернёт снова maximized
+    /// (WPF_RESTORETOMAXIMIZED), свернутое из обычного — обычным;</item>
+    /// <item>normal — состояние не трогаем, только передний план.</item>
+    /// </list>
+    /// </para>
+    /// </summary>
     public static bool Activate(long handle)
     {
         if (handle == 0)
             return false;
 
         var hWnd = new IntPtr(handle);
-        ShowWindow(hWnd, SwRestore);
+        var showCmd = GetShowCmd(hWnd);
+        if (showCmd == SwShowMinimized || showCmd == SwMinimize || showCmd == SwShowMinNoActive)
+            ShowWindow(hWnd, SwRestore);
         return SetForegroundWindow(hWnd);
+    }
+
+    /// <summary>
+    /// Текущий ShowCmd окна (GetWindowPlacement, issue #120 v1.0.1.58). При ошибке
+    /// API возвращается 0 (SW_HIDE) — восстановление не выполняется, остаётся только
+    /// SetForegroundWindow (безопасно: скрытое окно активатору не передаётся).
+    /// </summary>
+    private static int GetShowCmd(IntPtr hWnd)
+    {
+        var placement = new WINDOWPLACEMENT();
+        placement.length = Marshal.SizeOf<WINDOWPLACEMENT>();
+        return GetWindowPlacement(hWnd, ref placement) ? placement.showCmd : 0;
     }
 
     /// <summary>
@@ -143,6 +177,36 @@ public static class OneCWindowActivator
 
     [DllImport("user32.dll")]
     private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WINDOWPLACEMENT lpwndpl);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPLACEMENT
+    {
+        public int length;
+        public int flags;
+        public int showCmd;
+        public POINT minPosition;
+        public POINT maxPosition;
+        public RECT normalPosition;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RECT
+    {
+        public int Left;
+        public int Top;
+        public int Right;
+        public int Bottom;
+    }
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);

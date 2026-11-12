@@ -100,7 +100,11 @@ public sealed class ExtensionsViewModel : ViewModelBase
             if (!SetProperty(ref _cfePath, value ?? string.Empty) && _extensionNameEdited)
                 return;
             if (!_extensionNameEdited)
-                ExtensionName = ConfigExtensionService.SuggestName(_cfePath);
+            {
+                // Issue #117: приоритет — НАСТОЯЩЕЕ имя расширения из .cfe, чтобы в поле
+                // было имя, под которым расширение установлено в базе, а не имя файла.
+                SetAutoName(ConfigExtensionService.ResolveName(_cfePath));
+            }
         }
     }
 
@@ -118,6 +122,16 @@ public sealed class ExtensionsViewModel : ViewModelBase
             _extensionNameEdited = v.Length > 0 &&
                 !string.Equals(v, ConfigExtensionService.SuggestName(_cfePath), StringComparison.OrdinalIgnoreCase);
         }
+    }
+
+    /// <summary>
+    /// Issue #117: программная автоподстановка имени (настоящее имя из .cfe или имя
+    /// файла) — не считается ручным вводом и снимает признак редактирования.
+    /// </summary>
+    private void SetAutoName(string name)
+    {
+        _extensionNameEdited = false;
+        SetProperty(ref _extensionName, name, nameof(ExtensionName));
     }
 
     public string? SelectedExtension
@@ -276,6 +290,11 @@ public sealed class ExtensionsViewModel : ViewModelBase
             foreach (var row in _allTargets)
                 if (row.IsChecked) row.Status = LocalizationManager.T("Extensions.StatusQueued");
 
+            // Issue #117: настоящее имя расширения из .cfe имеет приоритет над именем
+            // файла — если пользователь не вводил имя вручную, установка выполняется под
+            // именем из файла, чтобы обновить существующее расширение, а не создать дубль.
+            ApplyCfeName();
+
             // Issue #117 п.4: перед установкой (только ветка конфигуратора — у ibcmd список
             // расширений дёшево не получить) тихо читаем установленные расширения каждой
             // отмеченной базы и показываем план: «установка» или «уже установлено — обновление».
@@ -307,9 +326,21 @@ public sealed class ExtensionsViewModel : ViewModelBase
                 }
                 if (result.Success)
                 {
-                    ok++;
-                    row.Status = LocalizationManager.T("Extensions.StatusDone");
-                    AppendLog(string.Format(LocalizationManager.T("Extensions.LogInstalled"), row.Name));
+                    // Issue #117: конфигуратор возвращает код 0 даже при отказе применять
+                    // расширение («Загрузка конфигурации успешно завершена» при неуспешном
+                    // /UpdateDBCfg) — сообщаем фактический результат, а не «успешно».
+                    var refusal = ConfigExtensionService.FindRefusalMessage(result.Log);
+                    if (refusal is not null)
+                    {
+                        row.Status = LocalizationManager.T("Extensions.StatusError");
+                        AppendLog(string.Format(LocalizationManager.T("Extensions.LogInstallRefused"), row.Name, refusal));
+                    }
+                    else
+                    {
+                        ok++;
+                        row.Status = LocalizationManager.T("Extensions.StatusDone");
+                        AppendLog(string.Format(LocalizationManager.T("Extensions.LogInstalled"), row.Name));
+                    }
                 }
                 else
                 {
@@ -332,6 +363,33 @@ public sealed class ExtensionsViewModel : ViewModelBase
             return DesignerCommandResult.Fail(LocalizationManager.T("Extensions.FileNotFound"));
         var r = await IbcmdService.InstallExtensionAsync(infobase, CfePath, ExtensionName, token);
         return new DesignerCommandResult { Success = r.Success, ExitCode = r.ExitCode, Log = r.Output, Error = r.Error };
+    }
+
+    /// <summary>
+    /// Issue #117: имя из .cfe имеет приоритет над именем файла. Если настоящее имя
+    /// файла удалось прочитать и пользователь не вводил имя вручную — установка
+    /// выполняется под именем из файла (обновление существующего расширения вместо
+    /// дубля). При ручном вводе остаётся введённое имя, но выводится предупреждение
+    /// о создании дубля. Решение о имени — чистая функция
+    /// <see cref="ConfigExtensionService.ResolveInstallName"/> (покрыта тестами).
+    /// </summary>
+    private void ApplyCfeName()
+    {
+        var cfeName = ConfigExtensionService.TryReadExtensionName(CfePath);
+        if (string.IsNullOrWhiteSpace(cfeName))
+            return;
+        if (string.Equals(cfeName, ExtensionName, StringComparison.OrdinalIgnoreCase))
+            return;
+        var installName = ConfigExtensionService.ResolveInstallName(cfeName, ExtensionName, _extensionNameEdited);
+        if (!_extensionNameEdited)
+        {
+            SetAutoName(installName);
+            AppendLog(string.Format(LocalizationManager.T("Extensions.LogNameFromCfe"), installName));
+        }
+        else
+        {
+            AppendLog(string.Format(LocalizationManager.T("Extensions.LogNameConflict"), cfeName, ExtensionName));
+        }
     }
 
     /// <summary>

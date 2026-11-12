@@ -278,6 +278,113 @@ namespace Workspace1C.Services
             }
         }
 
+        // ---- Готовый к установке файл обновления (issue #116, v1.0.1.58) ----
+
+        /// <summary>
+        /// Релиз, установочный файл которого уже скачан и готов к установке (issue #116).
+        /// Заполняется фоновой загрузкой режима «Загружать с предложением установки»
+        /// (<see cref="StartBackgroundDownload"/>); сбрасывается при применении обновления.
+        /// </summary>
+        public ReleaseInfo? ReadyRelease { get; private set; }
+
+        /// <summary>Путь к скачанному файлу обновления для <see cref="ReadyRelease"/>;
+        /// null — готового файла нет.</summary>
+        public string? ReadyFilePath { get; private set; }
+
+        /// <summary>Событие смены состояния «файл обновления скачан и готов к установке»
+        /// (вызывается из фонового потока; подписчик обязан сам перейти в UI-поток).</summary>
+        public event Action? ReadyStateChanged;
+
+        /// <summary>
+        /// True — установочный файл этого релиза уже скачан и существует на диске
+        /// (issue #116): состояние «готов к установке» отличается от «доступно
+        /// обновление» (файл ещё не скачан).
+        /// </summary>
+        public bool IsReadyFor(ReleaseInfo? release)
+        {
+            if (release is null || ReadyRelease is null || ReadyFilePath is null)
+                return false;
+            if (!string.Equals(ReadyRelease.TagName, release.TagName, StringComparison.Ordinal))
+                return false;
+            try
+            {
+                return File.Exists(ReadyFilePath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Обновляет состояние «файл обновления скачан» и уведомляет подписчиков.</summary>
+        private void SetReadyState(ReleaseInfo? release, string? path)
+        {
+            if (ReferenceEquals(ReadyRelease, release)
+                && string.Equals(ReadyFilePath, path, StringComparison.Ordinal))
+                return;
+            ReadyRelease = release;
+            ReadyFilePath = path;
+            try { ReadyStateChanged?.Invoke(); }
+            catch { /* подписчик не должен ронять фоновую загрузку */ }
+        }
+
+        /// <summary>
+        /// Запускает фоновую загрузку установочного файла релиза без подтверждения
+        /// (issue #116, режим «Загружать с предложением установки»). Загрузка идёт через
+        /// <see cref="DownloadNewBinaryAsync"/> — тот же путь, что и в режиме «Обновлять
+        /// при запуске»: единый реестр фоновых загрузок, проверка размера/платформы,
+        /// single-writer. Повторные вызовы при уже идущей или завершённой (готовой)
+        /// загрузке того же релиза ничего не делают.
+        /// <para>Graceful-ограничение Linux: из пакета AppImage самообновление
+        /// невозможно — файл не скачивается, обновление остаётся ручным.</para>
+        /// </summary>
+        public void StartBackgroundDownload(ReleaseInfo release)
+        {
+            if (release is null || IsReadyFor(release) || IsUpdateDownloadInProgress(release))
+                return;
+            if (string.IsNullOrWhiteSpace(release.DownloadUrl))
+                return;
+
+            var target = ResolveTargetBinary();
+            if (target is null || IsRunningFromAppImage(target))
+                return; // самообновление невозможно — файл скачивать бессмысленно
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var previousReadyPath = ReadyFilePath;
+                    var (path, _) = await DownloadNewBinaryAsync(
+                        release.DownloadUrl!, release.TagName, release.AssetSize)
+                        .ConfigureAwait(false);
+                    if (path is null)
+                        return;
+
+                    // Успешная загрузка: устаревший скачанный файл обновления
+                    // больше не нужен (issue #116).
+                    UpdateDownloadCleanup.RemoveStaleDownload(previousReadyPath, path);
+                    SetReadyState(release, path);
+                }
+                catch
+                {
+                    // Фоновая загрузка не должна ронять приложение.
+                }
+            });
+        }
+
+        /// <summary>
+        /// Открывает диалог установки уже скачанного обновления (issue #116): без
+        /// сетевой проверки — файл готов, остаётся только применить его. Клик по
+        /// значку готовности в статус-баре.
+        /// </summary>
+        public Task OpenReadyInstallAsync()
+        {
+            var release = ReadyRelease;
+            if (release is null || !IsReadyFor(release))
+                return Task.CompletedTask;
+            return ShowUpdateDialogAsync(release);
+        }
+
         public UpdateService(
             GitHubReleaseService gitHub,
             IDialogService dialogs,
@@ -341,10 +448,14 @@ namespace Workspace1C.Services
                         return;
 
                     case AppUpdateMode.DownloadAskInstall:
-                        // Запоминаем доступный релиз (ссылка «Обновить» в подвале) и
-                        // показываем единый диалог с вопросом о применении обновления.
+                        // Фоновая загрузка без подтверждения (issue #116, v1.0.1.58):
+                        // файл обновления скачивается сразу, как в режиме «Обновлять
+                        // при запуске», но установка молча НЕ применяется. Диалог не
+                        // показывается: когда файл готов, значок в статус-баре отражает
+                        // готовность, клик по нему открывает диалог с кнопкой
+                        // «Установить» (применение готового файла).
                         SetAvailableRelease(release);
-                        await Dispatcher.UIThread.InvokeAsync(() => ShowUpdateDialogAsync(release));
+                        StartBackgroundDownload(release);
                         return;
 
                     case AppUpdateMode.NotifyOnly:
@@ -525,6 +636,14 @@ namespace Workspace1C.Services
                     return;
                 }
 
+                // Файл уже скачан в фоне (issue #116, v1.0.1.58): диалог сразу
+                // предлагает установку готового файла, без подтверждения скачивания.
+                if (IsReadyFor(release))
+                {
+                    await ShowReadyInstallAsync(release, target);
+                    return;
+                }
+
                 // Запуск из пакета AppImage самообновлению не поддаётся: исполняемый файл
                 // лежит внутри разового монтирования, доступного только на чтение.
                 if (IsRunningFromAppImage(target))
@@ -556,6 +675,86 @@ namespace Workspace1C.Services
             {
                 Interlocked.Exchange(ref _updateInProgress, 0);
             }
+        }
+
+        /// <summary>
+        /// Устанавливает уже скачанный файл обновления (issue #116, v1.0.1.58):
+        /// по способу установки — прямая замена single-file (вопрос «Перезапустить
+        /// сейчас / Обновить после закрытия») или установка через pkexec с явным
+        /// согласием пользователя на повышение прав. AppImage — ручной путь
+        /// (самообновление недоступно, файл в фоновом режиме не скачивался).
+        /// </summary>
+        private async Task ShowReadyInstallAsync(ReleaseInfo release, string target)
+        {
+            var readyBinary = ReadyFilePath;
+            if (string.IsNullOrWhiteSpace(readyBinary) || !File.Exists(readyBinary))
+            {
+                // Готовый файл исчез (очистка temp, сбой диска) — откат к обычному
+                // диалогу со скачиванием, чтобы обновление осталось доступным.
+                await ShowSelfUpdateDialogAsync(release, target);
+                return;
+            }
+
+            if (IsRunningFromAppImage(target))
+            {
+                ShowManualUpdateDialog(
+                    LocalizationManager.T("Update.PackageManualUpdate"), release.HtmlUrl);
+                return;
+            }
+
+            // Single-file в каталоге пользователя — применяем готовый файл напрямую.
+            if (IsDirectoryWritable(Path.GetDirectoryName(target)))
+            {
+                var restartNow = _dialogs.Confirm(
+                    LocalizationManager.T("Update.RestartNowPrompt"),
+                    LocalizationManager.T("Update.NewVersionAvailable"));
+
+                if (restartNow)
+                {
+                    if (!ApplyRestartNow(target, readyBinary))
+                    {
+                        ShowOnUi(() => _dialogs.ShowError(
+                            LocalizationManager.T("Update.InstallFailed"),
+                            LocalizationManager.T("Update.NewVersionAvailable")));
+                        return;
+                    }
+                    SetReadyState(null, null);
+                    ShutdownNow();
+                }
+                else
+                {
+                    if (!ApplyAfterClose(target, readyBinary))
+                    {
+                        ShowOnUi(() => _dialogs.ShowError(
+                            LocalizationManager.T("Update.InstallFailed"),
+                            LocalizationManager.T("Update.NewVersionAvailable")));
+                        return;
+                    }
+                    SetReadyState(null, null);
+                    ShowOnUi(() => _dialogs.ShowInfo(
+                        LocalizationManager.T("Update.WillApplyOnExit"),
+                        LocalizationManager.T("Update.NewVersionAvailable")));
+                }
+                return;
+            }
+
+            // Системный каталог (например deb в /usr/bin): установка готового файла
+            // через pkexec — только после явного согласия пользователя на повышение прав.
+            var installNow = _dialogs.Confirm(
+                LocalizationManager.T("Update.ReadyInstallPrompt"),
+                LocalizationManager.T("Update.NewVersionAvailable"));
+            if (!installNow)
+                return;
+
+            if (!await ApplyPrivilegedUpdateAsync(target, readyBinary).ConfigureAwait(true))
+            {
+                ShowManualUpdateDialog(
+                    LocalizationManager.T("Update.TargetNotWritable"), release.HtmlUrl);
+                return;
+            }
+
+            SetReadyState(null, null);
+            ShutdownNow();
         }
 
         /// <summary>

@@ -327,14 +327,18 @@ public sealed class Release100125Tests
     public void RunningChips_Variant4_RedOnHang_BiggerEnterpriseIcon()
     {
         var wpf = ReadProjectFile("Workspace1C/Views/MainWindow.xaml");
-        var play = wpf.IndexOf("Kind=\"Play\" Width=\"16\" Height=\"16\"", StringComparison.Ordinal);
+        // Issue #125: фиксированные Width/Height сняты — размер значка задаёт
+        // ChipGlyphSize по активному набору иконок. Якорь с переносом строки —
+        // именно чип индикатора наименования (см. Issue103EnterpriseGlyphTests).
+        var play = wpf.IndexOf("Kind=\"Play\"\r\n", StringComparison.Ordinal);
         Assert.True(play > 0);
         var chip = wpf.LastIndexOf("<Border Width=\"18\" Height=\"18\"", play, StringComparison.Ordinal);
         Assert.True(chip > 0, "значок Play без чипа 18 px");
         var chipMarkup = wpf[chip..play];
         Assert.Contains("{DynamicResource ErrorBrush}", chipMarkup);
         Assert.Contains("Value=\"Hung\"", chipMarkup);
-        Assert.Contains("Kind=\"Play\" Width=\"16\" Height=\"16\"", wpf);
+        Assert.Contains("Kind=\"Play\"", wpf);
+        Assert.Contains("ConverterParameter=\"Enterprise:16\"", wpf);
 
         var avalonia = ReadProjectFile("Workspace1C/Views/MainWindow.Avalonia.Tree.cs");
         Assert.Contains("BuildRunningChip", avalonia);

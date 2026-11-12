@@ -673,6 +673,7 @@ public partial class MainViewModel : ViewModelBase
         s.ShowLastLaunchColumn = _showLastLaunchColumn;
         s.ShowSizeColumn = _showSizeColumn;
         s.ShowActionsColumn = _showActionsColumn;
+        s.ActionsHoverOnly = _actionsHoverOnly;
         s.SizeColumnWidth = _sizeColumnWidth;
         s.ShowModifiedColumn = _showModifiedColumn;
         s.ModifiedColumnWidth = _modifiedColumnWidth;

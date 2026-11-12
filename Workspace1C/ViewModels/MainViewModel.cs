@@ -133,6 +133,7 @@ public partial class MainViewModel : ViewModelBase
     private bool _showLastLaunchColumn = true;
     private bool _showSizeColumn = true;
     private bool _showActionsColumn = true;
+    private bool _actionsHoverOnly;
     private double _sizeColumnWidth;
     private bool _showModifiedColumn = true;
     private double _modifiedColumnWidth;
@@ -587,6 +588,7 @@ public partial class MainViewModel : ViewModelBase
         _showLastLaunchColumn = settings.ShowLastLaunchColumn;
         _showSizeColumn = settings.ShowSizeColumn;
         _showActionsColumn = settings.ShowActionsColumn;
+        _actionsHoverOnly = settings.ActionsHoverOnly;
         _sizeColumnWidth = settings.SizeColumnWidth;
         _showModifiedColumn = settings.ShowModifiedColumn;
         _modifiedColumnWidth = settings.ModifiedColumnWidth;

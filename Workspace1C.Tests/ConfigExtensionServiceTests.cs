@@ -1,3 +1,5 @@
+using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Text;
 using Workspace1C.Models;
@@ -189,5 +191,226 @@ public sealed class ConfigExtensionServiceTests
         vm.ExtensionName = "";
         vm.CfePath = "/x/Второе.cfe";
         Assert.Equal("Второе", vm.ExtensionName);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Issue #117: настоящее имя расширения из .cfe и фактический результат установки.
+    // ---------------------------------------------------------------------------
+
+    private static string TempCfeDir =>
+        Path.Combine(Path.GetTempPath(), "ws1c_cfe_tests");
+
+    /// <summary>
+    /// Собирает синтетический .cfe — нативный контейнер 1С (не zip!) с одним элементом,
+    /// содержащим текстовое дерево корневого элемента метаданных расширения. Формат
+    /// проверен на реальных .cfe (см. <see cref="ConfigExtensionService.TryReadExtensionName"/>).
+    /// </summary>
+    private static byte[] BuildCfeContainer(string extensionName)
+    {
+        const string rootGuid = "3354911e-a8f6-4d0c-9df2-e48caec5f502";
+        const string configurationClass = "9cd510cd-abfc-11d4-9434-004095e12fc7";
+        const string rootClassGuid = "cea2b2f0-16d8-41f9-b375-a44b8da27f74";
+        var metadata = "\uFEFF{2,\r\n{" + rootGuid + "},7,\r\n{" + configurationClass + ",\r\n{1,\r\n{79,\r\n{0,\r\n{4,\r\n{1,0," +
+            rootClassGuid + "},\"" + extensionName + "\",\r\n{1,\"ru\",\"Тест\"},1}";
+
+        var elementGuid = "009e27bc-bd81-4498-9b31-171e075e6ac1";
+        var elementHeader = new byte[20 + elementGuid.Length * 2];
+        Encoding.Unicode.GetBytes(elementGuid).CopyTo(elementHeader, 20);
+
+        var headerBlock = Block(Deflate(elementHeader));
+        var metadataBlock = Block(Deflate(Encoding.UTF8.GetBytes(metadata)));
+
+        // Таблица адресов: одна запись «hdrAddr, dataAddr, 0x7FFFFFFF» + терминирующие
+        // нули. Адрес зависят от длины deflate-таблицы, которая зависит от содержимого
+        // (адресов) — сходится итеративно.
+        var table = new byte[24];
+        BitConverter.GetBytes(0x7FFFFFFFu).CopyTo(table, 8);
+        int headerAddr = 0, dataAddr = 0, previousLength = -1;
+        byte[] tableBlock = Array.Empty<byte>();
+        for (var iteration = 0; iteration < 16; iteration++)
+        {
+            tableBlock = Block(Deflate(table));
+            if (tableBlock.Length == previousLength)
+                break;
+            previousLength = tableBlock.Length;
+            headerAddr = 16 + tableBlock.Length;
+            dataAddr = headerAddr + headerBlock.Length;
+            BitConverter.GetBytes((uint)headerAddr).CopyTo(table, 0);
+            BitConverter.GetBytes((uint)dataAddr).CopyTo(table, 4);
+        }
+
+        var container = new byte[16 + tableBlock.Length + headerBlock.Length + metadataBlock.Length];
+        BitConverter.GetBytes(0x7FFFFFFFu).CopyTo(container, 0);   // сигнатура контейнера
+        BitConverter.GetBytes(512u).CopyTo(container, 4);          // размер страницы
+        BitConverter.GetBytes(1u).CopyTo(container, 8);            // версия хранилища
+        tableBlock.CopyTo(container, 16);
+        headerBlock.CopyTo(container, 16 + tableBlock.Length);
+        metadataBlock.CopyTo(container, 16 + tableBlock.Length + headerBlock.Length);
+        return container;
+    }
+
+    private static byte[] Deflate(byte[] data)
+    {
+        using var output = new MemoryStream();
+        using (var deflate = new DeflateStream(output, CompressionLevel.Optimal, leaveOpen: true))
+            deflate.Write(data, 0, data.Length);
+        return output.ToArray();
+    }
+
+    /// <summary>ASCII-заголовок блока контейнера 1С + данные (одна страница).</summary>
+    private static byte[] Block(byte[] payload)
+    {
+        var header = "\r\n" + payload.Length.ToString("X8") + " " +
+                     payload.Length.ToString("X8") + " 7FFFFFFF \r\n";
+        var headerBytes = Encoding.ASCII.GetBytes(header);
+        var result = new byte[headerBytes.Length + payload.Length];
+        headerBytes.CopyTo(result, 0);
+        payload.CopyTo(result, headerBytes.Length);
+        return result;
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsRealNameFromContainer()
+    {
+        // Issue #117: настоящее имя расширения читается из .cfe даже когда оно
+        // отличается от имени файла (сценарий «дубль под другим именем» у RafaIS).
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "ИмяФайла_СовсемДругое.cfe");
+        File.WriteAllBytes(path, BuildCfeContainer("НастоящееИмя_Расширения"));
+        try
+        {
+            Assert.Equal("НастоящееИмя_Расширения", ConfigExtensionService.TryReadExtensionName(path));
+            Assert.Equal("НастоящееИмя_Расширения", ConfigExtensionService.ResolveName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReturnsNullForGarbageOrMissingFile()
+    {
+        Directory.CreateDirectory(TempCfeDir);
+        var garbage = Path.Combine(TempCfeDir, "garbage.cfe");
+        File.WriteAllBytes(garbage, new byte[] { 1, 2, 3, 4, 5 });
+        var missing = Path.Combine(TempCfeDir, "missing.cfe");
+        try
+        {
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(garbage));
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(missing));
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(null));
+            Assert.Equal(string.Empty, ConfigExtensionService.ResolveName(null));
+        }
+        finally
+        {
+            File.Delete(garbage);
+        }
+    }
+
+    [Fact]
+    public void FindRefusalMessage_DetectsRefusalAndIgnoresSuccess()
+    {
+        // Issue #117: «загрузка конфигурации успешно завершена» при фактическом отказе —
+        // журнал не должен считать это успехом.
+        var refusedLog = "Загрузка конфигурации успешно завершена\r\nОбновление информационной базы не выполнено.\r\n";
+        Assert.Equal("Обновление информационной базы не выполнено.",
+            ConfigExtensionService.FindRefusalMessage(refusedLog));
+        Assert.NotNull(ConfigExtensionService.FindRefusalMessage("… The infobase update has failed …"));
+        Assert.NotNull(ConfigExtensionService.FindRefusalMessage("Обновление выполнено с ошибками."));
+        Assert.Null(ConfigExtensionService.FindRefusalMessage(
+            "Загрузка конфигурации успешно завершена\nОбновление информационной базы выполнено успешно."));
+        Assert.Null(ConfigExtensionService.FindRefusalMessage(string.Empty));
+        Assert.Null(ConfigExtensionService.FindRefusalMessage(null));
+    }
+
+    [Fact]
+    public void ResolveInstallName_RealCfeNameWinsOverFileName_PreventsDuplicate()
+    {
+        // Issue #117 (защита от дубля): решение о имени установки — чистая функция.
+        // По умолчанию установка выполняется под НАСТОЯЩИМ именем из .cfe, чтобы
+        // /LoadCfg -Extension обновил существующее расширение, а не создал дубль
+        // (сценарий RafaIS: то же расширение установилось под именем файла).
+        Assert.Equal("НастоящееИмя",
+            ConfigExtensionService.ResolveInstallName("НастоящееИмя", "ИмяФайла", nameEdited: false));
+        Assert.Equal("НастоящееИмя",
+            ConfigExtensionService.ResolveInstallName("НастоящееИмя", string.Empty, nameEdited: false));
+        // Совпадение с настоящим именем (без учёта регистра) — дубля не будет,
+        // имя из поля остаётся как есть.
+        Assert.Equal("настоящееИмя",
+            ConfigExtensionService.ResolveInstallName("НастоящееИмя", "настоящееИмя", nameEdited: false));
+        // Ручной ввод имени пользователем — остаётся введённое имя (отдельное расширение,
+        // в журнале окна выводится предупреждение о дубликате).
+        Assert.Equal("СвоёИмя",
+            ConfigExtensionService.ResolveInstallName("НастоящееИмя", "СвоёИмя", nameEdited: true));
+        // Настоящее имя прочитать не удалось — остаётся имя файла/поля.
+        Assert.Equal("ИмяФайла", ConfigExtensionService.ResolveInstallName(null, "ИмяФайла", nameEdited: false));
+        Assert.Equal("ИмяФайла", ConfigExtensionService.ResolveInstallName("  ", "ИмяФайла", nameEdited: true));
+    }
+
+    /// <summary>
+    /// Issue #117 (сценарий дубля RafaIS): имя файла «ИмяФайла_СовсемДругое», настоящее
+    /// имя расширения в .cfe «НастоящееИмя_Расширения». При выборе файла поле имени
+    /// заполняется настоящим именем — установка под ним обновит существующее расширение,
+    /// а не создаст копию; повторный выбор того же файла имя не меняет.
+    /// </summary>
+    [Fact]
+    public void ViewModel_DuplicateScenario_InstallsUnderRealCfeName()
+    {
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "ИмяФайла_СовсемДругое.cfe");
+        File.WriteAllBytes(path, BuildCfeContainer("НастоящееИмя_Расширения"));
+        try
+        {
+            var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
+            vm.CfePath = path;
+            Assert.Equal("НастоящееИмя_Расширения", vm.ExtensionName);
+            Assert.NotEqual("ИмяФайла_СовсемДругое", vm.ExtensionName);
+
+            // Повторный выбор того же файла (по «Обзор») — имя остаётся настоящим.
+            vm.CfePath = path;
+            Assert.Equal("НастоящееИмя_Расширения", vm.ExtensionName);
+
+            // Решение о имени установки: ручное имя из поля НЕ считается ручным вводом,
+            // если совпадает с настоящим — установка пройдёт под именем из .cfe.
+            Assert.Equal("НастоящееИмя_Расширения",
+                ConfigExtensionService.ResolveInstallName(
+                    ConfigExtensionService.TryReadExtensionName(path), vm.ExtensionName,
+                    nameEdited: false));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Issue #117: при выборе .cfe «Обзором» подставляется НАСТОЯЩЕЕ имя расширения
+    /// из файла, а не имя файла; вручную введённое имя не перезаписывается.
+    /// </summary>
+    [Fact]
+    public void ViewModel_CfePath_SubstitutesRealExtensionNameFromCfe()
+    {
+        Directory.CreateDirectory(TempCfeDir);
+        var first = Path.Combine(TempCfeDir, "ИмяФайла_Первый.cfe");
+        var second = Path.Combine(TempCfeDir, "ИмяФайла_Второй.cfe");
+        File.WriteAllBytes(first, BuildCfeContainer("НастоящееИмя_Первый"));
+        File.WriteAllBytes(second, BuildCfeContainer("НастоящееИмя_Второй"));
+        try
+        {
+            var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
+            vm.CfePath = first;
+            Assert.Equal("НастоящееИмя_Первый", vm.ExtensionName);
+
+            // Ручной ввод имени уважается даже при выборе другого файла.
+            vm.ExtensionName = "МоёИмя";
+            vm.CfePath = second;
+            Assert.Equal("МоёИмя", vm.ExtensionName);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
     }
 }

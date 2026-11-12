@@ -62,6 +62,9 @@ public partial class MainWindow
             if (updateService is not null)
             {
                 updateService.AvailableReleaseChanged += OnAvailableReleaseChanged;
+                // Состояние «файл обновления скачан и готов к установке» (issue #116
+                // v1.0.1.58) меняется из той же фоновой загрузки — тот же обработчик.
+                updateService.ReadyStateChanged += OnAvailableReleaseChanged;
                 // Событие приходит из фоновой проверки (чужой поток) — обновляем UI
                 // через Dispatcher; первичное состояние расставляем отложенно,
                 // к этому моменту App успеет применить режим обновления.
@@ -98,20 +101,29 @@ public partial class MainWindow
             if (updateService is null)
                 return;
 
+            // Состояние «файл обновления скачан и готов к установке» (issue #116,
+            // v1.0.1.58): зелёная галочка вместо «внимания», клик — сразу диалог
+            // установки готового файла (без сетевой проверки).
+            var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
             var hasRelease = updateService.AvailableRelease is not null;
             var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
 
             FooterUpdateIcon.Visibility = hasRelease || manualCheck
                 ? Visibility.Visible
                 : Visibility.Collapsed;
-            FooterUpdateSyncIcon.Visibility = !hasRelease ? Visibility.Visible : Visibility.Collapsed;
-            FooterUpdateWarnIcon.Visibility = hasRelease ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateSyncIcon.Visibility = !hasRelease && !isReady ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateWarnIcon.Visibility = hasRelease && !isReady ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateReadyIcon.Visibility = isReady ? Visibility.Visible : Visibility.Collapsed;
 
-            FooterUpdateIcon.ToolTip = hasRelease
+            FooterUpdateIcon.ToolTip = isReady
                 ? string.Format(
-                    LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
-                    updateService.AvailableRelease!.TagName)
-                : (object)LocalizationManager.T("Main.Footer.CheckUpdates");
+                    LocalizationManager.T("Main.Footer.UpdateReadyTooltip"),
+                    updateService.ReadyRelease!.TagName)
+                : hasRelease
+                    ? string.Format(
+                        LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
+                        updateService.AvailableRelease!.TagName)
+                    : (object)LocalizationManager.T("Main.Footer.CheckUpdates");
         }
         catch
         {
@@ -142,6 +154,13 @@ public partial class MainWindow
         try
         {
             var updateService = AppServices.GetRequiredService<UpdateService>();
+            // Файл обновления уже скачан (issue #116 v1.0.1.58): открываем сразу
+            // диалог установки готового файла, без сетевой проверки.
+            if (updateService.IsReadyFor(updateService.ReadyRelease))
+            {
+                updateService.ShowReadyInstallDialog();
+                return;
+            }
             await updateService.CheckForUpdatesManualAsync();
         }
         catch

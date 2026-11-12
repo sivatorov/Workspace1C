@@ -1,3 +1,4 @@
+using System;
 using System.Windows;
 using Workspace1C.Localization;
 using Microsoft.Win32;
@@ -23,18 +24,107 @@ public sealed class WpfDialogService : IDialogService
 
     public bool Confirm(string message, string title = "")
     {
-        var win = new MaterialMessageWindow(message, DefaultTitle(title, "Common.Confirm"), MaterialMessageKind.Question);
-        SetOwnerIfAvailable(win);
-        win.ShowDialog();
-        return win.Confirmed;
+        var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+        try
+        {
+            var win = new MaterialMessageWindow(message, resolvedTitle, MaterialMessageKind.Question);
+            SetOwnerIfAvailable(win);
+            win.ShowDialog();
+            return win.Confirmed;
+        }
+        catch (Exception ex)
+        {
+            // issue #127: сбой показа material-диалога (Win32Exception 1816 «Недостаточно
+            // квот для обработки команды», 1400 «Недопустимый дескриптор окна» — нехватка
+            // desktop heap при долгой работе/многих окнах) не должен уводить процесс вниз.
+            LogDialogFallback(resolvedTitle, ex);
+            return TryFallbackMessageBox(message, resolvedTitle, MessageBoxButton.OKCancel,
+                MessageBoxImage.Question, ex) == MessageBoxResult.OK;
+        }
     }
 
     private static void Show(string message, string title, MaterialMessageKind kind)
     {
-        var win = new MaterialMessageWindow(message, DefaultTitle(title, "Common.Information"), kind);
-        SetOwnerIfAvailable(win);
-        win.ShowDialog();
+        var resolvedTitle = DefaultTitle(title, "Common.Information");
+        try
+        {
+            var win = new MaterialMessageWindow(message, resolvedTitle, kind);
+            SetOwnerIfAvailable(win);
+            win.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            // issue #127: сбой показа не должен уводить процесс вниз — fallback на
+            // стандартный MessageBox (без собственного hwnd-рендера WPF, устойчивее
+            // к нехватке desktop heap), при повторном сбое — только журнал.
+            LogDialogFallback(resolvedTitle, ex);
+            TryFallbackMessageBox(message, resolvedTitle, MessageBoxButton.OK,
+                ToMessageBoxImage(kind), ex);
+        }
     }
+
+    /// <summary>
+    /// Резервный показ сообщения через стандартный <see cref="System.Windows.MessageBox"/>
+    /// после сбоя material-диалога. Повторный сбой не бросается наружу — он логируется,
+    /// а метод возвращает <see cref="MessageBoxResult.None"/> (у вызывающего кода
+    /// «пользователь не ответил»).
+    /// </summary>
+    private static MessageBoxResult TryFallbackMessageBox(
+        string message, string title, MessageBoxButton buttons, MessageBoxImage image, Exception primary)
+    {
+        try
+        {
+            return System.Windows.MessageBox.Show(message, title, buttons, image);
+        }
+        catch (Exception fallback)
+        {
+            // Повторный сбой (issue #127): ни material-окно, ни MessageBox не показаны —
+            // остаётся журнал; исключение наружу не бросается.
+            LogDialogFailure(message, primary, fallback);
+            return MessageBoxResult.None;
+        }
+    }
+
+    /// <summary>Пишет предупреждение о переключении на резервный MessageBox (issue #127).</summary>
+    private static void LogDialogFallback(string title, Exception ex)
+    {
+        try
+        {
+            AppServices.TryGetService<IAppLogger>()?.Warn(
+                $"Диалог «{title}» не показан через MaterialMessageWindow " +
+                $"({ex.GetType().Name}: {ex.Message}) — используется резервный MessageBox.");
+        }
+        catch
+        {
+            // Логирование не должно ронять операцию показа диалога.
+        }
+    }
+
+    /// <summary>Пишет ошибку, когда не сработал и резервный MessageBox (issue #127).</summary>
+    private static void LogDialogFailure(string message, Exception primary, Exception fallback)
+    {
+        try
+        {
+            AppServices.TryGetService<IAppLogger>()?.Error(
+                $"Диалог «{message}» не удалось показать: MaterialMessageWindow — " +
+                $"{primary.GetType().Name}: {primary.Message}; MessageBox — " +
+                $"{fallback.GetType().Name}: {fallback.Message}.",
+                fallback);
+        }
+        catch
+        {
+            // Логирование не должно ронять операцию показа диалога.
+        }
+    }
+
+    /// <summary>Сопоставление вида material-сообщения иконке стандартного MessageBox.</summary>
+    private static MessageBoxImage ToMessageBoxImage(MaterialMessageKind kind) => kind switch
+    {
+        MaterialMessageKind.Warning => MessageBoxImage.Warning,
+        MaterialMessageKind.Error => MessageBoxImage.Error,
+        MaterialMessageKind.Question => MessageBoxImage.Question,
+        _ => MessageBoxImage.Information,
+    };
 
     /// <summary>
     /// Назначает окну владельца только при реально существующем главном окне,

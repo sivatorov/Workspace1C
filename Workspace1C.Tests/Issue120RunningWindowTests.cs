@@ -64,6 +64,47 @@ public sealed class Issue120RunningWindowTests
         Assert.Equal(expected, RunningWindowPlanner.PlanEnterpriseDoubleClick(openWindowCount));
     }
 
+    [Theory]
+    [InlineData(0, true, RunningWindowAction.LaunchNew)]
+    [InlineData(1, true, RunningWindowAction.ActivateSingle)]
+    [InlineData(1, false, RunningWindowAction.ActivateSingle)]
+    [InlineData(2, true, RunningWindowAction.ActivateSingle)]
+    [InlineData(2, false, RunningWindowAction.ShowPicker)]
+    [InlineData(5, false, RunningWindowAction.ShowPicker)]
+    public void PlanEnterpriseDoubleClick_PickerOnly_WhenActionsColumnHidden(
+        int openWindowCount, bool showActionsColumn, RunningWindowAction expected)
+    {
+        // Issue #120 (v1.0.1.58, RafaIS): меню выбора окна при двойном щелчке
+        // появляется ТОЛЬКО когда колонка «Действия» отключена («пользователи с
+        // колонкой запускают кнопками — меню только путает»). При включённой
+        // колонке и нескольких окнах активируется первое окно; одно окно
+        // активируется всегда напрямую; окон нет — обычный запуск.
+        Assert.Equal(expected,
+            RunningWindowPlanner.PlanEnterpriseDoubleClick(openWindowCount, showActionsColumn));
+    }
+
+    [Theory]
+    [InlineData(0, true, false, RunningWindowAction.None)]
+    [InlineData(1, true, false, RunningWindowAction.ActivateSingle)]
+    [InlineData(1, true, true, RunningWindowAction.ActivateSingle)]
+    [InlineData(3, true, false, RunningWindowAction.ActivateSingle)]
+    [InlineData(3, true, true, RunningWindowAction.None)]
+    [InlineData(3, false, false, RunningWindowAction.ShowPicker)]
+    [InlineData(3, false, true, RunningWindowAction.ShowPicker)]
+    [InlineData(5, false, true, RunningWindowAction.ShowPicker)]
+    public void PlanAllWindowsDoubleClick_PickerOnly_WhenActionsColumnHidden(
+        int openWindowCount, bool showActionsColumn, bool nothingAction, RunningWindowAction expected)
+    {
+        // Issue #120 (v1.0.1.58, RafaIS/7OH): итоговое правило для двойного щелчка
+        // «Ничего»/«Активировать окно» и вкладки «Запущенные»:
+        //  - колонка «Действия» ОТКЛЮЧЕНА: одно окно — напрямую, несколько — меню
+        //    выбора, окон нет — ничего;
+        //  - колонка ВКЛЮЧЕНА: «Ничего» ничего не делает (не путает),
+        //    «Активировать окно»/вкладка «Запущенные» активируют первое окно.
+        Assert.Equal(expected, RunningWindowPlanner.PlanAllWindowsDoubleClick(
+            openWindowCount, showActionsColumn, nothingAction));
+    }
+
     [Fact]
     public void FormatWindowTitle_AppendsPid_WhenTitlePresent()
     {
@@ -150,6 +191,56 @@ public sealed class Issue120RunningWindowTests
         var code = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Running.cs"));
         Assert.Contains("LogRunningWindowMiss", code, StringComparison.Ordinal);
         Assert.Contains("OperatingSystem.IsWindows", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Activation_DoesNotBreakMaximizedState()
+    {
+        // Issue #120 (v1.0.1.58, 7OH/RafaIS): безусловный ShowWindow(SW_RESTORE)
+        // перед SetForegroundWindow сбивал максимизацию — maximized окно при каждой
+        // активации разворачивалось в normal. Активация обязана смотреть состояние
+        // окна (GetWindowPlacement → showCmd): restore — только для свернутых окон
+        // (свернутое из максимизированного restore вернёт снова maximized,
+        // WPF_RESTORETOMAXIMIZED), maximized/normal — только передний план.
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "OneCWindowActivator.Windows.cs"));
+        Assert.Contains("GetWindowPlacement", code, StringComparison.Ordinal);
+        Assert.Contains("SwShowMinimized", code, StringComparison.Ordinal);
+        // Порядок внутри Activate: проверка состояния (GetShowCmd) выполняется
+        // ДО вызова восстановления — restore больше не безусловный.
+        var activateIdx = code.IndexOf("public static bool Activate(long handle)", StringComparison.Ordinal);
+        var placementIdx = code.IndexOf("GetShowCmd(hWnd);", StringComparison.Ordinal);
+        var restoreIdx = code.IndexOf("ShowWindow(hWnd, SwRestore);", StringComparison.Ordinal);
+        var foregroundIdx = code.IndexOf("return SetForegroundWindow(hWnd);", StringComparison.Ordinal);
+        Assert.True(activateIdx >= 0, "метод Activate(long handle) не найден");
+        Assert.True(placementIdx > activateIdx && restoreIdx > placementIdx && foregroundIdx > restoreIdx,
+            "ShowWindow(SwRestore) обязан выполняться только после проверки состояния окна (GetShowCmd)");
+    }
+
+    [Fact]
+    public void Wpf_DoubleClickPicker_ShownOnly_WhenActionsColumnHidden()
+    {
+        // Issue #120 (v1.0.1.58, RafaIS): меню выбора окна при двойном щелчке —
+        // только при отключённой колонке «Действия». WPF-точки двойного щелчка
+        // планируют решение через PlanAllWindowsDoubleClick/PlanEnterpriseDoubleClick
+        // с видимостью колонки (ShowActionsColumn); «Ничего» при включённой колонке
+        // не делает ничего (nothingAction).
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Events.cs"));
+        Assert.Contains("PlanAllWindowsDoubleClick", code, StringComparison.Ordinal);
+        Assert.Contains("_viewModel.ShowActionsColumn", code, StringComparison.Ordinal);
+        Assert.Contains("nothingAction", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_DoubleClickPicker_ShownOnly_WhenActionsColumnHidden()
+    {
+        var tree = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
+        Assert.Contains("PlanAllWindowsDoubleClick", tree, StringComparison.Ordinal);
+        Assert.Contains("ShowActionsColumn", tree, StringComparison.Ordinal);
+
+        // Enter-активация при запущенном Предприятии — то же правило колонки.
+        var enter = ReadProjectFile(Path.Combine("Workspace1C", "Controls", "LeveledTreeView.Avalonia.cs"));
+        Assert.Contains("windows.Count, vm.ShowActionsColumn", enter, StringComparison.Ordinal);
+        Assert.Contains("nothingAction: true", enter, StringComparison.Ordinal);
     }
 
     // ===================== Сторож: точки интеграции (Avalonia) =====================

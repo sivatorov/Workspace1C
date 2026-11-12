@@ -881,6 +881,18 @@
                                         </Button>
                                     </StackPanel>
                                 </Grid>
+                                <!-- «Действия только при наведении» (issue #128): кнопки колонки
+                                     «Действия» в строке базы показываются только под курсором;
+                                     кнопка-чип запущенного режима (Конфигуратор/Предприятие) видна
+                                     без наведения, пока процесс работает. -->
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ActionsHoverOnlyCheck" Margin="0,6,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Eye" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.Columns.ActionsHoverOnly}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <TextBlock Text="{loc:Loc Settings.Columns.ActionsHoverOnlyHint}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="24,0,0,12"/>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>

@@ -86,6 +86,22 @@ public static class RunningWindowPlanner
         };
 
     /// <summary>
+    /// Issue #120 (v1.0.1.58, RafaIS): двойной щелчок при запущенном Предприятии
+    /// с учётом видимости колонки «Действия». Меню выбора окна при двойном щелчке
+    /// показывается ТОЛЬКО при отключённой колонке «Действия»: «пользователи с
+    /// колонкой запускают кнопками» — внезапное меню только путает. При включённой
+    /// колонке и нескольких окнах активируется первое (верхнее по Z-порядку
+    /// перечисления окон). Одно окно активируется напрямую, окон нет — запуск.
+    /// </summary>
+    public static RunningWindowAction PlanEnterpriseDoubleClick(int openWindowCount, bool showActionsColumn)
+    {
+        var planned = PlanEnterpriseDoubleClick(openWindowCount);
+        return planned == RunningWindowAction.ShowPicker && showActionsColumn
+            ? RunningWindowAction.ActivateSingle
+            : planned;
+    }
+
+    /// <summary>
     /// Решение для действия «Активировать окно» (issue #120 v1.0.1.55) и для
     /// двойного щелчка при действии «Ничего» при запущенной базе: окон нет —
     /// ничего; одно окно — активировать напрямую; несколько — выбор окна.
@@ -97,6 +113,32 @@ public static class RunningWindowPlanner
             1 => RunningWindowAction.ActivateSingle,
             _ => RunningWindowAction.ShowPicker
         };
+
+    /// <summary>
+    /// Issue #120 (v1.0.1.58, RafaIS/7OH): двойной щелчок «Ничего»/«Активировать
+    /// окно» (и двойной клик на вкладке «Запущенные») с учётом видимости колонки
+    /// «Действия». Меню выбора окна показывается ТОЛЬКО при отключённой колонке
+    /// «Действия» (RafaIS: «если колонка Действия отключена, то только тогда
+    /// появляется это меню» — кнопки действия и так перед глазами, меню путает).
+    /// При включённой колонке:
+    /// <list type="bullet">
+    /// <item>действие «Ничего» — ничего не делает (7OH: «Выбор — когда не указано
+    /// действие»; колонка включена — двойной клик не путает);</item>
+    /// <item>«Активировать окно»/вкладка «Запущенные» — активируется первое окно
+    /// (верхнее по Z-порядку перечисления), явное намерение пользователя сохранить.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="openWindowCount">Число открытых окон базы (все режимы).</param>
+    /// <param name="showActionsColumn">Видима ли колонка «Действия» (ShowActionsColumn).</param>
+    /// <param name="nothingAction">true — действие двойного щелчка «Ничего».</param>
+    public static RunningWindowAction PlanAllWindowsDoubleClick(
+        int openWindowCount, bool showActionsColumn, bool nothingAction)
+    {
+        var planned = PlanAllWindows(openWindowCount);
+        if (planned != RunningWindowAction.ShowPicker || !showActionsColumn)
+            return planned;
+        return nothingAction ? RunningWindowAction.None : RunningWindowAction.ActivateSingle;
+    }
 
     /// <summary>
     /// Строка элемента выбора окна (issue #120 v1.0.1.55, 7OH): «Предприятие

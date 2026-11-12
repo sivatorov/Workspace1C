@@ -94,6 +94,21 @@ namespace Workspace1C
         public static void SetSuppressMaximizeButton(DependencyObject element, bool value) => element.SetValue(SuppressMaximizeButtonProperty, value);
         public static bool GetSuppressMaximizeButton(DependencyObject element) => (bool)element.GetValue(SuppressMaximizeButtonProperty);
 
+        /// <summary>
+        /// Вложенное свойство: рисовать ли видимую рамку окна (issue #126). По умолчанию
+        /// true — все диалоговые окна, как и главное окно (issue #273, MainWindow.xaml),
+        /// получают тонкую рамку цвета темы (DynamicResource BorderBrushColor), чтобы
+        /// окно оставалось различимым на системах без системных теней/эффектов DWM
+        /// (терминал, виртуализация, некоторые темы ОС). Специальные окна (полноэкранные,
+        /// просмотрщики изображений и т.п.) могут отключить рамку, установив false
+        /// в конструкторе до показа.
+        /// </summary>
+        public static readonly DependencyProperty ShowWindowFrameProperty =
+            DependencyProperty.RegisterAttached(
+                "ShowWindowFrame", typeof(bool), typeof(WindowChromeHelper), new PropertyMetadata(true));
+        public static void SetShowWindowFrame(DependencyObject element, bool value) => element.SetValue(ShowWindowFrameProperty, value);
+        public static bool GetShowWindowFrame(DependencyObject element) => (bool)element.GetValue(ShowWindowFrameProperty);
+
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
 
@@ -528,7 +543,30 @@ namespace Workspace1C
 
             grid.Children.Add(titleBar);
             grid.Children.Add(inner);
-            return grid;
+
+            // Видимая рамка окна (issue #126): у главного окна она есть (issue #273,
+            // MainWindow.xaml — Border поверх всей клиентской области), а диалоговые
+            // окна на системах без теней/эффектов DWM сливались с фоном. Рамка — тонкий
+            // слой поверх всего окна (шапка + содержимое) цвета темы: DynamicResource
+            // BorderBrushColor перекрашивается при смене темы/схемы так же, как у
+            // главного окна. Слой не перехватывает мышь и не получает фокус. Окно может
+            // отключить рамку вложенным свойством ShowWindowFrame=false.
+            if (!GetShowWindowFrame(window))
+                return grid;
+
+            var root = new Grid();
+            root.Children.Add(grid);
+
+            var frame = new Border
+            {
+                IsHitTestVisible = false,
+                Focusable = false,
+                BorderThickness = new Thickness(1)
+            };
+            frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrushColor");
+            Panel.SetZIndex(frame, 2000);
+            root.Children.Add(frame);
+            return root;
         }
 
         /// <summary>

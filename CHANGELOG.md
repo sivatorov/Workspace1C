@@ -11,6 +11,73 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.58] — 2026-11-12
+
+### Добавлено
+
+- **Новая настройка «Действия только при наведении» (issue #128).** В
+  Настройки → Отображение → Колонки появился переключатель `ActionsHoverOnly`:
+  при включении кнопки колонки «Действия» (Предприятие/Конфигуратор/ЕЩЁ)
+  показываются только в строке под курсором мыши, а чипы занятости запущенных
+  баз видны всегда — список больше не перегружается кнопками
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs),
+  локализация `ru.json`/`en.json`). Тесты: `Issue128ActionsHoverTests`.
+
+### Исправлено
+
+- **Краш «Недостаточно квот для обработки команды» при показе диалога ошибки
+  (issue #127).** При нехватке оконных дескрипторов Windows `ShowDialog` в
+  [`WpfDialogService`](Workspace1C/Services/WpfDialogService.cs) бросал
+  `Win32Exception`, и приложение падало именно в момент попытки показать
+  сообщение об ошибке. Все показы диалогов обёрнуты в try/catch с fallback на
+  системный `MessageBox` — сбой отрисовки диалога больше не рушит приложение.
+  Тесты: `WpfDialogServiceIssue127Tests`.
+- **Обновление вручную: режим «Загружать с предложением установки» теперь
+  реально скачивает файл в фоне (issue #116).** При обнаружении новой версии
+  файл обновления загружается сразу в фоне
+  ([`BackgroundDownloadManager`](Workspace1C/Services/BackgroundDownloadManager.cs)),
+  старый скачанный файл удаляется; возле версии в статус-баре появляется
+  зелёный индикатор готовности; в диалоге при готовом файле — кнопка
+  «Установить» вместо «Скачать»
+  ([`UpdateService.cs`](Workspace1C/Services/UpdateService.cs),
+  [`UpdateService.Avalonia.cs`](Workspace1C/Services/UpdateService.Avalonia.cs)).
+  Тесты: `Issue116BackgroundDownloadTests`, `Issue116UpdateIntervalTests`.
+- **Расширения конфигурации: настоящее имя читается из .cfe, защита от дубля
+  (issue #117).** Имя расширения теперь определяется из содержимого файла .cfe
+  (нативный контейнер 1С), а не из имени файла; при выборе .cfe по «Обзор»
+  имя подставляется автоматически; установка дублирующего расширения
+  (по реальному имени) блокируется; отказ конфигуратора распознаётся и
+  показывается пользователю
+  ([`ConfigExtensionService.cs`](Workspace1C/Services/ConfigExtensionService.cs)).
+  Тесты: `ConfigExtensionServiceTests`, `CfeProbeTempTests`.
+- **Активация окна больше не сбивает максимизацию (issue #120).** Активация
+  запущенного окна Конфигуратора/Предприятия через `GetWindowPlacement`/
+  условный `restore` сохраняет развёрнутое состояние окна; меню выбора окна
+  по двойному клику показывается только когда колонка «Действия» отключена
+  ([`RunningInfobasesService.Windows.cs`](Workspace1C/Services/RunningInfobasesService.Windows.cs)).
+  Тесты: `Issue120RunningWindowTests`.
+- **Иконки разворачивания/сворачивания групп отличались от компактного режима
+  (issue #123).** В наборах Outline, Material, MacOS, WindowsXp и Glass иконки
+  групп в списках (панель задач) заменены на двойные шевроны — они больше не
+  совпадают с кнопкой компактного режима
+  ([`IconsOutline.xaml`](Workspace1C/Themes/IconsOutline.xaml),
+  [`IconsMaterial.xaml`](Workspace1C/Themes/IconsMaterial.xaml),
+  [`IconsMacOS.xaml`](Workspace1C/Themes/IconsMacOS.xaml),
+  [`IconsWindowsXp.xaml`](Workspace1C/Themes/IconsWindowsXp.xaml),
+  [`IconsGlass.xaml`](Workspace1C/Themes/IconsGlass.xaml) + Avalonia-аналоги `.axaml`).
+  Тесты: `Issue123GroupIconTests`.
+- **Увеличены значки в кружках-чипах запуска (issue #125).** Material Design:
+  Предприятие ×1.4, Конфигуратор ×1.3; Fluent: Предприятие ×1.4 — в обеих
+  колонках («Действия» и «Наименование») значки в кружках стали заметнее
+  ([`ChipGlyphScale.cs`](Workspace1C/Themes/ChipGlyphScale.cs)).
+  Тесты: `Issue125ChipGlyphScaleTests`, обновлён `Issue103EnterpriseGlyphTests`.
+- **Рамка по умолчанию у всех внутренних окон (issue #126).** Рамка в стиле
+  основного окна добавляется всем внутренним окнам по умолчанию через
+  [`WindowChromeHelper`](Workspace1C/Views/WindowChromeHelper.cs) (opt-out
+  для специальных окон), а не разовыми правками.
+  Тесты: `Issue126WindowFrameTests`.
+
 ## [1.0.1.57] — 2026-11-11
 
 ### Изменено

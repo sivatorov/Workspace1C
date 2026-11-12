@@ -64,7 +64,16 @@ public partial class UpdateAvailableWindow : Window
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
         }
 
-        Loaded += (_, _) => DownloadButton.Focus();
+        // Issue #116 (v1.0.1.58): если файл обновления уже скачан в фоне (режим
+        // «Загружать с предложением установки»), вместо «Скачать» показывается
+        // «Установить» — она сразу применяет готовый файл по логике автообновления.
+        var readyToInstall = _service.IsReadyFor(release);
+        InstallButton.Visibility = readyToInstall ? Visibility.Visible : Visibility.Collapsed;
+        DownloadButton.Visibility = readyToInstall ? Visibility.Collapsed : Visibility.Visible;
+        InstallButton.IsDefault = readyToInstall;
+        DownloadButton.IsDefault = !readyToInstall;
+
+        Loaded += (_, _) => (readyToInstall ? InstallButton : DownloadButton).Focus();
 
         // Закрытие окна по Esc (issue #371): единообразно с остальными окнами приложения
         // (ActualReleasesWindow и др.). Во время скачивания окно не закрывается — как и
@@ -213,6 +222,38 @@ public partial class UpdateAvailableWindow : Window
         UpdateAfterCloseButton.IsEnabled = false;
 
         if (!_service.ApplyRestartNow(_targetExe, _newExe))
+        {
+            ShowError(LocalizationManager.T("Update.InstallFailed"));
+            return;
+        }
+
+        // Обновление запланировано: помощник заменит файл сам, temp не удалять.
+        _applyScheduled = true;
+
+        // Помощник уже запущен. Показываем подтверждение и через короткую паузу закрываем
+        // приложение, чтобы exe освободился и был заменён, а новое приложение запустилось.
+        ShowDonePhase(LocalizationManager.T("Update.RestartPrompt"));
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            _service.ShutdownNow();
+        };
+        timer.Start();
+    }
+
+    /// <summary>
+    /// «Установить» (issue #116, v1.0.1.58): применяет уже скачанный в фоне файл
+    /// обновления по существующей логике автообновления (помощник замены exe,
+    /// маркер pending_update.json), затем закрывает приложение для перезапуска.
+    /// </summary>
+    private void OnInstallClick(object sender, RoutedEventArgs e)
+    {
+        InstallButton.IsEnabled = false;
+        SkipVersionButton.IsEnabled = false;
+        CancelButton.IsEnabled = false;
+
+        if (!_service.ApplyReadyInstall(_release))
         {
             ShowError(LocalizationManager.T("Update.InstallFailed"));
             return;

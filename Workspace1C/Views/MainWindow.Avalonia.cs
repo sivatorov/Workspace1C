@@ -58,6 +58,9 @@ namespace Workspace1C
         private StackPanel _footerUpdateIcon = null!;
         private Control _footerUpdateSyncIcon = null!;
         private Control _footerUpdateWarningIcon = null!;
+        // Состояние «файл обновления скачан и готов к установке» (issue #116
+        // v1.0.1.58): зелёная галочка вместо «внимания».
+        private Control _footerUpdateReadyIcon = null!;
 
         // Issue #114: координата курсора по X (в координатах окна) над строкой состояния.
         // Запоминается в PointerEntered/PointerMoved/PointerPressed на _statusInfo и
@@ -2319,8 +2322,13 @@ namespace Workspace1C
             _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(15), "@AccentBrush");
             _footerUpdateWarningIcon = IconHelper.MakeIcon("IconWarning", UiMetrics.Scaled(16), "@AccentBrush");
             _footerUpdateWarningIcon.IsVisible = false;
+            // Состояние «готов к установке» (issue #116 v1.0.1.58): зелёная галочка —
+            // файл обновления уже скачан в фоне, клик сразу открывает установку.
+            _footerUpdateReadyIcon = IconHelper.MakeIcon("IconCheck", UiMetrics.Scaled(16), "@SuccessBrush");
+            _footerUpdateReadyIcon.IsVisible = false;
             _footerUpdateIcon.Children.Add(_footerUpdateSyncIcon);
             _footerUpdateIcon.Children.Add(_footerUpdateWarningIcon);
+            _footerUpdateIcon.Children.Add(_footerUpdateReadyIcon);
             _footerUpdateIcon.PointerReleased += (_, _) => _ = RunFooterCheckUpdatesAsync();
             footerPanel.Children.Add(_footerUpdateIcon);
 
@@ -2429,6 +2437,10 @@ namespace Workspace1C
                 {
                     updateService.AvailableReleaseChanged += () =>
                         Dispatcher.UIThread.Post(RefreshFooterUpdateState);
+                    // Состояние «файл обновления скачан и готов к установке»
+                    // (issue #116 v1.0.1.58) меняется из той же фоновой загрузки.
+                    updateService.ReadyStateChanged += () =>
+                        Dispatcher.UIThread.Post(RefreshFooterUpdateState);
                     Dispatcher.UIThread.Post(RefreshFooterUpdateState);
                 }
             }
@@ -2456,18 +2468,27 @@ namespace Workspace1C
                 if (updateService is null)
                     return;
 
+                // Состояние «файл обновления скачан и готов к установке» (issue #116,
+                // v1.0.1.58): зелёная галочка вместо «внимания», клик — сразу диалог
+                // установки готового файла (без сетевой проверки).
+                var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
                 var hasRelease = updateService.AvailableRelease is not null;
                 var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
 
                 _footerUpdateIcon.IsVisible = hasRelease || manualCheck;
-                _footerUpdateSyncIcon.IsVisible = !hasRelease;
-                _footerUpdateWarningIcon.IsVisible = hasRelease;
+                _footerUpdateSyncIcon.IsVisible = !hasRelease && !isReady;
+                _footerUpdateWarningIcon.IsVisible = hasRelease && !isReady;
+                _footerUpdateReadyIcon.IsVisible = isReady;
 
-                ToolTip.SetTip(_footerUpdateIcon, hasRelease
+                ToolTip.SetTip(_footerUpdateIcon, isReady
                     ? string.Format(
-                        LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
-                        updateService.AvailableRelease!.TagName)
-                    : LocalizationManager.T("Main.Footer.CheckUpdates"));
+                        LocalizationManager.T("Main.Footer.UpdateReadyTooltip"),
+                        updateService.ReadyRelease!.TagName)
+                    : hasRelease
+                        ? string.Format(
+                            LocalizationManager.T("Main.Footer.UpdateAvailableTooltip"),
+                            updateService.AvailableRelease!.TagName)
+                        : LocalizationManager.T("Main.Footer.CheckUpdates"));
             }
             catch
             {
@@ -2500,6 +2521,13 @@ namespace Workspace1C
             try
             {
                 var updateService = AppServices.GetRequiredService<UpdateService>();
+                // Файл обновления уже скачан (issue #116 v1.0.1.58): открываем сразу
+                // диалог установки готового файла, без сетевой проверки.
+                if (updateService.IsReadyFor(updateService.ReadyRelease))
+                {
+                    await updateService.OpenReadyInstallAsync();
+                    return;
+                }
                 await updateService.CheckForUpdatesManualAsync();
             }
             catch

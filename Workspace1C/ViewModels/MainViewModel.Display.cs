@@ -634,6 +634,13 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>Показывать колонку «Действия» (кнопки запуска/конфигуратора/очистки кеша) в списке баз.</summary>
     public bool ShowActionsColumn => _showActionsColumn;
 
+    /// <summary>
+    /// «Действия только при наведении» (issue #128): при включении кнопки колонки
+    /// «Действия» в строке базы видны только под курсором; кнопки запуска остаются
+    /// видимыми, пока база запущена (чипы-индикаторы без наведения).
+    /// </summary>
+    public bool ActionsHoverOnly => _actionsHoverOnly;
+
     public double SizeColumnWidth
     {
         get => _sizeColumnWidth;
@@ -753,7 +760,8 @@ public partial class MainViewModel : ViewModelBase
         bool showVersionColumn, bool showLaunchModeColumn, bool showServerColumn, bool showLastLaunchColumn,
         bool groupByGroup, bool showFavoritesOnly, bool showSizeColumn = true, bool showModifiedColumn = true,
         bool showConfigurationColumn = true, bool showConfigurationVersionColumn = true, bool showEmptyGroups = false,
-        List<string>? columnOrder = null, bool showActionsColumn = true, bool showLastBackupColumn = true)
+        List<string>? columnOrder = null, bool showActionsColumn = true, bool showLastBackupColumn = true,
+        bool actionsHoverOnly = false)
     {
         _showFavoritesButton = showFavoritesButton;
         _showPinnedButton = showPinnedButton;
@@ -768,6 +776,7 @@ public partial class MainViewModel : ViewModelBase
         _showModifiedColumn = showModifiedColumn;
         _showLastBackupColumn = showLastBackupColumn;
         _showActionsColumn = showActionsColumn;
+        _actionsHoverOnly = actionsHoverOnly;
 
         OnPropertyChanged(nameof(ShowFavoritesButton));
         OnPropertyChanged(nameof(ShowPinnedButton));
@@ -782,6 +791,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowModifiedColumn));
         OnPropertyChanged(nameof(ShowLastBackupColumn));
         OnPropertyChanged(nameof(ShowActionsColumn));
+        OnPropertyChanged(nameof(ActionsHoverOnly));
 
         // Применяем поведение списка (уже имеющиеся настройки).
         GroupByGroup = groupByGroup;
@@ -817,7 +827,8 @@ public partial class MainViewModel : ViewModelBase
             showEmptyGroups: _showEmptyGroups,
             columnOrder: _columnOrder,
             showActionsColumn: key == "Actions" ? visible : _showActionsColumn,
-            showLastBackupColumn: key == "LastBackup" ? visible : _showLastBackupColumn);
+            showLastBackupColumn: key == "LastBackup" ? visible : _showLastBackupColumn,
+            actionsHoverOnly: _actionsHoverOnly);
     }
 
     /// <summary>Сохранённая ширина окна приложения (0 — по умолчанию).</summary>

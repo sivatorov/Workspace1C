@@ -526,24 +526,27 @@ namespace Workspace1C.Controls
             // 7OH): при нескольких запущенных приложениях базы — выбор окна.
             if (vm.IsListModeRunning && ib.IsRunning)
             {
-                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
+                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this, nothingAction: false);
                 return;
             }
 
             var dblAction = vm.ResolveDoubleClickAction(ib);
             // Issue #120 (v1.0.1.55, 7OH): при действии «Ничего» у запущенной базы —
-            // выбор окна (в списке и Предприятие, и Конфигуратор).
+            // выбор окна (в списке и Предприятие, и Конфигуратор). Issue #120
+            // (v1.0.1.58, RafaIS): меню выбора — только при отключённой колонке
+            // «Действия»; при включённой двойной клик с «Ничего» ничего не делает.
             if (dblAction == Workspace1C.Models.DoubleClickAction.None)
             {
                 if (ib.IsRunning)
-                    Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
+                    Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this, nothingAction: true);
                 return;
             }
             // Issue #120 (v1.0.1.55): действие «Активировать окно» — переход к
-            // открытому окну Предприятия/Конфигуратора.
+            // открытому окну Предприятия/Конфигуратора. Меню выбора — только при
+            // отключённой колонке «Действия» (issue #120 v1.0.1.58, RafaIS).
             if (dblAction == Workspace1C.Models.DoubleClickAction.ActivateWindow)
             {
-                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this);
+                Workspace1C.MainWindow.ActivateAllWindowsOrNothing(vm, ib, this, nothingAction: false);
                 return;
             }
             if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
@@ -588,7 +591,11 @@ namespace Workspace1C.Controls
                 var windows = t.Result;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    switch (Services.RunningWindowPlanner.PlanEnterpriseDoubleClick(windows.Count))
+                    // Issue #120 (v1.0.1.58, RafaIS): меню выбора окна при двойном
+                    // щелчке — только при отключённой колонке «Действия»;
+                    // при включённой — первое окно.
+                    switch (Services.RunningWindowPlanner.PlanEnterpriseDoubleClick(
+                                windows.Count, vm.ShowActionsColumn))
                     {
                         case Services.RunningWindowAction.ActivateSingle:
                             vm.ActivateWindowByHandle(windows[0].Handle);
