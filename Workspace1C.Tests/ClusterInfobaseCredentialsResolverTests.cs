@@ -1,6 +1,7 @@
 using System.Threading;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Tests.TestSupport;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -608,7 +609,12 @@ public sealed class ClusterInfobaseCredentialsResolverTests
             Assert.Equal("pg-host", passed!.Host);
             Assert.Equal("postgres", passed.User);
             // В логе окна есть шаг автоподстановки (локализованный текст либо ключ).
-            Assert.Contains(vm.LogLines, l =>
+            var log = AsyncLogAssert.WaitForLine(
+                vm.LogLines,
+                l => l.Contains("rac", StringComparison.Ordinal) ||
+                     l.Contains("DbmsProfile", StringComparison.Ordinal),
+                "В журнале ожидался шаг автоподстановки профиля СУБД");
+            Assert.Contains(log, l =>
                 l.Contains("rac", StringComparison.Ordinal) ||
                 l.Contains("DbmsProfile", StringComparison.Ordinal));
         }

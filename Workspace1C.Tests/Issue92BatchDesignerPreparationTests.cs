@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Tests.TestSupport;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -129,7 +130,11 @@ public sealed class Issue92BatchDesignerPreparationTests
             Assert.Equal(0, rac.ClustersCallCount);
             // В журнале — предупреждение о пропуске подготовки (в тестовом окружении
             // локализация не загружена — возвращается ключ строки).
-            Assert.Contains(vm.LogLines, l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal));
+            var log = AsyncLogAssert.WaitForLine(
+                vm.LogLines,
+                l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal),
+                "В журнале ожидалось предупреждение о пропуске подготовки (Designer)");
+            Assert.Contains(log, l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal));
         }
         finally
         {
@@ -194,7 +199,11 @@ public sealed class Issue92BatchDesignerPreparationTests
             var item = Assert.Single(vm.Items);
             Assert.Equal(BatchOperationsStatus.Success, item.Status);
             Assert.Equal(0, rac.ClustersCallCount);
-            Assert.Contains(vm.LogLines, l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal));
+            var log = AsyncLogAssert.WaitForLine(
+                vm.LogLines,
+                l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal),
+                "В журнале ожидалось предупреждение о пропуске подготовки (Designer, файловая база)");
+            Assert.Contains(log, l => l.Contains("BatchOps.PrepareSkippedDesigner", StringComparison.Ordinal));
         }
         finally
         {

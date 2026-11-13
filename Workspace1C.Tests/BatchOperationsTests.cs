@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Tests.TestSupport;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -178,7 +179,14 @@ public sealed class BatchOperationsTests
             Assert.Contains("ibcmd: ошибка загрузки", vm.Items[1].StatusText, StringComparison.Ordinal);
             // Строки по базам: «[время] «Имя» → путь» (2 шт.); строка старта тоже
             // содержит «», поэтому фильтруем по стрелке целевого пути.
-            Assert.Equal(2, vm.LogLines.Count(line => line.Contains("→", StringComparison.Ordinal)));
+            // Записи журнала могут публиковаться через SynchronizationContext.Post —
+            // ждём нужное число строк и проверяем снимок (без гонки с добавлением).
+            var log = AsyncLogAssert.WaitForCount(
+                vm.LogLines,
+                line => line.Contains("→", StringComparison.Ordinal),
+                2,
+                "Ожидались две строки «[время] «Имя» → путь»");
+            Assert.Equal(2, log.Count(line => line.Contains("→", StringComparison.Ordinal)));
             Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
             Assert.False(vm.IsRunning);
         }
@@ -204,7 +212,9 @@ public sealed class BatchOperationsTests
 
         Assert.False(called);
         Assert.False(vm.IsRunning);
-        Assert.Contains(vm.LogLines, l => !string.IsNullOrWhiteSpace(l));
+        var log = AsyncLogAssert.WaitForNonEmpty(
+            vm.LogLines, "Журнал «ничего не выбрано» должен содержать строку");
+        Assert.Contains(log, l => !string.IsNullOrWhiteSpace(l));
     }
 
     [Fact]

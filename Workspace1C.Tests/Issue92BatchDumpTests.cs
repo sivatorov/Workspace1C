@@ -665,22 +665,27 @@ public sealed class Issue92BatchDumpTests
         // ставится в очередь ЗАХВАЧЕННОГО контекста UI-потока. Тест: продолжения
         // исполнителя уходят в пул потоков, сброс IsRunning — в очередь контекста,
         // после прокачки очереди IsRunning == false.
+        //
+        // ВАЖНО: VM создаётся НА потоке с «насосным» контекстом — именно его
+        // конструктор запоминает как UI-поток (_syncContext). Если создать VM на
+        // тестовом потоке, захватывается чужой контекст xUnit, и проверка очереди
+        // становится гоночной (иногда падала в полном прогоне).
         var dir = Directory.CreateTempSubdirectory("ws1c_runctx").FullName;
         try
         {
             var context = new PumpingSynchronizationContext();
-            var vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
-            {
-                PathText = dir,
-                ExecutorOverride = (_, _, _) => Task.Run(() => new IbcmdResult { Success = true, ExitCode = 0 })
-            };
-
+            BatchOperationsViewModel? vm = null;
             Exception? threadError = null;
             var thread = new Thread(() =>
             {
                 try
                 {
                     SynchronizationContext.SetSynchronizationContext(context);
+                    vm = new BatchOperationsViewModel(new[] { FileBase("Альфа") }, BatchOperationKind.DumpDt)
+                    {
+                        PathText = dir,
+                        ExecutorOverride = (_, _, _) => Task.Run(() => new IbcmdResult { Success = true, ExitCode = 0 })
+                    };
                     vm.RunAsync(CancellationToken.None).GetAwaiter().GetResult();
                 }
                 catch (Exception ex)
@@ -692,10 +697,13 @@ public sealed class Issue92BatchDumpTests
             thread.Join();
 
             Assert.Null(threadError);
-            // Сброс IsRunning отправлен в очередь контекста UI-потока (прогон ушёл
-            // с потока прогона), а не выполнен на фоновом потоке.
-            Assert.True(context.Pending.Count > 0 || !vm.IsRunning,
+            Assert.NotNull(vm);
+            // Сброс IsRunning отправлен в очередь захваченного контекста UI-потока
+            // (прогон ушёл с потока прогона), а не выполнен на фоновом потоке.
+            Assert.True(context.Pending.Count > 0,
                 "Сброс IsRunning должен идти через захваченный контекст UI-потока.");
+            Assert.True(vm!.IsRunning,
+                "До прокачки очереди захваченного контекста сброс IsRunning ещё не применён.");
             context.PumpAll();
             Assert.False(vm.IsRunning);
         }

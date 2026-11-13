@@ -30,6 +30,34 @@ public sealed class TraceFlagsStateCollection { }
 public sealed class LocalDataStoreStateCollection { }
 
 /// <summary>
+/// Коллекция статиков общих авторизаций (<see cref="OneCLauncher.CommonAuthorization"/>,
+/// CommonEnterpriseAuthorization/CommonConfiguratorAuthorization): выполняется БЕЗ
+/// параллели с другими коллекциями.
+/// <para>
+/// Причина: <see cref="OneCLauncher.BuildArguments"/> вызывает
+/// <see cref="OneCLauncher.EnsureCommonAuthLoaded"/>, который при первом вызове и
+/// доступных сервисах читает настройки профиля и перезаписывает статики. Если
+/// параллельно другой тест сконфигурировал AppServices (например,
+/// <c>Issue79TestDeployWindowConstructionTests</c>), значение, выставленное тестом
+/// аргументов, затирается — тест падал редко и в разных прогонах.
+/// </para>
+/// <para>
+/// Фикстура заранее помечает общие авторизации загруженными
+/// (<see cref="OneCLauncher.MarkCommonAuthLoaded"/>), поэтому ленивая загрузка из
+/// профиля в тестах не выполняется вовсе — используются значения, выставленные
+/// тестом, и результат детерминирован.
+/// </para>
+/// </summary>
+[CollectionDefinition("CommonAuthStatics", DisableParallelization = true)]
+public sealed class CommonAuthStaticsCollection : ICollectionFixture<CommonAuthStaticsFixture> { }
+
+/// <summary>См. <see cref="CommonAuthStaticsCollection"/>.</summary>
+public sealed class CommonAuthStaticsFixture
+{
+    public CommonAuthStaticsFixture() => OneCLauncher.MarkCommonAuthLoaded();
+}
+
+/// <summary>
 /// Глобальная подготовка тестового процесса (выполняется один раз при загрузке сборки,
 /// до всех тестов). INFO-диагностика редиректов/входа портала 1С (issue #347, флаг
 /// CM_REDIRECT в trace.json) нужна тестам входа (<see cref="OneCUpdatesLoginFlowTests"/>)

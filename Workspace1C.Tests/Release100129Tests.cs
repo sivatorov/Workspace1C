@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Tests.TestSupport;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -369,7 +370,9 @@ public sealed class Release100129Tests
 
         Assert.False(vm.IsRunning);
         Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
-        Assert.Contains(vm.LogLines, l => !string.IsNullOrWhiteSpace(l));
+        var log = AsyncLogAssert.WaitForNonEmpty(
+            vm.LogLines, "Журнал отменённого прогона должен содержать строку");
+        Assert.Contains(log, l => !string.IsNullOrWhiteSpace(l));
     }
 
     [Fact]

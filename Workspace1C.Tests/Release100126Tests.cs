@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Tests.TestSupport;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -318,7 +319,13 @@ public sealed class Release100126Tests
             await vm.RunAsync();
 
             Assert.Equal(BatchOperationsStatus.Failed, vm.Items.Single(i => i.Infobase == ib).Status);
-            Assert.Contains(vm.LogLines, l => l.Contains("BatchOps.DbmsPasswordMissing", StringComparison.Ordinal));
+            // Строка журнала может прийти через SynchronizationContext.Post —
+            // дожидаемся её и перечисляем снимок (иначе «Collection was modified»).
+            var log = AsyncLogAssert.WaitForLine(
+                vm.LogLines,
+                l => l.Contains("BatchOps.DbmsPasswordMissing", StringComparison.Ordinal),
+                "В журнале ожидалось объяснение отсутствия пароля СУБД");
+            Assert.Contains(log, l => l.Contains("BatchOps.DbmsPasswordMissing", StringComparison.Ordinal));
         }
         finally
         {

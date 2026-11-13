@@ -1007,12 +1007,22 @@ public sealed class BatchOperationsViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Добавляет строку в лог потокобезопасно (через захваченный контекст синхронизации).</summary>
+    /// <summary>
+    /// Добавляет строку в журнал потокобезопасно. Если вызывающий код уже находится
+    /// на захваченном контексте синхронизации (UI-поток, либо контекста нет вовсе),
+    /// строка добавляется СИНХРОННО — журнал обновляется без задержки и к моменту
+    /// возврата из <see cref="RunAsync"/> строки уже на месте. Для «чужого» потока
+    /// (например, после <c>ConfigureAwait(false)</c>) по-прежнему используется
+    /// <see cref="SynchronizationContext.Post"/> — fire-and-forget, без блокировки
+    /// вызывающего потока. Рекурсии нет: <see cref="OnPropertyChanged"/> только
+    /// уведомляет подписчиков и не вызывает <see cref="AppendLog"/> повторно.
+    /// </summary>
     private void AppendLog(string line)
     {
-        if (_syncContext is null)
+        if (_syncContext is null || ReferenceEquals(SynchronizationContext.Current, _syncContext))
         {
             LogLines.Add(line);
+            OnPropertyChanged(nameof(LogLines));
             return;
         }
         _syncContext.Post(_ =>

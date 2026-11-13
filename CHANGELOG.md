@@ -11,6 +11,43 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.63] — 2026-11-13
+
+### Исправлено
+
+- **Детерминированная запись журнала пакетных операций.**
+  [`BatchOperationsViewModel.AppendLog`](Workspace1C/ViewModels/BatchOperationsViewModel.cs:1011)
+  добавляет строку синхронно, если вызывающий код уже находится на захваченном
+  контексте синхронизации (UI-поток), — журнал обновляется без задержки и к
+  моменту возврата из
+  [`RunAsync`](Workspace1C/ViewModels/BatchOperationsViewModel.cs:505) строки уже
+  на месте; для «чужого» потока (после `ConfigureAwait(false)`) по-прежнему
+  используется `SynchronizationContext.Post`. Поведение окна не меняется:
+  на UI-потоке запись и так была мгновенной, но результат стал детерминированным.
+- **Стабилизация тестов пакетных операций.** Общий helper ожидания
+  [`AsyncLogAssert`](Workspace1C.Tests/TestSupport/AsyncLogAssert.cs) дожидается
+  применения отложенных записей журнала (опрос снимка с шагом 10 мс и таймаутом
+  2 с) и перечисляет `LogLines.ToArray()`; проверки журнала в
+  [`BatchOperationsTests`](Workspace1C.Tests/BatchOperationsTests.cs),
+  [`Release100126Tests`](Workspace1C.Tests/Release100126Tests.cs),
+  [`Release100129Tests`](Workspace1C.Tests/Release100129Tests.cs),
+  [`Issue92BatchDesignerPreparationTests`](Workspace1C.Tests/Issue92BatchDesignerPreparationTests.cs)
+  и [`ClusterInfobaseCredentialsResolverTests`](Workspace1C.Tests/ClusterInfobaseCredentialsResolverTests.cs)
+  больше не зависят от момента доставки строки — устранены редкие падения
+  «пустая коллекция» и «Collection was modified». Тесты статиков общих
+  авторизаций вынесены в непараллельную коллекцию с фикстурой, заранее
+  помечающей авторизации загруженными, — исключена гонка с ленивым чтением
+  настроек профиля при первом вызове `BuildArguments`. Тест сброса `IsRunning`
+  через захваченный контекст создаёт модель на потоке с целевым контекстом —
+  проверка очереди контекста стала детерминированной.
+- **Стабилизация замеров производительности переключения вкладок.** Тесты
+  [`ListSwitchPerformanceTests`](Workspace1C.Tests/ListSwitchPerformanceTests.cs)
+  получили прогрев JIT (10 прогонов каждого пути), 200 итераций и сравнение
+  медиан с относительным допуском (не более 1,5× плюс 0,5 мс на шум) вместо
+  жёстких +5 мс по сумме — замеры не зависят от «холодного» пути, единичных
+  GC-пауз и фоновой нагрузки, но по-прежнему ловят реальную деградацию
+  переиспользования.
+
 ## [1.0.1.62] — 2026-11-13
 
 ### Исправлено
