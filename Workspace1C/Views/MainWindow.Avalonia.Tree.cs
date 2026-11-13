@@ -176,14 +176,36 @@ namespace Workspace1C
             if (_vm?.ShowActionsColumn != false)
             {
                 var actions = new ActionsPanel();
-                actions.Children.Add(GroupRowActionButton(group, "IconEdit", "EditGroupCommand",
-                    LocalizationManager.T("Main.EditGroupTooltip"), "TextSecondaryBrush"));
+                // Issue #128 (v1.0.1.60, 7OH «для папок подвиг повторить»): при
+                // включённой настройке «Действия только при наведении» кнопки
+                // строки группы («править»/«удалить») видны только когда курсор
+                // над строкой группы — 7OH дважды жаловался, что «у папок кнопки
+                // видимы до сих пор без наведения». Правило — тот же чистый
+                // планировщик ActionsHoverPlanner, что и у строк баз, только без
+                // чипов запуска: у групп нет Предприятия/Конфигуратора, поэтому
+                // «видимой без наведения» кнопки у папки не бывает вовсе.
+                // Настройка выключена — прежнее поведение, кнопки видны всегда.
+                var editBtn = GroupRowActionButton(group, "IconEdit", "EditGroupCommand",
+                    LocalizationManager.T("Main.EditGroupTooltip"), "TextSecondaryBrush");
+                BindGroupActionsHoverVisibility(editBtn, header);
+                // Issue #128 (v1.0.1.59, 7OH «каждую иконку на своём месте»):
+                // кнопка живёт в фиксированном слоте постоянной ширины — скрытая
+                // (Collapsed) кнопка не освобождает слот, и появление/исчезновение
+                // кнопки «удалить» не сдвигает иконку «править»: у папок «править»
+                // всегда первый слот, «удалить» — второй, как Предприятие/Конфигуратор
+                // у строк баз.
+                actions.Children.Add(FixedLaunchSlot(editBtn));
                 // «Удалить» у служебных узлов скрыта: у них нет модели группы.
+                // Проверка маркера (Pinned/NoGroup) живёт на СЛОТЕ, а видимость по
+                // наведению — на самой кнопке: привязка IsVisible кнопки перекрыла
+                // бы локальное значение, если бы оба правила жили на одном элементе.
                 var deleteBtn = GroupRowActionButton(group, "IconDelete", "DeleteGroupCommand",
                     LocalizationManager.T("Main.DeleteGroupTooltip"), colorHex: "#DC2626");
-                deleteBtn.IsVisible = group.Marker != GroupNodeViewModel.PinnedMarker
-                                      && group.Marker != GroupNodeViewModel.NoGroupMarker;
-                actions.Children.Add(deleteBtn);
+                BindGroupActionsHoverVisibility(deleteBtn, header);
+                var deleteSlot = FixedLaunchSlot(deleteBtn);
+                deleteSlot.IsVisible = group.Marker != GroupNodeViewModel.PinnedMarker
+                                       && group.Marker != GroupNodeViewModel.NoGroupMarker;
+                actions.Children.Add(deleteSlot);
                 Grid.SetColumn(actions, actionsIndex);
                 row.Children.Add(actions);
             }
@@ -1002,13 +1024,18 @@ namespace Workspace1C
         /// <param name="runningPath">Имя свойства запущенного режима (IsEnterpriseRunning/
         /// IsConfiguratorRunning) или null для служебной кнопки без индикатора.</param>
         /// <summary>
-        /// Фиксированный слот кнопки запуска в колонке «Действия» (issue #128,
+        /// Фиксированный слот кнопки в колонке «Действия» (issue #128,
         /// v1.0.1.59, 7OH): панель постоянной ширины (кружок 18 px + поля кнопки
         /// 1,0 с двух сторон). В режиме «Действия только при наведении» скрытая
         /// (Collapsed) кнопка не освобождает слот — соседние иконки не сдвигаются:
-        /// Предприятие всегда первый слот, Конфигуратор — второй.
+        /// у строк баз Предприятие всегда первый слот, Конфигуратор — второй.
+        /// Issue #128 (v1.0.1.60, 7OH «для папок подвиг повторить»): тот же слот
+        /// используется и у строк групп — «править» всегда первый слот,
+        /// «удалить» второй; появление/исчезновение кнопок папки не дёргает
+        /// раскладку.
         /// </summary>
-        /// <param name="button">Кнопка запуска (Предприятие/Конфигуратор).</param>
+        /// <param name="button">Кнопка колонки «Действия» (запуск у строк баз,
+        /// править/удалить у строк групп).</param>
         private static Panel FixedLaunchSlot(Control button)
         {
             var slot = new Panel
@@ -1035,6 +1062,36 @@ namespace Workspace1C
                     runningPath is null
                         ? new Binding { Source = false }
                         : new Binding(runningPath) { Source = ib }
+                }
+            });
+        }
+
+        /// <summary>
+        /// «Действия только при наведении» для строки ГРУППЫ (issue #128, v1.0.1.60,
+        /// 7OH «для папок подвиг повторить»): привязывает видимость кнопки («править»/
+        /// «удалить») к решению чистого <see cref="ActionsHoverPlanner"/> (обёртка —
+        /// <see cref="RowActionHoverVisibilityConverter"/>): кнопка видна, когда
+        /// настройка выключена или курсор над строкой группы. У групп нет кнопок
+        /// запуска и чипов-индикаторов запущенных режимов, поэтому третий вход
+        /// конвертера — константа false, как у служебной кнопки очистки кеша в
+        /// строке базы: «видимой без наведения» кнопки у папки не бывает вовсе.
+        /// </summary>
+        /// <param name="button">Кнопка колонки «Действия» строки группы.</param>
+        /// <param name="rowRoot">Корень строки группы (Border-заголовок из
+        /// <see cref="BuildGroupRow"/>): его IsPointerOver — курсор над строкой.</param>
+        private void BindGroupActionsHoverVisibility(Control button, Control rowRoot)
+        {
+            if (_vm is null)
+                return;
+            button.Bind(Visual.IsVisibleProperty, new MultiBinding
+            {
+                Converter = new RowActionHoverVisibilityConverter(),
+                Bindings =
+                {
+                    new Binding(nameof(MainViewModel.ActionsHoverOnly)) { Source = _vm },
+                    new Binding(nameof(InputElement.IsPointerOver)) { Source = rowRoot },
+                    // У групп нет запущенных режимов — чипов-индикаторов без наведения не бывает.
+                    new Binding { Source = false }
                 }
             });
         }

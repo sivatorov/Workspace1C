@@ -575,6 +575,8 @@
     "Settings.Logging.CatClusterimportDesc": "Connect and load phases of “Import from 1C cluster”, cluster auto-selection, retries.",
     "Settings.Logging.CatUpdates": "Update check",
     "Settings.Logging.CatUpdatesDesc": "Detailed update check diagnostics: URL, response length, found versions.",
+    "Settings.Logging.CatPrevVersion": "Treat version as previous",
+    "Settings.Logging.CatPrevVersionDesc": "The app virtually treats itself as the previous version (from git tags, otherwise one build lower): the “What’s new” dialog shows the previous release summary immediately, before its release. The flag survives restarts and is reset after a successful update (issue #129).",
     "Settings.TabAbout": "About",
     "Settings.TabUtilitiesMenu": "Edit menus",
     "Settings.UtilitiesMenu.GroupTitle": "Utilities menu",

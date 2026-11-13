@@ -84,6 +84,14 @@ public static class TraceFlags
     /// и решение о повторе с полным каталогом (issue #371).</summary>
     public const string UpdatesFlag = "CM_UPDATES";
 
+    /// <summary>Диагностический флаг «Считать версию прошлой» (CM_PREV_VERSION, issue #129):
+    /// приложение виртуально считает себя ПРЕДЫДУЩЕЙ версией — «Что нового» и решения
+    /// о показе диалога работают так, как будто сборка ещё не выпущена. Позволяет
+    /// тестировать сводку релиза сразу, не дожидаясь следующей версии. Флаг сохраняется
+    /// в trace.json как остальные флаги вкладки «Логирование» и СБРАСЫВАЕТСЯ после
+    /// успешного обновления (см. <see cref="EffectiveVersionService.ResetPrevVersionFlag"/>).</summary>
+    public const string PrevVersionFlag = "CM_PREV_VERSION";
+
     /// <summary>Числовой параметр диагностики обновлений (CM_UPDATES_PREVIEW_LEN): длина
     /// превью HTML в журнале CM_UPDATES (issue #371). Читается из trace.json через
     /// <see cref="GetInt"/>, дефолт 500.</summary>

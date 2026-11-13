@@ -1114,6 +1114,10 @@ namespace Workspace1C.Services
             try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
             catch { /* маркер сервисный — обновление не должно срываться */ }
 
+            // Issue #129: флаг «Считать версию прошлой» сбрасывается — новая версия
+            // после перезапуска снова считает себя реальной текущей.
+            EffectiveVersionService.ResetPrevVersionFlag();
+
             // Помощник запущен — закрываем приложение, чтобы замена прошла после выхода.
             ShutdownNow();
             return true;

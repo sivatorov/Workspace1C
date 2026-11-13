@@ -45,6 +45,14 @@ namespace Workspace1C
         private const int DwmCornerRound = 2;
         private const int DwmCornerDoNotRound = 1;
 
+        // DWMWA_WINDOW_CORNER_STATE (34): фактическое состояние скругления углов окна,
+        // которое DWM применил к окну. 1 = DWMWCS_DO_NOT_ROUND (в том числе у
+        // максимизированных окон), 2 = DWMWCS_ROUNDED. Читается для синхронизации
+        // скругления видимой рамки с системным скруглением (issue #126).
+        private const int DwmWindowCornerState = 34;
+        private const int DwmStateDoNotRound = 1;
+        private const int DwmStateRounded = 2;
+
         // DWM_BB_ENABLE для DwmEnableBlurBehindWindow.
         private const int DwmBbEnable = 0x00000001;
 
@@ -55,6 +63,22 @@ namespace Workspace1C
 
         private static bool IsApplied(DependencyObject d) => (bool)d.GetValue(AppliedProperty);
         private static void MarkApplied(DependencyObject d) => d.SetValue(AppliedProperty, true);
+
+        // Ссылки на элементы, скругление которых синхронизируется с системным
+        // скруглением DWM (issue #126): видимый оверлей-рамка и полоса заголовка.
+        // Хранятся как вложенные свойства, чтобы StateChanged-хук мог обновить
+        // радиусы при максимизации/восстановлении окна без внешних словарей.
+        private static readonly DependencyProperty FrameBorderProperty =
+            DependencyProperty.RegisterAttached(
+                "FrameBorder", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
+        private static Border? GetFrameBorder(DependencyObject d) => (Border?)d.GetValue(FrameBorderProperty);
+        private static void SetFrameBorder(DependencyObject d, Border? value) => d.SetValue(FrameBorderProperty, value);
+
+        private static readonly DependencyProperty TitleBarBorderProperty =
+            DependencyProperty.RegisterAttached(
+                "TitleBarBorder", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
+        private static Border? GetTitleBarBorder(DependencyObject d) => (Border?)d.GetValue(TitleBarBorderProperty);
+        private static void SetTitleBarBorder(DependencyObject d, Border? value) => d.SetValue(TitleBarBorderProperty, value);
 
         // ---- Вложенные свойства собственных кнопок управления окном (App.xaml) ----
         // Круглая «подложка» кнопок: шаблон WindowControlButton рисует три наложенных
@@ -111,6 +135,9 @@ namespace Workspace1C
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int dwAttribute, ref int pvAttribute, int cbAttribute);
+
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmEnableBlurBehindWindow(IntPtr hwnd, ref DwmBlurBehind pBlurBehind);
@@ -309,6 +336,9 @@ namespace Workspace1C
             ApplyGlassBackground(window);
             ApplySystemBackdrop(window);
             ApplyCornerPreference(window);
+            // Рамка и шапка повторяют системное скругление углов (issue #126):
+            // читаем фактическое состояние DWM после применения CornerPreference.
+            ApplyFrameCornerRadius(window);
             // Убираем системные кнопки заголовка (свернуть/развернуть/закрыть), которые DWM
             // может рисовать «призрачными» поверх расширенной стеклянной рамки.
             RemoveSystemCaptionButtons(window);
@@ -332,6 +362,10 @@ namespace Workspace1C
                 try
                 {
                     ApplyCornerPreference(window);
+                    // Рамка/шапка следуют за состоянием DWM (issue #126): при
+                    // максимизации DWM рисует прямые углы — радиусы обнуляются,
+                    // при восстановлении скругление возвращается.
+                    ApplyFrameCornerRadius(window);
                     UpdateGlassFrameForMaximize(window);
                 }
                 catch { /* некритично */ }
@@ -561,9 +595,14 @@ namespace Workspace1C
             {
                 IsHitTestVisible = false,
                 Focusable = false,
-                BorderThickness = new Thickness(1)
+                BorderThickness = new Thickness(1),
+                // Скругление рамки синхронизируется с системным скруглением углов окна
+                // (issue #126): стартовое значение 0 — актуальный радиус выставит
+                // ApplyFrameCornerRadius по фактическому состоянию DWM.
+                CornerRadius = new CornerRadius(0)
             };
             frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrushColor");
+            SetFrameBorder(window, frame);
             Panel.SetZIndex(frame, 2000);
             root.Children.Add(frame);
             return root;
@@ -589,6 +628,10 @@ namespace Workspace1C
                 // шапки просвечивает стеклянная подложка/рабочий стол — «недозалитые» углы.
                 CornerRadius = new CornerRadius(DwmCornerRadius, DwmCornerRadius, 0, 0)
             };
+            // Запоминаем полосу, чтобы ApplyFrameCornerRadius (issue #126) мог
+            // обновить её скругление при максимизации/восстановлении окна: у
+            // maximized-окна верхние углы прямые — «недозалитые» углы шапки недопустимы.
+            SetTitleBarBorder(window, bar);
             bar.SetResourceReference(Border.BackgroundProperty, "AccentBrush");
             bar.MouseLeftButtonDown += (_, e) =>
             {
@@ -795,6 +838,70 @@ namespace Workspace1C
             {
                 // Не блокируем: останется полупрозрачный фон без размытия.
             }
+        }
+
+        /// <summary>
+        /// Синхронизирует скругление видимой рамки окна и полосы заголовка с фактическим
+        /// системным скруглением углов DWM (issue #126). На Windows 11 DWM скругляет
+        /// углы окна, и прямоугольная рамка «срезается» скруглённым клипом окна — линия
+        /// по углам обрывается и выглядит неаккуратно. Рамке задаётся CornerRadius,
+        /// совпадающий с системным радиусом (<see cref="DwmCornerRadius"/>), поэтому
+        /// рамка рисуется ПО скруглению. Состояние читается из
+        /// DWMWA_WINDOW_CORNER_STATE (фактическое значение DWM), при недоступности —
+        /// оценка по версии ОС. Максимизированное окно DWM рисует с прямыми углами —
+        /// радиусы рамки и шапки обнуляются; на Windows 10 (build < 22000)
+        /// скругления нет — рамка остаётся прямоугольной, как раньше.
+        /// </summary>
+        private static void ApplyFrameCornerRadius(Window window)
+        {
+            try
+            {
+                bool maximized = window.WindowState == WindowState.Maximized;
+                bool rounded = ReadDwmCornerStateRounded(window);
+                var radius = WindowSizeMath.ComputeFrameCornerRadius(rounded, maximized, DwmCornerRadius);
+                if (GetFrameBorder(window) is { } frame)
+                    frame.CornerRadius = new CornerRadius(radius);
+                // Полоса заголовка повторяет геометрию верхних углов окна (issue #135):
+                // при скруглённом окне — скруглённая, при maximized/Windows 10 — прямая.
+                if (GetTitleBarBorder(window) is { } bar)
+                    bar.CornerRadius = new CornerRadius(radius, radius, 0, 0);
+            }
+            catch
+            {
+                // Скругление — некритичное улучшение: не ломаем показ окна.
+            }
+        }
+
+        /// <summary>
+        /// Читает фактическое состояние скругления углов окна у DWM
+        /// (DWMWA_WINDOW_CORNER_STATE): true — DWMWCS_ROUNDED, окно скруглено.
+        /// На Windows 10 (build < 22000) атрибут не поддерживается — скругления нет.
+        /// Если атрибут вернул неизвестное состояние или прочитать его не удалось,
+        /// используется статическая оценка по версии ОС: Windows 11+ скругляет
+        /// углы обычных (не maximized) окон.
+        /// </summary>
+        private static bool ReadDwmCornerStateRounded(Window window)
+        {
+            if (Environment.OSVersion.Version.Build < 22000)
+                return false;
+            try
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                if (hwnd != IntPtr.Zero &&
+                    DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out int state, sizeof(int)) == 0)
+                {
+                    if (state == DwmStateRounded)
+                        return true;
+                    if (state == DwmStateDoNotRound)
+                        return false;
+                }
+            }
+            catch
+            {
+                // Не удалось прочитать состояние — ниже вернётся оценка по версии ОС.
+            }
+            // Fallback по версии ОС: на Windows 11 DWM скругляет углы обычных окон.
+            return true;
         }
 
         /// <summary>

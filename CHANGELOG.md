@@ -11,6 +11,47 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.60] — 2026-11-13
+
+### Добавлено
+
+- **Новая настройка «Считать версию прошлой» (issue #129).** На вкладке
+  «Логирование» появился переключатель, который сохраняет флаг
+  `CM_PREV_VERSION` в `trace.json` ([`TraceFlags`](Workspace1C/Services/TraceFlags.cs)):
+  до следующего запуска приложение считает актуальной предыдущую версию —
+  эффективно она вычисляется как предыдущий git-тег, иначе «минус одна сборка»
+  ([`EffectiveVersionService`](Workspace1C/Services/EffectiveVersionService.cs)).
+  Учет эффективной версии добавлен в `ShouldShow`/`MarkShown` и в окно
+  «Что нового» на обеих платформах; после успешного обновления настройка
+  автоматически сбрасывается
+  ([`UpdateService.cs`](Workspace1C/Services/UpdateService.cs),
+  [`UpdateService.Avalonia.cs`](Workspace1C/Services/UpdateService.Avalonia.cs)).
+  Тесты: `Issue129PrevVersionTests`.
+
+### Исправлено
+
+- **Кнопки строки группы («править»/«удалить») при «Действия только при
+  наведении»: видны только под курсором, каждая в своём слоте (issue #128,
+  7OH «для папок подвиг повторить»).** Кнопки строки группы теперь показываются
+  только когда курсор находится над строкой и живут в фиксированных слотах
+  постоянной ширины — соседние элементы не сдвигаются при появлении/скрытии:
+  планировщик видимости [`ActionsHoverPlanner.IsGroupActionVisible`](Workspace1C/Services/ActionsHoverPlanner.cs);
+  Avalonia — [`BuildGroupRow`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)
+  + привязка видимости и слоты постоянной ширины; WPF — `GroupRowBorder`
+  с `MultiDataTrigger` → `Hidden` в [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml)
+  (место резервируется, кнопка не отрисовывается).
+  Тесты: `Issue128GroupRowHoverTests`.
+- **Рамка внутренних окон повторяет скругление углов Windows 11 (issue #126,
+  7OH «рамка должна быть и у скругления»).** Рамка внутренних окон теперь
+  повторяет скругление углов системы: развёрнутое окно — без скругления,
+  Windows 11 со скруглёнными углами — системный радиус (8 px), Windows 10 —
+  прямые углы
+  ([`WindowSizeMath.ComputeFrameCornerRadius`](Workspace1C/Services/WindowSizeMath.cs),
+  [`WindowChromeHelper.ApplyFrameCornerRadius`](Workspace1C/Views/WindowChromeHelper.cs)
+  через `DWMWA_WINDOW_CORNER_STATE` с пересчётом при смене состояния окна);
+  скругление рамки согласовано со скруглением шапки. Avalonia не затронута.
+  Тесты: `Issue126FrameCornerRadiusTests`.
+
 ## [1.0.1.59] — 2026-11-12
 
 ### Исправлено

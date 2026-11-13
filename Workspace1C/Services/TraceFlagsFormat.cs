@@ -118,7 +118,10 @@ internal static class TraceFlagsFormat
         "CM_THEMES",
         "CM_PUBLISH",
         // Очистка кеша 1С (issue #109, v1.0.1.40): диагностика «нулей».
-        "CM_CACHE"
+        "CM_CACHE",
+        // «Считать версию прошлой» (issue #129): виртуальное снижение версии для
+        // проверки «Что нового» до выпуска релиза. Сбрасывается после обновления.
+        "CM_PREV_VERSION"
     };
 
     /// <summary>

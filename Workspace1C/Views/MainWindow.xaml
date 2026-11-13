@@ -1333,8 +1333,12 @@
                                                       ItemsSource="{Binding Items}">
                                 <!-- Заголовок группы без собственного горизонтального отступа:
                                      сдвиг иерархии даёт отступ Expander по Level (в ItemContainerStyle).
-                                     Фон/выделение начинаются сразу после кнопки разворота. -->
-                                <Border CornerRadius="6">
+                                     Фон/выделение начинаются сразу после кнопки разворота.
+                                     x:Name нужен триггерам «Действий только при наведении»
+                                     строк групп (issue #128, v1.0.1.60, 7OH «для папок подвиг
+                                     повторить»): кнопки «править»/«удалить» смотрят на IsMouseOver
+                                     корневого Border строки группы, как у строк баз (InfobaseRowBorder). -->
+                                <Border x:Name="GroupRowBorder" CornerRadius="6">
                                     <!-- Отступ заголовка группы по уровню вложенности. У групп с дочерними
                                          элементами сдвиг даёт кнопка разворота; у пустых (листовых) групп её нет,
                                          поэтому GroupOffset добавляет такой же отступ, чтобы иерархия сохранялась.
@@ -1560,10 +1564,33 @@
                                              чипов, что и кнопки строк, выровнены по левому краю колонки. -->
                                         <StackPanel Grid.Column="7" Orientation="Horizontal"
                                                     HorizontalAlignment="Left" VerticalAlignment="Center" Margin="6,0,0,0">
+                                            <!-- Issue #128 (v1.0.1.60, 7OH «для папок подвиг повторить»):
+                                                 при включённой настройке «Действия только при наведении»
+                                                 кнопки группы видны только когда курсор над строкой группы
+                                                 (IsMouseOver корневого Border GroupRowBorder) — 7OH дважды
+                                                 жаловался, что «у папок кнопки видимы до сих пор без наведения».
+                                                 Настройка выключена — прежнее поведение, видны всегда.
+                                                 Hidden вместо Collapsed — слот резервируется, иконка соседа
+                                                 не сдвигается (как кнопки запуска строк баз в v1.0.1.59). -->
                                             <Button Command="{Binding DataContext.EditGroupCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                     CommandParameter="{Binding}"
-                                                    ToolTip="{loc:Loc Main.EditGroupTooltip}"
-                                                    Style="{StaticResource RowActionChipButton}">
+                                                    ToolTip="{loc:Loc Main.EditGroupTooltip}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
+                                                        <Style.Triggers>
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding DataContext.ActionsHoverOnly, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=GroupRowBorder}" Value="False"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <!-- Hidden, а не Collapsed: слот кнопки «править»
+                                                                     резервируется всегда, иконка «удалить» не
+                                                                     сдвигается — «править» всегда первый слот. -->
+                                                                <Setter Property="Visibility" Value="Hidden"/>
+                                                            </MultiDataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
                                                 <Border Style="{StaticResource RowActionChip}">
                                                     <materialDesign:PackIcon Kind="Pencil" Style="{StaticResource RowActionIcon}"
                                                                              Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -1575,6 +1602,20 @@
                                                 <Button.Style>
                                                     <Style TargetType="Button" BasedOn="{StaticResource RowActionChipButton}">
                                                         <Style.Triggers>
+                                                            <!-- Issue #128 (v1.0.1.60): hover-only для кнопки «удалить»
+                                                                 строки группы — видна только под курсором при включённой
+                                                                 настройке (Hidden — слот резервируется). Триггер объявлен
+                                                                 ПЕРЕД триггерами маркеров: WPF применяет последний
+                                                                 сработавший триггер, поэтому у служебных узлов
+                                                                 («Закреплённые»/«Без группы») побеждает Collapsed —
+                                                                 кнопка удаления полностью исчезает, как и раньше. -->
+                                                            <MultiDataTrigger>
+                                                                <MultiDataTrigger.Conditions>
+                                                                    <Condition Binding="{Binding DataContext.ActionsHoverOnly, RelativeSource={RelativeSource AncestorType=Window}}" Value="True"/>
+                                                                    <Condition Binding="{Binding IsMouseOver, ElementName=GroupRowBorder}" Value="False"/>
+                                                                </MultiDataTrigger.Conditions>
+                                                                <Setter Property="Visibility" Value="Hidden"/>
+                                                            </MultiDataTrigger>
                                                             <DataTrigger Binding="{Binding Marker}" Value="Pinned">
                                                                 <Setter Property="Visibility" Value="Collapsed"/>
                                                             </DataTrigger>

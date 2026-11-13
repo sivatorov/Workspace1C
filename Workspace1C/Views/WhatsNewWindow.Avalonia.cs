@@ -40,7 +40,9 @@ namespace Workspace1C
             FontSize = 13;
             CanResize = true;
 
-            var version = WhatsNewService.CurrentVersion;
+            // Issue #129: при флаге «Считать версию прошлой» окно показывает
+            // ЭФФЕКТИВНУЮ версию (предыдущий релиз), а не реальную сборку.
+            var version = WhatsNewService.EffectiveVersion;
 
             // Issue #124 (v1.0.1.56): корневая компоновка — DockPanel вместо Grid
             // (Auto/Star/Auto): нижняя панель с галкой «Показывать при запуске»
@@ -132,9 +134,10 @@ namespace Workspace1C
                 // Fallback-порядок сводки (issue #116 v1.0.1.54): body GitHub-релиза
                 // текущего тега → локальная секция CHANGELOG.md рядом с exe →
                 // текст-заглушка. Окно никогда не остаётся с пустым содержимым.
-                var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.CurrentVersion);
+                // Issue #129: fallback работает с ЭФФЕКТИВНОЙ версией (см. конструктор).
+                var body = await WhatsNewService.GetGithubReleaseNotesAsync(WhatsNewService.EffectiveVersion);
                 if (string.IsNullOrWhiteSpace(body))
-                    body = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
+                    body = WhatsNewService.TryGetChangelogSection(WhatsNewService.EffectiveVersion);
                 if (string.IsNullOrWhiteSpace(body))
                 {
                     var info = AvaloniaUi.Text(LocalizationManager.T("WhatsNew.NotesUnavailable"), 13);
@@ -151,7 +154,7 @@ namespace Workspace1C
                 // иначе показываем заглушку (окно никогда не остаётся пустым —
                 // issue #116 v1.0.1.54).
                 panel.Children.Clear();
-                var changelog = WhatsNewService.TryGetChangelogSection(WhatsNewService.CurrentVersion);
+                var changelog = WhatsNewService.TryGetChangelogSection(WhatsNewService.EffectiveVersion);
                 if (!string.IsNullOrWhiteSpace(changelog))
                 {
                     panel.Children.Add(MarkdownRenderer.ToStackPanel(changelog));

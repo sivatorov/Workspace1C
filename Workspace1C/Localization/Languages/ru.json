@@ -575,6 +575,8 @@
     "Settings.Logging.CatClusterimportDesc": "Фазы подключения и загрузки баз окна «Импорт из кластера 1С», автовыбор кластера, повторы попыток.",
     "Settings.Logging.CatUpdates": "Проверка обновлений",
     "Settings.Logging.CatUpdatesDesc": "Детальная диагностика проверки обновлений конфигураций: URL, длина ответа, найденные версии.",
+    "Settings.Logging.CatPrevVersion": "Считать версию прошлой",
+    "Settings.Logging.CatPrevVersionDesc": "Приложение виртуально считает себя предыдущей версией (из git-тегов, иначе на одну сборку ниже): «Что нового» показывает сводку прошлого релиза сразу, не дожидаясь выпуска. Флаг переживает перезапуск и сбрасывается после успешного обновления (issue #129).",
     "Settings.TabAbout": "О программе",
     "Settings.TabUtilitiesMenu": "Правка меню",
     "Settings.UtilitiesMenu.GroupTitle": "Меню «Утилиты»",

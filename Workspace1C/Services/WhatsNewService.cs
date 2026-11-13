@@ -22,6 +22,16 @@ public static class WhatsNewService
     public static string CurrentVersion => VersionInfo.Display();
 
     /// <summary>
+    /// Эффективная версия для «Что нового» (issue #129): при включённом флаге
+    /// «Считать версию прошлой» (<see cref="EffectiveVersionService"/>) — предыдущая
+    /// версия (из git-тегов, иначе текущая с уменьшенной последней частью); при
+    /// выключенном — совпадает с <see cref="CurrentVersion"/>. Сравнение
+    /// <see cref="AppSettings.LastWhatsNewVersion"/> идёт с ЭТОЙ версией: сводка
+    /// прошлой релизной версии показывается сразу, не дожидаясь выпуска.
+    /// </summary>
+    public static string EffectiveVersion => EffectiveVersionService.GetEffectiveVersion(CurrentVersion);
+
+    /// <summary>
     /// Нужно ли показать диалог «Что нового» при старте: включено в настройках, версия
     /// изменилась с прошлого показа (<paramref name="settings"/>.<see cref="AppSettings.LastWhatsNewVersion"/>)
     /// И для текущей версии есть сводка — захардкоженная (<see cref="HasEntry"/>) или
@@ -34,16 +44,23 @@ public static class WhatsNewService
         ArgumentNullException.ThrowIfNull(settings);
         if (!settings.ShowWhatsNewOnStart)
             return false;
-        if (string.Equals(settings.LastWhatsNewVersion, CurrentVersion, StringComparison.Ordinal))
+        // Issue #129: сравнение с ЭФФЕКТИВНОЙ версией — при флаге «Считать версию
+        // прошлой» сводка прошлой релизной версии показывается сразу.
+        if (string.Equals(settings.LastWhatsNewVersion, EffectiveVersion, StringComparison.Ordinal))
             return false;
-        return HasEntry(CurrentVersion) || HasChangelogSection(CurrentVersion);
+        return HasEntry(EffectiveVersion) || HasChangelogSection(EffectiveVersion);
     }
 
-    /// <summary>Помечает текущую версию как «диалог уже показан» (без записи файла — сохраняет вызывающий).</summary>
+    /// <summary>
+    /// Помечает версию как «диалог уже показан» (без записи файла — сохраняет
+    /// вызывающий). Issue #129: запоминается ЭФФЕКТИВНАЯ версия (при флаге
+    /// «Считать версию прошлой» — предыдущая), чтобы после сброса флага следующим
+    /// релизом диалог корректно показался уже для новой версии.
+    /// </summary>
     public static void MarkShown(AppSettings settings)
     {
         ArgumentNullException.ThrowIfNull(settings);
-        settings.LastWhatsNewVersion = CurrentVersion;
+        settings.LastWhatsNewVersion = EffectiveVersion;
     }
 
     /// <summary>Есть ли захардкоженная сводка изменений для версии <paramref name="version"/>.</summary>

@@ -98,7 +98,12 @@ public static class LogCategory
         "CM_TREESWITCH_FLUSH",
         "CM_REVEAL",
         "CM_CLUSTERIMPORT",
-        "CM_UPDATES"
+        "CM_UPDATES",
+        // «Считать версию прошлой» (issue #129): виртуальное снижение версии для
+        // проверки «Что нового» сразу, не дожидаясь выпуска релиза. Флаг хранится
+        // в trace.json как остальные диагностические флаги и автоматически
+        // сбрасывается после успешного обновления (EffectiveVersionService).
+        "CM_PREV_VERSION"
     };
 
     /// <summary>

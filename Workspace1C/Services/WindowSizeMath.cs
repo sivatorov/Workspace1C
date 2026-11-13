@@ -89,4 +89,28 @@ public static class WindowSizeMath
         width = work.Right - work.Left;
         height = work.Bottom - work.Top;
     }
+
+    /// <summary>
+    /// Радиус скругления видимой рамки окна, согласованный с системным скруглением
+    /// углов DWM (issue #126): на Windows 11 DWM скругляет углы окна, и рамка должна
+    /// рисоваться ПО скруглению (Border.CornerRadius = системному радиусу), иначе
+    /// прямоугольная линия рамки «срезается» скруглённым клипом окна и по углам
+    /// выглядит неаккуратно. Максимизированное окно DWM рисует с прямыми углами —
+    /// радиус обнуляется; на Windows 10 (или когда DWM сообщает DWMWCS_DO_NOT_ROUND)
+    /// скругления нет — рамка остаётся прямоугольной, как раньше. Класс не зависит
+    /// от UI-платформы, поэтому чистая логика покрыта юнит-тестами
+    /// (Issue126FrameCornerRadiusTests).
+    /// </summary>
+    /// <param name="dwmRounded">
+    /// Фактическое состояние скругления DWM (DWMWA_WINDOW_CORNER_STATE = DWMWCS_ROUNDED).
+    /// </param>
+    /// <param name="maximized">Окно развёрнуто (DWM рисует maximized-окно с прямыми углами).</param>
+    /// <param name="systemRadius">Системный радиус скругления в DIP (~8, совпадает с клипом DWM).</param>
+    /// <returns>Радиус CornerRadius рамки и верхних углов полосы заголовка (DIP).</returns>
+    public static double ComputeFrameCornerRadius(bool dwmRounded, bool maximized, double systemRadius)
+    {
+        if (maximized || !dwmRounded || systemRadius <= 0)
+            return 0;
+        return systemRadius;
+    }
 }

@@ -328,6 +328,10 @@ public sealed class UpdateService : IAppUpdateService
             try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
             catch { /* маркер сервисный — установка не должна срываться */ }
 
+            // Issue #129: флаг «Считать версию прошлой» сбрасывается — новая версия
+            // после перезапуска снова считает себя реальной текущей.
+            EffectiveVersionService.ResetPrevVersionFlag();
+
             SetReadyState(null, null);
             return true;
         }
@@ -678,6 +682,10 @@ public sealed class UpdateService : IAppUpdateService
             // обновляемся; новая версия отправит уведомление при следующем старте.
             try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
             catch { /* маркер сервисный — обновление не должно срываться */ }
+
+            // Issue #129: флаг «Считать версию прошлой» сбрасывается — новая версия
+            // после перезапуска снова считает себя реальной текущей.
+            EffectiveVersionService.ResetPrevVersionFlag();
 
             // Помощник запущен — закрываем приложение, чтобы exe освободился и был заменён.
             ShutdownNow();
