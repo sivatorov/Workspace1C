@@ -99,6 +99,20 @@ namespace Workspace1C
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
+
+            // Issue #117 (требование 7OH): если настоящее имя расширения не прочитано
+            // из .cfe, а в базе уже есть расширения — предупреждаем и уточняем ДО установки,
+            // чтобы не создать дубль под именем файла.
+            _vm.ConfirmUnknownNameAsync = installed =>
+            {
+                var message = installed.Count == 0
+                    ? string.Format(LocalizationManager.T("Extensions.ConfirmUnknownNameNoList"),
+                        _vm.ExtensionName)
+                    : string.Format(LocalizationManager.T("Extensions.ConfirmUnknownName"),
+                        _vm.ExtensionName, string.Join(", ", installed));
+                return System.Threading.Tasks.Task.FromResult(Dialogs.Confirm(message, Title));
+            };
+
             // Issue #117 п.3: тихое получение списка расширений выбранной базы
             // при открытии окна (fire-and-forget; ошибки гасятся внутри VM).
             _ = _vm.PrefetchExtensionsAsync();

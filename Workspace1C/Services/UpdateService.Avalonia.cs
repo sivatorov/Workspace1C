@@ -417,7 +417,10 @@ namespace Workspace1C.Services
                 if (release is null)
                     return;
 
-                if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
+                // Issue #129: сравнение с ЭФФЕКТИВНОЙ (понижённой) версией —
+                // при включённом «Считать версию прошлой» обновление на реальную
+                // сборку должно предлагаться.
+                if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
                 {
                     // Новой версии нет — сбрасываем состояние «доступна версия»
                     // (ссылка «Обновить» в подвале главного окна скрывается).
@@ -442,6 +445,14 @@ namespace Workspace1C.Services
                         // диалог не показывается, и если окно свёрнуто в трей — пользователь
                         // узнает о новой версии только из уведомления.
                         NotifyUpdateAvailable(release);
+                        // issue #129: при виртуально понижённой версии найденный релиз может
+                        // совпадать с РЕАЛЬНОЙ сборкой — молча его не ставим (установка ничего
+                        // не изменит, кроме сброса флага), а только предлагаем в подвале.
+                        if (EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(release))
+                        {
+                            SetAvailableRelease(release);
+                            return;
+                        }
                         // Применяем новую версию без вопросов.
                         if (await DownloadAndInstallAutoAsync(release).ConfigureAwait(false))
                             SetAvailableRelease(null);
@@ -554,7 +565,9 @@ namespace Workspace1C.Services
                     return;
                 }
 
-                if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
+                // Issue #129: сравнение с эффективной версией — при понижении ручная
+                // проверка должна предлагать обновление на реальную сборку.
+                if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
                 {
                     SetAvailableRelease(null);
                     ShowOnUi(() => _dialogs.ShowInfo(
@@ -773,8 +786,14 @@ namespace Workspace1C.Services
             }
 
             // Спрашиваем разрешение до скачивания: отказ прекращает обновление целиком.
+            // Issue #129: при включённом «Считать версию прошлой» подпись текущей версии
+            // показывает реальную сборку и эффективную (понижённую) версию.
             var current = string.Format(
-                LocalizationManager.T("Update.CurrentVersion"), VersionInfo.Display());
+                LocalizationManager.T("Update.CurrentVersion"),
+                EffectiveVersionService.FormatVersionForDisplay(
+                    VersionInfo.Display(),
+                    EffectiveVersionService.CurrentForUpdates,
+                    LocalizationManager.T("Common.VersionEffective")));
             var offered = string.Format(
                 LocalizationManager.T("Update.NewVersion"), NormalizeTag(release.TagName));
             var summary = current + Environment.NewLine + offered

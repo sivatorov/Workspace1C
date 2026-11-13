@@ -18,6 +18,8 @@ public sealed class ExtensionsViewModel : ViewModelBase
     private string _searchText = string.Empty;
     private string _cfePath = string.Empty;
     private string _extensionName = string.Empty;
+    // Issue #117: настоящее имя расширения, прочитанное из выбранного .cfe (null — не прочитано).
+    private string? _cfeRealName;
     // Issue #117 п.2: пользователь вручную правил имя расширения — автоподстановка не перезаписывает его.
     private bool _extensionNameEdited;
     private string? _selectedExtension;
@@ -99,14 +101,35 @@ public sealed class ExtensionsViewModel : ViewModelBase
             // поэтому при неизменившемся пути проверяем только флаг ручного ввода.
             if (!SetProperty(ref _cfePath, value ?? string.Empty) && _extensionNameEdited)
                 return;
+
+            // Issue #117: запоминаем настоящее имя из .cfe — оно нужно и для автоподстановки,
+            // и для решения «спросить пользователя, чтобы не создать дубль».
+            _cfeRealName = ConfigExtensionService.TryReadExtensionName(_cfePath);
             if (!_extensionNameEdited)
             {
-                // Issue #117: приоритет — НАСТОЯЩЕЕ имя расширения из .cfe, чтобы в поле
-                // было имя, под которым расширение установлено в базе, а не имя файла.
-                SetAutoName(ConfigExtensionService.ResolveName(_cfePath));
+                // Приоритет — НАСТОЯЩЕЕ имя расширения из .cfe, чтобы в поле было имя,
+                // под которым расширение установлено в базе, а не имя файла.
+                SetAutoName(_cfeRealName ?? ConfigExtensionService.SuggestName(_cfePath));
             }
         }
     }
+
+    /// <summary>
+    /// Issue #117: настоящее имя расширения, прочитанное из выбранного .cfe
+    /// (<c>null</c> — прочитать не удалось, используется имя файла).
+    /// </summary>
+    public string? CfeExtensionName => _cfeRealName;
+
+    /// <summary>Issue #117: имя расширения удалось прочитать из .cfe.</summary>
+    public bool HasCfeExtensionName => !string.IsNullOrWhiteSpace(_cfeRealName);
+
+    /// <summary>
+    /// Issue #117 (требование 7OH): нужно ли подтверждение перед установкой, чтобы
+    /// не создать дубль. Истина, если имя из .cfe не прочитано, а в базе уже есть
+    /// расширения с другими именами. Используется окном для предупреждения ДО установки.
+    /// </summary>
+    public bool RequiresNameConfirmation(IReadOnlyCollection<string> installedNames) =>
+        ConfigExtensionService.RequiresUnknownNameConfirmation(_cfeRealName, ExtensionName, installedNames);
 
     public string ExtensionName
     {
@@ -162,6 +185,15 @@ public sealed class ExtensionsViewModel : ViewModelBase
         get => _useIbcmd;
         set => SetProperty(ref _useIbcmd, value);
     }
+
+    /// <summary>
+    /// Issue #117 (требование 7OH): подтверждение установки, когда настоящее имя
+    /// расширения не прочитано из .cfe, а в базе уже есть расширения с другими именами.
+    /// Аргумент — установленные имена; <c>true</c> — устанавливать под именем файла.
+    /// Обработчик задаётся окном (WPF/Avalonia). Если его нет (headless/тесты),
+    /// установка не выполняется — дубль не создаётся молча.
+    /// </summary>
+    public Func<IReadOnlyCollection<string>, Task<bool>>? ConfirmUnknownNameAsync { get; set; }
 
     public string LogText => _log.ToString();
 
@@ -298,8 +330,31 @@ public sealed class ExtensionsViewModel : ViewModelBase
             // Issue #117 п.4: перед установкой (только ветка конфигуратора — у ibcmd список
             // расширений дёшево не получить) тихо читаем установленные расширения каждой
             // отмеченной базы и показываем план: «установка» или «уже установлено — обновление».
+            var installedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             if (!UseIbcmd)
-                await MarkAlreadyInstalledAsync(targets, token);
+                installedNames = await MarkAlreadyInstalledAsync(targets, token);
+
+            // Issue #117 (требование 7OH): если настоящее имя из .cfe не прочитано, а в
+            // базе уже есть расширения с другими именами — предупреждаем и уточняем ДО
+            // установки. Без подтверждения установка не выполняется, чтобы не создать
+            // дубль под именем файла (платформа затем ругается «такое уже есть»).
+            // Ветка ibcmd список расширений дёшево не получает — при неизвестном имени
+            // спрашиваем всегда (безопаснее, чем молча создать дубль).
+            var needsNameConfirmation = UseIbcmd
+                ? string.IsNullOrWhiteSpace(_cfeRealName) && !string.IsNullOrWhiteSpace(CfePath)
+                : ConfigExtensionService.RequiresUnknownNameConfirmation(_cfeRealName, ExtensionName, installedNames);
+            if (needsNameConfirmation)
+            {
+                var confirmed = await ConfirmUnknownExtensionNameAsync(installedNames, token);
+                if (!confirmed)
+                {
+                    foreach (var row in targets)
+                        row.Status = LocalizationManager.T("Extensions.StatusCancelled");
+                    AppendLog(string.Format(LocalizationManager.T("Extensions.LogUnknownNameCancelled"),
+                        ExtensionName));
+                    return 0;
+                }
+            }
 
             foreach (var row in targets)
             {
@@ -370,15 +425,23 @@ public sealed class ExtensionsViewModel : ViewModelBase
     /// файла удалось прочитать и пользователь не вводил имя вручную — установка
     /// выполняется под именем из файла (обновление существующего расширения вместо
     /// дубля). При ручном вводе остаётся введённое имя, но выводится предупреждение
-    /// о создании дубля. Решение о имени — чистая функция
-    /// <see cref="ConfigExtensionService.ResolveInstallName"/> (покрыта тестами).
+    /// о создании дубля. Если имя не прочитано — в журнале появляется предупреждение,
+    /// а перед установкой запрашивается подтверждение (см. <see cref="ConfirmUnknownNameAsync"/>).
+    /// Решение о имени — чистая функция <see cref="ConfigExtensionService.ResolveInstallName"/>.
     /// </summary>
-    private void ApplyCfeName()
+    internal void ApplyCfeName()
     {
-        var cfeName = ConfigExtensionService.TryReadExtensionName(CfePath);
+        var cfeName = _cfeRealName ?? ConfigExtensionService.TryReadExtensionName(CfePath);
         if (string.IsNullOrWhiteSpace(cfeName))
+        {
+            // Issue #117 (7OH): имя не прочитано — установка под именем файла может
+            // создать дубль; предупреждаем в журнале (подтверждение — в InstallToCheckedAsync).
+            AppendLog(string.Format(LocalizationManager.T("Extensions.LogNameUnknown"),
+                ConfigExtensionService.SuggestName(CfePath)));
             return;
-        if (string.Equals(cfeName, ExtensionName, StringComparison.OrdinalIgnoreCase))
+        }
+        _cfeRealName = cfeName;
+        if (ConfigExtensionService.NameEquals(cfeName, ExtensionName))
             return;
         var installName = ConfigExtensionService.ResolveInstallName(cfeName, ExtensionName, _extensionNameEdited);
         if (!_extensionNameEdited)
@@ -393,13 +456,47 @@ public sealed class ExtensionsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Issue #117 (7OH): предупреждение и уточнение перед установкой, когда настоящее
+    /// имя расширения не прочитано из .cfe. Обработчик задаётся окном (WPF/Avalonia);
+    /// если его нет (headless/тесты) — установка отменяется, дубль не создаётся молча.
+    /// </summary>
+    internal async Task<bool> ConfirmUnknownExtensionNameAsync(IReadOnlyCollection<string> installedNames,
+        CancellationToken token)
+    {
+        if (token.IsCancellationRequested)
+            return false;
+        var names = installedNames
+            .Where(n => !string.IsNullOrWhiteSpace(n))
+            .OrderBy(n => n, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        AppendLog(names.Count == 0
+            ? string.Format(LocalizationManager.T("Extensions.LogNameUnknown"),
+                ConfigExtensionService.SuggestName(CfePath))
+            : string.Format(LocalizationManager.T("Extensions.LogNameUnknownInstalled"),
+                ConfigExtensionService.SuggestName(CfePath), string.Join(", ", names)));
+        if (ConfirmUnknownNameAsync is null)
+            return false;
+        try
+        {
+            return await ConfirmUnknownNameAsync(installedNames);
+        }
+        catch (OperationCanceledException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Issue #117 п.4: для каждой отмеченной базы тихо получает список установленных
     /// расширений и помечает строки/журнал для имён, которые уже установлены
-    /// (сравнение OrdinalIgnoreCase). Сбой чтения не блокирует установку —
-    /// в журнале появляется предупреждение.
+    /// (сравнение OrdinalIgnoreCase с обрезкой пробелов). Возвращает объединённый
+    /// список установленных имён — по нему окно решает, нужно ли подтверждение.
+    /// Сбой чтения не блокирует установку — в журнале появляется предупреждение.
     /// </summary>
-    private async Task MarkAlreadyInstalledAsync(IReadOnlyList<ExtensionTargetRow> targets, CancellationToken token)
+    private async Task<HashSet<string>> MarkAlreadyInstalledAsync(IReadOnlyList<ExtensionTargetRow> targets,
+        CancellationToken token)
     {
+        var allInstalled = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var row in targets)
         {
             if (token.IsCancellationRequested)
@@ -421,12 +518,16 @@ public sealed class ExtensionsViewModel : ViewModelBase
                 AppendLog(string.Format(LocalizationManager.T("Extensions.LogPreflightFailed"), row.Name, ex.Message));
                 continue;
             }
-            if (installed.Contains(ExtensionName, StringComparer.OrdinalIgnoreCase))
+            foreach (var name in installed)
+                if (!string.IsNullOrWhiteSpace(name))
+                    allInstalled.Add(name.Trim());
+            if (ConfigExtensionService.FindInstalledMatch(ExtensionName, installed) is not null)
             {
                 row.Status = LocalizationManager.T("Extensions.StatusAlreadyInstalled");
                 AppendLog(string.Format(LocalizationManager.T("Extensions.LogAlreadyInstalled"), ExtensionName, row.Name));
             }
         }
+        return allInstalled;
     }
 
     /// <summary>Выгружает выбранное расширение выбранной базы в файл.</summary>

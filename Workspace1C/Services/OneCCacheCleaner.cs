@@ -759,36 +759,83 @@ public static class OneCCacheCleaner
         var rootsToScan = new List<string>();
         foreach (var root in GetCacheRoots(kind))
         {
-            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+
+            string trimmed;
+            try { trimmed = root.Trim(); }
+            catch { continue; }
+
+            // Проверка существования не должна ронять расчёт объёма: недоступный
+            // сетевой диск или «битая» ссылка просто не участвуют в итоге.
+            if (!SafeDirectoryExists(trimmed))
                 continue;
 
             // Два корня, ведущие в один каталог (например, junction и его цель),
             // дают один и тот же канонический путь — считаем только первый.
-            if (!seenRoots.Add(ResolveCanonicalPath(root)))
+            if (!seenRoots.Add(ResolveCanonicalPath(trimmed)))
                 continue;
 
-            rootsToScan.Add(root);
+            rootsToScan.Add(trimmed);
         }
 
         if (rootsToScan.Count == 0)
+        {
+            Log.Info(LogCategory.Cache, $"CACHE root total kind={kind}: корней для сканирования нет");
             return 0;
+        }
 
         // Issue #109 (v1.0.1.55): корни сканируются параллельно — при перенесённом
         // на другой диск кэше полный обход одного корня может занимать минуты, и
         // последовательный обход нескольких корней растягивал расчёт ещё сильнее.
         // Свежее множество visited на корень: рекурсия внутри корня защищена своим
         // набором (циклы через ссылки внутри цели перенесённого кэша).
-        if (rootsToScan.Count == 1)
-            return GetDirectorySize(rootsToScan[0], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
-
         var rootTotals = new long[rootsToScan.Count];
-        Parallel.For(0, rootsToScan.Count, i =>
-            rootTotals[i] = GetDirectorySize(rootsToScan[i], new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        if (rootsToScan.Count == 1)
+        {
+            rootTotals[0] = GetDirectorySize(rootsToScan[0], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        }
+        else
+        {
+            var options = new ParallelOptions
+            {
+                // Узкое место — диск, а не CPU: больше четырёх корней одновременно
+                // не ускоряет обход и лишь увеличивает нагрузку на накопитель.
+                MaxDegreeOfParallelism = Math.Min(rootsToScan.Count, 4)
+            };
+            Parallel.For(0, rootsToScan.Count, options, i =>
+                rootTotals[i] = GetDirectorySize(rootsToScan[i], new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+        }
 
-        foreach (var t in rootTotals)
-            total += t;
+        // Issue #109: диагностика CM_CACHE — по diagnostics-ZIP видно, какие корни
+        // сканировались и сколько байт дал каждый (в т. ч. серверный кэш из реестра).
+        for (var i = 0; i < rootsToScan.Count; i++)
+        {
+            total += rootTotals[i];
+            Log.Info(LogCategory.Cache,
+                $"CACHE root total kind={kind}: корень «{rootsToScan[i]}» = {rootTotals[i]} байт");
+        }
+
+        Log.Info(LogCategory.Cache,
+            $"CACHE root total kind={kind}: корней={rootsToScan.Count}, всего={total} байт");
 
         return total;
+    }
+
+    /// <summary>
+    /// Проверяет существование каталога, не выпуская наружу исключения файловой системы
+    /// (недоступный сетевой диск, «битая» ссылка, удалённый на лету каталог).
+    /// </summary>
+    private static bool SafeDirectoryExists(string path)
+    {
+        try
+        {
+            return Directory.Exists(path);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>
@@ -881,7 +928,10 @@ public static class OneCCacheCleaner
     /// <summary>
     /// Обход поддерева кеша под <paramref name="root"/>: прямые каталоги с именами из
     /// <paramref name="names"/> считаются каталогами кеша, каталоги версий (имя — версия
-    /// платформы) обходятся рекурсивно, остальное игнорируется.
+    /// платформы) обходятся рекурсивно, остальное игнорируется. Внутренняя раскладка
+    /// srvinfo серверного агента намеренно не «угадывается»: серверные корни
+    /// добавляются в <see cref="GetCacheRoots"/>, а поиск идёт по уже известным именам
+    /// каталогов кеша (Srvr__…__Ref__…__, GUID, имя базы) — issue #109.
     /// </summary>
     private static IEnumerable<string> EnumerateCacheDirsUnder(string root, List<string> names, int depth)
     {
@@ -945,7 +995,15 @@ public static class OneCCacheCleaner
             // ускоряет расчёт «честного» общего объёма.
             var dirInfo = new DirectoryInfo(path);
 
-            foreach (var file in dirInfo.EnumerateFiles("*"))
+            // Issue #109: «битая» ссылка (цель удалена/недоступна) не обходится —
+            // иначе каждое обращение к ней даёт исключение на ровном месте.
+            if (IsBrokenDirectoryLink(dirInfo))
+                return 0;
+
+            // Перечисление ведётся через безопасные обёртки: ошибка на отдельной записи
+            // (файл исчез, нет прав, обрыв сетевого диска) не отменяет подсчёт остальных
+            // файлов каталога — на больших кэшах это иначе давало заметно заниженный объём.
+            foreach (var file in EnumerateFilesSafe(dirInfo))
             {
                 try
                 {
@@ -957,7 +1015,7 @@ public static class OneCCacheCleaner
                 }
             }
 
-            foreach (var dir in dirInfo.EnumerateDirectories("*"))
+            foreach (var dir in EnumerateDirectoriesSafe(dirInfo))
             {
                 try
                 {
@@ -975,6 +1033,89 @@ public static class OneCCacheCleaner
         }
 
         return total;
+    }
+
+    /// <summary>
+    /// Проверяет, является ли каталог «битой» ссылкой (reparse point с отсутствующей
+    /// или недоступной целью). Для обычных каталогов — false. Ошибки чтения атрибутов
+    /// трактуются как «недоступен» (issue #109).
+    /// </summary>
+    private static bool IsBrokenDirectoryLink(DirectoryInfo dir)
+    {
+        try
+        {
+            if ((dir.Attributes & FileAttributes.ReparsePoint) == 0)
+                return false;
+
+            var target = dir.ResolveLinkTarget(returnFinalTarget: true);
+            return target is null || !SafeDirectoryExists(target.FullName);
+        }
+        catch
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Безопасное перечисление файлов каталога: исключения на отдельной записи
+    /// (файл исчез, нет прав) прекращают перечисление этого каталога, но не роняют
+    /// расчёт объёма целиком (issue #109).
+    /// </summary>
+    private static IEnumerable<FileInfo> EnumerateFilesSafe(DirectoryInfo dir)
+    {
+        IEnumerator<FileInfo> enumerator;
+        try { enumerator = dir.EnumerateFiles("*").GetEnumerator(); }
+        catch { yield break; }
+
+        using (enumerator)
+        {
+            while (true)
+            {
+                FileInfo current;
+                try
+                {
+                    if (!enumerator.MoveNext())
+                        yield break;
+                    current = enumerator.Current;
+                }
+                catch
+                {
+                    yield break;
+                }
+
+                yield return current;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Безопасное перечисление подкаталогов (см. <see cref="EnumerateFilesSafe"/>).
+    /// </summary>
+    private static IEnumerable<DirectoryInfo> EnumerateDirectoriesSafe(DirectoryInfo dir)
+    {
+        IEnumerator<DirectoryInfo> enumerator;
+        try { enumerator = dir.EnumerateDirectories("*").GetEnumerator(); }
+        catch { yield break; }
+
+        using (enumerator)
+        {
+            while (true)
+            {
+                DirectoryInfo current;
+                try
+                {
+                    if (!enumerator.MoveNext())
+                        yield break;
+                    current = enumerator.Current;
+                }
+                catch
+                {
+                    yield break;
+                }
+
+                yield return current;
+            }
+        }
     }
 
     /// <summary>
@@ -1108,6 +1249,17 @@ public static class OneCCacheCleaner
         }
 #endif
 
+        // Серверный кэш, перенесённый параметрами серверного агента 1С (issue #109):
+        // каталоги из -d/-srvinfo/-cache/--cache/--cache-dir/CachePath службы ragent и
+        // веток Software\1C. На не-Windows платформах провайдер пуст. В поиск «остатков»
+        // (forOrphanScan) серверные корни не добавляются: удалять серверные данные вне
+        // подтверждённой принадлежности базе недопустимо.
+        if (kind != OneCCacheKind.None && !forOrphanScan)
+        {
+            foreach (var serverRoot in GetServerCacheRoots())
+                roots.Add(serverRoot);
+        }
+
         // Дополнительные корни из настроек пользователя (issue #109): ищем в них кеш
         // любого типа — пользователь объявил каталог как корень кеша 1С целиком.
         if (kind != OneCCacheKind.None)
@@ -1172,20 +1324,25 @@ public static class OneCCacheCleaner
 
                     foreach (var name in key.GetValueNames())
                     {
-                        if (key.GetValue(name) is not string value || string.IsNullOrWhiteSpace(value))
+                        // Значение может быть как одиночной строкой, так и REG_MULTI_SZ
+                        // (несколько строк параметров запуска агента).
+                        var value = GetRegistryValueText(key.GetValue(name));
+                        if (string.IsNullOrWhiteSpace(value))
                             continue;
 
-                        // Диагностика (issue #109б): дамп всех строковых значений веток 1С.
+                        // Диагностика (issue #109б): дамп строковых значений веток 1С.
                         Log.Info(LogCategory.Cache, $"CACHE registry: {sub}\\{name} = {value}");
 
-                        if (!IsCacheLocationValueName(name))
-                            continue;
-
-                        var dir = NormalizeRegistryDir(value);
+                        // Issue #109: значение может быть путём к каталогу кэша (CacheLocation,
+                        // CachePath, srvinfo) либо строкой параметров запуска серверного
+                        // агента («-d D:\1c\srvinfo», «--cache=D:\cache»).
+                        var dir = TryExtractCachePathFromServerParameters(value);
+                        if (dir is null && (IsCacheLocationValueName(name) || IsServerInfoValueName(name)))
+                            dir = NormalizeRegistryDir(value);
                         if (dir is null)
                         {
                             Log.Info(LogCategory.Cache,
-                                $"CACHE registry: значение «{name}» не похоже на каталог, пропущено: {value}");
+                                $"CACHE registry: значение «{name}» не похоже на каталог кэша, пропущено: {value}");
                             continue;
                         }
 
@@ -1287,6 +1444,400 @@ public static class OneCCacheCleaner
 
         return null;
     }
+
+    // ===================== Серверный кэш: параметры агента 1С (issue #109) =====================
+
+    // Подмена серверных корней в тестах: реестр служб серверного агента на машине
+    // тестов может быть пуст или недоступен. Null — использовать реальное чтение реестра.
+    private static readonly object s_serverRootsLock = new();
+    private static IReadOnlyList<string>? s_serverRootsOverride;
+#if WINDOWS
+    // Кэш реального чтения реестра служб на сеанс (issue #109).
+    private static IReadOnlyList<string>? s_serverAgentRootsCache;
+#endif
+
+    /// <summary>
+    /// Подменяет список серверных корней кэша в тестах (issue #109). Null возвращает
+    /// реальное чтение реестра. Значения нормализуются и дедуплицируются.
+    /// </summary>
+    internal static void SetServerCacheRootsForTests(IEnumerable<string?>? roots)
+    {
+        lock (s_serverRootsLock)
+        {
+            s_serverRootsOverride = roots is null
+                ? null
+                : roots
+                    .Where(r => !string.IsNullOrWhiteSpace(r))
+                    .Select(r => r!.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+        }
+    }
+
+    /// <summary>
+    /// Корни серверного кэша, найденные по параметрам серверного агента 1С (issue #109).
+    /// Учитывает тестовую подмену; на не-Windows платформах реальный провайдер пуст.
+    /// </summary>
+    internal static IReadOnlyList<string> GetServerCacheRoots()
+    {
+        lock (s_serverRootsLock)
+        {
+            if (s_serverRootsOverride is not null)
+                return s_serverRootsOverride;
+        }
+
+        return GetServerAgentCacheRoots();
+    }
+
+#if WINDOWS
+    /// <summary>
+    /// Читает параметры служб серверного агента 1С (ragent) и возвращает существующие
+    /// каталоги, в которых может лежать серверный кэш (issue #109): разбирается
+    /// <c>ImagePath</c> службы (ключи -d/-srvinfo/-cache/--cache/--cache-dir) и строковые
+    /// параметры её ветки <c>Parameters</c> (CachePath, CacheDir, srvinfo и т. п.).
+    /// Консервативно: несуществующие каталоги не добавляются; результат кэшируется
+    /// на сеанс. Недоступный реестр не роняет приложение — корней просто нет.
+    /// </summary>
+    internal static IReadOnlyList<string> GetServerAgentCacheRoots()
+    {
+        lock (s_serverRootsLock)
+        {
+            if (s_serverAgentRootsCache is not null)
+                return s_serverAgentRootsCache;
+
+            var found = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddCandidate(string? candidate, string source)
+            {
+                var dir = NormalizeServerCachePath(candidate);
+                if (dir is null)
+                    return;
+
+                // Безопасная проверка существования: битый/отсутствующий путь не должен
+                // попадать в корни очистки (issue #109: «не добавлять мусорные пути»).
+                if (!SafeDirectoryExists(dir))
+                {
+                    Log.Info(LogCategory.Cache,
+                        $"CACHE server: каталог из {source} не существует, пропущен: {dir}");
+                    return;
+                }
+
+                if (!seen.Add(NormalizePathForCompare(dir)))
+                    return;
+
+                found.Add(dir);
+                Log.Info(LogCategory.Cache, $"CACHE server root добавлен: {dir} (из {source})");
+            }
+
+            const string servicesPath = @"SYSTEM\CurrentControlSet\Services";
+            try
+            {
+                using var services = Registry.LocalMachine.OpenSubKey(servicesPath);
+                if (services is not null)
+                {
+                    foreach (var serviceName in services.GetSubKeyNames())
+                    {
+                        try
+                        {
+                            using var service = services.OpenSubKey(serviceName);
+                            if (service is null)
+                                continue;
+
+                            var imagePath = service.GetValue("ImagePath") as string;
+                            var looksLikeAgent =
+                                (!string.IsNullOrWhiteSpace(imagePath)
+                                 && imagePath.Contains("ragent", StringComparison.OrdinalIgnoreCase))
+                                || serviceName.Contains("ragent", StringComparison.OrdinalIgnoreCase)
+                                || (serviceName.Contains("1C", StringComparison.OrdinalIgnoreCase)
+                                    && serviceName.Contains("Server", StringComparison.OrdinalIgnoreCase));
+                            if (!looksLikeAgent)
+                                continue;
+
+                            Log.Info(LogCategory.Cache,
+                                $"CACHE server service: {serviceName}, ImagePath={imagePath}");
+                            AddCandidate(ExtractCachePathFromCommandLine(imagePath),
+                                $"{serviceName}\\ImagePath");
+
+                            using var parameters = service.OpenSubKey("Parameters");
+                            if (parameters is null)
+                                continue;
+
+                            foreach (var name in parameters.GetValueNames())
+                            {
+                                var text = GetRegistryValueText(parameters.GetValue(name));
+                                if (string.IsNullOrWhiteSpace(text))
+                                    continue;
+
+                                Log.Info(LogCategory.Cache,
+                                    $"CACHE server service {serviceName}\\Parameters\\{name} = {text}");
+
+                                var parsed = TryExtractCachePathFromServerParameters(text)
+                                             ?? TryExtractCachePathFromServerParameters($"{name}={text}");
+                                if (parsed is not null)
+                                {
+                                    AddCandidate(parsed, $"{serviceName}\\Parameters\\{name}");
+                                }
+                                else if (IsCacheLocationValueName(name) || IsServerInfoValueName(name))
+                                {
+                                    AddCandidate(NormalizeServerCachePath(text),
+                                        $"{serviceName}\\Parameters\\{name}");
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            // Служба недоступна (права, удаляется) — пропускаем.
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // Ветка служб недоступна — серверных корней нет, приложение работает дальше.
+            }
+
+            s_serverAgentRootsCache = found;
+            return s_serverAgentRootsCache;
+        }
+    }
+#else
+    /// <summary>
+    /// На не-Windows платформах параметров серверного агента 1С в реестре нет —
+    /// автоопределение серверного кэша не выполняется (issue #109).
+    /// </summary>
+    internal static IReadOnlyList<string> GetServerAgentCacheRoots() => Array.Empty<string>();
+#endif
+
+    /// <summary>
+    /// Разбирает строку параметров запуска серверного агента 1С (issue #109) и возвращает
+    /// первый каталог, похожий на серверный кэш/srvinfo. Поддерживаются ключи
+    /// -d/-srvinfo/-cache/--cache/--cache-dir/CachePath/CacheDir в формах «ключ значение»,
+    /// «ключ=значение», «ключ:значение» и слитной форме -d<путь>. Чистая функция:
+    /// ни реестр, ни файловая система не читаются.
+    /// </summary>
+    /// <remarks>internal: юнит-тесты разбора строки запуска службы в Workspace1C.Tests.</remarks>
+    internal static string? ExtractCachePathFromCommandLine(string? commandLine)
+    {
+        var tokens = TokenizeCommandLine(commandLine);
+        for (var i = 0; i < tokens.Count; i++)
+        {
+            var token = tokens[i];
+            if (string.IsNullOrWhiteSpace(token) || token == "=")
+                continue;
+
+            var (key, inlineValue) = SplitParameter(token);
+            if (key is null || (!IsCacheDirParameterName(key) && !IsServerInfoParameterName(key)))
+                continue;
+
+            var value = inlineValue;
+            if (value is null)
+            {
+                // Форма «CachePath = D:\cache»: пропускаем отдельный токен «=».
+                if (i + 1 < tokens.Count && tokens[i + 1] == "=")
+                    i++;
+
+                value = i + 1 < tokens.Count ? tokens[++i] : null;
+            }
+
+            var dir = NormalizeServerCachePath(value);
+            if (dir is not null)
+                return dir;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Разбирает значение реестра/параметра службы как строку параметров серверного кэша
+    /// (issue #109): поддерживает как «CachePath=D:\cache», так и «-d D:\srvinfo».
+    /// </summary>
+    /// <remarks>internal: юнит-тесты разбора параметров в Workspace1C.Tests.</remarks>
+    internal static string? TryExtractCachePathFromServerParameters(string? text)
+        => ExtractCachePathFromCommandLine(text);
+
+    /// <summary>
+    /// Нормализует путь серверного кэша (issue #109): снимает кавычки и завершающие
+    /// разделители, принимает только абсолютные пути Windows (X:\…, \\server\share\…)
+    /// и Unix (/…). Относительные пути и «мусорные» значения возвращают null.
+    /// </summary>
+    /// <remarks>internal: юнит-тесты нормализации пути в Workspace1C.Tests.</remarks>
+    internal static string? NormalizeServerCachePath(string? value)
+    {
+        var dir = value?.Trim().Trim('"').Trim();
+        if (string.IsNullOrWhiteSpace(dir))
+            return null;
+
+        dir = dir.TrimEnd('\\', '/');
+        if (dir.Length == 0)
+            return null;
+
+        // Абсолютный путь Windows: «X:\…», «X:\» или UNC «\\server\share\…».
+        if (dir.Length == 2 && dir[1] == ':')
+            return dir + Path.DirectorySeparatorChar;
+        if (dir.Length > 2 && dir[1] == ':')
+            return dir;
+        if (dir.StartsWith(@"\\", StringComparison.Ordinal) && dir.Length > 2)
+            return dir;
+
+        // Абсолютный путь Unix (Linux-сервер 1С).
+        if (dir.StartsWith("/", StringComparison.Ordinal) && dir.Length > 1)
+            return dir;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Разбивает строку параметров на токены с учётом кавычек (пробелы внутри кавычек
+    /// не разделяют параметры). Кавычки в токены не попадают.
+    /// </summary>
+    internal static IReadOnlyList<string> TokenizeCommandLine(string? commandLine)
+    {
+        var tokens = new List<string>();
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return tokens;
+
+        var sb = new StringBuilder();
+        var inQuotes = false;
+        foreach (var c in commandLine)
+        {
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (!inQuotes && char.IsWhiteSpace(c))
+            {
+                if (sb.Length > 0)
+                {
+                    tokens.Add(sb.ToString());
+                    sb.Clear();
+                }
+
+                continue;
+            }
+
+            sb.Append(c);
+        }
+
+        if (sb.Length > 0)
+            tokens.Add(sb.ToString());
+
+        return tokens;
+    }
+
+    /// <summary>
+    /// Делит токен на ключ и встроенное значение («--cache=путь», «/cache:путь»,
+    /// «-dпуть»). Для токена без значения возвращает сам токен как ключ.
+    /// </summary>
+    private static (string? Key, string? Value) SplitParameter(string token)
+    {
+        if (string.IsNullOrEmpty(token))
+            return (null, null);
+
+        var separator = token.IndexOfAny(new[] { '=', ':' });
+        if (separator > 0)
+        {
+            var key = token.Substring(0, separator);
+            var value = token.Substring(separator + 1);
+            if (IsCacheDirParameterName(key) || IsServerInfoParameterName(key))
+                return (key, value);
+        }
+
+        // Слитная форма: -dC:\1c\srvinfo (кавычки уже сняты токенизатором).
+        if (token.Length > 2 && token.StartsWith("-d", StringComparison.OrdinalIgnoreCase))
+        {
+            var rest = token.Substring(2);
+            if (LooksLikePathStart(rest))
+                return ("-d", rest);
+        }
+
+        return (token, null);
+    }
+
+    /// <summary>
+    /// Проверяет, что остаток токена после ключа -d начинается как путь: «C:\…», «\\…»,
+    /// «/…» или кавычка. Отсекает чужие ключи вроде -debug.
+    /// </summary>
+    private static bool LooksLikePathStart(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        if (value[0] == '"' || value[0] == '/' || value[0] == '\\')
+            return true;
+
+        return value.Length >= 2 && char.IsLetter(value[0]) && value[1] == ':';
+    }
+
+    /// <summary>
+    /// Ключи параметров запуска, задающие каталог кэша серверного агента 1С (issue #109).
+    /// </summary>
+    private static bool IsCacheDirParameterName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        var n = name.Trim();
+        return n.Equals("-cache", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("--cache", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("/cache", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("-cachedir", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("--cache-dir", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("--cachedir", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("/cachedir", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("-cachepath", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("--cachepath", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("/cachepath", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cache", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cachedir", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cachepath", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cachefolder", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cachelocation", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("cachedatalocation", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Ключи параметров запуска, задающие каталог серверных данных 1С (srvinfo),
+    /// внутри которого платформа держит серверный кэш (issue #109).
+    /// </summary>
+    private static bool IsServerInfoParameterName(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return false;
+
+        var n = name.Trim();
+        return n.Equals("-d", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("-srvinfo", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("--srvinfo", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("/srvinfo", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("srvinfo", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("srvpath", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("srvdir", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Определяет, является ли имя реестрового значения путём серверных данных 1С
+    /// (srvinfo), внутри которых лежит серверный кэш (issue #109).
+    /// </summary>
+    /// <remarks>internal: юнит-тесты фильтра имён в Workspace1C.Tests.</remarks>
+    internal static bool IsServerInfoValueName(string? name)
+        => !string.IsNullOrWhiteSpace(name) &&
+           (name.Contains("srvinfo", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("srvpath", StringComparison.OrdinalIgnoreCase)
+            || name.Equals("srvdir", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Приводит значение реестра к строке: REG_SZ — как есть, REG_MULTI_SZ — построчно.
+    /// Прочие типы (DWORD, BINARY) для путей кэша не используются и игнорируются.
+    /// </summary>
+    private static string? GetRegistryValueText(object? value) => value switch
+    {
+        string s => s,
+        string[] many => string.Join(Environment.NewLine, many),
+        _ => null
+    };
 
     /// <summary>
     /// Удаляет каталог кеша. Каталог сначала переименовывается во временное имя

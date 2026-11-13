@@ -1116,6 +1116,13 @@ namespace Workspace1C
                 ApplyGlassBackground();
                 ApplySystemBackdrop(hwnd);
                 ApplyCornerPreference();
+                // Главное окно оформлено собственными средствами и не проходит через
+                // WindowChromeHelper.Apply, поэтому видимая рамка (issue #273) раньше
+                // оставалась прямоугольной при скруглённых углах DWM — «скругление с
+                // квадратной рамкой» (issue #126). Подключаем тот же механизм: радиус
+                // по фактическому состоянию DWM с пересчётом после показа окна, при
+                // максимизации и при смене темы/композиции.
+                WindowChromeHelper.AttachFrameCornerTracking(this, WindowFrameBorder);
             }
             catch
             {

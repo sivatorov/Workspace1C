@@ -16,6 +16,8 @@ namespace Workspace1C.Tests;
 /// кламп и миграция старых настроек (0/60/360/1440 остаются валидными);</item>
 /// <item>значок «внимание» в подвале вместо красных «!!!» — source-гварды WPF
 /// разметки и Avalonia кода;</item>
+/// <item>значок проверки обновлений виден во всех режимах (v1.0.1.61) —
+/// юнит-тесты <see cref="FooterUpdateIndicatorState"/> и source-гварды окон;</item>
 /// <item>fallback «Что нового»: локальная секция CHANGELOG.md (парсер) и
 /// гарантия непустого содержимого — source-гварды окон;</item>
 /// <item>запрет вертикального растягивания окна обновления — source-гварды
@@ -247,6 +249,122 @@ public sealed class Issue116UpdateIntervalTests
         Assert.Contains("_footerUpdateWarningIcon = IconHelper.MakeIcon(\"IconWarning\"", code);
         Assert.DoesNotContain("Text = \"!!!\"", code);
         Assert.DoesNotContain("_footerUpdateExclaim", code);
+    }
+
+    // ===================== Значок проверки обновлений виден во всех режимах =====================
+
+    [Theory]
+    [InlineData(AppUpdateMode.InstallOnStartup)]
+    [InlineData(AppUpdateMode.DownloadAskInstall)]
+    [InlineData(AppUpdateMode.NotifyOnly)]
+    [InlineData(AppUpdateMode.Manual)]
+    public void FooterUpdateIcon_VisibleInEveryMode_WhenNoRelease(AppUpdateMode mode)
+    {
+        // v1.0.1.61 (issue #116): даже в авто-режимах без найденного релиза значок
+        // виден — пользователь может проверить обновления вручную из подвала.
+        var state = FooterUpdateIndicatorState.Resolve(mode, hasRelease: false, isReady: false);
+
+        Assert.True(state.IsVisible);
+        Assert.True(state.ShowSyncIcon);
+        Assert.False(state.ShowWarningIcon);
+        Assert.False(state.ShowReadyIcon);
+    }
+
+    [Theory]
+    [InlineData(AppUpdateMode.InstallOnStartup)]
+    [InlineData(AppUpdateMode.DownloadAskInstall)]
+    [InlineData(AppUpdateMode.NotifyOnly)]
+    [InlineData(AppUpdateMode.Manual)]
+    public void FooterUpdateIcon_VisibleInEveryMode_WhenReleaseAvailable(AppUpdateMode mode)
+    {
+        // При доступном релизе значок «внимание» показывается во всех режимах.
+        var state = FooterUpdateIndicatorState.Resolve(mode, hasRelease: true, isReady: false);
+
+        Assert.True(state.IsVisible);
+        Assert.False(state.ShowSyncIcon);
+        Assert.True(state.ShowWarningIcon);
+        Assert.False(state.ShowReadyIcon);
+    }
+
+    [Fact]
+    public void FooterUpdateIcon_ShowsReadyCheck_WhenFileDownloaded()
+    {
+        // v1.0.1.58: скачанный файл — зелёная галочка вместо «внимания»/стрелок.
+        var state = FooterUpdateIndicatorState.Resolve(
+            AppUpdateMode.DownloadAskInstall, hasRelease: true, isReady: true);
+
+        Assert.True(state.IsVisible);
+        Assert.False(state.ShowSyncIcon);
+        Assert.False(state.ShowWarningIcon);
+        Assert.True(state.ShowReadyIcon);
+    }
+
+    [Fact]
+    public void FooterUpdateIcon_ReadyWithoutRelease_KeepsIconVisible()
+    {
+        // Защитный случай: файл готов, а AvailableRelease уже сброшен — значок
+        // не должен исчезнуть, показывается зелёная галочка.
+        var state = FooterUpdateIndicatorState.Resolve(
+            AppUpdateMode.NotifyOnly, hasRelease: false, isReady: true);
+
+        Assert.True(state.IsVisible);
+        Assert.False(state.ShowSyncIcon);
+        Assert.False(state.ShowWarningIcon);
+        Assert.True(state.ShowReadyIcon);
+    }
+
+    [Fact]
+    public void FooterUpdateIcon_StateDoesNotDependOnUpdateMode()
+    {
+        // Режим обновления не влияет ни на видимость, ни на выбранный глиф.
+        foreach (var mode in Enum.GetValues<AppUpdateMode>())
+        {
+            foreach (var (hasRelease, isReady) in new[]
+                     {
+                         (false, false), (true, false), (false, true), (true, true)
+                     })
+            {
+                Assert.Equal(
+                    FooterUpdateIndicatorState.Resolve(AppUpdateMode.InstallOnStartup, hasRelease, isReady),
+                    FooterUpdateIndicatorState.Resolve(mode, hasRelease, isReady));
+            }
+        }
+    }
+
+    [Fact]
+    public void FooterUpdateIcon_WpfAndAvalonia_UseSharedState_WithoutModeGate()
+    {
+        // Обе платформы считают состояние через общий хелпер и больше не скрывают
+        // значок по условию hasRelease || manualCheck (issue #116 v1.0.1.61).
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
+        Assert.Contains("FooterUpdateIndicatorState.Resolve", wpf);
+        Assert.Contains("FooterUpdateSyncIcon.Visibility = state.ShowSyncIcon", wpf);
+        Assert.Contains("FooterUpdateWarnIcon.Visibility = state.ShowWarningIcon", wpf);
+        Assert.Contains("FooterUpdateReadyIcon.Visibility = state.ShowReadyIcon", wpf);
+        Assert.DoesNotContain("manualCheck", wpf);
+        Assert.DoesNotContain("hasRelease || manualCheck", wpf);
+
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("FooterUpdateIndicatorState.Resolve", avalonia);
+        Assert.Contains("_footerUpdateSyncIcon.IsVisible = state.ShowSyncIcon", avalonia);
+        Assert.Contains("_footerUpdateWarningIcon.IsVisible = state.ShowWarningIcon", avalonia);
+        Assert.Contains("_footerUpdateReadyIcon.IsVisible = state.ShowReadyIcon", avalonia);
+        Assert.DoesNotContain("manualCheck", avalonia);
+        Assert.DoesNotContain("hasRelease || manualCheck", avalonia);
+    }
+
+    [Theory]
+    [InlineData("UpdateService.cs")]
+    [InlineData("UpdateService.Avalonia.cs")]
+    public void UpdateService_IntervalTimer_StillRespectsZeroAndManualMode(string fileName)
+    {
+        // Регрессия по интервалам авто-проверки: правка видимости значка не должна
+        // менять правило таймера — он выключается только при 0 минут или режиме
+        // «Проверять вручную».
+        var source = ReadProjectFile(Path.Combine("Workspace1C", "Services", fileName));
+        Assert.Contains("if (_intervalMinutes <= 0 || Mode == AppUpdateMode.Manual)", source);
+        Assert.Contains("public void ApplyInterval(int minutes)", source);
+        Assert.Contains("_intervalMinutes = Math.Max(0, minutes)", source);
     }
 
     // ===================== Fallback «Что нового» =====================

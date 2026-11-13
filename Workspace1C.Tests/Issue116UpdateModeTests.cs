@@ -215,21 +215,27 @@ public sealed class Issue116UpdateModeTests
     [Fact]
     public void MainWindow_Footer_UpdateIcon_HasThreeStates()
     {
-        // Три состояния значка обновления (issue #116 п.3 v1.0.1.50) на обеих
-        // платформах: скрыт / стрелки синхронизации / значок «внимание» при
-        // доступном релизе (issue #116 v1.0.1.54).
+        // Три состояния глифа значка обновления (issue #116 п.3 v1.0.1.50) на обеих
+        // платформах: стрелки синхронизации / «внимание» при доступном релизе
+        // (v1.0.1.54) / зелёная галочка готовности (v1.0.1.58). Сам значок с
+        // v1.0.1.61 виден во всех режимах — условие hasRelease || manualCheck убрано.
         var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
+        Assert.Contains("FooterUpdateIndicatorState.Resolve", wpf);
         Assert.Contains("FooterUpdateIcon.Visibility", wpf);
         Assert.Contains("FooterUpdateSyncIcon.Visibility", wpf);
         Assert.Contains("FooterUpdateWarnIcon.Visibility", wpf);
         Assert.Contains("Main.Footer.UpdateAvailableTooltip", wpf);
         Assert.Contains("AvailableRelease", wpf);
-        Assert.Contains("AppUpdateMode.NotifyOnly or AppUpdateMode.Manual", wpf);
+        Assert.DoesNotContain("manualCheck", wpf);
+        Assert.DoesNotContain("hasRelease || manualCheck", wpf);
 
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        Assert.Contains("_footerUpdateIcon.IsVisible = hasRelease || manualCheck", avalonia);
-        Assert.Contains("_footerUpdateSyncIcon.IsVisible = !hasRelease", avalonia);
-        Assert.Contains("_footerUpdateWarningIcon.IsVisible = hasRelease", avalonia);
+        Assert.Contains("FooterUpdateIndicatorState.Resolve", avalonia);
+        Assert.Contains("_footerUpdateIcon.IsVisible = state.IsVisible", avalonia);
+        Assert.Contains("_footerUpdateSyncIcon.IsVisible = state.ShowSyncIcon", avalonia);
+        Assert.Contains("_footerUpdateWarningIcon.IsVisible = state.ShowWarningIcon", avalonia);
+        Assert.DoesNotContain("manualCheck", avalonia);
+        Assert.DoesNotContain("hasRelease || manualCheck", avalonia);
     }
 
     [Fact]

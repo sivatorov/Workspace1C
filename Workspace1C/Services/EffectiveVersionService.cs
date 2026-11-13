@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using Workspace1C.Models;
 
 namespace Workspace1C.Services;
 
@@ -86,6 +87,66 @@ public static class EffectiveVersionService
         // 2) Fallback: текущая версия с уменьшенной последней частью на 1.
         return DecrementLastPart(currentVersion) ?? currentVersion;
     }
+
+    /// <summary>
+    /// Реальная версия установленной сборки (<see cref="VersionInfo.Display"/>).
+    /// Её обязаны использовать логи и диагностика (<see cref="DiagnosticsBundleService"/>,
+    /// <see cref="TechnicalInfoService"/>, заголовок окна и т.п.): при включённом флаге
+    /// «Считать версию прошлой» диагностика не должна становиться недостоверной (issue #129).
+    /// </summary>
+    public static string RealVersion => VersionInfo.Display();
+
+    /// <summary>
+    /// Текущая версия для решений об обновлении (issue #129) — <b>единый источник истины</b>
+    /// для всех сравнений с релизами (<see cref="GitHubReleaseService.IsNewerThan"/>):
+    /// при включённом флаге «Считать версию прошлой» — эффективная (понижённая) версия,
+    /// иначе — реальная сборка. Без этого сравнение шло с реальной версией и при понижении
+    /// проверка обновлений сообщала «обновлений нет» вместо предложения реальной сборки.
+    /// </summary>
+    public static string CurrentForUpdates => GetEffectiveVersion(RealVersion);
+
+    /// <summary>
+    /// Признак «версия виртуально понижена» (issue #129): эффективная версия для решений
+    /// об обновлении отличается от реальной сборки. При выключенном флаге всегда false;
+    /// при включённом, но невозможности снижения (нет git-тегов и последняя часть 0) — тоже
+    /// false, потому что сравнивать нечего.
+    /// </summary>
+    public static bool IsDowngraded =>
+        !string.Equals(CurrentForUpdates, RealVersion, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Подпись версии для интерфейса (issue #129): без понижения — только реальная сборка;
+    /// при понижении — реальная сборка и эффективная версия по шаблону
+    /// <paramref name="downgradedFormat"/> (<c>{0}</c> — реальная, <c>{1}</c> — эффективная).
+    /// Чистая функция: шаблон передаёт вызывающий код (локализация), поэтому её можно
+    /// покрыть тестами без UI. Используется подвалом главного окна и диалогами обновления.
+    /// </summary>
+    public static string FormatVersionForDisplay(
+        string? realVersion,
+        string? effectiveVersion,
+        string? downgradedFormat)
+    {
+        var real = string.IsNullOrWhiteSpace(realVersion)
+            ? (effectiveVersion ?? string.Empty).Trim()
+            : realVersion.Trim();
+        var effective = (effectiveVersion ?? string.Empty).Trim();
+        if (effective.Length == 0 || string.Equals(real, effective, StringComparison.Ordinal))
+            return real;
+        var format = string.IsNullOrWhiteSpace(downgradedFormat) ? "{0} ({1})" : downgradedFormat;
+        return string.Format(CultureInfo.CurrentCulture, format, real, effective);
+    }
+
+    /// <summary>
+    /// Запрет МОЛЧАЛИВОЙ автоустановки найденного релиза при виртуальном понижении версии
+    /// (issue #129): если флаг включён и релиз совпадает с РЕАЛЬНОЙ сборкой, установка
+    /// ничего не изменит, кроме сброса флага, — такой релиз нужно предлагать, а не ставить
+    /// без спроса (иначе цикл «обновились на свою же версию»). Сравнение идёт по реальной
+    /// версии намеренно: «более новый» релиз по-прежнему ставится автоматически.
+    /// </summary>
+    public static bool ShouldOfferInsteadOfAutoInstall(ReleaseInfo? release)
+        => release is not null
+           && IsDowngraded
+           && GitHubReleaseService.IsSameVersion(release, RealVersion);
 
     /// <summary>
     /// Предыдущая версия из git-тегов: запускает <c>git tag --sort=-creatordate</c>

@@ -38,8 +38,14 @@ public partial class UpdateAvailableWindow : Window
 
         Title = LocalizationManager.T("Update.NewVersionAvailable");
         HeadingText.Text = LocalizationManager.T("Update.NewVersionAvailable");
+        // Issue #129: при включённом «Считать версию прошлой» подпись текущей версии
+        // показывает реальную сборку и эффективную (понижённую) версию.
         CurrentVersionText.Text = string.Format(
-            LocalizationManager.T("Update.CurrentVersion"), VersionInfo.Display());
+            LocalizationManager.T("Update.CurrentVersion"),
+            EffectiveVersionService.FormatVersionForDisplay(
+                VersionInfo.Display(),
+                EffectiveVersionService.CurrentForUpdates,
+                LocalizationManager.T("Common.VersionEffective")));
         NewVersionText.Text = string.Format(
             LocalizationManager.T("Update.NewVersion"), NormalizeTag(release.TagName));
         WhatsNewLabel.Text = LocalizationManager.T("Update.WhatsNew");

@@ -209,6 +209,69 @@ public sealed class Issue109_110CacheTests
         }
     }
 
+    // ===================== Серверный агент 1С: разбор параметров (issue #109) =====================
+
+    [Theory]
+    [InlineData("-d \"D:\\1C\\srvinfo\"", "D:\\1C\\srvinfo")]
+    [InlineData("-d D:\\1C\\srvinfo", "D:\\1C\\srvinfo")]
+    [InlineData("-dD:\\1C\\srvinfo", "D:\\1C\\srvinfo")]
+    [InlineData("\"C:\\Program Files\\1cv8\\bin\\ragent.exe\" -srvc -agent -d \"E:\\1c srvinfo\"", "E:\\1c srvinfo")]
+    [InlineData("--cache-dir=D:\\1C\\cache", "D:\\1C\\cache")]
+    [InlineData("--cache \"E:\\1c cache\"", "E:\\1c cache")]
+    [InlineData("-cache E:\\1c\\cache", "E:\\1c\\cache")]
+    [InlineData("/cache:D:\\1C\\cache", "D:\\1C\\cache")]
+    [InlineData("CachePath=D:\\1C\\cache", "D:\\1C\\cache")]
+    [InlineData("CacheDir = D:\\1C\\cache", "D:\\1C\\cache")]
+    [InlineData("srvinfo = D:\\1C\\srvinfo", "D:\\1C\\srvinfo")]
+    [InlineData("-srvinfo E:\\1c\\srvinfo", "E:\\1c\\srvinfo")]
+    [InlineData("-port 1541 -regport 1540", null)]
+    [InlineData("-debug", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void ExtractCachePathFromCommandLine_RecognizesServerAgentParameters(
+        string? commandLine, string? expected)
+    {
+        // Issue #109: серверный кэш, перенесённый параметрами агента (реестр/служба),
+        // должен распознаваться — разбор вынесен в чистую функцию без чтения реестра.
+        Assert.Equal(expected, OneCCacheCleaner.ExtractCachePathFromCommandLine(commandLine));
+    }
+
+    [Fact]
+    public void TryExtractCachePathFromServerParameters_RecognizesMultiStringValue()
+    {
+        // REG_MULTI_SZ службы: несколько строк параметров — берём первый распознанный путь.
+        const string text = "CachePath=D:\\1C\\cache\r\n-srvinfo E:\\1C\\srvinfo";
+        Assert.Equal("D:\\1C\\cache", OneCCacheCleaner.TryExtractCachePathFromServerParameters(text));
+    }
+
+    [Theory]
+    [InlineData("D:\\1C_Cache", "D:\\1C_Cache")]
+    [InlineData("  \"D:\\1C_Cache\"  ", "D:\\1C_Cache")]
+    [InlineData("D:\\1C_Cache\\", "D:\\1C_Cache")]
+    [InlineData("\\\\server\\share\\1c-cache", "\\\\server\\share\\1c-cache")]
+    [InlineData("/var/cache/1cv8", "/var/cache/1cv8")]
+    [InlineData("cache", null)]
+    [InlineData("relative\\path", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void NormalizeServerCachePath_AcceptsOnlyAbsolutePaths(string? value, string? expected)
+    {
+        // Issue #109: «мусорные» значения не должны попадать в корни очистки.
+        Assert.Equal(expected, OneCCacheCleaner.NormalizeServerCachePath(value));
+    }
+
+    [Fact]
+    public void TokenizeCommandLine_KeepsQuotedPathsTogether()
+    {
+        var tokens = OneCCacheCleaner.TokenizeCommandLine(
+            "\"C:\\Program Files\\1cv8\\bin\\ragent.exe\" -d \"E:\\1c srvinfo\"");
+
+        Assert.Equal(3, tokens.Count);
+        Assert.Equal("C:\\Program Files\\1cv8\\bin\\ragent.exe", tokens[0]);
+        Assert.Equal("-d", tokens[1]);
+        Assert.Equal("E:\\1c srvinfo", tokens[2]);
+    }
+
     private static void RemoveJunction(string junctionPath)
     {
         try

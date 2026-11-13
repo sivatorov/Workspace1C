@@ -115,3 +115,6 @@ publish/_fetch_debug.txt
 /diag_issue*.md
 /screenshots/_issue*
 /screenshots/issue101_variants.html
+ 
+# Release build artifacts (relnotes_tmp/buildNNN) - never committed 
+relnotes_tmp/build*/ 

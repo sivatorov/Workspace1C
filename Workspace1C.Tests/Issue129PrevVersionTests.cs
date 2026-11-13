@@ -196,6 +196,96 @@ public sealed class Issue129PrevVersionTests : IDisposable
         Assert.Equal("1.0.1.59", EffectiveVersionService.GetEffectiveVersion("1.0.1.60"));
     }
 
+    // --------------------------------------------------------------
+    // Единый источник истины для проверки обновлений (issue #129)
+    // --------------------------------------------------------------
+
+    [Fact]
+    public void CurrentForUpdates_FlagOff_EqualsRealBuild()
+    {
+        // Флаг выключен — решать об обновлении нужно по реальной сборке.
+        Assert.False(EffectiveVersionService.IsPrevVersionModeEnabled());
+        Assert.Equal(VersionInfo.Display(), EffectiveVersionService.CurrentForUpdates);
+        Assert.False(EffectiveVersionService.IsDowngraded);
+    }
+
+    [Fact]
+    public void CurrentForUpdates_FlagOn_EqualsEffectiveVersion()
+    {
+        EnablePrevVersionFlag();
+        EffectiveVersionService.GitTagsProvider = () => "v1.0.1.58\nv1.0.1.59";
+        EffectiveVersionService.ResetGitCacheForTesting();
+
+        Assert.Equal("1.0.1.59", EffectiveVersionService.CurrentForUpdates);
+        Assert.True(EffectiveVersionService.IsDowngraded);
+    }
+
+    [Fact]
+    public void UpdateDecision_UsesEffectiveVersion_WhenDowngraded()
+    {
+        // Ключевой сценарий issue #129: релиз равен РЕАЛЬНОЙ сборке.
+        var real = VersionInfo.Display();
+        var sameRelease = new ReleaseInfo { TagName = "v" + real };
+
+        // Флаг выключен — «обновлений нет» (как и было до исправления).
+        Assert.False(GitHubReleaseService.IsNewerThan(
+            sameRelease, EffectiveVersionService.CurrentForUpdates));
+
+        // Флаг включён и git даёт предыдущую версию — та же сборка СЧИТАЕТСЯ
+        // доступным обновлением (сравнение идёт с эффективной версией).
+        EnablePrevVersionFlag();
+        EffectiveVersionService.GitTagsProvider = () => "v1.0.0.1";
+        EffectiveVersionService.ResetGitCacheForTesting();
+
+        Assert.Equal("1.0.0.1", EffectiveVersionService.CurrentForUpdates);
+        Assert.True(GitHubReleaseService.IsNewerThan(
+            sameRelease, EffectiveVersionService.CurrentForUpdates));
+    }
+
+    [Fact]
+    public void FormatVersionForDisplay_NoDowngrade_ReturnsRealVersion()
+    {
+        const string format = "{0} (prev: {1})";
+        // Версии совпадают (флаг выключен либо снижать нечем) — только реальная сборка.
+        Assert.Equal("1.0.1.60",
+            EffectiveVersionService.FormatVersionForDisplay("1.0.1.60", "1.0.1.60", format));
+        Assert.Equal("1.0.1.60",
+            EffectiveVersionService.FormatVersionForDisplay("1.0.1.60", null, format));
+        Assert.Equal("1.0.1.60",
+            EffectiveVersionService.FormatVersionForDisplay(" 1.0.1.60 ", "", format));
+    }
+
+    [Fact]
+    public void FormatVersionForDisplay_Downgraded_ShowsRealAndEffective()
+    {
+        Assert.Equal("1.0.1.60 (prev: 1.0.1.59)",
+            EffectiveVersionService.FormatVersionForDisplay("1.0.1.60", "1.0.1.59", "{0} (prev: {1})"));
+        // Пустой шаблон — нейтральный fallback без падения.
+        Assert.Equal("1.0.1.60 (1.0.1.59)",
+            EffectiveVersionService.FormatVersionForDisplay("1.0.1.60", "1.0.1.59", null));
+    }
+
+    [Fact]
+    public void ShouldOfferInsteadOfAutoInstall_OnlyForSameRealBuildWhenDowngraded()
+    {
+        var real = VersionInfo.Display();
+        var sameRelease = new ReleaseInfo { TagName = "v" + real };
+        var newerRelease = new ReleaseInfo { TagName = "v9.9.9.9" };
+
+        // Флаг выключен — обычная автоустановка (ограничения нет).
+        Assert.False(EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(sameRelease));
+
+        EnablePrevVersionFlag();
+        EffectiveVersionService.GitTagsProvider = () => "v1.0.0.1";
+        EffectiveVersionService.ResetGitCacheForTesting();
+
+        // Релиз совпадает с РЕАЛЬНОЙ сборкой — только предлагать, не ставить молча.
+        Assert.True(EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(sameRelease));
+        // Реально более новый релиз ставится автоматически, как раньше.
+        Assert.False(EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(newerRelease));
+        Assert.False(EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(null));
+    }
+
     [Fact]
     public void ShouldShowAndMarkShown_UseEffectiveVersion()
     {
@@ -265,6 +355,57 @@ public sealed class Issue129PrevVersionTests : IDisposable
         var fullPath = Path.Combine(FindRepoRoot(), relativePath);
         Assert.True(File.Exists(fullPath), $"Файл проекта не найден: {relativePath}");
         return File.ReadAllText(fullPath);
+    }
+
+    [Fact]
+    public void UpdateChecks_CompareWithEffectiveVersion_NotWithRealBuild()
+    {
+        // Source-гвард issue #129: все решения об обновлении идут через единый
+        // EffectiveVersionService.CurrentForUpdates, прямых сравнений с реальной
+        // сборкой в этих местах быть не должно.
+        foreach (var relativePath in new[]
+                 {
+                     Path.Combine("Workspace1C", "Services", "UpdateService.cs"),
+                     Path.Combine("Workspace1C", "Services", "UpdateService.Avalonia.cs"),
+                     Path.Combine("Workspace1C", "Services", "SchedulerService.cs")
+                 })
+        {
+            var source = ReadProjectFile(relativePath);
+            Assert.Contains("EffectiveVersionService.CurrentForUpdates", source, StringComparison.Ordinal);
+            Assert.DoesNotContain("IsNewerThan(release, VersionInfo.Display())", source, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void FooterAndUpdateDialogs_ShowEffectiveVersion()
+    {
+        // Подпись версии в подвале и диалоги обновления показывают реальную сборку
+        // и эффективную версию (issue #129), а не «голую» реальную версию.
+        var wpfFooter = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
+        Assert.Contains("EffectiveVersionService.FormatVersionForDisplay", wpfFooter, StringComparison.Ordinal);
+        Assert.DoesNotContain("FooterVersionText.Text = \"v\" + VersionInfo.Display()",
+            wpfFooter, StringComparison.Ordinal);
+
+        var avaloniaFooter = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("EffectiveVersionService.FormatVersionForDisplay", avaloniaFooter, StringComparison.Ordinal);
+
+        var wpfDialog = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+        Assert.Contains("EffectiveVersionService.FormatVersionForDisplay", wpfDialog, StringComparison.Ordinal);
+
+        var avaloniaDialog = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateService.Avalonia.cs"));
+        Assert.Contains("EffectiveVersionService.FormatVersionForDisplay", avaloniaDialog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Localization_HasEffectiveVersionKeys_InBothLanguages()
+    {
+        foreach (var lang in new[] { "ru", "en" })
+        {
+            var json = File.ReadAllText(Path.Combine(
+                FindRepoRoot(), "Workspace1C", "Localization", "Languages", lang + ".json"));
+            Assert.Contains("\"Common.VersionEffective\":", json, StringComparison.Ordinal);
+            Assert.Contains("\"Update.AvailableDowngraded\":", json, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

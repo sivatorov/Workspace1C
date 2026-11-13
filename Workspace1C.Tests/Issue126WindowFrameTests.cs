@@ -112,5 +112,47 @@ namespace Workspace1C.Tests
             Assert.Contains("BorderThickness = new Thickness(1)", code, StringComparison.Ordinal);
             Assert.Contains("Border.BorderBrushProperty, \"BorderColorBrush\"", code, StringComparison.Ordinal);
         }
+
+        // ---------- WPF: рамка главного окна следует системному скруглению (1.0.1.61) ----------
+
+        [Fact]
+        public void MainWindow_Wpf_FrameOverlayHasCornerRadius()
+        {
+            // Главное окно не проходит через WindowChromeHelper.Apply (собственный
+            // каркас), поэтому его рамка раньше оставалась прямоугольной при
+            // скруглённых углах DWM — «скругление с квадратной рамкой» (issue #126).
+            // Рамке даётся имя и стартовый CornerRadius, актуальный радиус выставляет
+            // WindowChromeHelper.AttachFrameCornerTracking.
+            var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
+            Assert.Contains("x:Name=\"WindowFrameBorder\"", xaml, StringComparison.Ordinal);
+            Assert.Contains("BorderThickness=\"1\" CornerRadius=\"0\"", xaml, StringComparison.Ordinal);
+
+            var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml.cs"));
+            Assert.Contains("WindowChromeHelper.AttachFrameCornerTracking(this, WindowFrameBorder)",
+                code, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void WindowChromeHelper_Wpf_AttachSharesDeferredRefresh()
+        {
+            // Публичный Attach для окон с собственным каркасом использует тот же
+            // механизм: подписки на показ/смену темы/композиции и пересчёт по состоянию.
+            var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+            Assert.Contains("public static void AttachFrameCornerTracking", code, StringComparison.Ordinal);
+            Assert.Contains("HookFrameCornerMessages(window)", code, StringComparison.Ordinal);
+            Assert.Contains("SetFrameBorder(window, frame)", code, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        public void WindowChromeHelper_Wpf_DialogsTrackFrameAfterShow()
+        {
+            // Диалоги (общий стиль Apply) получают слежение за рамкой сразу после
+            // применения CornerPreference — до первого расчёта радиуса.
+            var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+            var hook = code.IndexOf("HookFrameCornerTracking(window);", StringComparison.Ordinal);
+            var apply = code.IndexOf("ApplyFrameCornerRadius(window);", StringComparison.Ordinal);
+            Assert.True(hook >= 0, "HookFrameCornerTracking не вызывается в Apply.");
+            Assert.True(apply > hook, "Состояние слежения должно создаваться до первого расчёта радиуса.");
+        }
     }
 }

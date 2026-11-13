@@ -11,6 +11,50 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.61] — 2026-11-13
+
+### Исправлено
+
+- **Ручная проверка обновлений доступна во всех режимах (issue #116).** Значок
+  ручной проверки обновлений в подвале главного окна теперь виден во всех
+  режимах проверки — в том числе при автоматической проверке без найденного
+  релиза; видимость считает общий хелпер
+  ([`FooterUpdateIndicatorState`](Workspace1C/Models/FooterUpdateIndicatorState.cs))
+  на обеих платформах
+  ([`MainWindow.Updates.cs`](Workspace1C/Views/MainWindow.Updates.cs),
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)).
+- **Настройка «Считать версию прошлой» учитывается в проверке обновлений,
+  расписании и подписях версии (issue #129).** Эффективная (понижённая) версия
+  используется при сравнении версий и в задании расписания
+  ([`EffectiveVersionService.CurrentForUpdates`](Workspace1C/Services/EffectiveVersionService.cs),
+  [`GitHubReleaseService.IsSameVersion`](Workspace1C/Services/GitHubReleaseService.cs)),
+  в подписях текущей версии диалогов обновления (WPF/Avalonia); добавлена
+  локализация `Common.VersionEffective` и `Update.AvailableDowngraded`.
+- **Рамка окон следует системному скруглению и после показа окна (issue #126).**
+  Радиус рамки пересчитывается после показа окна с отложенным повтором,
+  обрабатываются `WM_THEMECHANGED`/`WM_DWMCOMPOSITIONCHANGED`, добавлена
+  диагностика `CM_THEMES`
+  ([`WindowChromeHelper.ApplyFrameCornerRadius`](Workspace1C/Views/WindowChromeHelper.cs),
+  [`WindowSizeMath.ResolveFrameRounding`](Workspace1C/Services/WindowSizeMath.cs),
+  `AttachFrameCornerTracking`).
+- **Расширения конфигурации: разбор `.cfe` и защита от дублей (issue #117).**
+  Разбор расширений переведён на потоковое чтение с поддержкой UTF-16,
+  вложенных контейнеров и zip-fallback, распознаётся маркер
+  `ConfigurationExtensionPurpose`
+  ([`ConfigExtensionService`](Workspace1C/Services/ConfigExtensionService.cs));
+  при неизвестном имени расширения установка дубля блокируется с предупреждением
+  ([`ExtensionsViewModel`](Workspace1C/ViewModels/ExtensionsViewModel.cs)),
+  локализация ru/en, диалоги WPF/Avalonia. Часть пункта (COM-флажки) сознательно
+  не реализована.
+- **Очистка кэша: поиск серверного кэша 1С (issue #109).** Корни кэша ищутся по
+  параметрам служб и реестра, разбираются `-d`/`--cache`/`srvinfo`, объём
+  считается устойчиво, корни дедуплицируются
+  ([`OneCCacheCleaner.GetCacheRoots`](Workspace1C/Services/OneCCacheCleaner.cs),
+  [`GetRegistryCacheRoots`](Workspace1C/Services/OneCCacheCleaner.cs),
+  [`GetServerAgentCacheRoots`](Workspace1C/Services/OneCCacheCleaner.cs),
+  [`GetRootTotalSize`](Workspace1C/Services/OneCCacheCleaner.cs)). Автоопределение
+  серверного кэша требует уточнений.
+
 ## [1.0.1.60] — 2026-11-13
 
 ### Добавлено

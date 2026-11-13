@@ -209,7 +209,9 @@ public sealed class Issue116BackgroundDownloadTests
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
         Assert.Contains("_footerUpdateReadyIcon = IconHelper.MakeIcon(\"IconCheck\"", code);
-        Assert.Contains("_footerUpdateReadyIcon.IsVisible = isReady;", code);
+        // v1.0.1.61: состояние считает общий хелпер, видимость не зависит от режима.
+        Assert.Contains("_footerUpdateReadyIcon.IsVisible = state.ShowReadyIcon", code);
+        Assert.Contains("FooterUpdateIndicatorState.Resolve", code);
         Assert.Contains("updateService.ReadyStateChanged", code);
         Assert.Contains("Main.Footer.UpdateReadyTooltip", code);
         Assert.Contains("updateService.OpenReadyInstallAsync()", code);

@@ -82,9 +82,55 @@ public static class ConfigExtensionService
     public static string ResolveInstallName(string? cfeRealName, string enteredName, bool nameEdited)
     {
         if (string.IsNullOrWhiteSpace(cfeRealName) || nameEdited ||
-            string.Equals(cfeRealName, enteredName, StringComparison.OrdinalIgnoreCase))
+            NameEquals(cfeRealName, enteredName))
             return enteredName;
         return cfeRealName;
+    }
+
+    /// <summary>
+    /// Сравнение имён расширений: без учёта регистра и с обрезкой пробелов
+    /// (issue #117 — имена из .cfe и из списка базы могут отличаться пробелами).
+    /// </summary>
+    public static bool NameEquals(string? left, string? right) =>
+        string.Equals(left?.Trim(), right?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Issue #117 (защита от дубля): находит установленное расширение, совпадающее
+    /// с именем установки по имени (OrdinalIgnoreCase, с обрезкой пробелов).
+    /// Возвращает имя из списка базы или <c>null</c>. Чистая функция — для тестов.
+    /// </summary>
+    public static string? FindInstalledMatch(string? installName, IEnumerable<string>? installedNames)
+    {
+        if (string.IsNullOrWhiteSpace(installName) || installedNames is null)
+            return null;
+        foreach (var installed in installedNames)
+        {
+            if (NameEquals(installed, installName))
+                return installed.Trim();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Issue #117 (требование 7OH): нужно ли спросить пользователя перед установкой.
+    /// Истина, когда настоящее имя из .cfe прочитать НЕ удалось, а в базе уже есть
+    /// расширения с другими именами — иначе установка молча создаст дубль под именем
+    /// файла, и платформа завершится ошибкой «такое расширение уже есть».
+    /// Если имя из файла прочитано или совпадает с установленным — подтверждение
+    /// не требуется. Чистая функция — для юнит-тестов и окна расширений.
+    /// </summary>
+    public static bool RequiresUnknownNameConfirmation(string? cfeRealName, string? installName,
+        IEnumerable<string>? installedNames)
+    {
+        if (!string.IsNullOrWhiteSpace(cfeRealName))
+            return false;
+        if (installedNames is null)
+            return false;
+        var names = installedNames.Where(n => !string.IsNullOrWhiteSpace(n)).ToList();
+        if (names.Count == 0)
+            return false;
+        // Имя файла/ручное имя совпало с установленным — это обновление, не дубль.
+        return FindInstalledMatch(installName, names) is null;
     }
 
     // ---------------------------------------------------------------------------
@@ -98,19 +144,69 @@ public static class ConfigExtensionService
     // свойство — имя расширения: «{1,0,<guid>},"НастоящееИмя"». Формат проверен на
     // реальных .cfe (платформа 8.3.x); служебный индекс контейнера называется
     // «configinfo» и содержит только список GUID-файлов с их хэшами.
+    //
+    // Issue #117 (расширение «ИР»): у части файлов раскладка отличается — метаданные
+    // лежат во вложенном контейнере (глубже первого уровня), в элементе больше 1 МБ,
+    // в UTF-16 или рядом с маркером ConfigurationExtensionPurpose. Поэтому разбор:
+    //  * читает файл потоково (FileStream + блочное чтение), а не File.ReadAllBytes;
+    //  * обходит вложенные контейнеры до MaxContainerDepth;
+    //  * перебирает все элементы, включая версионные (имя может быть только в «.N»);
+    //  * ищет имя по нескольким шаблонам и в UTF-8, и в UTF-16;
+    //  * при неудаче возвращает null — вызывающий код откатывается к имени файла,
+    //    но установка без подтверждения не выполняется (см. ExtensionsViewModel).
     // ---------------------------------------------------------------------------
 
     /// <summary>GUID-класс «Конфигурация» в текстовом дереве корневого элемента .cfe.</summary>
     private const string ConfigurationClassGuid = "9cd510cd-abfc-11d4-9434-004095e12fc7";
 
+    /// <summary>Маркер назначения расширения (в части .cfe стоит рядом с именем).</summary>
+    private const string ConfigurationExtensionPurposeMarker = "ConfigurationExtensionPurpose";
+
     /// <summary>Сигнатура нативного контейнера 1С (первое LE-слово файла .cfe).</summary>
     private const uint ContainerSignature = 0x7FFFFFFF;
+
+    /// <summary>Сигнатура zip-архива («PK\x03\x04») — встречается у перепакованных .cfe.</summary>
+    private const uint ZipSignature = 0x04034B50;
 
     /// <summary>Размер ASCII-заголовка блока контейнера 1С.</summary>
     private const int BlockHeaderSize = 31;
 
     /// <summary>Заголовок элемента контейнера: даты создания/изменения + 4 нулевых байта.</summary>
     private const int ElementHeaderSize = 20;
+
+    /// <summary>Максимальная глубина вложенных контейнеров при поиске имени.</summary>
+    private const int MaxContainerDepth = 4;
+
+    /// <summary>Предел размера таблицы адресов (защита от повреждённого файла).</summary>
+    private const long MaxTableBlockBytes = 32L * 1024 * 1024;
+
+    /// <summary>Предел размера заголовка элемента контейнера.</summary>
+    private const long MaxElementHeaderBytes = 256 * 1024;
+
+    /// <summary>
+    /// Предел размера данных элемента, читаемых в память целиком. Блоки больше
+    /// распаковываются и просматриваются потоково (без загрузки всего файла).
+    /// </summary>
+    private const long MaxElementBlockBytes = 64L * 1024 * 1024;
+
+    /// <summary>Предел размера элемента zip-архива, читаемого в память.</summary>
+    private const long MaxZipEntryBytes = 32L * 1024 * 1024;
+
+    /// <summary>Размер порции при потоковом просмотре текста.</summary>
+    private const int StreamScanBufferSize = 64 * 1024;
+
+    /// <summary>Сколько символов держать «внахлёст» между порциями потока.</summary>
+    private const int StreamScanWindow = 4096;
+
+    /// <summary>Шаблон строкового свойства «{1,0,<guid>},"Имя"» в текстовом дереве 1С.</summary>
+    private static readonly Regex QuotedNameRegex = new(
+        "\\{1,0,[0-9a-fA-F-]{36}\\},\"([^\"\\r\\n]{1,100})\"",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    /// <summary>Явные именованные свойства в JSON-подобных дампах и служебных блоках.</summary>
+    private static readonly Regex NamedPropertyRegex = new(
+        "\"(?:Name|Наименование|Синоним|Synonym)\"\\s*[:=]\\s*\"([^\"\\r\\n]{1,100})\"",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Читает НАСТОЯЩЕЕ имя расширения из файла .cfe (issue #117): при выборе файла
@@ -126,33 +222,28 @@ public static class ConfigExtensionService
         {
             if (!File.Exists(cfePath))
                 return null;
-            var bytes = File.ReadAllBytes(cfePath);
-            if (bytes.Length < BlockHeaderSize + 16 || BitConverter.ToUInt32(bytes, 0) != ContainerSignature)
+
+            // Issue #117: файл читается потоково (без File.ReadAllBytes) — крупные .cfe
+            // не загружаются в память целиком, читаются только нужные блоки.
+            using var stream = new FileStream(cfePath, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete, 81920, FileOptions.RandomAccess);
+            if (stream.Length < BlockHeaderSize + 16)
+                return null;
+
+            var signatureBytes = new byte[4];
+            if (!ReadAt(stream, 0, signatureBytes, signatureBytes.Length))
+                return null;
+            var signature = BitConverter.ToUInt32(signatureBytes, 0);
+
+            // Перепакованный .cfe может оказаться обычным zip-архивом.
+            if (signature == ZipSignature)
+                return TryReadNameFromZip(cfePath);
+            if (signature != ContainerSignature)
                 return null;
 
             var elements = new List<ContainerElement>();
-            if (!ReadContainerElements(bytes, elements, maxDepth: 1))
-                return null;
-
-            // Приоритет 1: текущие версии элементов (имена без суффикса «.N») компактного
-            // размера — корневой элемент метаданных всегда невелик. Приоритет 2: все
-            // элементы (на случай другой раскладки контейнера).
-            foreach (var candidates in new Func<ContainerElement, bool>[]
-            {
-                e => !IsVersionedElement(e.Name) && e.Data is { Length: > 60 } && e.Data.Length <= 1024 * 1024,
-                e => e.Data is { Length: > 60 }
-            })
-            {
-                foreach (var element in elements)
-                {
-                    if (!candidates(element))
-                        continue;
-                    var name = ExtractExtensionName(element.Data!);
-                    if (name is not null)
-                        return name;
-                }
-            }
-            return null;
+            ReadContainerElements(stream, stream.Length, 16, elements, MaxContainerDepth, depth: 0);
+            return SelectExtensionName(elements);
         }
         catch
         {
@@ -165,6 +256,28 @@ public static class ConfigExtensionService
     {
         public string Name = string.Empty;
         public byte[]? Data;
+        public string? FoundName;
+        public int Depth;
+    }
+
+    /// <summary>
+    /// Выбирает имя из найденных элементов: приоритет — текущие (не версионные)
+    /// элементы верхнего уровня, затем вложенные, затем версионные («.N»).
+    /// </summary>
+    private static string? SelectExtensionName(IReadOnlyList<ContainerElement> elements)
+    {
+        foreach (var predicate in new Func<ContainerElement, bool>[]
+        {
+            e => e.FoundName is not null && e.Depth == 0 && !IsVersionedElement(e.Name),
+            e => e.FoundName is not null && !IsVersionedElement(e.Name),
+            e => e.FoundName is not null
+        })
+        {
+            foreach (var element in elements)
+                if (predicate(element))
+                    return element.FoundName;
+        }
+        return null;
     }
 
     /// <summary>Истина, если имя элемента имеет суффикс версии «.N» (старая версия файла).</summary>
@@ -179,24 +292,21 @@ public static class ConfigExtensionService
         return true;
     }
 
-    /// <summary>Извлекает имя расширения из текстового дерева корневого элемента.</summary>
+    /// <summary>Извлекает имя расширения из данных элемента (UTF-8 и UTF-16LE).</summary>
     private static string? ExtractExtensionName(byte[] data)
     {
+        if (data.Length < 16)
+            return null;
         try
         {
-            var text = Encoding.UTF8.GetString(data);
-            var classPos = text.IndexOf(ConfigurationClassGuid, StringComparison.OrdinalIgnoreCase);
-            if (classPos < 0)
-                return null;
-            // После GUID-класса «Конфигурация» первое строковое свойство — имя:
-            // …9cd510cd-…,{1,{79,{0,{4,{1,0,<guid>},"ИмяРасширения",{1,"ru",…
-            var match = Regex.Match(text.Substring(classPos), @"\{1,0,[0-9a-f-]{36}\},""([^""\r\n]{1,100})""");
-            if (!match.Success)
-                return null;
-            var name = match.Groups[1].Value.Trim().TrimEnd('\0');
-            if (name.Length == 0 || name.IndexOf('"') >= 0)
-                return null;
-            return name;
+            var name = ExtractNameFromText(Encoding.UTF8.GetString(data));
+            if (name is not null)
+                return name;
+
+            // Issue #117: часть .cfe хранит текстовое дерево в UTF-16LE (иногда с BOM).
+            if (LooksLikeUtf16(data))
+                return ExtractNameFromText(Encoding.Unicode.GetString(data));
+            return null;
         }
         catch
         {
@@ -204,18 +314,155 @@ public static class ConfigExtensionService
         }
     }
 
+    /// <summary>Признак UTF-16LE-текста: BOM или высокая доля нулевых старших байтов.</summary>
+    private static bool LooksLikeUtf16(byte[] data)
+    {
+        if (data.Length >= 2 && data[0] == 0xFF && data[1] == 0xFE)
+            return true;
+        var sample = Math.Min(data.Length, 4096);
+        if (sample < 32)
+            return false;
+        var pairs = sample / 2;
+        var oddZeros = 0;
+        var evenZeros = 0;
+        for (var i = 0; i + 1 < sample; i += 2)
+        {
+            if (data[i] == 0) evenZeros++;
+            if (data[i + 1] == 0) oddZeros++;
+        }
+        return oddZeros > pairs / 4 && evenZeros < pairs / 10;
+    }
+
     /// <summary>
-    /// Разбирает контейнер 1С (включая вложенные до <paramref name="maxDepth"/>) и
-    /// наполняет <paramref name="elements"/> парами «имя элемента — распакованные данные».
+    /// Извлекает имя из текстового дерева: после GUID-класса «Конфигурация», рядом
+    /// с маркером ConfigurationExtensionPurpose, в именованных свойствах или как
+    /// первое правдоподобное «{1,0,<guid>,"Имя"».
     /// </summary>
-    private static bool ReadContainerElements(byte[] bytes, List<ContainerElement> elements, int maxDepth)
+    private static string? ExtractNameFromText(string text)
+    {
+        if (text.Length == 0)
+            return null;
+
+        // 1. Основной шаблон: после GUID-класса «Конфигурация» первое строковое
+        //    свойство — имя расширения:
+        //    …9cd510cd-…,{1,{79,{0,{4,{1,0,<guid>},"ИмяРасширения",{1,"ru",…
+        var classPos = text.IndexOf(ConfigurationClassGuid, StringComparison.OrdinalIgnoreCase);
+        if (classPos >= 0)
+        {
+            var name = FindFirstQuotedName(text, classPos, text.Length - classPos, generic: false);
+            if (name is not null)
+                return name;
+        }
+
+        // 2. Issue #117 («ИР»): имя может стоять рядом с маркером назначения
+        //    расширения, а не сразу после класса «Конфигурация».
+        var purposePos = text.IndexOf(ConfigurationExtensionPurposeMarker, StringComparison.OrdinalIgnoreCase);
+        if (purposePos >= 0)
+        {
+            var name = FindFirstQuotedName(text, purposePos,
+                Math.Min(text.Length - purposePos, 200_000), generic: false);
+            if (name is not null)
+                return name;
+        }
+
+        // 3. Явные именованные свойства (JSON-подобные дампы и служебные блоки).
+        var named = NamedPropertyRegex.Match(text);
+        if (named.Success && IsPlausibleNameValue(named.Groups[1].Value, generic: true))
+            return named.Groups[1].Value.Trim();
+
+        // 4. Последний шанс: первое правдоподобное «{1,0,<guid>},"…"» в тексте.
+        foreach (Match match in QuotedNameRegex.Matches(text))
+        {
+            var value = match.Groups[1].Value;
+            if (IsPlausibleNameValue(value, generic: true))
+                return value.Trim();
+        }
+        return null;
+    }
+
+    /// <summary>Ищет первое правдоподобное имя «{1,0,<guid>},"…"» в указанном окне текста.</summary>
+    private static string? FindFirstQuotedName(string text, int start, int length, bool generic)
+    {
+        if (start < 0 || length <= 0 || start >= text.Length)
+            return null;
+        length = Math.Min(length, text.Length - start);
+        var match = QuotedNameRegex.Match(text, start, length);
+        while (match.Success)
+        {
+            var value = match.Groups[1].Value;
+            if (IsPlausibleNameValue(value, generic))
+                return value.Trim();
+            match = match.NextMatch();
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Проверка правдоподобности строкового значения как имени расширения:
+    /// отсекает GUID, языковые коды локализованных синонимов, пути и мусор.
+    /// </summary>
+    private static bool IsPlausibleNameValue(string? value, bool generic)
+    {
+        if (value is null)
+            return false;
+        var name = value.Trim().TrimEnd('\0');
+        if (name.Length is 0 or > 100)
+            return false;
+        if (name.IndexOf('"') >= 0 || name.IndexOf('{') >= 0 || name.IndexOf('}') >= 0)
+            return false;
+        if (name.Any(char.IsControl))
+            return false;
+        if (Guid.TryParse(name, out _))
+            return false;
+        if (!generic)
+            return true;
+        if (name.All(char.IsDigit))
+            return false;
+        if (name.Length <= 3 && name.All(c => c is >= 'a' and <= 'z'))
+            return false;
+        if (name.Contains('/') || name.Contains('\\'))
+            return false;
+        return true;
+    }
+
+    /// <summary>Поиск имени в перепакованном .cfe (zip-архив).</summary>
+    private static string? TryReadNameFromZip(string cfePath)
+    {
+        using var archive = ZipFile.OpenRead(cfePath);
+        foreach (var entry in archive.Entries)
+        {
+            if (entry.Length <= 0 || entry.Length > MaxZipEntryBytes)
+                continue;
+            try
+            {
+                using var entryStream = entry.Open();
+                using var memory = new MemoryStream((int)entry.Length);
+                entryStream.CopyTo(memory);
+                var name = ExtractExtensionName(memory.ToArray());
+                if (name is not null)
+                    return name;
+            }
+            catch
+            {
+                // Повреждённая запись архива — пропускаем.
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Разбирает контейнер 1С (включая вложенные до <paramref name="maxDepth"/>)
+    /// и наполняет <paramref name="elements"/> найденными именами расширения.
+    /// </summary>
+    private static void ReadContainerElements(Stream source, long containerLength, long tableAddr,
+        List<ContainerElement> elements, int maxDepth, int depth)
     {
         // Заголовок контейнера: 16 байт (сигнатура, размер страницы, версия, резерв),
         // затем блок-таблица адресов элементов.
-        var table = ReadBlock(bytes, 16);
-        if (table is null)
-            return false;
-        table = TryInflate(table);
+        var tableRaw = ReadBlock(source, tableAddr, MaxTableBlockBytes);
+        if (tableRaw is null)
+            return;
+        var table = TryInflate(tableRaw);
 
         for (var offset = 0; offset + 12 <= table.Length; offset += 12)
         {
@@ -224,29 +471,101 @@ public static class ConfigExtensionService
                 break;
             var headerAddr = BitConverter.ToUInt32(table, offset);
             var dataAddr = BitConverter.ToUInt32(table, offset + 4);
-            if (headerAddr == ContainerSignature || headerAddr == 0 || dataAddr >= bytes.Length)
+            if (headerAddr == ContainerSignature || headerAddr == 0 || dataAddr >= containerLength)
                 break;
 
-            var elementHeader = TryInflate(ReadBlock(bytes, (int)headerAddr) ?? Array.Empty<byte>());
-            var elementData = ReadBlock(bytes, (int)dataAddr);
-            if (elementData is null)
-                continue;
-
+            var elementHeader = TryInflate(ReadBlock(source, headerAddr, MaxElementHeaderBytes) ?? Array.Empty<byte>());
             var element = new ContainerElement
             {
                 Name = GetElementName(elementHeader),
-                Data = TryInflate(elementData)
+                Depth = depth
             };
-            elements.Add(element);
 
-            // Вложенный контейнер (например, «<guid>.2» — текущая версия файла объекта).
-            if (maxDepth > 0 && element.Data.Length > 16 &&
-                BitConverter.ToUInt32(element.Data, 0) == ContainerSignature)
+            var dataRaw = ReadBlock(source, dataAddr, MaxElementBlockBytes);
+            if (dataRaw is not null)
             {
-                ReadContainerElements(element.Data, elements, maxDepth - 1);
+                var data = TryInflate(dataRaw);
+                element.Data = data;
+                element.FoundName = ExtractExtensionName(data);
+                if (element.FoundName is null && !ReferenceEquals(data, dataRaw))
+                    element.FoundName = ExtractExtensionName(dataRaw);
+
+                if (maxDepth > 0)
+                {
+                    // Вложенный контейнер может быть как распакован, так и сжат в блоке.
+                    var nested = data.Length > 16 && BitConverter.ToUInt32(data, 0) == ContainerSignature
+                        ? data
+                        : dataRaw.Length > 16 && BitConverter.ToUInt32(dataRaw, 0) == ContainerSignature
+                            ? dataRaw
+                            : null;
+                    if (nested is not null)
+                    {
+                        using var nestedStream = new MemoryStream(nested, writable: false);
+                        ReadContainerElements(nestedStream, nested.Length, 16, elements,
+                            maxDepth - 1, depth + 1);
+                    }
+                }
             }
+            else
+            {
+                // Элемент больше MaxElementBlockBytes — просматриваем потоково.
+                element.FoundName = ScanLargeBlock(source, dataAddr);
+            }
+
+            elements.Add(element);
         }
-        return true;
+    }
+
+    /// <summary>Потоковый поиск имени в очень крупном элементе контейнера.</summary>
+    private static string? ScanLargeBlock(Stream source, long dataAddr)
+    {
+        // Сначала пробуем распаковать deflate-поток.
+        try
+        {
+            using var block = new BlockDataStream(source, dataAddr);
+            using var deflate = new DeflateStream(block, CompressionMode.Decompress, leaveOpen: false);
+            var name = ScanTextStream(deflate, Encoding.UTF8);
+            if (name is not null)
+                return name;
+        }
+        catch
+        {
+            // Не сжатый блок — ниже просмотрим как есть.
+        }
+
+        try
+        {
+            using var block = new BlockDataStream(source, dataAddr);
+            return ScanTextStream(block, Encoding.UTF8);
+        }
+        catch
+        {
+            // Повреждённый блок — имени нет.
+            return null;
+        }
+    }
+
+    /// <summary>Потоковое чтение текста с окном перекрытия (имя может быть на границе порций).</summary>
+    private static string? ScanTextStream(Stream stream, Encoding encoding)
+    {
+        var decoder = encoding.GetDecoder();
+        var bytes = new byte[StreamScanBufferSize];
+        var chars = new char[encoding.GetMaxCharCount(bytes.Length)];
+        var text = new StringBuilder();
+        int read;
+        while ((read = stream.Read(bytes, 0, bytes.Length)) > 0)
+        {
+            var charCount = decoder.GetChars(bytes, 0, read, chars, 0, flush: false);
+            if (charCount > 0)
+                text.Append(chars, 0, charCount);
+            if (text.Length < StreamScanWindow * 2)
+                continue;
+            var name = ExtractNameFromText(text.ToString());
+            if (name is not null)
+                return name;
+            text.Remove(0, text.Length - StreamScanWindow);
+        }
+        return ExtractNameFromText(text.ToString());
     }
 
     /// <summary>Имя элемента контейнера: UTF-16LE после 20-байтового заголовка.</summary>
@@ -265,41 +584,139 @@ public static class ConfigExtensionService
     /// Читает блок контейнера по адресу его ASCII-заголовка, поддерживая блоки,
     /// разбитые на несколько страниц (переход по адресу следующей страницы).
     /// </summary>
-    private static byte[]? ReadBlock(byte[] bytes, int addr)
+    private static byte[]? ReadBlock(Stream source, long addr, long maxBytes)
     {
-        if (addr < 0 || addr + BlockHeaderSize > bytes.Length)
+        if (!TryReadHeader(source, addr, out var dataSize, out _, out _))
             return null;
-        var header = Encoding.ASCII.GetString(bytes, addr, BlockHeaderSize);
-        if (!header.StartsWith("\r\n", StringComparison.Ordinal))
+        if (dataSize <= 0 || dataSize > maxBytes)
             return null;
-        if (!TryParseHex(header, 2, 8, out var dataSize) ||
-            !TryParseHex(header, 11, 8, out var pageSize) ||
-            !TryParseHex(header, 20, 8, out var nextAddr))
-            return null;
-        if (dataSize < 0 || dataSize > bytes.Length)
-            return null;
-
-        using var result = new MemoryStream();
-        var read = 0;
-        while (read < dataSize)
+        try
         {
-            var take = (int)Math.Min(pageSize, dataSize - read);
-            if (take <= 0 || addr + BlockHeaderSize + read + take > bytes.Length)
-                return null;
-            result.Write(bytes, addr + BlockHeaderSize + read, take);
-            read += take;
-            if (nextAddr == ContainerSignature)
-                break;
-            addr = (int)nextAddr;
-            if (addr < 0 || addr + BlockHeaderSize > bytes.Length)
-                return null;
-            header = Encoding.ASCII.GetString(bytes, addr, BlockHeaderSize);
-            if (!header.StartsWith("\r\n", StringComparison.Ordinal) ||
-                !TryParseHex(header, 11, 8, out pageSize) ||
-                !TryParseHex(header, 20, 8, out nextAddr))
-                return null;
+            using var block = new BlockDataStream(source, addr);
+            using var result = new MemoryStream((int)Math.Min(dataSize, int.MaxValue));
+            block.CopyTo(result);
+            return result.Length > 0 ? result.ToArray() : null;
         }
-        return result.ToArray();
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Разбор ASCII-заголовка блока контейнера 1С.</summary>
+    private static bool TryReadHeader(Stream source, long addr,
+        out long dataSize, out long pageSize, out long nextAddr)
+    {
+        dataSize = 0;
+        pageSize = 0;
+        nextAddr = 0;
+        if (addr < 0 || addr + BlockHeaderSize > source.Length)
+            return false;
+        var header = new byte[BlockHeaderSize];
+        if (!ReadAt(source, addr, header, header.Length))
+            return false;
+        var text = Encoding.ASCII.GetString(header);
+        if (!text.StartsWith("\r\n", StringComparison.Ordinal))
+            return false;
+        if (!TryParseHex(text, 2, 8, out dataSize) ||
+            !TryParseHex(text, 11, 8, out pageSize) ||
+            !TryParseHex(text, 20, 8, out nextAddr))
+            return false;
+        if (pageSize <= 0)
+            pageSize = dataSize;
+        return dataSize >= 0;
+    }
+
+    /// <summary>Чтение ровно <paramref name="count"/> байт по абсолютному смещению.</summary>
+    private static bool ReadAt(Stream source, long offset, byte[] buffer, int count)
+        => ReadAt(source, offset, buffer, 0, count) == count;
+
+    private static int ReadAt(Stream source, long offset, byte[] buffer, int bufferOffset, int count)
+    {
+        if (offset < 0 || count < 0 || offset + count > source.Length)
+            return 0;
+        source.Position = offset;
+        var total = 0;
+        while (total < count)
+        {
+            var read = source.Read(buffer, bufferOffset + total, count - total);
+            if (read <= 0)
+                break;
+            total += read;
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// Потоковое чтение данных блока контейнера 1С (с переходом по страницам),
+    /// без загрузки всего файла в память.
+    /// </summary>
+    private sealed class BlockDataStream : Stream
+    {
+        private readonly Stream _source;
+        private long _currentDataOffset;
+        private long _nextAddr;
+        private long _remaining;
+        private int _pageSize;
+        private int _pageRemaining;
+
+        public BlockDataStream(Stream source, long addr)
+        {
+            _source = source;
+            if (!TryReadHeader(source, addr, out var dataSize, out var pageSize, out var nextAddr))
+                throw new InvalidDataException("Повреждён заголовок блока контейнера 1С.");
+            _remaining = dataSize;
+            _pageSize = (int)Math.Min(pageSize, int.MaxValue);
+            _nextAddr = nextAddr;
+            _currentDataOffset = addr + BlockHeaderSize;
+            _pageRemaining = (int)Math.Min(_pageSize, _remaining);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var total = 0;
+            while (count > 0 && _remaining > 0)
+            {
+                if (_pageRemaining == 0)
+                {
+                    if (_nextAddr == ContainerSignature)
+                        break;
+                    if (!TryReadHeader(_source, _nextAddr, out _, out var pageSize, out var nextAddr))
+                        break;
+                    _currentDataOffset = _nextAddr + BlockHeaderSize;
+                    _nextAddr = nextAddr;
+                    _pageSize = (int)Math.Min(pageSize, int.MaxValue);
+                    _pageRemaining = (int)Math.Min(_pageSize, _remaining);
+                    if (_pageRemaining <= 0)
+                        break;
+                }
+                var take = Math.Min(count, _pageRemaining);
+                var read = ReadAt(_source, _currentDataOffset, buffer, offset, take);
+                if (read <= 0)
+                    break;
+                _currentDataOffset += read;
+                _pageRemaining -= read;
+                _remaining -= read;
+                offset += read;
+                count -= read;
+                total += read;
+            }
+            return total;
+        }
+
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     /// <summary>Разбор 8-символьного hex-числа из ASCII-заголовка блока.</summary>
@@ -348,6 +765,12 @@ public static class ConfigExtensionService
         "обнаружены ошибки",
         "ошибка обновления",
         "ошибка при обновлении",
+        // Issue #117 (7OH): платформа ругается на уже установленное расширение —
+        // это отказ, а не «успешно завершено», даже если код возврата 0.
+        "уже существует",
+        "уже установлено",
+        "already exists",
+        "already installed",
         "has failed",
         "cannot be performed",
         "cannot be completed",

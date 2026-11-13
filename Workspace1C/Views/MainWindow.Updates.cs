@@ -51,10 +51,16 @@ public partial class MainWindow
     /// Инициализирует блок версии в подвале строки состояния (issue #116): текст
     /// версии, подписка на смену состояния «доступна новая версия» службы обновления
     /// и первичная расстановка видимости ссылок «Обновить»/«Проверить обновления».
+    /// Issue #129: при включённом «Считать версию прошлой» в подписи показываются
+    /// реальная сборка и эффективная (понижённая) версия — иначе непонятно, почему
+    /// проверка обновлений предлагает «обновление на текущую версию».
     /// </summary>
     private void InitializeFooterUpdateState()
     {
-        FooterVersionText.Text = "v" + VersionInfo.Display();
+        FooterVersionText.Text = "v" + EffectiveVersionService.FormatVersionForDisplay(
+            VersionInfo.Display(),
+            EffectiveVersionService.CurrentForUpdates,
+            LocalizationManager.T("Common.VersionEffective"));
 
         try
         {
@@ -84,14 +90,16 @@ public partial class MainWindow
         => Dispatcher.Invoke(RefreshFooterUpdateState);
 
     /// <summary>
-    /// Расставляет три состояния значка обновления в статус-баре (issue #116,
-    /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие стрелки
-    /// синхронизации — ручная проверка доступна (режимы «только уведомлять» и
-    /// «проверять вручную»), релиза нет; значок «внимание» (восклицательный знак
-    /// в треугольнике) в акцентном цвете — есть доступный релиз (issue #116
-    /// v1.0.1.54: жирные красные «!!!» вводили в заблуждение — красный «!!»
-    /// в логах означает серьёзные ошибки). Tooltip меняется вместе с состоянием;
-    /// клик — единая ручная проверка.
+    /// Расставляет состояния значка обновления в статус-баре (issue #116).
+    /// С v1.0.1.61 значок виден во <b>всех</b> режимах обновления: в авто-режимах
+    /// без доступного релиза он больше не скрывается, поэтому ручная проверка
+    /// доступна всегда. Состояния: стрелки синхронизации — релиза нет и файл
+    /// ещё не готов; значок «внимание» (восклицательный знак в треугольнике)
+    /// в акцентном цвете — есть доступный релиз (issue #116 v1.0.1.54: жирные
+    /// красные «!!!» вводили в заблуждение — красный «!!» в логах означает
+    /// серьёзные ошибки); зелёная галочка — файл скачан и готов к установке
+    /// (issue #116 v1.0.1.58). Tooltip меняется вместе с состоянием; клик —
+    /// единая ручная проверка.
     /// </summary>
     private void RefreshFooterUpdateState()
     {
@@ -106,14 +114,14 @@ public partial class MainWindow
             // установки готового файла (без сетевой проверки).
             var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
             var hasRelease = updateService.AvailableRelease is not null;
-            var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
+            // v1.0.1.61: видимость значка больше не зависит от режима обновления —
+            // в авто-режимах без релиза он тоже доступен для ручной проверки.
+            var state = FooterUpdateIndicatorState.Resolve(updateService.Mode, hasRelease, isReady);
 
-            FooterUpdateIcon.Visibility = hasRelease || manualCheck
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-            FooterUpdateSyncIcon.Visibility = !hasRelease && !isReady ? Visibility.Visible : Visibility.Collapsed;
-            FooterUpdateWarnIcon.Visibility = hasRelease && !isReady ? Visibility.Visible : Visibility.Collapsed;
-            FooterUpdateReadyIcon.Visibility = isReady ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateIcon.Visibility = state.IsVisible ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateSyncIcon.Visibility = state.ShowSyncIcon ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateWarnIcon.Visibility = state.ShowWarningIcon ? Visibility.Visible : Visibility.Collapsed;
+            FooterUpdateReadyIcon.Visibility = state.ShowReadyIcon ? Visibility.Visible : Visibility.Collapsed;
 
             FooterUpdateIcon.ToolTip = isReady
                 ? string.Format(

@@ -310,6 +310,172 @@ public sealed class Issue109CacheRootTotalTests
         Assert.Contains("\"CacheClean.SizeUnits\": \"B,KB,MB,GB,TB\"", en, StringComparison.Ordinal);
     }
 
+    // ===================== Серверный кэш из параметров агента (issue #109) =====================
+
+    [Theory]
+    [InlineData("srvinfo", true)]
+    [InlineData("CachePath", false)]
+    [InlineData("SrvInfoPath", true)]
+    [InlineData("srvdir", true)]
+    [InlineData("InstalledLocation", false)]
+    [InlineData("", false)]
+    public void IsServerInfoValueName_MatchesOnlyServerDataParameters(string name, bool expected)
+    {
+        Assert.Equal(expected, OneCCacheCleaner.IsServerInfoValueName(name));
+    }
+
+    [Fact]
+    public void ServerCacheRoots_ParticipateInRootsAndSize_ButNotInOrphanScan()
+    {
+        var temp = CreateTempDir();
+        try
+        {
+            var suffix = Guid.NewGuid().ToString("N");
+            var dbName = "Серверная_" + suffix;
+            var serverRoot = Path.Combine(temp, "srvinfo");
+            var cacheDir = Path.Combine(serverRoot, $"Srvr__srv1c__Ref__{dbName}__");
+            WriteFile(Path.Combine(cacheDir, "data.dat"), 300);
+
+            // Подменяем реальный провайдер (реестр служб ragent): на машине тестов
+            // службы серверного агента может не быть.
+            OneCCacheCleaner.SetServerCacheRootsForTests(new[] { serverRoot });
+            try
+            {
+                // Найденный серверный корень участвует в корнях обоих типов кэша.
+                Assert.Contains(serverRoot, OneCCacheCleaner.GetCacheRoots(OneCCacheKind.User));
+                Assert.Contains(serverRoot, OneCCacheCleaner.GetCacheRoots(OneCCacheKind.Program));
+
+                // Но не участвует в поиске «остатков»: удалять серверные данные
+                // вне подтверждённой принадлежности базе недопустимо.
+                Assert.DoesNotContain(serverRoot,
+                    OneCCacheCleaner.GetCacheRoots(OneCCacheKind.User, forOrphanScan: true));
+
+                // Размер серверного кэша базы находится по имени Srvr__…__Ref__…__.
+                var ib = new Infobase { Id = "ib-id", Name = dbName };
+                ib.Connection.Type = ConnectionType.ClientServer;
+                ib.Connection.Server = "srv1c";
+                ib.Connection.DatabaseName = dbName;
+                Assert.Equal(300, OneCCacheCleaner.GetSize(ib, OneCCacheKind.User));
+
+                // Итог окна очистки (GetRootTotalSize) тоже включает серверный корень.
+                Assert.True(OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User) >= 300);
+            }
+            finally
+            {
+                OneCCacheCleaner.SetServerCacheRootsForTests(null);
+            }
+        }
+        finally
+        {
+            DeleteDir(temp);
+        }
+    }
+
+    [Fact]
+    public void GetRootTotalSize_ServerRootAlsoListedAsAdditional_IsCountedOnce()
+    {
+        var temp = CreateTempDir();
+        try
+        {
+            var root = Path.Combine(temp, "srvinfo");
+            WriteFile(Path.Combine(root, "cache-id", "data.dat"), 200);
+
+            OneCCacheCleaner.SetAdditionalRoots(new[] { root });
+            long baseline;
+            try
+            {
+                baseline = OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User);
+            }
+            finally
+            {
+                OneCCacheCleaner.SetAdditionalRoots(null);
+            }
+
+            // Тот же каталог пришёл и из «серверных» параметров, и из настроек —
+            // канонизация путей не должна удваивать объём.
+            OneCCacheCleaner.SetAdditionalRoots(new[] { root });
+            OneCCacheCleaner.SetServerCacheRootsForTests(new[] { root });
+            try
+            {
+                Assert.Equal(baseline, OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User));
+            }
+            finally
+            {
+                OneCCacheCleaner.SetServerCacheRootsForTests(null);
+                OneCCacheCleaner.SetAdditionalRoots(null);
+            }
+        }
+        finally
+        {
+            DeleteDir(temp);
+        }
+    }
+
+#if !LINUX
+    [Fact]
+    public void GetServerAgentCacheRoots_ResultIsCachedPerSession()
+    {
+        // Реестр служб на машине тестов может быть пуст — проверяем контракт:
+        // повторные вызовы возвращают тот же снимок (реестр читается один раз).
+        var first = OneCCacheCleaner.GetServerAgentCacheRoots();
+        var second = OneCCacheCleaner.GetServerAgentCacheRoots();
+        Assert.Same(first, second);
+    }
+#endif
+
+    // ===================== Устойчивость расчёта объёма (issue #109) =====================
+
+    [Fact]
+    public void GetDirectorySize_CountsLargeDirectoryCompletely()
+    {
+        var temp = CreateTempDir();
+        try
+        {
+            var root = Path.Combine(temp, "1cv8", "8.3.24.1000", "cache-id");
+            Directory.CreateDirectory(root);
+            const int files = 2000;
+            const int fileSize = 1024;
+            for (var i = 0; i < files; i++)
+                File.WriteAllBytes(Path.Combine(root, $"f{i}.bin"), new byte[fileSize]);
+
+            // «Большой» каталог: объём не должен обрезаться/теряться из-за порций перечисления.
+            Assert.Equal((long)files * fileSize, OneCCacheCleaner.GetDirectorySize(root));
+        }
+        finally
+        {
+            DeleteDir(temp);
+        }
+    }
+
+    [Fact]
+    public void GetDirectorySize_BrokenLink_DoesNotThrowAndCountsRegularFiles()
+    {
+        var temp = CreateTempDir();
+        try
+        {
+            var root = Path.Combine(temp, "1cv8");
+            WriteFile(Path.Combine(root, "cache-id", "data.dat"), 128);
+
+            // «Битая» ссылка: цель не существует. Создание симлинка может быть
+            // недоступно без прав — тогда тест всё равно проверяет обычный подсчёт.
+            var broken = Path.Combine(root, "broken-cache");
+            try
+            {
+                Directory.CreateSymbolicLink(broken, Path.Combine(temp, "missing-target"));
+            }
+            catch
+            {
+                // Нет прав/поддержки ссылок — пропускаем создание.
+            }
+
+            Assert.Equal(128, OneCCacheCleaner.GetDirectorySize(root));
+        }
+        finally
+        {
+            DeleteDir(temp);
+        }
+    }
+
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

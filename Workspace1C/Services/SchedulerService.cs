@@ -479,11 +479,25 @@ public class SchedulerService : IDisposable
         // Это НЕ ошибка: задание завершается успешно, в LastRunMessage попадает текст
         // «версия актуальна», а уведомление подавляется, чтобы не спамить при повторе
         // проверки по расписанию.
-        if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
+        // Issue #129: сравнение идёт с ЭФФЕКТИВНОЙ версией (при включённом «Считать
+        // версию прошлой» — понижённой), иначе проверка по расписанию не видела
+        // обновления на реальную сборку.
+        if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
         {
             result.Success = true;
             result.ScenarioName = LocalizationManager.T("Update.UpToDate");
             result.SuppressNotification = true;
+            return result;
+        }
+
+        // issue #129: при виртуальном понижении найденный релиз может совпадать с РЕАЛЬНОЙ
+        // сборкой — молча его не устанавливаем (цикл «обновились на свою же версию»),
+        // а сообщаем, что обновление доступно (уведомление задания не подавляется).
+        if (EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(release))
+        {
+            result.Success = true;
+            result.ScenarioName = string.Format(
+                LocalizationManager.T("Update.AvailableDowngraded"), release.TagName);
             return result;
         }
 

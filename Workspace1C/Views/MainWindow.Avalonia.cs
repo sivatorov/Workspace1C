@@ -2293,8 +2293,9 @@ namespace Workspace1C
             Grid.SetColumn(_syncMessage, 1);
 
             // Версия приложения и значок обновления (issue #116): значок стоит СЛЕВА
-            // от версии; клик по версии — окно «Что нового». Состояния значка
-            // (скрыт / стрелки синхронизации / значок «внимание») расставляет
+            // от версии; клик по версии — окно «Что нового». Значок виден во всех
+            // режимах обновления (v1.0.1.61); его состояния (стрелки синхронизации /
+            // «внимание» / зелёная галочка готовности) расставляет
             // RefreshFooterUpdateState.
             var footerPanel = new StackPanel
             {
@@ -2334,7 +2335,12 @@ namespace Workspace1C
 
             _footerVersionText = new TextBlock
             {
-                Text = "v" + VersionInfo.Display(),
+                // Issue #129: при включённом «Считать версию прошлой» показываем
+                // реальную сборку и эффективную (понижённую) версию.
+                Text = "v" + EffectiveVersionService.FormatVersionForDisplay(
+                    VersionInfo.Display(),
+                    EffectiveVersionService.CurrentForUpdates,
+                    LocalizationManager.T("Common.VersionEffective")),
                 FontSize = 12,
                 Margin = new Thickness(10, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -2453,12 +2459,14 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Расставляет три состояния значка обновления в статус-баре (issue #116,
-        /// п.3 v1.0.1.50): скрыт — в авто-режимах без доступного релиза; синие
-        /// стрелки синхронизации — ручная проверка доступна (режимы «только
-        /// уведомлять» и «проверять вручную»), релиза нет; значок «внимание» в
-        /// акцентном цвете — есть доступный релиз (issue #116 v1.0.1.54: красные
-        /// «!!!» вводили в заблуждение). Tooltip меняется вместе с состоянием.
+        /// Расставляет состояния значка обновления в статус-баре (issue #116).
+        /// С v1.0.1.61 значок виден во <b>всех</b> режимах обновления: в авто-режимах
+        /// без доступного релиза он больше не скрывается, поэтому ручная проверка
+        /// доступна всегда. Состояния: стрелки синхронизации — релиза нет и файл
+        /// ещё не готов; значок «внимание» в акцентном цвете — есть доступный релиз
+        /// (issue #116 v1.0.1.54: красные «!!!» вводили в заблуждение); зелёная
+        /// галочка — файл скачан и готов к установке (issue #116 v1.0.1.58).
+        /// Tooltip меняется вместе с состоянием.
         /// </summary>
         private void RefreshFooterUpdateState()
         {
@@ -2473,12 +2481,14 @@ namespace Workspace1C
                 // установки готового файла (без сетевой проверки).
                 var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
                 var hasRelease = updateService.AvailableRelease is not null;
-                var manualCheck = updateService.Mode is AppUpdateMode.NotifyOnly or AppUpdateMode.Manual;
+                // v1.0.1.61: видимость значка больше не зависит от режима обновления —
+                // в авто-режимах без релиза он тоже доступен для ручной проверки.
+                var state = FooterUpdateIndicatorState.Resolve(updateService.Mode, hasRelease, isReady);
 
-                _footerUpdateIcon.IsVisible = hasRelease || manualCheck;
-                _footerUpdateSyncIcon.IsVisible = !hasRelease && !isReady;
-                _footerUpdateWarningIcon.IsVisible = hasRelease && !isReady;
-                _footerUpdateReadyIcon.IsVisible = isReady;
+                _footerUpdateIcon.IsVisible = state.IsVisible;
+                _footerUpdateSyncIcon.IsVisible = state.ShowSyncIcon;
+                _footerUpdateWarningIcon.IsVisible = state.ShowWarningIcon;
+                _footerUpdateReadyIcon.IsVisible = state.ShowReadyIcon;
 
                 ToolTip.SetTip(_footerUpdateIcon, isReady
                     ? string.Format(

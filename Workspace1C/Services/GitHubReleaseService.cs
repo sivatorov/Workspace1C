@@ -248,6 +248,26 @@ public class GitHubReleaseService
     }
 
     /// <summary>
+    /// Совпадает ли версия выпуска с указанной версией (issue #129). Тег нормализуется
+    /// так же, как в <see cref="IsNewerThan"/>. Нужно, чтобы отличить «тот же релиз»
+    /// (например, реальную сборку при включённом «Считать версию прошлой») от
+    /// действительно более новой версии. При невозможности распарсить — false.
+    /// </summary>
+    public static bool IsSameVersion(ReleaseInfo release, string version)
+    {
+        if (release is null)
+            return false;
+
+        if (!TryParseVersion(NormalizeTag(release.TagName), out var releaseVer))
+            return false;
+
+        if (!TryParseVersion(NormalizeTag(version), out var versionVer))
+            return false;
+
+        return releaseVer == versionVer;
+    }
+
+    /// <summary>
     /// Извлекает из строки тега подстроку, начинающуюся с первой цифры, и обрезает
     /// хвост на первом пробеле, двоеточии или «+». Это устойчиво к произвольным
     /// префиксам тегов: «new-0.3.5.75» → «0.3.5.75», «v0.3.5.74» → «0.3.5.74»,

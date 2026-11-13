@@ -8,7 +8,9 @@ using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using System.Windows.Shell;
+using System.Windows.Threading;
 using Workspace1C.Localization;
+using Workspace1C.Services;
 using Workspace1C.Themes;
 
 namespace Workspace1C
@@ -53,6 +55,18 @@ namespace Workspace1C
         private const int DwmStateDoNotRound = 1;
         private const int DwmStateRounded = 2;
 
+        // Сообщения, после которых DWM может пересоздать скругление углов окна
+        // (issue #126): смена системной темы/схемы и смена режима композиции
+        // (включение/выключение Aero, вход/выход из RDP). Рамка не должна
+        // «застревать» в прежнем радиусе — пересчитываем её без перезапуска.
+        private const int WmThemeChanged = 0x031A;
+        private const int WmDwmCompositionChanged = 0x031E;
+
+        // Задержка отложенного повтора пересчёта радиуса после показа окна:
+        // один кадр (Dispatcher) закрывает обычный случай, ~200 мс — медленное
+        // применение темы/композиции (холодный старт, RDP, виртуализация).
+        private const int FrameCornerDeferredDelayMs = 200;
+
         // DWM_BB_ENABLE для DwmEnableBlurBehindWindow.
         private const int DwmBbEnable = 0x00000001;
 
@@ -79,6 +93,51 @@ namespace Workspace1C
                 "TitleBarBorder", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
         private static Border? GetTitleBarBorder(DependencyObject d) => (Border?)d.GetValue(TitleBarBorderProperty);
         private static void SetTitleBarBorder(DependencyObject d, Border? value) => d.SetValue(TitleBarBorderProperty, value);
+
+        // Состояние слежения за скруглением рамки конкретного окна (issue #126):
+        // последний применённый радиус (чтобы не переустанавливать CornerRadius без
+        // изменения — риск мерцания) и одноразовый таймер отложенного повтора после
+        // показа окна. Хранится вложенным свойством: подписки/таймер умирают вместе
+        // с окном, глобальных словарей нет.
+        private static readonly DependencyProperty FrameTrackingProperty =
+            DependencyProperty.RegisterAttached(
+                "FrameTracking", typeof(FrameCornerTracking), typeof(WindowChromeHelper),
+                new PropertyMetadata(null));
+
+        private static FrameCornerTracking? GetFrameTracking(DependencyObject d)
+            => (FrameCornerTracking?)d.GetValue(FrameTrackingProperty);
+        private static void SetFrameTracking(DependencyObject d, FrameCornerTracking? value)
+            => d.SetValue(FrameTrackingProperty, value);
+
+        /// <summary>
+        /// Состояние пересчёта радиуса рамки окна (issue #126): последний применённый
+        /// радиус и таймер отложенного повтора. Не UI-элемент — только данные.
+        /// </summary>
+        private sealed class FrameCornerTracking
+        {
+            public double? LastRadius { get; set; }
+            public bool Closed { get; set; }
+            public DispatcherTimer? PendingTimer { get; set; }
+
+            /// <summary>
+            /// Предупреждение «показанное окно, но DWM не сообщил состояние скругления»
+            /// уже записано — повторно не спамим на каждом Activated/DPI.
+            /// </summary>
+            public bool WarnedUnknownState { get; set; }
+
+            public void StopTimer()
+            {
+                try
+                {
+                    PendingTimer?.Stop();
+                }
+                catch
+                {
+                    // Таймер уже мог быть остановлен/освобождён — не критично.
+                }
+                PendingTimer = null;
+            }
+        }
 
         // ---- Вложенные свойства собственных кнопок управления окном (App.xaml) ----
         // Круглая «подложка» кнопок: шаблон WindowControlButton рисует три наложенных
@@ -155,6 +214,11 @@ namespace Workspace1C
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        // Реальная видимость окна (WS_VISIBLE): до первого показа окно имеет HWND,
+        // но ещё не видимо — состояние DWM в этот момент недостоверно (issue #126).
+        [DllImport("user32.dll")]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
 
         // Флаги SetWindowPos для принудительной перерисовки рамки после смены стиля.
         private const uint SwpNoSize = 0x0001;
@@ -336,6 +400,10 @@ namespace Workspace1C
             ApplyGlassBackground(window);
             ApplySystemBackdrop(window);
             ApplyCornerPreference(window);
+            // Слежение за скруглением рамки (issue #126): состояние создаётся ДО первого
+            // применения радиуса, чтобы пересчёт после показа/активации не переустанавливал
+            // CornerRadius без реального изменения (иначе рамка мерцала бы).
+            HookFrameCornerTracking(window);
             // Рамка и шапка повторяют системное скругление углов (issue #126):
             // читаем фактическое состояние DWM после применения CornerPreference.
             ApplyFrameCornerRadius(window);
@@ -853,18 +921,49 @@ namespace Workspace1C
         /// скругления нет — рамка остаётся прямоугольной, как раньше.
         /// </summary>
         private static void ApplyFrameCornerRadius(Window window)
+            => ApplyFrameCornerRadius(window, "apply");
+
+        /// <summary>
+        /// Пересчитывает радиус рамки и верхних углов шапки по фактическому состоянию
+        /// окна (issue #126). <paramref name="reason"/> попадает в диагностику, чтобы по
+        /// журналу было видно, на каком событии радиус изменился (показ окна, смена
+        /// темы/композиции, DPI, активация).
+        /// <para>
+        /// Ключевая правка 1.0.1.61: до показа окна состояние DWM недостоверно (часто
+        /// DWMWCS_DO_NOT_ROUND), поэтому для невидимого окна берётся оценка по версии ОС
+        /// (<see cref="WindowSizeMath.ResolveFrameRounding"/>), а после показа радиус
+        /// уточняется повторно. Повторное присваивание CornerRadius выполняется только
+        /// при реальном изменении радиуса — иначе рамка мерцала бы на каждом Activated.
+        /// </para>
+        /// </summary>
+        private static void ApplyFrameCornerRadius(Window window, string reason)
         {
             try
             {
                 bool maximized = window.WindowState == WindowState.Maximized;
-                bool rounded = ReadDwmCornerStateRounded(window);
+                bool shown = IsWindowShown(window, out var hwnd);
+                bool stateKnown = TryReadDwmCornerState(hwnd, out bool dwmRounded);
+                bool osRounds = Environment.OSVersion.Version.Build >= 22000;
+                bool rounded = WindowSizeMath.ResolveFrameRounding(stateKnown, dwmRounded, shown, osRounds);
                 var radius = WindowSizeMath.ComputeFrameCornerRadius(rounded, maximized, DwmCornerRadius);
-                if (GetFrameBorder(window) is { } frame)
-                    frame.CornerRadius = new CornerRadius(radius);
-                // Полоса заголовка повторяет геометрию верхних углов окна (issue #135):
-                // при скруглённом окне — скруглённая, при maximized/Windows 10 — прямая.
-                if (GetTitleBarBorder(window) is { } bar)
-                    bar.CornerRadius = new CornerRadius(radius, radius, 0, 0);
+
+                var tracking = GetFrameTracking(window);
+                double? previous = tracking?.LastRadius;
+                bool changed = previous is null || Math.Abs(previous.Value - radius) > 0.01;
+                if (changed)
+                {
+                    if (GetFrameBorder(window) is { } frame)
+                        frame.CornerRadius = new CornerRadius(radius);
+                    // Полоса заголовка повторяет геометрию верхних углов окна (issue #135):
+                    // при скруглённом окне — скруглённая, при maximized/Windows 10 — прямая.
+                    if (GetTitleBarBorder(window) is { } bar)
+                        bar.CornerRadius = new CornerRadius(radius, radius, 0, 0);
+                    if (tracking != null)
+                        tracking.LastRadius = radius;
+                }
+
+                LogFrameCornerRadius(window, reason, hwnd, shown, stateKnown, dwmRounded,
+                    osRounds, maximized, radius, previous, changed);
             }
             catch
             {
@@ -873,35 +972,288 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Читает фактическое состояние скругления углов окна у DWM
-        /// (DWMWA_WINDOW_CORNER_STATE): true — DWMWCS_ROUNDED, окно скруглено.
-        /// На Windows 10 (build < 22000) атрибут не поддерживается — скругления нет.
-        /// Если атрибут вернул неизвестное состояние или прочитать его не удалось,
-        /// используется статическая оценка по версии ОС: Windows 11+ скругляет
-        /// углы обычных (не maximized) окон.
+        /// Показано ли окно фактически (есть HWND, WPF-видимость и WS_VISIBLE).
+        /// До первого показа состояние DWM недостоверно (issue #126).
         /// </summary>
-        private static bool ReadDwmCornerStateRounded(Window window)
+        private static bool IsWindowShown(Window window, out IntPtr hwnd)
         {
-            if (Environment.OSVersion.Version.Build < 22000)
+            hwnd = IntPtr.Zero;
+            try
+            {
+                hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                if (hwnd == IntPtr.Zero)
+                    return false;
+                return window.IsVisible && IsWindowVisible(hwnd);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Читает фактическое состояние скругления углов окна у DWM
+        /// (DWMWA_WINDOW_CORNER_STATE). Возвращает <c>true</c>, если DWM ответил
+        /// известным состоянием (<c>DWMWCS_ROUNDED</c>/<c>DWMWCS_DO_NOT_ROUND</c>);
+        /// иначе состояние неизвестно и решение принимает
+        /// <see cref="WindowSizeMath.ResolveFrameRounding"/> (оценка по версии ОС).
+        /// На Windows 10 (build < 22000) атрибут не поддерживается — состояния нет.
+        /// </summary>
+        private static bool TryReadDwmCornerState(IntPtr hwnd, out bool rounded)
+        {
+            rounded = false;
+            if (Environment.OSVersion.Version.Build < 22000 || hwnd == IntPtr.Zero)
                 return false;
             try
             {
-                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
-                if (hwnd != IntPtr.Zero &&
-                    DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out int state, sizeof(int)) == 0)
+                if (DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out int state, sizeof(int)) != 0)
+                    return false;
+                if (state == DwmStateRounded)
                 {
-                    if (state == DwmStateRounded)
-                        return true;
-                    if (state == DwmStateDoNotRound)
-                        return false;
+                    rounded = true;
+                    return true;
+                }
+                if (state == DwmStateDoNotRound)
+                {
+                    rounded = false;
+                    return true;
                 }
             }
             catch
             {
-                // Не удалось прочитать состояние — ниже вернётся оценка по версии ОС.
+                // Не удалось прочитать состояние — решение примет оценка по версии ОС.
             }
-            // Fallback по версии ОС: на Windows 11 DWM скругляет углы обычных окон.
-            return true;
+            return false;
+        }
+
+        /// <summary>
+        /// Пишет в журнал (категория <see cref="LogCategory.Themes"/>) диагностику
+        /// скругления рамки: тип окна, наличие HWND, фактическое состояние DWM,
+        /// вычисленный радиус и причину пересчёта (issue #126). При выключенной
+        /// категории INFO-запись не пишется; предупреждение — только при реальной
+        /// проблеме: показанное окно на Windows 11, но DWM не сообщил состояние
+        /// (RDP/нет композиции), либо поздний пересчёт изменил радиус (исходный
+        /// дефект — рамка была рассчитана до показа окна).
+        /// </summary>
+        private static void LogFrameCornerRadius(
+            Window window, string reason, IntPtr hwnd, bool shown, bool stateKnown, bool dwmRounded,
+            bool osRounds, bool maximized, double radius, double? previous, bool changed)
+        {
+            try
+            {
+                var message =
+                    $"frame-corner reason={reason} window={window.GetType().Name} " +
+                    $"hwnd=0x{hwnd.ToInt64():X} shown={shown} " +
+                    $"dwmState={(stateKnown ? (dwmRounded ? "rounded" : "do-not-round") : "unknown")} " +
+                    $"osRounds={osRounds} maximized={maximized} radius={radius:0.#} " +
+                    $"previous={(previous.HasValue ? previous.Value.ToString("0.#") : "-")} " +
+                    $"changed={changed} frameOptOut={!GetShowWindowFrame(window)}";
+
+                if (Log.Info(LogCategory.Themes, message))
+                    return;
+
+                // Диагностика проблемы должна попадать в журнал и при выключенных
+                // категориях. Предупреждаем только о реальных аномалиях и не чаще
+                // одного раза на окно — иначе Activated/DPI спамили бы журнал:
+                //  * показанное окно, но DWM не сообщил состояние (RDP/нет композиции);
+                //  * поздний пересчёт изменил радиус (исходный дефект #126 — рамка была
+                //    рассчитана до показа окна). Штатные переходы Apply/StateChanged
+                //    (максимизация, восстановление) сюда не входят.
+                var tracking = GetFrameTracking(window);
+                bool lateReason = reason is not "apply" and not "state-changed";
+                // На Windows 10 атрибут состояния DWM не поддерживается — это норма,
+                // а не аномалия: предупреждаем только на Windows 11 (osRounds).
+                bool unknownStateFirstTime = osRounds && shown && !maximized && !stateKnown &&
+                                             tracking is { WarnedUnknownState: false };
+                if (unknownStateFirstTime)
+                    tracking!.WarnedUnknownState = true;
+                bool anomaly = unknownStateFirstTime ||
+                               (shown && changed && previous.HasValue && lateReason);
+                if (anomaly)
+                    AppServices.TryGetService<IAppLogger>()?.Warn($"[{LogCategory.Themes}] {message}");
+            }
+            catch
+            {
+                // Логирование не должно ломать показ окна.
+            }
+        }
+
+        /// <summary>
+        /// Подписывается на события окна, после которых радиус рамки мог устареть
+        /// (issue #126): <c>ContentRendered</c> (окно реально показано),
+        /// <c>Activated</c>, <c>DpiChanged</c> и сообщения DWM о смене темы/композиции.
+        /// Дополнительно ставит отложенный повтор (1 кадр и ~200 мс), чтобы поймать
+        /// медленное применение скругления DWM (холодный старт, RDP, виртуализация).
+        /// Идемпотентно: повторный вызов не дублирует подписки.
+        /// </summary>
+        private static void HookFrameCornerTracking(Window window)
+        {
+            if (GetFrameTracking(window) is not null)
+                return;
+
+            var tracking = new FrameCornerTracking();
+            SetFrameTracking(window, tracking);
+
+            try
+            {
+                window.ContentRendered += (_, _) => ScheduleFrameCornerRadiusRefresh(window);
+                window.Activated += (_, _) => RefreshFrameCornerRadius(window, "activated");
+                window.DpiChanged += (_, _) => RefreshFrameCornerRadius(window, "dpi-changed");
+                window.Closed += (_, _) =>
+                {
+                    tracking.Closed = true;
+                    tracking.StopTimer();
+                };
+            }
+            catch
+            {
+                // Подписки — диагностическое улучшение: сбой не ломает окно.
+            }
+
+            HookFrameCornerMessages(window);
+
+            // Окно могло быть показано до применения стиля (например, главное окно,
+            // оформленное собственными средствами): планируем повтор сразу.
+            if (window.IsVisible)
+                ScheduleFrameCornerRadiusRefresh(window);
+        }
+
+        /// <summary>
+        /// Ставит хук HwndSource на WM_THEMECHANGED и WM_DWMCOMPOSITIONCHANGED:
+        /// после смены системной темы или режима композиции (включение/выключение
+        /// эффектов, вход/выход из RDP) DWM может пересоздать скругление — рамка
+        /// должна обновиться без перезапуска приложения (issue #126). Обработка
+        /// откладывается через Dispatcher, чтобы не трогать визуал внутри WndProc.
+        /// </summary>
+        private static void HookFrameCornerMessages(Window window)
+        {
+            try
+            {
+                var hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                if (hwnd == IntPtr.Zero)
+                    return;
+                System.Windows.Interop.HwndSource.FromHwnd(hwnd)?.AddHook((_, msg, _, _, ref handled) =>
+                {
+                    if (msg == WmThemeChanged || msg == WmDwmCompositionChanged)
+                    {
+                        var reason = msg == WmThemeChanged ? "theme-changed" : "composition-changed";
+                        try
+                        {
+                            window.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+                            {
+                                ApplyCornerPreference(window);
+                                RefreshFrameCornerRadius(window, reason);
+                            }));
+                        }
+                        catch
+                        {
+                            // Окно уже закрывается — пересчёт не нужен.
+                        }
+                    }
+                    return IntPtr.Zero;
+                });
+            }
+            catch
+            {
+                // Хук недоступен — останутся пересчёты по ContentRendered/Activated.
+            }
+        }
+
+        /// <summary>
+        /// Планирует отложенный пересчёт радиуса после показа окна (issue #126):
+        /// один кадр (Dispatcher) и повтор через ~200 мс. Повтор одноразовый и
+        /// выполняется только если окно ещё открыто.
+        /// </summary>
+        private static void ScheduleFrameCornerRadiusRefresh(Window window)
+        {
+            try
+            {
+                window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                    RefreshFrameCornerRadius(window, "content-rendered")));
+            }
+            catch
+            {
+                // Dispatcher недоступен (окно закрывается) — не критично.
+            }
+
+            try
+            {
+                var tracking = GetFrameTracking(window);
+                if (tracking is null || tracking.Closed)
+                    return;
+                tracking.StopTimer();
+                var timer = new DispatcherTimer(DispatcherPriority.Background, window.Dispatcher)
+                {
+                    Interval = TimeSpan.FromMilliseconds(FrameCornerDeferredDelayMs)
+                };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    if (tracking.PendingTimer == timer)
+                        tracking.PendingTimer = null;
+                    RefreshFrameCornerRadius(window, "deferred");
+                };
+                tracking.PendingTimer = timer;
+                timer.Start();
+            }
+            catch
+            {
+                // Таймер — страховка: без него останется пересчёт по ContentRendered.
+            }
+        }
+
+        /// <summary>
+        /// Пересчитывает радиус рамки, если окно ещё открыто (issue #126).
+        /// </summary>
+        private static void RefreshFrameCornerRadius(Window window, string reason)
+        {
+            try
+            {
+                if (GetFrameTracking(window) is { Closed: true })
+                    return;
+                ApplyFrameCornerRadius(window, reason);
+            }
+            catch
+            {
+                // Скругление — некритичное улучшение.
+            }
+        }
+
+        /// <summary>
+        /// Подключает синхронизацию скругления рамки для окна, оформленного
+        /// собственными средствами (главное окно: <see cref="Apply"/> для него не
+        /// вызывается). Задаёт элементы рамки и запускает тот же механизм
+        /// пересчёта после показа/смены темы/композиции (issue #126).
+        /// Идемпотентно: повторный вызов только обновляет ссылки на элементы.
+        /// </summary>
+        /// <param name="window">Окно, которому принадлежит рамка.</param>
+        /// <param name="frame">Видимый оверлей-рамка окна (Border поверх содержимого).</param>
+        /// <param name="titleBar">Полоса заголовка (необязательно) — скругляются верхние углы.</param>
+        public static void AttachFrameCornerTracking(Window window, Border frame, Border? titleBar = null)
+        {
+            if (window is null || frame is null)
+                return;
+            SetFrameBorder(window, frame);
+            if (titleBar is not null)
+                SetTitleBarBorder(window, titleBar);
+
+            bool firstHook = GetFrameTracking(window) is null;
+            HookFrameCornerTracking(window);
+            if (firstHook)
+            {
+                try
+                {
+                    // У окон вне Apply нет общего StateChanged-хука: при максимизации
+                    // DWM рисует прямые углы — радиус должен обнулиться (issue #126).
+                    window.StateChanged += (_, _) => RefreshFrameCornerRadius(window, "state-changed");
+                }
+                catch
+                {
+                    // Подписка — улучшение: сбой не ломает окно.
+                }
+            }
+
+            ApplyFrameCornerRadius(window, "attach");
         }
 
         /// <summary>

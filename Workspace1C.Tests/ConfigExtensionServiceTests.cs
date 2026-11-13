@@ -205,20 +205,31 @@ public sealed class ConfigExtensionServiceTests
     /// содержащим текстовое дерево корневого элемента метаданных расширения. Формат
     /// проверен на реальных .cfe (см. <see cref="ConfigExtensionService.TryReadExtensionName"/>).
     /// </summary>
-    private static byte[] BuildCfeContainer(string extensionName)
+    internal static byte[] BuildCfeContainer(string extensionName) =>
+        BuildCfeContainerFromPayload(Encoding.UTF8.GetBytes(BuildMetadataText(extensionName)));
+
+    /// <summary>Текстовое дерево метаданных расширения (как в реальном .cfe).</summary>
+    internal static string BuildMetadataText(string extensionName)
     {
         const string rootGuid = "3354911e-a8f6-4d0c-9df2-e48caec5f502";
         const string configurationClass = "9cd510cd-abfc-11d4-9434-004095e12fc7";
         const string rootClassGuid = "cea2b2f0-16d8-41f9-b375-a44b8da27f74";
-        var metadata = "\uFEFF{2,\r\n{" + rootGuid + "},7,\r\n{" + configurationClass + ",\r\n{1,\r\n{79,\r\n{0,\r\n{4,\r\n{1,0," +
-            rootClassGuid + "},\"" + extensionName + "\",\r\n{1,\"ru\",\"Тест\"},1}";
+        return "\uFEFF{2,\r\n{" + rootGuid + "},7,\r\n{" + configurationClass + ",\r\n{1,\r\n{79,\r\n{0,\r\n{4,\r\n{1,0," +
+               rootClassGuid + "},\"" + extensionName + "\",\r\n{1,\"ru\",\"Тест\"},1}";
+    }
 
+    /// <summary>
+    /// Собирает контейнер с произвольным содержимым элемента: payload может быть
+    /// текстом метаданных, вложенным контейнером или крупным блоком (issue #117).
+    /// </summary>
+    internal static byte[] BuildCfeContainerFromPayload(byte[] payload, bool compress = true)
+    {
         var elementGuid = "009e27bc-bd81-4498-9b31-171e075e6ac1";
         var elementHeader = new byte[20 + elementGuid.Length * 2];
         Encoding.Unicode.GetBytes(elementGuid).CopyTo(elementHeader, 20);
 
         var headerBlock = Block(Deflate(elementHeader));
-        var metadataBlock = Block(Deflate(Encoding.UTF8.GetBytes(metadata)));
+        var payloadBlock = Block(compress ? Deflate(payload) : payload);
 
         // Таблица адресов: одна запись «hdrAddr, dataAddr, 0x7FFFFFFF» + терминирующие
         // нули. Адрес зависят от длины deflate-таблицы, которая зависит от содержимого
@@ -239,13 +250,13 @@ public sealed class ConfigExtensionServiceTests
             BitConverter.GetBytes((uint)dataAddr).CopyTo(table, 4);
         }
 
-        var container = new byte[16 + tableBlock.Length + headerBlock.Length + metadataBlock.Length];
+        var container = new byte[16 + tableBlock.Length + headerBlock.Length + payloadBlock.Length];
         BitConverter.GetBytes(0x7FFFFFFFu).CopyTo(container, 0);   // сигнатура контейнера
         BitConverter.GetBytes(512u).CopyTo(container, 4);          // размер страницы
         BitConverter.GetBytes(1u).CopyTo(container, 8);            // версия хранилища
         tableBlock.CopyTo(container, 16);
         headerBlock.CopyTo(container, 16 + tableBlock.Length);
-        metadataBlock.CopyTo(container, 16 + tableBlock.Length + headerBlock.Length);
+        payloadBlock.CopyTo(container, 16 + tableBlock.Length + headerBlock.Length);
         return container;
     }
 
@@ -411,6 +422,116 @@ public sealed class ConfigExtensionServiceTests
         {
             File.Delete(first);
             File.Delete(second);
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // Issue #117 («ИР»): устойчивость разбора .cfe к разным раскладкам контейнера.
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void TryReadExtensionName_ReadsUtf16Metadata()
+    {
+        // Часть .cfe хранит текстовое дерево в UTF-16LE (с BOM) — прежний разбор
+        // искал GUID-класс «Конфигурация» только в UTF-8 и имя не находил.
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "utf16.cfe");
+        var metadata = BuildMetadataText("Имя_UTF16");
+        File.WriteAllBytes(path, BuildCfeContainerFromPayload(Encoding.Unicode.GetBytes(metadata)));
+        try
+        {
+            Assert.Equal("Имя_UTF16", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsFromNestedContainer()
+    {
+        // Метаданные могут лежать во вложенном контейнере глубже первого уровня
+        // (раскладка, на которой ломался прежний maxDepth: 1).
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "nested.cfe");
+        var inner = BuildCfeContainer("Имя_Вложенное");
+        File.WriteAllBytes(path, BuildCfeContainerFromPayload(inner, compress: false));
+        try
+        {
+            Assert.Equal("Имя_Вложенное", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsFromLargeElement()
+    {
+        // У «ИР» элемент метаданных может быть больше прежнего предела 1 МБ.
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "large.cfe");
+        var payload = Encoding.UTF8.GetBytes(new string(' ', 1_200_000) + BuildMetadataText("Имя_Большое"));
+        Assert.True(payload.Length > 1024 * 1024);
+        File.WriteAllBytes(path, BuildCfeContainerFromPayload(payload, compress: false));
+        try
+        {
+            Assert.Equal("Имя_Большое", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsNameNearPurposeMarker()
+    {
+        // Альтернативная раскладка: имени нет сразу после класса «Конфигурация»,
+        // зато оно стоит рядом с маркером ConfigurationExtensionPurpose.
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "purpose.cfe");
+        var metadata = "\uFEFF{2,{3354911e-a8f6-4d0c-9df2-e48caec5f502},7," +
+                       "{\"ConfigurationExtensionPurpose\",1," +
+                       "{1,0,cea2b2f0-16d8-41f9-b375-a44b8da27f74},\"Имя_Из_Назначения\"}}";
+        File.WriteAllBytes(path,
+            BuildCfeContainerFromPayload(Encoding.UTF8.GetBytes(metadata), compress: true));
+        try
+        {
+            Assert.Equal("Имя_Из_Назначения", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsFromZipContainer()
+    {
+        // Перепакованный .cfe может быть обычным zip-архивом.
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "zipped.cfe");
+        using (var memory = new MemoryStream())
+        {
+            using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                var entry = archive.CreateEntry("config");
+                using var entryStream = entry.Open();
+                var bytes = Encoding.UTF8.GetBytes(BuildMetadataText("Имя_Из_Zip"));
+                entryStream.Write(bytes, 0, bytes.Length);
+            }
+            File.WriteAllBytes(path, memory.ToArray());
+        }
+        try
+        {
+            Assert.Equal("Имя_Из_Zip", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
         }
     }
 }

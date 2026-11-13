@@ -113,4 +113,41 @@ public static class WindowSizeMath
             return 0;
         return systemRadius;
     }
+
+    /// <summary>
+    /// Решает, считать ли окно скруглённым для целей отрисовки рамки (issue #126,
+    /// доработка 1.0.1.61). Главная причина «квадратной рамки при скруглённых углах»:
+    /// <c>ApplyFrameCornerRadius</c> вызывается ДО показа окна, и DWM в этот момент
+    /// часто сообщает <c>DWMWCS_DO_NOT_ROUND</c> (окно ещё не скомпоновано), хотя
+    /// после показа скругляет его. Поэтому состояние DWM считается достоверным только
+    /// для уже показанного окна; до показа используется оценка по версии ОС
+    /// (Windows 11+ скругляет обычные окна), а фактическое состояние перечитывается
+    /// после <c>Loaded</c>/<c>ContentRendered</c> и отложенным повтором.
+    /// Класс не зависит от UI-платформы — покрыт юнит-тестами
+    /// (Issue126FrameCornerRadiusTests).
+    /// </summary>
+    /// <param name="dwmStateKnown">
+    /// Удалось ли прочитать <c>DWMWA_WINDOW_CORNER_STATE</c> (DWM ответил известным
+    /// состоянием <c>DWMWCS_ROUNDED</c>/<c>DWMWCS_DO_NOT_ROUND</c>).
+    /// </param>
+    /// <param name="dwmRounded">Значение состояния DWM, если оно известно.</param>
+    /// <param name="windowShown">
+    /// Окно реально показано (есть HWND, <c>IsVisible</c> и <c>IsWindowVisible</c>).
+    /// </param>
+    /// <param name="osRoundsWindows">
+    /// ОС скругляет углы обычных окон (Windows 11, build >= 22000).
+    /// </param>
+    /// <returns><c>true</c> — рамку и верхние углы шапки нужно скруглять.</returns>
+    public static bool ResolveFrameRounding(
+        bool dwmStateKnown, bool dwmRounded, bool windowShown, bool osRoundsWindows)
+    {
+        // Окно ещё не показано: состояние DWM недостоверно (часто DO_NOT_ROUND у
+        // невидимого окна). Берём оценку по ОС, после показа — уточняем.
+        if (!windowShown)
+            return osRoundsWindows;
+        if (dwmStateKnown)
+            return dwmRounded;
+        // Показанное окно, но DWM не ответил (RDP/отключённая композиция) — оценка по ОС.
+        return osRoundsWindows;
+    }
 }

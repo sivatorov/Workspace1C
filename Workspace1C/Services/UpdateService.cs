@@ -404,8 +404,10 @@ public sealed class UpdateService : IAppUpdateService
             if (release is null)
                 return;
 
-            // Сравниваем с текущей версией приложения.
-            if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
+            // Сравниваем с текущей версией приложения. Issue #129: при включённом
+            // «Считать версию прошлой» сравнение идёт с ЭФФЕКТИВНОЙ (понижённой)
+            // версией — иначе обновление на свою же сборку не предлагалось.
+            if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
             {
                 // Новой версии нет — сбрасываем состояние «доступна версия»
                 // (ссылка «Обновить» в подвале главного окна скрывается).
@@ -430,6 +432,14 @@ public sealed class UpdateService : IAppUpdateService
                     // диалог не показывается, и если окно свёрнуто в трей — пользователь
                     // узнает о новой версии только из уведомления.
                     NotifyUpdateAvailable(release);
+                    // issue #129: при виртуально понижённой версии найденный релиз может
+                    // совпадать с РЕАЛЬНОЙ сборкой — молча его не ставим (установка ничего
+                    // не изменит, кроме сброса флага), а только предлагаем в подвале.
+                    if (EffectiveVersionService.ShouldOfferInsteadOfAutoInstall(release))
+                    {
+                        SetAvailableRelease(release);
+                        return;
+                    }
                     // Применяем новую версию без вопросов.
                     if (await DownloadAndInstallAutoAsync(release).ConfigureAwait(false))
                         SetAvailableRelease(null);
@@ -486,7 +496,9 @@ public sealed class UpdateService : IAppUpdateService
                 return;
             }
 
-            if (!GitHubReleaseService.IsNewerThan(release, VersionInfo.Display()))
+            // Issue #129: сравнение с эффективной версией — при понижении ручная
+            // проверка должна предлагать обновление на реальную сборку.
+            if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
             {
                 SetAvailableRelease(null);
                 ShowOnUi(() => _dialogs.ShowInfo(
