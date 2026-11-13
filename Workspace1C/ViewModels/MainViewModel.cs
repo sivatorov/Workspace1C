@@ -134,6 +134,9 @@ public partial class MainViewModel : ViewModelBase
     private bool _showSizeColumn = true;
     private bool _showActionsColumn = true;
     private bool _actionsHoverOnly;
+    // Issue #130: линии сетки списка баз (по умолчанию выключены).
+    private bool _showHorizontalGridLines;
+    private bool _showVerticalGridLines;
     private double _sizeColumnWidth;
     private bool _showModifiedColumn = true;
     private double _modifiedColumnWidth;
@@ -183,6 +186,12 @@ public partial class MainViewModel : ViewModelBase
     private bool _showTrayIcon = true;
     // Системные уведомления ОС о завершении фоновых операций (функция №4).
     private bool _showSystemNotifications = true;
+    // Уведомления о длительных операциях (issue #131).
+    private bool _longOperationNotificationsEnabled;
+    private string _longOperationChannel = LongOperationNotificationChannels.System;
+    private string _longOperationTelegramTarget = "";
+    private int _longOperationThresholdValue = 30;
+    private string _longOperationThresholdUnit = LongOperationThresholdUnits.Seconds;
     // Догоняющее выполнение пропущенных заданий при старте (функция №7).
     private bool _catchUpMissedTasks = true;
     // Порог предупреждения «Свободно на диске» в Центре обслуживания (0.3.9.96), ГБ.
@@ -589,6 +598,9 @@ public partial class MainViewModel : ViewModelBase
         _showSizeColumn = settings.ShowSizeColumn;
         _showActionsColumn = settings.ShowActionsColumn;
         _actionsHoverOnly = settings.ActionsHoverOnly;
+        // Issue #130: линии сетки списка баз; старые профили без полей — выключены.
+        _showHorizontalGridLines = settings.ShowHorizontalGridLines;
+        _showVerticalGridLines = settings.ShowVerticalGridLines;
         _sizeColumnWidth = settings.SizeColumnWidth;
         _showModifiedColumn = settings.ShowModifiedColumn;
         _modifiedColumnWidth = settings.ModifiedColumnWidth;
@@ -623,6 +635,13 @@ public partial class MainViewModel : ViewModelBase
         _closeToTray = settings.CloseToTray;
         _showTrayIcon = settings.ShowTrayIcon;
         _showSystemNotifications = settings.ShowSystemNotifications;
+        // issue #131: уведомления о длительных операциях.
+        var longOperation = settings.LongOperationNotifications ?? new LongOperationNotificationsSettings();
+        _longOperationNotificationsEnabled = longOperation.Enabled;
+        _longOperationChannel = LongOperationNotificationChannels.Normalize(longOperation.Channel);
+        _longOperationTelegramTarget = longOperation.TelegramTarget ?? "";
+        _longOperationThresholdValue = longOperation.ThresholdValue > 0 ? longOperation.ThresholdValue : 30;
+        _longOperationThresholdUnit = LongOperationThresholdUnits.Normalize(longOperation.ThresholdUnit);
         _catchUpMissedTasks = settings.CatchUpMissedTasks;
         // Тема приложения следует за режимом ОС (issue #108).
         _themeFollowsOs = settings.ThemeFollowsOs;

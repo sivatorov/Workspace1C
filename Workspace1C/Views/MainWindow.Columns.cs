@@ -265,6 +265,10 @@ namespace Workspace1C
             {
                 if (obj is not FrameworkElement fe)
                     continue;
+                // Линии сетки (issue #130) — декоративный слой: их колонка задаётся
+                // заново при каждой перерисовке, ключ колонки им не нужен.
+                if (IsGridLineElement(fe))
+                    continue;
                 if (Grid.GetColumnSpan(fe) != 1)
                     continue; // объединённые ячейки (название/теги) двигаются отдельно
                 var c = Grid.GetColumn(fe);
@@ -279,6 +283,8 @@ namespace Workspace1C
             foreach (var obj in grid.Children)
             {
                 if (obj is not FrameworkElement fe)
+                    continue;
+                if (IsGridLineElement(fe))
                     continue;
                 var s = GetColumnKey(fe);
                 if (string.IsNullOrEmpty(s))
@@ -352,6 +358,8 @@ namespace Workspace1C
             {
                 if (obj is not FrameworkElement fe)
                     continue;
+                if (IsGridLineElement(fe))
+                    continue;
                 var s = GetColumnKey(fe);
                 if (!string.IsNullOrEmpty(s))
                 {
@@ -386,6 +394,126 @@ namespace Workspace1C
                 acc.Add(g);
             for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
                 FindRowGridsCore(VisualTreeHelper.GetChild(parent, i), marker, acc);
+        }
+
+        /// <summary>
+        /// Метка декоративных линий сетки (issue #130). Позволяет отличить их от
+        /// ячеек строки при перестановке колонок и убрать перед перерисовкой.
+        /// </summary>
+        private static readonly object GridLineMarker = new();
+
+        private static bool IsGridLineElement(FrameworkElement element)
+            => ReferenceEquals(element.Tag, GridLineMarker);
+
+        /// <summary>
+        /// Удаляет ранее нарисованные линии сетки из сетки строки/заголовка.
+        /// </summary>
+        private static void RemoveGridLines(Grid grid)
+        {
+            for (var i = grid.Children.Count - 1; i >= 0; i--)
+                if (grid.Children[i] is FrameworkElement fe && IsGridLineElement(fe))
+                    grid.Children.RemoveAt(i);
+        }
+
+        /// <summary>
+        /// Рисует линии сетки (issue #130) в сетке строки базы, строки группы или
+        /// заголовка: вертикальные — у правого края каждой видимой колонки, кроме
+        /// последней; горизонтальную — по нижней границе строки. Цвет берётся из
+        /// темы (<c>BorderBrushColor</c>), мышь линии не перехватывают и выделение
+        /// строк не ломают.
+        /// </summary>
+        private void ApplyGridLinesToGrid(Grid grid, bool includeHorizontal)
+        {
+            if (_viewModel is null)
+                return;
+            RemoveGridLines(grid);
+
+            // Ведущие колонки (кнопки групп, звезда, булавка) — часть блока имени:
+            // линии внутри них резали бы подпись «Название» и значки. Сетка начинается
+            // с колонки имени (её правый край — первая вертикальная линия).
+            var nameColumn = RowFirstDataColumn - 1;
+            var visible = new List<bool>(grid.ColumnDefinitions.Count);
+            for (var i = 0; i < grid.ColumnDefinitions.Count; i++)
+            {
+                var definition = grid.ColumnDefinitions[i];
+                visible.Add(i >= nameColumn
+                    && (!definition.Width.IsAbsolute || definition.Width.Value > 0.5));
+            }
+
+            var plan = Services.GridLinesPlanner.Resolve(
+                showHorizontal: includeHorizontal && _viewModel.ShowHorizontalGridLines,
+                showVertical: _viewModel.ShowVerticalGridLines,
+                compactMode: _viewModel.CompactMode,
+                visibleColumns: visible);
+            if (!plan.HasAnyLines)
+                return;
+
+            var brush = TryFindResource("BorderBrushColor") as Brush ?? Brushes.Gray;
+            var rows = Math.Max(1, grid.RowDefinitions.Count);
+
+            foreach (var column in plan.VerticalBoundaryColumns)
+            {
+                var line = new System.Windows.Shapes.Rectangle
+                {
+                    Width = plan.Thickness,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    Fill = brush,
+                    Opacity = plan.Opacity,
+                    IsHitTestVisible = false,
+                    Tag = GridLineMarker
+                };
+                Grid.SetColumn(line, column);
+                Grid.SetRowSpan(line, rows);
+                Panel.SetZIndex(line, 1);
+                grid.Children.Add(line);
+            }
+
+            if (plan.ShowHorizontalLine)
+            {
+                var line = new System.Windows.Shapes.Rectangle
+                {
+                    Height = plan.Thickness,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Fill = brush,
+                    Opacity = plan.Opacity,
+                    IsHitTestVisible = false,
+                    Tag = GridLineMarker
+                };
+                Grid.SetColumn(line, 0);
+                Grid.SetColumnSpan(line, Math.Max(1, grid.ColumnDefinitions.Count));
+                Grid.SetRow(line, rows - 1);
+                Panel.SetZIndex(line, 1);
+                grid.Children.Add(line);
+            }
+        }
+
+        /// <summary>
+        /// Перерисовывает линии сетки у всех уже созданных строк и в заголовке
+        /// списка (issue #130): вызывается при смене настройки, состава колонок и
+        /// порядка, чтобы не ждать пересоздания строк виртуализацией.
+        /// </summary>
+        private void RefreshGridLines()
+        {
+            if (_viewModel is null || MainTree is null)
+                return;
+            foreach (var grid in FindRowGrids(MainTree, RowGridMarker))
+                ApplyGridLinesToGrid(grid, includeHorizontal: true);
+            foreach (var grid in FindRowGrids(MainTree, GroupGridMarker))
+                ApplyGridLinesToGrid(grid, includeHorizontal: true);
+            ApplyGridLinesToHeader();
+        }
+
+        /// <summary>
+        /// Вертикальные линии в заголовке списка (issue #130): продолжение линий
+        /// строк, чтобы сетка была непрерывной от шапки до последней строки.
+        /// </summary>
+        private void ApplyGridLinesToHeader()
+        {
+            if (_viewModel is null || HeaderGrid is null)
+                return;
+            ApplyGridLinesToGrid(HeaderGrid, includeHorizontal: false);
         }
 
         /// <summary>
@@ -451,6 +579,10 @@ namespace Workspace1C
             // полосы — последние колонки гарантированно достижимы и видны, даже если
             // расчётная минимальная ширина оказалась меньше фактической ширины контента.
             EnsureHorizontalReach();
+
+            // Issue #130: линии сетки привязаны к номерам колонок — после перестановки
+            // перерисовываем их и в строках, и в заголовке.
+            RefreshGridLines();
         }
 
         /// <summary>
@@ -521,6 +653,8 @@ namespace Workspace1C
             }
             grid.Tag = RowGridMarker;
             ApplyRowCompact(grid);
+            // Issue #130: линии сетки рисуются после применения порядка колонок.
+            ApplyGridLinesToGrid(grid, includeHorizontal: true);
             // Проба утечки строк (issue #21, 1.0.0.62): при включённом CM_TREESWITCH
             // запоминаем строку слабой ссылкой; после GC в логе — сколько строк живо.
             if (TraceFlags.IsEnabled(TraceFlags.TreeSwitchFlag))
@@ -557,6 +691,8 @@ namespace Workspace1C
                 }
                 grid.Tag = GroupGridMarker;
                 ApplyRowCompact(grid);
+                // Issue #130: линии сетки у строки группы.
+                ApplyGridLinesToGrid(grid, includeHorizontal: true);
             });
         }
 

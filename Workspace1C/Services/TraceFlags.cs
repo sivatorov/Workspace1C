@@ -301,6 +301,16 @@ public static class TraceFlags
     }
 
     /// <summary>
+    /// Событие успешной записи настроек в <c>trace.json</c> (issue #129): поднимается
+    /// ПОСЛЕ освобождения внутренней блокировки и содержит список фактически сохранённых
+    /// известных флагов. Подписчики (главное окно WPF/Avalonia, <c>UpdateService</c>)
+    /// пересчитывают подпись версии и состояние значка обновления СРАЗУ при переключении
+    /// галки «Считать версию прошлой» — без перезапуска приложения.
+    /// Ошибки подписчиков не влияют на сохранение конфига.
+    /// </summary>
+    public static event Action<TraceSettingsSavedEventArgs>? SettingsSaved;
+
+    /// <summary>
     /// Сохраняет значения категорий логирования в <c>trace.json</c> (issue #80).
     /// Полный набор <paramref name="values"/>: «имя категории → включена». Категории,
     /// отсутствующие в <see cref="TraceFlagsFormat.KnownFlags"/>, игнорируются; флаги,
@@ -317,19 +327,28 @@ public static class TraceFlags
     {
         if (values is null || values.Count == 0)
             return false;
+
+        // Список сохранённых известных флагов заполняется под блокировкой, а событие
+        // поднимается ПОСЛЕ её освобождения: подписчики могут сами читать trace.json
+        // (IsEnabled) и не должны попадать в повторный захват блокировки.
+        List<string> savedFlags;
         lock (Lock)
         {
             EnsureExistsCore();
             ReloadIfChangedCore();
 
             var merged = new Dictionary<string, bool>(_flags, StringComparer.Ordinal);
+            savedFlags = new List<string>();
             foreach (var pair in values)
             {
                 var name = pair.Key?.Trim().ToUpperInvariant();
                 if (string.IsNullOrEmpty(name))
                     continue;
                 if (Array.IndexOf(TraceFlagsFormat.KnownFlags, name) >= 0)
+                {
                     merged[name] = pair.Value;
+                    savedFlags.Add(name);
+                }
             }
 
             var path = ConfigFilePath();
@@ -342,7 +361,6 @@ public static class TraceFlags
                 // перекрывается env, кэш перечитает файл по изменённому mtime.
                 _configCreatedByUs = false;
                 _initialized = false;
-                return true;
             }
             catch
             {
@@ -357,6 +375,28 @@ public static class TraceFlags
                 }
                 return false;
             }
+        }
+
+        RaiseSettingsSaved(savedFlags);
+        return true;
+    }
+
+    /// <summary>
+    /// Поднимает <see cref="SettingsSaved"/> вне блокировки; ошибки подписчиков
+    /// не должны ломать сохранение настроек (issue #129).
+    /// </summary>
+    private static void RaiseSettingsSaved(IReadOnlyList<string> savedFlags)
+    {
+        var handler = SettingsSaved;
+        if (handler is null || savedFlags.Count == 0)
+            return;
+        try
+        {
+            handler(new TraceSettingsSavedEventArgs(savedFlags));
+        }
+        catch
+        {
+            // Подписчик (обновление UI) не должен ронять сохранение конфига.
         }
     }
 

@@ -31,6 +31,8 @@ public static class NotificationEventFilter
             NotificationEvent.ScheduledTask => settings.NotifyOnScheduledTasks,
             NotificationEvent.Update => settings.NotifyOnUpdates,
             NotificationEvent.Monitoring => settings.NotifyOnMonitoring,
+            // issue #131: длительные операции во внешние каналы — по отдельной галочке.
+            NotificationEvent.LongOperation => settings.NotifyOnLongOperations,
             _ => false
         };
         if (!byEvent)

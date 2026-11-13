@@ -62,7 +62,9 @@ public partial class MainViewModel : ViewModelBase
         bool groupByGroup, bool showEmptyGroups,
         List<string>? columnOrder,
         bool showLastBackupColumn = true,
-        bool actionsHoverOnly = false)
+        bool actionsHoverOnly = false,
+        bool showHorizontalGridLines = false,
+        bool showVerticalGridLines = false)
     {
         var previousShowFavoritesButton = _settings.ShowFavoritesButton;
         var previousShowPinnedButton = _settings.ShowPinnedButton;
@@ -77,6 +79,9 @@ public partial class MainViewModel : ViewModelBase
         var previousShowModifiedColumn = _settings.ShowModifiedColumn;
         var previousShowLastBackupColumn = _settings.ShowLastBackupColumn;
         var previousShowActionsColumn = _settings.ShowActionsColumn;
+        // Issue #130: линии сетки.
+        var previousShowHorizontalGridLines = _settings.ShowHorizontalGridLines;
+        var previousShowVerticalGridLines = _settings.ShowVerticalGridLines;
         var previousColumnOrder = _settings.ColumnOrder ?? new List<string>();
         var previousGroupByGroup = _groupByGroup;
         var previousShowEmptyGroups = _showEmptyGroups;
@@ -96,6 +101,9 @@ public partial class MainViewModel : ViewModelBase
         _settings.ShowLastBackupColumn = showLastBackupColumn;
         _settings.ShowActionsColumn = showActionsColumn;
         _settings.ActionsHoverOnly = actionsHoverOnly;
+        // Issue #130: линии сетки списка баз.
+        _settings.ShowHorizontalGridLines = showHorizontalGridLines;
+        _settings.ShowVerticalGridLines = showVerticalGridLines;
         _settings.ColumnOrder = columnOrder ?? new List<string>();
         _settings.ShowRightPanelDetails = showRightPanelDetails;
         _settings.ShowSessionLaunchPanel = showSessionLaunchPanel;
@@ -124,6 +132,9 @@ public partial class MainViewModel : ViewModelBase
             || showModifiedColumn != previousShowModifiedColumn
             || showLastBackupColumn != previousShowLastBackupColumn
             || showActionsColumn != previousShowActionsColumn
+            // Issue #130: включение/выключение линий пересобирает строки.
+            || showHorizontalGridLines != previousShowHorizontalGridLines
+            || showVerticalGridLines != previousShowVerticalGridLines
             || !previousColumnOrder.SequenceEqual(_settings.ColumnOrder);
 
         SaveSettingsSilently();
@@ -135,6 +146,9 @@ public partial class MainViewModel : ViewModelBase
         // Issue #128: «Действия только при наведении» не влияет на состав дерева —
         // видимость кнопок обновится через PropertyChanged без пересборки строк.
         OnPropertyChanged(nameof(ActionsHoverOnly));
+        // Issue #130: линии сетки списка баз.
+        OnPropertyChanged(nameof(ShowHorizontalGridLines));
+        OnPropertyChanged(nameof(ShowVerticalGridLines));
         OnPropertyChanged(nameof(ShowRightPanelDetails));
         OnPropertyChanged(nameof(ShowConnectionInfo));
         OnPropertyChanged(nameof(ShowRightPanelHint));
@@ -175,7 +189,9 @@ public partial class MainViewModel : ViewModelBase
             _showEmptyGroups,
             _settings.ColumnOrder,
             showLastBackupColumn: key == "LastBackup" ? visible : _settings.ShowLastBackupColumn,
-            actionsHoverOnly: _settings.ActionsHoverOnly);
+            actionsHoverOnly: _settings.ActionsHoverOnly,
+            showHorizontalGridLines: _settings.ShowHorizontalGridLines,
+            showVerticalGridLines: _settings.ShowVerticalGridLines);
     }
 
     /// <summary>
@@ -733,6 +749,18 @@ public partial class MainViewModel : ViewModelBase
     /// видимыми, пока база запущена (чипы-индикаторы без наведения).
     /// </summary>
     public bool ActionsHoverOnly => _settings.ActionsHoverOnly;
+
+    /// <summary>
+    /// «Выводить линии — по горизонтали» (issue #130): тонкие линии между строками
+    /// списка баз. По умолчанию выключено.
+    /// </summary>
+    public bool ShowHorizontalGridLines => _settings.ShowHorizontalGridLines;
+
+    /// <summary>
+    /// «Выводить линии — по вертикали» (issue #130): тонкие линии между столбцами
+    /// списка баз, включая заголовок. По умолчанию выключено.
+    /// </summary>
+    public bool ShowVerticalGridLines => _settings.ShowVerticalGridLines;
 
     /// <summary>
     /// Состав нижней панели: какие сведения о выбранной базе в неё попадают.

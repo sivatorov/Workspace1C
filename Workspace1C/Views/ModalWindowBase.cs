@@ -18,6 +18,7 @@ using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
+using Workspace1C.Services;
 using Workspace1C.Themes;
 
 namespace Workspace1C
@@ -559,7 +560,10 @@ namespace Workspace1C
         {
             var glass = new Border
             {
-                CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
+                // Радиус «стеклянного» корня — единая константа с WPF-слоем
+                // (issue #126): рамка и содержимое скруглены одинаково, в том числе
+                // на системах без скругления DWM (RDP/Windows 10).
+                CornerRadius = new CornerRadius(WindowSizeMath.DefaultContentCornerRadius),
                 ClipToBounds = true,
                 // Видимая рамка окна (issue #273): даже без системных теней/эффектов
                 // (терминал, виртуализация) окно остаётся различимым, а не сливается
@@ -597,7 +601,7 @@ namespace Workspace1C
                 .Subscribe(new WindowStateObserver(() =>
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(UiMetrics.RadiusLg)));
+                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius)));
 
             return glass;
         }

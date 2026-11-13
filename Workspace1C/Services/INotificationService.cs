@@ -32,4 +32,14 @@ public interface INotificationService
     /// <param name="kind">Вид: успех/ошибка/предупреждение/информация.</param>
     /// <param name="evt">Категория события-источника (для фильтра «какие события отправлять»).</param>
     void Show(string title, string message, NotificationKind kind, NotificationEvent evt = NotificationEvent.ManualTest);
+
+    /// <summary>
+    /// Показывает готовое сообщение (issue #131): нужно для необязательных полей
+    /// <see cref="NotificationMessage"/>, в частности <see cref="NotificationMessage.ChatTargetOverride"/>
+    /// (отдельная группа/подтема Telegram для длительных операций).
+    /// Реализация по умолчанию разворачивает сообщение в прежний вызов —
+    /// существующие реализации интерфейса менять не требуется.
+    /// </summary>
+    void Show(NotificationMessage message) =>
+        Show(message.Title, message.Message, message.Kind, message.Event);
 }

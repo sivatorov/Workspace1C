@@ -185,6 +185,11 @@ namespace Workspace1C
             // «Действия только при наведении» (issue #128).
             if (ActionsHoverOnlyCheck != null)
                 ActionsHoverOnlyCheck.IsChecked = _viewModel.ActionsHoverOnly;
+            // Линии сетки списка баз (issue #130).
+            if (ShowHorizontalGridLinesCheck != null)
+                ShowHorizontalGridLinesCheck.IsChecked = _viewModel.ShowHorizontalGridLines;
+            if (ShowVerticalGridLinesCheck != null)
+                ShowVerticalGridLinesCheck.IsChecked = _viewModel.ShowVerticalGridLines;
 
             InitializeColumnOrder();
 
@@ -221,6 +226,22 @@ namespace Workspace1C
                 ThemeFollowsOsCheck.IsChecked = _viewModel.ThemeFollowsOs;
             if (ShowSystemNotificationsCheck != null)
                 ShowSystemNotificationsCheck.IsChecked = _viewModel.ShowSystemNotifications;
+            // Уведомления о длительных операциях (issue #131).
+            if (LongOperationNotificationsCheck != null)
+                LongOperationNotificationsCheck.IsChecked = _viewModel.LongOperationNotificationsEnabled;
+            if (LongOperationChannelCombo != null)
+                LongOperationChannelCombo.SelectedIndex = string.Equals(
+                    _viewModel.LongOperationNotificationsChannel,
+                    Models.LongOperationNotificationChannels.Telegram, StringComparison.Ordinal)
+                    ? 1
+                    : 0;
+            if (LongOperationTelegramTargetBox != null)
+                LongOperationTelegramTargetBox.Text = _viewModel.LongOperationTelegramTarget;
+            if (LongOperationThresholdBox != null)
+                LongOperationThresholdBox.Text = _viewModel.LongOperationThresholdValue.ToString();
+            if (LongOperationThresholdUnitCombo != null)
+                LongOperationThresholdUnitCombo.SelectedIndex = (int)Services.LongOperationThreshold.ParseUnit(
+                    _viewModel.LongOperationThresholdUnit);
             if (CatchUpMissedTasksCheck != null)
                 CatchUpMissedTasksCheck.IsChecked = _viewModel.CatchUpMissedTasks;
             if (AfterLaunchActionCombo != null)

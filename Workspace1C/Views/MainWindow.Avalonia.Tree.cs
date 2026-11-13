@@ -215,6 +215,11 @@ namespace Workspace1C
             row.Children.Add(caption);
 
             header.Child = row;
+
+            // Issue #130: линии сетки у строки группы — тот же планировщик и те же
+            // настройки, что у строк баз и заголовка.
+            ApplyGridLinesToGrid(row, includeHorizontal: true);
+
             return header;
         }
 
@@ -709,6 +714,10 @@ namespace Workspace1C
             }
 
             card.Child = grid;
+
+            // Issue #130: линии сетки строки базы. Обе настройки выключены —
+            // планировщик не вернёт ни одной линии, разметка остаётся прежней.
+            ApplyGridLinesToGrid(grid, includeHorizontal: true);
 
             // Двойной клик по строке базы запускает её в режиме по умолчанию
             // (issue #201): «1С:Предприятие» или «Конфигуратор» согласно DefaultLaunchMode.
@@ -1561,6 +1570,11 @@ namespace Workspace1C
             actionsLabel.Bind(Control.IsVisibleProperty, new Binding("ShowRightPanelDetails"));
             panel.Children.Add(actionsLabel);
 
+            // Issue #131: переключение уведомлений о длительных операциях — иконка
+            // будильника справа (просто будильник — включены, перечёркнутый — выключены).
+            // Видна и в узкой панели: привязки к ShowRightPanelDetails нет.
+            panel.Children.Add(BuildLongOperationAlarmToggle());
+
             panel.Children.Add(launchEnterpriseBlock);
             panel.Children.Add(launchConfiguratorBlock);
             panel.Children.Add(starterBlock);
@@ -1602,6 +1616,58 @@ namespace Workspace1C
             panel.Children.Add(exitBtn);
 
             return panel;
+        }
+
+        /// <summary>
+        /// Переключатель «Уведомлять о длительных операциях» (issue #131): будильник
+        /// в правом верхнем углу блока действий. Клик переключает и сохраняет
+        /// настройку; подсказка отражает состояние.
+        /// </summary>
+        private static Control BuildLongOperationAlarmToggle()
+        {
+            var icon = IconHelper.MakeIcon("IconScheduler", UiMetrics.Scaled(18), "TextPrimaryBrush");
+            var cross = new Avalonia.Controls.Shapes.Line
+            {
+                StartPoint = new Point(2, 16),
+                EndPoint = new Point(16, 2),
+                Stroke = new SolidColorBrush(Color.Parse("#DC2626")),
+                StrokeThickness = 1.6,
+                StrokeLineCap = PenLineCap.Round
+            };
+
+            var content = new Grid
+            {
+                Width = 18,
+                Height = 18,
+                Children = { icon, cross }
+            };
+
+            var toggle = new ToggleButton
+            {
+                Content = content,
+                Width = 28,
+                Height = 28,
+                Padding = new Thickness(4),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            toggle.Bind(ToggleButton.IsCheckedProperty,
+                new Binding("LongOperationNotificationsEnabled") { Mode = BindingMode.TwoWay });
+            toggle.Bind(ToolTip.TipProperty, new Binding("LongOperationNotificationsEnabled")
+            {
+                Converter = new Avalonia.Data.Converters.FuncValueConverter<bool, string>(on =>
+                    LocalizationManager.T(on
+                        ? "LongOperation.Alarm.TooltipOn"
+                        : "LongOperation.Alarm.TooltipOff"))
+            });
+            cross.Bind(Visual.IsVisibleProperty, new Binding("IsChecked")
+            {
+                Source = toggle,
+                Converter = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value != true)
+            });
+            return toggle;
         }
 
         /// <summary>

@@ -149,11 +149,43 @@ public sealed class TelegramNotificationChannel : INotificationChannel
         NotificationChannelSettings settings;
         try { settings = _store.Load(); }
         catch { return false; }
-        if (!IsConfigured(settings) || !NotificationEventFilter.ShouldSend(settings, message))
+
+        // issue #131: для уведомлений о длительных операциях чат/тема может быть
+        // переопределена в самом сообщении или отдельной настройкой; пусто —
+        // используется общий TelegramChatId.
+        var chatTarget = ResolveChatTarget(settings, message);
+
+        if (!IsConfigured(settings, chatTarget) || !NotificationEventFilter.ShouldSend(settings, message))
             return true; // отфильтровано — это не ошибка канала
-        var (ok, _) = await SendCoreAsync(settings, message, cancellationToken).ConfigureAwait(false);
+
+        var (ok, _) = await SendCoreAsync(settings, message, cancellationToken, chatTarget).ConfigureAwait(false);
         return ok;
     }
+
+    /// <summary>
+    /// Итоговый чат/тема для сообщения (issue #131): явное переопределение в
+    /// сообщении, затем отдельная настройка длительных операций, затем общий чат.
+    /// </summary>
+    public static string? ResolveChatTarget(NotificationChannelSettings settings, NotificationMessage message)
+    {
+        if (message is null)
+            return null;
+        if (!string.IsNullOrWhiteSpace(message.ChatTargetOverride))
+            return message.ChatTargetOverride!.Trim();
+        if (message.Event == NotificationEvent.LongOperation &&
+            !string.IsNullOrWhiteSpace(settings?.LongOperationTelegramChatId))
+            return settings!.LongOperationTelegramChatId.Trim();
+        return null;
+    }
+
+    /// <summary>
+    /// Канал настроен: заполнен токен и есть чат — общий либо переопределённый
+    /// для длительных операций (issue #131).
+    /// </summary>
+    public static bool IsConfigured(NotificationChannelSettings s, string? chatTarget)
+        => s is not null && s.TelegramEnabled
+           && !string.IsNullOrWhiteSpace(s.TelegramBotToken)
+           && (!string.IsNullOrWhiteSpace(chatTarget) || !string.IsNullOrWhiteSpace(s.TelegramChatId));
 
     /// <summary>
     /// Тестовая отправка с переданными (ещё не сохранёнными) настройками — для кнопки
@@ -185,7 +217,7 @@ public sealed class TelegramNotificationChannel : INotificationChannel
     }
 
     private async Task<(bool Ok, string Error)> SendCoreAsync(NotificationChannelSettings settings, NotificationMessage message,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, string? chatTarget = null)
     {
         var token = settings.TelegramBotToken.Trim();
         try
@@ -197,7 +229,9 @@ public sealed class TelegramNotificationChannel : INotificationChannel
                 ? new HttpClient()
                 : new HttpClient(proxyHandler, disposeHandler: _handler is null);
             http.Timeout = RequestTimeout;
-            var (chatId, threadId) = ParseChatTarget(settings.TelegramChatId);
+            // issue #131: переопределённый чат/тема (группа/подгруппа) приоритетнее общего.
+            var (chatId, threadId) = ParseChatTarget(
+                string.IsNullOrWhiteSpace(chatTarget) ? settings.TelegramChatId : chatTarget);
             using var request = BuildRequest(token, chatId, BuildText(message), threadId);
             using var response = await http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)

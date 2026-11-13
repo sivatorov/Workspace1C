@@ -1175,6 +1175,55 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Галочка «Уведомлять» о длительных операциях (issue #131). Переключается
+    /// иконкой-будильником в панели запуска и в окне настроек; сохранение —
+    /// отложенное, как у остальных настроек главного окна.
+    /// </summary>
+    public bool LongOperationNotificationsEnabled
+    {
+        get => _longOperationNotificationsEnabled;
+        set
+        {
+            if (SetProperty(ref _longOperationNotificationsEnabled, value))
+                ScheduleSaveSettings();
+        }
+    }
+
+    /// <summary>Канал уведомлений о длительных операциях (System/Telegram, issue #131).</summary>
+    public string LongOperationNotificationsChannel => _longOperationChannel;
+
+    /// <summary>Отдельная группа/подгруппа Telegram для длительных операций (issue #131).</summary>
+    public string LongOperationTelegramTarget => _longOperationTelegramTarget;
+
+    /// <summary>Значение порога «Длительность простоя» (issue #131).</summary>
+    public int LongOperationThresholdValue => _longOperationThresholdValue;
+
+    /// <summary>Единица измерения порога (Seconds/Minutes/Hours, issue #131).</summary>
+    public string LongOperationThresholdUnit => _longOperationThresholdUnit;
+
+    /// <summary>
+    /// Применяет группу «Уведомления о длительных операциях» из окна настроек
+    /// (issue #131): сохранение вместе с остальными настройками окна, применение —
+    /// без перезапуска (монитор читает настройки на каждом опросе).
+    /// </summary>
+    public void ApplyLongOperationNotificationSettings(
+        bool enabled, string? channel, string? telegramTarget, int thresholdValue, string? unit)
+    {
+        _longOperationNotificationsEnabled = enabled;
+        _longOperationChannel = LongOperationNotificationChannels.Normalize(channel);
+        _longOperationTelegramTarget = telegramTarget?.Trim() ?? "";
+        _longOperationThresholdValue = thresholdValue > 0 ? thresholdValue : 30;
+        _longOperationThresholdUnit = LongOperationThresholdUnits.Normalize(unit);
+
+        OnPropertyChanged(nameof(LongOperationNotificationsEnabled));
+        OnPropertyChanged(nameof(LongOperationNotificationsChannel));
+        OnPropertyChanged(nameof(LongOperationTelegramTarget));
+        OnPropertyChanged(nameof(LongOperationThresholdValue));
+        OnPropertyChanged(nameof(LongOperationThresholdUnit));
+        SaveSettings();
+    }
+
+    /// <summary>
     /// Догоняющее выполнение пропущенных заданий по расписанию при старте (функция №7):
     /// задания, чьё плановое время наступило, пока приложение было выключено, выполняются
     /// сразу при следующем запуске (один раз, только свежие пропуски — не старше 7 суток).

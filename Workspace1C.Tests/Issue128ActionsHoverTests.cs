@@ -127,7 +127,9 @@ public sealed class Issue128ActionsHoverTests
         // Свойство для привязок WPF-разметки (DataContext.ActionsHoverOnly).
         Assert.Contains("public bool ActionsHoverOnly => _actionsHoverOnly;", vm, StringComparison.Ordinal);
         // ApplyDisplaySettings принимает и применяет настройку (окно настроек).
-        Assert.Contains("bool actionsHoverOnly = false)", vm, StringComparison.Ordinal);
+        // Issue #130 добавила после actionsHoverOnly параметры линий сетки — проверяем
+        // саму настройку, а не точный хвост сигнатуры.
+        Assert.Contains("bool actionsHoverOnly = false, bool showHorizontalGridLines = false", vm, StringComparison.Ordinal);
         Assert.Contains("_actionsHoverOnly = actionsHoverOnly;", vm, StringComparison.Ordinal);
         // Смена настройки доходит до привязок без пересборки дерева.
         Assert.Contains("OnPropertyChanged(nameof(ActionsHoverOnly));", vm, StringComparison.Ordinal);
@@ -146,7 +148,9 @@ public sealed class Issue128ActionsHoverTests
     {
         var vm = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Avalonia.Display.cs"));
         Assert.Contains("public bool ActionsHoverOnly => _settings.ActionsHoverOnly;", vm, StringComparison.Ordinal);
-        Assert.Contains("bool actionsHoverOnly = false)", vm, StringComparison.Ordinal);
+        // Issue #130: сигнатура выросла параметрами линий сетки — проверяем настройку.
+        Assert.Contains("bool actionsHoverOnly = false,", vm, StringComparison.Ordinal);
+        Assert.Contains("bool showHorizontalGridLines = false,", vm, StringComparison.Ordinal);
         Assert.Contains("_settings.ActionsHoverOnly = actionsHoverOnly;", vm, StringComparison.Ordinal);
         Assert.Contains("OnPropertyChanged(nameof(ActionsHoverOnly));", vm, StringComparison.Ordinal);
         Assert.Contains("actionsHoverOnly: _settings.ActionsHoverOnly", vm, StringComparison.Ordinal);

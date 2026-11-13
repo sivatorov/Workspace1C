@@ -37,6 +37,14 @@ namespace Workspace1C
         /// </summary>
         private const double DwmCornerRadius = 8;
 
+        /// <summary>
+        /// Радиус собственного скругления содержимого окон (issue #126), общий с
+        /// Avalonia-слоем. Применяется, когда состояние DWM неизвестно (RDP/Windows 10),
+        /// но композиция включена: рамка повторяет скругление содержимого, а не
+        /// остаётся квадратной вокруг скруглённых углов.
+        /// </summary>
+        private const double FrameContentCornerRadius = WindowSizeMath.DefaultContentCornerRadius;
+
         // DWMWA_SYSTEMBACKDROP_TYPE (38): 2 = Mica, 3 = Acrylic.
         private const int DwmSystemBackdropType = 38;
         private const int DwmBackdropAcrylic = 3;
@@ -87,6 +95,17 @@ namespace Workspace1C
                 "FrameBorder", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
         private static Border? GetFrameBorder(DependencyObject d) => (Border?)d.GetValue(FrameBorderProperty);
         private static void SetFrameBorder(DependencyObject d, Border? value) => d.SetValue(FrameBorderProperty, value);
+
+        // Контейнер содержимого диалога (шапка + тело) со скруглением, совпадающим с
+        // радиусом видимой рамки (issue #126): иначе при неизвестном DWM (RDP/Windows 10)
+        // рамка скругляется по радиусу содержимого, а само содержимое остаётся
+        // прямоугольным — «скруглённая рамка вокруг квадратных углов». Радиус и клип
+        // синхронизируются в ApplyFrameCornerRadius вместе с рамкой.
+        private static readonly DependencyProperty ContentBorderProperty =
+            DependencyProperty.RegisterAttached(
+                "ContentBorder", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
+        private static Border? GetContentBorder(DependencyObject d) => (Border?)d.GetValue(ContentBorderProperty);
+        private static void SetContentBorder(DependencyObject d, Border? value) => d.SetValue(ContentBorderProperty, value);
 
         private static readonly DependencyProperty TitleBarBorderProperty =
             DependencyProperty.RegisterAttached(
@@ -197,6 +216,11 @@ namespace Workspace1C
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+
+        // Состояние композиции DWM (issue #126): при выключенных эффектах системного
+        // скругления нет — рамка не должна скругляться «наугад».
+        [DllImport("dwmapi.dll", PreserveSig = true)]
+        private static extern int DwmIsCompositionEnabled(out bool pfEnabled);
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmEnableBlurBehindWindow(IntPtr hwnd, ref DwmBlurBehind pBlurBehind);
@@ -657,7 +681,21 @@ namespace Workspace1C
                 return grid;
 
             var root = new Grid();
-            root.Children.Add(grid);
+
+            // Содержимое (шапка + тело) живёт в контейнере с тем же радиусом, что и
+            // видимая рамка (issue #126): на Windows 10/RDP, где DWM не клипует окно,
+            // скруглённая рамка вокруг прямоугольного содержимого выглядела бы как
+            // «срезанные» углы. Радиус и клип синхронизируются в ApplyFrameCornerRadius.
+            var contentHost = new Border
+            {
+                CornerRadius = new CornerRadius(FrameContentCornerRadius)
+            };
+            contentHost.Child = grid;
+            contentHost.SizeChanged += (_, _) =>
+                ApplyRoundedContentClip(contentHost, GetFrameTracking(window)?.LastRadius ?? 0);
+            SetContentBorder(window, contentHost);
+            ApplyRoundedContentClip(contentHost, FrameContentCornerRadius);
+            root.Children.Add(contentHost);
 
             var frame = new Border
             {
@@ -674,6 +712,33 @@ namespace Workspace1C
             Panel.SetZIndex(frame, 2000);
             root.Children.Add(frame);
             return root;
+        }
+
+        /// <summary>
+        /// Обрезает содержимое окна по скруглённому контуру (issue #126). WPF
+        /// <see cref="Border"/> с CornerRadius сам содержимое не клипует, поэтому
+        /// клип задаётся геометрией по фактическому размеру элемента. Радиус
+        /// синхронизирован с радиусом видимой рамки; при прямых углах
+        /// (<paramref name="radius"/> <= 0) клип снимается.
+        /// </summary>
+        private static void ApplyRoundedContentClip(FrameworkElement element, double radius)
+        {
+            try
+            {
+                if (radius <= 0 || element.ActualWidth <= 0 || element.ActualHeight <= 0)
+                {
+                    element.Clip = null;
+                    return;
+                }
+
+                element.Clip = new RectangleGeometry(
+                    new Rect(0, 0, element.ActualWidth, element.ActualHeight), radius, radius);
+            }
+            catch
+            {
+                // Клип — косметика: при сбое содержимое просто останется прямоугольным.
+                element.Clip = null;
+            }
         }
 
         /// <summary>
@@ -917,8 +982,14 @@ namespace Workspace1C
         /// рамка рисуется ПО скруглению. Состояние читается из
         /// DWMWA_WINDOW_CORNER_STATE (фактическое значение DWM), при недоступности —
         /// оценка по версии ОС. Максимизированное окно DWM рисует с прямыми углами —
-        /// радиусы рамки и шапки обнуляются; на Windows 10 (build < 22000)
-        /// скругления нет — рамка остаётся прямоугольной, как раньше.
+        /// радиусы рамки и шапки обнуляются. Если состояние DWM неизвестно (RDP/Windows
+        /// 10), но композиция включена, рамка повторяет радиус собственного скруглённого
+        /// содержимого (<see cref="WindowSizeMath.DefaultContentCornerRadius"/>), чтобы
+        /// не оставаться квадратной вокруг скруглённых углов. Содержимое диалога
+        /// (шапка + тело) скругляется и клипуется тем же радиусом, что и рамка, — рамка
+        /// и содержимое совпадают. Окна с собственным каркасом (главное окно) и окна с
+        /// <c>ShowWindowFrame=false</c> своего скругления не имеют: на Windows 10/RDP их
+        /// рамка остаётся прямой (явный opt-out от «фантомного» скругления).
         /// </summary>
         private static void ApplyFrameCornerRadius(Window window)
             => ApplyFrameCornerRadius(window, "apply");
@@ -929,11 +1000,13 @@ namespace Workspace1C
         /// журналу было видно, на каком событии радиус изменился (показ окна, смена
         /// темы/композиции, DPI, активация).
         /// <para>
-        /// Ключевая правка 1.0.1.61: до показа окна состояние DWM недостоверно (часто
-        /// DWMWCS_DO_NOT_ROUND), поэтому для невидимого окна берётся оценка по версии ОС
-        /// (<see cref="WindowSizeMath.ResolveFrameRounding"/>), а после показа радиус
-        /// уточняется повторно. Повторное присваивание CornerRadius выполняется только
-        /// при реальном изменении радиуса — иначе рамка мерцала бы на каждом Activated.
+        /// Решение принимает единая чистая политика
+        /// <see cref="WindowSizeMath.ResolveFrameCornerRadius"/>: до показа окна состояние
+        /// DWM недостоверно (часто DWMWCS_DO_NOT_ROUND) — используется оценка по версии ОС,
+        /// а после показа радиус уточняется повторно. В RDP/Windows 10 (DWM не сообщает
+        /// состояние) рамка повторяет радиус содержимого. Повторное присваивание
+        /// CornerRadius выполняется только при реальном изменении радиуса — иначе рамка
+        /// мерцала бы на каждом Activated.
         /// </para>
         /// </summary>
         private static void ApplyFrameCornerRadius(Window window, string reason)
@@ -944,8 +1017,27 @@ namespace Workspace1C
                 bool shown = IsWindowShown(window, out var hwnd);
                 bool stateKnown = TryReadDwmCornerState(hwnd, out bool dwmRounded);
                 bool osRounds = Environment.OSVersion.Version.Build >= 22000;
-                bool rounded = WindowSizeMath.ResolveFrameRounding(stateKnown, dwmRounded, shown, osRounds);
-                var radius = WindowSizeMath.ComputeFrameCornerRadius(rounded, maximized, DwmCornerRadius);
+                bool compositionEnabled = TryGetDwmCompositionEnabled();
+                // Радиус собственного скруглённого содержимого (issue #126): у диалогов
+                // WPF содержимое обёрнуто в скруглённый контейнер (BuildChrome), поэтому
+                // рамка может повторять его радиус. У окон с собственным каркасом
+                // (главное окно) своего скругления нет — на Windows 10/RDP рамка
+                // остаётся прямой, как и содержимое (нет «круглых углов с квадратной
+                // рамкой» и наоборот).
+                double contentRadius = GetContentBorder(window) is not null ? FrameContentCornerRadius : 0;
+                // Единая политика скругления (issue #126): чистая функция, покрытая
+                // тестами. В RDP/Windows 10 DWM не сообщает состояние — рамка
+                // повторяет радиус собственного содержимого, а не остаётся квадратной.
+                var policy = WindowSizeMath.ResolveFrameCornerRadius(new WindowSizeMath.FrameRoundingInputs(
+                    DwmStateKnown: stateKnown,
+                    DwmRounded: dwmRounded,
+                    WindowShown: shown,
+                    Maximized: maximized,
+                    CompositionEnabled: compositionEnabled,
+                    OsRoundsWindows: osRounds,
+                    ContentCornerRadius: contentRadius,
+                    SystemRadius: DwmCornerRadius));
+                var radius = policy.Radius;
 
                 var tracking = GetFrameTracking(window);
                 double? previous = tracking?.LastRadius;
@@ -954,8 +1046,17 @@ namespace Workspace1C
                 {
                     if (GetFrameBorder(window) is { } frame)
                         frame.CornerRadius = new CornerRadius(radius);
+                    // Содержимое диалога скругляется тем же радиусом, что и рамка:
+                    // на Windows 10/RDP DWM окно не клипует, и без этого скруглённая
+                    // рамка обрамляла бы прямоугольное содержимое (issue #126).
+                    if (GetContentBorder(window) is { } content)
+                    {
+                        content.CornerRadius = new CornerRadius(radius);
+                        ApplyRoundedContentClip(content, radius);
+                    }
                     // Полоса заголовка повторяет геометрию верхних углов окна (issue #135):
-                    // при скруглённом окне — скруглённая, при maximized/Windows 10 — прямая.
+                    // при скруглённом окне — скруглённая (включая фолбэк RDP/Win10 по радиусу
+                    // содержимого), при maximized/прямых углах — прямая.
                     if (GetTitleBarBorder(window) is { } bar)
                         bar.CornerRadius = new CornerRadius(radius, radius, 0, 0);
                     if (tracking != null)
@@ -963,7 +1064,8 @@ namespace Workspace1C
                 }
 
                 LogFrameCornerRadius(window, reason, hwnd, shown, stateKnown, dwmRounded,
-                    osRounds, maximized, radius, previous, changed);
+                    osRounds, compositionEnabled, contentRadius, maximized, radius, policy.Policy,
+                    previous, changed);
             }
             catch
             {
@@ -996,8 +1098,9 @@ namespace Workspace1C
         /// (DWMWA_WINDOW_CORNER_STATE). Возвращает <c>true</c>, если DWM ответил
         /// известным состоянием (<c>DWMWCS_ROUNDED</c>/<c>DWMWCS_DO_NOT_ROUND</c>);
         /// иначе состояние неизвестно и решение принимает
-        /// <see cref="WindowSizeMath.ResolveFrameRounding"/> (оценка по версии ОС).
-        /// На Windows 10 (build < 22000) атрибут не поддерживается — состояния нет.
+        /// <see cref="WindowSizeMath.ResolveFrameCornerRadius"/> (радиус содержимого
+        /// на RDP/Windows 10). На Windows 10 (build < 22000) атрибут не
+        /// поддерживается — состояние всегда неизвестно, без ложного «do-not-round».
         /// </summary>
         private static bool TryReadDwmCornerState(IntPtr hwnd, out bool rounded)
         {
@@ -1027,17 +1130,38 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Включена ли композиция DWM (issue #126). На Windows 8+ композиция включена
+        /// всегда, но в RDP/при отключённых эффектах она может быть недоступна — тогда
+        /// системного скругления нет и рамку не нужно скруглять «наугад». Если API
+        /// недоступен, считаем композицию включённой (современные ОС).
+        /// </summary>
+        private static bool TryGetDwmCompositionEnabled()
+        {
+            try
+            {
+                if (DwmIsCompositionEnabled(out bool enabled) == 0)
+                    return enabled;
+            }
+            catch
+            {
+                // API недоступен — на поддерживаемых ОС композиция включена.
+            }
+            return true;
+        }
+
+        /// <summary>
         /// Пишет в журнал (категория <see cref="LogCategory.Themes"/>) диагностику
         /// скругления рамки: тип окна, наличие HWND, фактическое состояние DWM,
-        /// вычисленный радиус и причину пересчёта (issue #126). При выключенной
-        /// категории INFO-запись не пишется; предупреждение — только при реальной
-        /// проблеме: показанное окно на Windows 11, но DWM не сообщил состояние
-        /// (RDP/нет композиции), либо поздний пересчёт изменил радиус (исходный
-        /// дефект — рамка была рассчитана до показа окна).
+        /// состояние композиции, радиус содержимого, вычисленный радиус, причину
+        /// пересчёта и принятую политику (issue #126). При выключенной категории
+        /// INFO-запись не пишется; предупреждение — только при реальной проблеме:
+        /// показанное окно на Windows 11, но DWM не сообщил состояние, либо поздний
+        /// пересчёт изменил радиус (исходный дефект — рамка была рассчитана до показа).
         /// </summary>
         private static void LogFrameCornerRadius(
             Window window, string reason, IntPtr hwnd, bool shown, bool stateKnown, bool dwmRounded,
-            bool osRounds, bool maximized, double radius, double? previous, bool changed)
+            bool osRounds, bool compositionEnabled, double contentRadius, bool maximized, double radius,
+            WindowSizeMath.FrameCornerPolicy policy, double? previous, bool changed)
         {
             try
             {
@@ -1045,7 +1169,9 @@ namespace Workspace1C
                     $"frame-corner reason={reason} window={window.GetType().Name} " +
                     $"hwnd=0x{hwnd.ToInt64():X} shown={shown} " +
                     $"dwmState={(stateKnown ? (dwmRounded ? "rounded" : "do-not-round") : "unknown")} " +
-                    $"osRounds={osRounds} maximized={maximized} radius={radius:0.#} " +
+                    $"osRounds={osRounds} compositionEnabled={compositionEnabled} " +
+                    $"contentRadius={contentRadius:0.#} maximized={maximized} " +
+                    $"radius={radius:0.#} policy={policy} " +
                     $"previous={(previous.HasValue ? previous.Value.ToString("0.#") : "-")} " +
                     $"changed={changed} frameOptOut={!GetShowWindowFrame(window)}";
 

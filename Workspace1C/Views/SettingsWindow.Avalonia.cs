@@ -547,6 +547,129 @@ namespace Workspace1C
                 margin: new Thickness(0, 14, 0, 0),
                 padding: new Thickness(8)));
 
+            // Уведомления о длительных операциях (issue #131): галочка «Уведомлять»,
+            // правее — «Куда уведомлять», ниже отдельная группа/подгруппа Telegram,
+            // ещё ниже — «Длительность простоя» и единица измерения. Сохраняется
+            // вместе с остальными настройками окна; монитор читает настройки на
+            // каждом опросе — применение без перезапуска.
+            var longOperationContent = new StackPanel();
+
+            var longOperationNotifyCheck = SettingsSwitch(
+                "LongOperation.Settings.Enabled", _viewModel.LongOperationNotificationsEnabled,
+                "IconScheduler", "@InfoBrush");
+            longOperationNotifyCheck.Margin = new Thickness(0, 0, 0, 8);
+            longOperationContent.Children.Add(longOperationNotifyCheck);
+
+            var longOperationChannelRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            longOperationChannelRow.Children.Add(new TextBlock
+            {
+                Text = LocalizationManager.T("LongOperation.Settings.ChannelLabel"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            var longOperationChannelCombo = new ComboBox
+            {
+                MinWidth = 220,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            foreach (var channelKey in new[]
+                     {
+                         "LongOperation.Settings.Channel.System",
+                         "LongOperation.Settings.Channel.Telegram"
+                     })
+            {
+                longOperationChannelCombo.Items.Add(new ComboBoxItem
+                {
+                    Content = new TextBlock { Text = LocalizationManager.T(channelKey) }
+                });
+            }
+            longOperationChannelCombo.SelectedIndex = string.Equals(
+                _viewModel.LongOperationNotificationsChannel,
+                Models.LongOperationNotificationChannels.Telegram, StringComparison.Ordinal)
+                ? 1
+                : 0;
+            longOperationChannelRow.Children.Add(longOperationChannelCombo);
+            longOperationContent.Children.Add(longOperationChannelRow);
+
+            var longOperationTargetHint = new TextBlock
+            {
+                Text = LocalizationManager.T("LongOperation.Settings.TelegramTargetHint"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            ThemeBrushes.Bind(longOperationTargetHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            longOperationContent.Children.Add(longOperationTargetHint);
+
+            var longOperationTargetBox = new TextBox
+            {
+                Text = _viewModel.LongOperationTelegramTarget,
+                Margin = new Thickness(0, 0, 0, 10)
+            };
+            ToolTip.SetTip(longOperationTargetBox,
+                LocalizationManager.T("LongOperation.Settings.TelegramTargetTooltip"));
+            longOperationContent.Children.Add(longOperationTargetBox);
+
+            var longOperationThresholdRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal
+            };
+            longOperationThresholdRow.Children.Add(new TextBlock
+            {
+                Text = LocalizationManager.T("LongOperation.Settings.ThresholdLabel"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            var longOperationThresholdBox = new TextBox
+            {
+                Text = _viewModel.LongOperationThresholdValue.ToString(),
+                MinWidth = 90,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0)
+            };
+            longOperationThresholdRow.Children.Add(longOperationThresholdBox);
+
+            var longOperationUnitCombo = new ComboBox
+            {
+                MinWidth = 140,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            foreach (var unitKey in new[]
+                     {
+                         "LongOperation.Settings.Unit.Seconds",
+                         "LongOperation.Settings.Unit.Minutes",
+                         "LongOperation.Settings.Unit.Hours"
+                     })
+            {
+                longOperationUnitCombo.Items.Add(new ComboBoxItem
+                {
+                    Content = new TextBlock { Text = LocalizationManager.T(unitKey) }
+                });
+            }
+            longOperationUnitCombo.SelectedIndex = (int)LongOperationThreshold.ParseUnit(
+                _viewModel.LongOperationThresholdUnit);
+            longOperationThresholdRow.Children.Add(longOperationUnitCombo);
+            longOperationContent.Children.Add(longOperationThresholdRow);
+
+            var longOperationHint = new TextBlock
+            {
+                Text = LocalizationManager.T("LongOperation.Settings.Hint"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            ThemeBrushes.Bind(longOperationHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            longOperationContent.Children.Add(longOperationHint);
+
+            settingsFunctionality.Children.Add(Controls.GroupBoxPanel.Build(
+                "LongOperation.Settings.GroupTitle", longOperationContent,
+                margin: new Thickness(0, 14, 0, 0),
+                padding: new Thickness(8)));
+
             // Поведение значка в области уведомлений. До этого три настройки
             // жили только в файле и в версии для Windows: в Linux-сборке ни
             // флажков, ни учёта не было.
@@ -1526,6 +1649,18 @@ namespace Workspace1C
                 "IconPlay", "@WarningBrush");
             displayColumns.Children.Add(actionsHoverOnlyCheck);
             displayColumns.Children.Add(Hint(LocalizationManager.T("Settings.Columns.ActionsHoverOnlyHint"), bottom: 12));
+
+            // Линии сетки списка баз (issue #130): горизонтальные — между строками,
+            // вертикальные — между столбцами, включая заголовок. «Зебра» не включается.
+            var showHorizontalGridLinesCheck = DisplayCheck(
+                "Settings.Columns.ShowHorizontalGridLines", _viewModel.ShowHorizontalGridLines,
+                iconKey: null, iconColor: null);
+            displayColumns.Children.Add(showHorizontalGridLinesCheck);
+            var showVerticalGridLinesCheck = DisplayCheck(
+                "Settings.Columns.ShowVerticalGridLines", _viewModel.ShowVerticalGridLines,
+                iconKey: null, iconColor: null);
+            displayColumns.Children.Add(showVerticalGridLinesCheck);
+            displayColumns.Children.Add(Hint(LocalizationManager.T("Settings.Columns.GridLinesHint"), bottom: 12));
 
             displayPanels.Children.Add(Hint(LocalizationManager.T("Settings.Panels.Description"), bottom: 10));
             var rightPanelCheck = DisplayCheck("Settings.Panels.RightPanelDetails", _viewModel.ShowRightPanelDetails, "IconPageLayoutSidebarRight", "@InfoBrush");
@@ -3680,6 +3815,23 @@ namespace Workspace1C
                     closeToTrayCheck.IsChecked == true,
                     escapeToTrayCheck.IsChecked == true,
                     notificationsCheck.IsChecked == true);
+                // Уведомления о длительных операциях (issue #131): канал, отдельная
+                // группа/подгруппа Telegram, порог и единица измерения.
+                _viewModel.ApplyLongOperationNotificationSettings(
+                    longOperationNotifyCheck.IsChecked == true,
+                    longOperationChannelCombo.SelectedIndex == 1
+                        ? Models.LongOperationNotificationChannels.Telegram
+                        : Models.LongOperationNotificationChannels.System,
+                    longOperationTargetBox.Text,
+                    int.TryParse(longOperationThresholdBox.Text?.Trim(), out var longOperationThreshold)
+                        ? longOperationThreshold
+                        : _viewModel.LongOperationThresholdValue,
+                    longOperationUnitCombo.SelectedIndex switch
+                    {
+                        1 => Models.LongOperationThresholdUnits.Minutes,
+                        2 => Models.LongOperationThresholdUnits.Hours,
+                        _ => Models.LongOperationThresholdUnits.Seconds
+                    });
                 // Тема приложения следует за режимом ОС (issue #108): применяется
                 // сразу — наблюдатель подписывается/отписывается в сеттере свойства.
                 _viewModel.ThemeFollowsOs = themeFollowsOsCheck.IsChecked == true;
@@ -3838,7 +3990,10 @@ namespace Workspace1C
                     // не передавалось, и колонка оставалась видимой всегда.
                     VisibleOf("LastBackup"),
                     // «Действия только при наведении» (issue #128).
-                    actionsHoverOnlyCheck.IsChecked == true);
+                    actionsHoverOnlyCheck.IsChecked == true,
+                    // Линии сетки списка баз (issue #130).
+                    showHorizontalGridLinesCheck.IsChecked == true,
+                    showVerticalGridLinesCheck.IsChecked == true);
 
                 // «Дополнение заголовка программы» (issue #28).
                 _viewModel.ApplyTitleSuffixSettings(

@@ -674,6 +674,9 @@ public partial class MainViewModel : ViewModelBase
         s.ShowSizeColumn = _showSizeColumn;
         s.ShowActionsColumn = _showActionsColumn;
         s.ActionsHoverOnly = _actionsHoverOnly;
+        // Issue #130: линии сетки списка баз.
+        s.ShowHorizontalGridLines = _showHorizontalGridLines;
+        s.ShowVerticalGridLines = _showVerticalGridLines;
         s.SizeColumnWidth = _sizeColumnWidth;
         s.ShowModifiedColumn = _showModifiedColumn;
         s.ModifiedColumnWidth = _modifiedColumnWidth;
@@ -702,6 +705,19 @@ public partial class MainViewModel : ViewModelBase
         s.AfterLaunchAction = _afterLaunchAction;
         s.ShowTrayIcon = _showTrayIcon;
         s.ShowSystemNotifications = _showSystemNotifications;
+        // issue #131: уведомления о длительных операциях. Флаги мониторинга режимов
+        // в окне не редактируются — сохраняем значения, прочитанные из профиля.
+        var existingLongOperation = s.LongOperationNotifications ?? new Models.LongOperationNotificationsSettings();
+        s.LongOperationNotifications = new Models.LongOperationNotificationsSettings
+        {
+            Enabled = _longOperationNotificationsEnabled,
+            Channel = LongOperationNotificationChannels.Normalize(_longOperationChannel),
+            TelegramTarget = _longOperationTelegramTarget ?? "",
+            ThresholdValue = _longOperationThresholdValue > 0 ? _longOperationThresholdValue : 30,
+            ThresholdUnit = LongOperationThresholdUnits.Normalize(_longOperationThresholdUnit),
+            MonitorEnterprise = existingLongOperation.MonitorEnterprise,
+            MonitorConfigurator = existingLongOperation.MonitorConfigurator
+        };
         s.CatchUpMissedTasks = _catchUpMissedTasks;
         s.MaintenanceFreeSpaceWarningGb = _maintenanceFreeSpaceWarningGb;
         s.EscapeToTray = _escapeToTray;

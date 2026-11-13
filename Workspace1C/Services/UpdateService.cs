@@ -155,6 +155,45 @@ public sealed class UpdateService : IAppUpdateService
     }
 
     /// <summary>
+    /// Пересчитывает доступность кэшированного релиза БЕЗ сети (issue #129): после
+    /// переключения галки «Считать версию прошлой» эффективная версия меняется, и
+    /// ранее найденный релиз (равный реальной сборке) должен снова предлагаться,
+    /// а переставший быть новее — сниматься с предложения. Возвращает true, если
+    /// кэша нет и нужна фоновая проверка (её запускает подписчик на
+    /// <see cref="TraceFlags.SettingsSaved"/>).
+    /// </summary>
+    public bool ReevaluateAvailability()
+    {
+        var current = AvailableRelease;
+        var evaluation = UpdateAvailabilityLogic.Reevaluate(
+            current,
+            EffectiveVersionService.CurrentForUpdates,
+            current is not null && IsSkipped(current));
+        SetAvailableRelease(evaluation.Release);
+        return evaluation.NeedsNetworkCheck;
+    }
+
+    /// <summary>
+    /// Реакция на сохранение флагов диагностики (issue #129): при смене
+    /// <see cref="TraceFlags.PrevVersionFlag"/> доступность обновления пересчитывается
+    /// сразу; если кэшированного релиза нет — планируется фоновая проверка.
+    /// </summary>
+    private void OnTraceSettingsSaved(TraceSettingsSavedEventArgs args)
+    {
+        if (args is null || !args.Contains(TraceFlags.PrevVersionFlag))
+            return;
+        try
+        {
+            if (ReevaluateAvailability())
+                _ = Task.Run(() => CheckForUpdatesAsync());
+        }
+        catch
+        {
+            // Пересчёт не должен ронять сохранение настроек.
+        }
+    }
+
+    /// <summary>
     /// Проверяет, была ли версия релиза пропущена пользователем («Пропустить эту
     /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
     /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
@@ -380,6 +419,10 @@ public sealed class UpdateService : IAppUpdateService
         _notifications = notifications;
         // Маркер «запланировано уведомление об успешном обновлении» (issue #10).
         _pendingUpdate = pendingUpdate;
+
+        // Issue #129: переключение галки «Считать версию прошлой» пересчитывает
+        // доступность обновления сразу — без перезапуска приложения.
+        TraceFlags.SettingsSaved += OnTraceSettingsSaved;
 
         _http = new HttpClient();
         // GitHub требует корректный User-Agent.
@@ -759,6 +802,24 @@ public sealed class UpdateService : IAppUpdateService
         var probe = await ProbeAssetAsync(url).ConfigureAwait(false);
         var totalBytes = probe.TotalSize;
 
+        // Issue #129: полный файл того же размера переиспользуется, если ETag/дата
+        // не противоречат серверу. Пустой ETag ответа (сбой зонда) файл не удаляет.
+        var existingLength = TryGetFileLength(dest);
+        var cachedMarker = UpdateDownloadCache.TryReadMarker(dest);
+        if (existingLength > 0 && expectedSize > 0 && existingLength == expectedSize)
+        {
+            var decision = UpdateDownloadCache.Decide(
+                dest, expectedSize, cachedMarker, probe.ETag, probe.LastModifiedUtc);
+            if (decision == UpdateCacheDecision.Reuse)
+            {
+                UpdateDownloadCache.WriteReadyMarker(
+                    dest, existingLength, probe.ETag ?? TryReadText(etagPath), probe.LastModifiedUtc);
+                return (dest, false);
+            }
+            if (decision == UpdateCacheDecision.Redownload)
+                TryDelete(dest);
+        }
+
         // Сервер отдаёт не тот файл, что заявлен GitHub API (размер ассета не совпал):
         // качать такой гибрид бессмысленно, считаем загрузку неудачной (issue #302).
         // Диагностика CM_UPDATES (issue #89, 1.0.1.11): причина видна в журнале.
@@ -790,7 +851,10 @@ public sealed class UpdateService : IAppUpdateService
         var parallelResult = await ParallelDownloader.TryDownloadAsync(
             _http, url, dest, ReportDownloadProgressPercent, expectedSize);
         if (parallelResult is not null)
+        {
+            MarkDownloadComplete(parallelResult, probe.ETag ?? TryReadText(etagPath));
             return (parallelResult, false);
+        }
 
         const int maxAttempts = 12;
 
@@ -805,7 +869,10 @@ public sealed class UpdateService : IAppUpdateService
             if (accepted > 0 && existing >= accepted)
             {
                 if (existing == accepted)
+                {
+                    MarkDownloadComplete(dest, probe.ETag ?? TryReadText(etagPath));
                     return (dest, false);
+                }
                 // Длиннее ожидаемого — повреждён, начинаем заново.
                 TryDelete(dest);
                 existing = 0;
@@ -824,7 +891,10 @@ public sealed class UpdateService : IAppUpdateService
                     // Без эталона вовсе (обе стороны размер не сообщили) — как раньше,
                     // принимаем любой непустой файл.
                     if (accepted > 0 ? size == accepted : size > 0)
+                    {
+                        MarkDownloadComplete(dest, probe.ETag ?? TryReadText(etagPath));
                         return (dest, false);
+                    }
                 }
             }
             catch
@@ -844,6 +914,17 @@ public sealed class UpdateService : IAppUpdateService
         TryDelete(dest);
         TryDelete(etagPath);
         return (null, false);
+    }
+
+    /// <summary>
+    /// Фиксирует успешную загрузку маркером <c>*.ready</c> (issue #129): размер, ETag
+    /// и дата позволяют в следующий раз переиспользовать файл без сети.
+    /// </summary>
+    private static void MarkDownloadComplete(string dest, string? etag)
+    {
+        var size = TryGetFileLength(dest);
+        if (size > 0)
+            UpdateDownloadCache.WriteReadyMarker(dest, size, etag, null);
     }
 
     /// <summary>Имя временного файла загрузки, привязанное к версии релиза (issue #302).</summary>
@@ -882,7 +963,11 @@ public sealed class UpdateService : IAppUpdateService
             {
                 var name = Path.GetFileName(file);
                 if (string.Equals(name, currentTemp, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(name, currentTemp + ".etag", StringComparison.OrdinalIgnoreCase))
+                    || string.Equals(name, currentTemp + ".etag", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(
+                        name,
+                        currentTemp + UpdateDownloadCache.ReadyMarkerExtension,
+                        StringComparison.OrdinalIgnoreCase))
                     continue;
                 TryDelete(file);
             }
@@ -900,7 +985,7 @@ public sealed class UpdateService : IAppUpdateService
     /// байты разных ассетов. При любой ошибке возвращает пустой результат: загрузка
     /// пойдёт без докачки, а размер сверится с ожидаемым из GitHub API.
     /// </summary>
-    private async Task<(string? ETag, long TotalSize)> ProbeAssetAsync(string url)
+    private async Task<(string? ETag, long TotalSize, DateTime? LastModifiedUtc)> ProbeAssetAsync(string url)
     {
         try
         {
@@ -916,16 +1001,17 @@ public sealed class UpdateService : IAppUpdateService
                 ? response.Content.Headers.ContentRange?.Length ?? -1
                 : response.Content.Headers.ContentLength ?? -1;
             var etag = response.Headers.ETag?.ToString();
+            var lastModified = response.Content.Headers.LastModified?.UtcDateTime;
 
             // Дренируем тело (1 байт), чтобы соединение вернулось в пул.
             try { await response.Content.ReadAsByteArrayAsync(cts.Token); }
             catch { /* не критично */ }
 
-            return (etag, total);
+            return (etag, total, lastModified);
         }
         catch
         {
-            return (null, -1);
+            return (null, -1, null);
         }
     }
 
@@ -1143,6 +1229,20 @@ public sealed class UpdateService : IAppUpdateService
     }
 
     /// <summary>
+    /// Возвращает путь к уже скачанному полному файлу обновления для релиза или null
+    /// (issue #129). Проверяется ТОЛЬКО точный размер ассета из GitHub API — сеть не
+    /// нужна, поэтому файл из прошлого сеанса переиспользуется при каждом запуске.
+    /// </summary>
+    internal string? TryGetCachedUpdateFile(ReleaseInfo release)
+    {
+        if (release is null || string.IsNullOrWhiteSpace(release.TagName))
+            return null;
+        var dir = Path.Combine(Path.GetTempPath(), UpdateTempDir);
+        return UpdateDownloadCache.ResolveCachedFile(
+            dir, TempFileName(release.TagName), release.AssetSize);
+    }
+
+    /// <summary>
     /// Скачивает exe по прямой ссылке релиза и поднимает события прогресса/завершения
     /// для строки состояния главного окна. Возвращает путь к файлу или null при неудаче.
     /// Имя временного файла и проверка размера привязаны к версии релиза (issue #302).
@@ -1169,6 +1269,28 @@ public sealed class UpdateService : IAppUpdateService
         bool joined = false;
         try
         {
+            var dir = Path.Combine(Path.GetTempPath(), UpdateTempDir);
+            Directory.CreateDirectory(dir);
+
+            // Issue #129: полный файл, скачанный в прошлом сеансе, переиспользуется —
+            // повторной загрузки при каждом запуске больше нет. Файл обязан быть
+            // точного размера и пройти проверку сигнатуры (PE/ZIP).
+            var cached = TryGetCachedUpdateFile(release);
+            if (cached is not null)
+            {
+                var cachedPayload = UpdatePayload.EnsureExecutablePayload(cached, dir);
+                if (cachedPayload is not null)
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Обновление {release.TagName}: используется уже скачанный файл {cached} " +
+                        $"(размер {release.AssetSize} байт) — повторная загрузка не требуется.");
+                    return (cachedPayload, false);
+                }
+
+                // Кэш повреждён/не тот формат — удаляем и качаем заново.
+                UpdateDownloadCache.DeleteCachedFile(cached);
+            }
+
             var (downloaded, joinedExisting) = await DownloadAsync(
                 release.DownloadUrl!, release.TagName, release.AssetSize);
             joined = joinedExisting;
@@ -1177,7 +1299,6 @@ public sealed class UpdateService : IAppUpdateService
 
             // Защита от «не того» файла (issue #358): PE — как есть, ZIP — распаковать exe,
             // иное (HTML и пр.) — удалить и вернуть null (ошибка скачивания).
-            var dir = Path.Combine(Path.GetTempPath(), UpdateTempDir);
             result = UpdatePayload.EnsureExecutablePayload(downloaded, dir);
             return (result, false);
         }

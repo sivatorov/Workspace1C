@@ -33,15 +33,37 @@ public sealed class SystemNotificationChannel : INotificationChannel
     /// <inheritdoc/>
     public bool IsEnabled(AppSettings settings) => settings.ShowSystemNotifications;
 
+    /// <summary>
+    /// Чистая проверка «показывать ли сообщение системным каналом» (issue #131):
+    /// общая настройка системных уведомлений плюс для длительных операций —
+    /// включённая галочка и выбранный канал «Системные уведомления».
+    /// </summary>
+    public static bool ShouldShow(AppSettings settings, NotificationMessage message)
+    {
+        if (settings is null || !settings.ShowSystemNotifications)
+            return false;
+        if (message?.Event != NotificationEvent.LongOperation)
+            return true;
+
+        var longOperation = settings.LongOperationNotifications;
+        return longOperation is not null
+               && longOperation.Enabled
+               && string.Equals(LongOperationNotificationChannels.Normalize(longOperation.Channel),
+                   LongOperationNotificationChannels.System, StringComparison.Ordinal);
+    }
+
     /// <inheritdoc/>
     public Task<bool> SendAsync(NotificationMessage message, CancellationToken cancellationToken = default)
     {
         try
         {
+            var settings = _repository.LoadSettings();
+
             // Настройка «Системные уведомления» (AppSettings.ShowSystemNotifications):
             // при false все уведомления подавляются (страховка для прямых вызовов —
-            // диспетчер уже отфильтровал через IsEnabled).
-            if (!_repository.LoadSettings().ShowSystemNotifications)
+            // диспетчер уже отфильтровал через IsEnabled). issue #131: длительные
+            // операции дополнительно требуют включённую галочку и канал «Система».
+            if (!ShouldShow(settings, message))
                 return Task.FromResult(true);
 
             var tray = MainWindow.TrayIconInstance;

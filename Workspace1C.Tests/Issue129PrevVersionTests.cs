@@ -325,6 +325,77 @@ public sealed class Issue129PrevVersionTests : IDisposable
         }
     }
 
+    // --------------------------------------------------------------
+    // Мгновенное применение без перезапуска (issue #129, часть 2)
+    // --------------------------------------------------------------
+
+    [Fact]
+    public void SettingsSaved_FlagEnabled_ReevaluatesAvailabilityWithoutRestart()
+    {
+        // Релиз равен РЕАЛЬНОЙ сборке — именно его проверка обновлений видит при
+        // выключенном флаге и отвергает как «не новее» (дефект из комментария @7OH).
+        var real = VersionInfo.Display();
+        var sameRelease = new ReleaseInfo { TagName = "v" + real };
+
+        Assert.False(EffectiveVersionService.IsPrevVersionModeEnabled());
+        var before = UpdateAvailabilityLogic.Reevaluate(
+            sameRelease, EffectiveVersionService.CurrentForUpdates, skipped: false);
+        Assert.Null(before.Release);
+        Assert.False(before.NeedsNetworkCheck);
+
+        var savedEvents = new List<TraceSettingsSavedEventArgs>();
+        void Handler(TraceSettingsSavedEventArgs args) => savedEvents.Add(args);
+        TraceFlags.SettingsSaved += Handler;
+        try
+        {
+            EnablePrevVersionFlag();
+        }
+        finally
+        {
+            TraceFlags.SettingsSaved -= Handler;
+        }
+
+        // Событие поднято — главное окно и UpdateService пересчитывают состояние СРАЗУ.
+        var args = Assert.Single(savedEvents);
+        Assert.True(args.Contains(TraceFlags.PrevVersionFlag));
+
+        // Пересчёт без перезапуска: та же сборка становится доступным обновлением.
+        EffectiveVersionService.GitTagsProvider = () => "v1.0.0.1";
+        EffectiveVersionService.ResetGitCacheForTesting();
+        Assert.Equal("1.0.0.1", EffectiveVersionService.CurrentForUpdates);
+
+        var after = UpdateAvailabilityLogic.Reevaluate(
+            sameRelease, EffectiveVersionService.CurrentForUpdates, skipped: false);
+        Assert.Same(sameRelease, after.Release);
+        Assert.False(after.NeedsNetworkCheck);
+    }
+
+    [Fact]
+    public void SettingsSaved_FlagDisabled_ReleaseIsNotNewer()
+    {
+        EnablePrevVersionFlag();
+        EffectiveVersionService.GitTagsProvider = () => "v1.0.0.1";
+        EffectiveVersionService.ResetGitCacheForTesting();
+
+        var real = VersionInfo.Display();
+        var sameRelease = new ReleaseInfo { TagName = "v" + real };
+        Assert.NotNull(UpdateAvailabilityLogic.Reevaluate(
+            sameRelease, EffectiveVersionService.CurrentForUpdates, skipped: false).Release);
+
+        // Выключение флага тем же путём (вкладка «Логирование») возвращает состояние
+        // «не новее» — снова без перезапуска.
+        Assert.True(TraceFlags.SaveCategorySettings(new Dictionary<string, bool>
+        {
+            [TraceFlags.PrevVersionFlag] = false
+        }));
+        Assert.Equal(real, EffectiveVersionService.CurrentForUpdates);
+
+        var after = UpdateAvailabilityLogic.Reevaluate(
+            sameRelease, EffectiveVersionService.CurrentForUpdates, skipped: false);
+        Assert.Null(after.Release);
+        Assert.False(after.NeedsNetworkCheck);
+    }
+
     private void EnablePrevVersionFlag()
     {
         Assert.True(TraceFlags.SaveCategorySettings(new Dictionary<string, bool>

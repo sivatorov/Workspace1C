@@ -223,6 +223,44 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
+        /// Пересчитывает доступность кэшированного релиза БЕЗ сети (issue #129): после
+        /// переключения галки «Считать версию прошлой» эффективная версия меняется, и
+        /// ранее найденный релиз (равный реальной сборке) должен снова предлагаться,
+        /// а переставший быть новее — сниматься с предложения. Возвращает true, если
+        /// кэша нет и нужна фоновая проверка.
+        /// </summary>
+        public bool ReevaluateAvailability()
+        {
+            var current = AvailableRelease;
+            var evaluation = UpdateAvailabilityLogic.Reevaluate(
+                current,
+                EffectiveVersionService.CurrentForUpdates,
+                current is not null && IsSkipped(current));
+            SetAvailableRelease(evaluation.Release);
+            return evaluation.NeedsNetworkCheck;
+        }
+
+        /// <summary>
+        /// Реакция на сохранение флагов диагностики (issue #129): при смене
+        /// <see cref="TraceFlags.PrevVersionFlag"/> доступность обновления
+        /// пересчитывается сразу; при отсутствии кэша планируется фоновая проверка.
+        /// </summary>
+        private void OnTraceSettingsSaved(TraceSettingsSavedEventArgs args)
+        {
+            if (args is null || !args.Contains(TraceFlags.PrevVersionFlag))
+                return;
+            try
+            {
+                if (ReevaluateAvailability())
+                    _ = Task.Run(() => CheckForUpdatesAsync());
+            }
+            catch
+            {
+                // Пересчёт не должен ронять сохранение настроек.
+            }
+        }
+
+        /// <summary>
         /// Проверяет, была ли версия релиза пропущена пользователем («Пропустить эту
         /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
         /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
@@ -396,6 +434,10 @@ namespace Workspace1C.Services
             _notifications = notifications;
             // Маркер «запланировано уведомление об успешном обновлении» (issue #10).
             _pendingUpdate = pendingUpdate;
+
+            // Issue #129: переключение галки «Считать версию прошлой» пересчитывает
+            // доступность обновления сразу — без перезапуска приложения.
+            TraceFlags.SettingsSaved += OnTraceSettingsSaved;
 
             _http = new HttpClient();
             // GitHub требует корректный User-Agent.
@@ -1354,6 +1396,25 @@ namespace Workspace1C.Services
             var dir = EnsureUpdateDirectory();
             var dest = Path.Combine(dir, $"Workspace1C.{SanitizeKey(versionKey)}.new");
 
+            // Issue #129: полный файл, скачанный в прошлом сеансе, переиспользуется —
+            // повторной загрузки при каждом запуске больше нет. Файл обязан быть
+            // точного размера и иметь сигнатуру ELF (Linux-сборка).
+            var cached = UpdateDownloadCache.ResolveCachedFile(dir, Path.GetFileName(dest), expectedSize);
+            if (cached is not null)
+            {
+                if (UpdatePayload.ValidatePlatformMagic(cached, linux: true, expectedSize)
+                    == UpdatePayload.UpdatePlatformValidation.Valid)
+                {
+                    Log.Info(TraceFlags.UpdatesFlag,
+                        $"Обновление {versionKey}: используется уже скачанный файл {cached} " +
+                        $"(размер {expectedSize} байт) — повторная загрузка не требуется.");
+                    return (cached, false);
+                }
+
+                // Кэш повреждён/не тот формат — удаляем и качаем заново.
+                UpdateDownloadCache.DeleteCachedFile(cached);
+            }
+
             // issue #89: имя ассета в индикаторе загрузок — по платформе. Ранее было
             // захардкожено «Workspace1C.exe», из-за чего на Linux пользователь видел
             // в индикаторе загрузку Windows-версии, даже когда качался корректный
@@ -1396,6 +1457,8 @@ namespace Workspace1C.Services
                     }).ConfigureAwait(false);
                 if (parallelPath is not null)
                 {
+                    UpdateDownloadCache.WriteReadyMarker(
+                        parallelPath, SafeFileLength(parallelPath), null, null);
                     BackgroundDownloadManager.Default.Complete(entry.Id);
                     return (parallelPath, false);
                 }
@@ -1493,6 +1556,10 @@ namespace Workspace1C.Services
                     return (null, false);
                 }
 
+                // Issue #129: маркер готового файла — размер + дата ассета; при следующем
+                // запуске файл переиспользуется без сети.
+                UpdateDownloadCache.WriteReadyMarker(
+                    dest, size, null, response.Content.Headers.LastModified?.UtcDateTime);
                 BackgroundDownloadManager.Default.Complete(entry.Id);
                 return (dest, false);
             }

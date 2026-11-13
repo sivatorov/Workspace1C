@@ -641,6 +641,18 @@ public partial class MainViewModel : ViewModelBase
     /// </summary>
     public bool ActionsHoverOnly => _actionsHoverOnly;
 
+    /// <summary>
+    /// «Выводить линии — по горизонтали» (issue #130): тонкие линии между строками
+    /// списка баз. По умолчанию выключено.
+    /// </summary>
+    public bool ShowHorizontalGridLines => _showHorizontalGridLines;
+
+    /// <summary>
+    /// «Выводить линии — по вертикали» (issue #130): тонкие линии между столбцами
+    /// списка баз, включая заголовок. По умолчанию выключено.
+    /// </summary>
+    public bool ShowVerticalGridLines => _showVerticalGridLines;
+
     public double SizeColumnWidth
     {
         get => _sizeColumnWidth;
@@ -761,7 +773,7 @@ public partial class MainViewModel : ViewModelBase
         bool groupByGroup, bool showFavoritesOnly, bool showSizeColumn = true, bool showModifiedColumn = true,
         bool showConfigurationColumn = true, bool showConfigurationVersionColumn = true, bool showEmptyGroups = false,
         List<string>? columnOrder = null, bool showActionsColumn = true, bool showLastBackupColumn = true,
-        bool actionsHoverOnly = false)
+        bool actionsHoverOnly = false, bool showHorizontalGridLines = false, bool showVerticalGridLines = false)
     {
         _showFavoritesButton = showFavoritesButton;
         _showPinnedButton = showPinnedButton;
@@ -777,6 +789,8 @@ public partial class MainViewModel : ViewModelBase
         _showLastBackupColumn = showLastBackupColumn;
         _showActionsColumn = showActionsColumn;
         _actionsHoverOnly = actionsHoverOnly;
+        _showHorizontalGridLines = showHorizontalGridLines;
+        _showVerticalGridLines = showVerticalGridLines;
 
         OnPropertyChanged(nameof(ShowFavoritesButton));
         OnPropertyChanged(nameof(ShowPinnedButton));
@@ -792,6 +806,8 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(ShowLastBackupColumn));
         OnPropertyChanged(nameof(ShowActionsColumn));
         OnPropertyChanged(nameof(ActionsHoverOnly));
+        OnPropertyChanged(nameof(ShowHorizontalGridLines));
+        OnPropertyChanged(nameof(ShowVerticalGridLines));
 
         // Применяем поведение списка (уже имеющиеся настройки).
         GroupByGroup = groupByGroup;
@@ -828,7 +844,9 @@ public partial class MainViewModel : ViewModelBase
             columnOrder: _columnOrder,
             showActionsColumn: key == "Actions" ? visible : _showActionsColumn,
             showLastBackupColumn: key == "LastBackup" ? visible : _showLastBackupColumn,
-            actionsHoverOnly: _actionsHoverOnly);
+            actionsHoverOnly: _actionsHoverOnly,
+            showHorizontalGridLines: _showHorizontalGridLines,
+            showVerticalGridLines: _showVerticalGridLines);
     }
 
     /// <summary>Сохранённая ширина окна приложения (0 — по умолчанию).</summary>

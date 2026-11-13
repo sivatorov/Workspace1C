@@ -145,13 +145,18 @@ public static class ConfigExtensionService
     // реальных .cfe (платформа 8.3.x); служебный индекс контейнера называется
     // «configinfo» и содержит только список GUID-файлов с их хэшами.
     //
-    // Issue #117 (расширение «ИР»): у части файлов раскладка отличается — метаданные
-    // лежат во вложенном контейнере (глубже первого уровня), в элементе больше 1 МБ,
-    // в UTF-16 или рядом с маркером ConfigurationExtensionPurpose. Поэтому разбор:
+    // Issue #117 (расширение «ИР», реальный файл ir-8.23.1e.cfe): контейнер содержит
+    // тысячи служебных элементов — объекты метаданных, формы, модули, картинки, — и
+    // почти в каждом есть своя строка «{1,0,<guid>},"Имя"». Прежний разбор брал
+    // ПЕРВУЮ такую строку и показывал имя служебного объекта вместо имени расширения.
+    // Поэтому разбор:
     //  * читает файл потоково (FileStream + блочное чтение), а не File.ReadAllBytes;
-    //  * обходит вложенные контейнеры до MaxContainerDepth;
-    //  * перебирает все элементы, включая версионные (имя может быть только в «.N»);
-    //  * ищет имя по нескольким шаблонам и в UTF-8, и в UTF-16;
+    //  * обходит вложенные контейнеры до MaxContainerDepth и НЕ ищет имя в их
+    //    двоичных данных (только в элементах);
+    //  * выбирает имя по приоритету якорей: GUID-класс «Конфигурация» → маркер
+    //    ConfigurationExtensionPurpose → именованное свойство (Name/Синоним) →
+    //    общий шаблон только как «последний шанс», если профильных элементов нет;
+    //  * определяет кодировку (UTF-8/UTF-16) ПО БЛОКУ, а не по первым 4 КБ файла;
     //  * при неудаче возвращает null — вызывающий код откатывается к имени файла,
     //    но установка без подтверждения не выполняется (см. ExtensionsViewModel).
     // ---------------------------------------------------------------------------
@@ -211,11 +216,22 @@ public static class ConfigExtensionService
     /// <summary>
     /// Читает НАСТОЯЩЕЕ имя расширения из файла .cfe (issue #117): при выборе файла
     /// «Обзором» пользователь должен увидеть имя, под которым расширение установлено
-    /// в базе, а не имя файла. Возвращает <c>null</c>, если файл не распознан или имя
-    /// прочитать не удалось (тогда callers откатываются к имени файла).
+    /// в базе, а не имя файла. Возвращает <c>null</c>, если файл не распознан, имя
+    /// прочитать не удалось или кандидаты противоречат друг другу (тогда callers
+    /// откатываются к имени файла и требуют подтверждения).
     /// </summary>
     public static string? TryReadExtensionName(string? cfePath)
+        => TryReadExtensionName(cfePath, out _);
+
+    /// <summary>
+    /// Issue #117 (диагностика выбора имени): читает имя и возвращает ВСЕХ найденных
+    /// кандидатов с путями в дереве контейнеров и типом якоря — окно расширений пишет
+    /// их в журнал, чтобы было видно, почему выбрано то или иное имя.
+    /// </summary>
+    internal static string? TryReadExtensionName(string? cfePath,
+        out IReadOnlyList<ExtensionNameCandidate> candidates)
     {
+        candidates = Array.Empty<ExtensionNameCandidate>();
         if (string.IsNullOrWhiteSpace(cfePath))
             return null;
         try
@@ -237,13 +253,16 @@ public static class ConfigExtensionService
 
             // Перепакованный .cfe может оказаться обычным zip-архивом.
             if (signature == ZipSignature)
-                return TryReadNameFromZip(cfePath);
+                return TryReadNameFromZip(cfePath, out candidates);
             if (signature != ContainerSignature)
                 return null;
 
             var elements = new List<ContainerElement>();
             ReadContainerElements(stream, stream.Length, 16, elements, MaxContainerDepth, depth: 0);
-            return SelectExtensionName(elements);
+            var found = new List<ExtensionNameCandidate>();
+            var name = SelectExtensionName(elements, found);
+            candidates = found;
+            return name;
         }
         catch
         {
@@ -252,32 +271,174 @@ public static class ConfigExtensionService
         }
     }
 
+    /// <summary>Элемент контейнера .cfe с найденными якорями имени (issue #117).</summary>
     private sealed class ContainerElement
     {
+        /// <summary>Имя элемента в контейнере (GUID объекта или служебное «form»/«module»).</summary>
         public string Name = string.Empty;
-        public byte[]? Data;
-        public string? FoundName;
+
+        /// <summary>Путь элемента в дереве контейнеров (например, «138» или «3/0»).</summary>
+        public string Path = string.Empty;
+
+        /// <summary>Глубина вложенности контейнера (0 — корневой).</summary>
         public int Depth;
+
+        /// <summary>Порядковый номер обхода — для детерминированного выбора кандидата.</summary>
+        public int Order;
+
+        /// <summary>Имя из профильного якоря (GUID-класс «Конфигурация»/маркер назначения/Name).</summary>
+        public string? FoundName;
+
+        /// <summary>Имя по общему шаблону — «последний шанс», если профильных элементов нет.</summary>
+        public string? GenericName;
+
+        /// <summary>В элементе найден GUID-класс «Конфигурация».</summary>
+        public bool HasConfigurationClass;
+
+        /// <summary>В элементе найден маркер ConfigurationExtensionPurpose.</summary>
+        public bool HasPurposeMarker;
+
+        /// <summary>В элементе найдено явное именованное свойство (Name/Синоним).</summary>
+        public bool HasNamedProperty;
+    }
+
+    /// <summary>Результат зондирования блока: имя и найденные якоря раскладки.</summary>
+    private readonly record struct ElementNameProbe(
+        string? Name,
+        string? GenericName,
+        bool HasConfigurationClass,
+        bool HasPurposeMarker,
+        bool HasNamedProperty);
+
+    /// <summary>
+    /// Найденный кандидат имени расширения (issue #117): значение, путь элемента в дереве
+    /// контейнеров, глубина и тип якоря («class» / «purpose» / «named»). Нужен для журнала:
+    /// при нескольких кандидатах видно, откуда взято имя и какие варианты отвергнуты.
+    /// </summary>
+    internal readonly record struct ExtensionNameCandidate(string Name, string Path, int Depth, string Anchor)
+    {
+        /// <summary>Строка для журнала: путь, глубина, якорь и значение.</summary>
+        public string Describe() => $"path={Path}, depth={Depth}, anchor={Anchor}: '{Name}'";
     }
 
     /// <summary>
-    /// Выбирает имя из найденных элементов: приоритет — текущие (не версионные)
-    /// элементы верхнего уровня, затем вложенные, затем версионные («.N»).
+    /// Выбирает имя из найденных элементов (issue #117). Приоритет якорей:
+    /// GUID-класс «Конфигурация» → маркер назначения → именованное свойство →
+    /// общий шаблон (только если профильных элементов в файле нет вовсе).
+    /// В контейнере .cfe сотни служебных элементов (объекты метаданных, формы,
+    /// модули, картинки) со своими именами — брать первое попавшееся нельзя:
+    /// именно из-за этого расширение «ИР» показывалось под чужим именем.
+    /// Если на одном уровне приоритета нашлись РАЗНЫЕ имена — возвращается <c>null</c>
+    /// (сомнение): окно расширений запросит подтверждение вместо подстановки догадки.
     /// </summary>
-    private static string? SelectExtensionName(IReadOnlyList<ContainerElement> elements)
+    private static string? SelectExtensionName(IReadOnlyList<ContainerElement> elements,
+        List<ExtensionNameCandidate> candidates)
     {
-        foreach (var predicate in new Func<ContainerElement, bool>[]
+        // 1. Основной якорь: элемент метаданных расширения с GUID-классом «Конфигурация».
+        var name = SelectByAnchor(elements, e => e.HasConfigurationClass, "class", candidates,
+            out var ambiguous);
+        if (name is not null)
+            return name;
+        if (ambiguous)
+            return null;
+
+        // 2. Маркер назначения расширения (часть .cfe «ИР»).
+        name = SelectByAnchor(elements, e => e.HasPurposeMarker, "purpose", candidates, out ambiguous);
+        if (name is not null)
+            return name;
+        if (ambiguous)
+            return null;
+
+        // 3. Явное именованное свойство — только в элементе ВЕРХНЕГО уровня (метаданные):
+        //    в текстах модулей вложенных контейнеров тоже встречается «Name»:"ПриЗаписи".
+        name = SelectByAnchor(elements, e => e.HasNamedProperty && e.Depth == 0, "named", candidates,
+            out ambiguous);
+        if (name is not null)
+            return name;
+        if (ambiguous)
+            return null;
+
+        // Профильный элемент найден, но имя в нём не распознано — лучше вернуть null
+        // (вызывающий код запросит подтверждение), чем подставить служебное имя.
+        if (elements.Any(e => e.HasConfigurationClass || e.HasPurposeMarker || e.HasNamedProperty))
+            return null;
+
+        return SelectBest(elements, e => e.GenericName is not null, generic: true);
+    }
+
+    /// <summary>
+    /// Выбирает имя по одному якорю (issue #117): собирает ВСЕ элементы с этим якорем
+    /// в журнал кандидатов, а имя возвращает только если оно единственное —
+    /// при разных значениях на одном приоритете фиксирует сомнение (<paramref name="ambiguous"/>).
+    /// </summary>
+    private static string? SelectByAnchor(IReadOnlyList<ContainerElement> elements,
+        Func<ContainerElement, bool> isAnchor, string anchor,
+        List<ExtensionNameCandidate> candidates, out bool ambiguous)
+    {
+        ambiguous = false;
+        var matched = new List<ContainerElement>();
+        foreach (var element in elements)
         {
-            e => e.FoundName is not null && e.Depth == 0 && !IsVersionedElement(e.Name),
-            e => e.FoundName is not null && !IsVersionedElement(e.Name),
-            e => e.FoundName is not null
-        })
-        {
-            foreach (var element in elements)
-                if (predicate(element))
-                    return element.FoundName;
+            if (!isAnchor(element) || string.IsNullOrWhiteSpace(element.FoundName))
+                continue;
+            matched.Add(element);
+            candidates.Add(new ExtensionNameCandidate(element.FoundName!.Trim(),
+                element.Path, element.Depth, anchor));
         }
-        return null;
+        if (matched.Count == 0)
+            return null;
+
+        var distinct = matched
+            .Select(e => e.FoundName!.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (distinct.Count > 1)
+        {
+            // Разные имена на одном приоритете — догадка хуже подтверждения.
+            ambiguous = true;
+            return null;
+        }
+
+        var best = matched[0];
+        for (var i = 1; i < matched.Count; i++)
+            if (RanksBefore(matched[i], best))
+                best = matched[i];
+        return best.FoundName!.Trim();
+    }
+
+    /// <summary>Выбирает лучшего кандидата: ближе к корню, не версионный, раньше по обходу.</summary>
+    private static string? SelectBest(IReadOnlyList<ContainerElement> elements,
+        Func<ContainerElement, bool> isCandidate, bool generic)
+    {
+        ContainerElement? best = null;
+        foreach (var element in elements)
+        {
+            if (!isCandidate(element))
+                continue;
+            var value = generic ? element.GenericName : element.FoundName;
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+            if (best is null || RanksBefore(element, best))
+                best = element;
+        }
+        if (best is null)
+            return null;
+        return (generic ? best.GenericName : best.FoundName)?.Trim();
+    }
+
+    /// <summary>
+    /// Сравнение кандидатов: элемент ближе к корню контейнера предпочтительнее,
+    /// не версионный («.N») — предпочтительнее, при равенстве — раньше по обходу.
+    /// </summary>
+    private static bool RanksBefore(ContainerElement candidate, ContainerElement current)
+    {
+        if (candidate.Depth != current.Depth)
+            return candidate.Depth < current.Depth;
+        var candidateVersioned = IsVersionedElement(candidate.Name);
+        var currentVersioned = IsVersionedElement(current.Name);
+        if (candidateVersioned != currentVersioned)
+            return !candidateVersioned;
+        return candidate.Order < current.Order;
     }
 
     /// <summary>Истина, если имя элемента имеет суффикс версии «.N» (старая версия файла).</summary>
@@ -292,34 +453,67 @@ public static class ConfigExtensionService
         return true;
     }
 
-    /// <summary>Извлекает имя расширения из данных элемента (UTF-8 и UTF-16LE).</summary>
-    private static string? ExtractExtensionName(byte[] data)
+    /// <summary>Данные элемента — вложенный контейнер 1С (имя ищется в его элементах).</summary>
+    private static bool IsContainerData(byte[] data) =>
+        data.Length > 16 && BitConverter.ToUInt32(data, 0) == ContainerSignature;
+
+    /// <summary>
+    /// Зондирует данные элемента (issue #117): кодировка определяется ПО БЛОКУ
+    /// (BOM / плотность нулевых старших байтов), а не по первым 4 КБ всего файла.
+    /// Для UTF-16 блок декодируется целиком, с fallback на UTF-8.
+    /// </summary>
+    private static ElementNameProbe ProbeElementName(byte[] data)
     {
         if (data.Length < 16)
-            return null;
-        try
-        {
-            var name = ExtractNameFromText(Encoding.UTF8.GetString(data));
-            if (name is not null)
-                return name;
+            return default;
 
-            // Issue #117: часть .cfe хранит текстовое дерево в UTF-16LE (иногда с BOM).
-            if (LooksLikeUtf16(data))
-                return ExtractNameFromText(Encoding.Unicode.GetString(data));
-            return null;
-        }
-        catch
+        // Вложенный контейнер — двоичные данные: имя ищется в его элементах,
+        // иначе из служебных строк внутри находились чужие имена.
+        if (IsContainerData(data))
+            return default;
+
+        if (LooksLikeUtf16(data))
         {
-            return null;
+            var utf16 = ProbeNameFromText(Encoding.Unicode.GetString(data));
+            if (utf16.Name is not null || utf16.HasConfigurationClass)
+                return utf16;
+            return MergeProbes(utf16, ProbeNameFromText(Encoding.UTF8.GetString(data)));
         }
+
+        var utf8 = ProbeNameFromText(Encoding.UTF8.GetString(data));
+        if (utf8.Name is not null || utf8.HasConfigurationClass)
+            return utf8;
+
+        // Без BOM: блок может быть UTF-16LE — проверяем плотность нулевых старших байтов.
+        if (LooksLikeUtf16Loose(data))
+            return MergeProbes(utf8, ProbeNameFromText(Encoding.Unicode.GetString(data)));
+        return utf8;
     }
+
+    private static ElementNameProbe MergeProbes(ElementNameProbe first, ElementNameProbe second) =>
+        new(first.Name ?? second.Name,
+            first.GenericName ?? second.GenericName,
+            first.HasConfigurationClass || second.HasConfigurationClass,
+            first.HasPurposeMarker || second.HasPurposeMarker,
+            first.HasNamedProperty || second.HasNamedProperty);
 
     /// <summary>Признак UTF-16LE-текста: BOM или высокая доля нулевых старших байтов.</summary>
     private static bool LooksLikeUtf16(byte[] data)
     {
         if (data.Length >= 2 && data[0] == 0xFF && data[1] == 0xFE)
             return true;
-        var sample = Math.Min(data.Length, 4096);
+        return HasUtf16ZeroPattern(data, oddDivisor: 4, evenDivisor: 10);
+    }
+
+    /// <summary>Мягкий признак UTF-16LE (блок без BOM, но с нулевыми старшими байтами).</summary>
+    private static bool LooksLikeUtf16Loose(byte[] data) =>
+        HasUtf16ZeroPattern(data, oddDivisor: 8, evenDivisor: 8);
+
+    private static bool HasUtf16ZeroPattern(byte[] data, int oddDivisor, int evenDivisor)
+    {
+        // Плотность нулей считается по ВСЕМУ блоку (не по первым 4 КБ файла):
+        // у крупных блоков заголовок может быть в UTF-8, а текст — в UTF-16.
+        var sample = Math.Min(data.Length, 256 * 1024);
         if (sample < 32)
             return false;
         var pairs = sample / 2;
@@ -330,47 +524,67 @@ public static class ConfigExtensionService
             if (data[i] == 0) evenZeros++;
             if (data[i + 1] == 0) oddZeros++;
         }
-        return oddZeros > pairs / 4 && evenZeros < pairs / 10;
+        return oddZeros > pairs / oddDivisor && evenZeros < pairs / evenDivisor;
     }
 
     /// <summary>
-    /// Извлекает имя из текстового дерева: после GUID-класса «Конфигурация», рядом
-    /// с маркером ConfigurationExtensionPurpose, в именованных свойствах или как
-    /// первое правдоподобное «{1,0,<guid>,"Имя"».
+    /// Ищет имя по якорям: после GUID-класса «Конфигурация», рядом с маркером
+    /// ConfigurationExtensionPurpose или в явном именованном свойстве.
+    /// Общий шаблон «{1,0,<guid>},"Имя"» возвращается отдельно
+    /// (<see cref="ElementNameProbe.GenericName"/>) и используется только как
+    /// «последний шанс» на уровне выбора элемента — когда профильных элементов нет.
     /// </summary>
-    private static string? ExtractNameFromText(string text)
+    private static ElementNameProbe ProbeNameFromText(string text)
     {
         if (text.Length == 0)
-            return null;
+            return default;
 
-        // 1. Основной шаблон: после GUID-класса «Конфигурация» первое строковое
+        var hasClass = false;
+        var hasPurpose = false;
+        var hasNamed = false;
+        string? name = null;
+
+        // 1. Основной якорь: после GUID-класса «Конфигурация» первое строковое
         //    свойство — имя расширения:
         //    …9cd510cd-…,{1,{79,{0,{4,{1,0,<guid>},"ИмяРасширения",{1,"ru",…
         var classPos = text.IndexOf(ConfigurationClassGuid, StringComparison.OrdinalIgnoreCase);
         if (classPos >= 0)
         {
-            var name = FindFirstQuotedName(text, classPos, text.Length - classPos, generic: false);
-            if (name is not null)
-                return name;
+            hasClass = true;
+            name = FindFirstQuotedName(text, classPos, text.Length - classPos);
         }
 
         // 2. Issue #117 («ИР»): имя может стоять рядом с маркером назначения
         //    расширения, а не сразу после класса «Конфигурация».
-        var purposePos = text.IndexOf(ConfigurationExtensionPurposeMarker, StringComparison.OrdinalIgnoreCase);
-        if (purposePos >= 0)
+        if (name is null)
         {
-            var name = FindFirstQuotedName(text, purposePos,
-                Math.Min(text.Length - purposePos, 200_000), generic: false);
-            if (name is not null)
-                return name;
+            var purposePos = text.IndexOf(ConfigurationExtensionPurposeMarker, StringComparison.OrdinalIgnoreCase);
+            if (purposePos >= 0)
+            {
+                hasPurpose = true;
+                name = FindFirstQuotedName(text, purposePos,
+                    Math.Min(text.Length - purposePos, 200_000));
+            }
         }
 
         // 3. Явные именованные свойства (JSON-подобные дампы и служебные блоки).
-        var named = NamedPropertyRegex.Match(text);
-        if (named.Success && IsPlausibleNameValue(named.Groups[1].Value, generic: true))
-            return named.Groups[1].Value.Trim();
+        if (name is null)
+        {
+            var named = NamedPropertyRegex.Match(text);
+            if (named.Success && IsPlausibleNameValue(named.Groups[1].Value, generic: true))
+            {
+                hasNamed = true;
+                name = named.Groups[1].Value.Trim();
+            }
+        }
 
-        // 4. Последний шанс: первое правдоподобное «{1,0,<guid>},"…"» в тексте.
+        var generic = name is null ? FindGenericName(text) : null;
+        return new ElementNameProbe(name, generic, hasClass, hasPurpose, hasNamed);
+    }
+
+    /// <summary>Общий шаблон «{1,0,<guid>},"…"» — только как «последний шанс».</summary>
+    private static string? FindGenericName(string text)
+    {
         foreach (Match match in QuotedNameRegex.Matches(text))
         {
             var value = match.Groups[1].Value;
@@ -381,7 +595,7 @@ public static class ConfigExtensionService
     }
 
     /// <summary>Ищет первое правдоподобное имя «{1,0,<guid>},"…"» в указанном окне текста.</summary>
-    private static string? FindFirstQuotedName(string text, int start, int length, bool generic)
+    private static string? FindFirstQuotedName(string text, int start, int length)
     {
         if (start < 0 || length <= 0 || start >= text.Length)
             return null;
@@ -390,7 +604,7 @@ public static class ConfigExtensionService
         while (match.Success)
         {
             var value = match.Groups[1].Value;
-            if (IsPlausibleNameValue(value, generic))
+            if (IsPlausibleNameValue(value, generic: false))
                 return value.Trim();
             match = match.NextMatch();
         }
@@ -426,9 +640,11 @@ public static class ConfigExtensionService
     }
 
     /// <summary>Поиск имени в перепакованном .cfe (zip-архив).</summary>
-    private static string? TryReadNameFromZip(string cfePath)
+    private static string? TryReadNameFromZip(string cfePath, out IReadOnlyList<ExtensionNameCandidate> candidates)
     {
+        candidates = Array.Empty<ExtensionNameCandidate>();
         using var archive = ZipFile.OpenRead(cfePath);
+        string? generic = null;
         foreach (var entry in archive.Entries)
         {
             if (entry.Length <= 0 || entry.Length > MaxZipEntryBytes)
@@ -438,24 +654,48 @@ public static class ConfigExtensionService
                 using var entryStream = entry.Open();
                 using var memory = new MemoryStream((int)entry.Length);
                 entryStream.CopyTo(memory);
-                var name = ExtractExtensionName(memory.ToArray());
-                if (name is not null)
-                    return name;
+                var bytes = memory.ToArray();
+
+                // Запись может быть вложенным контейнером 1С — разбираем его элементы.
+                if (IsContainerData(bytes))
+                {
+                    var elements = new List<ContainerElement>();
+                    using var nestedStream = new MemoryStream(bytes, writable: false);
+                    ReadContainerElements(nestedStream, bytes.Length, 16, elements, MaxContainerDepth, depth: 0);
+                    var found = new List<ExtensionNameCandidate>();
+                    var nestedName = SelectExtensionName(elements, found);
+                    candidates = found;
+                    if (nestedName is not null)
+                        return nestedName;
+                    continue;
+                }
+
+                var probe = ProbeElementName(bytes);
+                if (probe.Name is not null)
+                {
+                    candidates = new[]
+                    {
+                        new ExtensionNameCandidate(probe.Name, entry.FullName, 0,
+                            probe.HasConfigurationClass ? "class" : "entry")
+                    };
+                    return probe.Name;
+                }
+                generic ??= probe.GenericName;
             }
             catch
             {
                 // Повреждённая запись архива — пропускаем.
             }
         }
-        return null;
+        return generic;
     }
 
     /// <summary>
     /// Разбирает контейнер 1С (включая вложенные до <paramref name="maxDepth"/>)
-    /// и наполняет <paramref name="elements"/> найденными именами расширения.
+    /// и наполняет <paramref name="elements"/> найденными якорями имени расширения.
     /// </summary>
     private static void ReadContainerElements(Stream source, long containerLength, long tableAddr,
-        List<ContainerElement> elements, int maxDepth, int depth)
+        List<ContainerElement> elements, int maxDepth, int depth, string pathPrefix = "")
     {
         // Заголовок контейнера: 16 байт (сигнатура, размер страницы, версия, резерв),
         // затем блок-таблица адресов элементов.
@@ -464,6 +704,7 @@ public static class ConfigExtensionService
             return;
         var table = TryInflate(tableRaw);
 
+        var index = 0;
         for (var offset = 0; offset + 12 <= table.Length; offset += 12)
         {
             var signature = BitConverter.ToUInt32(table, offset + 8);
@@ -478,80 +719,115 @@ public static class ConfigExtensionService
             var element = new ContainerElement
             {
                 Name = GetElementName(elementHeader),
-                Depth = depth
+                Path = pathPrefix.Length == 0 ? index.ToString() : pathPrefix + "/" + index,
+                Depth = depth,
+                Order = elements.Count
             };
 
             var dataRaw = ReadBlock(source, dataAddr, MaxElementBlockBytes);
             if (dataRaw is not null)
             {
                 var data = TryInflate(dataRaw);
-                element.Data = data;
-                element.FoundName = ExtractExtensionName(data);
-                if (element.FoundName is null && !ReferenceEquals(data, dataRaw))
-                    element.FoundName = ExtractExtensionName(dataRaw);
-
-                if (maxDepth > 0)
+                var nested = GetNestedContainer(data, dataRaw);
+                if (nested is not null)
                 {
-                    // Вложенный контейнер может быть как распакован, так и сжат в блоке.
-                    var nested = data.Length > 16 && BitConverter.ToUInt32(data, 0) == ContainerSignature
-                        ? data
-                        : dataRaw.Length > 16 && BitConverter.ToUInt32(dataRaw, 0) == ContainerSignature
-                            ? dataRaw
-                            : null;
-                    if (nested is not null)
+                    // Данные элемента — вложенный контейнер: имя ищется в его элементах,
+                    // а не в двоичном содержимом (иначе находились служебные строки).
+                    if (maxDepth > 0)
                     {
                         using var nestedStream = new MemoryStream(nested, writable: false);
                         ReadContainerElements(nestedStream, nested.Length, 16, elements,
-                            maxDepth - 1, depth + 1);
+                            maxDepth - 1, depth + 1, element.Path);
                     }
+                }
+                else
+                {
+                    var probe = ProbeElementName(data);
+                    if (probe.Name is null && !ReferenceEquals(data, dataRaw))
+                        probe = MergeProbes(probe, ProbeElementName(dataRaw));
+                    ApplyProbe(element, probe);
                 }
             }
             else
             {
                 // Элемент больше MaxElementBlockBytes — просматриваем потоково.
-                element.FoundName = ScanLargeBlock(source, dataAddr);
+                ApplyProbe(element, ScanLargeBlock(source, dataAddr));
             }
 
             elements.Add(element);
+            index++;
         }
     }
 
-    /// <summary>Потоковый поиск имени в очень крупном элементе контейнера.</summary>
-    private static string? ScanLargeBlock(Stream source, long dataAddr)
+    /// <summary>Возвращает данные вложенного контейнера (распакованные или как есть).</summary>
+    private static byte[]? GetNestedContainer(byte[] data, byte[] dataRaw)
     {
-        // Сначала пробуем распаковать deflate-поток.
-        try
-        {
-            using var block = new BlockDataStream(source, dataAddr);
-            using var deflate = new DeflateStream(block, CompressionMode.Decompress, leaveOpen: false);
-            var name = ScanTextStream(deflate, Encoding.UTF8);
-            if (name is not null)
-                return name;
-        }
-        catch
-        {
-            // Не сжатый блок — ниже просмотрим как есть.
-        }
+        if (IsContainerData(data))
+            return data;
+        if (IsContainerData(dataRaw))
+            return dataRaw;
+        return null;
+    }
 
+    private static void ApplyProbe(ContainerElement element, ElementNameProbe probe)
+    {
+        element.FoundName = probe.Name;
+        element.GenericName = probe.GenericName;
+        element.HasConfigurationClass = probe.HasConfigurationClass;
+        element.HasPurposeMarker = probe.HasPurposeMarker;
+        element.HasNamedProperty = probe.HasNamedProperty;
+    }
+
+    /// <summary>Потоковый поиск имени в очень крупном элементе контейнера.</summary>
+    private static ElementNameProbe ScanLargeBlock(Stream source, long dataAddr)
+    {
+        // Блок может быть сжат deflate или лежать как есть, а текст — в UTF-8 или
+        // UTF-16LE. Перебираем варианты с переоткрытием блока на каждую попытку.
+        foreach (var inflate in new[] { true, false })
+        {
+            var utf8 = ScanBlockWithEncoding(source, dataAddr, inflate, Encoding.UTF8);
+            if (utf8.Name is not null || utf8.HasConfigurationClass)
+                return utf8;
+
+            var utf16 = ScanBlockWithEncoding(source, dataAddr, inflate, Encoding.Unicode);
+            var merged = MergeProbes(utf8, utf16);
+            if (merged.Name is not null || merged.HasConfigurationClass)
+                return merged;
+        }
+        return default;
+    }
+
+    private static ElementNameProbe ScanBlockWithEncoding(Stream source, long dataAddr,
+        bool inflate, Encoding encoding)
+    {
         try
         {
             using var block = new BlockDataStream(source, dataAddr);
-            return ScanTextStream(block, Encoding.UTF8);
+            if (inflate)
+            {
+                using var deflate = new DeflateStream(block, CompressionMode.Decompress, leaveOpen: true);
+                return ScanTextStream(deflate, encoding);
+            }
+            return ScanTextStream(block, encoding);
         }
         catch
         {
-            // Повреждённый блок — имени нет.
-            return null;
+            // Не сжатый/повреждённый блок — вариантов для этой кодировки нет.
+            return default;
         }
     }
 
     /// <summary>Потоковое чтение текста с окном перекрытия (имя может быть на границе порций).</summary>
-    private static string? ScanTextStream(Stream stream, Encoding encoding)
+    private static ElementNameProbe ScanTextStream(Stream stream, Encoding encoding)
     {
         var decoder = encoding.GetDecoder();
         var bytes = new byte[StreamScanBufferSize];
         var chars = new char[encoding.GetMaxCharCount(bytes.Length)];
         var text = new StringBuilder();
+        var hasClass = false;
+        var hasPurpose = false;
+        var hasNamed = false;
+        string? generic = null;
         int read;
         while ((read = stream.Read(bytes, 0, bytes.Length)) > 0)
         {
@@ -560,12 +836,23 @@ public static class ConfigExtensionService
                 text.Append(chars, 0, charCount);
             if (text.Length < StreamScanWindow * 2)
                 continue;
-            var name = ExtractNameFromText(text.ToString());
-            if (name is not null)
-                return name;
+            var probe = ProbeNameFromText(text.ToString());
+            if (probe.Name is not null)
+                return probe;
+            hasClass |= probe.HasConfigurationClass;
+            hasPurpose |= probe.HasPurposeMarker;
+            hasNamed |= probe.HasNamedProperty;
+            generic ??= probe.GenericName;
             text.Remove(0, text.Length - StreamScanWindow);
         }
-        return ExtractNameFromText(text.ToString());
+
+        var last = ProbeNameFromText(text.ToString());
+        if (last.Name is not null)
+            return last;
+        return new ElementNameProbe(null, generic ?? last.GenericName,
+            hasClass || last.HasConfigurationClass,
+            hasPurpose || last.HasPurposeMarker,
+            hasNamed || last.HasNamedProperty);
     }
 
     /// <summary>Имя элемента контейнера: UTF-16LE после 20-байтового заголовка.</summary>

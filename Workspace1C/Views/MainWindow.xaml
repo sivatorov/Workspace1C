@@ -3053,6 +3053,73 @@
                                    Margin="0,0,0,10"
                                    Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
 
+                        <!-- Issue #131: переключение уведомлений о длительных операциях.
+                             Просто будильник — уведомления включены, перечёркнутый — выключены.
+                             Иконка видна и в узкой панели (без привязки к ShowRightPanelDetails). -->
+                        <Grid Margin="4,0,4,6">
+                            <ToggleButton x:Name="LongOperationAlarmToggle"
+                                          HorizontalAlignment="Right"
+                                          Width="28" Height="28" Padding="0"
+                                          Cursor="Hand" BorderThickness="0" Background="Transparent"
+                                          IsChecked="{Binding LongOperationNotificationsEnabled, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="alarmBorder" Background="Transparent"
+                                                CornerRadius="6" Padding="4">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="alarmBorder" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <ToggleButton.ToolTip>
+                                    <TextBlock>
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="{loc:Loc LongOperation.Alarm.TooltipOff}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=LongOperationAlarmToggle}" Value="True">
+                                                        <Setter Property="Text" Value="{loc:Loc LongOperation.Alarm.TooltipOn}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </ToggleButton.ToolTip>
+                                <Grid Width="18" Height="18">
+                                    <materialDesign:PackIcon Kind="ClockOutline" Width="18" Height="18">
+                                        <materialDesign:PackIcon.Style>
+                                            <Style TargetType="materialDesign:PackIcon">
+                                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=LongOperationAlarmToggle}" Value="True">
+                                                        <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </materialDesign:PackIcon.Style>
+                                    </materialDesign:PackIcon>
+                                    <!-- Перечёркивание для выключенного состояния. -->
+                                    <Line X1="2" Y1="16" X2="16" Y2="2" Stroke="#DC2626" StrokeThickness="1.6"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                                        <Line.Style>
+                                            <Style TargetType="Line">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsChecked, ElementName=LongOperationAlarmToggle}" Value="True">
+                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Line.Style>
+                                    </Line>
+                                </Grid>
+                            </ToggleButton>
+                        </Grid>
+
                         <!-- Split-кнопки запуска: единый блок «действие | ▼» -->
                         <Border Margin="4,0,4,4" CornerRadius="10"
                                 Background="{DynamicResource AccentBrush}">

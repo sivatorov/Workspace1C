@@ -69,6 +69,23 @@ public sealed class NotificationDispatcher : INotificationService
         }
     }
 
+    /// <inheritdoc/>
+    public void Show(NotificationMessage message)
+    {
+        if (message is null)
+            return;
+        try
+        {
+            // Готовое сообщение (issue #131): сохраняем необязательные поля
+            // (ChatTargetOverride) без пересборки из заголовка и текста.
+            _ = SendCoreAsync(message);
+        }
+        catch (Exception ex)
+        {
+            _logger?.Warn($"Уведомления не отправлены: {ex.Message}");
+        }
+    }
+
     /// <summary>
     /// Рассылает сообщение включённым каналам. Ошибки каналов логируются и не влияют
     /// друг на друга; все сетевые операции используют ConfigureAwait(false).
@@ -88,7 +105,34 @@ public sealed class NotificationDispatcher : INotificationService
                 return;
             }
 
-            var enabled = _channels.Where(c => c.IsEnabled(settings)).ToList();
+            List<INotificationChannel> enabled;
+            if (message.Event == NotificationEvent.LongOperation)
+            {
+                // issue #131: уведомления о длительных операциях идут только в
+                // выбранный канал (системные уведомления или Telegram). Email и
+                // прочие внешние каналы для этого события не используются;
+                // системный канал управляется галочкой «Уведомлять».
+                var longOperation = settings.LongOperationNotifications;
+                if (longOperation is null || !longOperation.Enabled)
+                    return;
+
+                var channelName = string.Equals(
+                    LongOperationNotificationChannels.Normalize(longOperation.Channel),
+                    LongOperationNotificationChannels.Telegram,
+                    StringComparison.Ordinal)
+                    ? "telegram"
+                    : "system";
+
+                enabled = _channels
+                    .Where(c => string.Equals(c.Name, channelName, StringComparison.OrdinalIgnoreCase)
+                                && c.IsEnabled(settings))
+                    .ToList();
+            }
+            else
+            {
+                enabled = _channels.Where(c => c.IsEnabled(settings)).ToList();
+            }
+
             if (enabled.Count == 0)
                 return;
 

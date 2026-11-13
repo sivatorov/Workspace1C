@@ -672,7 +672,10 @@ namespace Workspace1C
             // полупрозрачный фон без размытия, окно остаётся рабочим и красивым.
             var glass = new Border
             {
-                CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
+                // Радиус «стеклянного» корня — единая константа с WPF-слоем
+                // (issue #126): рамка и содержимое скруглены одинаково, в том числе
+                // на системах без скругления DWM (RDP/Windows 10).
+                CornerRadius = new CornerRadius(WindowSizeMath.DefaultContentCornerRadius),
                 ClipToBounds = true,
                 // Видимая рамка окна (issue #273): даже без системных теней/эффектов
                 // (терминал, виртуализация) окно остаётся различимым, а не сливается
@@ -696,7 +699,7 @@ namespace Workspace1C
                 .Subscribe(new WindowStateObserver(() =>
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(UiMetrics.RadiusLg)));
+                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius)));
 
             return glass;
         }
@@ -1857,6 +1860,12 @@ namespace Workspace1C
                     // применились бы к строкам, но не к уже собранному заголовку.
                     if (e.PropertyName is not null && e.PropertyName.Contains("Column", StringComparison.Ordinal))
                         QueueColumnHeaderRefresh();
+                    // Issue #130: линии сетки в заголовке зависят от своих настроек —
+                    // имена свойств не содержат «Column», поэтому обновляем шапку явно.
+                    // Строки пересобираются вьюмоделью (treeAffected в ApplyDisplaySettings).
+                    if (e.PropertyName is nameof(MainViewModel.ShowHorizontalGridLines)
+                        or nameof(MainViewModel.ShowVerticalGridLines))
+                        QueueColumnHeaderRefresh();
                     // Кнопки групп живут в заголовке и видны только при группировке.
                     if (e.PropertyName == nameof(MainViewModel.ShowExpandCollapseButtons))
                     {
@@ -2436,6 +2445,11 @@ namespace Workspace1C
             // Состояние «доступна новая версия» (issue #116): подписка на службу
             // обновления. Событие приходит из фоновой проверки (чужой поток) —
             // обновление UI через Dispatcher.
+            // Issue #129: переключение галки «Считать версию прошлой» (trace.json)
+            // сразу меняет подпись версии и состояние значка — без перезапуска.
+            TraceFlags.SettingsSaved += OnTraceSettingsSaved;
+            Closed += (_, _) => TraceFlags.SettingsSaved -= OnTraceSettingsSaved;
+
             try
             {
                 var updateService = AppServices.TryGetService<UpdateService>();
@@ -2470,6 +2484,9 @@ namespace Workspace1C
         /// </summary>
         private void RefreshFooterUpdateState()
         {
+            // Issue #129: подпись версии тоже зависит от «Считать версию прошлой».
+            RefreshFooterVersionText();
+
             try
             {
                 var updateService = AppServices.TryGetService<UpdateService>();
@@ -2503,6 +2520,46 @@ namespace Workspace1C
             catch
             {
                 // Состояние значка не критично: остаётся только версия.
+            }
+        }
+
+        /// <summary>
+        /// Обновляет подпись версии в подвале (issue #129): при включённом «Считать
+        /// версию прошлой» показываются реальная сборка и эффективная (понижённая)
+        /// версия. Вызывается при инициализации и после изменения флагов trace.json.
+        /// </summary>
+        private void RefreshFooterVersionText()
+        {
+            try
+            {
+                if (_footerVersionText is null)
+                    return;
+                _footerVersionText.Text = "v" + EffectiveVersionService.FormatVersionForDisplay(
+                    VersionInfo.Display(),
+                    EffectiveVersionService.CurrentForUpdates,
+                    LocalizationManager.T("Common.VersionEffective"));
+            }
+            catch
+            {
+                // Подпись версии не критична для работы окна.
+            }
+        }
+
+        /// <summary>
+        /// Реакция на сохранение флагов диагностики (issue #129): при смене
+        /// <see cref="TraceFlags.PrevVersionFlag"/> пересчитываем версию и значок.
+        /// </summary>
+        private void OnTraceSettingsSaved(TraceSettingsSavedEventArgs args)
+        {
+            if (args is null || !args.Contains(TraceFlags.PrevVersionFlag))
+                return;
+            try
+            {
+                Dispatcher.UIThread.Post(RefreshFooterUpdateState);
+            }
+            catch
+            {
+                // Окно уже закрывается — обновлять нечего.
             }
         }
 

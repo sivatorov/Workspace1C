@@ -11,6 +11,138 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.62] — 2026-11-13
+
+### Исправлено
+
+- **Расширения конфигурации: настоящее имя расширения читается из `.cfe` и
+  используется при установке (issue #117).** Для расширения «ИР»
+  (`ir-8.23.1e.cfe`) имя теперь берётся из элемента метаданных с GUID-классом
+  «Конфигурация» (`9cd510cd-abfc-11d4-9434-004095e12fc7`), а не из первой строки
+  «{1,0,<guid>},«Имя»» служебного объекта контейнера: приоритет якорей
+  «GUID-класс → маркер `ConfigurationExtensionPurpose` → именованное свойство
+  Name/Синоним», общий шаблон — только если профильных элементов нет вовсе
+  ([`ConfigExtensionService.TryReadExtensionName`](Workspace1C/Services/ConfigExtensionService.cs)).
+  Кодировка определяется по конкретному блоку (BOM/плотность нулей) с fallback
+  UTF-8, вложенные контейнеры обходятся с приоритетом элемента ближе к корню и
+  неверсионного. Если кандидатов несколько и они разные — имя не подставляется
+  (возвращается `null`), а все кандидаты с путями пишутся в журнал окна;
+  автоподстановка больше не помечает настоящее имя из файла как «введённое
+  вручную», поэтому установка идёт как обновление уже существующего расширения,
+  а не дублем под именем файла
+  ([`ExtensionsViewModel`](Workspace1C/ViewModels/ExtensionsViewModel.cs)).
+  Регрессия на реальном файле —
+  [`Issue117CfeRealFileRegressionTests`](Workspace1C.Tests/Issue117CfeRealFileRegressionTests.cs)
+  (бинарная фикстура не коммитится; при её отсутствии тест пропускается),
+  синтетические раскладки контейнера —
+  [`ConfigExtensionServiceTests`](Workspace1C.Tests/ConfigExtensionServiceTests.cs) и
+  [`Issue117ExtensionNameTests`](Workspace1C.Tests/Issue117ExtensionNameTests.cs).
+- **«Считать версию прошлой»: мгновенное применение и переиспользование
+  скачанного файла (issue #129).** Переключение галочки в «Настройки →
+  Логирование» сразу пересчитывает подпись версии, значок обновления в подвале
+  и доступность релиза — без перезапуска приложения: сохранение флагов
+  поднимает событие `TraceFlags.SettingsSaved`
+  ([`TraceFlags`](Workspace1C/Services/TraceFlags.cs)), главное окно WPF/Avalonia
+  обновляет подпись и значок
+  ([`MainWindow.Updates.cs`](Workspace1C/Views/MainWindow.Updates.cs),
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs)), а
+  [`UpdateService.ReevaluateAvailability`](Workspace1C/Services/UpdateService.cs)
+  переоценивает кэшированный релиз по `EffectiveVersionService.CurrentForUpdates`
+  без сети (паритет — [`UpdateService.Avalonia.cs`](Workspace1C/Services/UpdateService.Avalonia.cs),
+  чистая логика — [`UpdateAvailabilityLogic`](Workspace1C/Services/UpdateAvailabilityLogic.cs)).
+  Уже скачанный файл обновления больше не теряется: перед загрузкой проверяется
+  кэш по точному размеру, ETag и маркеру `.ready`
+  ([`UpdateDownloadCache`](Workspace1C/Services/UpdateDownloadCache.cs)), пустой
+  ETag зонда файл не удаляет, а диалог обновления сохраняет полный файл при
+  «Отмена/закрыть» и убирает его только при «Пропустить версию»/ошибке.
+  Тесты — [`Issue129UpdateCacheTests`](Workspace1C.Tests/Issue129UpdateCacheTests.cs)
+  и [`Issue129PrevVersionTests`](Workspace1C.Tests/Issue129PrevVersionTests.cs).
+- **Рамка окон совпадает со скруглением содержимого в RDP на Windows 10
+  (issue #126).** Единая чистая политика радиуса
+  [`WindowSizeMath.ResolveFrameCornerRadius`](Workspace1C/Services/WindowSizeMath.cs)
+  учитывает достоверность состояния DWM, версию ОС, состояние композиции
+  (`DwmIsCompositionEnabled`) и радиус собственного скруглённого содержимого:
+  развёрнутое окно и окно без своего скругления получают прямые углы, а при
+  неизвестном DWM (RDP/Windows 10, `dwmState=unknown`, `osRounds=false`) рамка
+  повторяет радиус содержимого `WindowSizeMath.DefaultContentCornerRadius`
+  (общий с Avalonia) вместо `radius=0`. `DWMWA_WINDOW_CORNER_STATE` читается
+  только на Windows 11+; содержимое диалогов WPF скругляется и клипуется тем же
+  радиусом, что и рамка, поэтому «круглые углы с квадратной рамкой» невозможны;
+  пересчёт после `ContentRendered`/`Activated`/`DpiChanged`, отложенный повтор и
+  обработка `WM_THEMECHANGED`/`WM_DWMCOMPOSITIONCHANGED` сохранены. В журнал
+  `CM_THEMES` (`frame-corner`) добавлены `compositionEnabled`, `contentRadius` и
+  `policy` — по ZIP-диагностике видно, почему радиус 0
+  ([`WindowChromeHelper.ApplyFrameCornerRadius`](Workspace1C/Views/WindowChromeHelper.cs)).
+  Тесты — [`Issue126FrameCornerRadiusTests`](Workspace1C.Tests/Issue126FrameCornerRadiusTests.cs)
+  и [`Issue126WindowFrameTests`](Workspace1C.Tests/Issue126WindowFrameTests.cs).
+
+### Добавлено
+
+- **Опция вывода сетки в списке баз: линии по горизонтали и по вертикали
+  (issue #130).** В «Настройки → Отображение → Колонки» под таблицей колонок
+  добавлены два переключателя — «Выводить линии — по горизонтали» и «Выводить
+  линии — по вертикали». При включении в списке баз рисуются тонкие линии между
+  строками и между столбцами, включая область заголовка; при выключенных
+  настройках вид и разметка списка не меняются. Чересстрочное выделение
+  («зебра») по обсуждению issue не включается — оценивается отдельно после
+  сетки. План линий считает общий чистый
+  [`GridLinesPlanner.Resolve`](Workspace1C/Services/GridLinesPlanner.cs) (компактный
+  режим — чуть контрастнее, скрытые колонки линии не дают, наружной рамки нет),
+  поэтому поведение WPF и Avalonia совпадает: строки и заголовок получают линии
+  из одного планировщика
+  ([`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs),
+  [`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Цвет линий берётся из темы (`BorderBrushColor`/`BorderColorBrush`) — без ярких
+  линий в тёмной и светлой темах; настройка применяется без перезапуска, линии
+  перерисовываются при смене состава/порядка колонок и в компактном режиме,
+  а ширины колонок отслеживаются самой привязкой линии к правому краю. Настройки
+  хранятся в [`AppSettings.ShowHorizontalGridLines`](Workspace1C/Models/AppSettings.cs)
+  и [`AppSettings.ShowVerticalGridLines`](Workspace1C/Models/AppSettings.cs)
+  (по умолчанию `false`; старые профили без полей читаются как «выключено»).
+  Тесты — [`Issue130GridLinesTests`](Workspace1C.Tests/Issue130GridLinesTests.cs).
+- **Уведомления о длительных операциях (issue #131).** В «Настройки →
+  Функциональность» добавлена группа «Уведомления о длительных операциях»:
+  галочка «Уведомлять», поле «Куда уведомлять» (системные уведомления или
+  Telegram), отдельная группа/подгруппа Telegram и «Длительность простоя»
+  со значением и единицей (секунды/минуты/часы). Настройки хранятся секцией
+  [`AppSettings.LongOperationNotifications`](Workspace1C/Models/AppSettings.cs)
+  (`LongOperationNotificationsSettings`: `Enabled`, `Channel`, `TelegramTarget`,
+  `ThresholdValue`/`ThresholdUnit`, `MonitorEnterprise`/`MonitorConfigurator`)
+  и читаются монитором запущенных баз на каждом опросе — применяются без
+  перезапуска. В панели запуска (правый блок действий) появился
+  переключатель-будильник: просто будильник — уведомления включены,
+  перечёркнутый — выключены; подсказка отражает состояние, клик сохраняет
+  настройку (WPF — [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml),
+  Avalonia — [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs)).
+  Чистая логика: порог и единицы —
+  [`LongOperationThreshold.ToTimeSpan`](Workspace1C/Services/LongOperationThreshold.cs),
+  машина состояний занятости с гистерезисом в два опроса и агрегацией по паре
+  «база + режим» —
+  [`LongOperationTracker`](Workspace1C/Services/LongOperationTracker.cs),
+  текст с именем компьютера, режимом, полным заголовком окна и длительностью —
+  [`LongOperationNotificationText`](Workspace1C/Services/LongOperationNotificationText.cs).
+  Монитор передаёт `IsResponding` и заголовок окна
+  ([`RunningOneCProcess.WindowTitle`](Workspace1C/Services/IRunningInfobasesService.cs),
+  [`MainViewModel.Running.cs`](Workspace1C/ViewModels/MainViewModel.Running.cs)):
+  уведомление уходит после освобождения окна, если занятость превысила порог;
+  закрытие процесса без освобождения события не даёт. Каналы:
+  [`NotificationDispatcher`](Workspace1C/Services/NotificationDispatcher.cs)
+  маршрутизирует `NotificationEvent.LongOperation` только в выбранный канал,
+  системный канал учитывает `Enabled`/`Channel == System`
+  ([`SystemNotificationChannel.Windows.cs`](Workspace1C/Services/SystemNotificationChannel.Windows.cs),
+  [`SystemNotificationChannel.Linux.cs`](Workspace1C/Services/SystemNotificationChannel.Linux.cs)),
+  Telegram — отдельный чат/тема `LongOperationTelegramChatId` с fallback на общий
+  чат и поддержкой `t.me/c/<id>/<thread>`
+  ([`TelegramNotificationChannel`](Workspace1C/Services/TelegramNotificationChannel.cs)),
+  внешние каналы фильтруются `NotifyOnLongOperations`
+  ([`NotificationChannelSettings`](Workspace1C/Models/NotificationChannelSettings.cs)).
+  Локализация ru/en — все ключи группы, каналов, единиц, текста и подсказок
+  будильника. Тесты —
+  [`Issue131LongOperationNotificationTests`](Workspace1C.Tests/Issue131LongOperationNotificationTests.cs),
+  [`NotificationChannelsTests`](Workspace1C.Tests/NotificationChannelsTests.cs),
+  [`NotificationDispatcherTests`](Workspace1C.Tests/NotificationDispatcherTests.cs).
+
 ## [1.0.1.61] — 2026-11-13
 
 ### Исправлено

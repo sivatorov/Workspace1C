@@ -596,6 +596,26 @@ namespace Workspace1C
                 _viewModel.FunctionalMode = fmCode;
             }
 
+            // Уведомления о длительных операциях (issue #131): канал, группа Telegram,
+            // порог и единица; сохранение — вместе с остальными настройками окна.
+            var longOperationChannel = LongOperationChannelCombo?.SelectedItem is ComboBoxItem loChannel
+                                       && loChannel.Tag is string loChannelCode
+                ? loChannelCode
+                : _viewModel.LongOperationNotificationsChannel;
+            var longOperationUnit = LongOperationThresholdUnitCombo?.SelectedItem is ComboBoxItem loUnit
+                                    && loUnit.Tag is string loUnitCode
+                ? loUnitCode
+                : _viewModel.LongOperationThresholdUnit;
+            var longOperationThreshold = int.TryParse(LongOperationThresholdBox?.Text?.Trim(), out var loValue)
+                ? loValue
+                : _viewModel.LongOperationThresholdValue;
+            _viewModel.ApplyLongOperationNotificationSettings(
+                LongOperationNotificationsCheck?.IsChecked == true,
+                longOperationChannel,
+                LongOperationTelegramTargetBox?.Text,
+                longOperationThreshold,
+                longOperationUnit);
+
             // Сохраняем настройки синхронизации с файлом ibases.v8i.
             var s = _settings.Sync;
             var filePath = SyncFilePathTextBox.Text?.Trim() ?? string.Empty;
@@ -633,7 +653,10 @@ namespace Workspace1C
                 VisibleOf("Actions"),
                 VisibleOf("LastBackup"),
                 // «Действия только при наведении» (issue #128).
-                ActionsHoverOnlyCheck?.IsChecked ?? false);
+                ActionsHoverOnlyCheck?.IsChecked ?? false,
+                // Линии сетки списка баз (issue #130).
+                ShowHorizontalGridLinesCheck?.IsChecked ?? false,
+                ShowVerticalGridLinesCheck?.IsChecked ?? false);
 
             // «Дополнение заголовка программы» (issue #28).
             _viewModel.ApplyTitleSuffixSettings(

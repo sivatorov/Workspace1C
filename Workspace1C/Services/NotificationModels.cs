@@ -50,7 +50,15 @@ public enum NotificationEvent
     /// и новые ошибки журнала регистрации. Во внешние каналы уходят при включённом
     /// <see cref="NotificationChannelSettings.NotifyOnMonitoring"/>.
     /// </summary>
-    Monitoring
+    Monitoring,
+
+    /// <summary>
+    /// Завершение длительной операции в окне 1С (issue #131): окно было занято
+    /// дольше порога и снова отвечает. Маршрутизируется в канал, выбранный в
+    /// <see cref="AppSettings.LongOperationNotifications"/>; внешние каналы
+    /// дополнительно фильтруются <see cref="NotificationChannelSettings.NotifyOnLongOperations"/>.
+    /// </summary>
+    LongOperation
 }
 
 /// <summary>
@@ -74,4 +82,11 @@ public sealed class NotificationMessage
 
     /// <summary>Метка времени события (UTC). Для шапки письма и логов.</summary>
     public DateTimeOffset UtcTimestamp { get; init; } = DateTimeOffset.UtcNow;
+
+    /// <summary>
+    /// Переопределение чата/темы для конкретного сообщения (issue #131): позволяет
+    /// отправить уведомление о длительной операции в отдельную группу/подгруппу
+    /// Telegram, не меняя сигнатуры каналов. Пусто — канал использует настройку.
+    /// </summary>
+    public string? ChatTargetOverride { get; init; }
 }

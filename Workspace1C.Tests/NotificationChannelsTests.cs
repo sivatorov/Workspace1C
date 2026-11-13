@@ -230,6 +230,100 @@ public sealed class NotificationChannelsTests : IDisposable
         Assert.Equal(0, handler.Calls);
     }
 
+    // ---------- Issue #131: длительные операции ----------
+
+    [Fact]
+    public void Filter_LongOperation_UsesNotifyOnLongOperations()
+    {
+        var on = new NotificationChannelSettings();
+        Assert.True(NotificationEventFilter.ShouldSend(on, Msg(NotificationEvent.LongOperation)));
+
+        var off = new NotificationChannelSettings { NotifyOnLongOperations = false };
+        Assert.False(NotificationEventFilter.ShouldSend(off, Msg(NotificationEvent.LongOperation)));
+    }
+
+    [Fact]
+    public async Task Telegram_SendAsync_LongOperation_UsesSeparateChatAndThread()
+    {
+        var store = new NotificationSettingsStore(directoryOverride: _dir);
+        store.Save(new NotificationChannelSettings
+        {
+            TelegramEnabled = true,
+            TelegramBotToken = "123:ABC",
+            TelegramChatId = "42",
+            LongOperationTelegramChatId = "t.me/c/1234567890/77"
+        });
+        var handler = new RecordingHandler(HttpStatusCode.OK);
+        var channel = new TelegramNotificationChannel(store, null, handler);
+
+        Assert.True(await channel.SendAsync(Msg(NotificationEvent.LongOperation)));
+
+        Assert.Equal(1, handler.Calls);
+        Assert.Contains("chat_id=-1001234567890", handler.LastBody);
+        Assert.Contains("message_thread_id=77", handler.LastBody);
+    }
+
+    [Fact]
+    public async Task Telegram_SendAsync_ChatTargetOverride_Wins()
+    {
+        var store = new NotificationSettingsStore(directoryOverride: _dir);
+        store.Save(new NotificationChannelSettings
+        {
+            TelegramEnabled = true,
+            TelegramBotToken = "123:ABC",
+            TelegramChatId = "42",
+            LongOperationTelegramChatId = "t.me/c/111/2"
+        });
+        var handler = new RecordingHandler(HttpStatusCode.OK);
+        var channel = new TelegramNotificationChannel(store, null, handler);
+
+        var message = new NotificationMessage
+        {
+            Title = "T",
+            Message = "M",
+            Event = NotificationEvent.LongOperation,
+            ChatTargetOverride = "t.me/c/555/9"
+        };
+        Assert.True(await channel.SendAsync(message));
+
+        Assert.Contains("chat_id=-100555", handler.LastBody);
+        Assert.Contains("message_thread_id=9", handler.LastBody);
+    }
+
+    [Fact]
+    public void Telegram_ResolveChatTarget_FallsBackToCommonChat()
+    {
+        var settings = new NotificationChannelSettings { TelegramChatId = "42" };
+        Assert.Null(TelegramNotificationChannel.ResolveChatTarget(settings, Msg(NotificationEvent.LongOperation)));
+        Assert.Equal("t.me/c/1/2", TelegramNotificationChannel.ResolveChatTarget(
+            new NotificationChannelSettings { LongOperationTelegramChatId = "t.me/c/1/2" },
+            Msg(NotificationEvent.LongOperation)));
+    }
+
+    [Fact]
+    public void SystemChannel_ShouldShow_RespectsSettings()
+    {
+        var message = Msg(NotificationEvent.LongOperation);
+        var disabled = new AppSettings { ShowSystemNotifications = false };
+        Assert.False(SystemNotificationChannel.ShouldShow(disabled, message));
+
+        var longOperationOff = new AppSettings();
+        Assert.False(SystemNotificationChannel.ShouldShow(longOperationOff, message));
+
+        var telegramChannel = new AppSettings();
+        telegramChannel.LongOperationNotifications.Enabled = true;
+        telegramChannel.LongOperationNotifications.Channel = LongOperationNotificationChannels.Telegram;
+        Assert.False(SystemNotificationChannel.ShouldShow(telegramChannel, message));
+
+        var systemChannel = new AppSettings();
+        systemChannel.LongOperationNotifications.Enabled = true;
+        systemChannel.LongOperationNotifications.Channel = LongOperationNotificationChannels.System;
+        Assert.True(SystemNotificationChannel.ShouldShow(systemChannel, message));
+
+        // Обычные события системного канала галочкой длительных операций не управляются.
+        Assert.True(SystemNotificationChannel.ShouldShow(new AppSettings(), Msg(NotificationEvent.Backup)));
+    }
+
     [Fact]
     public async Task Telegram_TestAsync_HttpError_ReturnsFalseAndMasksToken()
     {

@@ -6,7 +6,14 @@ namespace Workspace1C.Services;
 /// <param name="IsResponding">Процесс отвечает на запросы (Windows: <c>Process.Responding</c>;
 /// Linux: эвристика по /proc/<pid>/stat). По умолчанию true — если проверить не удалось,
 /// процесс считается отвечающим.</param>
-public sealed record RunningOneCProcess(string ProcessName, string CommandLine, bool IsResponding = true);
+/// <param name="WindowTitle">Полный заголовок главного окна процесса (issue #131): Windows —
+/// <c>Process.MainWindowTitle</c>; Linux — пусто (заголовок окна недоступен). Может быть
+/// пустым и на Windows (нет прав/нет окна) — уведомление подставит «окно без заголовка».</param>
+public sealed record RunningOneCProcess(
+    string ProcessName,
+    string CommandLine,
+    bool IsResponding = true,
+    string WindowTitle = "");
 
 /// <summary>
 /// Запущенный процесс платформы 1С с подробностями для инспектора процессов.

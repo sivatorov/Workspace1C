@@ -473,6 +473,20 @@ public class AppSettings
     public bool ActionsHoverOnly { get; set; }
 
     /// <summary>
+    /// «Выводить линии — по горизонтали» (issue #130): рисовать тонкие линии между
+    /// строками списка баз. По умолчанию выключено — вид списка не меняется.
+    /// Чересстрочное выделение («зебра») по обсуждению issue не включается.
+    /// </summary>
+    public bool ShowHorizontalGridLines { get; set; }
+
+    /// <summary>
+    /// «Выводить линии — по вертикали» (issue #130): рисовать тонкие линии между
+    /// столбцами списка баз, включая область заголовка. По умолчанию выключено —
+    /// вид списка не меняется.
+    /// </summary>
+    public bool ShowVerticalGridLines { get; set; }
+
+    /// <summary>
     /// Минимальная ширина видимой колонки «Действия» (issue #121, v1.0.1.54): под три
     /// круглые кнопки-чипа по 22 px (66) с отступами панелей и разделителя. Раньше
     /// 120 не давали колонке сузиться — «много пустого места ради максимум трёх
@@ -632,6 +646,14 @@ public class AppSettings
     /// false — все уведомления подавляются (Windows: balloon-tip трея, Linux: notify-send).
     /// </summary>
     public bool ShowSystemNotifications { get; set; } = true;
+
+    /// <summary>
+    /// Уведомления о длительных операциях (issue #131): галочка «Уведомлять»,
+    /// канал (системные уведомления/Telegram), отдельная группа Telegram,
+    /// порог простоя и мониторинг Предприятий/Конфигураторов. Читается
+    /// монитором запущенных баз на каждом опросе — применяется без перезапуска.
+    /// </summary>
+    public LongOperationNotificationsSettings LongOperationNotifications { get; set; } = new();
 
     /// <summary>
     /// Догоняющее выполнение пропущенных заданий по расписанию при старте (функция №7).
@@ -1277,6 +1299,11 @@ public class AppSettings
         UpdateCheckCache ??= new Dictionary<string, ConfigUpdateCheckResult>();
         BackupTargetDirectories ??= new List<string>();
         LaunchConfigDefaults ??= new LaunchConfigDefaults();
+        // issue #131: секция уведомлений о длительных операциях — легаси-файл
+        // без поля инициализируется значениями по умолчанию, строковые поля
+        // приводятся к каноническому виду.
+        LongOperationNotifications ??= new LongOperationNotificationsSettings();
+        LongOperationNotifications.Normalize();
         // issue #75: ширины колонок вкладок окна «Серверы 1С» — легаси-файл без поля
         // инициализируется пустым словарём (обращение по ключу вкладки безопасно).
         ServerMonitorColumnWidths ??= new Dictionary<string, double[]>();

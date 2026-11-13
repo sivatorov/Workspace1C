@@ -538,6 +538,61 @@
                                         </Grid>
                                     </StackPanel>
                                 </GroupBox>
+
+                                <!-- Уведомления о длительных операциях (issue #131): галочка «Уведомлять»,
+                                     правее — «Куда уведомлять»; ниже отдельная группа/подгруппа Telegram;
+                                     ещё ниже — «Длительность простоя» и единица измерения. -->
+                                <GroupBox Header="{loc:Loc LongOperation.Settings.GroupTitle}" Padding="8" Margin="0,12,0,0">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <CheckBox x:Name="LongOperationNotificationsCheck" Grid.Column="0"
+                                                      Content="{loc:Loc LongOperation.Settings.Enabled}"
+                                                      VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                            <TextBlock Grid.Column="1" Text="{loc:Loc LongOperation.Settings.ChannelLabel}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <ComboBox x:Name="LongOperationChannelCombo" Grid.Column="2" Height="30"
+                                                      MinWidth="220" HorizontalAlignment="Left"
+                                                      VerticalContentAlignment="Center"
+                                                      Style="{StaticResource ModernComboBox}">
+                                                <ComboBoxItem Content="{loc:Loc LongOperation.Settings.Channel.System}" Tag="System"/>
+                                                <ComboBoxItem Content="{loc:Loc LongOperation.Settings.Channel.Telegram}" Tag="Telegram"/>
+                                            </ComboBox>
+                                        </Grid>
+
+                                        <TextBlock Text="{loc:Loc LongOperation.Settings.TelegramTargetHint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                        <TextBox x:Name="LongOperationTelegramTargetBox" Height="30"
+                                                 VerticalContentAlignment="Center" Margin="0,0,0,10"
+                                                 Style="{StaticResource ModernTextBox}"
+                                                 ToolTip="{loc:Loc LongOperation.Settings.TelegramTargetTooltip}"/>
+
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{loc:Loc LongOperation.Settings.ThresholdLabel}"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                            <TextBox x:Name="LongOperationThresholdBox" Height="30" MinWidth="90"
+                                                     VerticalContentAlignment="Center" Margin="0,0,8,0"
+                                                     Style="{StaticResource ModernTextBox}"/>
+                                            <ComboBox x:Name="LongOperationThresholdUnitCombo" Height="30" Width="140"
+                                                      VerticalContentAlignment="Center"
+                                                      Style="{StaticResource ModernComboBox}">
+                                                <ComboBoxItem Content="{loc:Loc LongOperation.Settings.Unit.Seconds}" Tag="Seconds"/>
+                                                <ComboBoxItem Content="{loc:Loc LongOperation.Settings.Unit.Minutes}" Tag="Minutes"/>
+                                                <ComboBoxItem Content="{loc:Loc LongOperation.Settings.Unit.Hours}" Tag="Hours"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                        <TextBlock Text="{loc:Loc LongOperation.Settings.Hint}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                                   TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </GroupBox>
                             </StackPanel>
                         </ScrollViewer>
                     </TabItem>
@@ -892,6 +947,27 @@
                                     </StackPanel>
                                 </ToggleButton>
                                 <TextBlock Text="{loc:Loc Settings.Columns.ActionsHoverOnlyHint}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="24,0,0,12"/>
+                                <!-- Линии сетки списка баз (issue #130): горизонтальные — между
+                                     строками, вертикальные — между столбцами, включая заголовок. -->
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowHorizontalGridLinesCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <!-- Kind из общего набора значков тем (IconSetCoverageTests):
+                                             TableRow/TableColumn отсутствуют в наборах WindowsXp/Glass/
+                                             Outline/Material/MacOS. FormatListBulleted — три
+                                             горизонтальные линии (строки), ViewColumn — три
+                                             вертикальные полосы (столбцы). -->
+                                        <materialDesign:PackIcon Kind="FormatListBulleted" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.Columns.ShowHorizontalGridLines}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <ToggleButton Style="{DynamicResource SettingsToggle}" x:Name="ShowVerticalGridLinesCheck" Margin="0,0,0,6">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="ViewColumn" Width="16" Height="16" Foreground="{DynamicResource InfoBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.Columns.ShowVerticalGridLines}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                                <TextBlock Text="{loc:Loc Settings.Columns.GridLinesHint}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12" TextWrapping="Wrap" Margin="24,0,0,12"/>
                             </StackPanel>
                         </ScrollViewer>

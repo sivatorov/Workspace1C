@@ -174,4 +174,109 @@ public sealed class Issue117ExtensionNameTests
         Assert.False(confirmed);
         Assert.Contains(LocalizationManager.T("Extensions.LogNameUnknownInstalled"), vm.LogText);
     }
+
+    // ---------------------------------------------------------------------------
+    // Issue #117 (1.0.1.62): устойчивость автоподстановки имени и сопоставление
+    // с уже установленным расширением (жалоба @7OH: установка шла под именем файла).
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// UI может вернуть автоподставленное имя в сеттер (двусторонняя привязка) —
+    /// это НЕ ручной ввод: при выборе другого файла имя снова подставляется из .cfe.
+    /// Раньше после такого «эха» имя навсегда считалось изменённым вручную.
+    /// </summary>
+    [Fact]
+    public void ViewModel_ReapplyingAutoName_IsNotManualEdit()
+    {
+        Directory.CreateDirectory(TempDir);
+        var first = Path.Combine(TempDir, "ПервыйФайл.cfe");
+        var second = Path.Combine(TempDir, "ВторойФайл.cfe");
+        File.WriteAllBytes(first, ConfigExtensionServiceTests.BuildCfeContainer("ИмяПервого"));
+        File.WriteAllBytes(second, ConfigExtensionServiceTests.BuildCfeContainer("ИмяВторого"));
+        try
+        {
+            var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
+            vm.CfePath = first;
+            Assert.Equal("ИмяПервого", vm.ExtensionName);
+
+            // «Эхо» автоподстановки из UI — не ручное редактирование.
+            vm.ExtensionName = "ИмяПервого";
+
+            vm.CfePath = second;
+            Assert.Equal("ИмяВторого", vm.ExtensionName);
+            Assert.True(vm.HasCfeExtensionName);
+        }
+        finally
+        {
+            File.Delete(first);
+            File.Delete(second);
+        }
+    }
+
+    /// <summary>
+    /// Несколько РАЗНЫХ кандидатов имени в контейнере — имя не подставляется (null),
+    /// остаётся имя файла, а все кандидаты с путями пишутся в журнал окна.
+    /// </summary>
+    [Fact]
+    public void ViewModel_ConflictingCandidates_LogsCandidatesAndUsesFileName()
+    {
+        Directory.CreateDirectory(TempDir);
+        var path = Path.Combine(TempDir, "Конфликт.cfe");
+        File.WriteAllBytes(path, ConfigExtensionServiceTests.BuildCfeContainerMulti(
+            System.Text.Encoding.UTF8.GetBytes(ConfigExtensionServiceTests.BuildMetadataText("КандидатА")),
+            System.Text.Encoding.UTF8.GetBytes(ConfigExtensionServiceTests.BuildMetadataText("КандидатБ"))));
+        try
+        {
+            var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
+            vm.CfePath = path;
+
+            Assert.False(vm.HasCfeExtensionName);
+            Assert.Equal("Конфликт", vm.ExtensionName);
+            // Диагностика выбора: запись о нескольких кандидатах есть в журнале окна
+            // (в тестовой среде LocalizationManager.T возвращает ключ строки).
+            Assert.Contains(LocalizationManager.T("Extensions.LogNameCandidates"), vm.LogText);
+            // Сами кандидаты с путями доступны из разбора — все перечислены.
+            var parsed = ConfigExtensionService.TryReadExtensionName(path, out var candidates);
+            Assert.Null(parsed);
+            Assert.Equal(2, candidates.Count);
+            Assert.Contains(candidates, c => c.Name == "КандидатА");
+            Assert.Contains(candidates, c => c.Name == "КандидатБ");
+            // Имя не прочитано, а в базе есть другие расширения — нужно подтверждение.
+            Assert.True(vm.RequiresNameConfirmation(new[] { "ДругоеРасширение" }));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    /// <summary>
+    /// Жалоба @7OH: если настоящее имя из .cfe совпадает с уже установленным
+    /// расширением — установка выполняется под ним (обновление), подтверждение не нужно.
+    /// </summary>
+    [Fact]
+    public void ViewModel_RealNameAlreadyInstalled_InstallsAsUpdateWithoutConfirmation()
+    {
+        Directory.CreateDirectory(TempDir);
+        var path = Path.Combine(TempDir, "ir-8.23.1e.cfe");
+        File.WriteAllBytes(path, ConfigExtensionServiceTests.BuildCfeContainer("ИнструментыРазработчикаTormozit"));
+        try
+        {
+            var vm = new ExtensionsViewModel(System.Array.Empty<Infobase>(), null);
+            vm.CfePath = path;
+
+            // Имя файла («ir-8.23.1e») не используется — подставляется настоящее имя.
+            Assert.Equal("ИнструментыРазработчикаTormozit", vm.ExtensionName);
+            var installed = new[] { "ДругоеРасширение", "ИнструментыРазработчикаTormozit" };
+            Assert.False(vm.RequiresNameConfirmation(installed));
+            Assert.Equal("ИнструментыРазработчикаTormozit",
+                ConfigExtensionService.FindInstalledMatch(vm.ExtensionName, installed));
+            Assert.Equal("ИнструментыРазработчикаTormozit",
+                ConfigExtensionService.ResolveInstallName(vm.CfeExtensionName, vm.ExtensionName, nameEdited: false));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
 }

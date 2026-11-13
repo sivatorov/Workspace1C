@@ -20,6 +20,9 @@ public sealed class ExtensionsViewModel : ViewModelBase
     private string _extensionName = string.Empty;
     // Issue #117: настоящее имя расширения, прочитанное из выбранного .cfe (null — не прочитано).
     private string? _cfeRealName;
+    // Issue #117 (диагностика): все найденные в контейнере кандидаты имени с путями.
+    private IReadOnlyList<ConfigExtensionService.ExtensionNameCandidate> _cfeNameCandidates =
+        Array.Empty<ConfigExtensionService.ExtensionNameCandidate>();
     // Issue #117 п.2: пользователь вручную правил имя расширения — автоподстановка не перезаписывает его.
     private bool _extensionNameEdited;
     private string? _selectedExtension;
@@ -103,8 +106,12 @@ public sealed class ExtensionsViewModel : ViewModelBase
                 return;
 
             // Issue #117: запоминаем настоящее имя из .cfe — оно нужно и для автоподстановки,
-            // и для решения «спросить пользователя, чтобы не создать дубль».
-            _cfeRealName = ConfigExtensionService.TryReadExtensionName(_cfePath);
+            // и для решения «спросить пользователя, чтобы не создать дубль». Заодно получаем
+            // ВСЕХ кандидатов имени: если их несколько, они выводятся в журнал с путями
+            // в контейнере (видно, почему выбрано это имя и что отвергнуто).
+            _cfeRealName = ConfigExtensionService.TryReadExtensionName(_cfePath, out var candidates);
+            _cfeNameCandidates = candidates;
+            LogNameCandidates();
             if (!_extensionNameEdited)
             {
                 // Приоритет — НАСТОЯЩЕЕ имя расширения из .cfe, чтобы в поле было имя,
@@ -140,11 +147,34 @@ public sealed class ExtensionsViewModel : ViewModelBase
             if (!SetProperty(ref _extensionName, v))
                 return;
             // Ручным вводом считаем любое непустое имя, отличное от автоподстановки
-            // для текущего файла (и выбор расширения из списка). Очистка поля
-            // пользователем снимает признак ручного редактирования.
-            _extensionNameEdited = v.Length > 0 &&
-                !string.Equals(v, ConfigExtensionService.SuggestName(_cfePath), StringComparison.OrdinalIgnoreCase);
+            // для текущего файла. Очистка поля пользователем снимает признак ручного
+            // редактирования.
+            _extensionNameEdited = v.Length > 0 && !IsAutoNameValue(v);
         }
+    }
+
+    /// <summary>
+    /// Issue #117 (7OH): значение совпадает с автоподстановкой для текущего файла —
+    /// имя файла или НАСТОЯЩЕЕ имя расширения из .cfe. Такое значение не считается
+    /// ручным вводом: после автоподстановки UI может вернуть его же в сеттер (двусторонняя
+    /// привязка), и раньше это ложно помечало имя как «изменённое вручную» — тогда при
+    /// следующем выборе файла настоящее имя уже не подставлялось.
+    /// </summary>
+    private bool IsAutoNameValue(string value) =>
+        string.Equals(value, ConfigExtensionService.SuggestName(_cfePath), StringComparison.OrdinalIgnoreCase) ||
+        (!string.IsNullOrWhiteSpace(_cfeRealName) &&
+         string.Equals(value, _cfeRealName, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// Issue #117 (диагностика): выводит в журнал окна всех кандидатов имени расширения
+    /// с путями в дереве контейнеров — если кандидатов несколько.
+    /// </summary>
+    private void LogNameCandidates()
+    {
+        if (_cfeNameCandidates.Count <= 1)
+            return;
+        AppendLog(string.Format(LocalizationManager.T("Extensions.LogNameCandidates"),
+            string.Join("; ", _cfeNameCandidates.Select(c => c.Describe()))));
     }
 
     /// <summary>
@@ -431,7 +461,18 @@ public sealed class ExtensionsViewModel : ViewModelBase
     /// </summary>
     internal void ApplyCfeName()
     {
-        var cfeName = _cfeRealName ?? ConfigExtensionService.TryReadExtensionName(CfePath);
+        if (string.IsNullOrWhiteSpace(_cfeRealName) && !string.IsNullOrWhiteSpace(CfePath))
+        {
+            // Имя ещё не читали (файл выбран до появления разбора) — читаем вместе
+            // с кандидатами, чтобы в журнале была диагностика выбора.
+            _cfeRealName = ConfigExtensionService.TryReadExtensionName(CfePath, out var candidates);
+            if (candidates.Count > 0)
+            {
+                _cfeNameCandidates = candidates;
+                LogNameCandidates();
+            }
+        }
+        var cfeName = _cfeRealName;
         if (string.IsNullOrWhiteSpace(cfeName))
         {
             // Issue #117 (7OH): имя не прочитано — установка под именем файла может

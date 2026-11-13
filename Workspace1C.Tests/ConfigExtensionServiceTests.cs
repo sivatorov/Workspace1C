@@ -534,4 +534,208 @@ public sealed class ConfigExtensionServiceTests
             File.Delete(path);
         }
     }
+
+    // ---------------------------------------------------------------------------
+    // Issue #117 (1.0.1.62): раскладка реального «ИР» — тысячи служебных элементов
+    // со своими именами, несколько кандидатов, UTF-16 без BOM, повреждённый контейнер.
+    // ---------------------------------------------------------------------------
+
+    /// <summary>
+    /// Собирает синтетический .cfe с НЕСКОЛЬКИМИ элементами верхнего уровня — как в
+    /// реальном <c>ir-8.23.1e.cfe</c>: сначала служебные объекты метаданных со своими
+    /// строками «{1,0,<guid>},«Имя»», затем элемент метаданных расширения.
+    /// </summary>
+    internal static byte[] BuildCfeContainerMulti(params byte[][] payloads)
+    {
+        var headers = new byte[payloads.Length][];
+        var dataBlocks = new byte[payloads.Length][];
+        for (var i = 0; i < payloads.Length; i++)
+        {
+            headers[i] = Block(Deflate(BuildElementHeader("element" + i)));
+            dataBlocks[i] = Block(Deflate(payloads[i]));
+        }
+
+        // Таблица адресов: запись на каждый элемент + терминирующая запись из нулей.
+        var table = new byte[(payloads.Length + 1) * 12];
+        byte[] tableBlock = System.Array.Empty<byte>();
+        var previousLength = -1;
+        for (var iteration = 0; iteration < 32; iteration++)
+        {
+            tableBlock = Block(Deflate(table));
+            if (tableBlock.Length == previousLength)
+                break;
+            previousLength = tableBlock.Length;
+            long cursor = 16 + tableBlock.Length;
+            var headerAddrs = new long[payloads.Length];
+            var dataAddrs = new long[payloads.Length];
+            for (var i = 0; i < payloads.Length; i++)
+            {
+                headerAddrs[i] = cursor;
+                cursor += headers[i].Length;
+            }
+            for (var i = 0; i < payloads.Length; i++)
+            {
+                dataAddrs[i] = cursor;
+                cursor += dataBlocks[i].Length;
+            }
+            for (var i = 0; i < payloads.Length; i++)
+            {
+                BitConverter.GetBytes((uint)headerAddrs[i]).CopyTo(table, i * 12);
+                BitConverter.GetBytes((uint)dataAddrs[i]).CopyTo(table, i * 12 + 4);
+                BitConverter.GetBytes(0x7FFFFFFFu).CopyTo(table, i * 12 + 8);
+            }
+        }
+
+        var container = new byte[16 + tableBlock.Length +
+                                 headers.Sum(h => h.Length) + dataBlocks.Sum(d => d.Length)];
+        BitConverter.GetBytes(0x7FFFFFFFu).CopyTo(container, 0);   // сигнатура контейнера
+        BitConverter.GetBytes(512u).CopyTo(container, 4);          // размер страницы
+        BitConverter.GetBytes(1u).CopyTo(container, 8);            // версия хранилища
+        var offset = 16;
+        tableBlock.CopyTo(container, offset);
+        offset += tableBlock.Length;
+        foreach (var header in headers)
+        {
+            header.CopyTo(container, offset);
+            offset += header.Length;
+        }
+        foreach (var data in dataBlocks)
+        {
+            data.CopyTo(container, offset);
+            offset += data.Length;
+        }
+        return container;
+    }
+
+    /// <summary>Заголовок элемента контейнера: 20 байт + имя UTF-16LE.</summary>
+    internal static byte[] BuildElementHeader(string name)
+    {
+        var header = new byte[20 + name.Length * 2];
+        Encoding.Unicode.GetBytes(name).CopyTo(header, 20);
+        return header;
+    }
+
+    /// <summary>Текст метаданных без BOM (для UTF-16-раскладок без BOM).</summary>
+    internal static string BuildMetadataTextNoBom(string extensionName) =>
+        BuildMetadataText(extensionName).TrimStart('\uFEFF');
+
+    [Fact]
+    public void TryReadExtensionName_PrefersMetadataRootOverServiceElements()
+    {
+        // Причина ошибки 1.0.1.61: разбор брал ПЕРВУЮ строку «{1,0,<guid>},"Имя"»,
+        // а в «ИР» первым идёт служебный объект метаданных (например
+        // «SQLServer_СкриптСессииОпределенияСессииСУБД»), а не имя расширения.
+        // Настоящее имя лежит в элементе с GUID-классом «Конфигурация».
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "ir_like.cfe");
+        var service1 = Encoding.UTF8.GetBytes(
+            "\uFEFF{2,{1,0,11111111-2222-3333-4444-555555555555},\"SQLServer_СкриптСессии\"}");
+        var service2 = Encoding.UTF8.GetBytes(
+            "\uFEFF{2,{1,0,66666666-7777-8888-9999-000000000000},\"ирКэш\"}");
+        var metadata = Encoding.UTF8.GetBytes(BuildMetadataText("ИнструментыРазработчикаTormozit"));
+        File.WriteAllBytes(path, BuildCfeContainerMulti(service1, service2, metadata));
+        try
+        {
+            Assert.Equal("ИнструментыРазработчикаTormozit",
+                ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_PrefersMetadataRoot_RegardlessOfElementOrder()
+    {
+        // Порядок элементов не важен: служебное имя не должно побеждать даже если
+        // элемент метаданных расширения идёт ПЕРВЫМ (раньше брался первый попавшийся).
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "ir_like_reversed.cfe");
+        var metadata = Encoding.UTF8.GetBytes(BuildMetadataText("НастоящееИмяРасширения"));
+        var service = Encoding.UTF8.GetBytes(
+            "\uFEFF{2,{1,0,aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee},\"СлужебныйОбъект\"}");
+        File.WriteAllBytes(path, BuildCfeContainerMulti(metadata, service));
+        try
+        {
+            Assert.Equal("НастоящееИмяРасширения", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ReadsUtf16WithoutBom()
+    {
+        // Issue #117: кодировка определяется ПО БЛОКУ (плотность нулевых старших
+        // байтов), а не только по BOM первых КБ файла.
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "utf16_nobom.cfe");
+        var metadata = BuildMetadataTextNoBom("Имя_UTF16_БезBom");
+        File.WriteAllBytes(path, BuildCfeContainerFromPayload(Encoding.Unicode.GetBytes(metadata)));
+        try
+        {
+            Assert.Equal("Имя_UTF16_БезBom", ConfigExtensionService.TryReadExtensionName(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_ConflictingMetadataCandidates_ReturnsNull()
+    {
+        // Два элемента метаданных с РАЗНЫМИ именами — догадка хуже подтверждения:
+        // возвращается null (окно расширений запросит подтверждение).
+        Directory.CreateDirectory(TempCfeDir);
+        var path = Path.Combine(TempCfeDir, "conflicting.cfe");
+        File.WriteAllBytes(path, BuildCfeContainerMulti(
+            Encoding.UTF8.GetBytes(BuildMetadataText("ИмяА")),
+            Encoding.UTF8.GetBytes(BuildMetadataText("ИмяБ"))));
+        try
+        {
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(path));
+            var name = ConfigExtensionService.TryReadExtensionName(path, out var candidates);
+            Assert.Null(name);
+            Assert.Equal(2, candidates.Count);
+            Assert.Contains(candidates, c => c.Name == "ИмяА");
+            Assert.Contains(candidates, c => c.Name == "ИмяБ");
+            // Пути элементов в контейнере различаются — в журнале видно, откуда кандидаты.
+            Assert.Equal(2, candidates.Select(c => c.Path).Distinct().Count());
+            Assert.All(candidates, c => Assert.Equal("class", c.Anchor));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public void TryReadExtensionName_CorruptedContainer_ReturnsNullWithoutException()
+    {
+        // Повреждённый контейнер (испорчен заголовок таблицы адресов) и обрезанный
+        // файл не должны выбрасывать исключение — только null.
+        Directory.CreateDirectory(TempCfeDir);
+        var valid = BuildCfeContainer("Имя");
+        var corrupted = (byte[])valid.Clone();
+        for (var i = 16; i < Math.Min(corrupted.Length, 40); i++)
+            corrupted[i] = 0xFF;
+        var path = Path.Combine(TempCfeDir, "corrupted.cfe");
+        var truncated = Path.Combine(TempCfeDir, "truncated.cfe");
+        File.WriteAllBytes(path, corrupted);
+        File.WriteAllBytes(truncated, valid.Take(24).ToArray());
+        try
+        {
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(path));
+            Assert.Null(ConfigExtensionService.TryReadExtensionName(truncated));
+        }
+        finally
+        {
+            File.Delete(path);
+            File.Delete(truncated);
+        }
+    }
 }

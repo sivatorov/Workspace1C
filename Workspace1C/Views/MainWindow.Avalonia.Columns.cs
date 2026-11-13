@@ -386,9 +386,99 @@ namespace Workspace1C
                 _columnHeaderRow.Children.Add(BuildResizeGrip("Actions", actionsColumn));
             }
 
+            // Issue #130: вертикальные линии сетки в заголовке — продолжение линий
+            // строк, чтобы сетка была непрерывной от шапки до последней строки.
+            // Горизонтальной линии у заголовка нет (includeHorizontal: false).
+            ApplyGridLinesToGrid(_columnHeaderRow, includeHorizontal: false);
+
             UpdateListMinWidth();
 
             QueueHeaderAlign();
+        }
+
+        /// <summary>
+        /// Метка декоративных линий сетки (issue #130) в сетках Avalonia: позволяет
+        /// отличить их от ячеек и убрать перед перерисовкой.
+        /// </summary>
+        private static readonly object GridLineMarker = new();
+
+        private static bool IsGridLineElement(Control control)
+            => ReferenceEquals(control.Tag, GridLineMarker);
+
+        /// <summary>
+        /// Рисует линии сетки (issue #130) в сетке строки базы, строки группы или
+        /// заголовка: вертикальные — у правого края каждой видимой колонки, кроме
+        /// последней; горизонтальную — по нижней границе строки. План линий считает
+        /// общий <see cref="GridLinesPlanner"/> (та же чистая логика, что в WPF),
+        /// цвет — из темы (<c>BorderColorBrush</c>), мышь линии не перехватывают и
+        /// выделение строк не ломают. Обе настройки выключены — разметка не меняется.
+        /// </summary>
+        private void ApplyGridLinesToGrid(Grid grid, bool includeHorizontal)
+        {
+            if (_vm is null)
+                return;
+
+            for (var i = grid.Children.Count - 1; i >= 0; i--)
+                if (grid.Children[i] is Control existing && IsGridLineElement(existing))
+                    grid.Children.RemoveAt(i);
+
+            // Ведущие колонки (кнопки групп, звезда, булавка) — часть блока имени:
+            // линии внутри них резали бы подпись «Название» и значки. Сетка начинается
+            // с колонки имени (её правый край — первая вертикальная линия).
+            var visible = new List<bool>(grid.ColumnDefinitions.Count);
+            for (var i = 0; i < grid.ColumnDefinitions.Count; i++)
+            {
+                var definition = grid.ColumnDefinitions[i];
+                visible.Add(i >= NameHeaderColumn
+                    && (!definition.Width.IsAbsolute || definition.Width.Value > 0.5));
+            }
+
+            var plan = GridLinesPlanner.Resolve(
+                showHorizontal: includeHorizontal && _vm.ShowHorizontalGridLines,
+                showVertical: _vm.ShowVerticalGridLines,
+                compactMode: _vm.CompactMode,
+                visibleColumns: visible);
+            if (!plan.HasAnyLines)
+                return;
+
+            var rows = Math.Max(1, grid.RowDefinitions.Count);
+
+            foreach (var column in plan.VerticalBoundaryColumns)
+            {
+                var line = new Border
+                {
+                    Width = plan.Thickness,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    VerticalAlignment = VerticalAlignment.Stretch,
+                    Opacity = plan.Opacity,
+                    IsHitTestVisible = false,
+                    Tag = GridLineMarker
+                };
+                ThemeBrushes.Bind(line, Border.BackgroundProperty, "BorderColorBrush");
+                Grid.SetColumn(line, column);
+                Grid.SetRowSpan(line, rows);
+                line.ZIndex = 1;
+                grid.Children.Add(line);
+            }
+
+            if (plan.ShowHorizontalLine)
+            {
+                var line = new Border
+                {
+                    Height = plan.Thickness,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment = VerticalAlignment.Bottom,
+                    Opacity = plan.Opacity,
+                    IsHitTestVisible = false,
+                    Tag = GridLineMarker
+                };
+                ThemeBrushes.Bind(line, Border.BackgroundProperty, "BorderColorBrush");
+                Grid.SetColumn(line, 0);
+                Grid.SetColumnSpan(line, Math.Max(1, grid.ColumnDefinitions.Count));
+                Grid.SetRow(line, rows - 1);
+                line.ZIndex = 1;
+                grid.Children.Add(line);
+            }
         }
 
         /// <summary>

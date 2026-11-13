@@ -20,6 +20,13 @@ public partial class MainViewModel
     private Timer? _runningBasesTimer;
     private int _runningRefreshBusy;
 
+    /// <summary>
+    /// Трекер занятости окон 1С (issue #131). Живёт вместе с моделью представления;
+    /// опросы сериализованы флагом <see cref="_runningRefreshBusy"/>, поэтому
+    /// состояние трекера меняется только из одного потока за раз.
+    /// </summary>
+    private readonly LongOperationTracker _longOperationTracker = new();
+
     /// <summary>Период опроса процессов 1С (миллисекунды).</summary>
     private const int RunningBasesIntervalMs = 10_000;
 
@@ -72,6 +79,12 @@ public partial class MainViewModel
                 Infobases.Where(i => i.IsRunning).Select(i => i.Id),
                 StringComparer.Ordinal);
 
+            // issue #131: настройки читаются на каждом опросе — включение галочки,
+            // смена канала/порога применяются без перезапуска. Наблюдения собираются
+            // по паре (база, режим); отправка выполняется после классификации.
+            var longOperation = LoadLongOperationNotificationsSafe();
+            var longOperationObservations = new List<LongOperationObservation>();
+
             // Issue #103 (v1.0.1.35): двухпроходное сопоставление — сначала прямые ключи
             // /F//S, затем /IBName по имени базы. Запуск отладки из Конфигуратора
             // порождает клиентский процесс «ENTERPRISE /IBName <имя>» без /F//S —
@@ -101,6 +114,16 @@ public partial class MainViewModel
                 ib.IsEnterpriseRunning = running && enterpriseProcesses.Count > 0;
                 ib.IsConfiguratorRunning = running && configuratorProcesses.Count > 0;
 
+                if (longOperation is { Enabled: true })
+                {
+                    if (longOperation.MonitorEnterprise)
+                        longOperationObservations.Add(
+                            BuildLongOperationObservation(ib, RunningKind.Enterprise, enterpriseProcesses));
+                    if (longOperation.MonitorConfigurator)
+                        longOperationObservations.Add(
+                            BuildLongOperationObservation(ib, RunningKind.Configurator, configuratorProcesses));
+                }
+
                 // Issue #103 (v1.0.1.49): маркер отладки — хотя бы один Enterprise-процесс
                 // базы запущен с ключом /DEBUG (свой сеанс; см. ограничение в issue).
                 ib.IsEnterpriseDebugRunning = ib.IsEnterpriseRunning &&
@@ -126,6 +149,13 @@ public partial class MainViewModel
                 ib.NotRespondingStreak = notResponding ? ib.NotRespondingStreak + 1 : 0;
             }
 
+            // issue #131: занятость → освобождение. Если мониторинг выключен,
+            // состояние сбрасывается — при следующем включении новый цикл.
+            if (longOperation is { Enabled: true })
+                ProcessLongOperationReleases(longOperationObservations, longOperation);
+            else
+                _longOperationTracker.Reset();
+
             // issue #339: в режиме «Только запущенные» изменение состава запущенных баз
             // должно сразу отражаться в списке. Раньше флаги обновлялись, но список не
             // пересобирался: база, дозапустившаяся после включения отбора, не появлялась,
@@ -140,6 +170,95 @@ public partial class MainViewModel
         catch
         {
             // Применение результатов не должно ломать интерфейс.
+        }
+    }
+
+    /// <summary>
+    /// Настройки уведомлений о длительных операциях (issue #131) или null при
+    /// ошибке чтения. Читаются на каждом опросе — применение без перезапуска.
+    /// </summary>
+    private LongOperationNotificationsSettings? LoadLongOperationNotificationsSafe()
+    {
+        try
+        {
+            return _repository.LoadSettings()?.LongOperationNotifications;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Сводит процессы одного режима базы к одному наблюдению (issue #131):
+    /// занято, если хотя бы один процесс не отвечает; заголовок — от не отвечающего
+    /// окна, иначе первый непустой.
+    /// </summary>
+    private static LongOperationObservation BuildLongOperationObservation(
+        Infobase infobase, RunningKind mode, List<RunningOneCProcess> processes)
+    {
+        if (processes.Count == 0)
+            return new LongOperationObservation(infobase.Id, infobase.Name, mode, false, true, "");
+
+        var busy = processes.FirstOrDefault(p => !p.IsResponding);
+        var title = busy?.WindowTitle;
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            title = processes
+                .Select(p => p.WindowTitle)
+                .FirstOrDefault(t => !string.IsNullOrWhiteSpace(t));
+        }
+
+        return new LongOperationObservation(
+            infobase.Id, infobase.Name, mode, true, busy is null, title ?? "");
+    }
+
+    /// <summary>
+    /// Применяет наблюдения к трекеру и отправляет уведомления об освобождении
+    /// окон, занятость которых превысила порог (issue #131). Отправка —
+    /// fire-and-forget через <see cref="INotificationService"/>: ошибки каналов
+    /// не влияют на монитор.
+    /// </summary>
+    private void ProcessLongOperationReleases(
+        IReadOnlyList<LongOperationObservation> observations,
+        LongOperationNotificationsSettings settings)
+    {
+        var threshold = LongOperationThreshold.ToTimeSpan(settings.ThresholdValue, settings.ThresholdUnit);
+        var releases = _longOperationTracker.Observe(observations, threshold, DateTimeOffset.UtcNow);
+        if (releases.Count == 0)
+            return;
+
+        var service = AppServices.TryGetService<INotificationService>();
+        if (service is null)
+            return;
+
+        foreach (var release in releases)
+        {
+            var title = LongOperationNotificationText.BuildTitle();
+            if (!string.IsNullOrWhiteSpace(release.InfobaseName))
+                title += " — " + release.InfobaseName;
+
+            var message = new NotificationMessage
+            {
+                Title = title,
+                Message = LongOperationNotificationText.Build(
+                    Environment.MachineName, release.Mode, release.WindowTitle, release.Duration),
+                Kind = NotificationKind.Info,
+                Event = NotificationEvent.LongOperation,
+                // Отдельная группа/подгруппа Telegram (issue #131); пусто — общий чат.
+                ChatTargetOverride = string.IsNullOrWhiteSpace(settings.TelegramTarget)
+                    ? null
+                    : settings.TelegramTarget.Trim()
+            };
+
+            try
+            {
+                service.Show(message);
+            }
+            catch
+            {
+                // Уведомление не должно ломать монитор запущенных баз.
+            }
         }
     }
 

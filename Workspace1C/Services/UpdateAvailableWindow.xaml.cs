@@ -401,6 +401,9 @@ public partial class UpdateAvailableWindow : Window
     private void OnSkipVersionClick(object sender, RoutedEventArgs e)
     {
         _service.SkipVersion(_release);
+        // Issue #129: «Пропустить версию» — единственный сценарий, когда скачанный
+        // файл этой версии больше не нужен; убираем его и маркер кэша.
+        UpdateDownloadCache.DeleteCachedFile(_service.GetUpdateDownloadTargetPath(_release));
         Close();
     }
 
@@ -408,16 +411,18 @@ public partial class UpdateAvailableWindow : Window
 
     /// <summary>
     /// Окно закрыто без применения обновления («Отмена», крестик, закрытие на этапе
-    /// перезапуска): скачанный временный файл удаляется. Раньше он оставался в %TEMP%,
-    /// занимал десятки МБ и участвовал в «мгновенных» докачках со смешанными байтами
-    /// разных версий (issue #302).
+    /// перезапуска). Issue #129: ПОЛНЫЙ скачанный файл НЕ удаляется — при следующем
+    /// запуске он переиспользуется (<see cref="UpdateDownloadCache"/>), поэтому
+    /// повторной загрузки нет. Удаляется только неполный/битый файл; при «Пропустить
+    /// версию» файл убирается явно в <see cref="OnSkipVersionClick"/>.
     /// </summary>
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);
         if (!_applyScheduled && _newExe is not null)
         {
-            try { File.Delete(_newExe); } catch { /* не критично */ }
+            if (!UpdateDownloadCache.IsComplete(_newExe, _release.AssetSize))
+                UpdateDownloadCache.DeleteCachedFile(_newExe);
             _newExe = null;
         }
     }

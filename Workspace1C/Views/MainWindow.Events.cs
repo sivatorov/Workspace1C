@@ -270,6 +270,8 @@ namespace Workspace1C
             if (e.PropertyName == nameof(MainViewModel.CompactMode))
             {
                 QueueHeaderAlign();
+                // Issue #130: в компактном режиме линии сетки чуть контрастнее.
+                RefreshGridLines();
             }
             else if (e.PropertyName == nameof(MainViewModel.SearchText))
             {

@@ -36,8 +36,11 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
                         pid = parsedPid;
 
                     // issue #310: «зависший» процесс — точка у имени базы оранжевая/красная.
+                    // issue #131: вместе с откликом снимаем полный заголовок окна — он нужен
+                    // в тексте уведомления о длительной операции.
                     var responding = pid > 0 && IsProcessResponding(pid);
-                    result.Add(new RunningOneCProcess(name, commandLine, responding));
+                    var windowTitle = pid > 0 ? GetProcessWindowTitle(pid) : "";
+                    result.Add(new RunningOneCProcess(name, commandLine, responding, windowTitle));
                 }
                 catch { /* строка процесса могла исчезнуть — пропускаем */ }
             }
@@ -65,6 +68,23 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
         catch
         {
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Полный заголовок главного окна процесса (issue #131). Пусто — окна нет или
+    /// нет прав; уведомление подставит «окно без заголовка».
+    /// </summary>
+    private static string GetProcessWindowTitle(int pid)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(pid);
+            return process.MainWindowTitle ?? "";
+        }
+        catch
+        {
+            return "";
         }
     }
 

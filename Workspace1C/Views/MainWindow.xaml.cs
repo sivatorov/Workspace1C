@@ -711,6 +711,29 @@ namespace Workspace1C
                     QueueHeaderAlign();
                 }
 
+                // Issue #130: линии сетки зависят от состава видимых колонок —
+                // перерисовываем их при скрытии/показе колонки и при переключении
+                // самих опций «Выводить линии». Ширины колонок линии отслеживают
+                // сами (прижаты к правому краю колонки), поэтому на каждое движение
+                // разделителя перерисовки нет.
+                if (e.PropertyName is nameof(MainViewModel.ShowHorizontalGridLines)
+                    or nameof(MainViewModel.ShowVerticalGridLines)
+                    or nameof(MainViewModel.ShowVersionColumn)
+                    or nameof(MainViewModel.ShowLaunchModeColumn)
+                    or nameof(MainViewModel.ShowServerColumn)
+                    or nameof(MainViewModel.ShowLastLaunchColumn)
+                    or nameof(MainViewModel.ShowSizeColumn)
+                    or nameof(MainViewModel.ShowModifiedColumn)
+                    or nameof(MainViewModel.ShowLastBackupColumn)
+                    or nameof(MainViewModel.ShowConfigurationColumn)
+                    or nameof(MainViewModel.ShowConfigurationVersionColumn)
+                    or nameof(MainViewModel.ShowActionsColumn)
+                    or nameof(MainViewModel.ShowFavoritesButton)
+                    or nameof(MainViewModel.ShowPinnedButton))
+                {
+                    RefreshGridLines();
+                }
+
                 // Меню закладок (issue #356): сочетание — часть системных биндингов
                 // закладок, перерегистрируется отдельно (RegisterFavoriteHotkeys).
                 if (e.PropertyName is nameof(MainViewModel.HotkeyBookmarksMenu))

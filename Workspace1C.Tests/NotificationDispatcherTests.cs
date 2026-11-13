@@ -123,6 +123,89 @@ public sealed class NotificationDispatcherTests
         Assert.Single(failing.Received);
     }
 
+    // ---------- Issue #131: маршрутизация длительных операций ----------
+
+    [Fact]
+    public async Task LongOperation_ChannelSystem_OnlySystemChannelReceives()
+    {
+        var settings = LongOperationSettings(LongOperationNotificationChannels.System);
+        var system = new RecordingChannel(enabled: true, name: "system");
+        var telegram = new RecordingChannel(enabled: true, name: "telegram");
+        var dispatcher = new NotificationDispatcher(new[] { system, telegram }, new FakeRepository(settings));
+
+        dispatcher.Show(new NotificationMessage
+        {
+            Title = "T",
+            Message = "M",
+            Event = NotificationEvent.LongOperation
+        });
+
+        await system.Sent.WaitAsync(TimeSpan.FromMilliseconds(WaitMs));
+        await Task.Delay(150);
+        Assert.Single(system.Received);
+        Assert.Empty(telegram.Received);
+    }
+
+    [Fact]
+    public async Task LongOperation_ChannelTelegram_OnlyTelegramReceives()
+    {
+        var settings = LongOperationSettings(LongOperationNotificationChannels.Telegram);
+        var system = new RecordingChannel(enabled: true, name: "system");
+        var telegram = new RecordingChannel(enabled: true, name: "telegram");
+        var dispatcher = new NotificationDispatcher(new[] { system, telegram }, new FakeRepository(settings));
+
+        dispatcher.Show(new NotificationMessage
+        {
+            Title = "T",
+            Message = "M",
+            Event = NotificationEvent.LongOperation
+        });
+
+        await telegram.Sent.WaitAsync(TimeSpan.FromMilliseconds(WaitMs));
+        await Task.Delay(150);
+        Assert.Single(telegram.Received);
+        Assert.Empty(system.Received);
+    }
+
+    [Fact]
+    public async Task LongOperation_Disabled_NothingSent()
+    {
+        var settings = LongOperationSettings(LongOperationNotificationChannels.System);
+        settings.LongOperationNotifications.Enabled = false;
+        var system = new RecordingChannel(enabled: true, name: "system");
+        var dispatcher = new NotificationDispatcher(new[] { system }, new FakeRepository(settings));
+
+        dispatcher.Show(new NotificationMessage { Event = NotificationEvent.LongOperation });
+
+        await Task.Delay(200);
+        Assert.Empty(system.Received);
+    }
+
+    [Fact]
+    public async Task LongOperation_ChannelThrows_DoesNotThrowOutward()
+    {
+        var settings = LongOperationSettings(LongOperationNotificationChannels.System);
+        var failing = new RecordingChannel(enabled: true,
+            throwOnSend: new InvalidOperationException("сбой"), name: "system");
+        var dispatcher = new NotificationDispatcher(new[] { failing }, new FakeRepository(settings));
+
+        dispatcher.Show(new NotificationMessage { Event = NotificationEvent.LongOperation });
+
+        await failing.Sent.WaitAsync(TimeSpan.FromMilliseconds(WaitMs));
+        Assert.Single(failing.Received);
+    }
+
+    private static AppSettings LongOperationSettings(string channel) => new()
+    {
+        LongOperationNotifications = new LongOperationNotificationsSettings
+        {
+            Enabled = true,
+            Channel = channel,
+            ThresholdValue = 10,
+            ThresholdUnit = LongOperationThresholdUnits.Seconds
+        }
+    };
+
     // ---------- IsEnabled получает актуальные настройки ----------
 
     [Fact]
@@ -153,11 +236,13 @@ public sealed class NotificationDispatcherTests
         private readonly TaskCompletionSource<bool> _sent =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public RecordingChannel(bool enabled, bool result = true, Exception? throwOnSend = null)
+        public RecordingChannel(bool enabled, bool result = true, Exception? throwOnSend = null,
+            string name = "test")
         {
             _enabled = enabled;
             _result = result;
             _throwOnSend = throwOnSend;
+            Name = name;
         }
 
         public string Name { get; set; } = "test";

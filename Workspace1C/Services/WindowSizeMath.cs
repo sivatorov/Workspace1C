@@ -12,6 +12,15 @@ namespace Workspace1C;
 public static class WindowSizeMath
 {
     /// <summary>
+    /// Радиус скругления собственного содержимого окон (DIP), единый для WPF и
+    /// Avalonia (issue #126). Совпадает с радиусом «стеклянного» корня Avalonia
+    /// (<c>UiMetrics.RadiusLg</c>). Используется как радиус рамки, когда состояние
+    /// DWM неизвестно (RDP/Windows 10), но композиция включена: рамка повторяет
+    /// скругление содержимого, а не остаётся квадратной вокруг скруглённых углов.
+    /// </summary>
+    public const double DefaultContentCornerRadius = 10;
+
+    /// <summary>
     /// Высота окна по желаемой высоте контента с ограничениями окна.
     /// Значения <c><= 0</c> означают «ограничение не задано».
     /// </summary>
@@ -149,5 +158,105 @@ public static class WindowSizeMath
             return dwmRounded;
         // Показанное окно, но DWM не ответил (RDP/отключённая композиция) — оценка по ОС.
         return osRoundsWindows;
+    }
+
+    /// <summary>
+    /// Причина выбранного радиуса рамки (issue #126). Попадает в журнал
+    /// (<c>policy=…</c>), чтобы по диагностике было видно, почему рамка скруглена
+    /// или осталась прямоугольной.
+    /// </summary>
+    public enum FrameCornerPolicy
+    {
+        /// <summary>Углы прямые: композиция выключена или своего скругления нет.</summary>
+        CompositionOff,
+        /// <summary>Окно развёрнуто — DWM рисует прямые углы.</summary>
+        Maximized,
+        /// <summary>DWM сообщил, что окно скруглено — рамка по системному радиусу.</summary>
+        DwmRounded,
+        /// <summary>DWM явно сообщил «не скруглять» — рамка прямоугольная.</summary>
+        DwmDoNotRound,
+        /// <summary>
+        /// Состояние DWM неизвестно (RDP/Windows 10), композиция включена — рамка
+        /// повторяет радиус собственного скруглённого содержимого приложения.
+        /// </summary>
+        ContentRadius
+    }
+
+    /// <summary>
+    /// Входы чистой политики скругления рамки (issue #126). Отделены от UI/DWM,
+    /// поэтому решение детерминированно тестируется без реальной Windows-сессии.
+    /// </summary>
+    /// <param name="DwmStateKnown">Удалось прочитать состояние скругления DWM.</param>
+    /// <param name="DwmRounded">Значение состояния DWM, если оно известно.</param>
+    /// <param name="WindowShown">Окно реально показано (есть HWND и WS_VISIBLE).</param>
+    /// <param name="Maximized">Окно развёрнуто.</param>
+    /// <param name="CompositionEnabled">Композиция DWM включена (DwmIsCompositionEnabled).</param>
+    /// <param name="OsRoundsWindows">ОС скругляет окна (Windows 11, build >= 22000).</param>
+    /// <param name="ContentCornerRadius">Радиус собственного скругления содержимого (DIP).</param>
+    /// <param name="SystemRadius">Системный радиус скругления DWM (DIP, ~8).</param>
+    public readonly record struct FrameRoundingInputs(
+        bool DwmStateKnown,
+        bool DwmRounded,
+        bool WindowShown,
+        bool Maximized,
+        bool CompositionEnabled,
+        bool OsRoundsWindows,
+        double ContentCornerRadius,
+        double SystemRadius);
+
+    /// <summary>Результат политики: радиус рамки и причина решения.</summary>
+    public readonly record struct FrameCornerRadiusResult(double Radius, FrameCornerPolicy Policy);
+
+    /// <summary>
+    /// Единая политика скругления видимой рамки окна (issue #126), общая для WPF и
+    /// Avalonia. Правила (в порядке приоритета):
+    /// <list type="bullet">
+    /// <item>развёрнутое окно — прямые углы;</item>
+    /// <item>показанное окно с достоверным состоянием DWM — следуем ему
+    /// (пользователь/система могли отключить скругление);</item>
+    /// <item>ОС скругляет окна (Windows 11) — системный радиус;</item>
+    /// <item>приложение само рисует скруглённое содержимое (RDP/Windows 10, а также
+    /// выключенная композиция при собственном скруглении) — радиус содержимого,
+    /// чтобы рамка не оставалась квадратной вокруг скруглённых углов;</item>
+    /// <item>своего скругления нет — прямые углы (не «угадываем» скругление).</item>
+    /// </list>
+    /// <para>
+    /// Состояние DWM учитывается только при включённой композиции: без композиции
+    /// DWM не клипует окно, поэтому доверять его ответу нельзя. Это и есть случай
+    /// RDP на Windows 10: атрибут <c>DWMWA_WINDOW_CORNER_STATE</c> недоступен
+    /// (<c>dwmState=unknown</c>), <c>osRounds=false</c>, но содержимое приложения
+    /// скруглено — рамка должна повторять его радиус.
+    /// </para>
+    /// </summary>
+    public static FrameCornerRadiusResult ResolveFrameCornerRadius(FrameRoundingInputs inputs)
+    {
+        if (inputs.Maximized)
+            return new(0, FrameCornerPolicy.Maximized);
+
+        double systemRadius = inputs.SystemRadius > 0 ? inputs.SystemRadius : 0;
+        double contentRadius = inputs.ContentCornerRadius > 0 ? inputs.ContentCornerRadius : 0;
+
+        // Показанное окно с достоверным состоянием DWM: следуем фактическому
+        // состоянию. При выключенной композиции ответ DWM недостоверен — пропускаем.
+        if (inputs.CompositionEnabled && inputs.WindowShown && inputs.DwmStateKnown)
+        {
+            if (inputs.DwmRounded && systemRadius > 0)
+                return new(systemRadius, FrameCornerPolicy.DwmRounded);
+            return new(0, FrameCornerPolicy.DwmDoNotRound);
+        }
+
+        // Windows 11 (в том числе до показа окна, когда состояние DWM ещё
+        // недостоверно): системный радиус — поведение 1.0.1.61 без регрессии.
+        if (inputs.CompositionEnabled && inputs.OsRoundsWindows && systemRadius > 0)
+            return new(systemRadius, FrameCornerPolicy.DwmRounded);
+
+        // DWM не сообщил состояние (RDP/Windows 10) либо композиция выключена, но
+        // приложение само рисует скруглённое содержимое — повторяем его радиус.
+        // Если своего скругления нет, ниже вернём прямые углы.
+        if (contentRadius > 0)
+            return new(contentRadius, FrameCornerPolicy.ContentRadius);
+
+        // Композиция есть/нет, но своего скругления нет — углы последовательно прямые.
+        return new(0, FrameCornerPolicy.CompositionOff);
     }
 }

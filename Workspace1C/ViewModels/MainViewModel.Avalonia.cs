@@ -462,6 +462,69 @@ public partial class MainViewModel : ViewModelBase
     /// 0 — только при запуске и вручную; 60 — час; 360 — 6 часов; 1440 — сутки.</summary>
     public int UpdateCheckIntervalMinutes => _settings.UpdateCheckIntervalMinutes;
 
+    /// <summary>
+    /// Галочка «Уведомлять» о длительных операциях (issue #131): читается и
+    /// переключается иконкой-будильником в панели запуска и в окне настроек.
+    /// </summary>
+    public bool LongOperationNotificationsEnabled
+    {
+        get => _settings.LongOperationNotifications?.Enabled == true;
+        set
+        {
+            var settings = _settings.LongOperationNotifications ??=
+                new Models.LongOperationNotificationsSettings();
+            if (settings.Enabled == value)
+                return;
+            settings.Enabled = value;
+            SaveSettingsSilently();
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Канал уведомлений о длительных операциях (System/Telegram, issue #131).</summary>
+    public string LongOperationNotificationsChannel =>
+        Models.LongOperationNotificationChannels.Normalize(_settings.LongOperationNotifications?.Channel);
+
+    /// <summary>Отдельная группа/подгруппа Telegram для длительных операций (issue #131).</summary>
+    public string LongOperationTelegramTarget =>
+        _settings.LongOperationNotifications?.TelegramTarget ?? "";
+
+    /// <summary>Значение порога «Длительность простоя» (issue #131).</summary>
+    public int LongOperationThresholdValue =>
+        _settings.LongOperationNotifications?.ThresholdValue > 0
+            ? _settings.LongOperationNotifications!.ThresholdValue
+            : 30;
+
+    /// <summary>Единица измерения порога (Seconds/Minutes/Hours, issue #131).</summary>
+    public string LongOperationThresholdUnit =>
+        Models.LongOperationThresholdUnits.Normalize(_settings.LongOperationNotifications?.ThresholdUnit);
+
+    /// <summary>
+    /// Применяет группу «Уведомления о длительных операциях» из окна настроек
+    /// (issue #131). Сохраняется сразу; монитор читает настройки на каждом опросе.
+    /// </summary>
+    public void ApplyLongOperationNotificationSettings(
+        bool enabled, string? channel, string? telegramTarget, int thresholdValue, string? unit)
+    {
+        var settings = _settings.LongOperationNotifications ??=
+            new Models.LongOperationNotificationsSettings();
+        settings.Enabled = enabled;
+        settings.Channel = Models.LongOperationNotificationChannels.Normalize(channel);
+        settings.TelegramTarget = telegramTarget?.Trim() ?? "";
+        settings.ThresholdValue = thresholdValue > 0 ? thresholdValue : 30;
+        settings.ThresholdUnit = Models.LongOperationThresholdUnits.Normalize(unit);
+
+        if (!SaveSettingsSafe())
+            _dialog.ShowError(LocalizationManager.T("Main.SaveFailedHint"),
+                LocalizationManager.T("Settings.Title"));
+
+        OnPropertyChanged(nameof(LongOperationNotificationsEnabled));
+        OnPropertyChanged(nameof(LongOperationNotificationsChannel));
+        OnPropertyChanged(nameof(LongOperationTelegramTarget));
+        OnPropertyChanged(nameof(LongOperationThresholdValue));
+        OnPropertyChanged(nameof(LongOperationThresholdUnit));
+    }
+
     /// <summary>Применяет настройки поведения трея и системных уведомлений из окна настроек.</summary>
     public void ApplyTraySettings(
         bool showTrayIcon, bool closeToTray, bool escapeToTray, bool showSystemNotifications)

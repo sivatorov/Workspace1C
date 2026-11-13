@@ -66,6 +66,21 @@ public sealed class NotificationChannelSettings
     /// <summary>Отправлять оповещения мониторинга серверов и журналов регистрации (1.0.0.69).</summary>
     public bool NotifyOnMonitoring { get; set; } = true;
 
+    /// <summary>
+    /// Отправлять уведомления о длительных операциях (issue #131) во внешние
+    /// каналы. Системный канал этим флагом не управляется — у него отдельная
+    /// настройка <see cref="AppSettings.LongOperationNotifications"/>.
+    /// </summary>
+    public bool NotifyOnLongOperations { get; set; } = true;
+
+    /// <summary>
+    /// Отдельная группа/подгруппа Telegram для уведомлений о длительных
+    /// операциях (issue #131). Пусто — используется общий
+    /// <see cref="TelegramChatId"/>; поддерживается ссылка
+    /// <c>t.me/c/<id>/<thread></c> (тема/подгруппа).
+    /// </summary>
+    public string LongOperationTelegramChatId { get; set; } = "";
+
     /// <summary>Отправлять только ошибки и предупреждения (успешные операции пропускаются).</summary>
     public bool OnlyProblems { get; set; }
 

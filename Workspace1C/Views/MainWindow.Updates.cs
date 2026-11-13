@@ -57,10 +57,12 @@ public partial class MainWindow
     /// </summary>
     private void InitializeFooterUpdateState()
     {
-        FooterVersionText.Text = "v" + EffectiveVersionService.FormatVersionForDisplay(
-            VersionInfo.Display(),
-            EffectiveVersionService.CurrentForUpdates,
-            LocalizationManager.T("Common.VersionEffective"));
+        RefreshFooterVersionText();
+
+        // Issue #129: переключение галки «Считать версию прошлой» (trace.json)
+        // должно сразу менять подпись версии и состояние значка — без перезапуска.
+        TraceFlags.SettingsSaved += OnTraceSettingsSaved;
+        Closed += (_, _) => TraceFlags.SettingsSaved -= OnTraceSettingsSaved;
 
         try
         {
@@ -85,6 +87,46 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>
+    /// Обновляет подпись версии в подвале (issue #129): при включённом «Считать версию
+    /// прошлой» показываются реальная сборка и эффективная (понижённая) версия.
+    /// Вызывается при инициализации и после изменения флагов в <c>trace.json</c>.
+    /// </summary>
+    private void RefreshFooterVersionText()
+    {
+        try
+        {
+            FooterVersionText.Text = "v" + EffectiveVersionService.FormatVersionForDisplay(
+                VersionInfo.Display(),
+                EffectiveVersionService.CurrentForUpdates,
+                LocalizationManager.T("Common.VersionEffective"));
+        }
+        catch
+        {
+            // Подпись версии не критична для работы окна.
+        }
+    }
+
+    /// <summary>
+    /// Реакция на сохранение флагов диагностики (issue #129): при смене
+    /// <see cref="TraceFlags.PrevVersionFlag"/> пересчитываем версию и значок.
+    /// </summary>
+    private void OnTraceSettingsSaved(TraceSettingsSavedEventArgs args)
+    {
+        if (args is null || !args.Contains(TraceFlags.PrevVersionFlag))
+            return;
+        try
+        {
+            Dispatcher.BeginInvoke(
+                new Action(RefreshFooterUpdateState),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
+        catch
+        {
+            // Окно уже закрывается — обновлять нечего.
+        }
+    }
+
     /// <summary>Обработчик смены «доступна новая версия» в службе обновления (issue #116).</summary>
     private void OnAvailableReleaseChanged()
         => Dispatcher.Invoke(RefreshFooterUpdateState);
@@ -103,6 +145,9 @@ public partial class MainWindow
     /// </summary>
     private void RefreshFooterUpdateState()
     {
+        // Issue #129: подпись версии тоже зависит от «Считать версию прошлой».
+        RefreshFooterVersionText();
+
         try
         {
             var updateService = AppServices.TryGetService<UpdateService>();

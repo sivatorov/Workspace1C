@@ -183,10 +183,12 @@ public sealed class Issue126FrameCornerRadiusTests
     [Fact]
     public void WindowChromeHelper_Wpf_FrameUsesComputedCornerRadius()
     {
-        // Рамка-оверлей получает CornerRadius из чистой логики
-        // WindowSizeMath.ComputeFrameCornerRadius (dwmRounded, maximized, радиус).
+        // Рамка-оверлей получает CornerRadius из единой чистой политики
+        // WindowSizeMath.ResolveFrameCornerRadius (issue #126, доработка 1.0.1.62).
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
-        Assert.Contains("ComputeFrameCornerRadius(rounded, maximized, DwmCornerRadius)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowSizeMath.ResolveFrameCornerRadius(new WindowSizeMath.FrameRoundingInputs(", code,
+            StringComparison.Ordinal);
+        Assert.Contains("var radius = policy.Radius;", code, StringComparison.Ordinal);
         Assert.Contains("frame.CornerRadius = new CornerRadius(radius)", code, StringComparison.Ordinal);
     }
 
@@ -287,10 +289,11 @@ public sealed class Issue126FrameCornerRadiusTests
     public void WindowChromeHelper_Wpf_UsesOsEstimateUntilWindowShown()
     {
         // До показа окна (нет HWND/окно невидимо) состояние DWM не используется:
-        // решение принимает ResolveFrameRounding по версии ОС.
+        // политика получает WindowShown=false и принимает решение по версии ОС.
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
         Assert.Contains("IsWindowShown(window, out var hwnd)", code, StringComparison.Ordinal);
-        Assert.Contains("WindowSizeMath.ResolveFrameRounding(stateKnown, dwmRounded, shown, osRounds)", code, StringComparison.Ordinal);
+        Assert.Contains("WindowShown: shown", code, StringComparison.Ordinal);
+        Assert.Contains("OsRoundsWindows: osRounds", code, StringComparison.Ordinal);
         Assert.Contains("IsWindowVisible(hwnd)", code, StringComparison.Ordinal);
     }
 
@@ -308,13 +311,18 @@ public sealed class Issue126FrameCornerRadiusTests
     [Fact]
     public void WindowChromeHelper_Wpf_LogsFrameCornerDiagnostics()
     {
-        // Диагностика: тип окна, HWND, состояние DWM, вычисленный радиус и причина
-        // пересчёта — попадают в журнал (категория CM_THEMES / LogCategory.Themes).
+        // Диагностика: тип окна, HWND, состояние DWM/композиции, радиус содержимого,
+        // вычисленный радиус, принятая политика и причина пересчёта — попадают в
+        // журнал (категория CM_THEMES / LogCategory.Themes). По этим полям видно,
+        // почему рамка скруглена или осталась квадратной (RDP/Windows 10).
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
         Assert.Contains("LogFrameCornerRadius", code, StringComparison.Ordinal);
         Assert.Contains("LogCategory.Themes", code, StringComparison.Ordinal);
         Assert.Contains("frame-corner reason=", code, StringComparison.Ordinal);
         Assert.Contains("dwmState=", code, StringComparison.Ordinal);
+        Assert.Contains("compositionEnabled=", code, StringComparison.Ordinal);
+        Assert.Contains("contentRadius=", code, StringComparison.Ordinal);
+        Assert.Contains("policy=", code, StringComparison.Ordinal);
         Assert.Contains("frameOptOut=", code, StringComparison.Ordinal);
     }
 
@@ -327,5 +335,221 @@ public sealed class Issue126FrameCornerRadiusTests
         Assert.Contains("public static void AttachFrameCornerTracking(Window window, Border frame, Border? titleBar = null)",
             code, StringComparison.Ordinal);
         Assert.Contains("RefreshFrameCornerRadius(window, \"state-changed\")", code, StringComparison.Ordinal);
+    }
+
+    // ---------- Единая политика скругления: RDP/Windows 10 (1.0.1.62) ----------
+
+    /// <summary>
+    /// Входы «RDP на Windows 10»: DWM не сообщает состояние (атрибут не поддерживается),
+    /// ОС окна не скругляет, композиция включена, приложение рисует своё скругление.
+    /// </summary>
+    private static WindowSizeMath.FrameRoundingInputs RdpWin10Inputs(
+        bool compositionEnabled = true,
+        bool maximized = false,
+        bool shown = true,
+        double contentRadius = WindowSizeMath.DefaultContentCornerRadius) =>
+        new(
+            DwmStateKnown: false,
+            DwmRounded: false,
+            WindowShown: shown,
+            Maximized: maximized,
+            CompositionEnabled: compositionEnabled,
+            OsRoundsWindows: false,
+            ContentCornerRadius: contentRadius,
+            SystemRadius: SystemRadius);
+
+    [Fact]
+    public void ResolveFrameCornerRadius_RdpWin10_UnknownDwm_UsesContentRadius()
+    {
+        // Дефект #126 в RDP на Windows 10: dwmState=unknown, osRounds=false,
+        // radius=0 — рамка квадратная вокруг скруглённых углов. Теперь при
+        // неизвестном DWM и включённой композиции рамка повторяет радиус
+        // собственного скруглённого содержимого.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(RdpWin10Inputs());
+
+        Assert.Equal(WindowSizeMath.DefaultContentCornerRadius, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.ContentRadius, result.Policy);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ResolveFrameCornerRadius_RdpWin10_ContentRadiusBeforeAndAfterShow(bool shown)
+    {
+        // Радиус не «прыгает» между первым расчётом (окно ещё не показано) и
+        // повторным после показа: в обоих случаях рамка скруглена одинаково.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(RdpWin10Inputs(shown: shown));
+        Assert.Equal(WindowSizeMath.DefaultContentCornerRadius, result.Radius);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_CompositionDisabledWithoutOwnRounding_IsZero()
+    {
+        // Композиция DWM выключена и своего скругления у содержимого нет — рамку
+        // не скругляем «наугад»: углы последовательно прямые (правило issue #126:
+        // «композиция выключена и своего скругления нет → 0»).
+        var result = WindowSizeMath.ResolveFrameCornerRadius(
+            RdpWin10Inputs(compositionEnabled: false, contentRadius: 0));
+
+        Assert.Equal(0, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.CompositionOff, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_CompositionDisabledWithOwnRounding_FollowsContent()
+    {
+        // Композиция выключена, но приложение само рисует скруглённое содержимое:
+        // рамка повторяет его радиус — иначе получится «скруглённое содержимое в
+        // квадратной рамке» (тот же дефект #126, что и в RDP на Windows 10).
+        var result = WindowSizeMath.ResolveFrameCornerRadius(
+            RdpWin10Inputs(compositionEnabled: false));
+
+        Assert.Equal(WindowSizeMath.DefaultContentCornerRadius, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.ContentRadius, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_OwnChromeWithoutContentRadius_IsZeroOnWin10()
+    {
+        // Окно с собственным каркасом (главное окно) своего скругления не имеет:
+        // на Windows 10/RDP рамка остаётся прямой, как и содержимое, — явный
+        // opt-out от «фантомного» скругления вокруг прямоугольных углов.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(
+            RdpWin10Inputs(contentRadius: 0));
+
+        Assert.Equal(0, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.CompositionOff, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_Maximized_IsZero()
+    {
+        // Максимизированное окно — прямые углы при любой композиции и радиусе.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(RdpWin10Inputs(maximized: true));
+
+        Assert.Equal(0, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.Maximized, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_DwmDoNotRound_IsZero()
+    {
+        // DWM явно сообщил «не скруглять» — рамка прямоугольная, даже на Windows 11
+        // и при собственном радиусе содержимого.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(new WindowSizeMath.FrameRoundingInputs(
+            DwmStateKnown: true,
+            DwmRounded: false,
+            WindowShown: true,
+            Maximized: false,
+            CompositionEnabled: true,
+            OsRoundsWindows: true,
+            ContentCornerRadius: WindowSizeMath.DefaultContentCornerRadius,
+            SystemRadius: SystemRadius));
+
+        Assert.Equal(0, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.DwmDoNotRound, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_Win11Rounded_NoRegression()
+    {
+        // Windows 11 со скруглением DWM: поведение 1.0.1.61 не изменилось —
+        // рамка по системному радиусу DWM (8), а не по радиусу содержимого.
+        var result = WindowSizeMath.ResolveFrameCornerRadius(new WindowSizeMath.FrameRoundingInputs(
+            DwmStateKnown: true,
+            DwmRounded: true,
+            WindowShown: true,
+            Maximized: false,
+            CompositionEnabled: true,
+            OsRoundsWindows: true,
+            ContentCornerRadius: WindowSizeMath.DefaultContentCornerRadius,
+            SystemRadius: SystemRadius));
+
+        Assert.Equal(SystemRadius, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.DwmRounded, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_Win11BeforeShow_UsesSystemRadius()
+    {
+        // До показа окна на Windows 11 DWM ещё не отдаёт состояние: рамка сразу
+        // получает системный радиус (без «прыжка» 0 → 8 после ContentRendered).
+        var result = WindowSizeMath.ResolveFrameCornerRadius(new WindowSizeMath.FrameRoundingInputs(
+            DwmStateKnown: true,
+            DwmRounded: false,
+            WindowShown: false,
+            Maximized: false,
+            CompositionEnabled: true,
+            OsRoundsWindows: true,
+            ContentCornerRadius: WindowSizeMath.DefaultContentCornerRadius,
+            SystemRadius: SystemRadius));
+
+        Assert.Equal(SystemRadius, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.DwmRounded, result.Policy);
+    }
+
+    [Fact]
+    public void ResolveFrameCornerRadius_Win10WithoutContentRadius_IsZero()
+    {
+        // Windows 10/RDP, своего скругления нет — прямые углы (нет «фантомного»
+        // скругления там, где содержимое прямоугольное).
+        var result = WindowSizeMath.ResolveFrameCornerRadius(RdpWin10Inputs(contentRadius: 0));
+
+        Assert.Equal(0, result.Radius);
+        Assert.Equal(WindowSizeMath.FrameCornerPolicy.CompositionOff, result.Policy);
+    }
+
+    [Fact]
+    public void WindowSizeMath_DefaultContentCornerRadius_MatchesAvaloniaGlass()
+    {
+        // Единый радиус содержимого: WPF-фолбэк (RDP/Win10) и «стеклянный» корень
+        // Avalonia используют одну константу — рамка и содержимое совпадают.
+        Assert.Equal(10, WindowSizeMath.DefaultContentCornerRadius);
+
+        var main = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("WindowSizeMath.DefaultContentCornerRadius", main, StringComparison.Ordinal);
+
+        var modal = ReadProjectFile(Path.Combine("Workspace1C", "Views", "ModalWindowBase.cs"));
+        Assert.Contains("WindowSizeMath.DefaultContentCornerRadius", modal, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowChromeHelper_Wpf_DetectsDwmComposition()
+    {
+        // Политика учитывает состояние композиции DWM: при выключенных эффектах
+        // системного скругления нет, рамку не скругляем.
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        Assert.Contains("DwmIsCompositionEnabled", code, StringComparison.Ordinal);
+        Assert.Contains("TryGetDwmCompositionEnabled()", code, StringComparison.Ordinal);
+        Assert.Contains("CompositionEnabled: compositionEnabled", code, StringComparison.Ordinal);
+        Assert.Contains("FrameContentCornerRadius = WindowSizeMath.DefaultContentCornerRadius", code,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowChromeHelper_Wpf_RoundsContentWithFrameRadius()
+    {
+        // Рамка и содержимое диалога совпадают (issue #126): содержимое обёрнуто в
+        // скруглённый контейнер, радиус и клип синхронизируются с радиусом рамки.
+        // Без этого на Windows 10/RDP скруглённая рамка обрамляла бы прямоугольное
+        // содержимое — обратная сторона того же дефекта.
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        Assert.Contains("ContentBorderProperty", code, StringComparison.Ordinal);
+        Assert.Contains("ApplyRoundedContentClip(content, radius)", code, StringComparison.Ordinal);
+        Assert.Contains("content.CornerRadius = new CornerRadius(radius)", code, StringComparison.Ordinal);
+        Assert.Contains("GetContentBorder(window) is not null ? FrameContentCornerRadius : 0", code,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowChromeHelper_Wpf_LogsActualContentRadius()
+    {
+        // В лог frame-corner пишется фактический радиус содержимого (0 у окон с
+        // собственным каркасом) вместе с compositionEnabled и policy — по
+        // ZIP-диагностике видно, почему радиус рамки 0 (issue #126).
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "WindowChromeHelper.cs"));
+        Assert.Contains("compositionEnabled={compositionEnabled}", code, StringComparison.Ordinal);
+        Assert.Contains("contentRadius={contentRadius:0.#}", code, StringComparison.Ordinal);
+        Assert.Contains("policy={policy}", code, StringComparison.Ordinal);
     }
 }
