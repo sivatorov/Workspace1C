@@ -901,8 +901,11 @@ public partial class MainViewModel : ViewModelBase
             NotifySessionSettings();
 
             RebuildTree();
-            // Группа «Мои программы» (issue #91): список загружается после настроек,
-            // чтобы панель запуска сразу показала сохранённые программы.
+            // Группа «Мои программы» (issue #91): «1С:Стартер» переносится в группу при
+            // первом запуске (пустой список), отдельной кнопки стартера на панели нет;
+            // затем список загружается после настроек, чтобы панель запуска сразу
+            // показала сохранённые программы.
+            EnsureCustomProgramsStarterMigration();
             ReloadCustomPrograms();
             UpdateStatus(string.Format(LocalizationManager.T("Main.LoadedBases"), _allInfobases.Count));
 

@@ -26,8 +26,11 @@
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="ItemContainerStyle" Value="{StaticResource ModernListBoxItem}"/>
         </Style>
-        <!-- Превью иконки из файла (issue #91): путь → BitmapImage, ошибки не роняют окно. -->
-        <conv:FileIconPathToImageSourceConverter x:Key="FileIcon"/>
+        <!-- Иконка программы (issue #91): галочка «Иконка из файла» → картинка из
+             файла, иначе основная иконка исполняемого файла (Windows). Ошибки чтения
+             не роняют окно — показывается стандартная иконка группы. -->
+        <conv:CustomProgramIconConverter x:Key="CustomProgramIcon"/>
+        <conv:CustomProgramIconVisibilityConverter x:Key="CustomProgramIconVisibility"/>
     </Window.Resources>
 
     <DockPanel Margin="14">
@@ -97,31 +100,32 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Margin="2">
                                 <Grid Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <Image Source="{Binding IconPath, Converter={StaticResource FileIcon}}"
-                                           Width="18" Height="18" Stretch="Uniform">
-                                        <Image.Style>
-                                            <Style TargetType="Image">
-                                                <Setter Property="Visibility" Value="Visible"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </Image.Style>
+                                    <Image Width="18" Height="18" Stretch="Uniform">
+                                        <Image.Source>
+                                            <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                                <Binding Path="UseCustomIcon"/>
+                                                <Binding Path="IconPath"/>
+                                                <Binding Path="FilePath"/>
+                                            </MultiBinding>
+                                        </Image.Source>
+                                        <Image.Visibility>
+                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}">
+                                                <Binding Path="UseCustomIcon"/>
+                                                <Binding Path="IconPath"/>
+                                                <Binding Path="FilePath"/>
+                                            </MultiBinding>
+                                        </Image.Visibility>
                                     </Image>
                                     <materialDesign:PackIcon Kind="Application" Width="18" Height="18"
                                                              Foreground="{DynamicResource WarningBrush}">
-                                        <materialDesign:PackIcon.Style>
-                                            <Style TargetType="materialDesign:PackIcon">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </materialDesign:PackIcon.Style>
+                                        <materialDesign:PackIcon.Visibility>
+                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
+                                                          ConverterParameter="Invert">
+                                                <Binding Path="UseCustomIcon"/>
+                                                <Binding Path="IconPath"/>
+                                                <Binding Path="FilePath"/>
+                                            </MultiBinding>
+                                        </materialDesign:PackIcon.Visibility>
                                     </materialDesign:PackIcon>
                                 </Grid>
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
@@ -164,7 +168,14 @@
 
                     <TextBlock Text="{loc:Loc Launch.CustomPrograms.Icon}" Margin="0,0,0,4"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <DockPanel Margin="0,0,0,10">
+                    <!-- Галочка «Иконка из файла» (issue #91): без неё показывается основная
+                         иконка исполняемого файла (как в проводнике), а выбор/сброс файла
+                         недоступны. -->
+                    <CheckBox Content="{loc:Loc Launch.CustomPrograms.UseCustomIcon}"
+                              IsChecked="{Binding SelectedProgram.UseCustomIcon, Mode=TwoWay}"
+                              ToolTip="{loc:Loc Launch.CustomPrograms.UseCustomIconTooltip}"
+                              Margin="0,0,0,6"/>
+                    <DockPanel Margin="0,0,0,10" IsEnabled="{Binding SelectedProgram.UseCustomIcon}">
                         <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.ClearIcon}"
                                 Padding="10,5" Margin="6,0,0,0" Command="{Binding ClearIconCommand}"/>
                         <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.PickIcon}"
@@ -174,8 +185,15 @@
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="20" Height="20" Margin="0,0,8,0"
-                                   Source="{Binding SelectedProgram.IconPath, Converter={StaticResource FileIcon}}"/>
+                            <Image Grid.Column="0" Width="20" Height="20" Margin="0,0,8,0">
+                                <Image.Source>
+                                    <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                        <Binding Path="SelectedProgram.UseCustomIcon"/>
+                                        <Binding Path="SelectedProgram.IconPath"/>
+                                        <Binding Path="SelectedProgram.FilePath"/>
+                                    </MultiBinding>
+                                </Image.Source>
+                            </Image>
                             <TextBox Grid.Column="1" IsReadOnly="True"
                                      Text="{Binding SelectedProgram.IconPath, Mode=OneWay}"/>
                         </Grid>

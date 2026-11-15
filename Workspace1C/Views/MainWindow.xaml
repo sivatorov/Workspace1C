@@ -64,8 +64,11 @@
         <conv:LevelToThicknessConverter x:Key="LevelToThickness"/>
         <conv:GroupOffsetConverter x:Key="GroupOffset"/>
         <conv:MultiFormatConverter x:Key="MultiFormat"/>
-        <!-- Иконка программы из файла (issue #91): путь → BitmapImage, ошибки не роняют панель. -->
-        <conv:FileIconPathToImageSourceConverter x:Key="FileIcon"/>
+        <!-- Иконка программы группы «Мои программы» (issue #91): галочка «Иконка из
+             файла» → картинка из файла, иначе основная иконка исполняемого файла
+             (Windows). Ошибки чтения не роняют панель — стандартная иконка группы. -->
+        <conv:CustomProgramIconConverter x:Key="CustomProgramIcon"/>
+        <conv:CustomProgramIconVisibilityConverter x:Key="CustomProgramIconVisibility"/>
 
         <!-- Собственные кнопки управления окном вынесены в общие ресурсы приложения
              (App.xaml): WindowControlButton / WindowControlCloseButton. Здесь они
@@ -3278,33 +3281,9 @@
                             </Grid>
                         </Border>
 
-                        <!-- Родной стартер 1С (1CEStart.exe) для сверки списка -->
-                        <Button Command="{Binding LaunchNativeStarterCommand}"
-                                ToolTip="{loc:Loc Main.NativeStarterTooltip}"
-                                HorizontalContentAlignment="Left">
-                            <Button.Style>
-                                <Style TargetType="Button" BasedOn="{StaticResource ActionPanelSecondaryButton}">
-                                    <Setter Property="Padding" Value="8,6"/>
-                                    <Setter Property="Margin" Value="4,0,4,4"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding ShowRightPanelDetails}" Value="False">
-                                            <Setter Property="Padding" Value="6,8"/>
-                                            <Setter Property="Margin" Value="0,0,0,4"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </Button.Style>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                <materialDesign:PackIcon Kind="Application" Width="15" Height="15" Margin="0,0,6,0"
-                                                         Foreground="{DynamicResource WarningBrush}" VerticalAlignment="Center"/>
-                                <!-- Светлая подпись на тёмной кнопке панели действий (issue #26): ButtonTextBrush
-                                     в тёмной теме чёрный и на фоне карточки не читался — здесь и у «По ссылке» текст
-                                     берёт основной цвет темы TextPrimaryBrush (WPF) / TextPrimaryColorBrush (Avalonia). -->
-                                <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           Text="{loc:Loc Main.NativeStarter}" TextTrimming="None"/>
-                            </StackPanel>
-                        </Button>
+                        <!-- Отдельной кнопки родного стартера 1С здесь больше нет (issue #91):
+                             при первом запуске «1С:Стартер» автоматически переносится в группу
+                             «Мои программы», где его можно переименовать, скрыть или удалить. -->
 
                         <!-- Группа «Мои программы» (issue #91): свои программы под кнопками
                              запуска конфигуратора. Скрыта, если программ нет. Режим отображения —
@@ -3352,32 +3331,32 @@
                                             </Button.Style>
                                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
                                                 <Grid Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center">
-                                                    <Image Source="{Binding IconPath, Converter={StaticResource FileIcon}}"
-                                                           Width="16" Height="16" Stretch="Uniform">
-                                                        <Image.Style>
-                                                            <Style TargetType="Image">
-                                                                <Setter Property="Visibility" Value="Visible"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                                        <Setter Property="Visibility" Value="Collapsed"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </Image.Style>
+                                                    <Image Width="16" Height="16" Stretch="Uniform">
+                                                        <Image.Source>
+                                                            <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                                                <Binding Path="UseCustomIcon"/>
+                                                                <Binding Path="IconPath"/>
+                                                                <Binding Path="FilePath"/>
+                                                            </MultiBinding>
+                                                        </Image.Source>
+                                                        <Image.Visibility>
+                                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}">
+                                                                <Binding Path="UseCustomIcon"/>
+                                                                <Binding Path="IconPath"/>
+                                                                <Binding Path="FilePath"/>
+                                                            </MultiBinding>
+                                                        </Image.Visibility>
                                                     </Image>
                                                     <materialDesign:PackIcon Kind="Application" Width="15" Height="15"
                                                                              Foreground="{DynamicResource WarningBrush}">
-                                                        <materialDesign:PackIcon.Style>
-                                                            <Style TargetType="materialDesign:PackIcon"
-                                                                   BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                                                <Style.Triggers>
-                                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                                        <Setter Property="Visibility" Value="Visible"/>
-                                                                    </DataTrigger>
-                                                                </Style.Triggers>
-                                                            </Style>
-                                                        </materialDesign:PackIcon.Style>
+                                                        <materialDesign:PackIcon.Visibility>
+                                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
+                                                                          ConverterParameter="Invert">
+                                                                <Binding Path="UseCustomIcon"/>
+                                                                <Binding Path="IconPath"/>
+                                                                <Binding Path="FilePath"/>
+                                                            </MultiBinding>
+                                                        </materialDesign:PackIcon.Visibility>
                                                     </materialDesign:PackIcon>
                                                 </Grid>
                                                 <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
@@ -3413,32 +3392,32 @@
                                                 </Style>
                                             </Button.Style>
                                             <Grid Width="24" Height="24">
-                                                <Image Source="{Binding IconPath, Converter={StaticResource FileIcon}}"
-                                                       Width="24" Height="24" Stretch="Uniform">
-                                                    <Image.Style>
-                                                        <Style TargetType="Image">
-                                                            <Setter Property="Visibility" Value="Visible"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </Image.Style>
+                                                <Image Width="24" Height="24" Stretch="Uniform">
+                                                    <Image.Source>
+                                                        <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                                            <Binding Path="UseCustomIcon"/>
+                                                            <Binding Path="IconPath"/>
+                                                            <Binding Path="FilePath"/>
+                                                        </MultiBinding>
+                                                    </Image.Source>
+                                                    <Image.Visibility>
+                                                        <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}">
+                                                            <Binding Path="UseCustomIcon"/>
+                                                            <Binding Path="IconPath"/>
+                                                            <Binding Path="FilePath"/>
+                                                        </MultiBinding>
+                                                    </Image.Visibility>
                                                 </Image>
                                                 <materialDesign:PackIcon Kind="Application" Width="22" Height="22"
                                                                          Foreground="{DynamicResource WarningBrush}">
-                                                    <materialDesign:PackIcon.Style>
-                                                        <Style TargetType="materialDesign:PackIcon"
-                                                               BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                                            <Style.Triggers>
-                                                                <DataTrigger Binding="{Binding IconPath}" Value="">
-                                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                                </DataTrigger>
-                                                            </Style.Triggers>
-                                                        </Style>
-                                                    </materialDesign:PackIcon.Style>
+                                                    <materialDesign:PackIcon.Visibility>
+                                                        <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
+                                                                      ConverterParameter="Invert">
+                                                            <Binding Path="UseCustomIcon"/>
+                                                            <Binding Path="IconPath"/>
+                                                            <Binding Path="FilePath"/>
+                                                        </MultiBinding>
+                                                    </materialDesign:PackIcon.Visibility>
                                                 </materialDesign:PackIcon>
                                             </Grid>
                                         </Button>

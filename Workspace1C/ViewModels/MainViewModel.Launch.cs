@@ -607,6 +607,8 @@ public partial class MainViewModel : ViewModelBase
         s.ListMode = ListViewModes.ToSettingString(_listViewMode);
         // Режим отображения группы «Мои программы» (issue #91).
         s.CustomProgramsViewMode = _customProgramsViewMode;
+        // Флаг автопереноса «1С:Стартер» в группу (issue #91): ставится один раз.
+        s.CustomProgramsStarterMigrated = _customProgramsStarterMigrated;
         s.GroupByGroup = _groupByGroup;
         s.ShowEmptyGroups = _showEmptyGroups;
         s.Theme = _savedTheme;

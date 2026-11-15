@@ -11,10 +11,11 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Issue #91 «Группа „Мои программы“ под кнопками запуска конфигуратора» (v1.0.1.65):
-/// пользовательские программы с именем, файлом, аргументами, рабочей папкой и иконкой
-/// из файла; отображение группы «списком» (как родной стартер 1С) либо «иконками»
-/// (в строку с переносом); переключатель хранится в настройках.
+/// Issue #91 «Группа „Мои программы“ под кнопками запуска конфигуратора»
+/// (v1.0.1.65, доработка — v1.0.1.69): пользовательские программы с именем, файлом,
+/// аргументами, рабочей папкой и иконкой; отображение группы «списком» (как родной
+/// стартер 1С) либо «иконками» (в строку с переносом); переключатель хранится
+/// в настройках.
 /// <list type="bullet">
 /// <item>хранилище <see cref="CustomProgramsStore"/> — roundtrip JSON, порядок, битый
 /// файл, пустой список, уникальные Id;</item>
@@ -22,10 +23,17 @@ namespace Workspace1C.Tests;
 /// рабочая папка, отсутствующий файл → понятная ошибка;</item>
 /// <item>режим отображения <see cref="CustomProgramsViewModes"/> и roundtrip
 /// <see cref="AppSettings.CustomProgramsViewMode"/> (старые профили → «Списком»);</item>
+/// <item>флаг «Иконка из файла» <see cref="CustomProgram.UseCustomIcon"/> и обратная
+/// совместимость JSON (старые записи с заполненным <c>IconPath</c> считаются
+/// включёнными), кэш извлечённых иконок исполняемого файла;</item>
+/// <item>автоперенос «1С:Стартер» в группу при первом запуске
+/// (<see cref="CustomProgramsStarterMigration"/>, флаг
+/// <see cref="AppSettings.CustomProgramsStarterMigrated"/>);</item>
 /// <item>редактор <see cref="CustomProgramsViewModel"/> — добавление/удаление/порядок и
 /// сохранение;</item>
 /// <item>source-гварды WPF/Avalonia (группа на панели запуска, WrapPanel в режиме
-/// «иконками», выбор иконки из файла) и локализация ru/en.</item>
+/// «иконками», галочка «Иконка из файла», отсутствие отдельной кнопки стартера)
+/// и локализация ru/en.</item>
 /// </list>
 /// </summary>
 public sealed class Issue91CustomProgramsTests
@@ -340,6 +348,194 @@ public sealed class Issue91CustomProgramsTests
         Assert.True(vm.HasSelection);
     }
 
+    // ===================== Флаг «Иконка из файла» (1.0.1.69) =====================
+
+    [Fact]
+    public void UseCustomIcon_DefaultsFromIconPathForOldRecords()
+    {
+        // Старая запись custom_programs.json: поля UseCustomIcon нет, иконка задана —
+        // считается, что галочка «Иконка из файла» включена (обратная совместимость).
+        var old = JsonSerializer.Deserialize<CustomProgram>(
+            "{\"Name\":\"Старая\",\"FilePath\":\"a.exe\",\"IconPath\":\"C:\\\\icons\\\\a.ico\"}")!;
+        Assert.True(old.UseCustomIcon);
+        Assert.Equal(@"C:\icons\a.ico", CustomProgramIconProvider.ResolveCustomIconPath(old));
+
+        // Старая запись без иконки: иконка берётся из исполняемого файла.
+        var withoutIcon = JsonSerializer.Deserialize<CustomProgram>(
+            "{\"Name\":\"Без иконки\",\"FilePath\":\"b.exe\"}")!;
+        Assert.False(withoutIcon.UseCustomIcon);
+        Assert.Null(CustomProgramIconProvider.ResolveCustomIconPath(withoutIcon));
+    }
+
+    [Fact]
+    public void UseCustomIcon_ExplicitValueWinsOverIconPath()
+    {
+        var program = JsonSerializer.Deserialize<CustomProgram>(
+            "{\"Name\":\"Своя\",\"FilePath\":\"a.exe\",\"IconPath\":\"C:\\\\icons\\\\a.ico\",\"UseCustomIcon\":false}")!;
+        Assert.False(program.UseCustomIcon);
+        Assert.Null(CustomProgramIconProvider.ResolveCustomIconPath(program));
+
+        program.UseCustomIcon = true;
+        Assert.Equal(@"C:\icons\a.ico", CustomProgramIconProvider.ResolveCustomIconPath(program));
+
+        // После явной установки флага очистка пути не включает иконку из файла.
+        program.UseCustomIcon = false;
+        program.IconPath = "";
+        Assert.False(program.UseCustomIcon);
+    }
+
+    [Fact]
+    public void UseCustomIcon_StoreRoundtrip_PreservesFlag()
+    {
+        var store = NewStore();
+        var withIcon = Program("Своя", 0);
+        withIcon.IconPath = @"C:\icons\a.ico";
+        withIcon.UseCustomIcon = true;
+        var withoutIcon = Program("Из файла программы", 1);
+        withoutIcon.IconPath = @"C:\icons\b.ico";
+        withoutIcon.UseCustomIcon = false;
+
+        store.SaveAll(new[] { withIcon, withoutIcon });
+        var loaded = store.LoadAll();
+
+        Assert.True(loaded[0].UseCustomIcon);
+        Assert.False(loaded[1].UseCustomIcon);
+        // Путь сохранён в обоих случаях — снятая галочка его не стирает.
+        Assert.Equal(@"C:\icons\b.ico", loaded[1].IconPath);
+    }
+
+    [Fact]
+    public void UseCustomIcon_ChangeNotifications_ForEditor()
+    {
+        var program = new CustomProgram();
+        var changed = new List<string?>();
+        program.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        program.IconPath = "icon.ico";
+        Assert.Contains(nameof(CustomProgram.UseCustomIcon), changed);
+
+        changed.Clear();
+        program.IconPath = "";
+        Assert.Contains(nameof(CustomProgram.UseCustomIcon), changed);
+
+        changed.Clear();
+        program.UseCustomIcon = true;
+        Assert.Contains(nameof(CustomProgram.UseCustomIcon), changed);
+    }
+
+    [Fact]
+    public void ExecutableIcon_IsCachedAndNeverThrows()
+    {
+        CustomProgramIconProvider.ClearCache();
+        Assert.Null(CustomProgramIconProvider.TryGetExecutableIcon(null));
+        Assert.Null(CustomProgramIconProvider.TryGetExecutableIcon(""));
+        Assert.Null(CustomProgramIconProvider.TryGetExecutableIcon(
+            Path.Combine(_tempDir, "missing.exe")));
+
+        var existing = Path.Combine(_tempDir, "present.exe");
+        File.WriteAllText(existing, "stub");
+        var first = CustomProgramIconProvider.TryGetExecutableIcon(existing);
+        var second = CustomProgramIconProvider.TryGetExecutableIcon(existing);
+
+#if !LINUX
+        // Windows: извлекается связанная иконка файла и кэшируется (один массив).
+        Assert.NotNull(first);
+        Assert.Same(first, second);
+#else
+        // Linux: извлечение не поддерживается — стандартная иконка группы.
+        Assert.Null(first);
+#endif
+    }
+
+    // ===================== Автоперенос «1С:Стартер» (1.0.1.69) =====================
+
+    [Fact]
+    public void StarterMigration_EmptyList_AddsStarterAndPersistsFlag()
+    {
+        var store = NewStore();
+        var starter = Path.Combine(_tempDir, "1CEStart.exe");
+
+        var result = CustomProgramsStarterMigration.TryMigrate(
+            store, alreadyMigrated: false, () => starter, "1С:Стартер");
+
+        Assert.True(result.ProgramAdded);
+        Assert.True(result.ShouldPersistFlag);
+        var loaded = store.LoadAll();
+        Assert.Single(loaded);
+        Assert.Equal("1С:Стартер", loaded[0].Name);
+        Assert.Equal(starter, loaded[0].FilePath);
+        Assert.True(loaded[0].Enabled);
+        Assert.False(loaded[0].UseCustomIcon);
+    }
+
+    [Fact]
+    public void StarterMigration_NonEmptyList_KeepsProgramsAndPersistsFlag()
+    {
+        var store = NewStore();
+        store.SaveAll(new[] { Program("Своя", 0) });
+
+        var result = CustomProgramsStarterMigration.TryMigrate(
+            store, alreadyMigrated: false, () => Path.Combine(_tempDir, "1CEStart.exe"));
+
+        Assert.False(result.ProgramAdded);
+        // Флаг ставим, чтобы стартер не появился позже после удаления всех программ.
+        Assert.True(result.ShouldPersistFlag);
+        var loaded = store.LoadAll();
+        Assert.Single(loaded);
+        Assert.Equal("Своя", loaded[0].Name);
+    }
+
+    [Fact]
+    public void StarterMigration_AlreadyMigrated_DoesNothing()
+    {
+        var store = NewStore();
+        var searchCalled = false;
+
+        var result = CustomProgramsStarterMigration.TryMigrate(
+            store, alreadyMigrated: true,
+            () => { searchCalled = true; return Path.Combine(_tempDir, "1CEStart.exe"); });
+
+        Assert.False(result.ProgramAdded);
+        Assert.False(result.ShouldPersistFlag);
+        Assert.False(searchCalled);
+        Assert.Empty(store.LoadAll());
+    }
+
+    [Fact]
+    public void StarterMigration_StarterNotFound_DoesNotPersistFlag()
+    {
+        var store = NewStore();
+
+        var notFound = CustomProgramsStarterMigration.TryMigrate(
+            store, alreadyMigrated: false, () => null);
+        Assert.False(notFound.ProgramAdded);
+        // Флаг не ставим: при следующем запуске попытка повторится.
+        Assert.False(notFound.ShouldPersistFlag);
+        Assert.Empty(store.LoadAll());
+
+        var throwing = CustomProgramsStarterMigration.TryMigrate(
+            store, alreadyMigrated: false, () => throw new InvalidOperationException("boom"));
+        Assert.False(throwing.ProgramAdded);
+        Assert.False(throwing.ShouldPersistFlag);
+        Assert.Empty(store.LoadAll());
+
+        // Без хранилища миграция не выполняется и не падает.
+        var noStore = CustomProgramsStarterMigration.TryMigrate(
+            null, alreadyMigrated: false, () => "x");
+        Assert.False(noStore.ProgramAdded);
+        Assert.False(noStore.ShouldPersistFlag);
+    }
+
+    [Fact]
+    public void AppSettings_StarterMigrationFlag_RoundtripsAndDefaultsFalse()
+    {
+        Assert.False(new AppSettings().CustomProgramsStarterMigrated);
+        Assert.False(JsonSerializer.Deserialize<AppSettings>("{}")!.CustomProgramsStarterMigrated);
+
+        var json = JsonSerializer.Serialize(new AppSettings { CustomProgramsStarterMigrated = true });
+        Assert.True(JsonSerializer.Deserialize<AppSettings>(json)!.CustomProgramsStarterMigrated);
+    }
+
     // ===================== Source-гварды =====================
 
     [Fact]
@@ -354,14 +550,15 @@ public sealed class Issue91CustomProgramsTests
         Assert.Contains("CustomProgramsIconsView", xaml, StringComparison.Ordinal);
         // Режим «иконками» — в строку с переносом.
         Assert.Contains("<WrapPanel", xaml, StringComparison.Ordinal);
-        // Иконка из файла.
-        Assert.Contains("FileIconPathToImageSourceConverter", xaml, StringComparison.Ordinal);
-        Assert.Contains("IconPath", xaml, StringComparison.Ordinal);
-        // Группа идёт после кнопки родного стартера (под кнопками запуска).
-        Assert.True(
-            xaml.IndexOf("Launch.CustomPrograms.Header", StringComparison.Ordinal) >
-            xaml.IndexOf("Main.NativeStarter", StringComparison.Ordinal),
-            "Группа «Мои программы» должна идти под кнопками запуска (после родного стартера).");
+        // Иконка программы: галочка «Иконка из файла» либо основная иконка exe.
+        Assert.Contains("CustomProgramIconConverter", xaml, StringComparison.Ordinal);
+        Assert.Contains("CustomProgramIconVisibilityConverter", xaml, StringComparison.Ordinal);
+        Assert.Contains("UseCustomIcon", xaml, StringComparison.Ordinal);
+        Assert.Contains("FilePath", xaml, StringComparison.Ordinal);
+        // Отдельной кнопки «1С:Стартер» на панели больше нет (issue #91): стартер
+        // переносится в группу «Мои программы».
+        Assert.DoesNotContain("LaunchNativeStarterCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Main.NativeStarter", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -377,11 +574,11 @@ public sealed class Issue91CustomProgramsTests
         // Режим «иконками» — WrapPanel (строка с переносом).
         Assert.Contains("new WrapPanel()", code, StringComparison.Ordinal);
         Assert.Contains("CreateCustomProgramIcon", code, StringComparison.Ordinal);
-        // Группа добавляется после блока кнопок запуска.
-        Assert.True(
-            code.IndexOf("BuildCustomProgramsBlock()", StringComparison.Ordinal) >
-            code.IndexOf("panel.Children.Add(starterBlock)", StringComparison.Ordinal),
-            "Группа «Мои программы» должна идти под кнопками запуска (после стартера).");
+        // Иконка: своя из файла либо основная иконка исполняемого файла.
+        Assert.Contains("CustomProgramIconSource.Load", code, StringComparison.Ordinal);
+        // Отдельной кнопки «1С:Стартер» на панели больше нет (issue #91).
+        Assert.DoesNotContain("starterBlock", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("OpenNativeStarterCommand", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -395,6 +592,12 @@ public sealed class Issue91CustomProgramsTests
         Assert.Contains("SelectedProgram.FilePath", wpf, StringComparison.Ordinal);
         Assert.Contains("SelectedProgram.Arguments", wpf, StringComparison.Ordinal);
         Assert.Contains("SelectedProgram.WorkingDirectory", wpf, StringComparison.Ordinal);
+        // Галочка «Иконка из файла» (issue #91): выбор/сброс файла доступны только
+        // при включённой галочке.
+        Assert.Contains("Launch.CustomPrograms.UseCustomIcon", wpf, StringComparison.Ordinal);
+        Assert.Contains("SelectedProgram.UseCustomIcon", wpf, StringComparison.Ordinal);
+        Assert.Contains("IsEnabled=\"{Binding SelectedProgram.UseCustomIcon}\"", wpf, StringComparison.Ordinal);
+        Assert.Contains("CustomProgramIconConverter", wpf, StringComparison.Ordinal);
 
         var wpfCode = ReadProjectFile("Workspace1C", "Views", "CustomProgramsWindow.xaml.cs");
         Assert.Contains("OnBrowseIcon_Click", wpfCode, StringComparison.Ordinal);
@@ -405,6 +608,10 @@ public sealed class Issue91CustomProgramsTests
         Assert.Contains("IconPath", avalonia, StringComparison.Ordinal);
         Assert.Contains("IsListViewMode", avalonia, StringComparison.Ordinal);
         Assert.Contains("IsIconsViewMode", avalonia, StringComparison.Ordinal);
+        // Галочка «Иконка из файла» и блокировка выбора файла без неё (issue #91).
+        Assert.Contains("Launch.CustomPrograms.UseCustomIcon", avalonia, StringComparison.Ordinal);
+        Assert.Contains("SelectedProgram.UseCustomIcon", avalonia, StringComparison.Ordinal);
+        Assert.Contains("CustomProgramIconConverter", avalonia, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -417,6 +624,31 @@ public sealed class Issue91CustomProgramsTests
         var avalonia = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
         Assert.Contains("OpenCustomProgramsEditor", avalonia, StringComparison.Ordinal);
         Assert.Contains("ReloadCustomPrograms", avalonia, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MainViewModels_RunStarterMigrationOnStartup()
+    {
+        // Общий хук объявлен в общем файле, реализации — в платформенных.
+        var shared = ReadProjectFile("Workspace1C", "ViewModels", "MainViewModel.CustomPrograms.cs");
+        Assert.Contains("EnsureCustomProgramsStarterMigration", shared, StringComparison.Ordinal);
+
+        var wpfHooks = ReadProjectFile(
+            "Workspace1C", "ViewModels", "MainViewModel.CustomPrograms.Windows.cs");
+        Assert.Contains("CustomProgramsStarterMigration.TryMigrate", wpfHooks, StringComparison.Ordinal);
+        Assert.Contains("NativeStarterLocator.FindStarterPath", wpfHooks, StringComparison.Ordinal);
+
+        var avaloniaHooks = ReadProjectFile(
+            "Workspace1C", "ViewModels", "MainViewModel.CustomPrograms.Avalonia.cs");
+        Assert.Contains("CustomProgramsStarterMigration.TryMigrate", avaloniaHooks, StringComparison.Ordinal);
+        Assert.Contains("NativeStarterLocator.FindStarterPath", avaloniaHooks, StringComparison.Ordinal);
+
+        // Миграция вызывается при старте до загрузки списка программ.
+        var wpfStart = ReadProjectFile("Workspace1C", "ViewModels", "MainViewModel.cs");
+        Assert.Contains("EnsureCustomProgramsStarterMigration();", wpfStart, StringComparison.Ordinal);
+
+        var avaloniaStart = ReadProjectFile("Workspace1C", "ViewModels", "MainViewModel.Avalonia.cs");
+        Assert.Contains("EnsureCustomProgramsStarterMigration();", avaloniaStart, StringComparison.Ordinal);
     }
 
     // ===================== Локализация =====================
@@ -433,6 +665,9 @@ public sealed class Issue91CustomProgramsTests
         "Launch.CustomPrograms.Arguments",
         "Launch.CustomPrograms.WorkingDirectory",
         "Launch.CustomPrograms.Icon",
+        "Launch.CustomPrograms.UseCustomIcon",
+        "Launch.CustomPrograms.UseCustomIconTooltip",
+        "Launch.CustomPrograms.NativeStarter",
         "Launch.CustomPrograms.PickIcon",
         "Launch.CustomPrograms.ClearIcon",
         "Launch.CustomPrograms.Enabled",

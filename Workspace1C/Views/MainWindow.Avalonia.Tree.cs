@@ -1426,13 +1426,9 @@ namespace Workspace1C
             // Остальные действия («Очистить кеш», «Изменить настройки», «Удалить»,
             // «Добавить») перенесены в колонку «Действия» строк базы и верхнюю панель
             // команд. Здесь остаются вторичные действия списком.
-            // Под «Действиями» у автора ровно три кнопки: Предприятие, Конфигуратор
-            // и штатный стартер. «Открыть каталог» и «Ярлык на рабочем столе»
-            // у него живут в контекстном меню строки, там они есть и у нас.
-            var starterBlock = BuildActionList(
-                CompactActionButton("IconApplication", LocalizationManager.T("Main.NativeStarter"), "OpenNativeStarterCommand", LocalizationManager.T("Main.NativeStarterTooltipLinux"), "@WarningBrush", colorTextToo: false,
-                    iconSize: UiMetrics.Scaled(15), widePadding: new Thickness(8, 6), narrowPadding: new Thickness(6, 8))
-            );
+            // Отдельной кнопки родного стартера 1С больше нет (issue #91): при первом
+            // запуске «1С:Стартер» автоматически переносится в группу «Мои программы»,
+            // где его можно переименовать, скрыть или удалить.
 
             // Переход по ссылке идёт после карточки сессии, как в разметке.
             var byLinkBlock = BuildActionList(
@@ -1574,7 +1570,6 @@ namespace Workspace1C
 
             panel.Children.Add(launchEnterpriseBlock);
             panel.Children.Add(launchConfiguratorBlock);
-            panel.Children.Add(starterBlock);
             // Группа «Мои программы» (issue #91): свои программы под кнопками запуска
             // конфигуратора; скрыта, если программ нет.
             panel.Children.Add(BuildCustomProgramsBlock());
@@ -1853,26 +1848,27 @@ namespace Workspace1C
             return button;
         }
 
-        /// <summary>Иконка программы: файл (<c>.ico</c>/<c>.png</c>) либо стандартная.</summary>
+        /// <summary>
+        /// Иконка программы (issue #91): при включённой галочке «Иконка из файла» —
+        /// картинка из файла, иначе основная иконка исполняемого файла (на Linux
+        /// не извлекается — стандартная иконка группы). Картинки кэшируются, поэтому
+        /// файл не читается на каждую перерисовку панели.
+        /// </summary>
         private static Control CreateCustomProgramIcon(CustomProgram program, double size)
         {
-            if (!string.IsNullOrWhiteSpace(program.IconPath))
+            var source = Workspace1C.Converters.CustomProgramIconSource.Load(program);
+            if (source is not null)
             {
-                try
+                return new Image
                 {
-                    return new Image
-                    {
-                        Source = new Avalonia.Media.Imaging.Bitmap(program.IconPath!),
-                        Width = size,
-                        Height = size,
-                        Stretch = Stretch.Uniform
-                    };
-                }
-                catch
-                {
-                    // Нечитаемый/отсутствующий файл иконки не должен ронять панель.
-                }
+                    Source = source,
+                    Width = size,
+                    Height = size,
+                    Stretch = Stretch.Uniform
+                };
             }
+            // Нет иконки (галочка снята и извлечь не удалось, файл нечитаем) —
+            // стандартная иконка группы; панель не падает.
             return IconHelper.MakeIcon("IconApplication", size, "WarningBrush");
         }
 

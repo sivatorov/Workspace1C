@@ -5,10 +5,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
-using Avalonia.Data.Converters;
 using Avalonia.Layout;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -31,13 +29,14 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     private readonly IDialogService _dialogs = AppServices.GetRequiredService<IDialogService>();
     private readonly ListBox _list = new();
 
-    /// <summary>Путь к иконке → Bitmap (ошибки не роняют окно: возвращается null).</summary>
-    private static readonly FuncValueConverter<string?, Bitmap?> IconConverter =
-        new(path => LoadIcon(path));
+    /// <summary>
+    /// Иконка программы (issue #91): галочка «Иконка из файла» → картинка из файла,
+    /// иначе основная иконка исполняемого файла (на Linux — стандартная иконка группы).
+    /// </summary>
+    private static readonly Converters.CustomProgramIconConverter ProgramIconConverter = new();
 
-    /// <summary>Пустая строка → true (показ стандартной иконки вместо файла).</summary>
-    private static readonly FuncValueConverter<string?, bool> IsEmptyConverter =
-        new(value => string.IsNullOrWhiteSpace(value));
+    /// <summary>Видимость иконки: есть картинка либо её нет (параметр <c>Invert</c>).</summary>
+    private static readonly Converters.CustomProgramIconVisibilityConverter ProgramIconVisibility = new();
 
     /// <param name="viewMode">Текущий режим отображения группы из настроек.</param>
     public CustomProgramsWindow(string? viewMode)
@@ -177,6 +176,19 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         form.Children.Add(BrowseRow("SelectedProgram.WorkingDirectory", "Common.Browse", BrowseWorkingDirectory));
 
         form.Children.Add(FieldLabel("Launch.CustomPrograms.Icon"));
+
+        // Галочка «Иконка из файла» (issue #91): без неё показывается основная иконка
+        // исполняемого файла (как в проводнике), а выбор/сброс файла недоступны.
+        var useCustomIcon = new CheckBox
+        {
+            Content = T("Launch.CustomPrograms.UseCustomIcon"),
+            Margin = new Thickness(0, 0, 0, 6)
+        };
+        useCustomIcon.Bind(ToggleButton.IsCheckedProperty,
+            new Binding("SelectedProgram.UseCustomIcon") { Mode = BindingMode.TwoWay });
+        ToolTip.SetTip(useCustomIcon, T("Launch.CustomPrograms.UseCustomIconTooltip"));
+        form.Children.Add(useCustomIcon);
+
         form.Children.Add(BuildIconRow());
 
         var enabled = new CheckBox { Content = T("Launch.CustomPrograms.Enabled"), Margin = new Thickness(0, 6, 0, 0) };
@@ -208,17 +220,39 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     private Control BuildListItem(CustomProgram program)
     {
         var iconImage = new Image { Width = 18, Height = 18, Margin = new Thickness(0, 0, 8, 0) };
-        iconImage.Bind(Image.SourceProperty,
-            new Binding(nameof(CustomProgram.IconPath)) { Converter = IconConverter });
-        iconImage.Bind(Control.IsVisibleProperty,
-            new Binding(nameof(CustomProgram.IconPath))
+        iconImage.Bind(Image.SourceProperty, new MultiBinding
+        {
+            Converter = ProgramIconConverter,
+            Bindings =
             {
-                Converter = new FuncValueConverter<string?, bool>(v => !string.IsNullOrWhiteSpace(v))
-            });
+                new Binding(nameof(CustomProgram.UseCustomIcon)),
+                new Binding(nameof(CustomProgram.IconPath)),
+                new Binding(nameof(CustomProgram.FilePath))
+            }
+        });
+        iconImage.Bind(Control.IsVisibleProperty, new MultiBinding
+        {
+            Converter = ProgramIconVisibility,
+            Bindings =
+            {
+                new Binding(nameof(CustomProgram.UseCustomIcon)),
+                new Binding(nameof(CustomProgram.IconPath)),
+                new Binding(nameof(CustomProgram.FilePath))
+            }
+        });
 
         var fallback = IconHelper.MakeIcon("IconApplication", 18, "WarningBrush");
-        fallback.Bind(Control.IsVisibleProperty,
-            new Binding(nameof(CustomProgram.IconPath)) { Converter = IsEmptyConverter });
+        fallback.Bind(Control.IsVisibleProperty, new MultiBinding
+        {
+            Converter = ProgramIconVisibility,
+            ConverterParameter = "Invert",
+            Bindings =
+            {
+                new Binding(nameof(CustomProgram.UseCustomIcon)),
+                new Binding(nameof(CustomProgram.IconPath)),
+                new Binding(nameof(CustomProgram.FilePath))
+            }
+        });
 
         var name = new TextBlock
         {
@@ -280,8 +314,16 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     private Control BuildIconRow()
     {
         var preview = new Image { Width = 20, Height = 20, Margin = new Thickness(0, 0, 8, 0) };
-        preview.Bind(Image.SourceProperty,
-            new Binding("SelectedProgram.IconPath") { Converter = IconConverter });
+        preview.Bind(Image.SourceProperty, new MultiBinding
+        {
+            Converter = ProgramIconConverter,
+            Bindings =
+            {
+                new Binding("SelectedProgram.UseCustomIcon"),
+                new Binding("SelectedProgram.IconPath"),
+                new Binding("SelectedProgram.FilePath")
+            }
+        });
 
         var pathBox = new TextBox { IsReadOnly = true };
         pathBox.Bind(TextBox.TextProperty, new Binding("SelectedProgram.IconPath"));
@@ -293,7 +335,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         clear.Styled(ControlThemes.ModernButton);
         clear.Click += (_, _) => _vm.ClearSelectedIcon();
 
+        // Выбор и сброс файла доступны только при включённой галочке «Иконка из файла».
         var dock = new DockPanel();
+        dock.Bind(Control.IsEnabledProperty, new Binding("SelectedProgram.UseCustomIcon"));
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -380,20 +424,6 @@ public sealed class CustomProgramsWindow : ModalWindowBase
                 return null;
             var dir = System.IO.Path.GetDirectoryName(path);
             return !string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir) ? dir : null;
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
-    private static Bitmap? LoadIcon(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return null;
-        try
-        {
-            return System.IO.File.Exists(path) ? new Bitmap(path!) : null;
         }
         catch
         {

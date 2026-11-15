@@ -19,6 +19,8 @@ public class CustomProgram : INotifyPropertyChanged
     private string _arguments = "";
     private string _workingDirectory = "";
     private string _iconPath = "";
+    private bool _useCustomIcon;
+    private bool _useCustomIconExplicit;
     private bool _enabled = true;
     private int _order;
 
@@ -60,11 +62,44 @@ public class CustomProgram : INotifyPropertyChanged
         set => SetProperty(ref _workingDirectory, value);
     }
 
-    /// <summary>Путь к иконке из файла (<c>.ico</c>/<c>.png</c>); пусто — стандартная иконка.</summary>
+    /// <summary>
+    /// Путь к иконке из файла (<c>.ico</c>/<c>.png</c>). Используется только при
+    /// включённой галочке <see cref="UseCustomIcon"/>; иначе показывается основная
+    /// иконка исполняемого файла (issue #91).
+    /// </summary>
     public string IconPath
     {
         get => _iconPath;
-        set => SetProperty(ref _iconPath, value);
+        set
+        {
+            var wasUsingCustomIcon = UseCustomIcon;
+            if (!SetProperty(ref _iconPath, value))
+                return;
+            // Пока флаг не задан явно, UseCustomIcon выводится из пути: при
+            // появлении/очистке пути меняется и отображаемая иконка.
+            if (wasUsingCustomIcon != UseCustomIcon)
+                OnPropertyChanged(nameof(UseCustomIcon));
+        }
+    }
+
+    /// <summary>
+    /// Использовать иконку из файла <see cref="IconPath"/> (галочка «Иконка из файла»,
+    /// issue #91). Если галочка снята — показывается основная иконка исполняемого файла
+    /// (как в проводнике). Обратная совместимость: в старых записях
+    /// <c>custom_programs.json</c> поля не было, и заполненный <see cref="IconPath"/>
+    /// считался включённым — пока значение не задано явно, флаг выводится из пути.
+    /// </summary>
+    public bool UseCustomIcon
+    {
+        get => _useCustomIconExplicit ? _useCustomIcon : !string.IsNullOrWhiteSpace(_iconPath);
+        set
+        {
+            var wasUsingCustomIcon = UseCustomIcon;
+            _useCustomIconExplicit = true;
+            _useCustomIcon = value;
+            if (wasUsingCustomIcon != value)
+                OnPropertyChanged();
+        }
     }
 
     /// <summary>Показывать программу на панели запуска.</summary>

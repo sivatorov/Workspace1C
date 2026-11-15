@@ -11,6 +11,71 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.69] — 2026-11-15
+
+### Изменено
+
+- **Группа «Мои программы»: иконка из файла — по галочке, иначе основная иконка
+  исполняемого файла (issue #91, комментарий 7OH 2026-11-15 10:13).** 7OH:
+  «Иконка из файла по галочке. Если галка не стоит — использовать и отображать
+  основную иконку из запускаемого файла (как в проводнике)».
+  В модель [`CustomProgram`](Workspace1C/Models/CustomProgram.cs:64) добавлено
+  свойство `UseCustomIcon`. Обратная совместимость: в старых записях
+  `custom_programs.json` поля не было, и заполненный `IconPath` по-прежнему
+  считается включённой галочкой — пока флаг не задан явно, значение выводится из
+  пути, а снятие галочки его не стирает. В редакторах
+  ([`CustomProgramsWindow.xaml`](Workspace1C/Views/CustomProgramsWindow.xaml:165),
+  [`CustomProgramsWindow.Avalonia.cs`](Workspace1C/Views/CustomProgramsWindow.Avalonia.cs:179))
+  появилась галочка «Иконка из файла» с подсказкой; выбор и сброс файла доступны
+  только при включённой галочке. Иконка применяется в обоих представлениях группы
+  («Списком» и «Иконками») на панели запуска WPF
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3333)) и Avalonia
+  ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:1856)),
+  а также в списке редактора. Без галочки показывается основная иконка
+  исполняемого файла: на Windows — связанная иконка через
+  `Icon.ExtractAssociatedIcon` ([`CustomProgramIconProvider.Windows.cs`](Workspace1C/Services/CustomProgramIconProvider.Windows.cs:1)),
+  на Linux — разумный fallback (иконка из файла при включённой галочке, иначе
+  стандартная иконка группы; [`CustomProgramIconProvider.Linux.cs`](Workspace1C/Services/CustomProgramIconProvider.Linux.cs:1)),
+  без исключений наружу. Извлечённые иконки кэшируются по пути к файлу
+  ([`CustomProgramIconProvider`](Workspace1C/Services/CustomProgramIconProvider.cs:1)),
+  декодированные картинки — в конвертерах WPF/Avalonia, поэтому файл не читается
+  на каждую перерисовку; при отсутствии/недоступности файла — стандартная иконка.
+
+- **«1С:Стартер» переносится в группу «Мои программы», отдельная кнопка убрана
+  (issue #91, комментарий 7OH 2026-11-15 10:13).** 7OH: «Тогда уже и "1С:Стартер"
+  переносить автоматом в это меню при первом запуске, если список пустой.
+  А текущую кнопку, которая запускает "1С:Стартер", убрать совсем».
+  При первом запуске с пустым `custom_programs.json` и снятым флагом
+  `AppSettings.CustomProgramsStarterMigrated` в группу добавляется запись
+  «1С:Стартер» с путём к родному стартеру 1С, который уже умеет находить
+  [`InfobaseMaintenanceService.OpenNativeStarter`](Workspace1C/Services/InfobaseMaintenanceService.Shortcuts.cs:58)
+  / [`InfobaseMaintenanceService.Linux.Shortcuts.cs`](Workspace1C/Services/InfobaseMaintenanceService.Linux.Shortcuts.cs:85)
+  (поиск вынесен в [`NativeStarterLocator`](Workspace1C/Services/NativeStarterLocator.cs:1),
+  логика миграции — в чистой функции
+  [`CustomProgramsStarterMigration`](Workspace1C/Services/CustomProgramsStarterMigration.cs:1)).
+  Выбран предсказуемый вариант для ненайденного стартера: запись не создаётся и
+  флаг **не** помечается выполненным, поэтому попытка повторится при следующем
+  запуске (а не появится запись с пустым путём). Если список уже был непустым,
+  программы пользователя не трогаются, но флаг ставится — иначе стартер появился
+  бы позже, после удаления всех программ. Отдельная кнопка «1С:Стартер» удалена с
+  панели запуска в WPF ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3281))
+  и Avalonia ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:1432));
+  команды (`LaunchNativeStarterCommand` / `OpenNativeStarterCommand`) сохранены для
+  палитры команд и внешних сценариев. Локализация ru/en: `Launch.CustomPrograms.UseCustomIcon`,
+  `Launch.CustomPrograms.UseCustomIconTooltip`, `Launch.CustomPrograms.NativeStarter`,
+  обновлён `Launch.CustomPrograms.Hint`.
+
+### Тесты
+
+- Расширен [`Issue91CustomProgramsTests`](Workspace1C.Tests/Issue91CustomProgramsTests.cs:31):
+  автоперенос «1С:Стартер» (пустой список, непустой список, флаг уже стоит, стартер
+  не найден, исключение поиска, отсутствие хранилища), флаг `UseCustomIcon` и
+  обратная совместимость JSON (старые записи, явное значение, roundtrip хранилища,
+  уведомления для редактора), кэш и безопасность извлечения иконки исполняемого
+  файла, source-гварды WPF/Avalonia (галочка в редакторе, блокировка выбора файла
+  без галочки, отсутствие отдельной кнопки стартера, использование иконки exe,
+  вызов миграции при старте) и совпадение ключей локализации ru/en.
+
 ## [1.0.1.68] — 2026-11-15
 
 ### Исправлено

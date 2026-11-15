@@ -459,6 +459,8 @@ public partial class MainViewModel : ViewModelBase
         // Режим отображения группы «Мои программы» (issue #91): старые профили без
         // поля получают «Списком» (как родной стартер 1С).
         _customProgramsViewMode = Models.CustomProgramsViewModes.Normalize(settings.CustomProgramsViewMode);
+        // Автоперенос «1С:Стартер» в группу выполняется один раз (issue #91).
+        _customProgramsStarterMigrated = settings.CustomProgramsStarterMigrated;
         _showFavoritesOnly = settings.ShowFavoritesOnly;
         _groupByGroup = settings.GroupByGroup;
         // Единый режим списка (issue #52): восстанавливаем выбранную вкладку, включая
@@ -970,8 +972,10 @@ public partial class MainViewModel : ViewModelBase
         // Кэш пользовательских действий контекстного меню (функция 7): загружается при
         // старте, перечитывается после окна настроек (ReloadCustomActions).
         ReloadCustomActions();
-        // Группа «Мои программы» (issue #91): список загружается при старте,
-        // перечитывается после редактора группы.
+        // Группа «Мои программы» (issue #91): «1С:Стартер» переносится в группу при
+        // первом запуске (пустой список), отдельной кнопки стартера на панели нет;
+        // затем список загружается и перечитывается после редактора группы.
+        EnsureCustomProgramsStarterMigration();
         ReloadCustomPrograms();
     }
 

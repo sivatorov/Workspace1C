@@ -96,6 +96,15 @@ public partial class MainViewModel
     public ICommand ShowCustomProgramsSettingsCommand =>
         _showCustomProgramsSettingsCommand ??= new RelayCommand(_ => ExecuteShowCustomProgramsSettings());
 
+    /// <summary>
+    /// Автоперенос «1С:Стартер» в группу «Мои программы» при первом запуске
+    /// (issue #91): при пустом списке добавляется программа с путём к родному
+    /// стартеру 1С, отдельной кнопки стартера на панели запуска больше нет.
+    /// Флаг <see cref="AppSettings.CustomProgramsStarterMigrated"/> хранится в
+    /// настройках, поэтому реализация платформенная (разное хранение настроек).
+    /// </summary>
+    private partial void EnsureCustomProgramsStarterMigration();
+
     private void LaunchCustomProgram(CustomProgram? program)
     {
         if (program is null)
