@@ -139,6 +139,40 @@ public static class GridLinesPlanner
     }
 
     /// <summary>
+    /// Оставляет низы только тех реализованных строк, которые реально видны
+    /// (issue #130, замечание 7OH): строки внутри свёрнутой группы остаются в
+    /// визуальном дереве с координатами развёрнутого состояния, но не видны.
+    /// Без фильтра после сворачивания группы низ такой строки продолжал удлинять
+    /// линии, и они «уходили в самый низ». Недостающие значения видимости
+    /// считаются видимыми (безопасный fallback); <c>NaN</c> и
+    /// отрицательные низы (строки выше вьюпорта) отбрасываются.
+    /// </summary>
+    /// <param name="rowBottoms">Низы реализованных строк в координатах оверлея.</param>
+    /// <param name="rowVisibility">
+    /// Видимость строк в том же порядке; <c>null</c> — считать все строки видимыми.
+    /// </param>
+    public static IReadOnlyList<double> FilterVisibleRowBottoms(
+        IReadOnlyList<double>? rowBottoms,
+        IReadOnlyList<bool>? rowVisibility)
+    {
+        var result = new List<double>();
+        if (rowBottoms is null)
+            return result;
+
+        for (var i = 0; i < rowBottoms.Count; i++)
+        {
+            if (rowVisibility is not null && i < rowVisibility.Count && !rowVisibility[i])
+                continue;
+            var bottom = rowBottoms[i];
+            if (double.IsNaN(bottom) || bottom < 0)
+                continue;
+            result.Add(bottom);
+        }
+
+        return result;
+    }
+
+    /// <summary>
     /// Низ последней реализованной строки списка (issue #130, замечание 7OH): максимум
     /// из низа заголовка и низов строк. Строки выше вьюпорта дают отрицательные
     /// координаты и на максимум не влияют. Отрицательные и <see cref="double.NaN"/>
@@ -195,6 +229,31 @@ public static class GridLinesPlanner
         var scale = dpiScale > 0 ? dpiScale : 1.0;
         return snapped >= 1.0 / scale ? snapped : 0;
     }
+
+    /// <summary>
+    /// Перегрузка <c>ResolveVerticalExtent</c> с учётом видимости строк
+    /// (issue #130, замечание 7OH). Низы строк внутри
+    /// свёрнутой группы не участвуют в расчёте: после сворачивания группы они
+    /// остаются в визуальном дереве с прежними координатами, и линии сохраняли
+    /// высоту развёрнутого дерева — «уходили в самый низ». <paramref name="rowVisibility"/>
+    /// = <c>null</c> — все строки видимы (поведение прежней перегрузки).
+    /// </summary>
+    /// <param name="headerBottom">Низ заголовка в координатах оверлея; <c>null</c> — нет данных.</param>
+    /// <param name="rowBottoms">Низы реализованных строк баз и групп в координатах оверлея.</param>
+    /// <param name="rowVisibility">Видимость строк в том же порядке; <c>null</c> — все видимы.</param>
+    /// <param name="availableHeight">Доступная высота оверлея (вьюпорт списка).</param>
+    /// <param name="dpiScale">Масштаб DPI (1.0, 1.25, 1.5, 2.0…).</param>
+    public static double ResolveVerticalExtent(
+        double? headerBottom,
+        IReadOnlyList<double>? rowBottoms,
+        IReadOnlyList<bool>? rowVisibility,
+        double availableHeight,
+        double dpiScale)
+        => ResolveVerticalExtent(
+            headerBottom,
+            FilterVisibleRowBottoms(rowBottoms, rowVisibility),
+            availableHeight,
+            dpiScale);
 
     /// <summary>
     /// Строит план линий сетки.

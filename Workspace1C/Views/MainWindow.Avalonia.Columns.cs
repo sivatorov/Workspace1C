@@ -492,6 +492,60 @@ namespace Workspace1C
             RefreshGridLinesOverlay();
         }
 
+        // Признак того, что перерисовка линий сетки уже стоит в очереди UI-потока
+        // (issue #130, 7OH). Разворот/сворачивание группы и пересборка дерева приходят
+        // пачками событий — склеиваем их в один пересчёт после раскладки.
+        private bool _gridLinesRefreshQueued;
+
+        /// <summary>
+        /// Обработчик routed-событий <c>TreeViewItem.Expanded/Collapsed</c> (issue #130).
+        /// Хранится полем, чтобы при закрытии окна снять ту же подписку
+        /// (<c>RemoveHandler</c>).
+        /// </summary>
+        private EventHandler<Avalonia.Interactivity.RoutedEventArgs>? _gridLinesGroupExpansionHandler;
+
+        /// <summary>
+        /// Разворот/сворачивание группы (issue #130, 7OH): высоту вертикальных линий
+        /// пересчитываем после раскладки — обработчик события видит ещё старые координаты.
+        /// </summary>
+        private void OnMainTreeGroupExpansionChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+            => QueueGridLinesRefresh();
+
+        /// <summary>
+        /// Снимает подписки на Expanded/Collapsed при закрытии окна (issue #130):
+        /// обработчики ссылаются на окно, и без явной отписки они удерживали бы его
+        /// вместе с деревом после закрытия.
+        /// </summary>
+        private void DetachGridLinesTreeHandlers()
+        {
+            if (_tree is null || _gridLinesGroupExpansionHandler is null)
+                return;
+            _tree.RemoveHandler(TreeViewItem.ExpandedEvent, _gridLinesGroupExpansionHandler);
+            _tree.RemoveHandler(TreeViewItem.CollapsedEvent, _gridLinesGroupExpansionHandler);
+            _gridLinesGroupExpansionHandler = null;
+        }
+
+        /// <summary>
+        /// Ставит перерисовку линий сетки в очередь UI-потока на
+        /// <see cref="DispatcherPriority.Loaded"/> (issue #130, замечание 7OH).
+        /// После разворота/сворачивания группы и пересборки дерева набор строк и их
+        /// низы меняются только в проходе раскладки: синхронный пересчёт в обработчике
+        /// Expanded/Collapsed видит ещё старые координаты, и линии оставались высотой
+        /// развёрнутого дерева — «уходили в самый низ». Повторные вызовы до выполнения
+        /// объединяются в один пересчёт.
+        /// </summary>
+        private void QueueGridLinesRefresh()
+        {
+            if (_gridLinesRefreshQueued)
+                return;
+            _gridLinesRefreshQueued = true;
+            Dispatcher.UIThread.Post(() =>
+            {
+                _gridLinesRefreshQueued = false;
+                RefreshGridLines();
+            }, DispatcherPriority.Loaded);
+        }
+
         /// <summary>
         /// Единый слой вертикальных линий сетки (issue #130). Позиции считает чистый
         /// <see cref="GridLinesPlanner.ResolveVerticalOffsets"/> по фактическим ширинам
@@ -586,10 +640,15 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Низы уже реализованных строк списка (базы и группы) в координатах оверлея
-        /// (issue #130). У TreeView в Avalonia нет виртуализации — реализованы все
+        /// Низы уже реализованных и ВИДИМЫХ строк списка (базы и группы) в координатах
+        /// оверлея (issue #130). У TreeView в Avalonia нет виртуализации — реализованы все
         /// строки, но максимум низа всё равно даёт последнюю строку, а строки выше
         /// вьюпорта дают отрицательные координаты и на результат не влияют.
+        /// Строки внутри свёрнутой группы остаются в визуальном дереве с координатами
+        /// развёрнутого состояния, но <see cref="Visual.IsEffectivelyVisible"/> у них false —
+        /// их низы отбрасываются чистым <see cref="GridLinesPlanner.FilterVisibleRowBottoms"/>,
+        /// иначе после сворачивания группы линии сохраняли высоту развёрнутого дерева
+        /// и «уходили в самый низ» (issue #130, 7OH).
         /// </summary>
         private IReadOnlyList<double>? GetGridLinesRowBottoms()
         {
@@ -597,23 +656,28 @@ namespace Workspace1C
                 return null;
 
             var bottoms = new List<double>();
+            var visible = new List<bool>();
             foreach (var card in _tree.GetVisualDescendants().OfType<InfobaseRowCard>())
             {
                 if (card.Child is not Grid grid || grid.Bounds.Height <= 0)
                     continue;
                 var point = grid.TranslatePoint(new Point(0, grid.Bounds.Height), _gridLinesOverlay);
-                if (point is not null)
-                    bottoms.Add(point.Value.Y);
+                if (point is null)
+                    continue;
+                bottoms.Add(point.Value.Y);
+                visible.Add(grid.IsEffectivelyVisible);
             }
             foreach (var grid in _tree.GetVisualDescendants().OfType<Grid>())
             {
                 if (grid.Name != GroupRowGridName || grid.Bounds.Height <= 0)
                     continue;
                 var point = grid.TranslatePoint(new Point(0, grid.Bounds.Height), _gridLinesOverlay);
-                if (point is not null)
-                    bottoms.Add(point.Value.Y);
+                if (point is null)
+                    continue;
+                bottoms.Add(point.Value.Y);
+                visible.Add(grid.IsEffectivelyVisible);
             }
-            return bottoms;
+            return GridLinesPlanner.FilterVisibleRowBottoms(bottoms, visible);
         }
 
         /// <summary>

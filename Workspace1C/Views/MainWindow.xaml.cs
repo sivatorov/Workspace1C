@@ -98,6 +98,14 @@ namespace Workspace1C
         /// </summary>
         private bool _isActive;
 
+        /// <summary>
+        /// Обработчик routed-событий <c>TreeViewItem.Expanded/Collapsed</c> (issue #119,
+        /// issue #130). Хранится полем, чтобы снять ту же подписку при закрытии окна
+        /// (<see cref="FrameworkElement.RemoveHandler"/> сравнивает делегаты по цели
+        /// и методу, но явное поле исключает расхождение).
+        /// </summary>
+        private RoutedEventHandler? _groupExpansionHandler;
+
         /// <summary>Информационная версия сборки для заголовка окна (например «0.3.3.41»).</summary>
         private readonly string? _infoVersion;
 
@@ -383,6 +391,10 @@ namespace Workspace1C
             _viewModel.TreeModalClosed += RestoreTreeScrollAfterCancel;
             _viewModel.TreeRebuilt += () =>
             {
+                // Issue #130 (7OH): пересборка дерева (фильтр/поиск/смена группировки)
+                // меняет набор строк и их низы — высоту вертикальных линий пересчитываем
+                // после раскладки, иначе они остаются высотой прежнего дерева.
+                QueueGridLinesRefresh();
                 // Целевая навигация «переход к строке» (issue #31): НЕ планируем промежуточное
                 // восстановление выделения, пока идёт серия пересборок команды (Ctrl+T: смена
                 // вкладки + сброс поиска/тегов + повторная пересборка; Ctrl+цифра: пересборка).
@@ -641,12 +653,23 @@ namespace Workspace1C
                 // компенсатор сдвига заголовка при каждом изменении состояния узла.
                 try
                 {
-                    MainTree.AddHandler(
-                        TreeViewItem.ExpandedEvent,
-                        new RoutedEventHandler(OnMainTree_GroupExpansionChanged));
-                    MainTree.AddHandler(
-                        TreeViewItem.CollapsedEvent,
-                        new RoutedEventHandler(OnMainTree_GroupExpansionChanged));
+                    // Issue #130 (7OH): подписка на Expanded/Collapsed нужна не только
+                    // для выравнивания заголовка (issue #119), но и для пересчёта высоты
+                    // вертикальных линий сетки после разворота/сворачивания группы.
+                    _groupExpansionHandler ??= OnMainTree_GroupExpansionChanged;
+                    MainTree.AddHandler(TreeViewItem.ExpandedEvent, _groupExpansionHandler);
+                    MainTree.AddHandler(TreeViewItem.CollapsedEvent, _groupExpansionHandler);
+                    // Обязательная отписка: дерево живёт дольше, чем обработчик окна
+                    // (закрытие/повторное открытие главного окна), без неё подписки
+                    // накапливались бы вместе с удержанием окна.
+                    Closed += (_, _) =>
+                    {
+                        if (_groupExpansionHandler is null || MainTree is null)
+                            return;
+                        MainTree.RemoveHandler(TreeViewItem.ExpandedEvent, _groupExpansionHandler);
+                        MainTree.RemoveHandler(TreeViewItem.CollapsedEvent, _groupExpansionHandler);
+                        _groupExpansionHandler = null;
+                    };
                 }
                 catch
                 {

@@ -519,6 +519,32 @@ namespace Workspace1C
             RefreshGridLinesOverlay();
         }
 
+        // Признак того, что перерисовка линий сетки уже стоит в очереди диспетчера
+        // (issue #130, 7OH). Разворот/сворачивание группы и пересборка дерева приходят
+        // пачками событий — склеиваем их в один пересчёт после раскладки.
+        private bool _gridLinesRefreshQueued;
+
+        /// <summary>
+        /// Ставит перерисовку линий сетки в очередь диспетчера на
+        /// <see cref="System.Windows.Threading.DispatcherPriority.Loaded"/> (issue #130,
+        /// замечание 7OH). После разворота/сворачивания группы и пересборки дерева
+        /// набор реализованных строк и их низы меняются только в проходе раскладки:
+        /// синхронный пересчёт в обработчике Expanded/Collapsed видит ещё старые
+        /// координаты, и линии оставались высотой развёрнутого дерева — «уходили в
+        /// самый низ». Повторные вызовы до выполнения объединяются в один пересчёт.
+        /// </summary>
+        private void QueueGridLinesRefresh()
+        {
+            if (_gridLinesRefreshQueued)
+                return;
+            _gridLinesRefreshQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _gridLinesRefreshQueued = false;
+                RefreshGridLines();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
         /// <summary>
         /// Единый слой вертикальных линий сетки (issue #130). Позиции считает чистый
         /// <see cref="Services.GridLinesPlanner.ResolveVerticalOffsets"/> по фактическим
@@ -622,10 +648,15 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Низы уже реализованных строк списка (базы и группы) в координатах оверлея
-        /// (issue #130). Виртуализация создаёт только видимые контейнеры, поэтому
+        /// Низы уже реализованных и ВИДИМЫХ строк списка (базы и группы) в координатах
+        /// оверлея (issue #130). Виртуализация создаёт только видимые контейнеры, поэтому
         /// максимум низа и есть низ последней реализованной строки; строки выше
         /// вьюпорта дают отрицательные координаты и на результат не влияют.
+        /// Строки внутри свёрнутой группы остаются в визуальном дереве с координатами
+        /// развёрнутого состояния, но <see cref="UIElement.IsVisible"/> у них false —
+        /// их низы отбрасываются чистым <see cref="Services.GridLinesPlanner.FilterVisibleRowBottoms"/>,
+        /// иначе после сворачивания группы линии сохраняли высоту развёрнутого дерева
+        /// и «уходили в самый низ» (issue #130, 7OH).
         /// </summary>
         private IReadOnlyList<double>? GetGridLinesRowBottoms()
         {
@@ -633,21 +664,28 @@ namespace Workspace1C
                 return null;
 
             var bottoms = new List<double>();
+            var visible = new List<bool>();
             try
             {
                 foreach (var grid in FindRowGrids(MainTree, RowGridMarker))
+                {
                     bottoms.Add(grid.TransformToVisual(GridLinesOverlay)
                         .Transform(new Point(0, grid.ActualHeight)).Y);
+                    visible.Add(grid.IsVisible);
+                }
                 foreach (var grid in FindRowGrids(MainTree, GroupGridMarker))
+                {
                     bottoms.Add(grid.TransformToVisual(GridLinesOverlay)
                         .Transform(new Point(0, grid.ActualHeight)).Y);
+                    visible.Add(grid.IsVisible);
+                }
             }
             catch (InvalidOperationException)
             {
                 // Часть строк ещё не подключена к визуальному дереву: используем уже
                 // собранные координаты, остальные учтёт следующий пересчёт.
             }
-            return bottoms;
+            return Services.GridLinesPlanner.FilterVisibleRowBottoms(bottoms, visible);
         }
 
         /// <summary>
@@ -939,6 +977,11 @@ namespace Workspace1C
         private void OnMainTree_GroupExpansionChanged(object sender, RoutedEventArgs e)
         {
             QueueHeaderAlign();
+            // Issue #130 (7OH): разворот/сворачивание меняет набор реализованных
+            // строк и их низы — высоту вертикальных линий пересчитываем после
+            // раскладки, иначе после сворачивания они остаются высотой
+            // развёрнутого дерева и «уходят в самый низ».
+            QueueGridLinesRefresh();
         }
 
         // Признак того, что в очереди диспетчера уже стоит пересчёт выравнивания заголовка.

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.67-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.68-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.67**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.68**
 (поддерживается **более 5 500 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -205,6 +205,13 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Сетка списка баз пересчитывается после разворота/сворачивания группы
+  (1.0.1.68, Windows и Linux)** — высота вертикальных линий обновляется после
+  разворота/сворачивания группы, «Развернуть всё»/«Свернуть всё» и пересборки
+  дерева (фильтр/поиск/смена группировки). Строки свёрнутой группы больше не
+  удлиняют линии, и они не «уходят в самый низ» (issue #130, 7OH). Одна линия на
+  границу, толщина — один физический пиксель, цвет — из темы; «зебра» и
+  горизонтальные линии не менялись. Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Подсказки иконок подвала работают без перезапуска (1.0.1.67, Windows и Linux)** —
   при наведении подсказка появляется и остаётся, пока курсор над иконкой; уход курсора
   и повторное наведение снова её показывают. Причина: механизм подавления повторного

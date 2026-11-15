@@ -388,6 +388,168 @@ public sealed class Issue130GridLinesTests
         Assert.Equal(50, GridLinesPlanner.ResolveBottomOfRows(36, new[] { 50d }));
     }
 
+    // ===================== Разворот/сворачивание группы (issue #130, 7OH) =====================
+    // 7OH: «Работает при старте. СтОит развернуть группу и обратно свернуть и всё —
+    // линии опять уходят в самый низ». Причина: строки свёрнутой группы остаются в
+    // визуальном дереве с координатами развёрнутого состояния, а высота линий не
+    // пересчитывалась после раскладки. Ниже — чистые сценарии и source-гварды.
+
+    [Fact]
+    public void FilterVisibleRowBottoms_DropsRowsOfCollapsedGroup()
+    {
+        var bottoms = new[] { 36d, 76d, 106d, 136d };
+        var visible = new[] { true, true, false, false };
+
+        var filtered = GridLinesPlanner.FilterVisibleRowBottoms(bottoms, visible);
+
+        Assert.Equal(new[] { 36d, 76d }, filtered.ToArray());
+    }
+
+    [Fact]
+    public void FilterVisibleRowBottoms_NullVisibility_KeepsAllFinite()
+    {
+        var filtered = GridLinesPlanner.FilterVisibleRowBottoms(
+            new[] { 36d, double.NaN, -10d, 76d }, rowVisibility: null);
+
+        Assert.Equal(new[] { 36d, 76d }, filtered.ToArray());
+    }
+
+    [Fact]
+    public void FilterVisibleRowBottoms_MissingVisibility_TreatedAsVisible()
+    {
+        // Защитный fallback: списки разной длины не должны «терять» строки.
+        var filtered = GridLinesPlanner.FilterVisibleRowBottoms(
+            new[] { 36d, 76d, 106d }, new[] { true });
+
+        Assert.Equal(new[] { 36d, 76d, 106d }, filtered.ToArray());
+        Assert.Empty(GridLinesPlanner.FilterVisibleRowBottoms(null, new[] { true }));
+    }
+
+    [Fact]
+    public void Extent_AfterCollapse_EndsAtLastVisibleRow()
+    {
+        // Развернули группу: строки 66/96/126. Свернули — строки 96/126 больше
+        // не видны, линии обязаны закончиться низом последней видимой строки (66),
+        // а не остаться высотой развёрнутого дерева («уходят в самый низ»).
+        var expanded = GridLinesPlanner.ResolveVerticalExtent(
+            36, new[] { 66d, 96d, 126d }, new[] { true, true, true }, 600, 1.0);
+        var collapsed = GridLinesPlanner.ResolveVerticalExtent(
+            36, new[] { 66d, 96d, 126d }, new[] { true, false, false }, 600, 1.0);
+
+        Assert.Equal(126, expanded);
+        Assert.Equal(66, collapsed);
+        Assert.True(collapsed < expanded);
+    }
+
+    [Fact]
+    public void Extent_AllRowsCollapsed_EndsAtHeaderBottom()
+    {
+        // Все группы свёрнуты: видимых строк нет — линии заканчиваются заголовком.
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            36, new[] { 66d, 96d, 126d }, new[] { false, false, false }, 600, 1.0);
+
+        Assert.Equal(36, height);
+    }
+
+    [Fact]
+    public void Extent_EmptyListAfterRebuild_EndsAtHeaderBottom()
+    {
+        // Пустой список (фильтр/поиск не дал строк): линий ниже заголовка нет.
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            36, Array.Empty<double>(), Array.Empty<bool>(), 600, 1.0);
+
+        Assert.Equal(36, height);
+    }
+
+    [Fact]
+    public void Extent_LongListWithScroll_ClampedToViewport()
+    {
+        // Длинный список с прокруткой: линии не выходят за доступную высоту.
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            36,
+            new[] { 100d, 400d, 900d },
+            new[] { true, true, true },
+            availableHeight: 200,
+            dpiScale: 1.0);
+
+        Assert.Equal(200, height);
+    }
+
+    [Theory]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    public void Extent_AfterCollapse_SnapsToPhysicalPixel(double dpiScale)
+    {
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            36, new[] { 122.3d, 300d }, new[] { true, false }, 600, dpiScale);
+
+        var physical = height * dpiScale;
+        Assert.True(Math.Abs(physical - Math.Round(physical)) < 1e-9,
+            $"высота {height} не выровнена по физическому пикселю при DPI {dpiScale}");
+        Assert.True(height <= 122.3 + 1.0 / dpiScale + 1e-9);
+    }
+
+    [Fact]
+    public void Wpf_RefreshesGridLinesAfterExpandCollapseAndRebuild()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+
+        // Пересчёт после раскладки: синхронный вызов видит старые координаты.
+        Assert.Contains("private void QueueGridLinesRefresh()", columns, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Loaded", columns, StringComparison.Ordinal);
+        Assert.Contains("QueueGridLinesRefresh();", columns, StringComparison.Ordinal);
+        // Разворот/сворачивание одной группы — обработчик routed-событий.
+        Assert.Contains("OnMainTree_GroupExpansionChanged", columns, StringComparison.Ordinal);
+        Assert.Contains("QueueHeaderAlign();", columns, StringComparison.Ordinal);
+        // Строки свёрнутой группы не удлиняют линии.
+        Assert.Contains("grid.IsVisible", columns, StringComparison.Ordinal);
+        Assert.Contains("Services.GridLinesPlanner.FilterVisibleRowBottoms(", columns, StringComparison.Ordinal);
+
+        // Подписка на Expanded/Collapsed с обязательной отпиской.
+        var view = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml.cs"));
+        Assert.Contains("TreeViewItem.ExpandedEvent", view, StringComparison.Ordinal);
+        Assert.Contains("TreeViewItem.CollapsedEvent", view, StringComparison.Ordinal);
+        Assert.Contains("RemoveHandler(TreeViewItem.ExpandedEvent", view, StringComparison.Ordinal);
+        Assert.Contains("RemoveHandler(TreeViewItem.CollapsedEvent", view, StringComparison.Ordinal);
+        // Пересборка дерева (фильтр/поиск/смена группировки) — тоже пересчёт.
+        Assert.Contains("QueueGridLinesRefresh();", view, StringComparison.Ordinal);
+
+        // «Развернуть всё»/«Свернуть всё» — пересчёт после UpdateLayout.
+        var tree = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Tree.cs"));
+        var applyIndex = tree.IndexOf("internal void ApplyGroupExpandedState(bool expand)", StringComparison.Ordinal);
+        Assert.True(applyIndex >= 0, "ApplyGroupExpandedState не найден");
+        var refreshAfterApply = tree.IndexOf("QueueGridLinesRefresh();", applyIndex, StringComparison.Ordinal);
+        Assert.True(refreshAfterApply > applyIndex,
+            "QueueGridLinesRefresh не вызывается после ApplyGroupExpandedState");
+    }
+
+    [Fact]
+    public void Avalonia_RefreshesGridLinesAfterExpandCollapseAndRebuild()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Columns.cs"));
+
+        // Пересчёт после раскладки в UI-потоке.
+        Assert.Contains("private void QueueGridLinesRefresh()", columns, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(", columns, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Loaded", columns, StringComparison.Ordinal);
+        Assert.Contains("private void OnMainTreeGroupExpansionChanged(", columns, StringComparison.Ordinal);
+        // Строки свёрнутой группы не удлиняют линии.
+        Assert.Contains("IsEffectivelyVisible", columns, StringComparison.Ordinal);
+        Assert.Contains("GridLinesPlanner.FilterVisibleRowBottoms(", columns, StringComparison.Ordinal);
+        // Отписка при закрытии окна.
+        Assert.Contains("private void DetachGridLinesTreeHandlers()", columns, StringComparison.Ordinal);
+        Assert.Contains("RemoveHandler(TreeViewItem.ExpandedEvent", columns, StringComparison.Ordinal);
+        Assert.Contains("RemoveHandler(TreeViewItem.CollapsedEvent", columns, StringComparison.Ordinal);
+
+        // Подписка на Expanded/Collapsed дерева и пересчёт после пересборки.
+        var view = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("TreeViewItem.ExpandedEvent", view, StringComparison.Ordinal);
+        Assert.Contains("TreeViewItem.CollapsedEvent", view, StringComparison.Ordinal);
+        Assert.Contains("QueueGridLinesRefresh();", view, StringComparison.Ordinal);
+        Assert.Contains("Closed += (_, _) => DetachGridLinesTreeHandlers();", view, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Wpf_OverlayHeight_EndsAtLastRealizedRow()
     {

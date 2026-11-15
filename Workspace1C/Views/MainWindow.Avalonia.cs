@@ -342,6 +342,10 @@ namespace Workspace1C
             _vm.TreeModalClosed += RestoreTreeScrollAfterCancel;
             _vm.TreeRebuilt += () =>
             {
+                // Issue #130 (7OH): пересборка дерева (фильтр/поиск/смена группировки)
+                // меняет набор строк и их низы — высоту вертикальных линий пересчитываем
+                // после раскладки, иначе они остаются высотой прежнего дерева.
+                QueueGridLinesRefresh();
                 // Целевая навигация «переход к строке» (issue #31): НЕ планируем промежуточное
                 // восстановление выделения, пока идёт серия пересборок команды (Ctrl+T: смена
                 // вкладки + сброс поиска/тегов + повторная пересборка; Ctrl+цифра: пересборка).
@@ -413,6 +417,9 @@ namespace Workspace1C
             // обновляются на лету. Отписка — при реальном закрытии окна (Closed).
             ThemeManager.ThemeChanged += OnThemeChanged;
             Closed += (_, _) => ThemeManager.ThemeChanged -= OnThemeChanged;
+            // Issue #130: подписки дерева на Expanded/Collapsed снимаются при закрытии
+            // окна (дерево пересоздаётся при смене компактности, обработчик живёт с окном).
+            Closed += (_, _) => DetachGridLinesTreeHandlers();
 
             // Дефект №4 (аудит активации): меню «Утилиты» в Avalonia строится один раз
             // при построении панели команд, поэтому отметки «· ПРО» в заголовках пунктов
@@ -1707,6 +1714,19 @@ namespace Workspace1C
                     item.Bind(Visual.IsVisibleProperty, new Binding("IsVisible"));
             };
             _tree.ContainerClearing += (_, _) => _containersCleared++;
+
+            // Issue #130 (7OH): разворот/сворачивание группы меняет набор строк и их
+            // низы — высоту вертикальных линий пересчитываем после раскладки, иначе
+            // после сворачивания они остаются высотой развёрнутого дерева и «уходят
+            // в самый низ». Событие всплывает от любого вложенного контейнера, поэтому
+            // подписка одна, на дерево. Дерево пересоздаётся вместе с окном
+            // (BuildMainArea), поэтому подписки не накапливаются; при закрытии окна
+            // они снимаются явно (DetachGridLinesTreeHandlers).
+            _gridLinesGroupExpansionHandler = OnMainTreeGroupExpansionChanged;
+            _tree.AddHandler(TreeViewItem.ExpandedEvent, _gridLinesGroupExpansionHandler,
+                Avalonia.Interactivity.RoutingStrategies.Bubble);
+            _tree.AddHandler(TreeViewItem.CollapsedEvent, _gridLinesGroupExpansionHandler,
+                Avalonia.Interactivity.RoutingStrategies.Bubble);
 
             // Ширина шапки приравнивается ширине содержимого списка, а колонка
             // «Название» звёздная: любая разница общей ширины уходит в неё и
