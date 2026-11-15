@@ -290,6 +290,146 @@ public sealed class Issue130GridLinesTests
         Assert.DoesNotContain("CurrentTheme", planner, StringComparison.Ordinal);
     }
 
+    // ===================== Высота линий: низ последней строки (issue #130, 7OH) =====================
+
+    [Fact]
+    public void Extent_HeaderOnly_EndsAtHeaderBottom()
+    {
+        // Пустой список: строк нет — линии заканчиваются низом заголовка,
+        // а не тянутся до низа окна.
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            headerBottom: 36, rowBottoms: Array.Empty<double>(), availableHeight: 600, dpiScale: 1.0);
+
+        Assert.Equal(36, height);
+    }
+
+    [Fact]
+    public void Extent_NoHeaderNoRows_FallsBackToAvailable()
+    {
+        // Разметка ещё не готова — прежнее поведение как безопасный fallback.
+        Assert.Equal(600, GridLinesPlanner.ResolveVerticalExtent(null, null, 600, 1.0));
+        Assert.Equal(600, GridLinesPlanner.ResolveVerticalExtent(null, Array.Empty<double>(), 600, 1.0));
+        Assert.Equal(600, GridLinesPlanner.ResolveVerticalExtent(0, new[] { -10d }, 600, 1.0));
+    }
+
+    [Fact]
+    public void Extent_OneRow_EndsAtRowBottom()
+    {
+        var height = GridLinesPlanner.ResolveVerticalExtent(36, new[] { 76d }, 600, 1.0);
+
+        Assert.Equal(76, height);
+    }
+
+    [Fact]
+    public void Extent_RowsShorterThanViewport_EndsAtLastRow()
+    {
+        // Заголовок 36 + три строки по 30 → 126; доступно 600 — «хвоста» после
+        // последней строки нет.
+        var height = GridLinesPlanner.ResolveVerticalExtent(
+            36, new[] { 66d, 96d, 126d }, availableHeight: 600, dpiScale: 1.0);
+
+        Assert.Equal(126, height);
+        Assert.True(height < 600);
+    }
+
+    [Fact]
+    public void Extent_RowsTallerThanViewport_Clamped()
+    {
+        // Длинный список/прокрутка: линия не выходит за доступную высоту оверлея.
+        var height = GridLinesPlanner.ResolveVerticalExtent(36, new[] { 900d }, 200, 1.0);
+
+        Assert.Equal(200, height);
+    }
+
+    [Fact]
+    public void Extent_GroupRowTallerThanDataRow_UsesMaxBottom()
+    {
+        // Низ строки группы может быть ниже строки базы — берётся максимум,
+        // иначе линии обрывались бы на предпоследней строке.
+        var height = GridLinesPlanner.ResolveVerticalExtent(36, new[] { 100d, 140d, 120d }, 600, 1.0);
+
+        Assert.Equal(140, height);
+    }
+
+    [Theory]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    public void Extent_SnapsToPhysicalPixel(double dpiScale)
+    {
+        var height = GridLinesPlanner.ResolveVerticalExtent(36, new[] { 122.3 }, 600, dpiScale);
+
+        var physical = height * dpiScale;
+        Assert.True(Math.Abs(physical - Math.Round(physical)) < 1e-9,
+            $"высота {height} не выровнена по физическому пикселю при DPI {dpiScale}");
+        Assert.True(height <= 122.3 + 1.0 / dpiScale + 1e-9);
+    }
+
+    [Fact]
+    public void Extent_ZeroOrNegativeAvailable_Zero()
+    {
+        Assert.Equal(0, GridLinesPlanner.ResolveVerticalExtent(36, new[] { 76d }, 0, 1.0));
+        Assert.Equal(0, GridLinesPlanner.ResolveVerticalExtent(36, new[] { 76d }, -100, 1.0));
+        Assert.Equal(0, GridLinesPlanner.ResolveVerticalExtent(36, new[] { 76d }, double.NaN, 1.0));
+    }
+
+    [Fact]
+    public void Extent_TinyExtentAfterSnap_Zero()
+    {
+        // Меньше половины физического пикселя — линия не видна, не создаём её.
+        Assert.Equal(0, GridLinesPlanner.ResolveVerticalExtent(0.2, null, 600, 1.0));
+    }
+
+    [Fact]
+    public void BottomOfRows_IgnoresNegativeAndNaN()
+    {
+        Assert.Equal(36, GridLinesPlanner.ResolveBottomOfRows(36, new[] { double.NaN, -20d, 10d }));
+        Assert.Equal(0, GridLinesPlanner.ResolveBottomOfRows(null, new[] { -1d }));
+        Assert.Equal(50, GridLinesPlanner.ResolveBottomOfRows(36, new[] { 50d }));
+    }
+
+    [Fact]
+    public void Wpf_OverlayHeight_EndsAtLastRealizedRow()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+
+        // Высота линий — чистый расчёт по низу последней реализованной строки.
+        Assert.Contains("Services.GridLinesPlanner.ResolveVerticalExtent(", columns, StringComparison.Ordinal);
+        Assert.Contains("GetGridLinesHeaderBottom()", columns, StringComparison.Ordinal);
+        Assert.Contains("GetGridLinesRowBottoms()", columns, StringComparison.Ordinal);
+        Assert.Contains("TransformToVisual(GridLinesOverlay)", columns, StringComparison.Ordinal);
+        Assert.Contains("FindRowGrids(MainTree, RowGridMarker)", columns, StringComparison.Ordinal);
+        Assert.Contains("FindRowGrids(MainTree, GroupGridMarker)", columns, StringComparison.Ordinal);
+        // Прежняя высота «во весь оверлей» больше не задаёт высоту линии.
+        Assert.DoesNotContain("var height = GridLinesOverlay.ActualHeight", columns, StringComparison.Ordinal);
+
+        // Пересчёт при вертикальной прокрутке: набор реализованных строк меняется.
+        var scroll = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Scroll.cs"));
+        Assert.Contains("Dispatcher.BeginInvoke(new Action(RefreshGridLinesOverlay),",
+            scroll, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_OverlayHeight_EndsAtLastRealizedRow()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Columns.cs"));
+
+        Assert.Contains("GridLinesPlanner.ResolveVerticalExtent(", columns, StringComparison.Ordinal);
+        Assert.Contains("GetGridLinesHeaderBottom()", columns, StringComparison.Ordinal);
+        Assert.Contains("GetGridLinesRowBottoms()", columns, StringComparison.Ordinal);
+        Assert.Contains("TranslatePoint(new Point(0, grid.Bounds.Height), _gridLinesOverlay)",
+            columns, StringComparison.Ordinal);
+        Assert.Contains("GroupRowGridName", columns, StringComparison.Ordinal);
+        Assert.Contains("InfobaseRowCard", columns, StringComparison.Ordinal);
+        // Прежняя высота «во весь оверлей» больше не задаёт высоту линии.
+        Assert.DoesNotContain("var height = _gridLinesOverlay.Bounds.Height", columns, StringComparison.Ordinal);
+
+        // Пересчёт при вертикальной прокрутке списка.
+        var scroll = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Scroll.cs"));
+        Assert.Contains("Dispatcher.UIThread.Post(RefreshGridLinesOverlay, DispatcherPriority.Loaded)",
+            scroll, StringComparison.Ordinal);
+    }
+
     // ===================== Настройки: хранение и загрузка =====================
 
     [Fact]

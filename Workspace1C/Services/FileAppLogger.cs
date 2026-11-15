@@ -14,11 +14,19 @@ public sealed class FileAppLogger : IAppLogger
     private const long MaxFileBytes = 5 * 1024 * 1024;
     private const int KeepDays = 14;
 
+    /// <summary>
+    /// Переопределение каталога журнала для тестового процесса
+    /// (<c>Workspace1C.Tests/TestEnvironment.Init</c>). Тесты не должны писать
+    /// «тестовые» ERROR в пользовательский app-YYYYMMDD.log: такие записи путают
+    /// диагностику реальных сбоев. В приложении значение всегда <c>null</c>.
+    /// </summary>
+    public static string? DirectoryOverride { get; set; }
+
     public FileAppLogger(string? logDirectory = null)
     {
         // Windows: %APPDATA%\Workspace1C\logs
         // Linux:   ~/.config/Workspace1C/logs
-        _logDirectory = logDirectory ?? PlatformPaths.LogDirectory;
+        _logDirectory = logDirectory ?? DirectoryOverride ?? PlatformPaths.LogDirectory;
         Directory.CreateDirectory(_logDirectory);
         CleanupOldLogs();
     }

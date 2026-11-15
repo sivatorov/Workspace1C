@@ -118,3 +118,7 @@ publish/_fetch_debug.txt
  
 # Release build artifacts (relnotes_tmp/buildNNN) - never committed 
 relnotes_tmp/build*/ 
+
+# local scratch data (never commit)
+.tmpdata/
+relnotes_tmp/

@@ -842,7 +842,7 @@ namespace Workspace1C
                 // окно. Иначе главное окно уходит в трей, а элемент остаётся «висеть». После закрытия
                 // меню события сюда не доходят (меню обрабатывает ESC само класс-обработчиком
                 // OnContextMenuPreviewKeyDown), поэтому повторный ESC уже уводит окно в трей.
-                if (ToolTipCloser.CloseAll() || CloseOpenContextMenus() || CloseOpenPopups())
+                if (ToolTipCloser.CloseAll(suppressReopen: true) || CloseOpenContextMenus() || CloseOpenPopups())
                 {
                     e.Handled = true;
                     return;

@@ -41,7 +41,7 @@ namespace Workspace1C
         {
             if (e.Key == Key.Escape &&
                 Keyboard.Modifiers == ModifierKeys.None &&
-                ToolTipCloser.CloseAll())
+                ToolTipCloser.CloseAll(suppressReopen: true))
             {
                 e.Handled = true;
             }

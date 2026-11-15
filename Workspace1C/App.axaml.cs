@@ -726,6 +726,13 @@ namespace Workspace1C
                     var mainWindow = _desktopLifetime?.MainWindow;
                     if (mainWindow is { IsVisible: true })
                     {
+                        // Тестовый прогон (UiDialogs.SuppressModalDialogs): ошибка уже
+                        // записана в errors.log/журнал, реальное окно не показываем.
+                        if (UiDialogs.SuppressModalDialogs)
+                        {
+                            UiDialogs.TraceSuppressed("App.Fatal", title);
+                            return;
+                        }
                         var dialogs = AppServices.TryGetService<IDialogService>();
                         dialogs?.ShowError(
                             BuildFatalDialogText(title, ex),

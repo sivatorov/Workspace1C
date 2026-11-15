@@ -297,7 +297,7 @@ namespace Workspace1C
             if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None)
                 return;
 
-            if (ToolTipCloserAvalonia.CloseAll() || CloseOpenToolTips() || CloseOpenPopups())
+            if (ToolTipCloserAvalonia.CloseAll(suppressReopen: true) || CloseOpenToolTips(suppressReopen: true) || CloseOpenPopups())
             {
                 ToolTipCloserAvalonia.TraceLog("MainWindow.OnPreviewKeyDownCloseToolTips: первый ESC закрыл подсказки");
                 e.Handled = true;
@@ -508,7 +508,7 @@ namespace Workspace1C
             // ToolTipCloserAvalonia.CloseAll (issue #270); собственные CloseOpenToolTips/
             // CloseOpenPopups оставлены резервом для совместимости с текущим поведением.
             if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None
-                && (ToolTipCloserAvalonia.CloseAll() || CloseOpenToolTips() || CloseOpenPopups()))
+                && (ToolTipCloserAvalonia.CloseAll(suppressReopen: true) || CloseOpenToolTips(suppressReopen: true) || CloseOpenPopups()))
             {
                 e.Handled = true;
                 return;
@@ -834,8 +834,10 @@ namespace Workspace1C
         /// Закрывает открытую всплывающую подсказку (ToolTip) главного окна.
         /// Используется при нажатии ESC (issue #261): первый ESC должен скрыть подсказку,
         /// а не сворачивать/закрывать окно. Возвращает true, если была закрыта хотя бы одна.
+        /// <paramref name="suppressReopen"/> включает подавление повторного открытия только
+        /// в ESC-путях (issue #131).
         /// </summary>
-        private bool CloseOpenToolTips()
+        private bool CloseOpenToolTips(bool suppressReopen = false)
         {
             var closed = false;
 
@@ -850,9 +852,9 @@ namespace Workspace1C
                 {
                     ToolTip.SetIsOpen(owner, false);
                     closed = true;
-                    // Подавляем повторное автоматическое открытие подсказки (issue #261):
-                    // иначе при наведённом курсоре тултип тут же откроется снова.
-                    SuppressToolTipOwner(owner);
+                    // Подавляем повторное автоматическое открытие подсказки только для ESC
+                    // (issues #261, #131): при обычной потере фокуса подсказка открывается снова.
+                    SuppressToolTipOwner(owner, suppressReopen);
                 }
             }
             if (closed)
@@ -881,7 +883,7 @@ namespace Workspace1C
                         {
                             ToolTip.SetIsOpen(control, false);
                             closed = true;
-                            SuppressToolTipOwner(control);
+                            SuppressToolTipOwner(control, suppressReopen);
                         }
                     }
                 }
@@ -895,7 +897,7 @@ namespace Workspace1C
                 {
                     ToolTip.SetIsOpen(control, false);
                     closed = true;
-                    SuppressToolTipOwner(control);
+                    SuppressToolTipOwner(control, suppressReopen);
                 }
 
                 foreach (var child in node.GetVisualChildren())

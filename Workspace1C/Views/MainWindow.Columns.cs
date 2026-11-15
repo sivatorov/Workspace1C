@@ -561,9 +561,18 @@ namespace Workspace1C
             if (offsets.Count == 0)
                 return;
 
-            var height = GridLinesOverlay.ActualHeight > 0
+            // Issue #130 (7OH): высота линий — низ последней реализованной строки,
+            // а не вся высота оверлея: после последней строки линий быть не должно.
+            // Пустой список заканчивается низом заголовка, при неготовой разметке —
+            // безопасный fallback на прежнюю высоту оверлея.
+            var availableHeight = GridLinesOverlay.ActualHeight > 0
                 ? GridLinesOverlay.ActualHeight
                 : ListContentGrid?.ActualHeight ?? 0;
+            var height = Services.GridLinesPlanner.ResolveVerticalExtent(
+                GetGridLinesHeaderBottom(),
+                GetGridLinesRowBottoms(),
+                availableHeight,
+                dpiScale);
             if (height <= 0)
                 return;
 
@@ -588,6 +597,57 @@ namespace Workspace1C
                 Panel.SetZIndex(line, 1);
                 GridLinesOverlay.Children.Add(line);
             }
+        }
+
+        /// <summary>
+        /// Низ заголовка в координатах оверлея сетки (issue #130): линии начинаются
+        /// от низа заголовка, поэтому пустой список заканчивается ровно на нём.
+        /// <c>null</c> — заголовок ещё не в визуальном дереве/не измерен.
+        /// </summary>
+        private double? GetGridLinesHeaderBottom()
+        {
+            FrameworkElement? header = DbHeaderBorder is not null ? DbHeaderBorder : HeaderGrid;
+            if (GridLinesOverlay is null || header is null || header.ActualHeight <= 0)
+                return null;
+            try
+            {
+                return header.TransformToVisual(GridLinesOverlay)
+                    .Transform(new Point(0, header.ActualHeight)).Y;
+            }
+            catch (InvalidOperationException)
+            {
+                // Элемент не подключён к визуальному дереву — координат нет.
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Низы уже реализованных строк списка (базы и группы) в координатах оверлея
+        /// (issue #130). Виртуализация создаёт только видимые контейнеры, поэтому
+        /// максимум низа и есть низ последней реализованной строки; строки выше
+        /// вьюпорта дают отрицательные координаты и на результат не влияют.
+        /// </summary>
+        private IReadOnlyList<double>? GetGridLinesRowBottoms()
+        {
+            if (GridLinesOverlay is null || MainTree is null)
+                return null;
+
+            var bottoms = new List<double>();
+            try
+            {
+                foreach (var grid in FindRowGrids(MainTree, RowGridMarker))
+                    bottoms.Add(grid.TransformToVisual(GridLinesOverlay)
+                        .Transform(new Point(0, grid.ActualHeight)).Y);
+                foreach (var grid in FindRowGrids(MainTree, GroupGridMarker))
+                    bottoms.Add(grid.TransformToVisual(GridLinesOverlay)
+                        .Transform(new Point(0, grid.ActualHeight)).Y);
+            }
+            catch (InvalidOperationException)
+            {
+                // Часть строк ещё не подключена к визуальному дереву: используем уже
+                // собранные координаты, остальные учтёт следующий пересчёт.
+            }
+            return bottoms;
         }
 
         /// <summary>

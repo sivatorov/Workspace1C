@@ -589,6 +589,129 @@ public sealed class Issue131LongOperationNotificationTests
         Assert.Contains("OnPropertyChanged(string.Empty);", avalonia);
     }
 
+    // ---------- Механизм подсказок: подавление только по ESC (v1.0.1.67) ----------
+    // Причина бага (комментарий 7OH): прежнее вето в OnToolTipOpening содержало
+    // `|| IsPointerOver(owner)`, а при показе по наведению курсор ВСЕГДА над владельцем —
+    // запись о подавлении не снималась, и подсказка «не возвращалась» до перезапуска.
+    // Второй дефект: подавление ставилось при любом CloseAll(), включая потерю фокуса.
+
+    [Fact]
+    public void Wpf_ToolTipCloser_UsesTimeBoundedPolicyAndSuppressFlag()
+    {
+        var source = ReadSource("Workspace1C", "Views", "ToolTipCloser.cs");
+
+        Assert.Contains("ToolTipSuppressionPolicy", source);
+        Assert.Contains("public static bool CloseAll(bool suppressReopen = false)", source);
+        Assert.Contains("suppressReopen: true", source);
+
+        // Прежний «вечный» запрет по наведённому курсору удалён.
+        Assert.DoesNotContain("ToolTipSuppressWindowMs || IsPointerOver(owner)", source);
+        Assert.DoesNotContain("_lastToolTipEscTick", source);
+    }
+
+    [Fact]
+    public void Wpf_ToolTipOpening_DoesNotBlockReopenByPointerOver()
+    {
+        var source = ReadSource("Workspace1C", "Views", "ToolTipCloser.cs");
+        var method = ExtractMethod(source,
+            "private static void OnToolTipOpening(object sender, ToolTipEventArgs e)",
+            "ToolTipCloser.cs");
+
+        // Подавление снимается политикой; наведённый курсор больше не является условием вето.
+        Assert.Contains("ShouldRelease", method);
+        Assert.DoesNotContain("|| IsPointerOver(owner)", method);
+    }
+
+    [Fact]
+    public void Wpf_FallbackTimer_DoesNotSuppressReopen()
+    {
+        var source = ReadSource("Workspace1C", "Views", "ToolTipCloser.cs");
+        var method = ExtractMethod(source,
+            "private static void OnFocusCheckTick(object? sender, EventArgs e)",
+            "ToolTipCloser.cs");
+
+        Assert.Contains("IsFallbackCloseAllowed", method);
+        Assert.DoesNotContain("SuppressToolTipOwner", method);
+    }
+
+    [Fact]
+    public void Wpf_DeactivatedClose_IsDeferredAndChecksActivity()
+    {
+        var main = ReadSource("Workspace1C", "Views", "MainWindow.xaml.cs");
+        Assert.Contains("if (IsActive)", main);
+
+        var closer = ReadSource("Workspace1C", "Views", "ToolTipCloser.cs");
+        Assert.Contains("window.IsActive", closer);
+        Assert.Contains("IsAnyWindowActive()", closer);
+    }
+
+    [Fact]
+    public void Wpf_EscPaths_RequestSuppression()
+    {
+        foreach (var file in new[]
+                 {
+                     "MainWindow.Hotkeys.cs", "SettingsWindow.xaml.cs", "AddEditWindow.xaml.cs",
+                     "ConnectionSettingsWindow.xaml.cs", "CreateInfobaseWindow.xaml.cs"
+                 })
+        {
+            Assert.Contains("CloseAll(suppressReopen: true)",
+                ReadSource("Workspace1C", "Views", file));
+        }
+    }
+
+    [Fact]
+    public void Avalonia_ToolTipCloser_UsesTimeBoundedPolicyAndSuppressFlag()
+    {
+        var source = ReadSource("Workspace1C", "Views", "ToolTipCloserAvalonia.cs");
+
+        Assert.Contains("ToolTipSuppressionPolicy", source);
+        Assert.Contains("public static bool CloseAll(bool suppressReopen = false)", source);
+        Assert.Contains("ReleaseSuppressionIfPointerLeft", source);
+
+        Assert.DoesNotContain("ToolTipSuppressWindowMs || owner.IsPointerOver", source);
+        Assert.DoesNotContain("_lastToolTipEscTick", source);
+    }
+
+    [Fact]
+    public void Avalonia_IsToolTipSuppressed_DoesNotBlockByPointerOver()
+    {
+        var source = ReadSource("Workspace1C", "Views", "ToolTipCloserAvalonia.cs");
+        var method = ExtractMethod(source,
+            "private static bool IsToolTipSuppressed(Control owner)",
+            "ToolTipCloserAvalonia.cs");
+
+        Assert.Contains("ShouldRelease", method);
+        Assert.DoesNotContain("|| owner.IsPointerOver", method);
+    }
+
+    [Fact]
+    public void Avalonia_EscPathsSuppress_DeactivationDoesNot()
+    {
+        var hotkeys = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Hotkeys.cs");
+        Assert.Contains("CloseAll(suppressReopen: true)", hotkeys);
+
+        var modal = ReadSource("Workspace1C", "Views", "ModalWindowBase.cs");
+        Assert.Contains("CloseAll(suppressReopen: true)", modal);
+        Assert.Contains("if (IsActive)", modal);
+
+        var main = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+        Assert.Contains("if (IsActive)", main);
+        Assert.Contains("ReleaseSuppressionIfPointerLeft", main);
+    }
+
+    [Fact]
+    public void FooterIcons_HaveTooltipsInBothPlatforms()
+    {
+        var xaml = ReadSource("Workspace1C", "Views", "MainWindow.xaml");
+        Assert.Contains("ToolTip=\"{Binding LongOperationAlarmTooltip}\"", xaml);
+        Assert.Contains("ToolTip=\"{loc:Loc Main.CurrentSession}\"", xaml);
+        Assert.Contains("ToolTip=\"{Binding RightPanelToggleTooltip}\"", xaml);
+
+        var tree = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
+        Assert.Contains("LongOperationAlarmTooltip", tree);
+        Assert.Contains("ToolTip.TipProperty", tree);
+    }
+
 #if !LINUX
     [Theory]
     [InlineData(true)]

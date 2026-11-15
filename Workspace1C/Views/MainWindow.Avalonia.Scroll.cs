@@ -101,8 +101,20 @@ namespace Workspace1C
                 finally { _syncingScrollBar = false; }
             }
 
+            var lastOffsetY = scroll.Offset.Y;
             _scrollBarLinks.Add(scroll.GetObservable(ScrollViewer.OffsetProperty)
-                .Subscribe(new PropertyObserver<Vector>(_ => Sync())));
+                .Subscribe(new PropertyObserver<Vector>(offset =>
+                {
+                    Sync();
+                    // Issue #130: при вертикальной прокрутке меняется набор видимых строк —
+                    // высота линий (низ последней реализованной строки) пересчитывается
+                    // после раскладки, когда геометрия строк уже обновлена.
+                    if (Math.Abs(offset.Y - lastOffsetY) > 0.01)
+                    {
+                        lastOffsetY = offset.Y;
+                        Dispatcher.UIThread.Post(RefreshGridLinesOverlay, DispatcherPriority.Loaded);
+                    }
+                })));
             _scrollBarLinks.Add(scroll.GetObservable(ScrollViewer.ExtentProperty)
                 .Subscribe(new PropertyObserver<Size>(_ => Sync())));
             _scrollBarLinks.Add(scroll.GetObservable(ScrollViewer.ViewportProperty)

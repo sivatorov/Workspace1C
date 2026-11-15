@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
+using Workspace1C.Services;
 
 namespace Workspace1C
 {
@@ -54,16 +55,14 @@ namespace Workspace1C
         // ShouldClosePopup и в этот набор не попадают.
         private static readonly HashSet<Popup> _openPopups = new();
 
-        // Владельцы подсказок, подавленных после закрытия по ESC (issue #270): пока владелец
-        // числится здесь, повторное автоматическое открытие его ToolTip гасится в
-        // OnToolTipIsOpenChanged — подсказка не «возвращается» при наведённом курсоре.
-        private static readonly HashSet<Control> _suppressedToolTipOwners = new();
+        // Владельцы подсказок, подавленных после принудительного закрытия по ESC (issues #270,
+        // #131), и момент подавления (Environment.TickCount64). Подавление действует только
+        // на текущий цикл закрытия и ограничено окном ToolTipSuppressionPolicy.WindowMs;
+        // обычные закрытия (потеря фокуса, деактивация) запись не создают.
+        private static readonly Dictionary<Control, long> _suppressedToolTipOwners = new();
 
-        /// <summary>Момент последнего закрытия подсказки по ESC (Environment.TickCount64).</summary>
-        private static long _lastToolTipEscTick;
-
-        /// <summary>Окно подавления повторного открытия подсказки после ESC (мс), как в MainWindow.Avalonia.cs.</summary>
-        private const long ToolTipSuppressWindowMs = 800;
+        /// <summary>Чистая политика подавления повторного открытия подсказок (issue #131).</summary>
+        private static readonly ToolTipSuppressionPolicy _suppressionPolicy = new();
 
         /// <summary>Признак того, что класс-обработчики уже зарегистрированы (Register идемпотентен).</summary>
         private static bool _registered;
@@ -108,15 +107,20 @@ namespace Workspace1C
         /// Возвращает true, если был закрыт хотя бы один элемент. Используется по ESC (первый
         /// ESC закрывает подсказки и помечает событие обработанным — окно не трогается, второй
         /// ESC закрывает окно) и при потере фокуса окном (Deactivated).
+        /// <para>
+        /// <paramref name="suppressReopen"/> (issue #131): запрещать ли автоматическое повторное
+        /// открытие закрытых подсказок на текущий цикл. <c>true</c> передают только ESC-пути;
+        /// потеря фокуса/деактивация вызывают метод без подавления.
+        /// </para>
         /// </summary>
-        public static bool CloseAll()
+        public static bool CloseAll(bool suppressReopen = false)
         {
             var closed = false;
-            closed |= CloseOpenToolTips();
+            closed |= CloseOpenToolTips(suppressReopen);
             closed |= CloseOpenContextMenus();
             closed |= CloseOpenPopups();
             TraceLog($"CloseAll: итог closed={closed}, тултипов={_openToolTipOwners.Count}, " +
-                     $"меню={_openContextMenus.Count}, попапов={_openPopups.Count}");
+                     $"меню={_openContextMenus.Count}, попапов={_openPopups.Count}, suppressReopen={suppressReopen}");
             return closed;
         }
 
@@ -126,8 +130,10 @@ namespace Workspace1C
         /// визуального дерева, потому что открытый ToolTip рендерится попапом в оверлейном слое
         /// TopLevel. Резервный путь — обход визуального дерева всех окон и цепочки визуальных
         /// родителей сфокусированного элемента (владелец мог оказаться вне оверлея).
+        /// <paramref name="suppressReopen"/> включает подавление повторного открытия
+        /// только в ESC-путях (issue #131).
         /// </summary>
-        private static bool CloseOpenToolTips()
+        private static bool CloseOpenToolTips(bool suppressReopen)
         {
             var closed = false;
 
@@ -137,9 +143,9 @@ namespace Workspace1C
                 {
                     ToolTip.SetIsOpen(owner, false);
                     closed = true;
-                    // Подавляем повторное автоматическое открытие (issue #270): иначе при
-                    // наведённом курсоре тултип тут же откроется снова.
-                    SuppressToolTipOwner(owner);
+                    // Подавляем повторное автоматическое открытие только для ESC (issue #270,
+                    // #131): при обычной потере фокуса подсказка должна открываться снова.
+                    SuppressToolTipOwner(owner, suppressReopen);
                 }
             }
             if (closed)
@@ -154,7 +160,7 @@ namespace Workspace1C
             {
                 foreach (var window in GetWindows())
                 {
-                    if (CloseToolTipsIn(window))
+                    if (CloseToolTipsIn(window, suppressReopen))
                         closed = true;
                 }
                 if (GetFocusedVisual() is { } focused)
@@ -165,7 +171,7 @@ namespace Workspace1C
                         {
                             ToolTip.SetIsOpen(control, false);
                             closed = true;
-                            SuppressToolTipOwner(control);
+                            SuppressToolTipOwner(control, suppressReopen);
                         }
                     }
                 }
@@ -177,7 +183,7 @@ namespace Workspace1C
         }
 
         /// <summary>Закрывает все открытые ToolTip в поддереве (резервный путь).</summary>
-        private static bool CloseToolTipsIn(Visual root)
+        private static bool CloseToolTipsIn(Visual root, bool suppressReopen)
         {
             var closed = false;
             foreach (var node in root.GetVisualDescendants())
@@ -186,7 +192,7 @@ namespace Workspace1C
                 {
                     ToolTip.SetIsOpen(control, false);
                     closed = true;
-                    SuppressToolTipOwner(control);
+                    SuppressToolTipOwner(control, suppressReopen);
                 }
             }
             return closed;
@@ -324,28 +330,73 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Заблокировано ли повторное открытие подсказки владельца после ESC (issue #261).
-        /// Пока указатель над владельцем (<see cref="Control.IsPointerOver"/>) или не вышел
-        /// короткий интервал — подавлено; как только курсор ушёл и окно истекло — подавление
-        /// снимается, и тултип снова работает как обычно.
+        /// Заблокировано ли повторное открытие подсказки владельца (issues #261, #131).
+        /// Вето действует только внутри окна <see cref="ToolTipSuppressionPolicy.WindowMs"/>
+        /// от принудительного закрытия по ESC и НЕ продлевается наведённым курсором: при
+        /// показе по наведению указатель всегда над владельцем, и прежняя проверка
+        /// <see cref="Control.IsPointerOver"/> навсегда «замораживала» подсказку. Когда окно
+        /// истекло или курсор ушёл — запись снимается и подсказка снова открывается.
         /// </summary>
         private static bool IsToolTipSuppressed(Control owner)
         {
-            if (!_suppressedToolTipOwners.Contains(owner))
+            if (!_suppressedToolTipOwners.TryGetValue(owner, out var suppressedTick))
                 return false;
 
-            if (Environment.TickCount64 - _lastToolTipEscTick < ToolTipSuppressWindowMs || owner.IsPointerOver)
-                return true;
+            var pointerOver = owner.IsPointerOver;
+            if (_suppressionPolicy.ShouldRelease(Environment.TickCount64, suppressedTick, pointerOver))
+            {
+                _suppressedToolTipOwners.Remove(owner);
+                TraceLog($"IsToolTipSuppressed: подавление снято, owner={FormatObject(owner)}, pointerOver={pointerOver}");
+                return false;
+            }
 
-            _suppressedToolTipOwners.Remove(owner);
-            return false;
+            return true;
         }
 
-        /// <summary>Подавляет повторное открытие подсказки владельца после закрытия по ESC (issue #261).</summary>
-        private static void SuppressToolTipOwner(Control owner)
+        /// <summary>
+        /// Подавляет повторное открытие подсказки владельца (issue #261). Запись создаётся
+        /// только для ESC-путей (<paramref name="suppressReopen"/> = true); обычное закрытие
+        /// снимает прежнюю запись, чтобы владелец не «замораживался» (issue #131).
+        /// </summary>
+        private static void SuppressToolTipOwner(Control owner, bool suppressReopen)
         {
-            if (_suppressedToolTipOwners.Add(owner))
-                _lastToolTipEscTick = Environment.TickCount64;
+            if (!suppressReopen)
+            {
+                if (_suppressedToolTipOwners.Remove(owner))
+                    TraceLog($"SuppressToolTipOwner: подавление снято (не ESC), owner={FormatObject(owner)}");
+                return;
+            }
+
+            _suppressedToolTipOwners[owner] = Environment.TickCount64;
+            TraceLog($"SuppressToolTipOwner: owner={FormatObject(owner)}, окно={_suppressionPolicy.WindowMs} мс");
+        }
+
+        /// <summary>
+        /// Снимает подавление с владельцев, над которыми курсора больше нет, или у которых
+        /// истекло окно политики (issue #131). Вызывается из окон при движении указателя
+        /// (<c>PointerMoved</c>), поэтому повторное наведение сразу показывает подсказку.
+        /// </summary>
+        public static void ReleaseSuppressionIfPointerLeft()
+        {
+            if (_suppressedToolTipOwners.Count == 0)
+                return;
+
+            List<Control>? release = null;
+            var now = Environment.TickCount64;
+            foreach (var pair in _suppressedToolTipOwners)
+            {
+                if (_suppressionPolicy.ShouldRelease(now, pair.Value, pair.Key.IsPointerOver))
+                    (release ??= new List<Control>()).Add(pair.Key);
+            }
+
+            if (release is null)
+                return;
+
+            foreach (var owner in release)
+            {
+                _suppressedToolTipOwners.Remove(owner);
+                TraceLog($"ReleaseSuppressionIfPointerLeft: подавление снято, owner={FormatObject(owner)}");
+            }
         }
 
         /// <summary>Класс-обработчик открытия/закрытия <see cref="ContextMenu"/> (issue #261/#270).</summary>

@@ -75,13 +75,11 @@ namespace Workspace1C
         // поле, чтобы закрывались ВСЕ открытые подсказки, а не только последняя.
         private readonly HashSet<Control> _openToolTipOwners = new();
 
-        // Подавленные после ESC владельцы подсказок (issue #261): пока владелец числится здесь
-        // и указатель над ним (или не вышел короткий интервал), повторное открытие его ToolTip
-        // блокируется обработчиком OnToolTipIsOpenChanged — тултип не «возвращается» при наведённом
-        // курсоре. Подавление снимается, когда курсор ушёл с владельца и окно подавления истекло.
-        private readonly HashSet<Control> _suppressedToolTipOwners = new();
-        private long _lastToolTipEscTick;
-        private const long ToolTipSuppressWindowMs = 800;
+        // Подавленные после принудительного закрытия по ESC владельцы подсказок (issues #261,
+        // #131) и момент подавления. Запись создаётся только ESC-путями и живёт не дольше
+        // ToolTipSuppressionPolicy.WindowMs; наведённый курсор её НЕ продлевает.
+        private readonly Dictionary<Control, long> _suppressedToolTipOwners = new();
+        private readonly ToolTipSuppressionPolicy _toolTipSuppressionPolicy = new();
 
         // Поля empty-state (заглушка пустого списка / «ничего не найдено»).
         private Border _emptyState = null!;
@@ -287,7 +285,24 @@ namespace Workspace1C
                 MenuCloseTrace.Log($"Deactivated: openMenusCount={(_tree?.ContextMenu?.IsOpen == true ? 1 : 0)}, " +
                                    $"timeSinceMenuCloseMs={TimeSinceLastMenuCloseMs()}");
                 ToolTipCloserAvalonia.TraceLog("MainWindow.Deactivated: окно потеряло фокус");
-                ToolTipCloserAvalonia.CloseAll();
+                // issue #131: закрытие откладываем и выполняем, только если окно действительно
+                // осталось неактивным, — кратковременная деактивация (попап подсказки/меню)
+                // не должна гасить только что показанную подсказку.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (IsActive)
+                        return;
+                    ToolTipCloserAvalonia.CloseAll();
+                }, DispatcherPriority.Background);
+            };
+
+            // Снятие подавления при уходе курсора с владельца подсказки (issue #131):
+            // повторное наведение снова показывает подсказку без перезапуска приложения.
+            // Чистим и общий реестр ToolTipCloserAvalonia, и локальный реестр окна.
+            PointerMoved += (_, _) =>
+            {
+                ToolTipCloserAvalonia.ReleaseSuppressionIfPointerLeft();
+                ReleaseInstanceSuppressionIfPointerLeft();
             };
 
             // Геометрия обычного состояния запоминается на ходу: у Avalonia нет
@@ -543,28 +558,76 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Заблокировано ли повторное открытие подсказки владельца после ESC (issue #261).
-        /// Пока указатель над владельцем (<see cref="Control.IsPointerOver"/>) или не вышел
-        /// короткий интервал — подавлено; как только курсор ушёл и окно истекло — подавление
-        /// снимается, и тултип снова работает как обычно.
+        /// Заблокировано ли повторное открытие подсказки владельца (issues #261, #131).
+        /// Вето действует только внутри окна <see cref="ToolTipSuppressionPolicy.WindowMs"/>
+        /// от принудительного закрытия по ESC и НЕ продлевается наведённым курсором: при показе
+        /// по наведению указатель всегда над владельцем, и прежняя проверка
+        /// <see cref="Control.IsPointerOver"/> навсегда «замораживала» подсказку. Когда окно
+        /// истекло или курсор ушёл — запись снимается и подсказка снова открывается.
         /// </summary>
         private bool IsToolTipSuppressed(Control owner)
         {
-            if (!_suppressedToolTipOwners.Contains(owner))
+            if (!_suppressedToolTipOwners.TryGetValue(owner, out var suppressedTick))
                 return false;
 
-            if (Environment.TickCount64 - _lastToolTipEscTick < ToolTipSuppressWindowMs || owner.IsPointerOver)
-                return true;
+            var pointerOver = owner.IsPointerOver;
+            if (_toolTipSuppressionPolicy.ShouldRelease(Environment.TickCount64, suppressedTick, pointerOver))
+            {
+                _suppressedToolTipOwners.Remove(owner);
+                ToolTipCloserAvalonia.TraceLog(
+                    $"MainWindow.IsToolTipSuppressed: подавление снято, owner={owner.GetType().Name}[{owner.Name}], pointerOver={pointerOver}");
+                return false;
+            }
 
-            _suppressedToolTipOwners.Remove(owner);
-            return false;
+            return true;
         }
 
-        /// <summary>Подавляет повторное открытие подсказки владельца после закрытия по ESC (issue #261).</summary>
-        private void SuppressToolTipOwner(Control owner)
+        /// <summary>
+        /// Подавляет повторное открытие подсказки владельца (issue #261). Запись создаётся
+        /// только для ESC-путей (<paramref name="suppressReopen"/> = true); обычное закрытие
+        /// снимает прежнюю запись, чтобы владелец не «замораживался» (issue #131).
+        /// </summary>
+        private void SuppressToolTipOwner(Control owner, bool suppressReopen)
         {
-            if (_suppressedToolTipOwners.Add(owner))
-                _lastToolTipEscTick = Environment.TickCount64;
+            if (!suppressReopen)
+            {
+                if (_suppressedToolTipOwners.Remove(owner))
+                    ToolTipCloserAvalonia.TraceLog(
+                        $"MainWindow.SuppressToolTipOwner: подавление снято (не ESC), owner={owner.GetType().Name}[{owner.Name}]");
+                return;
+            }
+
+            _suppressedToolTipOwners[owner] = Environment.TickCount64;
+            ToolTipCloserAvalonia.TraceLog(
+                $"MainWindow.SuppressToolTipOwner: owner={owner.GetType().Name}[{owner.Name}], окно={_toolTipSuppressionPolicy.WindowMs} мс");
+        }
+
+        /// <summary>
+        /// Снимает устаревшие записи локального реестра подавления (issue #131): курсор
+        /// ушёл с владельца или истекло окно политики. Вызывается из <c>PointerMoved</c>.
+        /// </summary>
+        private void ReleaseInstanceSuppressionIfPointerLeft()
+        {
+            if (_suppressedToolTipOwners.Count == 0)
+                return;
+
+            List<Control>? release = null;
+            var now = Environment.TickCount64;
+            foreach (var pair in _suppressedToolTipOwners)
+            {
+                if (_toolTipSuppressionPolicy.ShouldRelease(now, pair.Value, pair.Key.IsPointerOver))
+                    (release ??= new List<Control>()).Add(pair.Key);
+            }
+
+            if (release is null)
+                return;
+
+            foreach (var owner in release)
+            {
+                _suppressedToolTipOwners.Remove(owner);
+                ToolTipCloserAvalonia.TraceLog(
+                    $"MainWindow.ReleaseInstanceSuppressionIfPointerLeft: подавление снято, owner={owner.GetType().Name}[{owner.Name}]");
+            }
         }
 
         /// <summary>Шапка окна: полоса, подпись и кнопки, перекрашиваемые по активности.</summary>

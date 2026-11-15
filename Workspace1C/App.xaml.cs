@@ -553,6 +553,14 @@ namespace Workspace1C
 
         private static void ShowFatalError(string title, Exception ex)
         {
+            // Тестовый прогон (UiDialogs.SuppressModalDialogs): фатальная ошибка уже
+            // записана в журнал вызывающим кодом, реальное окно не показываем.
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed("App.Fatal", title);
+                return;
+            }
+
             try
             {
                 var sb = new StringBuilder();

@@ -34,7 +34,15 @@ namespace Workspace1C.Services
 
         public bool Confirm(string message, string title = "")
         {
-            var win = new MaterialMessageWindowAvalonia(message, DefaultTitle(title, "Common.Confirm"), MaterialMessageKind.Question);
+            var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+            // Тестовый прогон (UiDialogs.SuppressModalDialogs): окно не показываем,
+            // отвечаем отказом — «пользователь не подтвердил».
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(Confirm), resolvedTitle);
+                return false;
+            }
+            var win = new MaterialMessageWindowAvalonia(message, resolvedTitle, MaterialMessageKind.Question);
             return ShowModalSync(win);
         }
 
@@ -48,8 +56,14 @@ namespace Workspace1C.Services
         /// <returns>True, если пользователь подтвердил действие.</returns>
         public bool ConfirmUpdate(string summary, string? markdownBody, string title = "")
         {
+            var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(ConfirmUpdate), resolvedTitle);
+                return false;
+            }
             var win = new MaterialMessageWindowAvalonia(
-                summary, DefaultTitle(title, "Common.Confirm"), MaterialMessageKind.Question, markdownBody);
+                summary, resolvedTitle, MaterialMessageKind.Question, markdownBody);
             return ShowModalSync(win);
         }
 
@@ -66,8 +80,14 @@ namespace Workspace1C.Services
         public UpdateDialogResult ConfirmUpdateWithSkip(
             string summary, string? markdownBody, string skipButtonText, string title = "")
         {
+            var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(ConfirmUpdateWithSkip), resolvedTitle);
+                return UpdateDialogResult.Cancelled;
+            }
             var win = new MaterialMessageWindowAvalonia(
-                summary, DefaultTitle(title, "Common.Confirm"), MaterialMessageKind.Question,
+                summary, resolvedTitle, MaterialMessageKind.Question,
                 markdownBody, skipButtonText);
             ShowModalSync(win);
             return win.SkipClicked
@@ -87,19 +107,48 @@ namespace Workspace1C.Services
         /// <param name="title">Заголовок окна.</param>
         public void ShowManualUpdate(string message, string linkUrl, string title = "")
         {
-            var win = new ManualUpdateWindowAvalonia(
-                message, linkUrl, DefaultTitle(title, "Update.NewVersionAvailable"));
+            var resolvedTitle = DefaultTitle(title, "Update.NewVersionAvailable");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(ShowManualUpdate), resolvedTitle);
+                return;
+            }
+            var win = new ManualUpdateWindowAvalonia(message, linkUrl, resolvedTitle);
             ShowModalSync(win);
         }
 
         public string? OpenFileDialog(string title = "", string filter = "", string? initialDirectory = null)
-            => RunSync(() => PickFileAsync(DefaultTitle(title, "Dialog.OpenFile"), filter, initialDirectory));
+        {
+            var resolvedTitle = DefaultTitle(title, "Dialog.OpenFile");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(OpenFileDialog), resolvedTitle);
+                return null;
+            }
+            return RunSync(() => PickFileAsync(resolvedTitle, filter, initialDirectory));
+        }
 
         public string? SaveFileDialog(string title = "", string defaultFileName = "", string filter = "", string? initialDirectory = null)
-            => RunSync(() => PickSaveFileAsync(DefaultTitle(title, "Dialog.SaveFile"), defaultFileName, filter, initialDirectory));
+        {
+            var resolvedTitle = DefaultTitle(title, "Dialog.SaveFile");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(SaveFileDialog), resolvedTitle);
+                return null;
+            }
+            return RunSync(() => PickSaveFileAsync(resolvedTitle, defaultFileName, filter, initialDirectory));
+        }
 
         public string? OpenFolderDialog(string title = "", string? initialDirectory = null)
-            => RunSync(() => PickFolderAsync(DefaultTitle(title, "Dialog.SelectFolder"), initialDirectory));
+        {
+            var resolvedTitle = DefaultTitle(title, "Dialog.SelectFolder");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(OpenFolderDialog), resolvedTitle);
+                return null;
+            }
+            return RunSync(() => PickFolderAsync(resolvedTitle, initialDirectory));
+        }
 
         /// <summary>Подставляет локализованный заголовок по умолчанию, если переданный пуст.</summary>
         private static string DefaultTitle(string title, string fallbackKey) =>
@@ -245,7 +294,15 @@ namespace Workspace1C.Services
         }
 
         private static void ShowMessage(string message, string title, MessageWindowKind kind)
-            => ShowModalSync(new MaterialMessageWindowAvalonia(message, title, (MaterialMessageKind)kind));
+        {
+            // Тестовый прогон (UiDialogs.SuppressModalDialogs): окно не показываем.
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(kind.ToString(), title);
+                return;
+            }
+            ShowModalSync(new MaterialMessageWindowAvalonia(message, title, (MaterialMessageKind)kind));
+        }
 
         /// <summary>
         /// Показывает окно модально и блокирует вызывающий поток до его закрытия,

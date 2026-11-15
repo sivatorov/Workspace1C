@@ -61,8 +61,19 @@ namespace Workspace1C
             Deactivated += (_, _) =>
             {
                 ToolTipCloserAvalonia.TraceLog($"ModalWindowBase.Deactivated: окно {GetType().Name} потеряло фокус");
-                ToolTipCloserAvalonia.CloseAll();
+                // issue #131: закрытие откладываем и выполняем, только если окно действительно
+                // осталось неактивным, — кратковременная деактивация не должна гасить подсказку.
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (IsActive)
+                        return;
+                    ToolTipCloserAvalonia.CloseAll();
+                }, Avalonia.Threading.DispatcherPriority.Background);
             };
+
+            // Снятие подавления при уходе курсора с владельца подсказки (issue #131):
+            // повторное наведение снова показывает подсказку без перезапуска приложения.
+            PointerMoved += (_, _) => ToolTipCloserAvalonia.ReleaseSuppressionIfPointerLeft();
 
             // Первый ESC в диалоге закрывает подсказки на туннельной фазе (Preview), ДО того,
             // как клавиша дойдёт до дочерних контролов и кнопки IsCancel (issue #270): так же,
@@ -846,7 +857,9 @@ namespace Workspace1C
             if (e.Handled || e.Key != Key.Escape || e.KeyModifiers != KeyModifiers.None)
                 return;
 
-            if (ToolTipCloserAvalonia.CloseAll())
+            // ESC — принудительное закрытие: повторное открытие подавляется на текущий цикл,
+            // чтобы подсказка не «мигнула» под курсором (issue #131).
+            if (ToolTipCloserAvalonia.CloseAll(suppressReopen: true))
             {
                 ToolTipCloserAvalonia.TraceLog($"ModalWindowBase.OnPreviewKeyDownCloseToolTips: первый ESC закрыл подсказки, окно {GetType().Name}");
                 e.Handled = true;
@@ -865,7 +878,7 @@ namespace Workspace1C
                 // Инвариант «сначала подсказка, потом окно» тот же, что в issue #261 для главного
                 // окна. На туннельной фазе (OnPreviewKeyDownCloseToolTips) подсказки уже закрыты,
                 // поэтому сюда обычно приходит только повторный ESC.
-                if (ToolTipCloserAvalonia.CloseAll())
+                if (ToolTipCloserAvalonia.CloseAll(suppressReopen: true))
                 {
                     ToolTipCloserAvalonia.TraceLog($"ModalWindowBase.OnKeyDown: ESC закрыл подсказки в окне {GetType().Name}");
                     e.Handled = true;

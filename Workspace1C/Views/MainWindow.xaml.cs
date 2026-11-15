@@ -236,7 +236,15 @@ namespace Workspace1C
                 // меню: при клике в другое окно/приложение открытый тултип исчезает,
                 // а не «висит» поверх браузера. Общий механизм ToolTipCloser дополнительно
                 // вешает Application.Deactivated — покрытие всех окон приложения.
-                ToolTipCloser.CloseAll();
+                // issue #131: закрытие откладываем на Background и выполняем только если окно
+                // действительно осталось неактивным — кратковременная деактивация (попап
+                // подсказки/меню) не должна гасить только что показанную подсказку.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (IsActive)
+                        return;
+                    ToolTipCloser.CloseAll();
+                }), System.Windows.Threading.DispatcherPriority.Background);
             };
 
             // «Стеклянный» полупрозрачный фон окна: подложка берётся из текущего цвета

@@ -19,6 +19,16 @@ namespace Workspace1C.Tests;
 public sealed class TraceFlagsStateCollection { }
 
 /// <summary>
+/// Коллекция с отключённой параллельностью для тестов, разделяющих ГЛОБАЛЬНОЕ
+/// состояние подавления модальных окон (<see cref="Workspace1C.Services.UiDialogs"/>)
+/// и подмен <see cref="Workspace1C.Services.UiExceptionGuard"/>. Тесты этой коллекции
+/// выполняются последовательно относительно остальных коллекций — иначе подмена
+/// DialogShower/флага в одном тесте влияла бы на проверки другого.
+/// </summary>
+[CollectionDefinition("UiDialogsState", DisableParallelization = true)]
+public sealed class UiDialogsStateCollection { }
+
+/// <summary>
 /// Коллекция xUnit с отключённой параллельностью для тестов, разделяющих ГЛОБАЛЬНОЕ
 /// состояние <see cref="Workspace1C.Services.FeatureDataStore.DirectoryOverride"/>:
 /// классы, которые на время теста подменяют каталог данных профиля (FeatureDataStore),
@@ -75,8 +85,33 @@ internal static class TestEnvironment
     [ModuleInitializer]
     internal static void Init()
     {
+        // Тестовый прогон не должен показывать РЕАЛЬНЫЕ модальные окна.
+        // Причина: часть тестов выполняет боевой код (AsyncRelayCommand,
+        // UiExceptionGuard, ViewModel-ы с AppServices после Configure) и при
+        // искусственном исключении («boom», «ошибка после await») вызывала
+        // WpfDialogService → material-окно падало на MTA-потоке xUnit, а резервный
+        // MessageBox открывался по-настоящему и блокировал прогон до нажатия кнопки.
+        // Заглушки, переданные явно (RecordingDialogs, UiExceptionGuard.DialogShower),
+        // продолжают работать — тесты показа диалогов остаются валидными.
+        UiDialogs.SuppressModalDialogs = true;
+
         try { Environment.SetEnvironmentVariable("CM_REDIRECT", "1"); }
         catch { /* env недоступен — часть тестов входа потеряет INFO-записи */ }
+
+        // Тестовые ERROR/WARN не должны попадать в пользовательский
+        // %APPDATA%\Workspace1C\logs\app-YYYYMMDD.log: такие записи («имитация»,
+        // «boom») путают диагностику реальных сбоев. Журнал тестового процесса
+        // уводится во временный каталог.
+        try
+        {
+            var logDir = Path.Combine(Path.GetTempPath(), $"cm_tests_logs_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(logDir);
+            FileAppLogger.DirectoryOverride = logDir;
+        }
+        catch
+        {
+            // Временный каталог не создался — тесты продолжат писать в штатный журнал.
+        }
 
         try
         {

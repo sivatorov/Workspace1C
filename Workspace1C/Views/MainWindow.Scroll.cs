@@ -310,6 +310,15 @@ namespace Workspace1C
             if (treeScroll.HorizontalOffset != 0)
                 treeScroll.ScrollToHorizontalOffset(0);
 
+            // Issue #130: вертикальная прокрутка меняет набор реализованных строк, а высота
+            // линий теперь равна низу последней реализованной строки. Пересчитываем после
+            // раскладки (Loaded), когда контейнеры новой области уже созданы.
+            if (e.VerticalChange != 0 || e.ExtentHeightChange != 0)
+            {
+                Dispatcher.BeginInvoke(new Action(RefreshGridLinesOverlay),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+
             // Вертикальная полоса вынесена отдельным столбцом — синхронизируем её геометрию.
             SyncVerticalScrollBar(treeScroll);
 

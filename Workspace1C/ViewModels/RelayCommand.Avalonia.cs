@@ -122,6 +122,12 @@ public class AsyncRelayCommand : ICommand
     /// <summary>Показ диалога ошибки в UI-потоке; без приложения/сервиса диалогов — тихий выход.</summary>
     private static void ShowErrorDialog(string message)
     {
+        // Тестовый прогон (UiDialogs.SuppressModalDialogs): диалог не показываем.
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed("AsyncRelayCommand", LocalizationManager.T("Common.Error"));
+            return;
+        }
         var dialogs = AppServices.TryGetService<IDialogService>();
         if (dialogs is null)
             return;

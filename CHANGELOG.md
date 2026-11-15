@@ -11,6 +11,80 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.67] — 2026-11-15
+
+### Исправлено
+
+- **Подсказки трёх иконок подвала больше не исчезают сразу и снова открываются
+  без перезапуска (issue #131, комментарий 7OH).** Затронуты колокольчик уведомлений
+  (`LongOperationAlarmToggle`), кнопка «Текущая сессия» и кнопка правой панели в WPF
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3742)) и в Avalonia
+  ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:1709)).
+  Причина состояла из двух дефектов. (1) В вето на повторное открытие
+  [`ToolTipCloser.OnToolTipOpening`](Workspace1C/Views/ToolTipCloser.cs:869) условие
+  `... || IsPointerOver(owner)` выполнялось всегда: при показе подсказки по наведению
+  курсор уже над владельцем, поэтому запись о подавлении никогда не снималась и владелец
+  навсегда терял подсказку до перезапуска. Тот же дефект был в Avalonia
+  ([`ToolTipCloserAvalonia.IsToolTipSuppressed`](Workspace1C/Views/ToolTipCloserAvalonia.cs:332)
+  и дублирующей проверке в
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:563)).
+  (2) `SuppressToolTipOwner` вызывался при любом `CloseAll()` — включая потерю фокуса,
+  `Application.Deactivated`, WndProc-хук и fallback-таймер 250 мс, — поэтому подсказка
+  «появлялась и почти сразу исчезала».
+  Решение: введена чистая политика
+  [`ToolTipSuppressionPolicy`](Workspace1C/Services/ToolTipSuppressionPolicy.cs:1) —
+  подавление ограничено окном 800 мс и не продлевается наведённым курсором; уход курсора
+  снимает запись немедленно (WPF — класс-обработчик `Mouse.MouseMoveEvent`, Avalonia —
+  `PointerMoved`), `Unloaded` очищает реестры. `CloseAll` получил параметр
+  `suppressReopen` (по умолчанию `false`): подавление включают только ESC-пути
+  (`OnGlobalPreviewKeyDown`, `OnToolTipPreviewKeyDown`, `OnThreadPreprocessMessage`,
+  ESC в главном окне и диалогах), а потеря фокуса, деактивация, прокрутка и
+  fallback-таймер закрывают подсказку без запрета повторного показа. Закрытие по
+  `Deactivated` теперь отложено на `DispatcherPriority.Background` и выполняется, только
+  если окно действительно осталось неактивным; fallback-таймер не закрывает подсказки,
+  когда foreground принадлежит нашему процессу или курсор над нашим окном. В
+  `SuppressToolTipOwner` и снятие подавления добавлен trace (`CM_TOOLTIP_TRACE=1`,
+  `%TEMP%\cm_tooltip_trace.log`). ESC-поведение (первый ESC — подсказка, второй — окно)
+  и скрытие подсказок при уходе в другое приложение сохранены. Покрыто тестами
+  [`ToolTipSuppressionPolicyTests`](Workspace1C.Tests/ToolTipSuppressionPolicyTests.cs:1)
+  и source-гвардами
+  [`Issue131LongOperationNotificationTests`](Workspace1C.Tests/Issue131LongOperationNotificationTests.cs:592):
+  наведение без подавления, ESC в пределах окна, деактивация без подавления, повторное
+  наведение после закрытия, отсутствие «вечного» подавления, fallback-политика, а также
+  проверки обеих платформ.
+
+## [1.0.1.66] — 2026-11-15
+
+### Исправлено
+
+- **Вертикальные линии сетки списка баз заканчиваются последней строкой
+  (issue #130, замечание 7OH).** После последней реализованной строки линии больше
+  не тянутся до низа окна. Оверлей `GridLinesOverlay` по-прежнему покрывает заголовок
+  и строки (`Grid.RowSpan="2"`), но высота самих линий теперь равна низу последней
+  реализованной строки (строки базы или группы), а при пустом списке — низу заголовка.
+  Причина: высота линии бралась как `ActualHeight`/`Bounds.Height` оверлея, который
+  растянут на всю область списка, поэтому при малом числе строк линия продолжалась до
+  низа вьюпорта (7OH: «после последней строки, наверное, не надо рисовать вертикальные
+  линии до конца окна вниз»). Добавлен чистый расчёт
+  [`GridLinesPlanner.ResolveVerticalExtent`](Workspace1C/Services/GridLinesPlanner.cs:177)
+  (и хелпер `ResolveBottomOfRows`): максимум из низа заголовка и низов реализованных
+  строк, ограничение доступной высотой оверлея, округление к физическому пикселю
+  (`SnapToPhysicalPixel`) для DPI 125/150 %, пустой список → низ заголовка, неготовая
+  разметка → прежняя высота как безопасный fallback. WPF вычисляет низы через
+  `TransformToVisual`/`TranslatePoint` по уже существующим маркерам строк
+  (`RowGridMarker`/`GroupGridMarker`) —
+  [`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs:571), пересчёт на
+  вертикальной прокрутке — [`MainWindow.Scroll.cs`](Workspace1C/Views/MainWindow.Scroll.cs:318);
+  Avalonia — через `TranslatePoint`/`Bounds` по `InfobaseRowCard` и `GroupRowGridName`
+  ([`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs:543),
+  прокрутка — [`MainWindow.Avalonia.Scroll.cs`](Workspace1C/Views/MainWindow.Avalonia.Scroll.cs:115)).
+  Горизонтальные линии, линии заголовка, скрытые колонки, одна линия на границу,
+  компактный режим, тёмная/светлая темы и группы не менялись. Покрыто тестами
+  [`Issue130GridLinesTests`](Workspace1C.Tests/Issue130GridLinesTests.cs:293): пустой
+  список, одна/несколько строк, группа выше строки базы, ограничение доступной высотой,
+  DPI 1.0/1.25/1.5/2.0, нулевые и отрицательные входы, source-гварды обеих платформ
+  (включая отсутствие высоты «во весь оверлей»).
+
 ## [1.0.1.65] — 2026-11-15
 
 ### Исправлено

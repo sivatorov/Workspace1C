@@ -139,6 +139,64 @@ public static class GridLinesPlanner
     }
 
     /// <summary>
+    /// Низ последней реализованной строки списка (issue #130, замечание 7OH): максимум
+    /// из низа заголовка и низов строк. Строки выше вьюпорта дают отрицательные
+    /// координаты и на максимум не влияют. Отрицательные и <see cref="double.NaN"/>
+    /// значения игнорируются; заголовок тоже может отсутствовать.
+    /// </summary>
+    /// <param name="headerBottom">Низ заголовка в координатах оверлея; <c>null</c> — нет данных.</param>
+    /// <param name="rowBottoms">Низы реализованных строк баз и групп в координатах оверлея.</param>
+    public static double ResolveBottomOfRows(double? headerBottom, IReadOnlyList<double>? rowBottoms)
+    {
+        var extent = headerBottom is { } header && header > 0 && !double.IsNaN(header) ? header : 0;
+        if (rowBottoms is not null)
+        {
+            for (var i = 0; i < rowBottoms.Count; i++)
+            {
+                var bottom = rowBottoms[i];
+                if (!double.IsNaN(bottom) && bottom > extent)
+                    extent = bottom;
+            }
+        }
+        return extent;
+    }
+
+    /// <summary>
+    /// Высота вертикальных линий сетки (issue #130): линии заканчиваются низом последней
+    /// реализованной строки списка (включая заголовок), а не растягиваются до низа окна.
+    /// Пустой список — линии заканчиваются низом заголовка. Высота не превышает доступную
+    /// (прокрутка/длинный список) и округляется к физическому пикселю, чтобы торец линии
+    /// не был полупрозрачным на 125/150 % DPI. Если разметка ещё не готова (нет ни
+    /// заголовка, ни строк), возвращается <paramref name="availableHeight"/> — прежнее
+    /// поведение как безопасный fallback, чтобы линии не исчезали при неготовой разметке.
+    /// </summary>
+    /// <param name="headerBottom">Низ заголовка в координатах оверлея; <c>null</c> — нет данных.</param>
+    /// <param name="rowBottoms">Низы реализованных строк баз и групп в координатах оверлея.</param>
+    /// <param name="availableHeight">Доступная высота оверлея (вьюпорт списка).</param>
+    /// <param name="dpiScale">Масштаб DPI (1.0, 1.25, 1.5, 2.0…).</param>
+    public static double ResolveVerticalExtent(
+        double? headerBottom,
+        IReadOnlyList<double>? rowBottoms,
+        double availableHeight,
+        double dpiScale)
+    {
+        // Нет доступной высоты (или она некорректна) — рисовать нечего.
+        if (!(availableHeight > 0))
+            return 0;
+
+        var extent = ResolveBottomOfRows(headerBottom, rowBottoms);
+        // Разметка ещё не готова: ни заголовка, ни строк — сохраняем прежнее поведение.
+        if (extent <= 0)
+            return availableHeight;
+
+        extent = Math.Min(extent, availableHeight);
+        var snapped = SnapToPhysicalPixel(extent, dpiScale);
+        // После округления линия тоньше физического пикселя не видна — не создаём её.
+        var scale = dpiScale > 0 ? dpiScale : 1.0;
+        return snapped >= 1.0 / scale ? snapped : 0;
+    }
+
+    /// <summary>
     /// Строит план линий сетки.
     /// </summary>
     /// <param name="showHorizontal">Настройка «Выводить линии — по горизонтали».</param>

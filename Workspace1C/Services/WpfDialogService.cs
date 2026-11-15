@@ -25,6 +25,13 @@ public sealed class WpfDialogService : IDialogService
     public bool Confirm(string message, string title = "")
     {
         var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+        // Тестовый прогон (UiDialogs.SuppressModalDialogs): окно не показываем,
+        // отвечаем отказом — «пользователь не подтвердил».
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed(nameof(Confirm), resolvedTitle);
+            return false;
+        }
         try
         {
             var win = new MaterialMessageWindow(message, resolvedTitle, MaterialMessageKind.Question);
@@ -46,6 +53,13 @@ public sealed class WpfDialogService : IDialogService
     private static void Show(string message, string title, MaterialMessageKind kind)
     {
         var resolvedTitle = DefaultTitle(title, "Common.Information");
+        // Тестовый прогон (UiDialogs.SuppressModalDialogs): ни material-окно, ни
+        // резервный MessageBox не показываем — иначе прогон блокируется нажатием кнопки.
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed(kind.ToString(), resolvedTitle);
+            return;
+        }
         try
         {
             var win = new MaterialMessageWindow(message, resolvedTitle, kind);
@@ -152,9 +166,15 @@ public sealed class WpfDialogService : IDialogService
 
     public string? OpenFileDialog(string title = "", string filter = "", string? initialDirectory = null)
     {
+        var resolvedTitle = DefaultTitle(title, "Dialog.OpenFile");
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed(nameof(OpenFileDialog), resolvedTitle);
+            return null;
+        }
         var dialog = new OpenFileDialog
         {
-            Title = DefaultTitle(title, "Dialog.OpenFile"),
+            Title = resolvedTitle,
             Filter = BuildFilter(filter),
             InitialDirectory = NormalizeDirectory(initialDirectory),
             CheckFileExists = true
@@ -164,9 +184,15 @@ public sealed class WpfDialogService : IDialogService
 
     public string? SaveFileDialog(string title = "", string defaultFileName = "", string filter = "", string? initialDirectory = null)
     {
+        var resolvedTitle = DefaultTitle(title, "Dialog.SaveFile");
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed(nameof(SaveFileDialog), resolvedTitle);
+            return null;
+        }
         var dialog = new SaveFileDialog
         {
-            Title = DefaultTitle(title, "Dialog.SaveFile"),
+            Title = resolvedTitle,
             FileName = defaultFileName,
             Filter = BuildFilter(filter),
             InitialDirectory = NormalizeDirectory(initialDirectory),
@@ -177,9 +203,15 @@ public sealed class WpfDialogService : IDialogService
 
     public string? OpenFolderDialog(string title = "", string? initialDirectory = null)
     {
+        var resolvedTitle = DefaultTitle(title, "Dialog.SelectFolder");
+        if (UiDialogs.SuppressModalDialogs)
+        {
+            UiDialogs.TraceSuppressed(nameof(OpenFolderDialog), resolvedTitle);
+            return null;
+        }
         var dialog = new System.Windows.Forms.FolderBrowserDialog
         {
-            Description = DefaultTitle(title, "Dialog.SelectFolder"),
+            Description = resolvedTitle,
             SelectedPath = NormalizeDirectory(initialDirectory)
         };
         return dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK ? dialog.SelectedPath : null;

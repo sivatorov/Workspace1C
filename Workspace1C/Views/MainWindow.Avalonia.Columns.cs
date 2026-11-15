@@ -533,9 +533,18 @@ namespace Workspace1C
             if (offsets.Count == 0)
                 return;
 
-            var height = _gridLinesOverlay.Bounds.Height > 0
+            // Issue #130 (7OH): высота линий — низ последней реализованной строки,
+            // а не вся высота оверлея: после последней строки линий быть не должно.
+            // Пустой список заканчивается низом заголовка, при неготовой разметке —
+            // безопасный fallback на прежнюю высоту оверлея.
+            var availableHeight = _gridLinesOverlay.Bounds.Height > 0
                 ? _gridLinesOverlay.Bounds.Height
                 : _listContent?.Bounds.Height ?? 0;
+            var height = GridLinesPlanner.ResolveVerticalExtent(
+                GetGridLinesHeaderBottom(),
+                GetGridLinesRowBottoms(),
+                availableHeight,
+                scale);
             if (height <= 0)
                 return;
 
@@ -558,6 +567,53 @@ namespace Workspace1C
                 line.ZIndex = 1;
                 _gridLinesOverlay.Children.Add(line);
             }
+        }
+
+        /// <summary>
+        /// Низ заголовка в координатах оверлея сетки (issue #130): линии начинаются
+        /// от низа заголовка, поэтому пустой список заканчивается ровно на нём.
+        /// <c>null</c> — заголовок ещё не в визуальном дереве/не измерен.
+        /// </summary>
+        private double? GetGridLinesHeaderBottom()
+        {
+            if (_gridLinesOverlay is null)
+                return null;
+            Control? header = (Control?)_columnHeader ?? _columnHeaderRow;
+            if (header is null || header.Bounds.Height <= 0)
+                return null;
+            var point = header.TranslatePoint(new Point(0, header.Bounds.Height), _gridLinesOverlay);
+            return point?.Y;
+        }
+
+        /// <summary>
+        /// Низы уже реализованных строк списка (базы и группы) в координатах оверлея
+        /// (issue #130). У TreeView в Avalonia нет виртуализации — реализованы все
+        /// строки, но максимум низа всё равно даёт последнюю строку, а строки выше
+        /// вьюпорта дают отрицательные координаты и на результат не влияют.
+        /// </summary>
+        private IReadOnlyList<double>? GetGridLinesRowBottoms()
+        {
+            if (_gridLinesOverlay is null || _tree is null)
+                return null;
+
+            var bottoms = new List<double>();
+            foreach (var card in _tree.GetVisualDescendants().OfType<InfobaseRowCard>())
+            {
+                if (card.Child is not Grid grid || grid.Bounds.Height <= 0)
+                    continue;
+                var point = grid.TranslatePoint(new Point(0, grid.Bounds.Height), _gridLinesOverlay);
+                if (point is not null)
+                    bottoms.Add(point.Value.Y);
+            }
+            foreach (var grid in _tree.GetVisualDescendants().OfType<Grid>())
+            {
+                if (grid.Name != GroupRowGridName || grid.Bounds.Height <= 0)
+                    continue;
+                var point = grid.TranslatePoint(new Point(0, grid.Bounds.Height), _gridLinesOverlay);
+                if (point is not null)
+                    bottoms.Add(point.Value.Y);
+            }
+            return bottoms;
         }
 
         /// <summary>

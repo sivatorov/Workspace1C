@@ -11,6 +11,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Workspace1C.Controls;
+using Workspace1C.Services;
 
 namespace Workspace1C
 {
@@ -81,19 +82,16 @@ namespace Workspace1C
         private static readonly HashSet<DependencyObject> _openToolTipOwners = new();
 
         /// <summary>
-        /// Владельцы подсказок, подавленных после закрытия по ESC (issue #270): пока владелец
-        /// числится здесь, повторное автоматическое открытие его ToolTip вето-обработчиком
-        /// ToolTipService.ToolTipOpeningEvent блокируется — подсказка не «возвращается» при
-        /// наведённом курсоре. Подавление снимается, когда курсор ушёл с владельца и истёк
-        /// короткий интервал после ESC.
+        /// Владельцы подсказок, подавленных после принудительного закрытия по ESC (issues #270,
+        /// #131), и момент подавления (Environment.TickCount64). Подавление действует только
+        /// на текущий цикл закрытия и ограничено окном
+        /// <see cref="ToolTipSuppressionPolicy.WindowMs"/>; обычные закрытия (потеря фокуса,
+        /// деактивация, прокрутка, fallback-таймер) запись не создают.
         /// </summary>
-        private static readonly HashSet<DependencyObject> _suppressedToolTipOwners = new();
+        private static readonly Dictionary<DependencyObject, long> _suppressedToolTipOwners = new();
 
-        /// <summary>Момент последнего закрытия подсказки по ESC (Environment.TickCount64).</summary>
-        private static long _lastToolTipEscTick;
-
-        /// <summary>Окно подавления повторного открытия подсказки после ESC (мс).</summary>
-        private const long ToolTipSuppressWindowMs = 800;
+        /// <summary>Чистая политика подавления повторного открытия подсказок (issue #131).</summary>
+        private static readonly ToolTipSuppressionPolicy _suppressionPolicy = new();
 
         // Открытые контекстные меню приложения (глобально, для всех окон). Первый ESC должен
         // закрыть и их тоже, иначе окно закроется, а меню останется «висеть» (issue #261/#270).
@@ -199,12 +197,28 @@ namespace Workspace1C
                 new KeyEventHandler(OnGlobalPreviewKeyDown),
                 handledEventsToo: true);
 
-            // Класс-обработчик вето на открытие: после закрытия по ESC подавленные владельцы
-            // не должны автоматически показывать тултип снова, пока указатель над ними.
+            // Класс-обработчик вето на открытие: после принудительного закрытия по ESC
+            // подавленный владелец не должен автоматически показывать тултип снова, но только
+            // на время текущего цикла закрытия (issue #131).
             EventManager.RegisterClassHandler(
                 typeof(FrameworkElement),
                 System.Windows.Controls.ToolTipService.ToolTipOpeningEvent,
                 new ToolTipEventHandler(OnToolTipOpening));
+
+            // Снятие подавления при уходе курсора с владельца (issue #131): подавление
+            // действует только на текущий цикл закрытия. Как только указатель покинул
+            // владельца (или истекло окно политики), запись удаляется, и повторное наведение
+            // снова показывает подсказку — без перезапуска приложения.
+            EventManager.RegisterClassHandler(
+                typeof(UIElement),
+                Mouse.MouseMoveEvent,
+                new MouseEventHandler(OnGlobalMouseMove));
+
+            // Удалённый из дерева элемент не должен удерживаться в реестрах подавления.
+            EventManager.RegisterClassHandler(
+                typeof(FrameworkElement),
+                FrameworkElement.UnloadedEvent,
+                new RoutedEventHandler(OnElementUnloaded));
 
             // Глобальное отслеживание открытых контекстных меню (issue #261/#270): первый ESC
             // должен закрыть открытое меню в любом окне приложения, а не само окно.
@@ -284,8 +298,31 @@ namespace Workspace1C
         private static void OnApplicationDeactivated(object? sender, EventArgs e)
         {
             TraceLog("OnApplicationDeactivated: приложение потеряло активацию");
-            try { CloseAll(); }
-            catch { /* потеря фокуса не должна ронять приложение */ }
+
+            // Закрытие откладываем на Background и выполняем, только если ни одно окно
+            // приложения не стало активным за это время (issue #131): кратковременная
+            // деактивация (активация попапа подсказки/меню, мигание foreground) не должна
+            // гасить только что показанную подсказку.
+            var app = Application.Current;
+            if (app is null)
+                return;
+
+            app.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                try
+                {
+                    if (IsAnyWindowActive())
+                    {
+                        TraceLog("OnApplicationDeactivated: окно снова активно — закрытие отменено");
+                        return;
+                    }
+                    CloseAll();
+                }
+                catch
+                {
+                    // потеря фокуса не должна ронять приложение
+                }
+            }));
         }
 
         /// <summary>
@@ -313,9 +350,34 @@ namespace Workspace1C
         /// </summary>
         private static void OnWindowDeactivated(object? sender, EventArgs e)
         {
-            TraceLog($"OnWindowDeactivated: окно {FormatObject(sender)} потеряло фокус");
-            try { CloseAll(); }
-            catch { /* потеря фокуса не должна ронять приложение */ }
+            if (sender is not Window window)
+            {
+                try { CloseAll(); }
+                catch { /* потеря фокуса не должна ронять приложение */ }
+                return;
+            }
+
+            TraceLog($"OnWindowDeactivated: окно {FormatObject(window)} потеряло фокус");
+
+            // Закрытие откладываем на Background и проверяем фактическую активность окна
+            // на момент выполнения (issue #131): кратковременная деактивация из-за попапа
+            // подсказки/меню не должна закрывать только что показанную подсказку.
+            window.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+            {
+                try
+                {
+                    if (window.IsActive)
+                    {
+                        TraceLog($"OnWindowDeactivated: окно {FormatObject(window)} снова активно — закрытие отменено");
+                        return;
+                    }
+                    CloseAll();
+                }
+                catch
+                {
+                    // потеря фокуса не должна ронять приложение
+                }
+            }));
         }
 
         /// <summary>
@@ -452,11 +514,19 @@ namespace Workspace1C
                 if (_openToolTips.Count == 0 && _openContextMenus.Count == 0 && _openPopups.Count == 0)
                     return;
 
-                if (!IsOurProcessForeground())
+                var ourProcessForeground = IsOurProcessForeground();
+                var pointerOverOurWindow = IsPointerOverAnyWindow();
+                if (ToolTipSuppressionPolicy.IsFallbackCloseAllowed(ourProcessForeground, pointerOverOurWindow))
                 {
                     TraceLog($"OnFocusCheckTick: foreground — чужой процесс, тултипов={_openToolTips.Count}, " +
                              $"меню={_openContextMenus.Count}, попапов={_openPopups.Count}");
+                    // Fallback-таймер не подавляет повторное открытие (issue #131): закрытие
+                    // по ложной деактивации не должно «замораживать» владельца подсказки.
                     CloseAll();
+                }
+                else if (!ourProcessForeground)
+                {
+                    TraceLog("OnFocusCheckTick: закрытие отменено — курсор над нашим окном");
                 }
             }
             catch
@@ -501,7 +571,9 @@ namespace Workspace1C
             Application.Current?.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
             {
                 _toolTipRetryScheduled = false;
-                if (_openToolTips.Count > 0 && CloseOpenToolTips())
+                // Повторный проход — не ESC-путь, поэтому подавление повторного открытия
+                // не включает (issue #131); уже подавленные ESC владельцы сохраняют запись.
+                if (_openToolTips.Count > 0 && CloseOpenToolTips(suppressReopen: false))
                     TraceLog("ScheduleToolTipRetry: повторный проход закрыл оставшиеся тултипы");
             }));
         }
@@ -524,13 +596,18 @@ namespace Workspace1C
         /// открытых окон и цепочка визуальных родителей элемента под курсором/в фокусе. Затем
         /// закрываются открытые контекстные меню и пользовательские Popup (кроме штатных
         /// дропдаунов селекторов/календарей, которыми управляют сами контролы).
-        /// Используется и по ESC, и при потере фокуса (issue #275), и в Win32-перехвате.
+        /// <para>
+        /// <paramref name="suppressReopen"/> (issue #131): запрещать ли автоматическое повторное
+        /// открытие закрытых подсказок на время текущего цикла. <c>true</c> передают только
+        /// ESC-пути; потеря фокуса, деактивация, прокрутка и fallback-таймер вызывают метод
+        /// без подавления, чтобы подсказка снова открывалась при повторном наведении.
+        /// </para>
         /// </summary>
-        public static bool CloseAll()
+        public static bool CloseAll(bool suppressReopen = false)
         {
             var closed = false;
 
-            closed |= CloseOpenToolTips();
+            closed |= CloseOpenToolTips(suppressReopen);
             closed |= CloseOpenContextMenus();
             closed |= CloseOpenPopups();
 
@@ -550,8 +627,10 @@ namespace Workspace1C
         /// Закрывает все открытые ToolTip приложения (основная часть <see cref="CloseAll"/>).
         /// Основной путь — по самим ToolTip-инстансам; резервные — по владельцам, обход
         /// визуального дерева окон и цепочка родителей элемента под курсором/в фокусе.
+        /// <paramref name="suppressReopen"/> включает подавление повторного открытия
+        /// только в ESC-путях (issue #131).
         /// </summary>
-        private static bool CloseOpenToolTips()
+        private static bool CloseOpenToolTips(bool suppressReopen)
         {
             var closed = false;
 
@@ -565,9 +644,9 @@ namespace Workspace1C
                 {
                     try { tip.IsOpen = false; } catch { /* не роняем по одной подсказке */ }
                     closed = true;
-                    // Подавляем повторное автоматическое открытие (issue #270): иначе при
-                    // наведённом курсоре ToolTipService тут же снова покажет подсказку.
-                    SuppressToolTipOwner(tip.PlacementTarget ?? tip);
+                    // Подавляем повторное автоматическое открытие только для ESC (issue #270,
+                    // #131): при обычной потере фокуса подсказка должна открываться снова.
+                    SuppressToolTipOwner(tip.PlacementTarget ?? tip, suppressReopen);
                 }
             }
             if (closed)
@@ -585,7 +664,7 @@ namespace Workspace1C
                 if (TryCloseToolTip(owner))
                 {
                     closed = true;
-                    SuppressToolTipOwner(owner);
+                    SuppressToolTipOwner(owner, suppressReopen);
                 }
             }
             if (closed)
@@ -602,14 +681,14 @@ namespace Workspace1C
             {
                 foreach (Window window in app.Windows)
                 {
-                    if (CloseToolTipsIn(window))
+                    if (CloseToolTipsIn(window, suppressReopen))
                         closed = true;
                 }
             }
 
             // Попап открытой подсказки размещается вне визуального дерева окна (отдельный
             // HWND/Popup), поэтому до «хозяина» добираемся и по курсору/фокусу.
-            closed |= CloseToolTipByMouseOrFocus();
+            closed |= CloseToolTipByMouseOrFocus(suppressReopen);
 
             if (closed)
                 TraceLog("CloseOpenToolTips: закрыты резервными путями");
@@ -618,7 +697,7 @@ namespace Workspace1C
         }
 
         /// <summary>Закрывает все открытые <see cref="System.Windows.Controls.ToolTip"/> в поддереве.</summary>
-        private static bool CloseToolTipsIn(DependencyObject root)
+        private static bool CloseToolTipsIn(DependencyObject root, bool suppressReopen)
         {
             var closed = false;
             var queue = new Queue<DependencyObject>();
@@ -630,7 +709,7 @@ namespace Workspace1C
                 if (node is UIElement ui && TryCloseToolTip(ui))
                 {
                     closed = true;
-                    SuppressToolTipOwner(ui);
+                    SuppressToolTipOwner(ui, suppressReopen);
                 }
 
                 for (var i = VisualTreeHelper.GetChildrenCount(node) - 1; i >= 0; i--)
@@ -645,7 +724,7 @@ namespace Workspace1C
         /// <see cref="CloseToolTipsIn"/>, поэтому дотягиваемся до «хозяина» подсказки по цепочке
         /// визуальных родителей от элемента под мышью/в фокусе.
         /// </summary>
-        private static bool CloseToolTipByMouseOrFocus()
+        private static bool CloseToolTipByMouseOrFocus(bool suppressReopen)
         {
             var closed = false;
             var candidates = new DependencyObject?[]
@@ -661,7 +740,7 @@ namespace Workspace1C
                     if (TryCloseToolTip(node))
                     {
                         closed = true;
-                        SuppressToolTipOwner(node);
+                        SuppressToolTipOwner(node, suppressReopen);
                     }
                 }
             }
@@ -732,7 +811,9 @@ namespace Workspace1C
 
             try
             {
-                if (CloseAll())
+                // ESC — принудительное закрытие: повторное открытие подавляется на текущий
+                // цикл, чтобы подсказка не «мигнула» под курсором (issue #131).
+                if (CloseAll(suppressReopen: true))
                 {
                     e.Handled = true;
                     TraceLog($"OnGlobalPreviewKeyDown: ESC обработан, sender={sender?.GetType().Name}");
@@ -784,39 +865,151 @@ namespace Workspace1C
                 var owner = tip.PlacementTarget ?? tip;
                 _openToolTips.Remove(tip);
                 _openToolTipOwners.Remove(owner);
-                SuppressToolTipOwner(owner);
+                SuppressToolTipOwner(owner, suppressReopen: true);
                 e.Handled = true;
                 TraceLog("OnToolTipPreviewKeyDown: ESC по тултипу");
             }
         }
 
         /// <summary>
-        /// Класс-обработчик вето на повторное открытие подсказки (issue #270). Вызывается до
-        /// показа тултипа владельца: если владелец подавлен после ESC и указатель всё ещё над
-        /// ним (или не истёк короткий интервал) — показ отменяется. Как только курсор ушёл и
-        /// интервал истёк — подавление снимается.
+        /// Класс-обработчик вето на повторное открытие подсказки (issues #270, #131).
+        /// Вызывается до показа тултипа владельца. Вето действует только внутри окна
+        /// <see cref="ToolTipSuppressionPolicy.WindowMs"/> от принудительного закрытия по ESC
+        /// и НЕ продлевается наведённым курсором: при показе по наведению указатель всегда над
+        /// владельцем, и прежняя проверка <c>IsPointerOver</c> навсегда «замораживала» подсказку
+        /// (issue #131). Когда окно истекло или курсор ушёл — запись снимается, и подсказка
+        /// снова открывается при повторном наведении.
         /// </summary>
         private static void OnToolTipOpening(object sender, ToolTipEventArgs e)
         {
             if (_suppressedToolTipOwners.Count == 0 || sender is not DependencyObject owner)
                 return;
-            if (!_suppressedToolTipOwners.Contains(owner))
+            if (!_suppressedToolTipOwners.TryGetValue(owner, out var suppressedTick))
                 return;
 
-            if (Environment.TickCount64 - _lastToolTipEscTick < ToolTipSuppressWindowMs || IsPointerOver(owner))
+            var pointerOver = IsPointerOver(owner);
+            if (_suppressionPolicy.ShouldRelease(Environment.TickCount64, suppressedTick, pointerOver))
             {
-                e.Handled = true;
+                _suppressedToolTipOwners.Remove(owner);
+                TraceLog($"OnToolTipOpening: подавление снято, owner={FormatObject(owner)}, pointerOver={pointerOver}");
                 return;
             }
 
-            _suppressedToolTipOwners.Remove(owner);
+            // Подавление действует только на текущий цикл закрытия после ESC.
+            e.Handled = true;
+            TraceLog($"OnToolTipOpening: показ подавлен после ESC, owner={FormatObject(owner)}");
         }
 
-        /// <summary>Подавляет повторное открытие подсказки владельца после закрытия по ESC (issue #270).</summary>
-        private static void SuppressToolTipOwner(DependencyObject owner)
+        /// <summary>
+        /// Подавляет повторное открытие подсказки владельца (issue #270). Запись создаётся
+        /// только для ESC-путей (<paramref name="suppressReopen"/> = true); обычное закрытие
+        /// снимает прежнюю запись, чтобы владелец не «замораживался» (issue #131).
+        /// </summary>
+        private static void SuppressToolTipOwner(DependencyObject owner, bool suppressReopen)
         {
-            _suppressedToolTipOwners.Add(owner);
-            _lastToolTipEscTick = Environment.TickCount64;
+            if (!suppressReopen)
+            {
+                if (_suppressedToolTipOwners.Remove(owner))
+                    TraceLog($"SuppressToolTipOwner: подавление снято (не ESC), owner={FormatObject(owner)}");
+                return;
+            }
+
+            _suppressedToolTipOwners[owner] = Environment.TickCount64;
+            TraceLog($"SuppressToolTipOwner: owner={FormatObject(owner)}, окно={_suppressionPolicy.WindowMs} мс");
+        }
+
+        /// <summary>
+        /// Класс-обработчик движения мыши (issue #131): снимает подавление с владельцев,
+        /// над которыми курсора больше нет (или истекло окно политики). Проверка дешёвая —
+        /// при пустом реестре сразу выходит.
+        /// </summary>
+        private static void OnGlobalMouseMove(object sender, MouseEventArgs e)
+        {
+            ReleaseSuppressedOwners();
+        }
+
+        /// <summary>Снимает устаревшие записи о подавлении подсказок (issue #131).</summary>
+        private static void ReleaseSuppressedOwners()
+        {
+            if (_suppressedToolTipOwners.Count == 0)
+                return;
+
+            List<DependencyObject>? release = null;
+            var now = Environment.TickCount64;
+            foreach (var pair in _suppressedToolTipOwners)
+            {
+                var pointerOver = IsPointerOver(pair.Key);
+                if (_suppressionPolicy.ShouldRelease(now, pair.Value, pointerOver))
+                    (release ??= new List<DependencyObject>()).Add(pair.Key);
+            }
+
+            if (release is null)
+                return;
+
+            foreach (var owner in release)
+            {
+                _suppressedToolTipOwners.Remove(owner);
+                TraceLog($"ReleaseSuppressedOwners: подавление снято, owner={FormatObject(owner)}");
+            }
+        }
+
+        /// <summary>
+        /// Класс-обработчик Unloaded (issue #131): удалённый из дерева элемент не должен
+        /// удерживаться в реестрах открытых подсказок и подавления.
+        /// </summary>
+        private static void OnElementUnloaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is not DependencyObject element)
+                return;
+
+            _suppressedToolTipOwners.Remove(element);
+            _openToolTipOwners.Remove(element);
+        }
+
+        /// <summary>Есть ли хотя бы одно активное окно приложения (issue #131).</summary>
+        private static bool IsAnyWindowActive()
+        {
+            if (Application.Current is not { } app)
+                return false;
+
+            foreach (Window window in app.Windows)
+            {
+                try
+                {
+                    if (window.IsActive)
+                        return true;
+                }
+                catch
+                {
+                    // окно могло закрыться во время обхода
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Находится ли курсор над каким-либо окном приложения (issue #131). Нужно
+        /// fallback-таймеру, чтобы не закрывать подсказку, пока пользователь работает
+        /// с приложением (кратковременный «чужой» foreground — артефакт).
+        /// </summary>
+        private static bool IsPointerOverAnyWindow()
+        {
+            if (Application.Current is not { } app)
+                return false;
+
+            foreach (Window window in app.Windows)
+            {
+                try
+                {
+                    if (window.IsMouseOver)
+                        return true;
+                }
+                catch
+                {
+                    // окно могло закрыться во время обхода
+                }
+            }
+            return false;
         }
 
         /// <summary>Находится ли указатель мыши над элементом или его потомком (issue #270).</summary>
@@ -1002,7 +1195,9 @@ namespace Workspace1C
                 if (Keyboard.FocusedElement is HotkeyBox)
                     return;
 
-                if (CloseAll())
+                // ESC — принудительное закрытие: подавляем повторное открытие на текущий
+                // цикл, чтобы подсказка не «мигнула» под курсором (issue #131).
+                if (CloseAll(suppressReopen: true))
                 {
                     handled = true;
                     _lastEscSwallowedTick = Environment.TickCount64;

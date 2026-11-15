@@ -137,12 +137,20 @@ public static class UiExceptionGuard
         var title = TOr("App.Fatal.Title", "Workspace 1C — ошибка");
         if (DialogShower is not null)
         {
+            // Явно переданная заглушка (юнит-тесты) имеет приоритет над подавлением:
+            // тесты проверяют сам факт показа диалога.
             DialogShower(message, title);
+            return;
         }
-        else
+
+        // Тестовый прогон (UiDialogs.SuppressModalDialogs): реальное окно не показываем.
+        if (UiDialogs.SuppressModalDialogs)
         {
-            AppServices.TryGetService<IDialogService>()?.ShowError(message, title);
+            UiDialogs.TraceSuppressed("UiExceptionGuard", title);
+            return;
         }
+
+        AppServices.TryGetService<IDialogService>()?.ShowError(message, title);
     }
 
     /// <summary>Строки содержательного диалога: тип, сообщение, обработчик, контекст,
