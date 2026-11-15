@@ -217,9 +217,10 @@ namespace Workspace1C
 
             header.Child = row;
 
-            // Issue #130: линии сетки у строки группы — тот же планировщик и те же
-            // настройки, что у строк баз и заголовка.
-            ApplyGridLinesToGrid(row, includeHorizontal: true);
+            // Issue #130: горизонтальная линия строки группы — та же толщина/цвет,
+            // что у строк баз; вертикальные линии ведёт единый оверлей. Отрицательный
+            // отступ компенсирует Padding 8/6 и рамку 2 контейнера строки группы.
+            ApplyHorizontalGridLine(row, 2 + (UiMetrics.Compact ? 6 : 8));
 
             return header;
         }
@@ -716,9 +717,9 @@ namespace Workspace1C
 
             card.Child = grid;
 
-            // Issue #130: линии сетки строки базы. Обе настройки выключены —
-            // планировщик не вернёт ни одной линии, разметка остаётся прежней.
-            ApplyGridLinesToGrid(grid, includeHorizontal: true);
+            // Issue #130: горизонтальная линия строки базы (вертикальные — в оверлее).
+            // Обе настройки выключены — линия не создаётся, разметка остаётся прежней.
+            ApplyHorizontalGridLine(grid);
 
             // Двойной клик по строке базы запускает её в режиме по умолчанию
             // (issue #201): «1С:Предприятие» или «Конфигуратор» согласно DefaultLaunchMode.
@@ -1574,6 +1575,9 @@ namespace Workspace1C
             panel.Children.Add(launchEnterpriseBlock);
             panel.Children.Add(launchConfiguratorBlock);
             panel.Children.Add(starterBlock);
+            // Группа «Мои программы» (issue #91): свои программы под кнопками запуска
+            // конфигуратора; скрыта, если программ нет.
+            panel.Children.Add(BuildCustomProgramsBlock());
 
             // Линия между запуском и остальными действиями (MainWindow.xaml:2097).
             var afterStarterSeparator = new Border
@@ -1699,13 +1703,10 @@ namespace Workspace1C
 
             toggle.Bind(ToggleButton.IsCheckedProperty,
                 new Binding("LongOperationNotificationsEnabled") { Mode = BindingMode.TwoWay });
-            toggle.Bind(ToolTip.TipProperty, new Binding("LongOperationNotificationsEnabled")
-            {
-                Converter = new Avalonia.Data.Converters.FuncValueConverter<bool, string>(on =>
-                    LocalizationManager.T(on
-                        ? "LongOperation.Alarm.TooltipOn"
-                        : "LongOperation.Alarm.TooltipOff"))
-            });
+            // Подсказка — вычисляемое свойство VM (issue #131): конвертер по
+            // IsChecked/настройке не пересчитывался при смене языка и расходился
+            // с поведением WPF-версии.
+            toggle.Bind(ToolTip.TipProperty, new Binding("LongOperationAlarmTooltip"));
 
             var isOn = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value == true);
             var isOff = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value != true);
@@ -1713,6 +1714,175 @@ namespace Workspace1C
             bellOff.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOff });
             cross.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOff });
             return toggle;
+        }
+
+        /// <summary>
+        /// Группа «Мои программы» (issue #91): под кнопками запуска конфигуратора —
+        /// заголовок с шестерёнкой (открывает редактор группы) и две формы отображения,
+        /// переключаемые настройкой: «Списком» — полноширинные кнопки «иконка + подпись»
+        /// (как родной стартер 1С), «Иконками» — квадратные кнопки в строку с переносом.
+        /// Группа скрыта, если программ нет.
+        /// </summary>
+        private Control BuildCustomProgramsBlock()
+        {
+            var root = new StackPanel { Spacing = 0 };
+            root.Bind(Control.IsVisibleProperty, new Binding("HasCustomPrograms"));
+
+            // Заголовок группы + быстрый переход в настройки (шестерёнка).
+            var header = new Grid { Margin = new Thickness(0, 4, 0, 2) };
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            var label = new TextBlock
+            {
+                Text = LocalizationManager.T("Launch.CustomPrograms.Header"),
+                FontSize = UiMetrics.ScaledFont(11),
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            ThemeBrushes.Bind(label, TextBlock.ForegroundProperty, "TextSecondaryColorBrush");
+            header.Children.Add(label);
+
+            var gear = new Button
+            {
+                Content = IconHelper.MakeIcon("IconCog", 14, "TextSecondaryBrush"),
+                Width = 24,
+                MinWidth = 24,
+                Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            gear.Bind(Button.CommandProperty, new Binding("ShowCustomProgramsSettingsCommand"));
+            ToolTip.SetTip(gear, LocalizationManager.T("Launch.CustomPrograms.SettingsTooltip"));
+            Grid.SetColumn(gear, 1);
+            header.Children.Add(gear);
+            root.Children.Add(header);
+
+            // Режим «Списком»: полноширинные кнопки «иконка + подпись».
+            var listView = new ItemsControl();
+            listView.Bind(ItemsControl.ItemsSourceProperty, new Binding("CustomPrograms"));
+            listView.Bind(Control.IsVisibleProperty, new Binding("CustomProgramsListView"));
+            listView.ItemTemplate = new FuncDataTemplate<CustomProgram>(
+                (program, _) => CreateCustomProgramListButton(program));
+            root.Children.Add(listView);
+
+            // Режим «Иконками»: квадратные кнопки в строку с переносом, подсказка — имя.
+            var iconsView = new ItemsControl
+            {
+                Margin = new Thickness(0, 0, 0, 4),
+                ItemsPanel = new FuncTemplate<Panel?>(() => new WrapPanel())
+            };
+            iconsView.Bind(ItemsControl.ItemsSourceProperty, new Binding("CustomPrograms"));
+            iconsView.Bind(Control.IsVisibleProperty, new Binding("CustomProgramsIconsView"));
+            iconsView.ItemTemplate = new FuncDataTemplate<CustomProgram>(
+                (program, _) => CreateCustomProgramIconButton(program));
+            root.Children.Add(iconsView);
+
+            return root;
+        }
+
+        /// <summary>Кнопка программы в режиме «Списком»: иконка + имя, клик — запуск.</summary>
+        private Control CreateCustomProgramListButton(CustomProgram program)
+        {
+            var content = new Grid
+            {
+                ColumnSpacing = 6,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            content.Children.Add(CreateCustomProgramIcon(program, UiMetrics.ActionIconSize));
+
+            var name = new TextBlock
+            {
+                Text = program.Name,
+                FontSize = UiMetrics.ActionFontSize,
+                FontWeight = FontWeight.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+            ThemeBrushes.Bind(name, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
+            Grid.SetColumn(name, 1);
+            content.Children.Add(name);
+
+            var button = new PanelButton(
+                "CardBackgroundBrush",
+                "ItemHoverBrush",
+                "ItemHoverBrush",
+                "BorderColorBrush",
+                new CornerRadius(UiMetrics.RadiusMd))
+            {
+                Content = content,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinHeight = UiMetrics.ActionButtonMinHeight,
+                Padding = new Thickness(UiMetrics.ActionButtonPadH, UiMetrics.ActionButtonPadV),
+                Margin = new Thickness(0, 0, 0, UiMetrics.ActionGridGap)
+            };
+            BindActionPadding(button, new Thickness(8, 6), new Thickness(6, 8));
+            ToolTip.SetTip(button, program.FilePath);
+            BindCustomProgramLaunch(button, program);
+            return button;
+        }
+
+        /// <summary>Кнопка программы в режиме «Иконками»: квадрат с иконкой и подсказкой-именем.</summary>
+        private Control CreateCustomProgramIconButton(CustomProgram program)
+        {
+            var button = new PanelButton(
+                "CardBackgroundBrush",
+                "ItemHoverBrush",
+                "ItemHoverBrush",
+                "BorderColorBrush",
+                new CornerRadius(UiMetrics.RadiusMd))
+            {
+                Content = CreateCustomProgramIcon(program, UiMetrics.Scaled(24)),
+                Width = UiMetrics.Scaled(40),
+                Height = UiMetrics.Scaled(40),
+                Padding = new Thickness(0),
+                Margin = new Thickness(0, 0, 4, 4),
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            ToolTip.SetTip(button, program.Name);
+            BindCustomProgramLaunch(button, program);
+            return button;
+        }
+
+        /// <summary>Иконка программы: файл (<c>.ico</c>/<c>.png</c>) либо стандартная.</summary>
+        private static Control CreateCustomProgramIcon(CustomProgram program, double size)
+        {
+            if (!string.IsNullOrWhiteSpace(program.IconPath))
+            {
+                try
+                {
+                    return new Image
+                    {
+                        Source = new Avalonia.Media.Imaging.Bitmap(program.IconPath!),
+                        Width = size,
+                        Height = size,
+                        Stretch = Stretch.Uniform
+                    };
+                }
+                catch
+                {
+                    // Нечитаемый/отсутствующий файл иконки не должен ронять панель.
+                }
+            }
+            return IconHelper.MakeIcon("IconApplication", size, "WarningBrush");
+        }
+
+        /// <summary>Привязывает кнопку программы к команде запуска (issue #91).</summary>
+        private void BindCustomProgramLaunch(Button button, CustomProgram program)
+        {
+            if (_vm is null)
+                return;
+            button.Command = _vm.LaunchCustomProgramCommand;
+            button.CommandParameter = program;
         }
 
         /// <summary>

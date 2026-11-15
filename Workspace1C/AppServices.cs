@@ -53,6 +53,10 @@ public static partial class AppServices
         // единый читаемый JSON-файл custom_actions.json рядом с настройками. Чистый сервис —
         // без UI-зависимостей.
         services.AddSingleton<ICustomActionsStore, CustomActionsStore>();
+        // Пользовательские программы группы «Мои программы» (issue #91): единый читаемый
+        // JSON-файл custom_programs.json рядом с настройками, по образцу CustomActionsStore.
+        // Чистый сервис — без UI-зависимостей.
+        services.AddSingleton<ICustomProgramsStore, CustomProgramsStore>();
         // Проверка резервных копий (функция 8, цикл 0.3.9.200–0.3.9.207): кэш результатов
         // проверки — единый читаемый JSON-файл backup_validation_cache.json рядом с настройками.
         // Чистый сервис — без UI-зависимостей.

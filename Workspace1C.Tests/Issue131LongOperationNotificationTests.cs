@@ -1,12 +1,15 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.ViewModels;
 using Xunit;
 
 namespace Workspace1C.Tests;
@@ -309,8 +312,8 @@ public sealed class Issue131LongOperationNotificationTests
         var xaml = ReadSource("Workspace1C", "Views", "MainWindow.xaml");
         Assert.Contains("LongOperationAlarmToggle", xaml);
         Assert.Contains("LongOperationNotificationsEnabled", xaml);
-        Assert.Contains("LongOperation.Alarm.TooltipOn", xaml);
-        Assert.Contains("LongOperation.Alarm.TooltipOff", xaml);
+        // Текст подсказки — вычисляемое свойство VM, а не триггер в XAML (issue #131).
+        Assert.Contains("LongOperationAlarmTooltip", xaml);
     }
 
     [Fact]
@@ -448,11 +451,10 @@ public sealed class Issue131LongOperationNotificationTests
         Assert.Contains("{DynamicResource AccentBrush}", toggleBlock);
         Assert.Contains("{DynamicResource SidebarTextBrush}", toggleBlock);
 
-        // Тултип переключается вместе с состоянием: Off по умолчанию, On — в триггере.
-        var tooltipOff = toggleBlock.IndexOf("LongOperation.Alarm.TooltipOff", StringComparison.Ordinal);
-        var tooltipOn = toggleBlock.IndexOf("LongOperation.Alarm.TooltipOn", StringComparison.Ordinal);
-        Assert.True(tooltipOff >= 0 && tooltipOn > tooltipOff,
-            "Тултип переключателя: TooltipOff по умолчанию, TooltipOn — в DataTrigger включённого состояния");
+        // Подсказка — вычисляемое свойство VM: DataTrigger внутри ToolTip не работал,
+        // потому что содержимое ToolTip живёт в отдельном Popup-дереве (issue #131).
+        Assert.Contains("ToolTip=\"{Binding LongOperationAlarmTooltip}\"", toggleBlock);
+        Assert.DoesNotContain("ToggleButton.ToolTip", toggleBlock);
     }
 
     [Fact]
@@ -489,11 +491,13 @@ public sealed class Issue131LongOperationNotificationTests
         Assert.Contains("new Avalonia.Controls.Shapes.Line", toggle);
         Assert.Contains("cross.Bind(Visual.IsVisibleProperty", toggle);
 
-        // Двусторонняя привязка к настройке и подсказки обоих состояний.
+        // Двусторонняя привязка к настройке; подсказка — вычисляемое свойство VM
+        // (issue #131), без конвертера по состоянию.
         Assert.Contains("BindingMode.TwoWay", toggle);
         Assert.Contains("LongOperationNotificationsEnabled", toggle);
-        Assert.Contains("LongOperation.Alarm.TooltipOn", toggle);
-        Assert.Contains("LongOperation.Alarm.TooltipOff", toggle);
+        Assert.Contains("new Binding(\"LongOperationAlarmTooltip\")", toggle);
+        Assert.DoesNotContain("LongOperation.Alarm.TooltipOn", toggle);
+        Assert.DoesNotContain("LongOperation.Alarm.TooltipOff", toggle);
 
         // Цвета состояний и управление видимостью всех трёх элементов через IsChecked.
         Assert.Contains("AccentBrush", toggle);
@@ -533,6 +537,117 @@ public sealed class Issue131LongOperationNotificationTests
             Assert.NotEqual(on, off);
         }
     }
+
+    // ---------- Подсказка колокольчика: вычисляемое свойство VM (v1.0.1.65) ----------
+    // Содержимое ToolTip в WPF размещается в отдельном Popup-дереве со своей namescope:
+    // ElementName-привязка внутри него не разрешалась, DataTrigger не срабатывал и
+    // подсказка всегда показывала «отключены». Поэтому текст считается в VM, а XAML
+    // и Avalonia только привязываются к LongOperationAlarmTooltip.
+
+    [Fact]
+    public void Wpf_Tooltip_IsBoundToViewModelProperty_NoElementNameTrigger()
+    {
+        var xaml = CollapseWhitespace(ReadSource("Workspace1C", "Views", "MainWindow.xaml"));
+        var toggleBlock = ExtractXamlElement(xaml,
+            "x:Name=\"LongOperationAlarmToggle\"", "</ToggleButton>");
+
+        Assert.Contains("ToolTip=\"{Binding LongOperationAlarmTooltip}\"", toggleBlock);
+        // Триггерного ToolTip с ElementName больше нет — именно он не работал.
+        Assert.DoesNotContain("ToggleButton.ToolTip", toggleBlock);
+        Assert.DoesNotContain("LongOperation.Alarm.TooltipOff", toggleBlock);
+        Assert.DoesNotContain("LongOperation.Alarm.TooltipOn", toggleBlock);
+    }
+
+    [Fact]
+    public void Avalonia_Tooltip_IsBoundToViewModelProperty()
+    {
+        var tree = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
+        var toggle = CollapseWhitespace(ExtractMethod(tree,
+            "private static Control BuildLongOperationAlarmToggle()", "MainWindow.Avalonia.Tree.cs"));
+
+        Assert.Contains("ToolTip.TipProperty", toggle);
+        Assert.Contains("new Binding(\"LongOperationAlarmTooltip\")", toggle);
+        // Конвертер по состоянию больше не используется — текст приходит из VM.
+        Assert.DoesNotContain("FuncValueConverter<bool, string>", toggle);
+    }
+
+    [Fact]
+    public void BothPlatforms_VmHasAlarmTooltipAndNotifies()
+    {
+        var wpf = ReadSource("Workspace1C", "ViewModels", "MainViewModel.Commands.cs");
+        Assert.Contains("public string LongOperationAlarmTooltip =>", wpf);
+        Assert.Contains("LongOperation.Alarm.TooltipOn", wpf);
+        Assert.Contains("LongOperation.Alarm.TooltipOff", wpf);
+        Assert.Contains("OnPropertyChanged(nameof(LongOperationAlarmTooltip));", wpf);
+
+        var avalonia = ReadSource("Workspace1C", "ViewModels", "MainViewModel.Avalonia.cs");
+        Assert.Contains("public string LongOperationAlarmTooltip =>", avalonia);
+        Assert.Contains("LongOperation.Alarm.TooltipOn", avalonia);
+        Assert.Contains("LongOperation.Alarm.TooltipOff", avalonia);
+        Assert.Contains("OnPropertyChanged(nameof(LongOperationAlarmTooltip));", avalonia);
+        // Смена языка пересчитывает вычисляемые локализованные свойства.
+        Assert.Contains("OnPropertyChanged(string.Empty);", avalonia);
+    }
+
+#if !LINUX
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Wpf_LongOperationAlarmTooltip_FollowsEnabledState(bool enabled)
+    {
+        var vm = CreateUninitializedViewModel();
+        SetPrivateField(vm, "_longOperationNotificationsEnabled", enabled);
+
+        // Сравнение через сам LocalizationManager.T — конвенция проекта: в тестовой
+        // среде локализация не инициализирована и T возвращает ключ. Наличие и
+        // различие человекочитаемых текстов ru/en проверяет
+        // Localization_AlarmTooltips_AreNonEmptyAndDifferInBothLanguages.
+        Assert.Equal(
+            LocalizationManager.T(enabled
+                ? "LongOperation.Alarm.TooltipOn"
+                : "LongOperation.Alarm.TooltipOff"),
+            vm.LongOperationAlarmTooltip);
+    }
+
+    [Fact]
+    public void Wpf_LongOperationAlarmTooltip_NotifiesOnToggle()
+    {
+        var vm = CreateUninitializedViewModel();
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.LongOperationNotificationsEnabled = true;
+
+        Assert.Contains(nameof(MainViewModel.LongOperationAlarmTooltip), raised);
+        Assert.Equal(LocalizationManager.T("LongOperation.Alarm.TooltipOn"), vm.LongOperationAlarmTooltip);
+
+        raised.Clear();
+        vm.LongOperationNotificationsEnabled = false;
+
+        Assert.Contains(nameof(MainViewModel.LongOperationAlarmTooltip), raised);
+        Assert.Equal(LocalizationManager.T("LongOperation.Alarm.TooltipOff"), vm.LongOperationAlarmTooltip);
+    }
+
+    /// <summary>
+    /// Неинициализированный MainViewModel: полный конструктор поднимает репозиторий,
+    /// WPF-диалоги и подписки на сервисы (конвенция проекта — см.
+    /// Issue132RowFontBindingTests). Debouncer подставляем, иначе сеттер флага падает
+    /// на отложенном сохранении настроек.
+    /// </summary>
+    private static MainViewModel CreateUninitializedViewModel()
+    {
+        var vm = (MainViewModel)RuntimeHelpers.GetUninitializedObject(typeof(MainViewModel));
+        SetPrivateField(vm, "_saveSettingsDebouncer", new SettingsSaveDebouncer());
+        return vm;
+    }
+
+    private static void SetPrivateField(object target, string name, object value)
+    {
+        var field = target.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field!.SetValue(target, value);
+    }
+#endif
 
     private static string CollapseWhitespace(string text) => Regex.Replace(text, @"\s+", " ");
 

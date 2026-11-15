@@ -259,4 +259,64 @@ public static class WindowSizeMath
         // Композиция есть/нет, но своего скругления нет — углы последовательно прямые.
         return new(0, FrameCornerPolicy.CompositionOff);
     }
+
+    /// <summary>
+    /// Входы чистой политики региона окна (issue #126). Отделены от Win32/GDI:
+    /// решение «нужен ли регион» детерминированно и тестируется без Windows-сессии.
+    /// </summary>
+    /// <param name="Policy">Причина выбранного радиуса рамки (<see cref="FrameCornerPolicy"/>).</param>
+    /// <param name="RadiusDip">Радиус скругления рамки/содержимого в DIP.</param>
+    /// <param name="FrameOptOut">Окно отключило видимую рамку/скругление (<c>ShowWindowFrame=false</c>).</param>
+    /// <param name="DpiScale">Масштаб DPI окна (1.0 = 96 DPI).</param>
+    public readonly record struct WindowRegionInputs(
+        FrameCornerPolicy Policy,
+        double RadiusDip,
+        bool FrameOptOut,
+        double DpiScale);
+
+    /// <summary>
+    /// Решение о регионе окна: применять ли <c>SetWindowRgn</c> и каким диаметром
+    /// скругления (в физических пикселях). <see cref="DiameterPixels"/> = 0, если
+    /// регион не нужен.
+    /// </summary>
+    public readonly record struct WindowRegionResult(bool Apply, int DiameterPixels);
+
+    /// <summary>
+    /// Решает, нужно ли обрезать HWND по скруглённому прямоугольнику (issue #126).
+    /// <para>
+    /// Клип содержимого (<c>contentHost</c>/<c>glass</c>) обрезает только содержимое,
+    /// а <c>Window.Background</c> заливает весь прямоугольник HWND: на Windows 10/RDP
+    /// DWM не обрезает окно по скруглению, и четыре треугольника вне рамки остаются
+    /// фоном темы (в светлой теме — «белые углы»). Регион применяется только там,
+    /// где скругление рисуем мы сами (<see cref="FrameCornerPolicy.ContentRadius"/>),
+    /// и снимается в остальных случаях:
+    /// </para>
+    /// <list type="bullet">
+    /// <item><see cref="FrameCornerPolicy.DwmRounded"/> — DWM скругляет окно сам
+    /// (Windows 11), регион сломал бы системную тень;</item>
+    /// <item><see cref="FrameCornerPolicy.Maximized"/> и
+    /// <see cref="FrameCornerPolicy.DwmDoNotRound"/> — углы прямые;</item>
+    /// <item><see cref="FrameCornerPolicy.CompositionOff"/> — своего скругления нет;</item>
+    /// <item><paramref name="inputs"/>.FrameOptOut — окно отказалось от скругления.</item>
+    /// </list>
+    /// <para>
+    /// Диаметр считается от DPI и округляется вверх: <c>ceil(radius × scale × 2)</c>,
+    /// чтобы регион не оказался меньше фактического скругления на 125%/150%.
+    /// </para>
+    /// </summary>
+    public static WindowRegionResult ResolveWindowRegion(WindowRegionInputs inputs)
+    {
+        if (inputs.FrameOptOut)
+            return new(false, 0);
+        if (inputs.Policy != FrameCornerPolicy.ContentRadius)
+            return new(false, 0);
+        if (!(inputs.RadiusDip > 0))
+            return new(false, 0);
+
+        var scale = inputs.DpiScale > 0 && !double.IsNaN(inputs.DpiScale)
+            ? inputs.DpiScale
+            : 1.0;
+        var diameter = (int)Math.Ceiling(inputs.RadiusDip * scale * 2);
+        return diameter >= 2 ? new(true, diameter) : new(false, 0);
+    }
 }

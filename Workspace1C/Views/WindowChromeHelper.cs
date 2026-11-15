@@ -70,6 +70,11 @@ namespace Workspace1C
         private const int WmThemeChanged = 0x031A;
         private const int WmDwmCompositionChanged = 0x031E;
 
+        // WM_SIZE: регион окна (issue #126) задаётся в координатах HWND, поэтому
+        // после изменения размера его нужно пересоздать — иначе углы обрежутся
+        // по прежнему размеру окна.
+        private const int WmSize = 0x0005;
+
         // Задержка отложенного повтора пересчёта радиуса после показа окна:
         // один кадр (Dispatcher) закрывает обычный случай, ~200 мс — медленное
         // применение темы/композиции (холодный старт, RDP, виртуализация).
@@ -164,6 +169,30 @@ namespace Workspace1C
 
             /// <summary>Фактический контраст рамки к фону (для строки журнала frame-corner).</summary>
             public double? LastFrameContrast { get; set; }
+
+            /// <summary>
+            /// Скругление рисуем мы сами (policy=ContentRadius): фон окна должен быть
+            /// прозрачным, а подложка темы — на контейнере содержимого (issue #126).
+            /// Не зависит от успеха <c>SetWindowRgn</c>: если регион не сработал,
+            /// прозрачный фон всё равно убирает «белые углы» (клип содержимого).
+            /// </summary>
+            public bool OwnRounding { get; set; }
+
+            /// <summary>
+            /// Регион окна (issue #126) применён: вне скругления фон окна прозрачный,
+            /// а подложка темы лежит на контейнере содержимого. Нужно, чтобы не
+            /// переключать фон зря и снимать регион только когда он реально был.
+            /// </summary>
+            public bool RegionApplied { get; set; }
+
+            /// <summary>Последний применённый диаметр региона (физические пиксели).</summary>
+            public int RegionDiameter { get; set; }
+
+            /// <summary>Ширина окна, для которой построен регион (физические пиксели).</summary>
+            public int RegionWidth { get; set; }
+
+            /// <summary>Высота окна, для которой построен регион (физические пиксели).</summary>
+            public int RegionHeight { get; set; }
 
             /// <summary>
             /// Предупреждение «показанное окно, но DWM не сообщил состояние скругления»
@@ -302,6 +331,25 @@ namespace Workspace1C
         [DllImport("user32.dll", SetLastError = true)]
         private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter,
             int X, int Y, int cx, int cy, uint uFlags);
+
+        // ---- Регион окна со скруглёнными углами (issue #126) ----
+        // На Windows 10/RDP DWM не обрезает окно по скруглению: клип содержимого
+        // обрезает только содержимое, а Window.Background заливал весь прямоугольник
+        // HWND, и вне рамки оставались четыре треугольника фона темы («белые углы»).
+        // Регион обрезает сам HWND по тому же радиусу, что и рамка/клип.
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern IntPtr CreateRoundRectRgn(
+            int nLeftRect, int nTopRect, int nRightRect, int nBottomRect,
+            int nWidthEllipse, int nHeightEllipse);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern bool DeleteObject(IntPtr hObject);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out RectLt lpRect);
 
         [StructLayout(LayoutKind.Sequential)]
         private struct DwmBlurBehind
@@ -995,14 +1043,34 @@ namespace Workspace1C
         /// обновляется для светлой/тёмной темы и любой цветовой схемы) и пересчитываем его
         /// с альфой ~0xE8. Именно эта подложка остаётся основным фоном, а размытие DWM
         /// добавляет эффект «стекла» сквозь прозрачные области.
+        /// <para>
+        /// issue #126: подложка переносится на контейнер содержимого (<c>contentHost</c>),
+        /// который обрезан по скруглению. Фон самого окна заливал весь прямоугольник HWND,
+        /// и на Windows 10/RDP вне скругления оставались «белые углы». Когда скругление
+        /// рисуем мы сами (policy=ContentRadius), фон окна становится прозрачным —
+        /// страховка на случай, если регион не сработал; на Windows 11 поведение прежнее.
+        /// </para>
         /// </summary>
         private static void ApplyGlassBackground(Window window)
         {
-            if (window.TryFindResource("ContentBackgroundBrush") is SolidColorBrush brush)
+            if (window.TryFindResource("ContentBackgroundBrush") is not SolidColorBrush brush)
+                return;
+
+            var c = brush.Color;
+            var glassColor = Color.FromArgb(GlassBackgroundAlpha, c.R, c.G, c.B);
+
+            // Подложка содержимого: внутри скругления вид не меняется, но вне него
+            // больше ничего не заливается (клип контейнера + прозрачный фон окна).
+            if (GetContentBorder(window) is { } content)
             {
-                var c = brush.Color;
-                window.Background = new SolidColorBrush(Color.FromArgb(GlassBackgroundAlpha, c.R, c.G, c.B));
+                if (content.Background is not SolidColorBrush contentBrush || contentBrush.Color != glassColor)
+                    content.Background = new SolidColorBrush(glassColor);
             }
+
+            bool ownRounding = GetFrameTracking(window)?.OwnRounding == true;
+            var desired = ownRounding ? Colors.Transparent : glassColor;
+            if (window.Background is not SolidColorBrush windowBrush || windowBrush.Color != desired)
+                window.Background = new SolidColorBrush(desired);
         }
 
         /// <summary>
@@ -1105,6 +1173,28 @@ namespace Workspace1C
                 var radius = policy.Radius;
 
                 var tracking = GetFrameTracking(window);
+
+                // Регион окна (issue #126): клип содержимого обрезает только
+                // содержимое, а фон окна заливал весь прямоугольник HWND — на
+                // Windows 10/RDP DWM не обрезает окно по скруглению, и вне рамки
+                // оставались четыре треугольника фона темы («белые углы»).
+                // Когда скругление рисуем мы сами (policy=ContentRadius), HWND
+                // обрезается тем же радиусом; на Windows 11 (DWM скругляет сам),
+                // в maximized и при opt-out регион снимается, чтобы не отключать
+                // системную тень/анимацию.
+                var region = WindowSizeMath.ResolveWindowRegion(new WindowSizeMath.WindowRegionInputs(
+                    Policy: policy.Policy,
+                    RadiusDip: radius,
+                    FrameOptOut: !GetShowWindowFrame(window),
+                    DpiScale: GetWindowDpiScale(window).X));
+                if (tracking is not null)
+                    tracking.OwnRounding = region.Apply;
+                bool regionApplied = ApplyWindowRegion(window, hwnd, region);
+                // Страховка от «белых углов» (issue #126): подложка темы перенесена
+                // на контейнер содержимого, а фон окна в режиме собственного
+                // скругления прозрачный — даже если регион не сработал.
+                if (GetContentBorder(window) is not null)
+                    ApplyGlassBackground(window);
                 double? previous = tracking?.LastRadius;
                 bool changed = previous is null || Math.Abs(previous.Value - radius) > 0.01;
                 if (changed)
@@ -1140,11 +1230,103 @@ namespace Workspace1C
                 LogFrameCornerRadius(window, reason, hwnd, shown, stateKnown, dwmRounded,
                     osRounds, compositionEnabled, contentRadius, maximized, radius, policy.Policy,
                     previous, changed, IsRemoteSession(), frameVisual, frameContrast,
-                    cornerHr, compositionHr);
+                    regionApplied, region, cornerHr, compositionHr);
             }
             catch
             {
                 // Скругление — некритичное улучшение: не ломаем показ окна.
+            }
+        }
+
+        /// <summary>
+        /// Применяет (или снимает) регион окна со скруглёнными углами (issue #126).
+        /// Решение принимает чистая политика <see cref="WindowSizeMath.ResolveWindowRegion"/>:
+        /// регион нужен только там, где скругление рисуем мы сами (Windows 10/RDP,
+        /// выключенная композиция), и снимается на Windows 11 с системным скруглением,
+        /// в maximized и при opt-out — иначе пропала бы системная тень DWM.
+        /// <para>
+        /// Регион задаётся в координатах HWND, поэтому пересоздаётся при изменении
+        /// размера/DPI и не пересоздаётся, если диаметр и размер окна не изменились
+        /// (иначе окно мигало бы на каждом Activated). Диаметр — в физических
+        /// пикселях, <c>CreateRoundRectRgn</c> не включает правую/нижнюю границу,
+        /// поэтому ширина/высота увеличены на 1 пиксель.
+        /// </para>
+        /// </summary>
+        /// <returns><c>true</c>, если регион фактически применён.</returns>
+        private static bool ApplyWindowRegion(
+            Window window, IntPtr hwnd, WindowSizeMath.WindowRegionResult region)
+        {
+            try
+            {
+                var tracking = GetFrameTracking(window);
+                if (hwnd == IntPtr.Zero)
+                    return false;
+
+                if (!region.Apply)
+                {
+                    // Windows 11 с системным скруглением, maximized, opt-out или
+                    // прямые углы: регион снимаем (в т.ч. оставшийся от прежнего
+                    // состояния окна), чтобы вернуть системную тень/анимацию.
+                    if (tracking is { RegionApplied: true })
+                        SetWindowRgn(hwnd, IntPtr.Zero, true);
+                    if (tracking is not null)
+                    {
+                        tracking.RegionApplied = false;
+                        tracking.RegionDiameter = 0;
+                        tracking.RegionWidth = 0;
+                        tracking.RegionHeight = 0;
+                    }
+                    return false;
+                }
+
+                if (!GetWindowRect(hwnd, out var rect))
+                    return false;
+
+                int width = rect.Right - rect.Left;
+                int height = rect.Bottom - rect.Top;
+                if (width <= 0 || height <= 0)
+                    return false;
+
+                // Регион уже построен для этого размера и диаметра — не пересоздаём.
+                if (tracking is { RegionApplied: true } &&
+                    tracking.RegionDiameter == region.DiameterPixels &&
+                    tracking.RegionWidth == width &&
+                    tracking.RegionHeight == height)
+                {
+                    return true;
+                }
+
+                // +1 по правой/нижней границе: CreateRoundRectRgn не включает её,
+                // иначе срезался бы край окна (1 физический пиксель).
+                IntPtr hrgn = CreateRoundRectRgn(
+                    0, 0, width + 1, height + 1, region.DiameterPixels, region.DiameterPixels);
+                if (hrgn == IntPtr.Zero)
+                    return false;
+
+                if (SetWindowRgn(hwnd, hrgn, true) == 0)
+                {
+                    // Система не забрала владение регионом — освобождаем сами,
+                    // иначе утечка GDI-объекта на каждом пересчёте.
+                    DeleteObject(hrgn);
+                    return false;
+                }
+
+                // После успешного SetWindowRgn регион принадлежит системе —
+                // DeleteObject для него не вызывается.
+                if (tracking is not null)
+                {
+                    tracking.RegionApplied = true;
+                    tracking.RegionDiameter = region.DiameterPixels;
+                    tracking.RegionWidth = width;
+                    tracking.RegionHeight = height;
+                }
+                return true;
+            }
+            catch
+            {
+                // Регион — страховка от «белых углов»: при сбое остаётся
+                // прозрачный фон окна и клип содержимого.
+                return false;
             }
         }
 
@@ -1252,6 +1434,7 @@ namespace Workspace1C
             bool osRounds, bool compositionEnabled, double contentRadius, bool maximized, double radius,
             WindowSizeMath.FrameCornerPolicy policy, double? previous, bool changed,
             bool remote, WindowFrameVisual frameVisual, double frameContrast,
+            bool regionApplied, WindowSizeMath.WindowRegionResult region,
             int cornerHr, int compositionHr)
         {
             try
@@ -1270,6 +1453,9 @@ namespace Workspace1C
                     $"frameContrast={frameContrast:0.00} " +
                     $"frameStrengthened={frameVisual.StrengthenContrast} " +
                     $"frameShadowLine={frameVisual.AddOuterShadowLine} " +
+                    $"regionApplied={regionApplied} " +
+                    $"regionRadius={(regionApplied ? radius : 0):0.#} " +
+                    $"regionDiameter={(regionApplied ? region.DiameterPixels : 0)} " +
                     $"frameOptOut={!GetShowWindowFrame(window)}";
 
                 if (Log.Info(LogCategory.Themes, message))
@@ -1509,6 +1695,27 @@ namespace Workspace1C
                     return;
                 System.Windows.Interop.HwndSource.FromHwnd(hwnd)?.AddHook((_, msg, _, _, ref handled) =>
                 {
+                    // Регион окна (issue #126) задан в координатах HWND: после
+                    // изменения размера его нужно пересоздать, иначе углы обрежутся
+                    // по прежнему размеру окна. Пересчёт — только если регион реально
+                    // применён (на Windows 11/maximized он не нужен).
+                    if (msg == WmSize)
+                    {
+                        if (GetFrameTracking(window) is { RegionApplied: true })
+                        {
+                            try
+                            {
+                                window.Dispatcher.BeginInvoke(DispatcherPriority.Background,
+                                    new Action(() => RefreshFrameCornerRadius(window, "size-changed")));
+                            }
+                            catch
+                            {
+                                // Окно закрывается — пересчёт не нужен.
+                            }
+                        }
+                        return IntPtr.Zero;
+                    }
+
                     if (msg == WmThemeChanged || msg == WmDwmCompositionChanged)
                     {
                         var reason = msg == WmThemeChanged ? "theme-changed" : "composition-changed";

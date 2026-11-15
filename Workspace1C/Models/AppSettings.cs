@@ -277,6 +277,15 @@ public class AppSettings
     public bool ContextMenuEditingEnabled { get; set; }
 
     /// <summary>
+    /// Режим отображения группы «Мои программы» на панели запуска (issue #91):
+    /// «List» — вертикальный список кнопок «иконка + подпись» (как родной стартер 1С),
+    /// «Icons» — кнопки-иконки в строку с переносом. Пустое/неизвестное значение
+    /// (старые профили) трактуется как «List» — см.
+    /// <see cref="CustomProgramsViewModes.Normalize"/>.
+    /// </summary>
+    public string CustomProgramsViewMode { get; set; } = CustomProgramsViewModes.Default;
+
+    /// <summary>
     /// Общая авторизация для всех ИБ (issue #57): если у базы не задана
     /// собственная (для режима или базы), при запуске подставляются эти
     /// учётные данные. Значения по умолчанию (IsDefault) — авторизация не задана.
@@ -1304,6 +1313,9 @@ public class AppSettings
         // приводятся к каноническому виду.
         LongOperationNotifications ??= new LongOperationNotificationsSettings();
         LongOperationNotifications.Normalize();
+        // issue #91: режим отображения группы «Мои программы» — старые профили
+        // без поля получают «Списком», неизвестные значения нормализуются.
+        CustomProgramsViewMode = CustomProgramsViewModes.Normalize(CustomProgramsViewMode);
         // issue #75: ширины колонок вкладок окна «Серверы 1С» — легаси-файл без поля
         // инициализируется пустым словарём (обращение по ключу вкладки безопасно).
         ServerMonitorColumnWidths ??= new Dictionary<string, double[]>();

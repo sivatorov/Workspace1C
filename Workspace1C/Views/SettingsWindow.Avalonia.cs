@@ -4958,6 +4958,34 @@ namespace Workspace1C
             editButton.Click += (_, _) => OpenUtilitiesMenuEditor();
             panel.Children.Add(editButton);
 
+            // Группа «Мои программы» (issue #91): свои программы под кнопками запуска —
+            // редактор списка, иконки из файла и режим «списком / иконками».
+            panel.Children.Add(GroupSectionHeader("Launch.CustomPrograms.Header"));
+            panel.Children.Add(Hint(LocalizationManager.T("Launch.CustomPrograms.SettingsHint"), bottom: 8));
+
+            var customProgramsButton = new Button
+            {
+                Content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    Children =
+                    {
+                        IconHelper.MakeIcon("IconCog", 16, "TextPrimaryBrush"),
+                        new TextBlock
+                        {
+                            Text = LocalizationManager.T("Launch.CustomPrograms.SettingsButton"),
+                            VerticalAlignment = VerticalAlignment.Center
+                        }
+                    }
+                },
+                Padding = new Thickness(12, 7),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            customProgramsButton.Styled(ControlThemes.ModernButton);
+            customProgramsButton.Click += (_, _) => OpenCustomProgramsEditor();
+            panel.Children.Add(customProgramsButton);
+
             // Контекстное меню базы (issue #56).
             panel.Children.Add(GroupSectionHeader("Settings.ContextMenu.GroupTitle"));
             _contextMenuEditingCheck = SettingsSwitch(
@@ -5050,6 +5078,26 @@ namespace Workspace1C
                 var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
                 var win = new UtilitiesMenuEditorWindow(store);
                 win.ShowDialogSync(this);
+            }
+            catch
+            {
+                // Не критично: редактор не открылся — настройка останется прежней.
+            }
+        }
+
+        /// <summary>
+        /// Открывает редактор группы «Мои программы» (issue #91): список своих программ под
+        /// кнопками запуска, иконки из файла и переключатель «списком / иконками».
+        /// После закрытия режим отображения применяется и панель перечитывает список.
+        /// </summary>
+        private void OpenCustomProgramsEditor()
+        {
+            try
+            {
+                var win = new CustomProgramsWindow(_viewModel.CustomProgramsViewMode);
+                win.ShowDialogSync(this);
+                _viewModel.CustomProgramsViewMode = win.ViewMode;
+                _viewModel.ReloadCustomPrograms();
             }
             catch
             {

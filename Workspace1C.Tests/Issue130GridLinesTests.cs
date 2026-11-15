@@ -145,6 +145,123 @@ public sealed class Issue130GridLinesTests
         Assert.False(plan.HasAnyLines);
     }
 
+    // ===================== Единый оверлей: позиции границ и толщина =====================
+
+    [Fact]
+    public void ResolveVerticalOffsets_OneLinePerBoundary_NoOuterFrame()
+    {
+        var widths = new[] { 10d, 20d, 30d, 40d };
+        var visible = new[] { true, true, true, true };
+
+        var offsets = GridLinesPlanner.ResolveVerticalOffsets(widths, visible, showVertical: true, dpiScale: 1.0);
+
+        // Одна линия на каждую внутреннюю границу: после 1-й, 2-й и 3-й колонки.
+        Assert.Equal(new[] { 10d, 30d, 60d }, offsets.ToArray());
+        // После последней видимой колонки линии нет — наружной рамки не рисуем.
+        Assert.DoesNotContain(100d, offsets);
+    }
+
+    [Fact]
+    public void ResolveVerticalOffsets_HiddenColumn_NoBoundaryInside()
+    {
+        var widths = new[] { 10d, 0d, 20d, 30d };
+        var visible = new[] { true, false, true, true };
+
+        var offsets = GridLinesPlanner.ResolveVerticalOffsets(widths, visible, true, 1.0);
+
+        // Скрытая колонка нулевой ширины: линия после 1-й видимой и после 2-й видимой.
+        Assert.Equal(new[] { 10d, 30d }, offsets.ToArray());
+    }
+
+    [Fact]
+    public void ResolveVerticalOffsets_LastVisibleNoLine_SingleVisibleNoLines()
+    {
+        var offsets = GridLinesPlanner.ResolveVerticalOffsets(
+            new[] { 10d, 20d, 30d, 40d },
+            new[] { true, true, false, false }, true, 1.0);
+        Assert.Equal(new[] { 10d }, offsets.ToArray());
+
+        Assert.Empty(GridLinesPlanner.ResolveVerticalOffsets(
+            new[] { 10d, 20d, 30d }, new[] { false, true, false }, true, 1.0));
+    }
+
+    [Fact]
+    public void ResolveVerticalOffsets_Disabled_NoOffsets()
+    {
+        Assert.Empty(GridLinesPlanner.ResolveVerticalOffsets(
+            new[] { 10d, 20d, 30d }, ThreeVisible, showVertical: false, dpiScale: 1.0));
+        Assert.Empty(GridLinesPlanner.ResolveVerticalOffsets(null, ThreeVisible, true, 1.0));
+        Assert.Empty(GridLinesPlanner.ResolveVerticalOffsets(new[] { 10d }, null, true, 1.0));
+    }
+
+    [Theory]
+    [InlineData(1.0)]
+    [InlineData(1.25)]
+    [InlineData(1.5)]
+    [InlineData(2.0)]
+    public void ResolveVerticalOffsets_SnapsToPhysicalPixel(double dpiScale)
+    {
+        var widths = new[] { 24d, 0d, 28d, 26d, 300.3, 120.7, 99.9 };
+        var visible = new[] { false, false, false, false, true, true, true };
+
+        var offsets = GridLinesPlanner.ResolveVerticalOffsets(widths, visible, true, dpiScale);
+
+        Assert.Equal(2, offsets.Count);
+        foreach (var x in offsets)
+        {
+            var physical = x * dpiScale;
+            Assert.True(Math.Abs(physical - Math.Round(physical)) < 1e-9,
+                $"позиция {x} не выровнена по физическому пикселю при DPI {dpiScale}");
+        }
+        // Позиции монотонно растут — по одной линии на границу.
+        Assert.True(offsets[0] < offsets[1]);
+    }
+
+    [Theory]
+    [InlineData(1.0, 1.0)]
+    [InlineData(1.25, 0.8)]
+    [InlineData(1.5, 2.0 / 3.0)]
+    [InlineData(2.0, 0.5)]
+    public void ResolveLineThickness_IsOnePhysicalPixel(double dpiScale, double expected)
+    {
+        var thickness = GridLinesPlanner.ResolveLineThickness(dpiScale);
+
+        Assert.Equal(expected, thickness, 6);
+        Assert.Equal(1.0, thickness * dpiScale, 6);
+    }
+
+    [Fact]
+    public void ResolveLineThickness_InvalidScale_FallsBackToDip()
+    {
+        Assert.Equal(GridLinesPlanner.LineThickness, GridLinesPlanner.ResolveLineThickness(0));
+        Assert.Equal(GridLinesPlanner.LineThickness, GridLinesPlanner.ResolveLineThickness(-1));
+    }
+
+    [Theory]
+    [InlineData(false, GridLinesPlanner.NormalOpacity)]
+    [InlineData(true, GridLinesPlanner.CompactOpacity)]
+    public void ResolveOpacity_MatchesPlan(bool compactMode, double expected)
+    {
+        Assert.Equal(expected, GridLinesPlanner.ResolveOpacity(compactMode));
+        Assert.Equal(expected, GridLinesPlanner.Resolve(true, true, compactMode, ThreeVisible).Opacity);
+    }
+
+    [Fact]
+    public void VerticalOffsets_HeaderWidthsAreSingleSourceOfTruth()
+    {
+        // Одна и та же граница даёт одну и ту же позицию независимо от того,
+        // в какой сетке (строка базы, строка группы, заголовок) она нарисована:
+        // позиции считаются только по ширинам колонок заголовка.
+        var widths = new[] { 24d, 12d, 28d, 26d, 320d, 120d, 120d };
+        var visible = new[] { false, false, false, false, true, true, true };
+
+        var first = GridLinesPlanner.ResolveVerticalOffsets(widths, visible, true, 1.0);
+        var second = GridLinesPlanner.ResolveVerticalOffsets(widths, visible, true, 1.0);
+
+        Assert.Equal(first.ToArray(), second.ToArray());
+        Assert.Equal(2, first.Count);
+    }
+
     [Fact]
     public void Resolve_SameInputsAfterThemeSwitch_SamePlan()
     {
@@ -233,20 +350,67 @@ public sealed class Issue130GridLinesTests
     // ===================== WPF: отрисовка и реакция на настройку =====================
 
     [Fact]
-    public void Wpf_RowAndHeader_UseSharedPlannerAndBothFlags()
+    public void Wpf_RowsAndOverlay_UseSharedPlannerAndBothFlags()
     {
         var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
 
-        // Один чистый планировщик для строк и заголовка.
-        Assert.Contains("Services.GridLinesPlanner.Resolve(", columns, StringComparison.Ordinal);
+        // Один чистый планировщик: позиции границ и толщина.
+        Assert.Contains("Services.GridLinesPlanner.ResolveVerticalOffsets(", columns, StringComparison.Ordinal);
+        Assert.Contains("Services.GridLinesPlanner.ResolveLineThickness(", columns, StringComparison.Ordinal);
         // Читаются оба флага.
         Assert.Contains("_viewModel.ShowHorizontalGridLines", columns, StringComparison.Ordinal);
         Assert.Contains("_viewModel.ShowVerticalGridLines", columns, StringComparison.Ordinal);
-        // Строки рисуют горизонталь, заголовок — только вертикальные линии.
-        Assert.Contains("ApplyGridLinesToGrid(grid, includeHorizontal: true)", columns, StringComparison.Ordinal);
-        Assert.Contains("ApplyGridLinesToGrid(HeaderGrid, includeHorizontal: false)", columns, StringComparison.Ordinal);
+        // Строки рисуют только горизонталь; вертикальные линии внутри строк/заголовка
+        // больше не рисуются (иначе — «две линии в колонке»).
+        Assert.Contains("ApplyHorizontalGridLine(grid)", columns, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyGridLinesToGrid", columns, StringComparison.Ordinal);
+        Assert.DoesNotContain("ApplyGridLinesToHeader", columns, StringComparison.Ordinal);
+        // Единый оверлей объявлен в разметке поверх заголовка и строк.
+        Assert.Contains("x:Name=\"GridLinesOverlay\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Grid.RowSpan=\"2\"", xaml, StringComparison.Ordinal);
         // Цвет линии — из темы, без ярких хардкод-цветов.
         Assert.Contains("TryFindResource(\"BorderBrushColor\")", columns, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Overlay_IsSingleSourceAndRefreshedAfterAlignment()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+
+        // Один оверлей: очищается и пересоздаётся целиком, линии в строках не плодятся.
+        Assert.Contains("private void RefreshGridLinesOverlay()", columns, StringComparison.Ordinal);
+        Assert.Contains("GridLinesOverlay.Children.Clear();", columns, StringComparison.Ordinal);
+        // Источник ширин — заголовок колонок (единственный источник истины).
+        Assert.Contains("var definitions = HeaderGrid.ColumnDefinitions;", columns, StringComparison.Ordinal);
+        // При включённой сетке декоративные линии разделителей заголовка скрыты:
+        // в шапке остаётся ровно одна линия — линия оверлея.
+        Assert.Contains("ApplyHeaderSeparatorVisibility(showSeparators: !showVertical);", columns, StringComparison.Ordinal);
+
+        // Перерисовка после AlignHeaderToData: линии заголовка не расходятся со строками.
+        var alignIndex = columns.IndexOf("private void AlignHeaderToData()", StringComparison.Ordinal);
+        Assert.True(alignIndex >= 0, "AlignHeaderToData не найден");
+        var overlayAfterAlign = columns.IndexOf("RefreshGridLinesOverlay();", alignIndex, StringComparison.Ordinal);
+        Assert.True(overlayAfterAlign > alignIndex, "RefreshGridLinesOverlay не вызывается после AlignHeaderToData");
+
+        // Пересчёт при смене DPI и размеров области списка.
+        var events = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Events.cs"));
+        Assert.Contains("DpiChanged += (_, _) => RefreshGridLines();", events, StringComparison.Ordinal);
+        Assert.Contains("ListContentGrid.SizeChanged += (_, _) => RefreshGridLinesOverlay();", events, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_HorizontalLine_IsOnePhysicalPixelAndExtendsToRowEdges()
+    {
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+
+        // Толщина — от DPI (1 физический пиксель), а не 1 DIP.
+        Assert.Contains("Height = Services.GridLinesPlanner.ResolveLineThickness(GridLinesDpiScale)",
+            columns, StringComparison.Ordinal);
+        // Строка группы: отрицательный отступ компенсирует Padding 8/6.
+        Assert.Contains("ApplyHorizontalGridLine(grid, groupInset);", columns, StringComparison.Ordinal);
+        // Обе настройки выключены — линия не создаётся.
+        Assert.Contains("if (!_viewModel.ShowHorizontalGridLines)", columns, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -308,23 +472,35 @@ public sealed class Issue130GridLinesTests
     // ===================== Avalonia: отрисовка и реакция на настройку =====================
 
     [Fact]
-    public void Avalonia_RowAndHeader_UseSharedPlannerAndBothFlags()
+    public void Avalonia_RowsAndOverlay_UseSharedPlannerAndBothFlags()
     {
         var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Columns.cs"));
+        var view = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        var tree = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
 
         // Тот же планировщик, что в WPF, — расхождение поведения недопустимо.
-        Assert.Contains("GridLinesPlanner.Resolve(", columns, StringComparison.Ordinal);
+        Assert.Contains("GridLinesPlanner.ResolveVerticalOffsets(", columns, StringComparison.Ordinal);
+        Assert.Contains("GridLinesPlanner.ResolveLineThickness(", columns, StringComparison.Ordinal);
         Assert.Contains("_vm.ShowHorizontalGridLines", columns, StringComparison.Ordinal);
         Assert.Contains("_vm.ShowVerticalGridLines", columns, StringComparison.Ordinal);
-        Assert.Contains("ApplyGridLinesToGrid(_columnHeaderRow, includeHorizontal: false)", columns, StringComparison.Ordinal);
+        // Вертикальные линии — только в едином оверлее, не в сетках строк/заголовка.
+        Assert.DoesNotContain("ApplyGridLinesToGrid", columns, StringComparison.Ordinal);
+        Assert.Contains("RefreshGridLinesOverlay();", columns, StringComparison.Ordinal);
         // Цвет линии — из темы.
         Assert.Contains("ThemeBrushes.Bind(line, Border.BackgroundProperty, \"BorderColorBrush\")",
             columns, StringComparison.Ordinal);
 
-        var tree = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
-        // Строка базы и строка группы — с горизонтальной линией.
-        Assert.Contains("ApplyGridLinesToGrid(grid, includeHorizontal: true)", tree, StringComparison.Ordinal);
-        Assert.Contains("ApplyGridLinesToGrid(row, includeHorizontal: true)", tree, StringComparison.Ordinal);
+        // Строка базы и строка группы — только с горизонтальной линией.
+        Assert.Contains("ApplyHorizontalGridLine(grid);", tree, StringComparison.Ordinal);
+        Assert.Contains("ApplyHorizontalGridLine(row, 2 + (UiMetrics.Compact ? 6 : 8));", tree, StringComparison.Ordinal);
+
+        // Единый оверлей создаётся в контейнере списка поверх заголовка и строк.
+        Assert.Contains("_gridLinesOverlay = new Canvas", view, StringComparison.Ordinal);
+        Assert.Contains("Grid.SetRowSpan(_gridLinesOverlay, 2);", view, StringComparison.Ordinal);
+        // Пересчёт при смене DPI (толщина — один физический пиксель).
+        Assert.Contains("ScalingChanged += (_, _) => RefreshGridLinesOverlay();", view, StringComparison.Ordinal);
+        // Декоративные линии разделителей заголовка скрываются при включённой сетке.
+        Assert.Contains("ApplyHeaderSeparatorVisibility(showSeparators: !showVertical);", columns, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -338,8 +514,7 @@ public sealed class Issue130GridLinesTests
 
         var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Columns.cs"));
         Assert.Contains("private void RefreshGridLines()", columns, StringComparison.Ordinal);
-        Assert.Contains("ApplyGridLinesToGrid(_columnHeaderRow, includeHorizontal: false);",
-            columns, StringComparison.Ordinal);
+        Assert.Contains("private void RefreshGridLinesOverlay()", columns, StringComparison.Ordinal);
         Assert.Contains("ThemeBrushes.Bind(line, Border.BackgroundProperty, \"BorderColorBrush\")",
             columns, StringComparison.Ordinal);
     }

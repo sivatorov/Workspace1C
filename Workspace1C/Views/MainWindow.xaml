@@ -64,6 +64,8 @@
         <conv:LevelToThicknessConverter x:Key="LevelToThickness"/>
         <conv:GroupOffsetConverter x:Key="GroupOffset"/>
         <conv:MultiFormatConverter x:Key="MultiFormat"/>
+        <!-- Иконка программы из файла (issue #91): путь → BitmapImage, ошибки не роняют панель. -->
+        <conv:FileIconPathToImageSourceConverter x:Key="FileIcon"/>
 
         <!-- Собственные кнопки управления окном вынесены в общие ресурсы приложения
              (App.xaml): WindowControlButton / WindowControlCloseButton. Здесь они
@@ -2779,6 +2781,18 @@
                              MainWindow.ContextMenu.cs (BuildRowContextMenu); при выключенной
                              правке структуры компоновка стандартная — меню идентично v1.0.0.66. -->
                         </controls:LeveledTreeView>
+
+                        <!-- Issue #130 (v1.0.1.65): единый слой вертикальных линий сетки.
+                             Одна линия на границу колонки, позиции считает чистый
+                             GridLinesPlanner.ResolveVerticalOffsets по ширинам заголовка
+                             (единственный источник истины). Слой лежит поверх заголовка
+                             и области строк, поэтому линии сходятся по всей высоте —
+                             включая строки групп, чьи отступы больше не сдвигают линии.
+                             Мышь слой не перехватывает. -->
+                        <Canvas x:Name="GridLinesOverlay" Grid.Row="0" Grid.RowSpan="2"
+                                IsHitTestVisible="False" ClipToBounds="True"
+                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                Panel.ZIndex="10"/>
                         </Grid>
                         </ScrollViewer>
 
@@ -3292,6 +3306,147 @@
                             </StackPanel>
                         </Button>
 
+                        <!-- Группа «Мои программы» (issue #91): свои программы под кнопками
+                             запуска конфигуратора. Скрыта, если программ нет. Режим отображения —
+                             «Списком» (как родной стартер) или «Иконками» (в строку с переносом);
+                             переключатель хранится в настройках. Шестерёнка открывает редактор группы. -->
+                        <StackPanel Visibility="{Binding HasCustomPrograms, Converter={StaticResource BoolToVis}}">
+                            <Grid Margin="8,4,8,2">
+                                <TextBlock Text="{loc:Loc Launch.CustomPrograms.Header}"
+                                           FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <Button x:Name="CustomProgramsSettingsButton"
+                                        HorizontalAlignment="Right" Width="24" MinWidth="24"
+                                        Padding="0" Cursor="Hand"
+                                        Background="Transparent" BorderThickness="0"
+                                        Command="{Binding ShowCustomProgramsSettingsCommand}"
+                                        ToolTip="{loc:Loc Launch.CustomPrograms.SettingsTooltip}">
+                                    <materialDesign:PackIcon Kind="Cog" Width="14" Height="14"
+                                                             Foreground="{DynamicResource TextSecondaryBrush}"
+                                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Режим «Списком»: полноширинные кнопки «иконка + подпись». -->
+                            <ItemsControl ItemsSource="{Binding CustomPrograms}"
+                                          Visibility="{Binding CustomProgramsListView, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button HorizontalContentAlignment="Left"
+                                                Command="{Binding DataContext.LaunchCustomProgramCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource ActionPanelSecondaryButton}">
+                                                    <Setter Property="Padding" Value="8,6"/>
+                                                    <Setter Property="Margin" Value="4,0,4,4"/>
+                                                    <Setter Property="ToolTip" Value="{Binding FilePath}"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DataContext.ShowRightPanelDetails,
+                                                                               RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                            <Setter Property="Padding" Value="6,8"/>
+                                                            <Setter Property="Margin" Value="0,0,0,4"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Button.Style>
+                                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                                <Grid Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                    <Image Source="{Binding IconPath, Converter={StaticResource FileIcon}}"
+                                                           Width="16" Height="16" Stretch="Uniform">
+                                                        <Image.Style>
+                                                            <Style TargetType="Image">
+                                                                <Setter Property="Visibility" Value="Visible"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
+                                                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Image.Style>
+                                                    </Image>
+                                                    <materialDesign:PackIcon Kind="Application" Width="15" Height="15"
+                                                                             Foreground="{DynamicResource WarningBrush}">
+                                                        <materialDesign:PackIcon.Style>
+                                                            <Style TargetType="materialDesign:PackIcon"
+                                                                   BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding IconPath}" Value="">
+                                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </materialDesign:PackIcon.Style>
+                                                    </materialDesign:PackIcon>
+                                                </Grid>
+                                                <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           Text="{Binding Name}" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Режим «Иконками»: квадратные кнопки в строку с переносом,
+                                 подсказка — имя программы. -->
+                            <ItemsControl ItemsSource="{Binding CustomPrograms}" Margin="4,0,4,4"
+                                          Visibility="{Binding CustomProgramsIconsView, Converter={StaticResource BoolToVis}}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Width="40" Height="40" Padding="0" Margin="0,0,4,4" Cursor="Hand"
+                                                ToolTip="{Binding Name}"
+                                                Command="{Binding DataContext.LaunchCustomProgramCommand,
+                                                                  RelativeSource={RelativeSource AncestorType=Window}}"
+                                                CommandParameter="{Binding}">
+                                            <Button.Style>
+                                                <Style TargetType="Button" BasedOn="{StaticResource ActionPanelSecondaryButton}">
+                                                    <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+                                                    <Setter Property="BorderThickness" Value="1"/>
+                                                </Style>
+                                            </Button.Style>
+                                            <Grid Width="24" Height="24">
+                                                <Image Source="{Binding IconPath, Converter={StaticResource FileIcon}}"
+                                                       Width="24" Height="24" Stretch="Uniform">
+                                                    <Image.Style>
+                                                        <Style TargetType="Image">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IconPath}" Value="">
+                                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </Image.Style>
+                                                </Image>
+                                                <materialDesign:PackIcon Kind="Application" Width="22" Height="22"
+                                                                         Foreground="{DynamicResource WarningBrush}">
+                                                    <materialDesign:PackIcon.Style>
+                                                        <Style TargetType="materialDesign:PackIcon"
+                                                               BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
+                                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding IconPath}" Value="">
+                                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </materialDesign:PackIcon.Style>
+                                                </materialDesign:PackIcon>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
                         <!-- Отступ между запуском (1С / Конфигуратор) и остальными действиями -->
                         <Border Height="1" Background="{DynamicResource BorderBrushColor}"
                                 Margin="8,10,8,10" Opacity="0.7"/>
@@ -3588,6 +3743,7 @@
                                   Width="28" Height="28" Padding="0"
                                   Cursor="Hand" BorderThickness="0" Background="Transparent"
                                   VerticalAlignment="Center"
+                                  ToolTip="{Binding LongOperationAlarmTooltip}"
                                   IsChecked="{Binding LongOperationNotificationsEnabled, Mode=TwoWay}">
                         <ToggleButton.Template>
                             <ControlTemplate TargetType="ToggleButton">
@@ -3602,20 +3758,6 @@
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </ToggleButton.Template>
-                        <ToggleButton.ToolTip>
-                            <TextBlock>
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value="{loc:Loc LongOperation.Alarm.TooltipOff}"/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IsChecked, ElementName=LongOperationAlarmToggle}" Value="True">
-                                                <Setter Property="Text" Value="{loc:Loc LongOperation.Alarm.TooltipOn}"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </ToggleButton.ToolTip>
                         <Grid Width="18" Height="18">
                             <Path Width="18" Height="18" Stretch="Uniform"
                                   Data="{DynamicResource Pack.BellOutline}">

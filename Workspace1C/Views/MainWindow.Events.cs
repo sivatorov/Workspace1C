@@ -341,6 +341,15 @@ namespace Workspace1C
             // Внешний общий ScrollViewer и вынесенная вертикальная полоса (issue #309):
             // подписки на изменение вьюпорта/значения и отступ полосы под заголовком.
             AttachListScrollHandler();
+
+            // Issue #130: единый слой вертикальных линий зависит от высоты области
+            // списка и масштаба DPI. Пересчитываем его после изменения размеров и
+            // при смене DPI: толщина линии — один физический пиксель (1 / dpiScale),
+            // иначе на 125/150 % линия занимает две колонки пикселей.
+            if (ListContentGrid is not null)
+                ListContentGrid.SizeChanged += (_, _) => RefreshGridLinesOverlay();
+            DpiChanged += (_, _) => RefreshGridLines();
+
             if (MainTree is not null)
             {
                 MainTree.Loaded += (_, __) => AttachTreeScrollHandler();

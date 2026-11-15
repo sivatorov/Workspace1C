@@ -456,6 +456,9 @@ public partial class MainViewModel : ViewModelBase
 
         // Загружаем настройки интерфейса (состояние кнопок «Избранные» и «Группировать»).
         var settings = _repository.LoadSettings();
+        // Режим отображения группы «Мои программы» (issue #91): старые профили без
+        // поля получают «Списком» (как родной стартер 1С).
+        _customProgramsViewMode = Models.CustomProgramsViewModes.Normalize(settings.CustomProgramsViewMode);
         _showFavoritesOnly = settings.ShowFavoritesOnly;
         _groupByGroup = settings.GroupByGroup;
         // Единый режим списка (issue #52): восстанавливаем выбранную вкладку, включая
@@ -967,6 +970,9 @@ public partial class MainViewModel : ViewModelBase
         // Кэш пользовательских действий контекстного меню (функция 7): загружается при
         // старте, перечитывается после окна настроек (ReloadCustomActions).
         ReloadCustomActions();
+        // Группа «Мои программы» (issue #91): список загружается при старте,
+        // перечитывается после редактора группы.
+        ReloadCustomPrograms();
     }
 
     /// <summary>Включено ли автосохранение состояния списка (раскрытые группы).</summary>

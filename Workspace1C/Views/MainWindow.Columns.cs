@@ -416,76 +416,64 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Рисует линии сетки (issue #130) в сетке строки базы, строки группы или
-        /// заголовка: вертикальные — у правого края каждой видимой колонки, кроме
-        /// последней; горизонтальную — по нижней границе строки. Цвет берётся из
-        /// темы (<c>BorderBrushColor</c>), мышь линии не перехватывают и выделение
-        /// строк не ломают.
+        /// Текущий масштаб DPI окна. Толщина линии считается от него: один физический
+        /// пиксель = <c>1 / dpiScale</c> DIP (issue #130, замечание 7OH о «двух
+        /// линиях» на 125/150 %).
         /// </summary>
-        private void ApplyGridLinesToGrid(Grid grid, bool includeHorizontal)
+        private double GridLinesDpiScale
+        {
+            get
+            {
+                try
+                {
+                    var scale = VisualTreeHelper.GetDpi(this).DpiScaleX;
+                    return scale > 0 ? scale : 1.0;
+                }
+                catch
+                {
+                    return 1.0;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Горизонтальная линия сетки (issue #130) по нижней границе строки базы
+        /// или строки группы. Вертикальные линии в строках больше не рисуются:
+        /// их ведёт единый оверлей <c>GridLinesOverlay</c> — иначе правая граница
+        /// одной ячейки и левая граница следующей давали «две линии в колонке».
+        /// Толщина — один физический пиксель. <paramref name="horizontalInset"/>
+        /// компенсирует Padding контейнера строки группы, чтобы линия доходила до
+        /// границ области списка и совпадала по толщине/цвету с линией строки базы.
+        /// Цвет берётся из темы (<c>BorderBrushColor</c>), мышь линия не перехватывает.
+        /// </summary>
+        private void ApplyHorizontalGridLine(Grid grid, double horizontalInset = 0)
         {
             if (_viewModel is null)
                 return;
             RemoveGridLines(grid);
-
-            // Ведущие колонки (кнопки групп, звезда, булавка) — часть блока имени:
-            // линии внутри них резали бы подпись «Название» и значки. Сетка начинается
-            // с колонки имени (её правый край — первая вертикальная линия).
-            var nameColumn = RowFirstDataColumn - 1;
-            var visible = new List<bool>(grid.ColumnDefinitions.Count);
-            for (var i = 0; i < grid.ColumnDefinitions.Count; i++)
-            {
-                var definition = grid.ColumnDefinitions[i];
-                visible.Add(i >= nameColumn
-                    && (!definition.Width.IsAbsolute || definition.Width.Value > 0.5));
-            }
-
-            var plan = Services.GridLinesPlanner.Resolve(
-                showHorizontal: includeHorizontal && _viewModel.ShowHorizontalGridLines,
-                showVertical: _viewModel.ShowVerticalGridLines,
-                compactMode: _viewModel.CompactMode,
-                visibleColumns: visible);
-            if (!plan.HasAnyLines)
+            if (!_viewModel.ShowHorizontalGridLines)
                 return;
 
             var rows = Math.Max(1, grid.RowDefinitions.Count);
-
-            foreach (var column in plan.VerticalBoundaryColumns)
+            var line = new System.Windows.Shapes.Rectangle
             {
-                var line = new System.Windows.Shapes.Rectangle
-                {
-                    Width = plan.Thickness,
-                    HorizontalAlignment = HorizontalAlignment.Right,
-                    VerticalAlignment = VerticalAlignment.Stretch,
-                    Opacity = plan.Opacity,
-                    IsHitTestVisible = false,
-                    Tag = GridLineMarker
-                };
-                ApplyGridLineBrush(line);
-                Grid.SetColumn(line, column);
-                Grid.SetRowSpan(line, rows);
-                Panel.SetZIndex(line, 1);
-                grid.Children.Add(line);
-            }
-
-            if (plan.ShowHorizontalLine)
-            {
-                var line = new System.Windows.Shapes.Rectangle
-                {
-                    Height = plan.Thickness,
-                    HorizontalAlignment = HorizontalAlignment.Stretch,
-                    VerticalAlignment = VerticalAlignment.Bottom,
-                    Opacity = plan.Opacity,
-                    IsHitTestVisible = false,
-                    Tag = GridLineMarker
-                };
-                ApplyGridLineBrush(line);
-                Grid.SetColumn(line, 0);
-                Grid.SetColumnSpan(line, Math.Max(1, grid.ColumnDefinitions.Count));
-                Grid.SetRow(line, rows - 1);
-                Panel.SetZIndex(line, 1);
-                grid.Children.Add(line);
-            }
+                Height = Services.GridLinesPlanner.ResolveLineThickness(GridLinesDpiScale),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Opacity = Services.GridLinesPlanner.ResolveOpacity(_viewModel.CompactMode),
+                IsHitTestVisible = false,
+                UseLayoutRounding = true,
+                SnapsToDevicePixels = true,
+                Tag = GridLineMarker
+            };
+            if (horizontalInset > 0)
+                line.Margin = new Thickness(-horizontalInset, 0, -horizontalInset, 0);
+            ApplyGridLineBrush(line);
+            Grid.SetColumn(line, 0);
+            Grid.SetColumnSpan(line, Math.Max(1, grid.ColumnDefinitions.Count));
+            Grid.SetRow(line, rows - 1);
+            Panel.SetZIndex(line, 1);
+            grid.Children.Add(line);
         }
 
         /// <summary>
@@ -506,30 +494,121 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Перерисовывает линии сетки у всех уже созданных строк и в заголовке
-        /// списка (issue #130): вызывается при смене настройки, состава колонок и
-        /// порядка, чтобы не ждать пересоздания строк виртуализацией.
+        /// Перерисовывает линии сетки (issue #130): горизонтальные — в уже созданных
+        /// строках баз и группах, вертикальные — в едином оверлее. Вызывается при
+        /// смене настройки, темы, компактности, состава/порядка колонок и после
+        /// выравнивания заголовка, чтобы не ждать пересоздания строк виртуализацией.
         /// </summary>
         private void RefreshGridLines()
         {
             if (_viewModel is null || MainTree is null)
+            {
+                RefreshGridLinesOverlay();
                 return;
+            }
+
             foreach (var grid in FindRowGrids(MainTree, RowGridMarker))
-                ApplyGridLinesToGrid(grid, includeHorizontal: true);
+                ApplyHorizontalGridLine(grid);
+
+            // Строка группы лежит внутри Border с Padding 8/6: отрицательный отступ
+            // возвращает линию к границам строки, как у строк баз.
+            var groupInset = _viewModel.CompactMode ? 6 : 8;
             foreach (var grid in FindRowGrids(MainTree, GroupGridMarker))
-                ApplyGridLinesToGrid(grid, includeHorizontal: true);
-            ApplyGridLinesToHeader();
+                ApplyHorizontalGridLine(grid, groupInset);
+
+            RefreshGridLinesOverlay();
         }
 
         /// <summary>
-        /// Вертикальные линии в заголовке списка (issue #130): продолжение линий
-        /// строк, чтобы сетка была непрерывной от шапки до последней строки.
+        /// Единый слой вертикальных линий сетки (issue #130). Позиции считает чистый
+        /// <see cref="Services.GridLinesPlanner.ResolveVerticalOffsets"/> по фактическим
+        /// ширинам колонок заголовка — единственного источника истины. Оверлей лежит
+        /// поверх заголовка и строк, поэтому Padding и отступ уровня строки группы
+        /// больше не сдвигают линии, а по всей высоте списка стоит ровно одна линия
+        /// на границу. Толщина — один физический пиксель, при смене DPI пересчитывается.
         /// </summary>
-        private void ApplyGridLinesToHeader()
+        private void RefreshGridLinesOverlay()
         {
-            if (_viewModel is null || HeaderGrid is null)
+            // Issue #130: при включённых вертикальных линиях декоративные линии
+            // разделителей заголовка скрываются — иначе в шапке рядом с линией
+            // оверлея видна вторая, более тусклая линия (7OH: «в колонках 2 линии»).
+            var showVertical = _viewModel?.ShowVerticalGridLines == true;
+            ApplyHeaderSeparatorVisibility(showSeparators: !showVertical);
+
+            if (GridLinesOverlay is null)
                 return;
-            ApplyGridLinesToGrid(HeaderGrid, includeHorizontal: false);
+
+            GridLinesOverlay.Children.Clear();
+            if (_viewModel is null || HeaderGrid is null || !showVertical)
+                return;
+
+            var definitions = HeaderGrid.ColumnDefinitions;
+            var widths = new List<double>(definitions.Count);
+            var visible = new List<bool>(definitions.Count);
+            // Линии начинаются после колонки имени: ведущие колонки — часть блока
+            // названия, линии внутри них резали бы подпись и значки.
+            var nameColumn = RowFirstDataColumn - 1;
+            for (var i = 0; i < definitions.Count; i++)
+            {
+                widths.Add(definitions[i].ActualWidth);
+                visible.Add(i >= nameColumn
+                    && (!definitions[i].Width.IsAbsolute || definitions[i].Width.Value > 0.5));
+            }
+
+            var dpiScale = GridLinesDpiScale;
+            var offsets = Services.GridLinesPlanner.ResolveVerticalOffsets(
+                widths, visible, _viewModel.ShowVerticalGridLines, dpiScale);
+            if (offsets.Count == 0)
+                return;
+
+            var height = GridLinesOverlay.ActualHeight > 0
+                ? GridLinesOverlay.ActualHeight
+                : ListContentGrid?.ActualHeight ?? 0;
+            if (height <= 0)
+                return;
+
+            var thickness = Services.GridLinesPlanner.ResolveLineThickness(dpiScale);
+            var opacity = Services.GridLinesPlanner.ResolveOpacity(_viewModel.CompactMode);
+
+            foreach (var offset in offsets)
+            {
+                var line = new System.Windows.Shapes.Rectangle
+                {
+                    Width = thickness,
+                    Height = height,
+                    Opacity = opacity,
+                    IsHitTestVisible = false,
+                    UseLayoutRounding = true,
+                    SnapsToDevicePixels = true,
+                    Tag = GridLineMarker
+                };
+                ApplyGridLineBrush(line);
+                Canvas.SetLeft(line, offset);
+                Canvas.SetTop(line, 0);
+                Panel.SetZIndex(line, 1);
+                GridLinesOverlay.Children.Add(line);
+            }
+        }
+
+        /// <summary>
+        /// Показывает/скрывает декоративные линии разделителей заголовка (issue #130).
+        /// При включённых вертикальных линиях сетки единственным источником линий
+        /// остаётся оверлей, а зона захвата разделителя продолжает работать —
+        /// у неё прозрачный фон. При выключенной сетке разделители выглядят как раньше.
+        /// </summary>
+        private void ApplyHeaderSeparatorVisibility(bool showSeparators)
+        {
+            var opacity = showSeparators ? 0.55 : 0.0;
+            foreach (var splitter in new Border?[]
+                     {
+                         NameSplitter, VersionSplitter, LaunchModeSplitter, ActionsSplitter,
+                         ServerSplitter, LastLaunchSplitter, SizeSplitter, ModifiedSplitter,
+                         LastBackupSplitter, ConfigurationSplitter, ConfigurationVersionSplitter
+                     })
+            {
+                if (splitter?.Child is Border line)
+                    line.Opacity = opacity;
+            }
         }
 
         /// <summary>
@@ -597,7 +676,7 @@ namespace Workspace1C
             EnsureHorizontalReach();
 
             // Issue #130: линии сетки привязаны к номерам колонок — после перестановки
-            // перерисовываем их и в строках, и в заголовке.
+            // перерисовываем горизонталь в строках и единый слой вертикальных линий.
             RefreshGridLines();
         }
 
@@ -669,8 +748,8 @@ namespace Workspace1C
             }
             grid.Tag = RowGridMarker;
             ApplyRowCompact(grid);
-            // Issue #130: линии сетки рисуются после применения порядка колонок.
-            ApplyGridLinesToGrid(grid, includeHorizontal: true);
+            // Issue #130: горизонтальная линия строки (вертикальные — в оверлее).
+            ApplyHorizontalGridLine(grid);
             // Проба утечки строк (issue #21, 1.0.0.62): при включённом CM_TREESWITCH
             // запоминаем строку слабой ссылкой; после GC в логе — сколько строк живо.
             if (TraceFlags.IsEnabled(TraceFlags.TreeSwitchFlag))
@@ -707,8 +786,8 @@ namespace Workspace1C
                 }
                 grid.Tag = GroupGridMarker;
                 ApplyRowCompact(grid);
-                // Issue #130: линии сетки у строки группы.
-                ApplyGridLinesToGrid(grid, includeHorizontal: true);
+                // Issue #130: горизонтальная линия строки группы (вертикальные — в оверлее).
+                ApplyHorizontalGridLine(grid, _viewModel?.CompactMode == true ? 6 : 8);
             });
         }
 
@@ -922,6 +1001,10 @@ namespace Workspace1C
             }
 
             SyncHeaderWidthWithList();
+
+            // Issue #130: компенсатор заголовка изменил позиции колонок — пересчитываем
+            // единый слой вертикальных линий, чтобы он сходился со строками и группами.
+            RefreshGridLinesOverlay();
         }
 
         /// <summary>
@@ -1572,6 +1655,11 @@ namespace Workspace1C
             // полоса горизонтальной прокрутки расширяется сразу, пока колонку тянут
             // за край видимой области, а не только после отпускания мыши.
             QueueTreeMinWidthRefresh();
+
+            // Issue #130: границы колонок изменились — сразу пересчитываем единый
+            // слой вертикальных линий, чтобы он не отставал от перетаскиваемого
+            // разделителя (одна линия на границу, без «двойных» линий).
+            RefreshGridLinesOverlay();
         }
 
         /// <summary>
@@ -1610,6 +1698,8 @@ namespace Workspace1C
                 InvalidateTreeMinWidthContent();
                 UpdateTreeMinWidthContent();
                 SyncHeaderWidthWithList();
+                // Issue #130: финальные позиции колонок — перерисовываем сетку целиком.
+                RefreshGridLines();
             }
 
             _resizeColumn = null;

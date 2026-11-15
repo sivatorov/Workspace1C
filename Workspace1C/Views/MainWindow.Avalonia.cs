@@ -96,6 +96,8 @@ namespace Workspace1C
         private Border? _columnHeader;
         private Grid? _columnHeaderRow;
         private ColumnDefinition? _headerOffsetColumn;
+        // Issue #130: единый слой вертикальных линий сетки поверх заголовка и строк.
+        private Canvas? _gridLinesOverlay;
         private Grid? _listContent;
         /// <summary>Текущая сумма ширин видимых колонок списка (минимум области, issue #309).</summary>
         private double _listMinWidth;
@@ -148,6 +150,18 @@ namespace Workspace1C
         // рендером/в виртуализации заставляет WM непрерывно перерисовывать фон.
         // В этом режиме «стеклянная» подложка рисуется полностью непрозрачной.
         private readonly bool _opaqueWindow;
+
+        /// <summary>
+        /// Радиус скругления «стеклянного» корня главного окна (issue #126).
+        /// В прозрачном режиме углы скруглены общим радиусом содержимого, а вне
+        /// скругления фон окна прозрачный — «белых треугольников» за рамкой нет.
+        /// Без прозрачности (системный заголовок или непрозрачный режим
+        /// X11/виртуализации) скруглённая подложка оставляла бы в углах
+        /// непрозрачную заливку окна, поэтому там углы прямые (fallback
+        /// «без скругления»).
+        /// </summary>
+        private double GlassCornerRadius =>
+            _useSystemTitleBar || _opaqueWindow ? 0 : WindowSizeMath.DefaultContentCornerRadius;
 
         public MainWindow(MainViewModel viewModel)
         {
@@ -679,8 +693,10 @@ namespace Workspace1C
             {
                 // Радиус «стеклянного» корня — единая константа с WPF-слоем
                 // (issue #126): рамка и содержимое скруглены одинаково, в том числе
-                // на системах без скругления DWM (RDP/Windows 10).
-                CornerRadius = new CornerRadius(WindowSizeMath.DefaultContentCornerRadius),
+                // на системах без скругления DWM (RDP/Windows 10). Без прозрачности
+                // (непрозрачный режим/системный заголовок) скругление не рисуем:
+                // иначе в углах остаётся непрозрачная заливка окна.
+                CornerRadius = new CornerRadius(GlassCornerRadius),
                 ClipToBounds = true,
                 // Видимая рамка окна (issue #273): даже без системных теней/эффектов
                 // (терминал, виртуализация) окно остаётся различимым, а не сливается
@@ -710,7 +726,7 @@ namespace Workspace1C
                 {
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius);
+                        : new CornerRadius(GlassCornerRadius);
                     // В maximized-окне линия тени рамке не нужна (issue #126).
                     ApplyFrameVisual(glass);
                 }));
@@ -1682,6 +1698,29 @@ namespace Workspace1C
             Grid.SetRow(columnHeader, 0);
             _listContent.Children.Add(leftInner);
             Grid.SetRow(leftInner, 1);
+
+            // Issue #130 (v1.0.1.65): единый слой вертикальных линий сетки поверх
+            // заголовка и строк. Позиции считаются по ширинам колонок заголовка
+            // (единственный источник истины), поэтому Padding и отступ уровня
+            // строки группы линии больше не сдвигают. Мышь слой не перехватывает.
+            _gridLinesOverlay = new Canvas
+            {
+                IsHitTestVisible = false,
+                ClipToBounds = true,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
+            };
+            Grid.SetRow(_gridLinesOverlay, 0);
+            Grid.SetRowSpan(_gridLinesOverlay, 2);
+            _gridLinesOverlay.ZIndex = 10;
+            _listContent.Children.Add(_gridLinesOverlay);
+            // Пересчёт при изменении размеров области списка и масштаба DPI:
+            // толщина линии — один физический пиксель (1 / scale).
+            _listContent.GetObservable(Visual.BoundsProperty)
+                .Subscribe(new PropertyObserver<Rect>(_ => RefreshGridLinesOverlay()));
+            // Смена масштаба DPI (переезд окна на другой монитор): толщина линии
+            // пересчитывается, чтобы она оставалась ровно один физический пиксель.
+            ScalingChanged += (_, _) => RefreshGridLinesOverlay();
 
             var listArea = new ScrollViewer
             {

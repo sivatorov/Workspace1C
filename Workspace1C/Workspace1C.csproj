@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.64</Version>
-    <AssemblyVersion>1.0.1.64</AssemblyVersion>
-    <FileVersion>1.0.1.64</FileVersion>
-    <InformationalVersion>1.0.1.64</InformationalVersion>
+    <Version>1.0.1.65</Version>
+    <AssemblyVersion>1.0.1.65</AssemblyVersion>
+    <FileVersion>1.0.1.65</FileVersion>
+    <InformationalVersion>1.0.1.65</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -627,6 +627,15 @@
          глобом *.Avalonia.cs; Windows-хук (MainViewModel.CustomActions.Windows.cs) собирается
          под #if WINDOWS дефолтным глобом SDK. -->
     <Compile Include="ViewModels\MainViewModel.CustomActions.cs" />
+    <!-- Мост группы «Мои программы» в MainViewModel (issue #91): общий для обеих платформ
+         файл, имя не совпадает с глобом *.Avalonia.cs, добавляется явно. Платформенный хук
+         (MainViewModel.CustomPrograms.Avalonia.cs) подхватывается глобом *.Avalonia.cs;
+         Windows-хук (MainViewModel.CustomPrograms.Windows.cs) собирается под #if WINDOWS
+         дефолтным глобом SDK. -->
+    <Compile Include="ViewModels\MainViewModel.CustomPrograms.cs" />
+    <!-- VM редактора группы «Мои программы» (issue #91): чистый .NET без WPF-зависимостей,
+         используется и Windows, и Linux — на Linux подключается явно. -->
+    <Compile Include="ViewModels\CustomProgramsViewModel.cs" />
     <!-- VM редактора и строки списка пользовательских действий (0.3.9.195, функция 7):
          чистый .NET без WPF-зависимостей, используются и Windows, и Linux — на Linux
          подключаются явно (имена не совпадают с глобом *.Avalonia.cs). -->

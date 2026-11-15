@@ -52,7 +52,12 @@ public sealed class GridLinesPlan
 /// </summary>
 public static class GridLinesPlanner
 {
-    /// <summary>Толщина линии сетки (1 px в обеих платформах).</summary>
+    /// <summary>
+    /// Базовая толщина линии: ровно один физический пиксель. В аппаратно-независимых
+    /// точках это значение делится на масштаб DPI (см. <see cref="ResolveLineThickness"/>),
+    /// иначе на 125/150 % линия занимает две полупрозрачные колонки пикселей и читается
+    /// как «двойная» (issue #130, замечание 7OH).
+    /// </summary>
     public const double LineThickness = 1.0;
 
     /// <summary>Прозрачность линий в обычном режиме — сетка не должна спорить с текстом.</summary>
@@ -60,6 +65,78 @@ public static class GridLinesPlanner
 
     /// <summary>Прозрачность линий в компактном режиме — строки плотнее, линия заметнее.</summary>
     public const double CompactOpacity = 1.0;
+
+    /// <summary>
+    /// Толщина линии в аппаратно-независимых точках, дающая ровно один физический
+    /// пиксель при заданном масштабе DPI: <c>1 / dpiScale</c>.
+    /// </summary>
+    public static double ResolveLineThickness(double dpiScale)
+        => dpiScale > 0 ? LineThickness / dpiScale : LineThickness;
+
+    /// <summary>Прозрачность линии по режиму плотности (та же, что в <see cref="Resolve"/>).</summary>
+    public static double ResolveOpacity(bool compactMode)
+        => compactMode ? CompactOpacity : NormalOpacity;
+
+    /// <summary>
+    /// Округляет координату к физическому пикселю: <c>round(value * scale) / scale</c>.
+    /// Без этого дробные позиции (звёздная колонка «Название») дают полупрозрачные
+    /// края линии и визуально «две линии» на 125/150 % DPI (issue #130).
+    /// </summary>
+    public static double SnapToPhysicalPixel(double value, double dpiScale)
+        => dpiScale > 0 ? Math.Round(value * dpiScale) / dpiScale : value;
+
+    /// <summary>
+    /// Позиции вертикальных линий (X, в DIP) для единого оверлея сетки (issue #130).
+    /// Один источник истины — ширины колонок заголовка: позиция границы = сумма ширин
+    /// предыдущих колонок, округлённая к физическому пикселю. Линия рисуется только
+    /// между двумя видимыми колонками; после последней видимой линии нет (наружной
+    /// рамки не делаем). Скрытые колонки нулевой ширины линий не дают.
+    /// </summary>
+    /// <param name="columnWidths">Фактические ширины колонок слева направо.</param>
+    /// <param name="visibleColumns">Видимость колонок слева направо.</param>
+    /// <param name="showVertical">Настройка «Выводить линии — по вертикали».</param>
+    /// <param name="dpiScale">Масштаб DPI (1.0, 1.25, 1.5, 2.0…).</param>
+    public static IReadOnlyList<double> ResolveVerticalOffsets(
+        IReadOnlyList<double>? columnWidths,
+        IReadOnlyList<bool>? visibleColumns,
+        bool showVertical,
+        double dpiScale)
+    {
+        var offsets = new List<double>();
+        if (!showVertical || columnWidths is null || visibleColumns is null)
+            return offsets;
+
+        var count = Math.Min(columnWidths.Count, visibleColumns.Count);
+        if (count == 0)
+            return offsets;
+
+        var lastVisible = -1;
+        for (var i = 0; i < count; i++)
+            if (visibleColumns[i])
+                lastVisible = i;
+        if (lastVisible <= 0)
+            return offsets;
+
+        double x = 0;
+        for (var i = 0; i < count; i++)
+        {
+            x += Math.Max(0, columnWidths[i]);
+            if (i >= lastVisible)
+                break;
+            if (visibleColumns[i] && HasVisibleAfter(visibleColumns, i + 1, count))
+                offsets.Add(SnapToPhysicalPixel(x, dpiScale));
+        }
+
+        return offsets;
+    }
+
+    private static bool HasVisibleAfter(IReadOnlyList<bool> visibleColumns, int start, int count)
+    {
+        for (var i = start; i < count; i++)
+            if (visibleColumns[i])
+                return true;
+        return false;
+    }
 
     /// <summary>
     /// Строит план линий сетки.
@@ -96,6 +173,6 @@ public static class GridLinesPlanner
             showHorizontal,
             boundaries,
             LineThickness,
-            compactMode ? CompactOpacity : NormalOpacity);
+            ResolveOpacity(compactMode));
     }
 }

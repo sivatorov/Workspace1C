@@ -1176,7 +1176,7 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Галочка «Уведомлять» о длительных операциях (issue #131). Переключается
-    /// иконкой-будильником в панели запуска и в окне настроек; сохранение —
+    /// колокольчиком в подвале и в окне настроек; сохранение —
     /// отложенное, как у остальных настроек главного окна.
     /// </summary>
     public bool LongOperationNotificationsEnabled
@@ -1185,9 +1185,23 @@ public partial class MainViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _longOperationNotificationsEnabled, value))
+            {
+                OnPropertyChanged(nameof(LongOperationAlarmTooltip));
                 ScheduleSaveSettings();
+            }
         }
     }
+
+    /// <summary>
+    /// Текст подсказки колокольчика (issue #131) — вычисляется в VM, а не в XAML.
+    /// Содержимое <c>ToolTip</c> в WPF живёт в отдельном Popup-дереве со своей
+    /// namescope: <c>ElementName</c>-триггер там не разрешался, поэтому подсказка
+    /// всегда показывала «отключены». Смена языка пересчитывается общим
+    /// <c>OnPropertyChanged(string.Empty)</c> в <see cref="HandleLanguageChanged"/>.
+    /// </summary>
+    public string LongOperationAlarmTooltip => _longOperationNotificationsEnabled
+        ? LocalizationManager.T("LongOperation.Alarm.TooltipOn")
+        : LocalizationManager.T("LongOperation.Alarm.TooltipOff");
 
     /// <summary>Канал уведомлений о длительных операциях (System/Telegram, issue #131).</summary>
     public string LongOperationNotificationsChannel => _longOperationChannel;
@@ -1216,6 +1230,7 @@ public partial class MainViewModel : ViewModelBase
         _longOperationThresholdUnit = LongOperationThresholdUnits.Normalize(unit);
 
         OnPropertyChanged(nameof(LongOperationNotificationsEnabled));
+        OnPropertyChanged(nameof(LongOperationAlarmTooltip));
         OnPropertyChanged(nameof(LongOperationNotificationsChannel));
         OnPropertyChanged(nameof(LongOperationTelegramTarget));
         OnPropertyChanged(nameof(LongOperationThresholdValue));

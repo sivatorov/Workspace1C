@@ -605,6 +605,8 @@ public partial class MainViewModel : ViewModelBase
         // Единый режим списка (issue #52): выбранная вкладка сохраняется автоматически.
         // Старые флаги выше продолжают писаться для обратной совместимости.
         s.ListMode = ListViewModes.ToSettingString(_listViewMode);
+        // Режим отображения группы «Мои программы» (issue #91).
+        s.CustomProgramsViewMode = _customProgramsViewMode;
         s.GroupByGroup = _groupByGroup;
         s.ShowEmptyGroups = _showEmptyGroups;
         s.Theme = _savedTheme;

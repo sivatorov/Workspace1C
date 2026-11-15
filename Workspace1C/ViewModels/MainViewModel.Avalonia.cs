@@ -464,7 +464,7 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Галочка «Уведомлять» о длительных операциях (issue #131): читается и
-    /// переключается иконкой-будильником в панели запуска и в окне настроек.
+    /// переключается колокольчиком в подвале и в окне настроек.
     /// </summary>
     public bool LongOperationNotificationsEnabled
     {
@@ -478,8 +478,21 @@ public partial class MainViewModel : ViewModelBase
             settings.Enabled = value;
             SaveSettingsSilently();
             OnPropertyChanged();
+            OnPropertyChanged(nameof(LongOperationAlarmTooltip));
         }
     }
+
+    /// <summary>
+    /// Текст подсказки колокольчика (issue #131): тот же контракт, что и в WPF —
+    /// текст вычисляется в VM по текущему состоянию настройки, а не собирается
+    /// конвертером в UI (иначе не пересчитывался при смене языка).
+    /// Смена языка пересчитывает все привязки через <c>OnPropertyChanged(string.Empty)</c>
+    /// в <see cref="ApplyLanguage"/>.
+    /// </summary>
+    public string LongOperationAlarmTooltip =>
+        _settings.LongOperationNotifications?.Enabled == true
+            ? LocalizationManager.T("LongOperation.Alarm.TooltipOn")
+            : LocalizationManager.T("LongOperation.Alarm.TooltipOff");
 
     /// <summary>Канал уведомлений о длительных операциях (System/Telegram, issue #131).</summary>
     public string LongOperationNotificationsChannel =>
@@ -519,6 +532,7 @@ public partial class MainViewModel : ViewModelBase
                 LocalizationManager.T("Settings.Title"));
 
         OnPropertyChanged(nameof(LongOperationNotificationsEnabled));
+        OnPropertyChanged(nameof(LongOperationAlarmTooltip));
         OnPropertyChanged(nameof(LongOperationNotificationsChannel));
         OnPropertyChanged(nameof(LongOperationTelegramTarget));
         OnPropertyChanged(nameof(LongOperationThresholdValue));
@@ -887,6 +901,9 @@ public partial class MainViewModel : ViewModelBase
             NotifySessionSettings();
 
             RebuildTree();
+            // Группа «Мои программы» (issue #91): список загружается после настроек,
+            // чтобы панель запуска сразу показала сохранённые программы.
+            ReloadCustomPrograms();
             UpdateStatus(string.Format(LocalizationManager.T("Main.LoadedBases"), _allInfobases.Count));
 
             // Дата изменений файла ИБ для колонки «Дата изменений» (Этап 13) считается
@@ -2605,6 +2622,13 @@ public partial class MainViewModel : ViewModelBase
             _logger.Error("Не удалось применить язык интерфейса", ex);
         }
 
+        // Вычисляемые локализованные свойства (например, LongOperationAlarmTooltip
+        // у колокольчика, issue #131) не откликаются на смену языка сами: пустое имя
+        // свойства означает «изменились все» — так же делает WPF-версия
+        // (MainViewModel.Theme.cs, HandleLanguageChanged). Подсказку уведомляем и
+        // явно — не полагаемся на обработку пустого имени в привязках Avalonia.
+        OnPropertyChanged(nameof(LongOperationAlarmTooltip));
+        OnPropertyChanged(string.Empty);
         // Строка состояния собрана из локализованных частей и хранится готовой,
         // поэтому её надо пересобрать: сама она на смену языка не откликается.
         UpdateStatus();

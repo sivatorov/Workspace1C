@@ -11,6 +11,114 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.65] — 2026-11-15
+
+### Исправлено
+
+- **Подсказка колокольчика уведомлений о длительных операциях снова соответствует
+  состоянию кнопки (issue #131).** В WPF содержимое `ToolTip` размещается в
+  отдельном Popup-дереве со своей namescope, поэтому `DataTrigger` по
+  `ElementName=LongOperationAlarmToggle` внутри подсказки не срабатывал и она
+  всегда показывала «уведомления отключены», хотя иконка менялась корректно.
+  Текст подсказки теперь вычисляется в модели представления —
+  `LongOperationAlarmTooltip` в
+  [`MainViewModel.Commands.cs`](Workspace1C/ViewModels/MainViewModel.Commands.cs:1189)
+  (WPF) и [`MainViewModel.Avalonia.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.cs:469)
+  (Avalonia) — и уведомляется из setter флага и из
+  `ApplyLongOperationNotificationSettings`; смена языка пересчитывает подсказку
+  общим `OnPropertyChanged(string.Empty)`. WPF-кнопка привязана к свойству
+  (`ToolTip="{Binding LongOperationAlarmTooltip}"`,
+  [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3746)), Avalonia — через
+  `ToolTip.TipProperty` без `FuncValueConverter`
+  ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:1709)).
+  Иконка, перечёркивание и место в подвале рядом с «Текущей сессией» не менялись.
+  Покрыто тестами
+  [`Issue131LongOperationNotificationTests`](Workspace1C.Tests/Issue131LongOperationNotificationTests.cs:19):
+  текст подсказки ru/en и при переключении, source-гварды обеих платформ.
+- **Белые углы вне скруглённой рамки окон на Windows 10 / RDP (issue #126).**
+  Клип содержимого (`contentHost`/`glass`) обрезал только содержимое, а
+  `Window.Background` заливал весь прямоугольник HWND: на Windows 10 и в RDP DWM
+  не обрезает окно по скруглению, поэтому четыре треугольника вне рамки
+  оставались фоном темы (в светлой теме — «белые углы»). Добавлена чистая политика
+  [`WindowSizeMath.ResolveWindowRegion`](Workspace1C/Services/WindowSizeMath.cs:307):
+  регион нужен только там, где скругление рисуем мы сами
+  (`FrameCornerPolicy.ContentRadius`), и снимается при `maximized`, системном
+  скруглении DWM (Windows 11), `CompositionOff`, нулевом радиусе и opt-out окна;
+  диаметр считается от DPI — `ceil(radius × scale × 2)`.
+  [`WindowChromeHelper`](Workspace1C/Views/WindowChromeHelper.cs:1256) применяет
+  `CreateRoundRectRgn`/`SetWindowRgn`, пересчитывает регион на `WM_SIZE`,
+  `DpiChanged`, смене композиции/темы и снимает его, когда он не нужен. Вторая
+  линия обороны — фон: подложка темы перенесена на `contentHost`, а
+  `Window.Background` для окон с собственным скруглением стал прозрачным
+  ([`WindowChromeHelper.ApplyGlassBackground`](Workspace1C/Views/WindowChromeHelper.cs:1054),
+  [`MainWindow.ApplyGlassBackground`](Workspace1C/Views/MainWindow.xaml.cs:1162)).
+  В журнал `CM_THEMES` (`frame-corner`) добавлены `regionApplied`,
+  `regionRadius` и `regionDiameter`. В Avalonia прозрачный «стеклянный» корень
+  ([`ModalWindowBase`](Workspace1C/Views/ModalWindowBase.cs:286),
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:163)): если
+  прозрачность недоступна (системный заголовок, непрозрачный режим X11),
+  содержимое не скругляется — прямые углы без белых треугольников. Покрыто новыми
+  [`Issue126WindowRegionTests`](Workspace1C.Tests/Issue126WindowRegionTests.cs:31)
+  и расширенными `Issue126FrameCornerRadiusTests`, `Issue126FrameVisibilityTests`,
+  `Issue126WindowFrameTests`.
+- **Сетка списка баз: одна линия на границу и согласованная геометрия
+  (issue #130).** Вертикальные линии рисовались внутри каждой сетки строки, и
+  собственные отступы строк баз, строк групп и заголовка сдвигали «одну и ту же»
+  границу колонки; заголовок при этом не перерисовывался после
+  `AlignHeaderToData`, а 1 DIP на 125/150 % DPI давал две полупрозрачные колонки
+  пикселей. Теперь позиции считает чистый
+  [`GridLinesPlanner.ResolveVerticalOffsets`](Workspace1C/Services/GridLinesPlanner.cs:99)
+  по фактическим ширинам колонок заголовка — единственного источника истины:
+  границы только между двумя видимыми колонками, после последней видимой линии
+  нет, координата округляется к физическому пикселю
+  (`SnapToPhysicalPixel`), толщина — ровно один физический пиксель
+  (`ResolveLineThickness = 1 / dpiScale`). Линии рисует **один** оверлей
+  `GridLinesOverlay` поверх заголовка и строк, мышь он не перехватывает:
+  WPF — [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:2792) и
+  [`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs:530),
+  Avalonia — [`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs:503)
+  и [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:1719). Из
+  строк, групп и заголовка вертикальные линии убраны — осталась горизонтальная
+  (`ApplyHorizontalGridLine`, у групп с тем же отступом, что и данные). Оверлей
+  пересчитывается после `AlignHeaderToData`, изменения ширин/порядка/видимости
+  колонок, смены темы и компактности, `SizeChanged` области списка и смены DPI;
+  цвет по-прежнему берётся из темы (`BorderBrushColor`/`BorderColorBrush`).
+  Покрыто тестами
+  [`Issue130GridLinesTests`](Workspace1C.Tests/Issue130GridLinesTests.cs:25).
+
+### Добавлено
+
+- **Группа «Мои программы» под кнопками запуска (issue #91).** Под карточкой
+  «Конфигуратор» на панели запуска появилась группа своих программ: имя,
+  исполняемый файл, аргументы, рабочая папка и иконка из файла. Модель —
+  [`CustomProgram`](Workspace1C/Models/CustomProgram.cs:14), хранение — атомарный
+  JSON `custom_programs.json` в каталоге данных профиля
+  ([`CustomProgramsStore`](Workspace1C/Services/CustomProgramsStore.cs:1),
+  битый файл не роняет загрузку, Id и порядок нормализуются), запуск — через
+  системный shell с локализованными ошибками
+  ([`CustomProgramLauncher`](Workspace1C/Services/CustomProgramLauncher.cs:1),
+  `UseShellExecute = true`, рабочая папка по умолчанию — каталог файла).
+  Отображение группы переключается между «Списком» (полноширинные кнопки
+  «иконка + подпись», как у родного стартера) и «Иконками» (`WrapPanel` с
+  квадратными кнопками и подсказкой-именем); режим хранится в
+  [`AppSettings.CustomProgramsViewMode`](Workspace1C/Models/AppSettings.cs:286)
+  (`CustomProgramsViewModes.Normalize`: старые профили и неизвестные значения →
+  `List`). Редактор — окно «Мои программы»
+  ([`CustomProgramsWindow.xaml`](Workspace1C/Views/CustomProgramsWindow.xaml:7) и
+  [`CustomProgramsWindow.Avalonia.cs`](Workspace1C/Views/CustomProgramsWindow.Avalonia.cs:1)):
+  добавить/изменить/удалить, перемещение вверх/вниз, выбор файла, рабочей папки и
+  иконки (`.ico`/`.png`) из файла с превью, переключатель «Списком / Иконками».
+  Открывается шестерёнкой в заголовке группы на панели запуска
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3318),
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:1726))
+  и кнопкой «Настроить программы…» в «Настройки → Правка меню»
+  ([`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml:2120)). Группа
+  видна, только если в ней есть включённые программы. Локализация ru/en — все
+  ключи `Launch.CustomPrograms.*`. Покрыто тестами
+  [`Issue91CustomProgramsTests`](Workspace1C.Tests/Issue91CustomProgramsTests.cs:31)
+  (33 теста: хранилище, режимы, лаунчер, настройки, view-модель, source-гварды
+  WPF/Avalonia, локализация).
+
 ## [1.0.1.64] — 2026-11-15
 
 ### Исправлено

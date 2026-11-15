@@ -2117,6 +2117,24 @@
                             </StackPanel>
                         </GroupBox>
 
+                        <!-- Мои программы (issue #91): группа своих программ под кнопками запуска -->
+                        <GroupBox Header="{loc:Loc Launch.CustomPrograms.Header}" Padding="8" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Launch.CustomPrograms.SettingsHint}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                           TextWrapping="Wrap" Margin="0,0,12,8"/>
+                                <Button x:Name="CustomProgramsEditButton" Click="OnCustomProgramsEdit_Click"
+                                        Style="{StaticResource ModernButton}"
+                                        HorizontalAlignment="Left" Padding="12,7">
+                                    <StackPanel Orientation="Horizontal">
+                                        <materialDesign:PackIcon Kind="Cog" Width="16" Height="16" Margin="0,0,6,0"
+                                            VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.SettingsButton}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </GroupBox>
+
                         <!-- Меню трея (issue #62) -->
                         <GroupBox Header="{loc:Loc Settings.TrayMenu.GroupTitle}" Padding="8" Margin="0,14,0,0">
                             <StackPanel>

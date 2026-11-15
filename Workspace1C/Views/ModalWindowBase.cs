@@ -275,6 +275,18 @@ namespace Workspace1C
         protected virtual bool UseGlassChrome => SystemDecorations != SystemDecorations.Full;
 
         /// <summary>
+        /// Радиус скругления «стеклянного» корня диалога (issue #126). В прозрачном
+        /// режиме углы скруглены общим радиусом содержимого: вне скругления фон
+        /// прозрачный, поэтому «белых треугольников» за рамкой нет. В непрозрачном
+        /// режиме (X11 без композитора, виртуализация, системный заголовок)
+        /// прозрачности нет, и скруглённая подложка оставляла бы в углах
+        /// непрозрачную заливку окна — там углы прямые (fallback «без скругления»,
+        /// вариант 7OH «или убирать скругления»).
+        /// </summary>
+        private double GlassCornerRadius =>
+            ShouldRenderOpaque ? 0 : WindowSizeMath.DefaultContentCornerRadius;
+
+        /// <summary>
         /// Показывать ли в собственном chrome (без системного заголовка) кнопку
         /// «Развернуть» (issue #324). По умолчанию выключено: обычные диалоги
         /// фиксированного размера в максимизации не нуждаются. Окна с изменяемым
@@ -562,8 +574,10 @@ namespace Workspace1C
             {
                 // Радиус «стеклянного» корня — единая константа с WPF-слоем
                 // (issue #126): рамка и содержимое скруглены одинаково, в том числе
-                // на системах без скругления DWM (RDP/Windows 10).
-                CornerRadius = new CornerRadius(WindowSizeMath.DefaultContentCornerRadius),
+                // на системах без скругления DWM (RDP/Windows 10). Без прозрачности
+                // (непрозрачный режим) скругление не рисуем: иначе в углах остаётся
+                // непрозрачная заливка окна — «белые треугольники» за рамкой.
+                CornerRadius = new CornerRadius(GlassCornerRadius),
                 ClipToBounds = true,
                 // Видимая рамка окна (issue #273): даже без системных теней/эффектов
                 // (терминал, виртуализация) окно остаётся различимым, а не сливается
@@ -605,7 +619,7 @@ namespace Workspace1C
                 {
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius);
+                        : new CornerRadius(GlassCornerRadius);
                     // В maximized-окне линия тени рамке не нужна (issue #126).
                     ApplyFrameVisual(glass);
                 }));

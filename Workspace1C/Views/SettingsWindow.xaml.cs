@@ -515,6 +515,22 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Открывает редактор группы «Мои программы» (issue #91): список своих программ под
+        /// кнопками запуска, иконки из файла и переключатель «списком / иконками».
+        /// После закрытия режим отображения применяется и панель перечитывает список.
+        /// </summary>
+        private void OnCustomProgramsEdit_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new CustomProgramsWindow(_viewModel.CustomProgramsViewMode)
+            {
+                Owner = this,
+            };
+            win.ShowDialog();
+            _viewModel.CustomProgramsViewMode = win.ViewMode;
+            _viewModel.ReloadCustomPrograms();
+        }
+
+        /// <summary>
         /// Открывает редактор структуры контекстного меню базы (issue #56): дерево
         /// компоновки, перемещение/отключение/группировка пунктов, разделители,
         /// сохранение/загрузка в файл context_menu_layout.json.
