@@ -179,14 +179,20 @@ public sealed class BatchOpsPreparationService
         // отдельные rac-запросы не дублируются.
         var resolver = new ClusterInfobaseCredentialsResolver(_racClient, _servers, _log);
         var resolution = await resolver.ResolveDetailedAsync(infobase, ct).ConfigureAwait(false);
-        if (resolution.InfobaseId == Guid.Empty || resolution.Profile is null)
+        // Issue #106 (v1.0.1.64): для блокировок/завершения сеансов нужны только
+        // кластер и ИБ — профиль СУБД (dbms/db-server/db-name) не требуется. Раньше
+        // требование профиля пропускало базу с сообщением «база не найдена в кластерах
+        // rac или тип СУБД не определён», даже когда rac нашёл ИБ и мог применить
+        // блокировки (репорт aepkugesi: «Массовая загрузка cf» пропускала базу).
+        if (resolution.InfobaseId == Guid.Empty)
         {
+            var reason = resolver.LastFailureReason ??
+                         LocalizationManager.T("BatchOps.Prepare.ResolveFailed");
             return new BatchOpsPreparationResult
             {
                 Success = false,
                 Error = string.Format(
-                    LocalizationManager.T("BatchOps.Prepare.FailedFormat"),
-                    LocalizationManager.T("BatchOps.Prepare.ResolveFailed"))
+                    LocalizationManager.T("BatchOps.Prepare.FailedFormat"), reason)
             };
         }
 
@@ -550,7 +556,9 @@ public sealed class BatchOpsPreparationService
     {
         var resolver = new ClusterInfobaseCredentialsResolver(_racClient, _servers, _log);
         var resolution = await resolver.ResolveDetailedAsync(infobase, ct).ConfigureAwait(false);
-        return resolution.InfobaseId != Guid.Empty && resolution.Profile is not null
+        // Issue #106 (v1.0.1.64): блокировка/разблокировка сеансов не требует профиля
+        // СУБД — достаточно найденной ИБ кластера.
+        return resolution.InfobaseId != Guid.Empty
             ? (resolution.ClusterId, resolution.InfobaseId, resolution.Parameters)
             : null;
     }

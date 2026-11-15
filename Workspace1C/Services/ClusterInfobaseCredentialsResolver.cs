@@ -48,9 +48,19 @@ public sealed record ClusterInfobaseCredentialsResolution
 public sealed class ClusterInfobaseCredentialsResolver
 {
     /// <summary>Общий таймаут резолва одной базы (issue #92, v1.0.1.21): перебор
-    /// кластеров не может тянуться дольше минуты — при недоступных серверах несколько
-    /// rac-проб подряд по 30 с выглядят как зависание без внятного прогресса.</summary>
-    public static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(60);
+    /// кластеров не может тянуться дольше двух минут — при недоступных серверах несколько
+    /// rac-проб подряд по 30 с выглядят как зависание без внятного прогресса.
+    /// Issue #106 (v1.0.1.64): увеличен с 60 до 120 с, чтобы уложились две попытки
+    /// «cluster list» с таймаутом <see cref="ClusterListTimeout"/>.</summary>
+    public static readonly TimeSpan ResolveTimeout = TimeSpan.FromSeconds(120);
+
+    /// <summary>
+    /// Таймаут одной команды «cluster list» (issue #106, v1.0.1.64): на загруженном
+    /// сервере 1С первый ответ rac не укладывался в стандартные 30 с, резолв
+    /// обрывался и «Массовая загрузка cf» пропускала базу с невнятной причиной
+    /// «база не найдена в кластерах rac или тип СУБД не определён».
+    /// </summary>
+    internal static readonly TimeSpan ClusterListTimeout = TimeSpan.FromSeconds(45);
 
     private readonly IRacClient _racClient;
     private readonly IReadOnlyList<ManagementServer> _servers;
@@ -198,6 +208,9 @@ public sealed class ClusterInfobaseCredentialsResolver
         // базе (пустой dbms в summary + ошибка «infobase info») — для честного итогового
         // сообщения вместо «база не найдена».
         string? profileFailureReason = null;
+        // Issue #106 (v1.0.1.64): найденные кластер и ИБ сохраняются даже когда профиль
+        // СУБД собрать не удалось — блокировкам и завершению сеансов профиль не нужен.
+        ClusterInfobaseCredentialsResolution? foundWithoutProfile = null;
         try
         {
             // Issue #92 (v1.0.1.21): общий таймаут на резолв одной базы — linked CTS
@@ -211,7 +224,7 @@ public sealed class ClusterInfobaseCredentialsResolver
             {
                 try
                 {
-                    var found = await _racClient.GetClustersAsync(candidate, timeoutCts.Token).ConfigureAwait(false);
+                    var found = await GetClustersWithRetryAsync(candidate, timeoutCts.Token).ConfigureAwait(false);
                     targets.AddRange(found.Select(c => (candidate, c)));
                 }
                 catch (OperationCanceledException) { throw; }
@@ -395,6 +408,17 @@ public sealed class ClusterInfobaseCredentialsResolver
                         LocalizationManager.T("BatchOps.DbmsResolveInfoFailedFormat"), ex.Message);
                     _log?.Invoke(profileFailureReason);
                 }
+
+                // Issue #106 (v1.0.1.64): база найдена, но профиль СУБД не собран —
+                // запоминаем кластер/ИБ: подготовка массовой операции (блокировки,
+                // завершение сеансов) работает без профиля. Профиль нужен только ibcmd.
+                foundWithoutProfile ??= new ClusterInfobaseCredentialsResolution
+                {
+                    Profile = null,
+                    ClusterId = cluster.Id,
+                    InfobaseId = match.InfobaseId,
+                    Parameters = parameters
+                };
             }
 
             // Issue #92 (v1.0.1.22): если база НАЙДЕНА, но профиль не собран (пустой dbms
@@ -426,15 +450,19 @@ public sealed class ClusterInfobaseCredentialsResolver
                     infobaseName, parameters.Address);
                 _log?.Invoke(LastFailureReason);
             }
-            return new();
+            // Issue #106 (v1.0.1.64): если ИБ найдена, но профиль не собран — возвращаем
+            // идентификаторы кластера/ИБ (Profile = null), иначе подготовка массовой
+            // операции не могла применить блокировки к найденной базе.
+            return foundWithoutProfile ?? new();
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             // Сработал общий таймаут резолва (не отмена операции пользователем) —
             // трактуем как «данные не получены» с записью в журнал (issue #92, v1.0.1.21).
-            _log?.Invoke(string.Format(
+            LastFailureReason = string.Format(
                 LocalizationManager.T("BatchOps.DbmsResolveTimeoutFormat"),
-                (int)ResolveTimeout.TotalSeconds));
+                (int)ResolveTimeout.TotalSeconds);
+            _log?.Invoke(LastFailureReason);
             return new();
         }
         catch (OperationCanceledException)
@@ -443,11 +471,57 @@ public sealed class ClusterInfobaseCredentialsResolver
         }
         catch (Exception ex)
         {
-            _log?.Invoke(string.Format(
+            // Issue #106 (v1.0.1.64): причина сохраняется не только в журнале, но и в
+            // LastFailureReason — окно массовой операции показывает её в статусе базы
+            // вместо общего «база не найдена в кластерах rac или тип СУБД не определён».
+            LastFailureReason = string.Format(
                 LocalizationManager.T("BatchOps.DbmsResolveClustersFailed"),
-                parameters.Address, ex.Message));
+                parameters.Address, ex.Message) + " " +
+                LocalizationManager.T("BatchOps.Prepare.RacUnavailableHint");
+            _log?.Invoke(LastFailureReason);
             return new();
         }
+    }
+
+    /// <summary>
+    /// «cluster list» с увеличенным таймаутом и ОДНОКРАТНЫМ повтором (issue #106,
+    /// v1.0.1.64): на загруженном сервере первый ответ rac не укладывался в 30 с,
+    /// и подготовка базы падала ещё до поиска ИБ. Повторяются только таймауты и
+    /// стартовые сбои rac (<see cref="IsRetryableRacFailure"/>), ошибки прав — нет.
+    /// </summary>
+    private async Task<IReadOnlyList<RacCluster>> GetClustersWithRetryAsync(
+        RacConnectionParams parameters, CancellationToken ct)
+    {
+        try
+        {
+            return await GetClustersOnceAsync(parameters, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Истёк таймаут одной попытки (не отмена операции): повторяем — на
+            // загруженном сервере второй ответ rac обычно укладывается.
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("BatchOps.DbmsResolveRacRetry"),
+                string.Format(
+                    LocalizationManager.T("BatchOps.DbmsResolveClustersTimeoutFormat"),
+                    (int)ClusterListTimeout.TotalSeconds)));
+            return await GetClustersOnceAsync(parameters, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (IsRetryableRacFailure(ex.Message))
+        {
+            _log?.Invoke(string.Format(
+                LocalizationManager.T("BatchOps.DbmsResolveRacRetry"), ex.Message));
+            return await GetClustersOnceAsync(parameters, ct).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Одна попытка «cluster list» с таймаутом <see cref="ClusterListTimeout"/>.</summary>
+    private async Task<IReadOnlyList<RacCluster>> GetClustersOnceAsync(
+        RacConnectionParams parameters, CancellationToken ct)
+    {
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeoutCts.CancelAfter(ClusterListTimeout);
+        return await _racClient.GetClustersAsync(parameters, timeoutCts.Token).ConfigureAwait(false);
     }
 
     /// <summary>

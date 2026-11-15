@@ -399,9 +399,14 @@ namespace Workspace1C
         /// <summary>
         /// Смена полноценной темы (Задача 6): пересоздаём контекстное меню «Утилиты»,
         /// чтобы иконки и цвета пунктов взялись из актуальных набора и схемы.
+        /// Issue #130: ресурсы кистей заменены вместе с темой — перерисовываем линии
+        /// сетки после применения темы (паритет с WPF), иначе они остаются прежними.
         /// </summary>
         private void OnThemeChanged(object? sender, EventArgs e)
-            => RebuildUtilitiesMenu();
+        {
+            RebuildUtilitiesMenu();
+            Dispatcher.UIThread.Post(RefreshGridLines, DispatcherPriority.Loaded);
+        }
 
         /// <summary>
         /// Смена лицензии (Дефект №4, аудит активации): активация/деактивация ключа
@@ -682,8 +687,13 @@ namespace Workspace1C
                 // с фоном рабочего стола за ним.
                 BorderThickness = new Thickness(1)
             };
-            // Цвет рамки берём из темы — адаптируется к светлой/тёмной теме и схеме.
-            ThemeBrushes.Bind(glass, Border.BorderBrushProperty, "BorderColorBrush");
+            // Видимость рамки (issue #126): на Linux/без системного ребра DWM контраст
+            // рамки поднимается по WCAG до 3:1 — иначе линия сливается с фоном.
+            // Цвет берётся из темы внутри ApplyFrameVisual и обновляется при смене
+            // темы/схемы (ThemeBrushes.Observe ниже).
+            ApplyFrameVisual(glass);
+            // Смена темы/схемы меняет и цвет рамки, и фон — пересчитываем контраст.
+            ThemeBrushes.Observe(glass, "BorderColorBrush", _ => ApplyFrameVisual(glass));
             ApplyGlassBackground(glass);
             grid.ClipToBounds = true;
             glass.Child = grid;
@@ -697,11 +707,61 @@ namespace Workspace1C
             _glassCornerSub?.Dispose();
             _glassCornerSub = this.GetObservable(WindowStateProperty)
                 .Subscribe(new WindowStateObserver(() =>
+                {
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius)));
+                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius);
+                    // В maximized-окне линия тени рамке не нужна (issue #126).
+                    ApplyFrameVisual(glass);
+                }));
 
             return glass;
+        }
+
+        /// <summary>
+        /// Видимость рамки главного окна (issue #126): на Linux (и в любой среде без
+        /// системного ребра/тени DWM) цвет рамки поднимается по WCAG до контраста
+        /// ≥ 3:1 к фону содержимого. Иначе #E2E8F0 на #F1F5F9 (светлая тема) даёт
+        /// ~1.13:1 — линия физически есть, но невидима. Политика общая с WPF и
+        /// модальными диалогами (<see cref="WindowFramePolicy.Resolve"/>).
+        /// </summary>
+        private void ApplyFrameVisual(Border glass)
+        {
+            var visual = WindowFramePolicy.Resolve(new WindowFrameInputs(
+                // Avalonia/Linux: DWM отсутствует, системного ребра нет — усиливаем.
+                CompositionEnabled: false,
+                OsRoundsWindows: false,
+                DwmStateKnown: false,
+                DwmRounded: false,
+                Maximized: WindowState == WindowState.Maximized,
+                RemoteSession: false,
+                DpiScale: 1.0));
+
+            if (visual.StrengthenContrast)
+            {
+                var frameColor = ThemeFrameColor("BorderColorBrush", "#E2E8F0");
+                var backgroundColor = ThemeFrameColor("ContentBackgroundColorBrush", "#F1F5F9");
+                var strengthened = WindowFramePolicy.EnsureContrast(
+                    frameColor, backgroundColor, WindowFramePolicy.MinContrastRatio);
+                glass.BorderBrush = new SolidColorBrush(
+                    Color.FromRgb(strengthened.R, strengthened.G, strengthened.B));
+            }
+            else
+            {
+                // Системное ребро есть — рамка перекрашивается из темы, как раньше.
+                ThemeBrushes.Bind(glass, Border.BorderBrushProperty, "BorderColorBrush");
+            }
+
+            glass.BorderThickness = new Thickness(visual.ThicknessDip);
+        }
+
+        /// <summary>Цвет кисти темы в платформо-независимый <see cref="WindowFrameColor"/>.</summary>
+        private static WindowFrameColor ThemeFrameColor(string brushKey, string fallbackHex)
+        {
+            var brush = ThemeBrushes.Get(brushKey, fallbackHex);
+            return brush is ISolidColorBrush solid
+                ? new WindowFrameColor(solid.Color.R, solid.Color.G, solid.Color.B)
+                : WindowFrameColor.FromHex(fallbackHex, new WindowFrameColor(0xE2, 0xE8, 0xF0));
         }
 
         /// <summary>
@@ -2363,11 +2423,24 @@ namespace Workspace1C
             grid.Children.Add(footerPanel);
             Grid.SetColumn(footerPanel, 2);
 
+            // Issue #131 (уточнение 7OH): переключатель уведомлений о длительных
+            // операциях стоит в подвале рядом с кнопкой «Текущая сессия», а не в
+            // блоке действий правой панели. Колокольчик — включены, перечёркнутый —
+            // выключены (см. BuildLongOperationAlarmToggle).
+            var sessionPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            sessionPanel.Children.Add(BuildLongOperationAlarmToggle());
+
             var sessionToggleBtn = StatusBarIconButton("IconRecent");
             ToolTip.SetTip(sessionToggleBtn, LocalizationManager.T("Main.CurrentSession"));
             sessionToggleBtn.Bind(Button.CommandProperty, new Binding("ToggleSessionLaunchPanelCommand"));
-            grid.Children.Add(sessionToggleBtn);
-            Grid.SetColumn(sessionToggleBtn, 3);
+            sessionPanel.Children.Add(sessionToggleBtn);
+
+            grid.Children.Add(sessionPanel);
+            Grid.SetColumn(sessionPanel, 3);
 
             var toggleBtn = StatusBarIconButton("IconPageLayoutSidebarRight");
             // Подсказка меняется вместе с состоянием панели, как в разметке

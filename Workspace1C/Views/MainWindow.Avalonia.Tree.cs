@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Presenters;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Shapes;
 using Avalonia.Controls.Templates;
@@ -1570,11 +1571,6 @@ namespace Workspace1C
             actionsLabel.Bind(Control.IsVisibleProperty, new Binding("ShowRightPanelDetails"));
             panel.Children.Add(actionsLabel);
 
-            // Issue #131: переключение уведомлений о длительных операциях — иконка
-            // будильника справа (просто будильник — включены, перечёркнутый — выключены).
-            // Видна и в узкой панели: привязки к ShowRightPanelDetails нет.
-            panel.Children.Add(BuildLongOperationAlarmToggle());
-
             panel.Children.Add(launchEnterpriseBlock);
             panel.Children.Add(launchConfiguratorBlock);
             panel.Children.Add(starterBlock);
@@ -1619,13 +1615,18 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Переключатель «Уведомлять о длительных операциях» (issue #131): будильник
-        /// в правом верхнем углу блока действий. Клик переключает и сохраняет
-        /// настройку; подсказка отражает состояние.
+        /// Переключатель «Уведомлять о длительных операциях» (issue #131): колокольчик
+        /// в подвале главного окна рядом с кнопкой «Текущая сессия». Уведомления
+        /// включены — акцентный колокольчик, выключены — перечёркнутый колокольчик
+        /// цвета текста подвала. Клик переключает и сохраняет настройку; подсказка
+        /// отражает состояние.
         /// </summary>
         private static Control BuildLongOperationAlarmToggle()
         {
-            var icon = IconHelper.MakeIcon("IconScheduler", UiMetrics.Scaled(18), "TextPrimaryBrush");
+            // Две копии одной геометрии: цвет зависит от состояния, а кисть каждой
+            // копии остаётся привязкой к ресурсу темы и меняется вместе со схемой.
+            var bellOn = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(18), "AccentBrush");
+            var bellOff = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(18), "SidebarTextBrush");
             var cross = new Avalonia.Controls.Shapes.Line
             {
                 StartPoint = new Point(2, 16),
@@ -1639,7 +1640,7 @@ namespace Workspace1C
             {
                 Width = 18,
                 Height = 18,
-                Children = { icon, cross }
+                Children = { bellOn, bellOff, cross }
             };
 
             var toggle = new ToggleButton
@@ -1647,12 +1648,55 @@ namespace Workspace1C
                 Content = content,
                 Width = 28,
                 Height = 28,
-                Padding = new Thickness(4),
-                HorizontalAlignment = HorizontalAlignment.Right,
+                Padding = new Thickness(0),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
-                Margin = new Thickness(0, 0, 0, 6)
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = new Cursor(StandardCursorType.Hand)
             };
+
+            // В подвале не нужна «залитая» кнопка темы Fluent при включении: как у
+            // соседних значковых кнопок, только подсветка при наведении.
+            Border? surface = null;
+            IBrush hoverBrush = Brushes.Transparent;
+            var hovered = false;
+
+            void ApplySurface()
+                => surface?.SetValue(Border.BackgroundProperty, hovered ? hoverBrush : (IBrush)Brushes.Transparent);
+
+            toggle.Theme = new ControlTheme(typeof(ToggleButton))
+            {
+                Setters =
+                {
+                    new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<ToggleButton>((_, _) =>
+                    {
+                        surface = new Border
+                        {
+                            Background = Brushes.Transparent,
+                            BorderThickness = new Thickness(0),
+                            CornerRadius = new CornerRadius(6),
+                            Padding = new Thickness(4)
+                        };
+                        var presenter = new ContentPresenter
+                        {
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+                        presenter[!ContentPresenter.ContentProperty] = new TemplateBinding(ContentControl.ContentProperty);
+                        surface.Child = presenter;
+                        return surface;
+                    }))
+                }
+            };
+
+            ThemeBrushes.Observe(toggle, "SidebarHoverBrush", brush =>
+            {
+                hoverBrush = brush;
+                ApplySurface();
+            });
+            toggle.PointerEntered += (_, _) => { hovered = true; ApplySurface(); };
+            toggle.PointerExited += (_, _) => { hovered = false; ApplySurface(); };
+
             toggle.Bind(ToggleButton.IsCheckedProperty,
                 new Binding("LongOperationNotificationsEnabled") { Mode = BindingMode.TwoWay });
             toggle.Bind(ToolTip.TipProperty, new Binding("LongOperationNotificationsEnabled")
@@ -1662,11 +1706,12 @@ namespace Workspace1C
                         ? "LongOperation.Alarm.TooltipOn"
                         : "LongOperation.Alarm.TooltipOff"))
             });
-            cross.Bind(Visual.IsVisibleProperty, new Binding("IsChecked")
-            {
-                Source = toggle,
-                Converter = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value != true)
-            });
+
+            var isOn = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value == true);
+            var isOff = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(value => value != true);
+            bellOn.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOn });
+            bellOff.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOff });
+            cross.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOff });
             return toggle;
         }
 

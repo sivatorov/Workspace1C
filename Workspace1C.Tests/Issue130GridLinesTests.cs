@@ -145,6 +145,34 @@ public sealed class Issue130GridLinesTests
         Assert.False(plan.HasAnyLines);
     }
 
+    [Fact]
+    public void Resolve_SameInputsAfterThemeSwitch_SamePlan()
+    {
+        // Тема не участвует в плане (issue #130): после переключения темы те же
+        // настройки дают тот же план — прозрачность и толщина не «запоминают»
+        // цвет/состояние прежней темы.
+        var before = GridLinesPlanner.Resolve(true, true, compactMode: false, visibleColumns: ThreeVisible);
+        var after = GridLinesPlanner.Resolve(true, true, compactMode: false, visibleColumns: ThreeVisible);
+
+        Assert.Equal(before.Opacity, after.Opacity);
+        Assert.Equal(GridLinesPlanner.NormalOpacity, after.Opacity);
+        Assert.Equal(before.Thickness, after.Thickness);
+        Assert.Equal(GridLinesPlanner.LineThickness, after.Thickness);
+        Assert.Equal(before.ShowHorizontalLine, after.ShowHorizontalLine);
+        Assert.Equal(before.VerticalBoundaryColumns, after.VerticalBoundaryColumns);
+    }
+
+    [Fact]
+    public void Planner_HasNoThemeDependency()
+    {
+        // Чистая логика плана не читает тему: иначе после смены темы план мог бы
+        // вернуть цвет/прозрачность прежней темы (дефект issue #130).
+        var planner = ReadProjectFile(Path.Combine("Workspace1C", "Services", "GridLinesPlanner.cs"));
+        Assert.DoesNotContain("ThemeManager", planner, StringComparison.Ordinal);
+        Assert.DoesNotContain("IsDarkTheme", planner, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentTheme", planner, StringComparison.Ordinal);
+    }
+
     // ===================== Настройки: хранение и загрузка =====================
 
     [Fact]
@@ -238,6 +266,45 @@ public sealed class Issue130GridLinesTests
         Assert.Contains("OnPropertyChanged(nameof(ShowVerticalGridLines));", vm, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Wpf_GridLineBrush_FollowsThemeResource()
+    {
+        // Issue #130 (7OH): после переключения тёмной темы линии становились чёрными.
+        // Кисть линии должна следовать за ресурсом темы, а не захватываться разово.
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Columns.cs"));
+
+        Assert.Contains("SetResourceReference(System.Windows.Shapes.Shape.FillProperty, \"BorderBrushColor\")",
+            columns, StringComparison.Ordinal);
+        // Запасной серый — только если ресурса темы реально нет в словарях.
+        Assert.Contains("TryFindResource(\"BorderBrushColor\") is Brush", columns, StringComparison.Ordinal);
+        Assert.Contains("line.Fill = Brushes.Gray;", columns, StringComparison.Ordinal);
+        // Разовое присваивание кисти в инициализаторе линии (Fill = brush,) запрещено:
+        // именно оно и «замораживало» цвет до повторного переключения темы.
+        Assert.DoesNotContain("Fill = brush,", columns, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fill = Brushes.Black", columns, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_ThemeChange_RefreshesGridLines()
+    {
+        // Реакция на смену темы: вьюмодель уведомляет окно свойством SavedTheme,
+        // а окно отложенно перерисовывает линии после применения ресурсов темы.
+        var events = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Events.cs"));
+        Assert.Contains("nameof(MainViewModel.SavedTheme)", events, StringComparison.Ordinal);
+        Assert.Contains("RefreshGridLinesAfterThemeChange", events, StringComparison.Ordinal);
+        Assert.Contains("RefreshGridLines();", events, StringComparison.Ordinal);
+        Assert.Contains("DispatcherPriority.Loaded", events, StringComparison.Ordinal);
+
+        // ToggleTheme (и предпросмотр полноценной темы) уведомляет окно о смене темы.
+        var vm = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Theme.cs"));
+        Assert.Contains("public void ToggleTheme()", vm, StringComparison.Ordinal);
+        Assert.Contains("OnPropertyChanged(nameof(SavedTheme));", vm, StringComparison.Ordinal);
+
+        // Прямая смена темы через ThemeManager тоже перерисовывает линии.
+        var menu = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
+        Assert.Contains("RefreshGridLinesAfterThemeChange();", menu, StringComparison.Ordinal);
+    }
+
     // ===================== Avalonia: отрисовка и реакция на настройку =====================
 
     [Fact]
@@ -258,6 +325,23 @@ public sealed class Issue130GridLinesTests
         // Строка базы и строка группы — с горизонтальной линией.
         Assert.Contains("ApplyGridLinesToGrid(grid, includeHorizontal: true)", tree, StringComparison.Ordinal);
         Assert.Contains("ApplyGridLinesToGrid(row, includeHorizontal: true)", tree, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_ThemeChange_RefreshesGridLines()
+    {
+        // Паритет с WPF: при смене темы линии сетки перерисовываются после
+        // применения ресурсов темы, а не остаются с прежней кистью.
+        var view = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("Dispatcher.UIThread.Post(RefreshGridLines, DispatcherPriority.Loaded)",
+            view, StringComparison.Ordinal);
+
+        var columns = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Columns.cs"));
+        Assert.Contains("private void RefreshGridLines()", columns, StringComparison.Ordinal);
+        Assert.Contains("ApplyGridLinesToGrid(_columnHeaderRow, includeHorizontal: false);",
+            columns, StringComparison.Ordinal);
+        Assert.Contains("ThemeBrushes.Bind(line, Border.BackgroundProperty, \"BorderColorBrush\")",
+            columns, StringComparison.Ordinal);
     }
 
     [Fact]

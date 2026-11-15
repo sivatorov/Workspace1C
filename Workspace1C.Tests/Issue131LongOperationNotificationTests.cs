@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -318,7 +319,8 @@ public sealed class Issue131LongOperationNotificationTests
         var source = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
         Assert.Contains("BuildLongOperationAlarmToggle", source);
         Assert.Contains("LongOperationNotificationsEnabled", source);
-        Assert.Contains("IconScheduler", source);
+        // Уточнение 7OH: будильник заменён колокольчиком (Pack.BellOutline).
+        Assert.Contains("Pack.BellOutline", source);
     }
 
     [Fact]
@@ -373,6 +375,201 @@ public sealed class Issue131LongOperationNotificationTests
             foreach (var key in keys)
                 Assert.True(strings.TryGetProperty(key, out _), $"{language}: нет ключа {key}");
         }
+    }
+
+    // ---------- Source-гварды: расположение и иконка (v1.0.1.64) ----------
+    // Перенос переключателя из блока действий правой панели в подвал и замена
+    // будильника на колокольчик должны оставаться зафиксированными source-тестами:
+    // они не зависят от форматирования XAML (пробелы схлопываются) и не повторяют
+    // проверки «ключ присутствует», уже сделанные выше.
+
+    [Fact]
+    public void Wpf_AlarmToggle_IsInStatusBarNextToSessionButton_NotInActionsBlock()
+    {
+        var xaml = CollapseWhitespace(ReadSource("Workspace1C", "Views", "MainWindow.xaml"));
+
+        const string toggleName = "x:Name=\"LongOperationAlarmToggle\"";
+        Assert.Equal(1, CountOccurrences(xaml, toggleName));
+
+        var statusBar = xaml.IndexOf("StatusBarBorder", StringComparison.Ordinal);
+        Assert.True(statusBar >= 0, "MainWindow.xaml: не найдена строка состояния (StatusBarBorder)");
+
+        var toggle = xaml.IndexOf(toggleName, StringComparison.Ordinal);
+        Assert.True(toggle > statusBar,
+            "Переключатель уведомлений должен находиться в строке состояния (после StatusBarBorder), " +
+            "а не в блоке действий правой панели");
+
+        var session = xaml.IndexOf("ToggleSessionLaunchPanelCommand", statusBar, StringComparison.Ordinal);
+        Assert.True(session > toggle,
+            "Переключатель уведомлений должен стоять в подвале перед кнопкой «Текущая сессия» " +
+            "(ToggleSessionLaunchPanelCommand)");
+        Assert.True(session - toggle < 4000,
+            "Переключатель уведомлений должен стоять рядом с кнопкой «Текущая сессия», " +
+            "а не в другом конце строки состояния");
+
+        // Блок «Действия» правой панели: от его заголовка до строки состояния —
+        // переключателя там быть не должно.
+        const string actionsHeader = "Text=\"{loc:Loc Main.Actions}\"";
+        var actions = xaml.LastIndexOf(actionsHeader, statusBar, StringComparison.Ordinal);
+        Assert.True(actions >= 0, "MainWindow.xaml: не найден блок действий правой панели");
+        var actionsBlock = xaml.Substring(actions, statusBar - actions);
+        Assert.DoesNotContain("LongOperationAlarmToggle", actionsBlock);
+
+        // Непосредственный родитель — StackPanel строки состояния (тот же, где кнопка сессии).
+        var beforeToggle = xaml.Substring(statusBar, toggle - statusBar);
+        var parentTail = beforeToggle.Length > 400 ? beforeToggle[^400..] : beforeToggle;
+        Assert.Contains("<StackPanel", parentTail);
+    }
+
+    [Fact]
+    public void Wpf_AlarmToggle_UsesBellOutlineAndStrikeThroughWhenOff()
+    {
+        var xaml = CollapseWhitespace(ReadSource("Workspace1C", "Views", "MainWindow.xaml"));
+        var toggleBlock = ExtractXamlElement(xaml,
+            "x:Name=\"LongOperationAlarmToggle\"", "</ToggleButton>");
+
+        // Иконка — контурный колокольчик из словаря темы.
+        Assert.Contains("Data=\"{DynamicResource Pack.BellOutline}\"", toggleBlock);
+
+        // Перечёркивание: линия поверх колокольчика.
+        Assert.Contains("<Line ", toggleBlock);
+
+        // Состояние переключателя — двусторонняя привязка к настройке.
+        Assert.Contains("IsChecked=\"{Binding LongOperationNotificationsEnabled, Mode=TwoWay}\"", toggleBlock);
+
+        // Выключено: линия видима по умолчанию; включено: DataTrigger её скрывает.
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Visible\"/>", toggleBlock);
+        Assert.Contains(
+            "<DataTrigger Binding=\"{Binding IsChecked, ElementName=LongOperationAlarmToggle}\" Value=\"True\">",
+            toggleBlock);
+        Assert.Contains("<Setter Property=\"Visibility\" Value=\"Collapsed\"/>", toggleBlock);
+
+        // Включённый колокольчик — акцентный, выключенный — цвет текста подвала.
+        Assert.Contains("{DynamicResource AccentBrush}", toggleBlock);
+        Assert.Contains("{DynamicResource SidebarTextBrush}", toggleBlock);
+
+        // Тултип переключается вместе с состоянием: Off по умолчанию, On — в триггере.
+        var tooltipOff = toggleBlock.IndexOf("LongOperation.Alarm.TooltipOff", StringComparison.Ordinal);
+        var tooltipOn = toggleBlock.IndexOf("LongOperation.Alarm.TooltipOn", StringComparison.Ordinal);
+        Assert.True(tooltipOff >= 0 && tooltipOn > tooltipOff,
+            "Тултип переключателя: TooltipOff по умолчанию, TooltipOn — в DataTrigger включённого состояния");
+    }
+
+    [Fact]
+    public void Avalonia_AlarmToggle_IsBuiltInStatusBar_NotInRightPanelActions()
+    {
+        var window = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+        var tree = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
+
+        var statusBar = ExtractMethod(window, "private Control BuildStatusBar()", "MainWindow.Avalonia.cs");
+        Assert.Contains("BuildLongOperationAlarmToggle()", statusBar);
+        Assert.Contains("ToggleSessionLaunchPanelCommand", statusBar);
+        Assert.True(
+            statusBar.IndexOf("BuildLongOperationAlarmToggle()", StringComparison.Ordinal) <
+            statusBar.IndexOf("ToggleSessionLaunchPanelCommand", StringComparison.Ordinal),
+            "В BuildStatusBar переключатель уведомлений должен добавляться перед кнопкой «Текущая сессия»");
+
+        // Вызов ровно один: переключатель строится только в подвале.
+        Assert.Equal(1, CountOccurrences(window, "BuildLongOperationAlarmToggle()"));
+
+        var rightPanel = ExtractMethod(tree, "private Control BuildRightPanel()", "MainWindow.Avalonia.Tree.cs");
+        Assert.DoesNotContain("BuildLongOperationAlarmToggle", rightPanel);
+    }
+
+    [Fact]
+    public void Avalonia_AlarmToggle_UsesBellAndCrossLine()
+    {
+        var tree = ReadSource("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
+        var toggle = CollapseWhitespace(ExtractMethod(tree,
+            "private static Control BuildLongOperationAlarmToggle()", "MainWindow.Avalonia.Tree.cs"));
+
+        // Две копии колокольчика (включён/выключен) и линия перечёркивания.
+        Assert.True(CountOccurrences(toggle, "Pack.BellOutline") >= 2,
+            "BuildLongOperationAlarmToggle должен использовать Pack.BellOutline для обоих состояний");
+        Assert.Contains("new Avalonia.Controls.Shapes.Line", toggle);
+        Assert.Contains("cross.Bind(Visual.IsVisibleProperty", toggle);
+
+        // Двусторонняя привязка к настройке и подсказки обоих состояний.
+        Assert.Contains("BindingMode.TwoWay", toggle);
+        Assert.Contains("LongOperationNotificationsEnabled", toggle);
+        Assert.Contains("LongOperation.Alarm.TooltipOn", toggle);
+        Assert.Contains("LongOperation.Alarm.TooltipOff", toggle);
+
+        // Цвета состояний и управление видимостью всех трёх элементов через IsChecked.
+        Assert.Contains("AccentBrush", toggle);
+        Assert.Contains("SidebarTextBrush", toggle);
+        Assert.True(CountOccurrences(toggle, "Visual.IsVisibleProperty") >= 3,
+            "Видимость колокольчиков и перечёркивающей линии должна привязываться к IsChecked");
+    }
+
+    [Fact]
+    public void BellOutlineIconKey_ExistsInBothThemeDictionaries()
+    {
+        // Ключ не начинается с Icon, поэтому IconSetCoverageTests его не покрывает —
+        // проверяем непустую геометрию в обоих словарях базового набора.
+        foreach (var file in new[] { "Icons.xaml", "Icons.axaml" })
+        {
+            var text = ReadSource("Workspace1C", "Themes", file);
+            Assert.True(
+                Regex.IsMatch(text, "<(?:Stream)?Geometry x:Key=\"Pack\\.BellOutline\">[^<]+"),
+                $"{file}: нет непустой геометрии с ключом Pack.BellOutline");
+        }
+    }
+
+    [Fact]
+    public void Localization_AlarmTooltips_AreNonEmptyAndDifferInBothLanguages()
+    {
+        foreach (var language in new[] { "ru.json", "en.json" })
+        {
+            using var document = JsonDocument.Parse(
+                ReadSource("Workspace1C", "Localization", "Languages", language));
+            var strings = document.RootElement.GetProperty("strings");
+
+            var on = strings.GetProperty("LongOperation.Alarm.TooltipOn").GetString();
+            var off = strings.GetProperty("LongOperation.Alarm.TooltipOff").GetString();
+
+            Assert.False(string.IsNullOrWhiteSpace(on), $"{language}: пустой LongOperation.Alarm.TooltipOn");
+            Assert.False(string.IsNullOrWhiteSpace(off), $"{language}: пустой LongOperation.Alarm.TooltipOff");
+            Assert.NotEqual(on, off);
+        }
+    }
+
+    private static string CollapseWhitespace(string text) => Regex.Replace(text, @"\s+", " ");
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
+    }
+
+    private static string ExtractXamlElement(string text, string startMarker, string endMarker)
+    {
+        var start = text.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"XAML: не найден маркер «{startMarker}»");
+        var end = text.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"XAML: не найден конец элемента «{endMarker}»");
+        return text.Substring(start, end - start + endMarker.Length);
+    }
+
+    /// <summary>
+    /// Вырезает тело метода по сигнатуре: окончание — первая закрывающая скобка
+    /// на уровне членов класса (8 пробелов), вложенные блоки отступают глубже.
+    /// </summary>
+    private static string ExtractMethod(string source, string signature, string description)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"{description}: не найдена сигнатура «{signature}»");
+        const string endMarker = "\n        }";
+        var end = source.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end > start, $"{description}: не найдено завершение метода");
+        return source.Substring(start, end - start + endMarker.Length);
     }
 
     private static string ReadSource(params string[] parts)

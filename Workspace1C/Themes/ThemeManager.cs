@@ -442,13 +442,24 @@ namespace Workspace1C.Themes
         /// (устанавливает локальные значения, перекрывающие фиксированные размеры в XAML).
         /// </summary>
         public static void ApplyFontToTree(DependencyObject root, ElementFontSettings? fs)
+            => ApplyFontToTree(root, fs, null);
+
+        /// <summary>
+        /// То же, но с исключением поддерева <paramref name="skipSubtree"/> из обхода
+        /// (issue #132). Нужно проходу «По умолчанию»: он не должен добираться до строк
+        /// списка, у которых размеры заданы привязками Row*FontSize, а начертание —
+        /// локальными значениями (SemiBold, курсив). Исключённый элемент не получает
+        /// значений вовсе: его шрифт задаётся отдельно, на корне дерева (для списка —
+        /// областью «Список баз»), а строки наследуют его как обычные потомки.
+        /// </summary>
+        public static void ApplyFontToTree(DependencyObject root, ElementFontSettings? fs, DependencyObject? skipSubtree)
         {
-            if (root is null)
+            if (root is null || ReferenceEquals(root, skipSubtree))
                 return;
             ApplyFontProps(root as FrameworkElement, fs);
             int count = VisualTreeHelper.GetChildrenCount(root);
             for (int i = 0; i < count; i++)
-                ApplyFontToTree(VisualTreeHelper.GetChild(root, i), fs);
+                ApplyFontToTree(VisualTreeHelper.GetChild(root, i), fs, skipSubtree);
         }
 
         private static void ApplyFontProps(FrameworkElement? fe, ElementFontSettings? fs)
@@ -462,10 +473,29 @@ namespace Workspace1C.Themes
             var style = string.Equals(fs?.FontStyle, "Italic", StringComparison.OrdinalIgnoreCase)
                 ? FontStyles.Italic : FontStyles.Normal;
 
-            fe.SetValue(TextElement.FontFamilyProperty, new FontFamily(family));
-            fe.SetValue(TextElement.FontSizeProperty, size);
-            fe.SetValue(TextElement.FontWeightProperty, weight);
-            fe.SetValue(TextElement.FontStyleProperty, style);
+            SetFontValueUnlessBound(fe, TextElement.FontFamilyProperty, new FontFamily(family));
+            SetFontValueUnlessBound(fe, TextElement.FontSizeProperty, size);
+            SetFontValueUnlessBound(fe, TextElement.FontWeightProperty, weight);
+            SetFontValueUnlessBound(fe, TextElement.FontStyleProperty, style);
+        }
+
+        /// <summary>
+        /// Записывает значение шрифта, только если свойство не задано привязкой (issue #132).
+        /// SetValue на привязанном свойстве заменяет Binding локальным значением — именно так
+        /// «ОК» в настройках снимал привязки RowNameFontSize / RowSecondaryFontSize /
+        /// RowBadgeFontSize / RowHotkeyFontSize / GroupNameFontSize / GroupCountFontSize
+        /// и затирал начертание SemiBold у уже созданных строк списка (после пересоздания
+        /// строк привязки возвращались, поэтому дефект «лечился» отбором).
+        /// Предохранитель тот же, что в <see cref="IsCompactable"/>: пока у свойства есть
+        /// BindingExpressionBase, хозяином значения остаётся привязка, и она продолжает
+        /// обновляться. TemplateBinding сюда не попадает (у него нет BindingExpressionBase),
+        /// и локальная запись по-прежнему перекрывает значение шаблона — как раньше.
+        /// </summary>
+        private static void SetFontValueUnlessBound(DependencyObject d, DependencyProperty property, object value)
+        {
+            if (BindingOperations.GetBindingExpressionBase(d, property) is not null)
+                return;
+            d.SetValue(property, value);
         }
 
         /// <summary>
@@ -486,8 +516,13 @@ namespace Workspace1C.Themes
                 return null;
             }
 
+            // Корень списка баз: шрифт области «Список баз» ставится только ему (issue #132).
+            var listRoot = window.FindName("MainTree") as FrameworkElement;
+
+            // «По умолчанию» применяется ко всему окну, кроме поддерева списка: строки
+            // получают шрифт наследованием от корня дерева, а не локальной записью.
             if (window.Content is FrameworkElement content)
-                ApplyFontToTree(content, Scope(FontDefault) ?? new ElementFontSettings());
+                ApplyFontToTree(content, Scope(FontDefault) ?? new ElementFontSettings(), listRoot);
 
             ApplyFontToType(window, typeof(Button), Scope(FontButtons));
             ApplyFontToType(window, typeof(TextBoxBase), Scope(FontInputs));
@@ -496,7 +531,11 @@ namespace Workspace1C.Themes
 
             ApplyFontToNamed(window, "TabsPanel", Scope(FontTabs));
             ApplyFontToNamed(window, "HeaderGrid", Scope(FontListHeader));
-            ApplyFontToNamed(window, "MainTree", Scope(FontList));
+            // Обход поддерева списка заменён записью на его корень (issue #132). Дальше
+            // работает наследование: элементы строк без явных значений получают шрифт
+            // области, а элементы с привязками и локальными значениями сохраняют своё.
+            if (listRoot is not null)
+                ApplyFontProps(listRoot, Scope(FontList) ?? Scope(FontDefault) ?? new ElementFontSettings());
             ApplyFontToNamed(window, "RightPanelBorder", Scope(FontRightPanel));
             ApplyFontToNamed(window, "StatusBarBorder", Scope(FontStatusBar));
         }

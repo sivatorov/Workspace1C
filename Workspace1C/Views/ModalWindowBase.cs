@@ -570,8 +570,11 @@ namespace Workspace1C
                 // с фоном рабочего стола за ним.
                 BorderThickness = new Thickness(1)
             };
-            // Цвет рамки берём из темы — адаптируется к светлой/тёмной теме и схеме.
-            ThemeBrushes.Bind(glass, Border.BorderBrushProperty, "BorderColorBrush");
+            // Видимость рамки (issue #126): на Linux/без системного ребра DWM контраст
+            // рамки поднимается по WCAG до 3:1, иначе линия сливается с фоном.
+            ApplyFrameVisual(glass);
+            // Смена темы/схемы меняет и цвет рамки, и фон — пересчитываем контраст.
+            ThemeBrushes.Observe(glass, "BorderColorBrush", _ => ApplyFrameVisual(glass));
             ApplyGlassBackground(glass);
             _glassRoot = glass;
 
@@ -599,11 +602,62 @@ namespace Workspace1C
             // просвечивать содержимое рабочего стола под рамкой соседних окон.
             _glassStateSub = this.GetObservable(WindowStateProperty)
                 .Subscribe(new WindowStateObserver(() =>
+                {
                     glass.CornerRadius = WindowState == WindowState.Maximized
                         ? new CornerRadius(0)
-                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius)));
+                        : new CornerRadius(WindowSizeMath.DefaultContentCornerRadius);
+                    // В maximized-окне линия тени рамке не нужна (issue #126).
+                    ApplyFrameVisual(glass);
+                }));
 
             return glass;
+        }
+
+        /// <summary>
+        /// Видимость рамки диалога (issue #126): на Linux (и в любой среде без
+        /// системного ребра/тени DWM) цвет рамки поднимается по WCAG до контраста
+        /// ≥ 3:1 к фону содержимого. Иначе #E2E8F0 на #F1F5F9 (светлая тема) даёт
+        /// ~1.13:1 — линия физически есть, но невидима. Решение принимает общая
+        /// чистая политика <see cref="WindowFramePolicy.Resolve"/> (паритет с WPF).
+        /// </summary>
+        private void ApplyFrameVisual(Border glass)
+        {
+            var visual = WindowFramePolicy.Resolve(new WindowFrameInputs(
+                // Avalonia/Linux: DWM отсутствует, системного ребра нет — усиливаем.
+                CompositionEnabled: false,
+                OsRoundsWindows: false,
+                DwmStateKnown: false,
+                DwmRounded: false,
+                Maximized: WindowState == WindowState.Maximized,
+                RemoteSession: false,
+                DpiScale: 1.0));
+
+            if (visual.StrengthenContrast)
+            {
+                var frameColor = ThemeFrameColor("BorderColorBrush", "#E2E8F0");
+                var backgroundColor = ThemeFrameColor("ContentBackgroundColorBrush", "#F1F5F9");
+                var strengthened = WindowFramePolicy.EnsureContrast(
+                    frameColor, backgroundColor, WindowFramePolicy.MinContrastRatio);
+                glass.BorderBrush = new SolidColorBrush(
+                    Color.FromRgb(strengthened.R, strengthened.G, strengthened.B));
+            }
+            else
+            {
+                // Системное ребро есть (например, будущий Windows-бэкенд Avalonia):
+                // рамка перекрашивается из темы, как раньше.
+                ThemeBrushes.Bind(glass, Border.BorderBrushProperty, "BorderColorBrush");
+            }
+
+            glass.BorderThickness = new Thickness(visual.ThicknessDip);
+        }
+
+        /// <summary>Цвет кисти темы в платформо-независимый <see cref="WindowFrameColor"/>.</summary>
+        private static WindowFrameColor ThemeFrameColor(string brushKey, string fallbackHex)
+        {
+            var brush = ThemeBrushes.Get(brushKey, fallbackHex);
+            return brush is ISolidColorBrush solid
+                ? new WindowFrameColor(solid.Color.R, solid.Color.G, solid.Color.B)
+                : WindowFrameColor.FromHex(fallbackHex, new WindowFrameColor(0xE2, 0xE8, 0xF0));
         }
 
         /// <summary>

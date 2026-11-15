@@ -113,6 +113,16 @@ namespace Workspace1C
         private static Border? GetTitleBarBorder(DependencyObject d) => (Border?)d.GetValue(TitleBarBorderProperty);
         private static void SetTitleBarBorder(DependencyObject d, Border? value) => d.SetValue(TitleBarBorderProperty, value);
 
+        // Дополнительная полупрозрачная линия тени рядом с видимой рамкой (issue #126):
+        // нужна только там, где DWM не рисует собственное ребро/тень (Windows 10/RDP,
+        // выключенная композиция). Создаётся один раз на окно и хранится вложенным
+        // свойством, чтобы не плодить оверлеи при каждом пересчёте.
+        private static readonly DependencyProperty OuterShadowLineProperty =
+            DependencyProperty.RegisterAttached(
+                "OuterShadowLine", typeof(Border), typeof(WindowChromeHelper), new PropertyMetadata(null));
+        private static Border? GetOuterShadowLine(DependencyObject d) => (Border?)d.GetValue(OuterShadowLineProperty);
+        private static void SetOuterShadowLine(DependencyObject d, Border? value) => d.SetValue(OuterShadowLineProperty, value);
+
         // Состояние слежения за скруглением рамки конкретного окна (issue #126):
         // последний применённый радиус (чтобы не переустанавливать CornerRadius без
         // изменения — риск мерцания) и одноразовый таймер отложенного повтора после
@@ -137,6 +147,23 @@ namespace Workspace1C
             public double? LastRadius { get; set; }
             public bool Closed { get; set; }
             public DispatcherTimer? PendingTimer { get; set; }
+
+            /// <summary>
+            /// Последнее применённое визуальное решение рамки (issue #126): толщина,
+            /// усиление контраста, линия тени. Нужно, чтобы не переустанавливать
+            /// кисть/свойства на каждом Activated/DPI без реального изменения.
+            /// </summary>
+            public WindowFrameVisual? LastFrameVisual { get; set; }
+
+            /// <summary>
+            /// Фактические цвета рамки и фона, для которых посчитано последнее решение:
+            /// при смене темы/схемы цвета меняются, и решение нужно пересчитать даже
+            /// при том же самом наборе флагов.
+            /// </summary>
+            public (uint Frame, uint Background)? LastFrameColors { get; set; }
+
+            /// <summary>Фактический контраст рамки к фону (для строки журнала frame-corner).</summary>
+            public double? LastFrameContrast { get; set; }
 
             /// <summary>
             /// Предупреждение «показанное окно, но DWM не сообщил состояние скругления»
@@ -243,6 +270,27 @@ namespace Workspace1C
         // но ещё не видимо — состояние DWM в этот момент недостоверно (issue #126).
         [DllImport("user32.dll")]
         private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        // SM_REMOTESESSION: сеанс удалённого рабочего стола (RDP). В удалённом сеансе
+        // DWM не рисует ребро/тень окна, и рамка должна усиливаться по контрасту
+        // (issue #126). Значение попадает и в строку журнала frame-corner.
+        private const int SmRemoteSession = 0x1000;
+
+        [DllImport("user32.dll")]
+        private static extern int GetSystemMetrics(int nIndex);
+
+        private static bool IsRemoteSession()
+        {
+            try
+            {
+                return GetSystemMetrics(SmRemoteSession) != 0;
+            }
+            catch
+            {
+                // API недоступен — считаем сеанс локальным.
+                return false;
+            }
+        }
 
         // Флаги SetWindowPos для принудительной перерисовки рамки после смены стиля.
         private const uint SwpNoSize = 0x0001;
@@ -410,7 +458,17 @@ namespace Workspace1C
             // словари в Application.Resources). Подписку снимаем при закрытии окна.
             var themeChangedHandler = new NotifyCollectionChangedEventHandler((_, _) =>
             {
-                try { window.Dispatcher.BeginInvoke(new Action(() => ApplyGlassBackground(window))); }
+                try
+                {
+                    window.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        ApplyGlassBackground(window);
+                        // Смена темы/схемы меняет BorderColor и ContentBackgroundColor:
+                        // решение о контрасте рамки нужно пересчитать (issue #126).
+                        if (GetFrameBorder(window) is { } themeFrame)
+                            ApplyWindowFrameVisual(window, themeFrame);
+                    }));
+                }
                 catch { /* не блокируем смену темы */ }
             });
             if (Application.Current?.Resources is { } resources)
@@ -458,6 +516,9 @@ namespace Workspace1C
                     // максимизации DWM рисует прямые углы — радиусы обнуляются,
                     // при восстановлении скругление возвращается.
                     ApplyFrameCornerRadius(window);
+                    // В maximized-окне линия тени рамке не нужна (issue #126).
+                    if (GetFrameBorder(window) is { } stateFrame)
+                        ApplyWindowFrameVisual(window, stateFrame);
                     UpdateGlassFrameForMaximize(window);
                 }
                 catch { /* некритично */ }
@@ -711,6 +772,10 @@ namespace Workspace1C
             SetFrameBorder(window, frame);
             Panel.SetZIndex(frame, 2000);
             root.Children.Add(frame);
+            // Видимость рамки (issue #126): если DWM не рисует ребро/тень, цвет
+            // усиливается по WCAG-контрасту и добавляется линия тени. На Windows 11
+            // остаётся прежняя привязка к BorderBrushColor — поведение не меняется.
+            ApplyWindowFrameVisual(window, frame);
             return root;
         }
 
@@ -1015,9 +1080,9 @@ namespace Workspace1C
             {
                 bool maximized = window.WindowState == WindowState.Maximized;
                 bool shown = IsWindowShown(window, out var hwnd);
-                bool stateKnown = TryReadDwmCornerState(hwnd, out bool dwmRounded);
+                bool stateKnown = TryReadDwmCornerState(hwnd, out bool dwmRounded, out int cornerHr);
                 bool osRounds = Environment.OSVersion.Version.Build >= 22000;
-                bool compositionEnabled = TryGetDwmCompositionEnabled();
+                bool compositionEnabled = TryGetDwmCompositionEnabled(out int compositionHr);
                 // Радиус собственного скруглённого содержимого (issue #126): у диалогов
                 // WPF содержимое обёрнуто в скруглённый контейнер (BuildChrome), поэтому
                 // рамка может повторять его радиус. У окон с собственным каркасом
@@ -1063,9 +1128,19 @@ namespace Workspace1C
                         tracking.LastRadius = radius;
                 }
 
+                // Видимость рамки (issue #126): при отсутствии системного ребра/тени
+                // (Windows 10/RDP, выключенная композиция) усиливаем контраст рамки,
+                // привязываем её к пикселям и добавляем линию тени. На Windows 11
+                // политика возвращает прежнее поведение — привязку к BorderBrushColor.
+                var frameVisual = GetFrameBorder(window) is { } visualFrame
+                    ? ApplyWindowFrameVisual(window, visualFrame)
+                    : default;
+                double frameContrast = tracking?.LastFrameContrast ?? 0;
+
                 LogFrameCornerRadius(window, reason, hwnd, shown, stateKnown, dwmRounded,
                     osRounds, compositionEnabled, contentRadius, maximized, radius, policy.Policy,
-                    previous, changed);
+                    previous, changed, IsRemoteSession(), frameVisual, frameContrast,
+                    cornerHr, compositionHr);
             }
             catch
             {
@@ -1102,14 +1177,18 @@ namespace Workspace1C
         /// на RDP/Windows 10). На Windows 10 (build < 22000) атрибут не
         /// поддерживается — состояние всегда неизвестно, без ложного «do-not-round».
         /// </summary>
-        private static bool TryReadDwmCornerState(IntPtr hwnd, out bool rounded)
+        private static bool TryReadDwmCornerState(IntPtr hwnd, out bool rounded, out int hresult)
         {
             rounded = false;
+            hresult = 0;
             if (Environment.OSVersion.Version.Build < 22000 || hwnd == IntPtr.Zero)
                 return false;
             try
             {
-                if (DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out int state, sizeof(int)) != 0)
+                // Код возврата DwmGetWindowAttribute не глушим: он попадает в строку
+                // журнала frame-corner (dwmCornerHr=…), но сбой не ломает отрисовку.
+                hresult = DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out int state, sizeof(int));
+                if (hresult != 0)
                     return false;
                 if (state == DwmStateRounded)
                 {
@@ -1136,10 +1215,20 @@ namespace Workspace1C
         /// недоступен, считаем композицию включённой (современные ОС).
         /// </summary>
         private static bool TryGetDwmCompositionEnabled()
+            => TryGetDwmCompositionEnabled(out _);
+
+        /// <summary>
+        /// Включена ли композиция DWM, с кодом возврата API (issue #126): код пишется
+        /// в журнал frame-corner (dwmCompositionHr=…), но сбой не ломает отрисовку —
+        /// при недоступном API считаем композицию включённой (современные ОС).
+        /// </summary>
+        private static bool TryGetDwmCompositionEnabled(out int hresult)
         {
+            hresult = 0;
             try
             {
-                if (DwmIsCompositionEnabled(out bool enabled) == 0)
+                hresult = DwmIsCompositionEnabled(out bool enabled);
+                if (hresult == 0)
                     return enabled;
             }
             catch
@@ -1161,7 +1250,9 @@ namespace Workspace1C
         private static void LogFrameCornerRadius(
             Window window, string reason, IntPtr hwnd, bool shown, bool stateKnown, bool dwmRounded,
             bool osRounds, bool compositionEnabled, double contentRadius, bool maximized, double radius,
-            WindowSizeMath.FrameCornerPolicy policy, double? previous, bool changed)
+            WindowSizeMath.FrameCornerPolicy policy, double? previous, bool changed,
+            bool remote, WindowFrameVisual frameVisual, double frameContrast,
+            int cornerHr, int compositionHr)
         {
             try
             {
@@ -1170,10 +1261,16 @@ namespace Workspace1C
                     $"hwnd=0x{hwnd.ToInt64():X} shown={shown} " +
                     $"dwmState={(stateKnown ? (dwmRounded ? "rounded" : "do-not-round") : "unknown")} " +
                     $"osRounds={osRounds} compositionEnabled={compositionEnabled} " +
+                    $"dwmCornerHr=0x{cornerHr:X8} dwmCompositionHr=0x{compositionHr:X8} " +
                     $"contentRadius={contentRadius:0.#} maximized={maximized} " +
                     $"radius={radius:0.#} policy={policy} " +
                     $"previous={(previous.HasValue ? previous.Value.ToString("0.#") : "-")} " +
-                    $"changed={changed} frameOptOut={!GetShowWindowFrame(window)}";
+                    $"changed={changed} remote={remote} " +
+                    $"frameThickness={frameVisual.ThicknessDip:0.#} " +
+                    $"frameContrast={frameContrast:0.00} " +
+                    $"frameStrengthened={frameVisual.StrengthenContrast} " +
+                    $"frameShadowLine={frameVisual.AddOuterShadowLine} " +
+                    $"frameOptOut={!GetShowWindowFrame(window)}";
 
                 if (Log.Info(LogCategory.Themes, message))
                     return;
@@ -1201,6 +1298,158 @@ namespace Workspace1C
             catch
             {
                 // Логирование не должно ломать показ окна.
+            }
+        }
+
+        /// <summary>
+        /// Применяет видимость рамки окна (issue #126). Если DWM рисует собственное
+        /// ребро/тень (Windows 11), остаётся прежняя привязка рамки к ресурсу темы
+        /// <c>BorderBrushColor</c> — поведение Windows 11 не меняется. Иначе цвет
+        /// рамки поднимается до WCAG-контраста ≥ 3:1 к фону содержимого, рамка
+        /// привязывается к пикселям, а рядом добавляется полупрозрачная линия тени.
+        /// Решение принимает чистая политика <see cref="WindowFramePolicy.Resolve"/>.
+        /// </summary>
+        private static WindowFrameVisual ApplyWindowFrameVisual(Window window, Border frame)
+        {
+            try
+            {
+                var (frameColor, backgroundColor) = ReadFrameThemeColors(window);
+                var hwnd = TryGetWindowHandle(window);
+                bool stateKnown = TryReadDwmCornerState(hwnd, out bool dwmRounded, out _);
+                var inputs = new WindowFrameInputs(
+                    CompositionEnabled: TryGetDwmCompositionEnabled(),
+                    OsRoundsWindows: Environment.OSVersion.Version.Build >= 22000,
+                    DwmStateKnown: stateKnown,
+                    DwmRounded: dwmRounded,
+                    Maximized: window.WindowState == WindowState.Maximized,
+                    RemoteSession: IsRemoteSession(),
+                    DpiScale: GetWindowDpiScale(window).X);
+                var visual = WindowFramePolicy.Resolve(inputs);
+
+                var tracking = GetFrameTracking(window);
+                var colors = (Frame: PackColor(frameColor), Background: PackColor(backgroundColor));
+                if (tracking is { LastFrameVisual: { } lastVisual, LastFrameColors: { } lastColors } &&
+                    lastVisual == visual && lastColors == colors)
+                {
+                    // Решение и цвета не изменились — не переустанавливаем кисть,
+                    // иначе рамка мерцала бы на каждом Activated/DPI.
+                    return visual;
+                }
+
+                if (visual.StrengthenContrast)
+                {
+                    var strengthened = WindowFramePolicy.EnsureContrast(
+                        frameColor, backgroundColor, WindowFramePolicy.MinContrastRatio);
+                    frame.BorderBrush = new SolidColorBrush(
+                        Color.FromRgb(strengthened.R, strengthened.G, strengthened.B));
+                }
+                else
+                {
+                    // Поведение Windows 11: рамка перекрашивается из темы (issue #126).
+                    frame.SetResourceReference(Border.BorderBrushProperty, "BorderBrushColor");
+                }
+
+                frame.BorderThickness = new Thickness(visual.ThicknessDip);
+                frame.SnapsToDevicePixels = visual.SnapToPixels;
+                frame.UseLayoutRounding = visual.SnapToPixels;
+                UpdateOuterShadowLine(window, frame, visual.AddOuterShadowLine);
+
+                if (tracking is not null)
+                {
+                    tracking.LastFrameVisual = visual;
+                    tracking.LastFrameColors = colors;
+                    tracking.LastFrameContrast = WindowFramePolicy.ContrastRatio(
+                        visual.StrengthenContrast
+                            ? WindowFramePolicy.EnsureContrast(
+                                frameColor, backgroundColor, WindowFramePolicy.MinContrastRatio)
+                            : frameColor,
+                        backgroundColor);
+                }
+
+                return visual;
+            }
+            catch
+            {
+                // Видимость рамки — некритичное улучшение: не ломаем показ окна.
+                return default;
+            }
+        }
+
+        /// <summary>Фактические цвета рамки и фона содержимого из ресурсов темы (issue #126).</summary>
+        private static (WindowFrameColor Frame, WindowFrameColor Background) ReadFrameThemeColors(Window window)
+        {
+            var frame = ReadColorResource(window, "BorderColor");
+            if (frame is null && window.TryFindResource("BorderBrushColor") is SolidColorBrush frameBrush)
+                frame = frameBrush.Color;
+
+            var background = ReadColorResource(window, "ContentBackgroundColor");
+            if (background is null && window.TryFindResource("ContentBackgroundBrush") is SolidColorBrush backgroundBrush)
+                background = backgroundBrush.Color;
+
+            return (
+                ToFrameColor(frame ?? Color.FromRgb(0xE2, 0xE8, 0xF0)),
+                ToFrameColor(background ?? Color.FromRgb(0xF1, 0xF5, 0xF9)));
+        }
+
+        private static Color? ReadColorResource(Window window, string key)
+            => window.TryFindResource(key) is Color color ? color : null;
+
+        private static WindowFrameColor ToFrameColor(Color color) => new(color.R, color.G, color.B);
+
+        private static uint PackColor(WindowFrameColor color)
+            => ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
+
+        private static IntPtr TryGetWindowHandle(Window window)
+        {
+            try
+            {
+                return new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            }
+            catch
+            {
+                return IntPtr.Zero;
+            }
+        }
+
+        /// <summary>
+        /// Дополнительная полупрозрачная линия тени рядом с рамкой (issue #126):
+        /// создаётся один раз и только когда DWM не рисует собственное ребро/тень.
+        /// Линия не перехватывает мышь (ZIndex 1999 — под видимой рамкой) и
+        /// скрывается в maximized-окне, чтобы не «утолщать» рамку у краёв экрана.
+        /// </summary>
+        private static void UpdateOuterShadowLine(Window window, Border frame, bool visible)
+        {
+            try
+            {
+                var line = GetOuterShadowLine(window);
+                if (line is null)
+                {
+                    if (!visible)
+                        return;
+                    if (frame.Parent is not Panel host)
+                        return;
+                    line = new Border
+                    {
+                        IsHitTestVisible = false,
+                        Focusable = false,
+                        // Линия рисуется сразу под видимой рамкой (на 1 DIP внутрь),
+                        // поэтому остаётся видимой на любом DPI и не обрезается
+                        // границей клиентской области окна.
+                        BorderThickness = new Thickness(1),
+                        Margin = new Thickness(1),
+                        BorderBrush = new SolidColorBrush(Color.FromArgb(0x33, 0x00, 0x00, 0x00))
+                    };
+                    SetOuterShadowLine(window, line);
+                    Panel.SetZIndex(line, 1999);
+                    host.Children.Add(line);
+                }
+
+                line.CornerRadius = frame.CornerRadius;
+                line.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            }
+            catch
+            {
+                // Линия тени — косметика: при сбое остаётся усиленная рамка.
             }
         }
 
@@ -1269,6 +1518,10 @@ namespace Workspace1C
                             {
                                 ApplyCornerPreference(window);
                                 RefreshFrameCornerRadius(window, reason);
+                                // Смена темы/композиции влияет и на видимость рамки
+                                // (issue #126): пересчитываем контраст вместе с радиусом.
+                                if (GetFrameBorder(window) is { } reasonFrame)
+                                    ApplyWindowFrameVisual(window, reasonFrame);
                             }));
                         }
                         catch
@@ -1380,6 +1633,8 @@ namespace Workspace1C
             }
 
             ApplyFrameCornerRadius(window, "attach");
+            // Видимость рамки главного окна (issue #126): та же политика, что у диалогов.
+            ApplyWindowFrameVisual(window, frame);
         }
 
         /// <summary>
@@ -1398,7 +1653,12 @@ namespace Workspace1C
                     return;
 
                 int pref = window.WindowState == WindowState.Maximized ? DwmCornerDoNotRound : DwmCornerRound;
-                DwmSetWindowAttribute(hwnd, DwmWindowCornerPreference, ref pref, sizeof(int));
+                // Код возврата DwmSetWindowAttribute не глушим (issue #126): он пишется
+                // в журнал, чтобы по диагностике было видно, применилось ли скругление.
+                int hresult = DwmSetWindowAttribute(hwnd, DwmWindowCornerPreference, ref pref, sizeof(int));
+                Log.Info(LogCategory.Themes,
+                    $"frame-corner dwm-set window={window.GetType().Name} " +
+                    $"hwnd=0x{hwnd.ToInt64():X} cornerPreference={pref} hr=0x{hresult:X8}");
             }
             catch
             {

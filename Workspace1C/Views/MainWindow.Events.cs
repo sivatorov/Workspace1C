@@ -288,10 +288,45 @@ namespace Workspace1C
                 // заголовок и все уже созданные строки баз.
                 Dispatcher.BeginInvoke(new Action(ApplyColumnOrder), System.Windows.Threading.DispatcherPriority.Loaded);
             }
+            else if (e.PropertyName == nameof(MainViewModel.SavedTheme))
+            {
+                // Issue #130: смена темы заменяет ресурс BorderBrushColor. Линии сетки
+                // перерисовываем ПОСЛЕ применения ресурсов темы — иначе они остаются
+                // с кистью, захваченной до переключения (после тёмной темы — чёрные,
+                // лечилось только повторным переключением тёмной темы и компактности).
+                RefreshGridLinesAfterThemeChange();
+            }
             else if (e.PropertyName == nameof(MainViewModel.ShowTags))
             {
                 Dispatcher.BeginInvoke(new Action(RefreshTagRowVisibility), System.Windows.Threading.DispatcherPriority.Loaded);
             }
+        }
+
+        // Признак того, что перерисовка линий сетки после смены темы уже стоит
+        // в очереди диспетчера (issue #130): тема может уведомить несколькими
+        // событиями подряд (вариант темы, полноценная тема, предпросмотр).
+        private bool _gridLinesThemeRefreshQueued;
+
+        /// <summary>
+        /// Перерисовка линий сетки после смены темы (issue #130). Ресурс
+        /// <c>BorderBrushColor</c> заменяется при применении темы, поэтому линии
+        /// пересоздаются уже с новой кистью. Выполняется отложенно на
+        /// <see cref="System.Windows.Threading.DispatcherPriority.Loaded"/>, когда
+        /// ресурсы темы гарантированно применены, — по образцу
+        /// <see cref="QueueHeaderAlign"/> и <see cref="ApplyColumnOrder"/>.
+        /// Без этого после переключения тёмной темы линии оставались чёрными до
+        /// повторного переключения тумблеров темы и компактности.
+        /// </summary>
+        private void RefreshGridLinesAfterThemeChange()
+        {
+            if (_gridLinesThemeRefreshQueued)
+                return;
+            _gridLinesThemeRefreshQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _gridLinesThemeRefreshQueued = false;
+                RefreshGridLines();
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         /// <summary>

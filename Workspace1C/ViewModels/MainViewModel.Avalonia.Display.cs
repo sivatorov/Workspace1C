@@ -817,6 +817,10 @@ public partial class MainViewModel : ViewModelBase
         ThemeManager.ApplyFontToAllWindows(_settings.FontFamily, _settings.FontSize,
             _settings.FontWeight, _settings.FontStyle);
         PreviewElementFonts(_settings.ElementFonts);
+        // Issue #132: строки списка строятся кодом с явными размерами из UiMetrics,
+        // поэтому смена области «Список баз» (или «По умолчанию») должна сразу
+        // пересчитать масштаб и пересобрать дерево — так же, как кнопка «Применить».
+        ApplyListZoom();
         SaveSettingsSilently();
 
         OnPropertyChanged(nameof(FontFamily));

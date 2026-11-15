@@ -2,6 +2,10 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text;
+#if WINDOWS
+using System.Runtime.InteropServices;
+#endif
+using Workspace1C.Themes;
 
 namespace Workspace1C.Services;
 
@@ -198,6 +202,20 @@ public static class DiagnosticsBundleService
         sb.AppendLine("Culture (current):  " + System.Globalization.CultureInfo.CurrentCulture.Name);
         sb.AppendLine("Culture (ui):       " + System.Globalization.CultureInfo.CurrentUICulture.Name);
         sb.AppendLine("Data directory:     " + dataDir);
+        // Issue #126: рамка окна невидима в удалённом сеансе/на Windows 10, где DWM
+        // не рисует ребро/тень. По этим строкам поддержка видит, в каком сеансе
+        // запущено приложение, что сообщает DWM и какие цвета рамки/фона активны.
+        sb.AppendLine("Session:            " + DescribeSessionKind());
+        sb.AppendLine("Session name:       " + (Environment.GetEnvironmentVariable("SESSIONNAME") ?? "unknown"));
+        sb.AppendLine("Session id:         " + DescribeSessionId());
+        sb.AppendLine("DWM composition:    " + DescribeDwmComposition());
+        sb.AppendLine("DWM corner state:   " + DescribeDwmCornerState());
+        sb.AppendLine("DPI scale:          " + DescribeDpiScale());
+        sb.AppendLine("Active theme:       " + DescribeTheme());
+        sb.AppendLine("Active scheme:      " + DescribeScheme());
+        sb.AppendLine("BorderColor:        " + DescribePaletteColor("BorderColor"));
+        sb.AppendLine("ContentBackgroundColor: " + DescribePaletteColor("ContentBackgroundColor"));
+        sb.AppendLine("Frame contrast:     " + DescribeFrameContrast());
         try
         {
             sb.AppendLine("App directory:      " + AppContext.BaseDirectory);
@@ -208,5 +226,190 @@ public static class DiagnosticsBundleService
             // Сведения о процессе не критичны для диагностики.
         }
         return sb.ToString();
+    }
+
+    // ---------- Сведения о сеансе/DWM/теме для диагностики issue #126 ----------
+
+#if WINDOWS
+    private const int SmRemoteSession = 0x1000;
+
+    // DWMWA_WINDOW_CORNER_STATE (34): 1 = не скруглять, 2 = скруглено.
+    private const int DwmWindowCornerState = 34;
+    private const int DwmStateDoNotRound = 1;
+    private const int DwmStateRounded = 2;
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForSystem();
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmIsCompositionEnabled(out bool pfEnabled);
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmGetWindowAttribute(IntPtr hwnd, int dwAttribute, out int pvAttribute, int cbAttribute);
+#endif
+
+    /// <summary>Локальный или удалённый (RDP) сеанс — SM_REMOTESESSION (issue #126).</summary>
+    private static string DescribeSessionKind()
+    {
+#if WINDOWS
+        try
+        {
+            return GetSystemMetrics(SmRemoteSession) != 0 ? "remote (RDP)" : "local";
+        }
+        catch
+        {
+            // API недоступен — сеанс неизвестен, сбор диагностики не ломается.
+        }
+#endif
+        return "unknown (non-Windows)";
+    }
+
+    /// <summary>Идентификатор сеанса Windows (для сопоставления с журналом событий).</summary>
+    private static string DescribeSessionId()
+    {
+        try
+        {
+            return Process.GetCurrentProcess().SessionId.ToString();
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
+    /// <summary>Состояние композиции DWM с кодом возврата API (issue #126).</summary>
+    private static string DescribeDwmComposition()
+    {
+#if WINDOWS
+        try
+        {
+            var hr = DwmIsCompositionEnabled(out var enabled);
+            return hr == 0 ? (enabled ? "enabled" : "disabled") : $"unavailable (hr=0x{hr:X8})";
+        }
+        catch
+        {
+            return "unavailable";
+        }
+#else
+        return "not applicable (non-Windows)";
+#endif
+    }
+
+    /// <summary>
+    /// Фактическое состояние скругления углов главного окна по данным DWM
+    /// (DWMWA_WINDOW_CORNER_STATE). На Windows 10 атрибут не поддерживается —
+    /// «unknown», без ложного «do-not-round» (issue #126).
+    /// </summary>
+    private static string DescribeDwmCornerState()
+    {
+#if WINDOWS
+        try
+        {
+            var hwnd = Process.GetCurrentProcess().MainWindowHandle;
+            if (hwnd == IntPtr.Zero)
+                return "unknown (no main window)";
+
+            var hr = DwmGetWindowAttribute(hwnd, DwmWindowCornerState, out var state, sizeof(int));
+            if (hr != 0)
+                return $"unknown (hr=0x{hr:X8})";
+
+            return state switch
+            {
+                DwmStateRounded => "rounded",
+                DwmStateDoNotRound => "do-not-round",
+                _ => $"other ({state})"
+            };
+        }
+        catch
+        {
+            return "unknown";
+        }
+#else
+        return "not applicable (non-Windows)";
+#endif
+    }
+
+    /// <summary>Масштаб DPI системы (issue #126: на нецелом DPI линия рамки «исчезает»).</summary>
+    private static string DescribeDpiScale()
+    {
+#if WINDOWS
+        try
+        {
+            var dpi = GetDpiForSystem();
+            return dpi > 0 ? (dpi / 96.0).ToString("0.##") + $" ({dpi} DPI)" : "unknown";
+        }
+        catch
+        {
+            return "unknown";
+        }
+#else
+        return "1.0 (assumed)";
+#endif
+    }
+
+    private static string DescribeTheme()
+    {
+        try
+        {
+            return ThemeManager.CurrentTheme;
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
+    private static string DescribeScheme()
+    {
+        try
+        {
+            return ThemeManager.CurrentScheme.Name;
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
+    /// <summary>Фактическое значение цвета активной палитры (BorderColor/ContentBackgroundColor).</summary>
+    private static string DescribePaletteColor(string key)
+    {
+        try
+        {
+            var dark = string.Equals(ThemeManager.CurrentTheme, ThemeManager.DarkThemeName, StringComparison.Ordinal);
+            var palette = ThemeManager.CurrentScheme.Palette(dark);
+            return palette.TryGetValue(key, out var hex) ? hex : "(not set)";
+        }
+        catch
+        {
+            return "unknown";
+        }
+    }
+
+    /// <summary>
+    /// Текущий контраст рамки к фону содержимого по WCAG и цвет после усиления
+    /// (issue #126): если значение ниже 3:1, линия рамки невидима.
+    /// </summary>
+    private static string DescribeFrameContrast()
+    {
+        try
+        {
+            var frame = WindowFrameColor.FromHex(
+                DescribePaletteColor("BorderColor"), new WindowFrameColor(0xE2, 0xE8, 0xF0));
+            var background = WindowFrameColor.FromHex(
+                DescribePaletteColor("ContentBackgroundColor"), new WindowFrameColor(0xF1, 0xF5, 0xF9));
+
+            var ratio = WindowFramePolicy.ContrastRatio(frame, background);
+            var strengthened = WindowFramePolicy.EnsureContrast(frame, background);
+            var strengthenedRatio = WindowFramePolicy.ContrastRatio(strengthened, background);
+            return $"{ratio:0.00}:1 (strengthened {strengthened.ToHex()} → {strengthenedRatio:0.00}:1)";
+        }
+        catch
+        {
+            return "unknown";
+        }
     }
 }

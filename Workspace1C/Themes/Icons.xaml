@@ -96,6 +96,11 @@
     <!-- Планировщик / Scheduler (clock) -->
     <Geometry x:Key="IconScheduler">M12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12.5,7V12.25L17,14.92L16.25,16.15L11,13V7H12.5Z</Geometry>
 
+    <!-- Колокольчик / Bell (уведомления, issue #131). Ключ Pack.BellOutline:
+         варианты набора уже есть в IconsOutline/Material/MacOS/WindowsXp/Glass,
+         здесь — базовый Fluent-контур (как у PackIcon «BellOutline»). -->
+    <Geometry x:Key="Pack.BellOutline">M10,21H14A2,2 0 0,1 12,23A2,2 0 0,1 10,21M21,19V20H3V19L5,17V11C5,7.9 7.03,5.17 10,4.29C10,4.19 10,4.1 10,4A2,2 0 0,1 12,2A2,2 0 0,1 14,4C14,4.1 14,4.19 14,4.29C16.97,5.17 19,7.9 19,11V17L21,19M19,18L17,16V11C17,8.24 15.24,6 12,6C9.76,6 7,8.24 7,11V16L5,18H19Z</Geometry>
+
     <!-- Автозапуск / Autostart (lightning) -->
     <Geometry x:Key="IconAutostart">M11,15H6L13,1V9H18L11,23V15Z</Geometry>
 

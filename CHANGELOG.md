@@ -11,6 +11,74 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.64] — 2026-11-15
+
+### Исправлено
+
+- **Рамка окон снова видна на Windows 10 и в RDP-сеансах (issue #126).**
+  Причина «пропавшей» рамки — DWM на Windows 10/RDP не рисует собственное
+  ребро/тень, а цвет рамки светлой темы (#E2E8F0) на фоне содержимого
+  (#F1F5F9) даёт контраст ≈1.13:1: линия физически есть, но невидима.
+  Добавлена чистая политика
+  [`WindowFramePolicy`](Workspace1C/Services/WindowFramePolicy.cs:98) —
+  контраст рамки к фону поднимается по WCAG до 3:1, добавляется внешняя
+  линия тени и привязка к физическим пикселям; на Windows 11 с системным
+  скруглением поведение не меняется. Политика подключена в
+  [`WindowChromeHelper`](Workspace1C/Views/WindowChromeHelper.cs:1289) (WPF),
+  [`ModalWindowBase`](Workspace1C/Views/ModalWindowBase.cs:1) и
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:405)
+  (Avalonia); в журнал `frame-corner` добавлены поля контраста и решения
+  политики. Покрыто тестами
+  [`Issue126FrameVisibilityTests`](Workspace1C.Tests/Issue126FrameVisibilityTests.cs:29).
+- **Шрифт строк списка баз больше не сбрасывается после сохранения настроек
+  (issue #132).** Проход «По умолчанию» в
+  [`ThemeManager.ApplyElementFonts`](Workspace1C/Themes/ThemeManager.cs:1)
+  обходил всё дерево и вызывал `SetValue` на уже привязанных свойствах строк:
+  `SetValue` заменял Binding локальным значением, и размеры
+  `RowNameFontSize`/`RowSecondaryFontSize`/`RowBadgeFontSize`/`RowHotkeyFontSize`
+  «слетали» до сохранения настроек. Теперь обход исключает поддерево
+  `MainTree` (`skipSubtree`), шрифт области «Список баз» пишется только корню
+  дерева, а `ApplyFontProps` использует
+  `SetFontValueUnlessBound` — свойства с `BindingExpressionBase` не трогаются.
+  В XAML-шаблоне строки размеры заданы только привязками; в Avalonia
+  `SaveElementFonts` не пересчитывает масштаб списка. Покрыто тестами
+  [`Issue132RowFontBindingTests`](Workspace1C.Tests/Issue132RowFontBindingTests.cs:32).
+- **Массовая загрузка `.cf`: недоступный/медленный rac больше не пропускает
+  базу с невнятной причиной (issue #106).** «cluster list» получил таймаут
+  45 с и один повтор при таймауте (общий таймаут резолва — 120 с), поэтому
+  холодный или загруженный сервер успевает ответить. Резолвер возвращает
+  найденные кластер и ИБ даже когда профиль СУБД собрать не удалось, а
+  подготовка (`BatchOpsPreparationService`) больше не требует профиль —
+  блокировкам и завершению сеансов он не нужен (профиль остаётся требованием
+  только для `ibcmd`). В статус базы попадает фактическая причина
+  (`Не удалось получить кластеры сервера …`) с подсказкой проверить адрес,
+  порт и учётные данные ras в справочнике «Серверы 1С». Покрыто тестами
+  [`Issue106PreparationRacTests`](Workspace1C.Tests/Issue106PreparationRacTests.cs:27).
+- **Линии сетки списка баз больше не становятся чёрными после смены темы
+  (issue #130).** Кисть линии теперь привязана к ресурсу темы
+  (`SetResourceReference` на `BorderBrushColor` в WPF, привязка к
+  `BorderColorBrush` в Avalonia) —
+  [`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs:493) и
+  [`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs:457),
+  а при смене темы линии перерисовываются после применения ресурсов темы
+  (`RefreshGridLinesAfterThemeChange`, `DispatcherPriority.Loaded` — см.
+  [`MainWindow.Events.cs`](Workspace1C/Views/MainWindow.Events.cs:320); в
+  Avalonia — `RefreshGridLines` из `OnThemeChanged`,
+  [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:405) и
+  [`MainWindow.Avalonia.Columns.cs`](Workspace1C/Views/MainWindow.Avalonia.Columns.cs:491)).
+  Ранее цвет фиксировался при создании линии и «лечился» только повторным
+  переключением темы и компактности. Покрыто тестами
+  [`Issue130GridLinesTests`](Workspace1C.Tests/Issue130GridLinesTests.cs:25).
+- **Переключатель уведомлений о длительных операциях перенесён в подвал главного
+  окна (issue #131).** В WPF и Avalonia он теперь стоит рядом с кнопкой «Текущая
+  сессия» в строке состояния, а не в блоке действий правой панели, и обозначен
+  колокольчиком: обычный — уведомления включены, перечёркнутый — выключены
+  ([`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:3587)). Добавлен контур
+  `Pack.BellOutline` в [`Themes/Icons.xaml`](Workspace1C/Themes/Icons.xaml:102) и
+  [`Themes/Icons.axaml`](Workspace1C/Themes/Icons.axaml:113); локализация
+  тултипов не менялась. Покрыто source-гвардами
+  [`Issue131LongOperationNotificationTests`](Workspace1C.Tests/Issue131LongOperationNotificationTests.cs:19).
+
 ## [1.0.1.63] — 2026-11-13
 
 ### Исправлено

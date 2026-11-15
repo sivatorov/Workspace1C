@@ -75,6 +75,9 @@ public partial class MainViewModel : ViewModelBase
         RebuildGroupTree();
         if (persist)
             SaveSettings();
+        // Issue #130: тема применена (ресурсы кистей уже заменены) — уведомляем окно,
+        // чтобы оно перерисовало линии сетки новой кистью, а не прежней/чёрной.
+        OnPropertyChanged(nameof(SavedTheme));
         LogTheme($"ApplyFullTheme('{id}', persist:{persist}) -> active='{_activeColorScheme?.Name}'");
     }
 
@@ -176,6 +179,9 @@ public partial class MainViewModel : ViewModelBase
         // Переключение базового варианта не меняет полноценную тему (её Id остаётся),
         // но выбор должен сохраниться в настройках.
         _fullTheme = Themes.ThemeManager.CurrentFullTheme?.Id ?? _fullTheme;
+        // Issue #130: смена варианта темы заменила ресурсы кистей — уведомляем окно,
+        // чтобы линии сетки пересоздались с новой кистью (иначе остаются чёрными).
+        OnPropertyChanged(nameof(SavedTheme));
         LogTheme($"ApplySchemeForTheme(dark={dark}) -> active='{_activeColorScheme?.Name}'");
     }
 

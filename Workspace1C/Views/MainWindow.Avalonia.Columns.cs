@@ -482,6 +482,30 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Перерисовывает линии сетки во всех уже созданных строках баз, строках групп
+        /// и в заголовке (issue #130). Вызывается после смены темы: кисти линий
+        /// привязаны к ресурсу <c>BorderColorBrush</c>, но пересоздание гарантирует,
+        /// что цвет взят из уже применённой темы (паритет с WPF). Обе настройки
+        /// выключены — планировщик не вернёт линий, разметка не меняется.
+        /// </summary>
+        private void RefreshGridLines()
+        {
+            if (_vm is null || _tree is null)
+                return;
+
+            foreach (var card in _tree.GetVisualDescendants().OfType<InfobaseRowCard>())
+                if (card.Child is Grid grid)
+                    ApplyGridLinesToGrid(grid, includeHorizontal: true);
+
+            foreach (var grid in _tree.GetVisualDescendants().OfType<Grid>())
+                if (grid.Name == GroupRowGridName)
+                    ApplyGridLinesToGrid(grid, includeHorizontal: true);
+
+            if (_columnHeaderRow is not null)
+                ApplyGridLinesToGrid(_columnHeaderRow, includeHorizontal: false);
+        }
+
+        /// <summary>
         /// Прикрепляет к заголовку колонки контекстное меню (issue #173): пункт
         /// «Скрыть колонку» скрывает колонку по её ключу, пункт «Открыть настройки
         /// колонок» открывает окно настроек сразу на подвкладке «Колонки».

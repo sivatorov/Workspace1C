@@ -448,7 +448,6 @@ namespace Workspace1C
             if (!plan.HasAnyLines)
                 return;
 
-            var brush = TryFindResource("BorderBrushColor") as Brush ?? Brushes.Gray;
             var rows = Math.Max(1, grid.RowDefinitions.Count);
 
             foreach (var column in plan.VerticalBoundaryColumns)
@@ -458,11 +457,11 @@ namespace Workspace1C
                     Width = plan.Thickness,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     VerticalAlignment = VerticalAlignment.Stretch,
-                    Fill = brush,
                     Opacity = plan.Opacity,
                     IsHitTestVisible = false,
                     Tag = GridLineMarker
                 };
+                ApplyGridLineBrush(line);
                 Grid.SetColumn(line, column);
                 Grid.SetRowSpan(line, rows);
                 Panel.SetZIndex(line, 1);
@@ -476,17 +475,34 @@ namespace Workspace1C
                     Height = plan.Thickness,
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment = VerticalAlignment.Bottom,
-                    Fill = brush,
                     Opacity = plan.Opacity,
                     IsHitTestVisible = false,
                     Tag = GridLineMarker
                 };
+                ApplyGridLineBrush(line);
                 Grid.SetColumn(line, 0);
                 Grid.SetColumnSpan(line, Math.Max(1, grid.ColumnDefinitions.Count));
                 Grid.SetRow(line, rows - 1);
                 Panel.SetZIndex(line, 1);
                 grid.Children.Add(line);
             }
+        }
+
+        /// <summary>
+        /// Привязывает кисть линии сетки к ресурсу темы (issue #130). Вместо
+        /// разового <c>Fill = brush</c> используется <c>SetResourceReference</c>:
+        /// при смене темы/схемы ресурс <c>BorderBrushColor</c> заменяется, и
+        /// привязка сама отдаёт линии новый цвет. Иначе линия сохраняла кисть,
+        /// захваченную в момент создания строки, и после переключения тёмной темы
+        /// оставалась чёрной (лечилось только повторным переключением тумблеров).
+        /// Запасной серый ставится только если ресурса реально нет в словарях.
+        /// </summary>
+        private void ApplyGridLineBrush(System.Windows.Shapes.Shape line)
+        {
+            if (TryFindResource("BorderBrushColor") is Brush)
+                line.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "BorderBrushColor");
+            else
+                line.Fill = Brushes.Gray;
         }
 
         /// <summary>
