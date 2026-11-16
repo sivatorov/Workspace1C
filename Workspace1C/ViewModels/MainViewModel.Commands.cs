@@ -1268,6 +1268,21 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): «PostgreSQL», «MsSql»
+    /// или пусто — «не задан». Используется профилем резервных копий СУБД как fallback.
+    /// </summary>
+    public string DefaultDbmsKind
+    {
+        get => _defaultDbmsKind;
+        set
+        {
+            var normalized = Services.DbmsDefaults.NormalizeSetting(value);
+            if (SetProperty(ref _defaultDbmsKind, normalized))
+                ScheduleSaveSettings();
+        }
+    }
+
     /// <summary>Esc сворачивает окно в трей (если значок в трее включён).</summary>
     public bool EscapeToTray
     {

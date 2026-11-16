@@ -724,6 +724,8 @@ public partial class MainViewModel : ViewModelBase
         };
         s.CatchUpMissedTasks = _catchUpMissedTasks;
         s.MaintenanceFreeSpaceWarningGb = _maintenanceFreeSpaceWarningGb;
+        // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73).
+        s.DefaultDbmsKind = _defaultDbmsKind;
         s.EscapeToTray = _escapeToTray;
         s.ConfirmCustomActions = _confirmCustomActions;
         // Правка структуры меню «Утилиты» (issue #374).

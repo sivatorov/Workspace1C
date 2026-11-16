@@ -932,6 +932,15 @@ public class AppSettings
     /// обновления» (issue #85, v1.0.1.43).</summary>
     public bool BatchLoadCfMonopol { get; set; }
 
+    /// <summary>
+    /// Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): «PostgreSQL», «MsSql»
+    /// или пусто — «не задан». Используется как fallback для профиля резервных копий
+    /// СУБД и других мест, где тип СУБД подставляется по умолчанию. Сохранённый профиль
+    /// базы и данные кластера rac приоритетнее. Разбор/запись — <see cref="Workspace1C.Services.DbmsDefaults"/>;
+    /// старые файлы без поля читаются как «не задан» (тип не подставляется).
+    /// </summary>
+    public string DefaultDbmsKind { get; set; } = string.Empty;
+
     /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
     public string FontFamily { get; set; } = "Segoe UI";
 

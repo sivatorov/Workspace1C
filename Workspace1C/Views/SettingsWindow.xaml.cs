@@ -124,6 +124,14 @@ namespace Workspace1C
             // Порог предупреждения «Свободно на диске» в Центре обслуживания (0.3.9.96).
             if (MaintenanceFreeSpaceWarningGbBox != null)
                 MaintenanceFreeSpaceWarningGbBox.Text = viewModel.MaintenanceFreeSpaceWarningGb.ToString();
+            // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73).
+            if (DefaultDbmsCombo != null)
+                DefaultDbmsCombo.SelectedIndex = Services.DbmsDefaults.ParseSetting(viewModel.DefaultDbmsKind) switch
+                {
+                    Services.DbmsKind.PostgreSql => 1,
+                    Services.DbmsKind.MsSql => 2,
+                    _ => 0
+                };
             // Каталоги шаблонов конфигураций: показываем сохранённые значения при открытии,
             // иначе список выглядел бы пустым и «ОК» затирал их пустым списком (как в Avalonia).
             if (TemplatePathsList != null)
@@ -812,6 +820,16 @@ namespace Workspace1C
             if (MaintenanceFreeSpaceWarningGbBox != null
                 && int.TryParse(MaintenanceFreeSpaceWarningGbBox.Text, out var freeSpaceWarningGb))
                 _viewModel.MaintenanceFreeSpaceWarningGb = Math.Max(0, freeSpaceWarningGb);
+            // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73).
+            if (DefaultDbmsCombo != null)
+            {
+                _viewModel.DefaultDbmsKind = DefaultDbmsCombo.SelectedIndex switch
+                {
+                    1 => Services.DbmsDefaults.PostgreSqlSetting,
+                    2 => Services.DbmsDefaults.MsSqlSetting,
+                    _ => string.Empty
+                };
+            }
             // Глубина истории запусков одной базы (issue #246).
             if (MaxLaunchHistoryDepthBox != null
                 && int.TryParse(MaxLaunchHistoryDepthBox.Text, out var historyDepth))

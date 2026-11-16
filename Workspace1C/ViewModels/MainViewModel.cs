@@ -196,6 +196,12 @@ public partial class MainViewModel : ViewModelBase
     private bool _catchUpMissedTasks = true;
     // Порог предупреждения «Свободно на диске» в Центре обслуживания (0.3.9.96), ГБ.
     private int _maintenanceFreeSpaceWarningGb = Services.DiskFreeSpaceHelper.DefaultWarningGb;
+
+    /// <summary>
+    /// Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): «PostgreSQL», «MsSql» или
+    /// пусто — «не задан». Fallback для профиля резервных копий СУБД.
+    /// </summary>
+    private string _defaultDbmsKind = string.Empty;
     private bool _compactMode;
 
     // ---- Быстрый запуск: индикатор загрузки и фоновое построение дерева ----
@@ -652,6 +658,9 @@ public partial class MainViewModel : ViewModelBase
         _themeFollowsOs = settings.ThemeFollowsOs;
         UpdateOsThemeWatcher();
         _maintenanceFreeSpaceWarningGb = Math.Max(0, settings.MaintenanceFreeSpaceWarningGb);
+        // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): старые файлы без
+        // поля читаются как «не задан» — профиль не подставляет PostgreSQL молча.
+        _defaultDbmsKind = Services.DbmsDefaults.NormalizeSetting(settings.DefaultDbmsKind);
         _escapeToTray = settings.EscapeToTray;
         // Подтверждение выполнения пользовательских действий (функция 7, 0.3.9.197).
         _confirmCustomActions = settings.ConfirmCustomActions;

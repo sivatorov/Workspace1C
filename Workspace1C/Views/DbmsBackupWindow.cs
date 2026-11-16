@@ -35,6 +35,17 @@ namespace Workspace1C
                 WpfUi.BoundCombo(_vm.InfobaseNames, nameof(DbmsBackupViewModel.SelectedIndex), 380),
                 WpfUi.Label("Dbms.Dbms"),
                 WpfUi.BoundCombo(_vm.DbmsOptions, nameof(DbmsBackupViewModel.DbmsIndex), 200)));
+            // Подсказка о неопределённом типе СУБД (issue #106, v1.0.1.73): профиль
+            // больше не подставляет PostgreSQL молча — пользователь видит, чего не хватает.
+            var dbmsHint = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 11,
+                Margin = new Thickness(0, 2, 0, 6)
+            };
+            dbmsHint.SetBinding(TextBlock.TextProperty,
+                new Binding(nameof(DbmsBackupViewModel.DbmsHint)));
+            form.Children.Add(dbmsHint);
             form.Children.Add(WpfUi.Wrap(
                 WpfUi.Label("Dbms.Host"), WpfUi.BoundTextBox(nameof(DbmsBackupViewModel.Host), 220),
                 WpfUi.Label("Dbms.Port"), WpfUi.BoundTextBox(nameof(DbmsBackupViewModel.Port), 70),
@@ -80,6 +91,9 @@ namespace Workspace1C
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
+            // Тип СУБД уточняется по кластеру 1С в фоне (issue #106, v1.0.1.73):
+            // сохранённый профиль и выбор пользователя приоритетнее.
+            _ = _vm.ResolveDbmsFromClusterAsync();
             if (!_vm.HasBases)
                 _vm.AppendLog(LocalizationManager.T("Dbms.NoBases"));
         }

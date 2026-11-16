@@ -395,6 +395,24 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): «PostgreSQL», «MsSql»
+    /// или пусто — «не задан». Используется профилем резервных копий СУБД как fallback.
+    /// </summary>
+    public string DefaultDbmsKind
+    {
+        get => Services.DbmsDefaults.NormalizeSetting(_settings.DefaultDbmsKind);
+        set
+        {
+            var normalized = Services.DbmsDefaults.NormalizeSetting(value);
+            if (string.Equals(_settings.DefaultDbmsKind, normalized, StringComparison.Ordinal))
+                return;
+            _settings.DefaultDbmsKind = normalized;
+            SaveSettingsSilently();
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Уводить ли окно в трей вместо выхода при закрытии.</summary>
     public bool CloseToTray => _settings.CloseToTray;
 

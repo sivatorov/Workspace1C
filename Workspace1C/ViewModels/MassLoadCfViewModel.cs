@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -241,6 +242,9 @@ public sealed class MassLoadCfViewModel : ViewModelBase
 
         IsRunning = true;
         Summary = string.Empty;
+        // Очистка — ТОЛЬКО в начале прогона (issue #106, v1.0.1.73): раньше журнал
+        // выглядел пустым, если все шаги проходили без сообщений, а после закрытия
+        // окна след операции терялся вовсе.
         LogLines.Clear();
         foreach (var item in Items)
         {
@@ -251,30 +255,37 @@ public sealed class MassLoadCfViewModel : ViewModelBase
         }
 
         int ok = 0, failed = 0;
+        var selected = Items.Where(i => i.IsChecked).ToList();
+        var options = BuildOptions();
+        // Стартовая строка с параметрами пишется ВСЕГДА — даже если баз не выбрано
+        // или пред-валидация не прошла: в журнале остаётся контекст операции.
+        var startLine = string.Format(
+            LocalizationManager.T("MassLoadCf.LogStartFormat"),
+            selected.Count, Items.Count, SourceDisplayName(options.Source), DescribeOptions(options));
+        AppendLog(WithTime(startLine));
+        WriteAudit(true, startLine);
         try
         {
-            var selected = Items.Where(i => i.IsChecked).ToList();
             if (selected.Count == 0)
             {
-                AppendLog(LocalizationManager.T("BatchOps.NothingSelected"));
+                AppendLog(WithTime(LocalizationManager.T("BatchOps.NothingSelected")));
+                Summary = string.Format(LocalizationManager.T("BatchOps.SummaryFormat"), 0, 0, 0);
+                AppendLog("— " + Summary + " —");
+                WriteAudit(false, Summary);
                 return;
             }
 
-            var options = BuildOptions();
             var errors = MassLoadCfPlanner.Validate(options, selected.Select(i => i.Infobase));
             if (errors.Count > 0)
             {
                 foreach (var error in errors)
                     AppendLog("✖ " + error);
                 Summary = LocalizationManager.T("BatchOps.ValidationFailed");
+                AppendLog("— " + Summary + " —");
+                WriteAudit(false, Summary + ": " + string.Join("; ", errors));
                 return;
             }
 
-            AppendLog(string.Format(
-                LocalizationManager.T("BatchOps.StartedFormat"), selected.Count,
-                LocalizationManager.T(options.Source == MassLoadCfSource.Repository
-                    ? "MassLoadCf.KindNameRepository"
-                    : "MassLoadCf.KindName")));
             if (options.DenyNewSessions && string.IsNullOrWhiteSpace(options.PermissionCode))
                 AppendLog($"[{DateTime.Now:HH:mm:ss}] " +
                           LocalizationManager.T("MassLoadCf.PermissionCodeHintLog"));
@@ -291,6 +302,7 @@ public sealed class MassLoadCfViewModel : ViewModelBase
             // Подмена запуска конфигуратора (юнит-тесты) — прокидывается в сервис.
             Service.RunnerOverride = RunnerOverride;
 
+            var processed = 0;
             foreach (var item in selected)
             {
                 ct.ThrowIfCancellationRequested();
@@ -298,6 +310,11 @@ public sealed class MassLoadCfViewModel : ViewModelBase
                 item.IsBusy = true;
                 item.DurationText = string.Empty;
                 item.Status = BatchOperationsStatus.Running;
+                // Строка начала по каждой базе — даже когда все опции подготовки
+                // выключены и сервис не пишет собственных шагов (issue #106, v1.0.1.73).
+                AppendLog(WithTime(string.Format(
+                    LocalizationManager.T("MassLoadCf.LogBaseStartFormat"),
+                    ib.Name, ++processed, selected.Count)));
 
                 // Запущенная база пропускается: конфигуратор требует монопольный доступ.
                 if (ib.IsRunning)
@@ -368,6 +385,7 @@ public sealed class MassLoadCfViewModel : ViewModelBase
 
             Summary = string.Format(LocalizationManager.T("BatchOps.SummaryFormat"), ok, failed, selected.Count);
             AppendLog("— " + Summary + " —");
+            WriteAudit(failed == 0, Summary);
         }
         catch (OperationCanceledException)
         {
@@ -375,7 +393,19 @@ public sealed class MassLoadCfViewModel : ViewModelBase
             // issue #92, v1.0.1.29); IsRunning сбрасывается в finally.
             Summary = string.Format(
                 LocalizationManager.T("BatchOps.SummaryCancelledFormat"), ok, failed, ok + failed);
+            AppendLog(WithTime(LocalizationManager.T("MassLoadCf.LogCancelled")));
             AppendLog("— " + Summary + " —");
+            WriteAudit(false, Summary);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Неожиданная ошибка вне обработки одной базы: след операции всё равно
+            // остаётся в журнале окна и в общем логе приложения.
+            AppendLog(WithTime("✖ " + ex.Message));
+            Summary = LocalizationManager.T("BatchOps.ValidationFailed");
+            AppendLog("— " + Summary + " —");
+            WriteAudit(false, ex.Message);
             throw;
         }
         finally
@@ -389,19 +419,72 @@ public sealed class MassLoadCfViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Добавляет строку в лог потокобезопасно (через захваченный контекст синхронизации).</summary>
+    /// <summary>
+    /// Добавляет строку в журнал окна и дублирует её в общий лог приложения
+    /// (issue #106, v1.0.1.73): след операции остаётся и после закрытия окна.
+    /// На UI-потоке строка добавляется сразу, с фонового — через захваченный
+    /// контекст синхронизации.
+    /// </summary>
     private void AppendLog(string line)
     {
-        if (_syncContext is null)
-        {
-            LogLines.Add(line);
+        var text = line ?? string.Empty;
+        if (text.Length == 0)
             return;
-        }
-        _syncContext.Post(_ =>
+        if (_syncContext is null || ReferenceEquals(SynchronizationContext.Current, _syncContext))
+            LogLines.Add(text);
+        else
+            _syncContext.Post(_ => LogLines.Add(text), null);
+        WriteAppLog(text);
+    }
+
+    /// <summary>Добавляет метку времени к строке журнала.</summary>
+    internal static string WithTime(string line) => $"[{DateTime.Now:HH:mm:ss}] {line}";
+
+    /// <summary>Локализованное имя источника обновления для стартовой строки журнала.</summary>
+    internal static string SourceDisplayName(MassLoadCfSource source) =>
+        LocalizationManager.T(source == MassLoadCfSource.Repository
+            ? "MassLoadCf.KindNameRepository"
+            : "MassLoadCf.KindName");
+
+    /// <summary>
+    /// Перечисляет включённые опции операции для стартовой строки журнала
+    /// (issue #106, v1.0.1.73). Пустой набор — «опции подготовки выключены»:
+    /// именно этот случай раньше давал «пустой» журнал.
+    /// </summary>
+    internal static string DescribeOptions(MassLoadCfOptions options)
+    {
+        var parts = new List<string>();
+        if (options.DumpDtBefore)
+            parts.Add(LocalizationManager.T("MassLoadCf.OptionDumpDt"));
+        if (options.TerminateSessions)
+            parts.Add(LocalizationManager.T("MassLoadCf.OptionTerminateSessions"));
+        if (options.DenyNewSessions)
+            parts.Add(LocalizationManager.T("MassLoadCf.OptionDenyNewSessions"));
+        if (options.DenyScheduledJobs)
+            parts.Add(LocalizationManager.T("MassLoadCf.OptionDenyScheduledJobs"));
+        if (options.LaunchEnterpriseMonopol)
+            parts.Add(LocalizationManager.T("MassLoadCf.OptionMonopol"));
+        return parts.Count == 0
+            ? LocalizationManager.T("MassLoadCf.OptionsNone")
+            : string.Join(", ", parts);
+    }
+
+    /// <summary>Пишет строку в общий лог приложения (сбой логгера не ломает прогон).</summary>
+    private static void WriteAppLog(string line)
+    {
+        try { AppServices.TryGetService<IAppLogger>()?.Info("[mass-load-cf] " + line); }
+        catch { /* журнал не должен ломать операцию */ }
+    }
+
+    /// <summary>Пишет ключевой шаг в журнал аудита (если модуль аудита подключён).</summary>
+    private static void WriteAudit(bool success, string details)
+    {
+        try
         {
-            LogLines.Add(line);
-            OnPropertyChanged(nameof(LogLines));
-        }, null);
+            Workspace1C.Services.Audit.AuditHub.Write(
+                Workspace1C.Services.Audit.AuditActions.CfMassLoad, "mass-load-cf", success, details);
+        }
+        catch { /* журнал аудита не должен ломать операцию */ }
     }
 
     /// <summary>

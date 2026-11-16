@@ -3006,6 +3006,39 @@ namespace Workspace1C
             freeSpaceWarningRow.Children.Add(freeSpaceWarningUnit);
             basesMaintenancePanel.Children.Add(freeSpaceWarningRow);
 
+            // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): fallback для
+            // профиля резервных копий СУБД. «Не задан» — тип не подставляется.
+            basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.DefaultDbms")));
+            basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.DefaultDbms.Hint")));
+            var dbmsSettingValues = new[]
+            {
+                string.Empty,
+                Services.DbmsDefaults.PostgreSqlSetting,
+                Services.DbmsDefaults.MsSqlSetting
+            };
+            var dbmsSettingLabels = new[]
+            {
+                LocalizationManager.T("Settings.DefaultDbms.NotSet"),
+                LocalizationManager.T("Settings.DefaultDbms.PostgreSql"),
+                LocalizationManager.T("Settings.DefaultDbms.MsSql")
+            };
+            var defaultDbmsBox = new ComboBox
+            {
+                ItemsSource = dbmsSettingLabels,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            var selectedDbms = Array.FindIndex(dbmsSettingValues,
+                v => string.Equals(v, Services.DbmsDefaults.NormalizeSetting(_viewModel.DefaultDbmsKind),
+                    StringComparison.Ordinal));
+            defaultDbmsBox.SelectedIndex = selectedDbms >= 0 ? selectedDbms : 0;
+            defaultDbmsBox.SelectionChanged += (_, _) =>
+            {
+                if (defaultDbmsBox.SelectedIndex >= 0)
+                    _viewModel.DefaultDbmsKind = dbmsSettingValues[defaultDbmsBox.SelectedIndex];
+            };
+            basesMaintenancePanel.Children.Add(defaultDbmsBox);
+
             // Интеграция с проводником Windows (функция №12): на Linux недоступна,
             // поэтому показываем заблокированный пункт с пояснением.
             var explorerIntegrationHint = new TextBlock

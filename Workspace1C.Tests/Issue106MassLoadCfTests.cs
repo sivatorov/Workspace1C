@@ -536,6 +536,71 @@ public sealed class Issue106MassLoadCfTests : IDisposable
         Assert.All(vm.Items, i => Assert.Equal(BatchOperationsStatus.Pending, i.Status));
     }
 
+    // ======================= Журнал прогона (issue #106, v1.0.1.73) =======================
+
+    private static MassLoadCfViewModel CreateNoContextVm(params Infobase[] bases)
+    {
+        // Без контекста синхронизации журнал пишется напрямую — проверки детерминированы.
+        var previous = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(null);
+        try
+        {
+            return new MassLoadCfViewModel(bases);
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(previous);
+        }
+    }
+
+    [Fact]
+    public async Task ViewModel_AllPrepareOptionsOff_LogContainsStartBaseAndSummary()
+    {
+        // Жалоба aepkugesi: «снял все флажки подготовки — конфигурация загрузилась,
+        // но в журнале нет записей». Теперь след операции пишется всегда.
+        var base_ = new Infobase
+        {
+            Id = "b1", Name = "База1",
+            Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = _tempDir }
+        };
+        var vm = CreateNoContextVm(base_);
+        vm.RunnerOverride = (_, _, _, _, _) => Task.FromResult(MassLoadCfRunnerResult.Ok());
+        vm.CfFilePath = _cfFile;
+        vm.SetAll(true);
+
+        await vm.RunAsync(CancellationToken.None);
+
+        Assert.Contains(vm.LogLines, l => l.Contains("MassLoadCf.LogStartFormat", StringComparison.Ordinal));
+        Assert.Contains(vm.LogLines, l => l.Contains("MassLoadCf.LogBaseStartFormat", StringComparison.Ordinal));
+        Assert.Contains(vm.LogLines, l => l.Contains("BatchOps.SummaryFormat", StringComparison.Ordinal));
+        // Все опции подготовки выключены — в стартовой строке явно сказано об этом.
+        Assert.Equal("MassLoadCf.OptionsNone",
+            MassLoadCfViewModel.DescribeOptions(new MassLoadCfOptions()));
+    }
+
+    [Fact]
+    public async Task ViewModel_LogIsClearedOnlyAtStartOfRun()
+    {
+        var base_ = new Infobase
+        {
+            Id = "b1", Name = "База1",
+            Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = _tempDir }
+        };
+        var vm = CreateNoContextVm(base_);
+        vm.RunnerOverride = (_, _, _, _, _) => Task.FromResult(MassLoadCfRunnerResult.Ok());
+        vm.CfFilePath = _cfFile;
+        vm.SetAll(true);
+
+        await vm.RunAsync(CancellationToken.None);
+        Assert.NotEmpty(vm.LogLines);
+
+        vm.SetAll(true);
+        await vm.RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, vm.LogLines.Count(l => l.Contains("MassLoadCf.LogStartFormat", StringComparison.Ordinal)));
+        Assert.Equal(1, vm.LogLines.Count(l => l.Contains("MassLoadCf.LogBaseStartFormat", StringComparison.Ordinal)));
+    }
+
     // ======================= Фейковый rac-клиент =======================
 
     /// <summary>Минимальный фейк <see cref="IRacClient"/> (образец BatchOpsPreparationServiceTests).</summary>

@@ -150,7 +150,11 @@ public partial class MainViewModel
 
     private void ExecuteDbmsBackup()
     {
-        var vm = new DbmsBackupViewModel(_allInfobases.ToList(), SelectedInfobase);
+        // issue #106 (v1.0.1.73): тип СУБД берётся из профиля базы, кластера rac
+        // или общей настройки; при неизвестности — явная подсказка, а не PostgreSQL.
+        var vm = new DbmsBackupViewModel(_allInfobases.ToList(), SelectedInfobase,
+            defaultDbms: DefaultDbmsKind,
+            clusterResolver: ClusterInfobaseCredentialsResolver.CreateDefault());
         var window = new Workspace1C.DbmsBackupWindow(vm);
         window.ShowDialogSync(OwnerWindow());
     }

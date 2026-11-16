@@ -2921,6 +2921,22 @@
                                         </StackPanel>
                                     </GroupBox>
 
+                                    <!-- Общий тип СУБД по умолчанию (issue #106, v1.0.1.73):
+                                         fallback для профиля резервных копий СУБД. -->
+                                    <GroupBox Header="{loc:Loc Settings.DefaultDbms}" Padding="8" Margin="0,0,0,8">
+                                        <StackPanel>
+                                            <TextBlock Text="{loc:Loc Settings.DefaultDbms.Hint}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                            <ComboBox x:Name="DefaultDbmsCombo" Height="30"
+                                                      Style="{StaticResource ModernComboBox}">
+                                                <ComboBoxItem Content="{loc:Loc Settings.DefaultDbms.NotSet}"/>
+                                                <ComboBoxItem Content="{loc:Loc Settings.DefaultDbms.PostgreSql}"/>
+                                                <ComboBoxItem Content="{loc:Loc Settings.DefaultDbms.MsSql}"/>
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </GroupBox>
+
                                     <!-- Опасные операции -->
                                     <GroupBox Header="{loc:Loc Settings.DangerousOps}" Padding="8" Margin="0,0,0,8">
                                         <StackPanel>
