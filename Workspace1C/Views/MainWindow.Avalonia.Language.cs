@@ -80,6 +80,8 @@ namespace Workspace1C
         /// Заголовок программы: локализованное имя, суффикс версии и (если включено
         /// в настройках, issue #28) дополнение из шаблона. Суффикс не задваивается
         /// при повторном вызове, как в версии для Windows (MainWindow.Language.cs:107-122).
+        /// При действующем ключе ПРО перед названием ставится метка редакции «★»
+        /// (<see cref="Services.Licensing.LicenseSummary.ProMark"/>).
         /// Пользователь видит эту строку в шапке окна, потому что системной строки
         /// заголовка на Linux у нас нет.
         /// </summary>
@@ -87,11 +89,18 @@ namespace Workspace1C
         {
             var baseTitle = LocalizationManager.T("App.Title");
             var version = VersionInfo.Display();
+
+            // Метка редакции ПРО — признак действующего лицензионного ключа.
+            var proMark = Services.Licensing.EditionService.IsPro
+                ? Services.Licensing.LicenseSummary.ProMark
+                : string.Empty;
+
             return TitleSuffixResolver.Compose(
                 baseTitle,
                 version,
                 _vm?.TitleSuffixEnabled ?? false,
-                _vm?.TitleSuffixTemplate ?? string.Empty);
+                _vm?.TitleSuffixTemplate ?? string.Empty,
+                proMark: proMark);
         }
     }
 }

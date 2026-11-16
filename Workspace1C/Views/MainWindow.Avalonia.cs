@@ -449,11 +449,18 @@ namespace Workspace1C
         /// меняет отметки «· ПРО» в заголовках пунктов меню «Утилиты»
         /// (<see cref="Services.UtilitiesMenuCatalog.DisplayText"/>), но меню в Avalonia
         /// строится один раз — пересобираем его по событию <see cref="Services.Licensing.EditionService.Changed"/>.
-        /// Событие приходит из потока активации (может быть фоновым): построение меню
-        /// выполняется только в UI-потоке.
+        /// Там же обновляется заголовок окна (пункт 4 плана ПРО): метка редакции «★»
+        /// перед названием — признак действующего ключа, она должна появляться/исчезать
+        /// сразу, без перезапуска. Событие приходит из потока активации (может быть
+        /// фоновым): построение меню и заголовка выполняется только в UI-потоке.
         /// </summary>
         private void OnEditionChanged(object? sender, EventArgs e)
-            => Dispatcher.UIThread.Post(RebuildUtilitiesMenu);
+            => Dispatcher.UIThread.Post(() =>
+            {
+                RebuildUtilitiesMenu();
+                // Шапка окна привязана к TitleProperty, поэтому достаточно Title.
+                Title = ComposeWindowTitle();
+            });
 
         /// <summary>
         /// Общая точка пересборки меню «Утилиты» (смена темы, смена лицензии):

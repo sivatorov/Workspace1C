@@ -301,6 +301,13 @@ namespace Workspace1C
             Themes.ThemeManager.ThemeChanged += OnThemeChanged;
             Closed += (_, _) => Themes.ThemeManager.ThemeChanged -= OnThemeChanged;
 
+            // Смена лицензии (пункт 4 плана ПРО): метка редакции «★» в заголовке должна
+            // появляться/исчезать сразу после активации/удаления ключа, без перезапуска.
+            // Событие приходит из потока активации (может быть фоновым) — обработчик
+            // пересобирает заголовок в UI-потоке; отписка — при закрытии окна.
+            Services.Licensing.EditionService.Changed += OnEditionServiceChanged;
+            Closed += (_, _) => Services.Licensing.EditionService.Changed -= OnEditionServiceChanged;
+
             _viewModel = viewModel ?? new ViewModels.MainViewModel();
             DataContext = _viewModel;
 

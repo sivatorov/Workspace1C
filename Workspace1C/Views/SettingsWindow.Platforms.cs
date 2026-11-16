@@ -17,6 +17,7 @@ using MaterialDesignThemes.Wpf;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Services.Licensing;
 using Workspace1C.Themes;
 using Workspace1C.ViewModels;
 using Drawing = System.Drawing;
@@ -524,6 +525,138 @@ namespace Workspace1C
                     LocalizationManager.T("Settings.About.TechInfoCopyFailed") + "\n" + ex.Message,
                     LocalizationManager.T("Common.Error"));
             }
+        }
+
+        /// <summary>
+        /// Инициализирует блок «Лицензия» на вкладке «О программе» (пункт 2 плана ПРО):
+        /// первичное заполнение и подписка на смену редакции (активация/удаление ключа).
+        /// Отписка — при закрытии окна: статическое событие <see cref="EditionService.Changed"/>
+        /// не должно удерживать окно в памяти.
+        /// </summary>
+        private void InitializeAboutLicense()
+        {
+            RefreshAboutLicense();
+            EditionService.Changed += OnEditionServiceChanged;
+            Closed += OnSettingsWindowClosedForLicense;
+        }
+
+        /// <summary>Отписывается от статического события лицензии при закрытии окна.</summary>
+        private void OnSettingsWindowClosedForLicense(object? sender, EventArgs e)
+        {
+            EditionService.Changed -= OnEditionServiceChanged;
+            Closed -= OnSettingsWindowClosedForLicense;
+        }
+
+        /// <summary>
+        /// Ключ активировали/удалили — обновляет блок. Событие может прийти из фонового
+        /// потока, поэтому изменение элементов выполняется только в потоке диспетчера.
+        /// </summary>
+        private void OnEditionServiceChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.CheckAccess())
+                RefreshAboutLicense();
+            else
+                Dispatcher.BeginInvoke(new Action(RefreshAboutLicense));
+        }
+
+        /// <summary>
+        /// Заполняет блок «Лицензия» вкладки «О программе» текущей сводкой
+        /// (<see cref="LicenseSummary.Current"/>): редакция, владелец, ключ, код компьютера,
+        /// ошибка ключа и напоминание о сборке без модулей ПРО. Пустые строки скрываются
+        /// через <see cref="Visibility.Collapsed"/>, чтобы не оставлять пустых отступов.
+        /// Повреждённый ключ не роняет окно — показывается безопасный текст ошибки.
+        /// </summary>
+        private void RefreshAboutLicense()
+        {
+            LicenseSummary? summary = null;
+            string? errorText = null;
+            try
+            {
+                summary = LicenseSummary.Current();
+            }
+            catch (Exception ex)
+            {
+                // Например, повреждённый ключ или недоступный идентификатор ОС:
+                // окно настроек должно открыться в любом случае.
+                errorText = LocalizationManager.T("Common.Error") + ": " + ex.Message;
+            }
+
+            var isPro = summary?.IsPro == true;
+            AboutLicenseProMark.Visibility = isPro ? Visibility.Visible : Visibility.Collapsed;
+            AboutLicenseEditionText.Text = summary?.EditionText ?? LocalizationManager.T("Pro.EditionFree");
+
+            SetOptionalAboutText(AboutLicenseOwnerText, summary?.OwnerText);
+            SetOptionalAboutText(AboutLicenseKeyInfoText, summary?.KeyInfoText);
+
+            // Подпись «Код компьютера:» берём из локализации, сам код — моноширинный Run.
+            var machineCodeFormat = LocalizationManager.T("Settings.About.LicenseMachineCode");
+            var placeholderIndex = machineCodeFormat.IndexOf("{0}", StringComparison.Ordinal);
+            AboutLicenseMachineCodeLabelRun.Text = placeholderIndex >= 0
+                ? machineCodeFormat[..placeholderIndex]
+                : machineCodeFormat + " ";
+            AboutLicenseMachineCodeRun.Text = string.IsNullOrWhiteSpace(summary?.MachineCodeText)
+                ? LocalizationManager.T("Pro.MachineCodeUnavailable")
+                : summary!.MachineCodeText;
+
+            SetOptionalAboutText(AboutLicenseStatusText, errorText ?? summary?.StatusText);
+
+            var isCommunityBuild = summary?.IsCommunityBuild ?? !EditionService.HasProModules;
+            SetOptionalAboutText(
+                AboutLicenseCommunityText,
+                isCommunityBuild ? LocalizationManager.T("Pro.CommunityBuild") : string.Empty);
+
+            // «Купить ПРО» нужна только в бесплатной редакции.
+            AboutBuyProButton.Visibility = isPro ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Показывает строку блока лицензии, если текст непустой, иначе скрывает её
+        /// (без пустых отступов в блоке).
+        /// </summary>
+        private static void SetOptionalAboutText(System.Windows.Controls.TextBlock target, string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                target.Text = string.Empty;
+                target.Visibility = Visibility.Collapsed;
+                return;
+            }
+            target.Text = text;
+            target.Visibility = Visibility.Visible;
+        }
+
+        /// <summary>
+        /// Открывает окно «Лицензия» из вкладки «О программе»; после закрытия обновляет
+        /// блок — ключ могли активировать или удалить.
+        /// </summary>
+        private void OnAboutLicense_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new LicenseWindow { Owner = this }.ShowDialog();
+            }
+            catch
+            {
+                // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+            }
+            RefreshAboutLicense();
+        }
+
+        /// <summary>
+        /// Открывает окно «Как купить ПРО» из бесплатной редакции; после закрытия
+        /// обновляет блок (пользователь мог перейти к активации ключа).
+        /// </summary>
+        private void OnAboutBuyPro_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new HowToBuyWindow { Owner = this }.ShowDialog();
+            }
+            catch
+            {
+                // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+            }
+            RefreshAboutLicense();
         }
 
         /// <summary>

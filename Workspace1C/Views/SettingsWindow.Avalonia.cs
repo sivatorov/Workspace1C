@@ -22,6 +22,7 @@ using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Services.Licensing;
 using Workspace1C.Themes;
 using Workspace1C.ViewModels;
 
@@ -70,6 +71,19 @@ namespace Workspace1C
 
         /// <summary>Контрол вложенных вкладок раздела «Отображение» (Значки/Колонки/…).</summary>
         private TabControl? _displaySubTabs;
+
+        // ---- Блок «Лицензия» вкладки «О программе» (пункт 3 плана ПРО) ----
+        // Ссылки на контролы сохраняются в полях: RefreshAboutLicenseUi меняет
+        // текст и видимость без пересборки окна (в том числе после смены языка).
+        private TextBlock? _aboutLicenseProMark;
+        private TextBlock? _aboutLicenseEditionText;
+        private TextBlock? _aboutLicenseOwnerText;
+        private TextBlock? _aboutLicenseKeyInfoText;
+        private TextBlock? _aboutLicenseMachineCodeLabel;
+        private TextBlock? _aboutLicenseMachineCodeText;
+        private TextBlock? _aboutLicenseStatusText;
+        private TextBlock? _aboutLicenseCommunityText;
+        private Button? _aboutBuyProButton;
 
         /// <summary>
         /// Переключает окно настроек сразу на подвкладку «Колонки» (issue #173).
@@ -133,6 +147,10 @@ namespace Workspace1C
             // не находили свойств и всегда стояли пустыми.
             DataContext = viewModel;
             Content = BuildRoot();
+            // Блок «Лицензия» уже построен вместе с вкладкой «О программе»:
+            // заполняем его сводкой и подписываемся на смену редакции.
+            // Отписка от статического события — при закрытии окна.
+            InitializeAboutLicense();
             // Кнопки окно строит само, поэтому подписку на смену языка
             // базовый класс не включает: включаем явно.
             EnsureLanguageSubscription();
@@ -206,10 +224,21 @@ namespace Workspace1C
         {
             base.OnLanguageChanged(sender, e);
 
+            // Пересборка создаёт новые контролы блока лицензии: после неё
+            // заполняем их заново, иначе блок остался бы пустым.
             if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+            {
                 Content = BuildRoot();
+                RefreshAboutLicenseUi();
+            }
             else
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => Content = BuildRoot());
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    Content = BuildRoot();
+                    RefreshAboutLicenseUi();
+                });
+            }
         }
 
         private Control BuildRoot()
@@ -5250,6 +5279,13 @@ namespace Workspace1C
             panel.Children.Add(LinkBlock(LocalizationManager.T("Settings.About.Telegram"),
                 "https://t.me/Workspace1C"));
 
+            // Лицензия (пункт 3 плана ПРО): карточка всегда видна и расположена
+            // строго ВЫШЕ кнопок техинформации/диагностики — как в WPF-версии
+            // (SettingsWindow.xaml:3051-3121). Строки заполняет
+            // RefreshAboutLicenseUi, пустые скрываются, «Купить ПРО» видна
+            // только в бесплатной редакции.
+            panel.Children.Add(BuildAboutLicenseBlock());
+
             // Макет вкладки перестроен (issue #99): текст и кнопки — в левой колонке
             // (кнопки и так в столбец), кликабельная спонсорская картинка — справа
             // и крупнее. Содержимое помещается без прокрутки на типовых размерах окна.
@@ -5400,6 +5436,320 @@ namespace Workspace1C
             panel.Children.Add(diagButton);
 
             return aboutRoot;
+        }
+
+        // ===================== Блок «Лицензия» вкладки «О программе» =====================
+
+        /// <summary>
+        /// Строит карточку лицензии на вкладке «О программе» — аналог WPF-блока
+        /// (SettingsWindow.xaml:3051-3121): заголовок со значком, метка ПРО,
+        /// редакция, владелец, данные ключа, код компьютера, статус, напоминание
+        /// о сборке без модулей ПРО и кнопки «Лицензия…»/«Купить ПРО».
+        /// Контролы сохраняются в полях класса для <see cref="RefreshAboutLicenseUi"/>.
+        /// </summary>
+        private Control BuildAboutLicenseBlock()
+        {
+            var card = new Border
+            {
+                Margin = new Thickness(0, 16, 0, 0),
+                Padding = new Thickness(12, 10),
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(1)
+            };
+            ThemeBrushes.Bind(card, Border.BackgroundProperty, "CardBackgroundBrush");
+            ThemeBrushes.Bind(card, Border.BorderBrushProperty, "BorderBrushColor");
+
+            var body = new StackPanel();
+
+            // Заголовок: значок ключа + «Лицензия» + метка ПРО (★).
+            var headerRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 0, 0, 6)
+            };
+            var headerIcon = IconHelper.MakeIcon("IconAccountKey", 16, "AccentBrush");
+            headerIcon.VerticalAlignment = VerticalAlignment.Center;
+            headerIcon.Margin = new Thickness(0, 0, 6, 0);
+            headerRow.Children.Add(headerIcon);
+
+            var headerText = new TextBlock
+            {
+                Text = LocalizationManager.T("Settings.About.LicenseHeader"),
+                FontSize = 14,
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            ThemeBrushes.Bind(headerText, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            headerRow.Children.Add(headerText);
+
+            // Метка ПРО видна только при действительном ключе.
+            var proMark = new TextBlock
+            {
+                Text = LicenseSummary.ProMark,
+                FontWeight = FontWeight.SemiBold,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsVisible = false
+            };
+            ThemeBrushes.Bind(proMark, TextBlock.ForegroundProperty, "AccentBrush");
+            headerRow.Children.Add(proMark);
+            body.Children.Add(headerRow);
+
+            // Редакция — основная строка блока.
+            var editionText = new TextBlock
+            {
+                FontWeight = FontWeight.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            };
+            ThemeBrushes.Bind(editionText, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            body.Children.Add(editionText);
+
+            // Владелец и данные ключа — только при действительном ключе.
+            var ownerText = OptionalAboutLicenseText("TextPrimaryBrush", new Thickness(0, 2, 0, 0));
+            body.Children.Add(ownerText);
+            var keyInfoText = OptionalAboutLicenseText("TextSecondaryBrush", new Thickness(0, 2, 0, 0));
+            body.Children.Add(keyInfoText);
+
+            // Код компьютера: подпись из Settings.About.LicenseMachineCode, сам код —
+            // моноширинным шрифтом, как в окне «Лицензия» (LicenseWindow.Avalonia.cs:52).
+            var machineRow = new WrapPanel { Margin = new Thickness(0, 2, 0, 0) };
+            var machineLabel = new TextBlock
+            {
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            ThemeBrushes.Bind(machineLabel, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            var machineCode = new TextBlock
+            {
+                FontFamily = new FontFamily("monospace"),
+                FontWeight = FontWeight.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+            ThemeBrushes.Bind(machineCode, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            machineRow.Children.Add(machineLabel);
+            machineRow.Children.Add(machineCode);
+            body.Children.Add(machineRow);
+
+            // Ошибка ключа (повреждён, чужая машина, не та версия) — предупреждение.
+            var statusText = OptionalAboutLicenseText("WarningBrush", new Thickness(0, 2, 0, 0));
+            body.Children.Add(statusText);
+
+            // Напоминание для сборки без модулей ПРО.
+            var communityText = OptionalAboutLicenseText("TextSecondaryBrush", new Thickness(0, 6, 0, 0));
+            body.Children.Add(communityText);
+
+            // Кнопки блока: «Лицензия…» и «Купить ПРО» (последняя — только в бесплатной).
+            var buttons = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(0, 8, 0, 0)
+            };
+            var licenseButton = new Button
+            {
+                Padding = new Thickness(14, 6),
+                Margin = new Thickness(0, 0, 8, 0),
+                Content = AboutLicenseButtonContent("Pro.MenuItem", "IconAccountKey", "InfoBrush")
+            };
+            licenseButton.Styled(ControlThemes.SecondaryButton);
+            licenseButton.Click += (_, _) =>
+            {
+                try
+                {
+                    // После закрытия обновляем блок: ключ могли активировать или удалить.
+                    new LicenseWindow().ShowDialogSync(this);
+                }
+                catch
+                {
+                    // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+                }
+                RefreshAboutLicenseUi();
+            };
+            buttons.Children.Add(licenseButton);
+
+            var buyProButton = new Button
+            {
+                Padding = new Thickness(14, 6),
+                Content = AboutLicenseButtonContent("Settings.About.BuyPro", "IconTag", "SuccessBrush")
+            };
+            buyProButton.Styled(ControlThemes.SecondaryButton);
+            buyProButton.Click += (_, _) =>
+            {
+                try
+                {
+                    // Пользователь мог перейти к активации ключа — обновляем блок.
+                    new HowToBuyWindow().ShowDialogSync(this);
+                }
+                catch
+                {
+                    // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+                }
+                RefreshAboutLicenseUi();
+            };
+            buttons.Children.Add(buyProButton);
+            body.Children.Add(buttons);
+
+            card.Child = body;
+
+            _aboutLicenseProMark = proMark;
+            _aboutLicenseEditionText = editionText;
+            _aboutLicenseOwnerText = ownerText;
+            _aboutLicenseKeyInfoText = keyInfoText;
+            _aboutLicenseMachineCodeLabel = machineLabel;
+            _aboutLicenseMachineCodeText = machineCode;
+            _aboutLicenseStatusText = statusText;
+            _aboutLicenseCommunityText = communityText;
+            _aboutBuyProButton = buyProButton;
+            return card;
+        }
+
+        /// <summary>
+        /// Строка блока лицензии, которая показывается только при непустом тексте
+        /// (без пустых отступов). Кисть — ресурс темы, чтобы цвет следовал схеме.
+        /// </summary>
+        private static TextBlock OptionalAboutLicenseText(string brushKey, Thickness margin)
+        {
+            var text = new TextBlock
+            {
+                TextWrapping = TextWrapping.Wrap,
+                Margin = margin,
+                IsVisible = false
+            };
+            ThemeBrushes.Bind(text, TextBlock.ForegroundProperty, brushKey);
+            return text;
+        }
+
+        /// <summary>Содержимое кнопки блока лицензии: значок и подпись из локализации.</summary>
+        private static Control AboutLicenseButtonContent(string labelKey, string iconKey, string brushKey)
+        {
+            var icon = IconHelper.MakeIcon(iconKey, 14, brushKey);
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            icon.Margin = new Thickness(0, 0, 5, 0);
+            return new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children =
+                {
+                    icon,
+                    new TextBlock
+                    {
+                        Text = LocalizationManager.T(labelKey),
+                        VerticalAlignment = VerticalAlignment.Center
+                    }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Первичное заполнение блока лицензии и подписка на смену редакции.
+        /// Отписка — при закрытии окна: статическое событие <see cref="EditionService.Changed"/>
+        /// не должно удерживать окно в памяти.
+        /// </summary>
+        private void InitializeAboutLicense()
+        {
+            RefreshAboutLicenseUi();
+            EditionService.Changed += OnEditionServiceChanged;
+            Closed += OnSettingsWindowClosedForLicense;
+        }
+
+        /// <summary>Отписывается от статического события лицензии при закрытии окна.</summary>
+        private void OnSettingsWindowClosedForLicense(object? sender, EventArgs e)
+        {
+            EditionService.Changed -= OnEditionServiceChanged;
+            Closed -= OnSettingsWindowClosedForLicense;
+        }
+
+        /// <summary>
+        /// Ключ активировали/удалили — обновляет блок. Событие может прийти из
+        /// фонового потока, поэтому изменение контролов выполняется в UI-потоке.
+        /// </summary>
+        private void OnEditionServiceChanged(object? sender, EventArgs e)
+        {
+            if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
+                RefreshAboutLicenseUi();
+            else
+                Avalonia.Threading.Dispatcher.UIThread.Post(RefreshAboutLicenseUi);
+        }
+
+        /// <summary>
+        /// Заполняет блок лицензии текущей сводкой (<see cref="LicenseSummary.Current"/>):
+        /// редакция, владелец, ключ, код компьютера, ошибка ключа и напоминание
+        /// о сборке без модулей ПРО. Пустые строки скрываются, «Купить ПРО» видна
+        /// только в бесплатной редакции. Повреждённый ключ не роняет окно —
+        /// показывается безопасный текст ошибки.
+        /// </summary>
+        private void RefreshAboutLicenseUi()
+        {
+            // Окно ещё не построено (или контролы уже освобождены) — обновлять нечего.
+            if (_aboutLicenseEditionText is null)
+                return;
+
+            LicenseSummary? summary = null;
+            string? errorText = null;
+            try
+            {
+                summary = LicenseSummary.Current();
+            }
+            catch (Exception ex)
+            {
+                // Например, повреждённый ключ или недоступный идентификатор ОС:
+                // окно настроек должно открыться в любом случае.
+                errorText = LocalizationManager.T("Common.Error") + ": " + ex.Message;
+            }
+
+            var isPro = summary?.IsPro == true;
+            if (_aboutLicenseProMark is not null)
+                _aboutLicenseProMark.IsVisible = isPro;
+            _aboutLicenseEditionText.Text = summary?.EditionText
+                ?? LocalizationManager.T("Pro.EditionFree");
+
+            SetOptionalAboutLicenseText(_aboutLicenseOwnerText, summary?.OwnerText);
+            SetOptionalAboutLicenseText(_aboutLicenseKeyInfoText, summary?.KeyInfoText);
+
+            // Подпись «Код компьютера:» берём из локализации, сам код — моноширинный.
+            var machineCodeFormat = LocalizationManager.T("Settings.About.LicenseMachineCode");
+            var placeholderIndex = machineCodeFormat.IndexOf("{0}", StringComparison.Ordinal);
+            if (_aboutLicenseMachineCodeLabel is not null)
+            {
+                _aboutLicenseMachineCodeLabel.Text = placeholderIndex >= 0
+                    ? machineCodeFormat[..placeholderIndex]
+                    : machineCodeFormat + " ";
+            }
+            if (_aboutLicenseMachineCodeText is not null)
+            {
+                _aboutLicenseMachineCodeText.Text = string.IsNullOrWhiteSpace(summary?.MachineCodeText)
+                    ? LocalizationManager.T("Pro.MachineCodeUnavailable")
+                    : summary!.MachineCodeText;
+            }
+
+            SetOptionalAboutLicenseText(_aboutLicenseStatusText, errorText ?? summary?.StatusText);
+
+            var isCommunityBuild = summary?.IsCommunityBuild ?? !EditionService.HasProModules;
+            SetOptionalAboutLicenseText(
+                _aboutLicenseCommunityText,
+                isCommunityBuild ? LocalizationManager.T("Pro.CommunityBuild") : string.Empty);
+
+            // «Купить ПРО» нужна только в бесплатной редакции.
+            if (_aboutBuyProButton is not null)
+                _aboutBuyProButton.IsVisible = !isPro;
+        }
+
+        /// <summary>
+        /// Показывает строку блока лицензии, если текст непустой, иначе скрывает её
+        /// (без пустых отступов в блоке).
+        /// </summary>
+        private static void SetOptionalAboutLicenseText(TextBlock? target, string? text)
+        {
+            if (target is null)
+                return;
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                target.Text = string.Empty;
+                target.IsVisible = false;
+                return;
+            }
+            target.Text = text;
+            target.IsVisible = true;
         }
 
         /// <summary>Окно ошибки вкладки «О программе» с текстом исключения.</summary>

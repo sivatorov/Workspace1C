@@ -74,6 +74,10 @@ namespace Workspace1C
         public SettingsWindow(MainViewModel viewModel)
         {
             InitializeComponent();
+            // Пункт 2 плана ПРО: блок «Лицензия» на вкладке «О программе» всегда виден.
+            // Метод заполняет элементы, подписывается на EditionService.Changed и
+            // отписывается при закрытии окна (SettingsWindow.Platforms.cs).
+            InitializeAboutLicense();
             // issue #71 (комментарий 7OH «Я всё ещё могу сжать настройки почти до нуля»):
             // гарантированный зажим размеров к MinWidth/MinHeight при ЛЮБОМ способе
             // изменения размера (в т.ч. быстрый ресайз мышью, растяжение оконного

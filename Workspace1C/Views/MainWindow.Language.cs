@@ -105,10 +105,26 @@ namespace Workspace1C
         public void RefreshWindowTitle() => UpdateWindowTitle();
 
         /// <summary>
+        /// Смена редакции (активация/удаление ключа ПРО): метка «★» в заголовке должна
+        /// появляться/исчезать сразу, без перезапуска приложения. Событие
+        /// <see cref="Services.Licensing.EditionService.Changed"/> поднимается в потоке
+        /// активации (может быть фоновым), поэтому заголовок обновляется в UI-потоке.
+        /// </summary>
+        private void OnEditionServiceChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.CheckAccess())
+                UpdateWindowTitle();
+            else
+                Dispatcher.BeginInvoke(new Action(UpdateWindowTitle));
+        }
+
+        /// <summary>
         /// Собирает заголовок программы из базового локализованного имени приложения
         /// и суффикса версии «v<версия>». Метод устойчив к повторному вызову: если
         /// базовый заголовок уже содержит суффикс версии, он не добавляется повторно
         /// (защита от дублирования вида «v0.3.5.68 v0.3.5.68»).
+        /// При действующем ключе ПРО перед названием ставится метка редакции «★»
+        /// (см. <see cref="Services.Licensing.LicenseSummary.ProMark"/>).
         /// Обновляет и системный заголовок окна (Title), и видимую кастомную шапку
         /// (иконка + название, <see cref="AppTitleBlock"/>): система Windows использует
         /// WindowChrome с CaptionHeight="0", поэтому пользователь видит именно шапку,
@@ -129,8 +145,16 @@ namespace Workspace1C
                 titleSuffixTemplate = _viewModel.TitleSuffixTemplate;
             }
 
+            // Метка редакции ПРО — признак действующего лицензионного ключа. От VM не
+            // зависит, поэтому выставляется и при первом вызове из конструктора
+            // (_viewModel is null), и после активации/удаления ключа.
+            var proMark = Services.Licensing.EditionService.IsPro
+                ? Services.Licensing.LicenseSummary.ProMark
+                : string.Empty;
+
             var fullTitle = TitleSuffixResolver.Compose(
-                baseTitle, _infoVersion ?? string.Empty, titleSuffixEnabled, titleSuffixTemplate);
+                baseTitle, _infoVersion ?? string.Empty, titleSuffixEnabled, titleSuffixTemplate,
+                proMark: proMark);
 
             // Системный заголовок окна (важен для панели задач и перечисления окон).
             Title = fullTitle;

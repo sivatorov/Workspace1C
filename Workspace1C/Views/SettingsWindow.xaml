@@ -7,6 +7,7 @@
         xmlns:vm="clr-namespace:Workspace1C.ViewModels"
         xmlns:controls="clr-namespace:Workspace1C.Controls"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
+        xmlns:licensing="clr-namespace:Workspace1C.Services.Licensing"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         mc:Ignorable="d"
         Title="{loc:Loc Settings.Title}"
@@ -3041,6 +3042,83 @@
                                        Text="https://t.me/Workspace1C"
                                        MouseLeftButtonUp="OnAboutLink_Click"
                                        Tag="https://t.me/Workspace1C"/>
+                            <!-- Лицензия (пункт 2 плана ПРО): блок всегда виден на вкладке
+                                 «О программе» — редакция, владелец/ключ, код компьютера и
+                                 кнопки «Лицензия…»/«Купить ПРО». Строки заполняет
+                                 RefreshAboutLicense (SettingsWindow.Platforms.cs), пустые
+                                 скрываются через Visibility.Collapsed. Блок расположен
+                                 строго ВЫШЕ кнопок техинформации/диагностики. -->
+                            <Border x:Name="AboutLicenseBlock" Margin="0,16,0,0" Padding="12,10"
+                                    Background="{DynamicResource CardBackgroundBrush}"
+                                    BorderBrush="{DynamicResource BorderBrushColor}"
+                                    BorderThickness="1" CornerRadius="6">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <materialDesign:PackIcon Kind="AccountKey" Width="16" Height="16"
+                                                                 Foreground="{DynamicResource AccentBrush}"
+                                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Settings.About.LicenseHeader}"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   VerticalAlignment="Center"/>
+                                        <!-- Метка ПРО (★) видна только при действительном ключе. -->
+                                        <TextBlock x:Name="AboutLicenseProMark"
+                                                   Text="{x:Static licensing:LicenseSummary.ProMark}"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   FontWeight="SemiBold" Margin="6,0,0,0"
+                                                   VerticalAlignment="Center" Visibility="Collapsed"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="AboutLicenseEditionText" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock x:Name="AboutLicenseOwnerText" Margin="0,2,0,0"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               TextWrapping="Wrap" Visibility="Collapsed"/>
+                                    <TextBlock x:Name="AboutLicenseKeyInfoText" Margin="0,2,0,0"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" Visibility="Collapsed"/>
+                                    <!-- Код компьютера: подпись из Settings.About.LicenseMachineCode,
+                                         сам код — моноширинным шрифтом (заполняется в коде). -->
+                                    <TextBlock Margin="0,2,0,0" TextWrapping="Wrap"
+                                               Foreground="{DynamicResource TextSecondaryBrush}">
+                                        <Run x:Name="AboutLicenseMachineCodeLabelRun"/>
+                                        <Run x:Name="AboutLicenseMachineCodeRun" FontFamily="Consolas"
+                                             FontWeight="SemiBold"
+                                             Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </TextBlock>
+                                    <TextBlock x:Name="AboutLicenseStatusText" Margin="0,2,0,0"
+                                               Foreground="{DynamicResource WarningBrush}"
+                                               TextWrapping="Wrap" Visibility="Collapsed"/>
+                                    <TextBlock x:Name="AboutLicenseCommunityText" Margin="0,6,0,0"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               TextWrapping="Wrap" Visibility="Collapsed"/>
+                                    <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                                        <Button x:Name="AboutLicenseButton" Padding="14,6" Margin="0,0,8,0"
+                                                Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                                Click="OnAboutLicense_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="AccountKey" Width="14" Height="14"
+                                                                         Foreground="{DynamicResource InfoBrush}"
+                                                                         Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:Loc Pro.MenuItem}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <!-- «Купить ПРО» нужна только в бесплатной редакции. -->
+                                        <Button x:Name="AboutBuyProButton" Padding="14,6"
+                                                Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                                Click="OnAboutBuyPro_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <!-- Kind="Tag": значок есть во всех наборах иконок тем
+                                                     (CartOutline в сгенерированных наборах отсутствует). -->
+                                                <materialDesign:PackIcon Kind="Tag" Width="14" Height="14"
+                                                                         Foreground="{DynamicResource SuccessBrush}"
+                                                                         Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:Loc Settings.About.BuyPro}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
                             <!-- Нижние кнопки — в одну колонку (issue #99), как подписи выше. -->
                             <!-- Issue #102: кнопки растягиваются по ширине колонки, подпись переносится
                                  (Grid Auto,* вместо горизонтального StackPanel). -->

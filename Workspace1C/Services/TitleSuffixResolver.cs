@@ -61,31 +61,47 @@ public static class TitleSuffixResolver
     }
 
     /// <summary>
-    /// Собирает полный заголовок окна: базовое имя + суффикс версии «v…» + (если
-    /// дополнение включено и результат непустой) разделитель и дополнение.
+    /// Собирает полный заголовок окна: (необязательная метка редакции ПРО) + базовое
+    /// имя + суффикс версии «v…» + (если дополнение включено и результат непустой)
+    /// разделитель и дополнение.
     /// Устойчив к повторному вызову: если базовое имя уже заканчивается на суффикс
-    /// версии (локаль может его содержать), суффикс не добавляется повторно.
+    /// версии (локаль может его содержать), суффикс не добавляется повторно; если
+    /// базовое имя уже начинается с метки редакции, метка не задваивается.
     /// </summary>
     /// <param name="baseTitle">Локализованное имя приложения («Workspace 1C»).</param>
     /// <param name="version">Версия без префикса «v» (например «1.0.0.31»).</param>
     /// <param name="enabled">Включено ли дополнение заголовка (галочка в настройках).</param>
     /// <param name="template">Шаблон дополнения (токены подставляются).</param>
     /// <param name="separator">Разделитель между суффиксом версии и дополнением.</param>
+    /// <param name="proMark">
+    /// Метка редакции ПРО (обычно <see cref="Licensing.LicenseSummary.ProMark"/> — «★»).
+    /// Непустая метка ставится префиксом перед названием программы как признак
+    /// действующего лицензионного ключа ПРО; пустая — заголовок без изменений.
+    /// </param>
     public static string Compose(
         string baseTitle,
         string version,
         bool enabled,
         string template,
-        string separator = " — ")
+        string separator = " — ",
+        string proMark = "")
     {
         var versionSuffix = string.IsNullOrWhiteSpace(version)
             ? string.Empty
             : $" v{version.Trim()}";
 
-        var head = versionSuffix.Length == 0
-            || baseTitle.EndsWith(versionSuffix, StringComparison.Ordinal)
-            ? baseTitle
-            : baseTitle + versionSuffix;
+        // Метка редакции ПРО — признак действующего ключа: ставится перед названием
+        // программы. Повторный вызов (или локализованное имя) может уже содержать
+        // метку с пробелом — тогда второй раз её не добавляем.
+        var head = baseTitle;
+        if (!string.IsNullOrEmpty(proMark)
+            && !head.StartsWith(proMark + " ", StringComparison.Ordinal))
+        {
+            head = proMark + " " + head;
+        }
+
+        if (versionSuffix.Length > 0 && !head.EndsWith(versionSuffix, StringComparison.Ordinal))
+            head += versionSuffix;
 
         if (!enabled)
             return head;

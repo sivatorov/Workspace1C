@@ -13,6 +13,32 @@
 
 ## [1.0.1.69] — 2026-11-15
 
+### Добавлено
+
+- **Блок «Лицензия» на вкладке «О программе» в WPF и Avalonia (пункт 2 плана ПРО).**
+  В настройках на вкладке «О программе» появилась карточка «Лицензия»: редакция
+  (в ПРО — с меткой `★`), владелец, версия ключа и дата выпуска, код компьютера
+  и статус ключа; в сборке без модулей ПРО дополнительно показывается напоминание
+  `Pro.CommunityBuild`. Кнопка «Лицензия…» открывает окно лицензии (скопировать
+  код компьютера, активировать/удалить ключ), кнопка «Купить ПРО» видна только
+  в бесплатной редакции и открывает окно «Как купить ПРО-версию». Блок расположен
+  выше кнопок технической информации и диагностики и обновляется сразу после
+  активации/удаления ключа по событию `EditionService.Changed`. Данные собирает
+  общий слой [`LicenseSummary`](Workspace1C/Services/Licensing/LicenseSummary.cs:18);
+  разметка WPF — [`SettingsWindow.xaml`](Workspace1C/Views/SettingsWindow.xaml:3051)
+  и [`SettingsWindow.Platforms.cs`](Workspace1C/Views/SettingsWindow.Platforms.cs:536),
+  Avalonia — [`SettingsWindow.Avalonia.cs`](Workspace1C/Views/SettingsWindow.Avalonia.cs:5450).
+  Новые ключи локализации ru/en: `Settings.About.LicenseHeader`,
+  `Settings.About.LicenseMachineCode`, `Settings.About.LicenseKeyInfo`,
+  `Settings.About.BuyPro`.
+
+- **Метка `★` ПРО в заголовке главного окна.** При действительном ключе заголовок
+  принимает вид `★ Workspace 1C v<версия>` в WPF
+  ([`MainWindow.Language.cs`](Workspace1C/Views/MainWindow.Language.cs:117)) и
+  Avalonia ([`MainWindow.Avalonia.Language.cs`](Workspace1C/Views/MainWindow.Avalonia.Language.cs:86)).
+  Метка появляется и исчезает сразу после активации или удаления ключа — по
+  событию `EditionService.Changed`, без перезапуска приложения.
+
 ### Изменено
 
 - **Группа «Мои программы»: иконка из файла — по галочке, иначе основная иконка
@@ -66,6 +92,18 @@
   обновлён `Launch.CustomPrograms.Hint`.
 
 ### Тесты
+
+- Добавлены [`LicenseSummaryTests`](Workspace1C.Tests/LicenseSummaryTests.cs:17),
+  [`AboutLicenseBlockTests`](Workspace1C.Tests/AboutLicenseBlockTests.cs:15) и
+  [`AboutLicenseBlockAvaloniaTests`](Workspace1C.Tests/AboutLicenseBlockAvaloniaTests.cs:16):
+  сборка сводки лицензии (редакция, владелец, данные ключа, код компьютера, статус,
+  признак сборки без модулей ПРО), наличие блока «Лицензия» и кнопок
+  «Лицензия…»/«Купить ПРО» на вкладке «О программе» в WPF и Avalonia, обновление
+  блока по `EditionService.Changed` и совпадение ключей локализации ru/en. Дополнены
+  [`TitleSuffixResolverTests`](Workspace1C.Tests/TitleSuffixResolverTests.cs:10) и
+  [`TitleProMarkTests`](Workspace1C.Tests/TitleProMarkTests.cs:17): метка `★` перед
+  названием при действительном ключе, её отсутствие в бесплатной редакции и
+  обновление заголовка без перезапуска в обеих оболочках.
 
 - Расширен [`Issue91CustomProgramsTests`](Workspace1C.Tests/Issue91CustomProgramsTests.cs:31):
   автоперенос «1С:Стартер» (пустой список, непустой список, флаг уже стоит, стартер

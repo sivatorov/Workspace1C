@@ -1,4 +1,5 @@
 using Workspace1C.Services;
+using Workspace1C.Services.Licensing;
 using Xunit;
 
 namespace Workspace1C.Tests;
@@ -71,5 +72,46 @@ public sealed class TitleSuffixResolverTests
     {
         var title = TitleSuffixResolver.Compose("Workspace 1C", string.Empty, enabled: false, string.Empty);
         Assert.Equal("Workspace 1C", title);
+    }
+
+    // ===================== Метка редакции ПРО (пункт 4 плана ПРО) =====================
+
+    [Fact]
+    public void Compose_ProMark_PrefixesTitle()
+    {
+        var title = TitleSuffixResolver.Compose(
+            "Workspace 1C", "2.0.0.1", enabled: false, string.Empty, proMark: LicenseSummary.ProMark);
+        Assert.Equal("★ Workspace 1C v2.0.0.1", title);
+    }
+
+    [Fact]
+    public void Compose_ProMark_WithEnabledSuffix_KeepsSuffixAtEnd()
+    {
+        var title = TitleSuffixResolver.Compose(
+            "Workspace 1C", "2.0.0.1", enabled: true, "%user_name%", proMark: LicenseSummary.ProMark);
+        Assert.Equal($"★ Workspace 1C v2.0.0.1 — {Environment.UserName}", title);
+    }
+
+    [Fact]
+    public void Compose_EmptyProMark_KeepsCurrentLook()
+    {
+        // Регрессия: пустая метка не меняет прежний формат заголовка.
+        var title = TitleSuffixResolver.Compose(
+            "Workspace 1C", "2.0.0.1", enabled: false, string.Empty, proMark: string.Empty);
+        Assert.Equal("Workspace 1C v2.0.0.1", title);
+    }
+
+    [Fact]
+    public void Compose_ProMark_DoesNotDuplicateWhenAlreadyPrefixed()
+    {
+        // Базовое имя уже с меткой (например, повторный вызов) — не задваиваем.
+        var title = TitleSuffixResolver.Compose(
+            "★ Workspace 1C", "2.0.0.1", enabled: false, string.Empty, proMark: LicenseSummary.ProMark);
+        Assert.Equal("★ Workspace 1C v2.0.0.1", title);
+
+        // Повторный вызов поверх готового заголовка тоже не задваивает метку.
+        var again = TitleSuffixResolver.Compose(
+            title, "2.0.0.1", enabled: false, string.Empty, proMark: LicenseSummary.ProMark);
+        Assert.Equal("★ Workspace 1C v2.0.0.1", again);
     }
 }
