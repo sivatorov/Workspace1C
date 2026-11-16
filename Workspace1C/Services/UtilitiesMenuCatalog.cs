@@ -36,6 +36,9 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Внешняя консоль администрирования серверов.</summary>
     OpenServerConsole,
 
+    /// <summary>Регистрация компонентов внешней консоли (radmin.dll, comctrl.dll), issue #135.</summary>
+    RegisterServerConsoleComponents,
+
     /// <summary>Временная блокировка приложения паролем.</summary>
     LockApp,
 
@@ -541,6 +544,11 @@ public static class UtilitiesMenuCatalog
                 "Cog", "IconSettings", "#06B6D4", UtilitiesMenuCommandKind.Services, "HotkeyServices", isNew: true),
             new("ServerConsoleExternal", "Admin.ServerConsoleExternal", GroupTopLevel,
                 "Server", "IconServer", "#64748B", UtilitiesMenuCommandKind.OpenServerConsole),
+            // Регистрация компонентов консоли (issue #135): radmin.dll и comctrl.dll нужны,
+            // если оснастка не запускается. Windows-only — в Avalonia/Linux пункт недоступен.
+            new("ServerConsoleRegister", "Admin.ServerConsoleRegister", GroupTopLevel,
+                "Cog", "IconSettings", "#64748B",
+                UtilitiesMenuCommandKind.RegisterServerConsoleComponents, isNew: true),
 
             // ---- Опции блокировки ----
             new("AppLock", "AppLock.LockTitle", GroupTopLevel,

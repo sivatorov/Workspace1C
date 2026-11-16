@@ -11,6 +11,70 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.72] — 2026-11-16
+
+### Исправлено
+
+- **Пункт «Утилиты → Консоль администрирования серверов (внешняя)» больше не «молчит»
+  (issue #135, ArtyoZ).** Причина была в том, что сервис возвращал только `bool`, а
+  ViewModel показывала общий текст; часть веток (нет каталога платформы, нет
+  `1CV8Servers.msc`, ошибка запуска) вообще не давала видимой реакции. Теперь каждая
+  ветка отказа возвращает [`ServerConsoleResult`](Workspace1C/Services/ServerConsolePlanner.cs:15)
+  с ключом локализации и подробностями (путь к каталогу/оснастке, текст исключения),
+  причина пишется в журнал, а пользователь видит конкретное сообщение.
+  Реализация — [`InfobaseAdminService.OpenServerAdminConsole`](Workspace1C/Services/InfobaseAdminService.cs:171),
+  команды — [`MainViewModel.Admin.cs`](Workspace1C/ViewModels/MainViewModel.Admin.cs:99) (WPF)
+  и [`MainViewModel.Avalonia.Admin.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.Admin.cs:81) (Avalonia).
+- **Надёжный запуск оснастки через `mmc.exe`.** Вместо shell-запуска `.msc` используется
+  `mmc.exe "<путь к 1CV8Servers.msc>"` с `UseShellExecute=false`; при ошибке — откат на
+  прежний shell-запуск. Для 32-битной платформы добавляется `mmc /32`: её `radmin.dll` —
+  32-битный COM-сервер, который 64-битная оснастка не загрузит. Команда строится чистой
+  функцией [`ServerConsolePlanner.BuildMmcArguments`](Workspace1C/Services/ServerConsolePlanner.cs:190).
+- **Linux: пункт недоступен с подсказкой.** Внешней консоли (оснастки MMC) в Linux нет —
+  пункт меню и действие регистрации отключены с локализованной подсказкой
+  «внешняя консоль доступна только в Windows», а команда по хоткею показывает ту же
+  причину ([`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:2712)).
+
+### Добавлено
+
+- **Выбор версии платформы для внешней консоли.** Перед запуском показываются только
+  установленные версии, в каталоге `bin` которых есть `1CV8Servers.msc`; если версия
+  одна — диалог не открывается. Выбор запоминается в
+  [`AppSettings.ServerConsolePlatformVersion`](Workspace1C/Models/AppSettings.cs:1073) и
+  используется по умолчанию. Отбор/выбор — чистые функции
+  [`ServerConsolePlanner.ListCandidates`](Workspace1C/Services/ServerConsolePlanner.cs:101)
+  и [`ChoosePreferred`](Workspace1C/Services/ServerConsolePlanner.cs:135);
+  диалог [`PlatformVersionPickerWindow`](Workspace1C/Views/PlatformVersionPickerWindow.xaml.cs:29)
+  получил режим «только переданные версии».
+- **Регистрация компонентов консоли `radmin.dll` и `comctrl.dll`.** Новый пункт
+  «Зарегистрировать компоненты консоли» выполняет `regsvr32 /s` нужной разрядности с
+  повышением прав (UAC) и показывает результат по каждой DLL; отсутствующий файл —
+  понятное сообщение, а не исключение. При ошибке запуска консоли регистрация
+  предлагается в диалоге. Код — [`InfobaseAdminService.RegisterServerConsoleComponents`](Workspace1C/Services/InfobaseAdminService.cs:284),
+  список DLL — [`ServerConsolePlanner.ListRegistrationDlls`](Workspace1C/Services/ServerConsolePlanner.cs:236).
+- Новые ключи локализации ru/en: `Admin.ServerConsolePlatformNotFound`,
+  `Admin.ServerConsoleSnapInNotFound`, `Admin.ServerConsoleLaunchFailed`,
+  `Admin.ServerConsoleWindowsOnly`, `Admin.ServerConsoleWindowsOnlyHint`,
+  `Admin.ServerConsoleRegister`, `Admin.ServerConsoleRegisterNoPlatform`,
+  `Admin.ServerConsoleRegisterNoFiles`, `Admin.ServerConsoleRegisterReport`,
+  `Admin.ServerConsoleRegisterOk`, `Admin.ServerConsoleRegisterFailed`,
+  `Admin.ServerConsoleRegisterMissing`, `Admin.ServerConsoleRegisterCanceled`,
+  `Admin.ServerConsoleRegisterExitCode`, `Admin.ServerConsoleRegisterStartFailed`,
+  `Admin.ServerConsoleRegisterTimeout`, `Admin.ServerConsoleOfferRegister`
+  ([`ru.json`](Workspace1C/Localization/Languages/ru.json:3039),
+  [`en.json`](Workspace1C/Localization/Languages/en.json:3039)).
+
+### Тесты
+
+- `Workspace1C.Tests/Issue135ServerConsoleTests.cs`: отбор версий с `.msc`
+  (есть/нет, одна/несколько, дубли, x64 раньше x86), выбор версии (точный вариант,
+  чистая/частичная версия, неизвестная — новейшая), построение команд `mmc`
+  (кавычки в пути, `/32`), пути `mmc.exe`/`regsvr32.exe` по разрядности, список DLL
+  для регистрации (есть/нет файла), причины отказа по каждой ветке, настройки,
+  каталог меню, source-гварды WPF/Avalonia (привязка команд, отключение на Linux,
+  вызов регистрации) и совпадение ключей `Admin.ServerConsole*` в ru/en.
+- `Release100159Tests`: ожидания версии обновлены до 1.0.1.72.
+
 ## [1.0.1.71] — 2026-11-16
 
 ### Добавлено

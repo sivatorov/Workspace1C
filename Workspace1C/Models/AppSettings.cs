@@ -1066,6 +1066,13 @@ public class AppSettings
     public string HotkeyServerConsole { get; set; } = "Ctrl+Alt+S";
 
     /// <summary>
+    /// Выбранная версия платформы для внешней консоли администрирования серверов
+    /// (issue #135), формат варианта «8.3.27.1688 (64)». Пусто — новейшая установленная
+    /// версия, в каталоге bin которой есть оснастка 1CV8Servers.msc.
+    /// </summary>
+    public string ServerConsolePlatformVersion { get; set; } = "";
+
+    /// <summary>
     /// Горячая клавиша «Управление службами» (issue #11, по умолчанию Ctrl+Shift+S).
     /// Настраивается в «Настройки → Клавиши».
     /// </summary>

@@ -685,6 +685,8 @@ public partial class MainViewModel : ViewModelBase
         // Администрирование ИБ (Этап 6, функция №29 + консоль серверов).
         _hotkeyCheckIntegrity = string.IsNullOrWhiteSpace(settings.HotkeyCheckIntegrity) ? "Ctrl+Alt+Q" : settings.HotkeyCheckIntegrity.Trim();
         _hotkeyServerConsole = string.IsNullOrWhiteSpace(settings.HotkeyServerConsole) ? "Ctrl+Alt+S" : settings.HotkeyServerConsole.Trim();
+        // Выбранная версия платформы для внешней консоли администрирования (issue #135).
+        _serverConsolePlatformVersion = settings.ServerConsolePlatformVersion?.Trim() ?? string.Empty;
         // Управление службами (issue #11): хоткей по умолчанию Ctrl+Shift+S.
         _hotkeyServices = string.IsNullOrWhiteSpace(settings.HotkeyServices) ? "Ctrl+Shift+S" : settings.HotkeyServices.Trim();
         // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.

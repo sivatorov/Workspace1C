@@ -260,6 +260,9 @@ public partial class MainWindow
                 item.Command = _viewModel.ShowServicesCommand; break;
             case UtilitiesMenuCommandKind.OpenServerConsole:
                 item.Command = _viewModel.OpenServerConsoleCommand; break;
+            // Регистрация компонентов консоли (issue #135, Windows-only).
+            case UtilitiesMenuCommandKind.RegisterServerConsoleComponents:
+                item.Command = _viewModel.RegisterServerConsoleComponentsCommand; break;
             case UtilitiesMenuCommandKind.LockApp:
                 item.Command = _viewModel.LockAppCommand; break;
             case UtilitiesMenuCommandKind.UnlockPrivateBases:

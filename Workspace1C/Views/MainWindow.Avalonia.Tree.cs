@@ -2707,6 +2707,17 @@ namespace Workspace1C
             if (Controls.HotkeyBox.TryParse(gesture, out var parsed) && parsed is not null)
                 item.InputGesture = parsed;
             ApplyAvaloniaCommand(item, catalogItem);
+
+            // issue #135: внешняя консоль администрирования серверов — оснастка MMC,
+            // её в Linux нет. Пункт остаётся видимым, но недоступен и подсказывает причину
+            // (раньше нажатие «молча ничего не делало»).
+            if (catalogItem.CommandKind is UtilitiesMenuCommandKind.OpenServerConsole
+                or UtilitiesMenuCommandKind.RegisterServerConsoleComponents)
+            {
+                item.IsEnabled = false;
+                ToolTip.SetTip(item, LocalizationManager.T("Admin.ServerConsoleWindowsOnlyHint"));
+            }
+
             return item;
         }
 
@@ -2769,6 +2780,9 @@ namespace Workspace1C
                     item.Command = _vm!.ShowServicesCommand; break;
                 case UtilitiesMenuCommandKind.OpenServerConsole:
                     item.Command = _vm!.OpenServerConsoleCommand; break;
+                // Регистрация компонентов консоли (issue #135, Windows-only).
+                case UtilitiesMenuCommandKind.RegisterServerConsoleComponents:
+                    item.Command = _vm!.RegisterServerConsoleComponentsCommand; break;
                 case UtilitiesMenuCommandKind.LockApp:
                     item.Command = _vm!.LockAppCommand; break;
                 case UtilitiesMenuCommandKind.UnlockPrivateBases:

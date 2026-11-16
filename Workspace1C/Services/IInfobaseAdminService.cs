@@ -27,12 +27,29 @@ public interface IInfobaseAdminService
     Task<BackupRunResult> CheckIntegrityQuiet(Infobase infobase);
 
     /// <summary>
-    /// Запуск консоли администрирования серверов 1С.
+    /// Запуск внешней консоли администрирования серверов 1С (оснастка MMC
+    /// <c>1CV8Servers.msc</c>) выбранной версии платформы.
     /// Консоль не привязана к конкретной базе (issue #295): параметр опционален
-    /// и используется только как источник настроек платформы (разрядность, версия);
-    /// при null (или файловой базе) берётся новейшая установленная платформа.
-    /// Выбирает подходящий инструмент платформы (<c>rac</c> / оснастка консоли).
-    /// Возвращает true, если процесс запущен.
+    /// и используется только как источник настроек платформы; при null берётся
+    /// новейшая установленная платформа с оснасткой.
+    /// Возвращает результат с причиной отказа (issue #135), а не «молчаливый» bool.
     /// </summary>
-    bool OpenServerAdminConsole(Infobase? infobase);
+    /// <param name="infobase">База-источник настроек платформы (может быть null).</param>
+    /// <param name="platformVersion">Выбранный вариант версии («8.3.27.1688 (64)») или null.</param>
+    ServerConsoleResult OpenServerAdminConsole(Infobase? infobase, string? platformVersion = null);
+
+    /// <summary>
+    /// Установленные платформы, в каталоге <c>bin</c> которых есть оснастка консоли
+    /// администрирования серверов (<c>1CV8Servers.msc</c>), новейшие первыми.
+    /// На Linux внешней консоли нет — пустой список.
+    /// </summary>
+    IReadOnlyList<ServerConsoleCandidate> GetServerConsoleCandidates();
+
+    /// <summary>
+    /// Регистрирует компоненты внешней консоли (<c>radmin.dll</c>, <c>comctrl.dll</c>)
+    /// для указанной версии платформы через regsvr32 с повышением прав (только Windows).
+    /// Отсутствующий файл и отмена UAC попадают в отчёт, исключение не бросается.
+    /// </summary>
+    /// <param name="platformVersion">Вариант версии («8.3.27.1688 (64)») или null — новейшая с оснасткой.</param>
+    ServerConsoleRegistrationResult RegisterServerConsoleComponents(string? platformVersion);
 }

@@ -20,13 +20,23 @@ namespace Workspace1C
         private string _archFilter = "all"; // all | x32 | x64
         private bool _isRestoringSelection; // перестроение дерева: гасим SelectionChanged(null) (#304)
 
-        public PlatformVersionPickerWindow(IEnumerable<string> installedPlatformVersions, string currentVersion)
+        /// <param name="installedPlatformVersions">Варианты версий для выбора.</param>
+        /// <param name="currentVersion">Текущая (сохранённая) версия — подсвечивается в дереве.</param>
+        /// <param name="useProvidedVersionsOnly">
+        /// true — показывать только переданный список (issue #135: внешняя консоль предлагает
+        /// лишь версии, в которых реально есть 1CV8Servers.msc), не подмешивая все установленные.
+        /// </param>
+        public PlatformVersionPickerWindow(
+            IEnumerable<string> installedPlatformVersions,
+            string currentVersion,
+            bool useProvidedVersionsOnly = false)
         {
             InitializeComponent();
             _currentVersion = currentVersion ?? "";
 
             var extras = PlatformVersionService.GetAdditionalSearchPaths();
-            _allInfos = PlatformVersionService.FindInstalledVersionInfos(extras);
+            if (!useProvidedVersionsOnly)
+                _allInfos = PlatformVersionService.FindInstalledVersionInfos(extras);
             if (_allInfos.Count == 0 && installedPlatformVersions != null)
             {
                 _allInfos = installedPlatformVersions

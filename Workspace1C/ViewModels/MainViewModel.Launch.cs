@@ -780,6 +780,8 @@ public partial class MainViewModel : ViewModelBase
         // Администрирование ИБ (Этап 6, функция №29 + консоль серверов).
         s.HotkeyCheckIntegrity = _hotkeyCheckIntegrity;
         s.HotkeyServerConsole = _hotkeyServerConsole;
+        // Выбранная версия платформы для внешней консоли (issue #135).
+        s.ServerConsolePlatformVersion = _serverConsolePlatformVersion;
         // Управление службами (issue #11): хоткей по умолчанию Ctrl+Shift+S.
         s.HotkeyServices = _hotkeyServices;
         // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.
