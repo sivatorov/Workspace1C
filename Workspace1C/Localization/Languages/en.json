@@ -2417,6 +2417,9 @@
     "KillProcesses.KillAllTitle": "Terminate all",
     "KillProcesses.KillAllConfirmFormat": "Terminate all processes of the selected infobases ({0})?\n\nUnsaved data in open 1C sessions will be lost.\nContinue?",
     "KillProcesses.KillAllSummaryFormat": "Processes terminated: {0}. Failed: {1}.",
+    "KillProcesses.KillAllBasesFormat": "Infobases: {0}",
+    "KillProcesses.KillAllFailedBasesFormat": "Failed to terminate processes of: {0}",
+    "KillProcesses.BasesSeparator": ", ",
     "KillProcesses.GroupHeaderFormat": "{0} ({1})",
     "KillProcesses.UnknownBase": "unnamed infobase",
 

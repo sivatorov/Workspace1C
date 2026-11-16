@@ -38,6 +38,17 @@ public enum OneCApplicationKind
 /// <param name="Label">Подпись пункта меню.</param>
 public sealed record KillProcessMenuItem(RunningOneCProcessDetails Process, string Label);
 
+/// <summary>
+/// Действие пункта «Завершить все» (issue #134, доработка автора от 16.11.2026):
+/// процессы для завершения и карта «PID → имя базы» для сводки отчёта. Окна кладут
+/// этот объект в <c>Tag</c> пункта меню, чтобы в отчёте были названия баз.
+/// </summary>
+/// <param name="Processes">Процессы, которые нужно завершить.</param>
+/// <param name="BaseNamesByPid">Отображаемые имена баз по PID процесса.</param>
+public sealed record KillProcessesKillAllAction(
+    IReadOnlyList<RunningOneCProcessDetails> Processes,
+    IReadOnlyDictionary<int, string>? BaseNamesByPid = null);
+
 /// <summary>Вид элемента плана подменю «Завершить процессы» (issue #134).</summary>
 public enum KillProcessesMenuEntryKind
 {
@@ -84,10 +95,14 @@ public sealed record KillProcessesMenuEntry(
 /// <param name="Entries">Элементы верхнего уровня в порядке показа.</param>
 /// <param name="AllProcesses">Все процессы плана (для «Завершить все»), без дублей PID.</param>
 /// <param name="IsGrouped">True — план сгруппирован по базам (баз с процессами больше одной).</param>
+/// <param name="BaseNamesByPid">Отображаемые имена баз по PID процесса — для сводки
+/// массового завершения (доработка автора issue #134 от 16.11.2026: «когда несколько —
+/// ничего не пишет, можно указывать хотя бы названия баз»).</param>
 public sealed record KillProcessesMenuPlan(
     IReadOnlyList<KillProcessesMenuEntry> Entries,
     IReadOnlyList<RunningOneCProcessDetails> AllProcesses,
-    bool IsGrouped)
+    bool IsGrouped,
+    IReadOnlyDictionary<int, string>? BaseNamesByPid = null)
 {
     /// <summary>Пустой план — подменю скрывается (процессов нет).</summary>
     public static KillProcessesMenuPlan Empty { get; } = new(
@@ -158,6 +173,21 @@ public static class KillProcessesMenuPlanner
 
     /// <summary>Ключ сводки «Завершить все»: сколько завершено и сколько не удалось.</summary>
     public const string KillAllSummaryFormatKey = "KillProcesses.KillAllSummaryFormat";
+
+    /// <summary>
+    /// Ключ строки сводки «Завершить все» с названиями баз (доработка автора issue #134
+    /// от 16.11.2026): при массовом завершении отчёт перечисляет базы, а не только счётчики.
+    /// </summary>
+    public const string KillAllBasesFormatKey = "KillProcesses.KillAllBasesFormat";
+
+    /// <summary>
+    /// Ключ строки сводки о базах, процессы которых завершить не удалось
+    /// (доработка автора issue #134 от 16.11.2026).
+    /// </summary>
+    public const string KillAllFailedBasesFormatKey = "KillProcesses.KillAllFailedBasesFormat";
+
+    /// <summary>Ключ разделителя названий баз в сводке («, »).</summary>
+    public const string BasesSeparatorKey = "KillProcesses.BasesSeparator";
 
     /// <summary>Ключ формата заголовка группы базы: «{0} ({1})» — имя базы и число процессов.</summary>
     public const string GroupHeaderFormatKey = "KillProcesses.GroupHeaderFormat";
@@ -443,6 +473,16 @@ public static class KillProcessesMenuPlanner
 
         var allProcesses = groups.SelectMany(group => group.Processes).ToList();
 
+        // PID → имя базы: сводка массового завершения перечисляет базы, к которым
+        // относились завершаемые процессы (доработка автора issue #134 от 16.11.2026).
+        var baseNamesByPid = new Dictionary<int, string>(allProcesses.Count);
+        foreach (var (infobase, groupProcesses) in groups)
+        {
+            var baseName = BaseDisplayName(infobase, translate);
+            foreach (var process in groupProcesses)
+                baseNamesByPid.TryAdd(process.Pid, baseName);
+        }
+
         // Одна база с процессами — плоский список (v1.0.1.74); при нескольких
         // процессах первым пунктом идёт «Завершить все» (issue #134, доработка
         // автора от 16.11.2026).
@@ -454,7 +494,7 @@ public static class KillProcessesMenuPlanner
                 flat.Add(CreateKillAllEntry(translate, onlyProcesses));
             flat.AddRange(onlyProcesses.Select(process => new KillProcessesMenuEntry(
                 KillProcessesMenuEntryKind.Process, FormatItemLabel(process, translate), process)));
-            return new KillProcessesMenuPlan(flat, allProcesses, IsGrouped: false);
+            return new KillProcessesMenuPlan(flat, allProcesses, IsGrouped: false, baseNamesByPid);
         }
 
         // Несколько баз — «Завершить все» первым пунктом, затем группы по базам.
@@ -480,7 +520,7 @@ public static class KillProcessesMenuPlanner
                 KillProcessesMenuEntryKind.BaseGroup, header, Children: children));
         }
 
-        return new KillProcessesMenuPlan(entries, allProcesses, IsGrouped: true);
+        return new KillProcessesMenuPlan(entries, allProcesses, IsGrouped: true, baseNamesByPid);
     }
 
     /// <summary>
@@ -491,6 +531,97 @@ public static class KillProcessesMenuPlanner
     private static KillProcessesMenuEntry CreateKillAllEntry(
         Func<string, string> translate, IReadOnlyList<RunningOneCProcessDetails> processes)
         => new(KillProcessesMenuEntryKind.KillAll, translate(KillAllTitleKey), Processes: processes);
+
+    /// <summary>
+    /// Сводка массового завершения (issue #134, доработка автора от 16.11.2026):
+    /// счётчики «завершено / не удалось» плюс названия баз, к которым относились
+    /// процессы. Раньше при завершении нескольких процессов отчёт показывал только
+    /// числа — автор попросил указывать хотя бы названия баз.
+    /// <para>
+    /// Базы перечисляются в порядке процессов (порядок выделения), без повторов.
+    /// При ошибках добавляется отдельная строка с базами, процессы которых завершить
+    /// не удалось. Если карта «PID → имя базы» неизвестна, возвращается прежний текст
+    /// со счётчиками (обратная совместимость).
+    /// </para>
+    /// </summary>
+    /// <param name="processes">Процессы, которые пытались завершить.</param>
+    /// <param name="failedPids">PID процессов, которые завершить не удалось.</param>
+    /// <param name="translate">Функция локализации.</param>
+    /// <param name="baseNamesByPid">Отображаемые имена баз по PID (из плана меню).</param>
+    public static string FormatKillAllSummary(
+        IReadOnlyList<RunningOneCProcessDetails>? processes,
+        IReadOnlyCollection<int>? failedPids,
+        Func<string, string> translate,
+        IReadOnlyDictionary<int, string>? baseNamesByPid = null)
+    {
+        if (translate is null)
+            throw new ArgumentNullException(nameof(translate));
+
+        var list = (processes ?? Array.Empty<RunningOneCProcessDetails>())
+            .Where(process => process is not null)
+            .ToList();
+        var failedSet = failedPids is null
+            ? new HashSet<int>()
+            : new HashSet<int>(failedPids);
+        var failedCount = list.Count(process => failedSet.Contains(process.Pid));
+        var killedCount = list.Count - failedCount;
+
+        var summary = new StringBuilder();
+        summary.Append(string.Format(
+            translate(KillAllSummaryFormatKey), killedCount, failedCount));
+
+        if (list.Count == 0 || baseNamesByPid is null || baseNamesByPid.Count == 0)
+            return summary.ToString();
+
+        var separator = translate(BasesSeparatorKey);
+        var baseNames = DistinctBaseNames(list, baseNamesByPid);
+        if (baseNames.Count > 0)
+        {
+            summary.AppendLine();
+            summary.AppendLine();
+            summary.Append(string.Format(
+                translate(KillAllBasesFormatKey), string.Join(separator, baseNames)));
+        }
+
+        if (failedCount > 0)
+        {
+            var failedBaseNames = DistinctBaseNames(list, baseNamesByPid, failedSet);
+            if (failedBaseNames.Count > 0)
+            {
+                summary.AppendLine();
+                summary.Append(string.Format(
+                    translate(KillAllFailedBasesFormatKey), string.Join(separator, failedBaseNames)));
+            }
+        }
+
+        return summary.ToString();
+    }
+
+    /// <summary>
+    /// Уникальные имена баз по процессам в порядке появления. <paramref name="onlyPids"/>
+    /// не null — учитываются только процессы с этими PID (базы с ошибками завершения).
+    /// </summary>
+    private static List<string> DistinctBaseNames(
+        IReadOnlyList<RunningOneCProcessDetails> processes,
+        IReadOnlyDictionary<int, string> baseNamesByPid,
+        HashSet<int>? onlyPids = null)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var process in processes)
+        {
+            if (process is null)
+                continue;
+            if (onlyPids is not null && !onlyPids.Contains(process.Pid))
+                continue;
+            if (!baseNamesByPid.TryGetValue(process.Pid, out var name) || string.IsNullOrWhiteSpace(name))
+                continue;
+            if (seen.Add(name))
+                names.Add(name);
+        }
+
+        return names;
+    }
 
     /// <summary>
     /// Плоский список пунктов (обратная совместимость v1.0.1.74, issue #134):

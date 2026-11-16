@@ -468,7 +468,8 @@ public partial class MainWindow
             switch (entry.Kind)
             {
                 case KillProcessesMenuEntryKind.KillAll:
-                    menu.Items.Add(CreateKillAllMenuItem(entry, plan.AllProcesses));
+                    menu.Items.Add(CreateKillAllMenuItem(
+                        entry, plan.AllProcesses, plan.BaseNamesByPid));
                     break;
 
                 case KillProcessesMenuEntryKind.BaseGroup:
@@ -478,12 +479,14 @@ public partial class MainWindow
                         Style = TryFindResource("ModernMenuItem") as Style,
                     };
                     foreach (var child in entry.Children ?? Array.Empty<KillProcessesMenuEntry>())
-                        groupItem.Items.Add(CreateKillProcessMenuItem(child, plan.AllProcesses));
+                        groupItem.Items.Add(CreateKillProcessMenuItem(
+                            child, plan.AllProcesses, plan.BaseNamesByPid));
                     menu.Items.Add(groupItem);
                     break;
 
                 default:
-                    menu.Items.Add(CreateKillProcessMenuItem(entry, plan.AllProcesses));
+                    menu.Items.Add(CreateKillProcessMenuItem(
+                        entry, plan.AllProcesses, plan.BaseNamesByPid));
                     break;
             }
         }
@@ -497,20 +500,28 @@ public partial class MainWindow
     /// только процессы своей группы — их список лежит в самом элементе плана.
     /// </summary>
     private MenuItem CreateKillProcessMenuItem(
-        KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
+        KillProcessesMenuEntry entry,
+        IReadOnlyList<RunningOneCProcessDetails> allProcesses,
+        IReadOnlyDictionary<int, string>? baseNamesByPid)
         => entry.Kind == KillProcessesMenuEntryKind.KillAll
-            ? CreateKillAllMenuItem(entry, allProcesses)
+            ? CreateKillAllMenuItem(entry, allProcesses, baseNamesByPid)
             : CreateProcessMenuItem(entry);
 
-    /// <summary>Пункт «Завершить все» — верхний или внутри подменю базы (issue #134).</summary>
+    /// <summary>
+    /// Пункт «Завершить все» — верхний или внутри подменю базы (issue #134).
+    /// В <c>Tag</c> кладётся действие с процессами и именами их баз: сводка отчёта
+    /// перечисляет базы (доработка автора от 16.11.2026).
+    /// </summary>
     private MenuItem CreateKillAllMenuItem(
-        KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
+        KillProcessesMenuEntry entry,
+        IReadOnlyList<RunningOneCProcessDetails> allProcesses,
+        IReadOnlyDictionary<int, string>? baseNamesByPid)
     {
         var item = new MenuItem
         {
             Header = entry.Label,
             Style = TryFindResource("ModernMenuItem") as Style,
-            Tag = entry.Processes ?? allProcesses,
+            Tag = new KillProcessesKillAllAction(entry.Processes ?? allProcesses, baseNamesByPid),
         };
         item.Icon = CreateRowMenuIcon("CloseNetwork", "@ErrorBrush");
         item.Click += OnKillAllProcesses_Click;
@@ -595,9 +606,11 @@ public partial class MainWindow
     /// </summary>
     private void OnKillAllProcesses_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not MenuItem { Tag: IReadOnlyList<RunningOneCProcessDetails> processes }
-            || processes.Count == 0)
+        if (sender is not MenuItem { Tag: KillProcessesKillAllAction action }
+            || action.Processes.Count == 0)
             return;
+
+        var processes = action.Processes;
 
         var title = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey);
         var dialogs = AppServices.TryGetService<IDialogService>();
@@ -608,32 +621,30 @@ public partial class MainWindow
             return;
 
         var killer = AppServices.TryGetService<IOneCProcessKiller>();
-        var killed = 0;
-        var failed = 0;
+        var failedPids = new List<int>();
         foreach (var process in processes)
         {
             try
             {
-                if (killer is not null && killer.Kill(
+                if (killer is null || !killer.Kill(
                         process.Pid,
                         string.IsNullOrEmpty(process.StartTimeToken) ? null : process.StartTimeToken))
                 {
-                    killed++;
-                }
-                else
-                {
-                    failed++;
+                    failedPids.Add(process.Pid);
                 }
             }
             catch
             {
                 // Нет прав/процесс уже завершён — считаем ошибкой, продолжаем остальные.
-                failed++;
+                failedPids.Add(process.Pid);
             }
         }
 
-        var summary = string.Format(
-            LocalizationManager.T(KillProcessesMenuPlanner.KillAllSummaryFormatKey), killed, failed);
+        // Сводка перечисляет базы завершаемых процессов (доработка автора issue #134
+        // от 16.11.2026), а при ошибках — и базы, процессы которых завершить не удалось.
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, failedPids, LocalizationManager.T, action.BaseNamesByPid);
+        var failed = failedPids.Count;
         if (failed > 0)
             dialogs.ShowWarning(summary, title);
         else

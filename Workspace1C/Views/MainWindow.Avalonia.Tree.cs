@@ -3467,19 +3467,22 @@ namespace Workspace1C
                 switch (entry.Kind)
                 {
                     case KillProcessesMenuEntryKind.KillAll:
-                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(entry, plan.AllProcesses));
+                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(
+                            entry, plan.AllProcesses, plan.BaseNamesByPid));
                         break;
 
                     case KillProcessesMenuEntryKind.BaseGroup:
                         var groupItem = new MenuItem { Header = entry.Label };
                         groupItem.Styled(Themes.ControlThemes.ModernMenuItem);
                         foreach (var child in entry.Children ?? Array.Empty<KillProcessesMenuEntry>())
-                            groupItem.Items.Add(CreateAvaloniaKillProcessMenuItem(child, plan.AllProcesses));
+                            groupItem.Items.Add(CreateAvaloniaKillProcessMenuItem(
+                                child, plan.AllProcesses, plan.BaseNamesByPid));
                         menu.Items.Add(groupItem);
                         break;
 
                     default:
-                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(entry, plan.AllProcesses));
+                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(
+                            entry, plan.AllProcesses, plan.BaseNamesByPid));
                         break;
                 }
             }
@@ -3493,13 +3496,15 @@ namespace Workspace1C
         /// только процессы своей группы — их список лежит в самом элементе плана.
         /// </summary>
         private MenuItem CreateAvaloniaKillProcessMenuItem(
-            KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
+            KillProcessesMenuEntry entry,
+            IReadOnlyList<RunningOneCProcessDetails> allProcesses,
+            IReadOnlyDictionary<int, string>? baseNamesByPid)
         {
             var item = new MenuItem
             {
                 Header = entry.Label,
                 Tag = entry.Kind == KillProcessesMenuEntryKind.KillAll
-                    ? entry.Processes ?? allProcesses
+                    ? new KillProcessesKillAllAction(entry.Processes ?? allProcesses, baseNamesByPid)
                     : entry.Process,
             };
             item.Styled(Themes.ControlThemes.ModernMenuItem);
@@ -3507,8 +3512,11 @@ namespace Workspace1C
             if (entry.Kind == KillProcessesMenuEntryKind.KillAll)
             {
                 item.Icon = MenuIcon("IconClose", "@ErrorBrush");
-                var killAllProcesses = entry.Processes ?? allProcesses;
-                item.Click += (_, _) => OnKillAllProcessesClick(killAllProcesses);
+                // Сводка отчёта перечисляет базы процессов (доработка автора issue #134
+                // от 16.11.2026), поэтому в действие кладётся карта «PID → имя базы».
+                var killAllAction = new KillProcessesKillAllAction(
+                    entry.Processes ?? allProcesses, baseNamesByPid);
+                item.Click += (_, _) => OnKillAllProcessesClick(killAllAction);
                 return item;
             }
 
@@ -3577,10 +3585,12 @@ namespace Workspace1C
         /// отчётом «завершено/не удалось» → обновление индикаторов запуска. Ошибки
         /// отдельных процессов не прерывают остальные.
         /// </summary>
-        private void OnKillAllProcessesClick(IReadOnlyList<RunningOneCProcessDetails> processes)
+        private void OnKillAllProcessesClick(KillProcessesKillAllAction action)
         {
-            if (processes is null || processes.Count == 0)
+            if (action is null || action.Processes.Count == 0)
                 return;
+
+            var processes = action.Processes;
 
             var title = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey);
             var dialogs = AppServices.TryGetService<IDialogService>();
@@ -3591,32 +3601,30 @@ namespace Workspace1C
                 return;
 
             var killer = AppServices.TryGetService<IOneCProcessKiller>();
-            var killed = 0;
-            var failed = 0;
+            var failedPids = new List<int>();
             foreach (var process in processes)
             {
                 try
                 {
-                    if (killer is not null && killer.Kill(
+                    if (killer is null || !killer.Kill(
                             process.Pid,
                             string.IsNullOrEmpty(process.StartTimeToken) ? null : process.StartTimeToken))
                     {
-                        killed++;
-                    }
-                    else
-                    {
-                        failed++;
+                        failedPids.Add(process.Pid);
                     }
                 }
                 catch
                 {
                     // Нет прав/процесс уже завершён — считаем ошибкой, продолжаем остальные.
-                    failed++;
+                    failedPids.Add(process.Pid);
                 }
             }
 
-            var summary = string.Format(
-                LocalizationManager.T(KillProcessesMenuPlanner.KillAllSummaryFormatKey), killed, failed);
+            // Сводка перечисляет базы завершаемых процессов (доработка автора issue #134
+            // от 16.11.2026), а при ошибках — и базы, процессы которых завершить не удалось.
+            var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+                processes, failedPids, LocalizationManager.T, action.BaseNamesByPid);
+            var failed = failedPids.Count;
             if (failed > 0)
                 dialogs.ShowWarning(summary, title);
             else

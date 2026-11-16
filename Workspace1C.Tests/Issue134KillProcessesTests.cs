@@ -544,6 +544,110 @@ public sealed class Issue134KillProcessesTests
         Assert.Equal("база без имени (1)", plan.Entries[1].Label);
     }
 
+    // ===================== Сводка «Завершить все»: названия баз =====================
+
+    [Fact]
+    public void BuildMenuPlan_ProvidesBaseNamesByPid()
+    {
+        // Доработка автора issue #134 от 16.11.2026: сводка массового завершения
+        // перечисляет базы, поэтому план несёт карту «PID → имя базы».
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 3, processName: "1cv8.exe", commandLine: "DESIGNER /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 11, 0, 0)),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 9, 0, 0)),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"",
+                startTime: new DateTime(2026, 11, 16, 8, 0, 0))
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+
+        Assert.NotNull(plan.BaseNamesByPid);
+        Assert.Equal("zkgu", plan.BaseNamesByPid![2]);
+        Assert.Equal("zkgu", plan.BaseNamesByPid[3]);
+        Assert.Equal("bgu", plan.BaseNamesByPid[1]);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_MultipleBases_ListsBaseNamesInSelectionOrder()
+    {
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 3, processName: "1cv8.exe", commandLine: "DESIGNER /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 11, 0, 0)),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 9, 0, 0)),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"",
+                startTime: new DateTime(2026, 11, 16, 8, 0, 0))
+        };
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            plan.AllProcesses, Array.Empty<int>(), Translate, plan.BaseNamesByPid);
+
+        Assert.Contains("Завершено: 3, ошибок: 0", summary, StringComparison.Ordinal);
+        Assert.Contains("Базы: zkgu, bgu", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Не удалось завершить процессы баз", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_FailedProcesses_ListFailedBases()
+    {
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\""),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"")
+        };
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+
+        // Не удалось завершить процесс базы БГУ — она попадает в строку ошибок.
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            plan.AllProcesses, new[] { 1 }, Translate, plan.BaseNamesByPid);
+
+        Assert.Contains("Завершено: 1, ошибок: 1", summary, StringComparison.Ordinal);
+        Assert.Contains("Базы: zkgu, bgu", summary, StringComparison.Ordinal);
+        Assert.Contains("Не удалось завершить процессы баз: bgu", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("zkgu", summary[(summary.IndexOf(
+            "Не удалось завершить процессы баз", StringComparison.Ordinal))..], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_WithoutBaseNames_KeepsCountersOnly()
+    {
+        // Обратная совместимость: карты «PID → имя базы» нет — прежний текст со счётчиками.
+        var processes = new[] { Process(pid: 1), Process(pid: 2) };
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, new[] { 2 }, Translate);
+
+        Assert.Equal("Завершено: 1, ошибок: 1", summary);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_SameBaseSeveralProcesses_BaseListedOnce()
+    {
+        var alpha = FileBase("alpha", @"C:\Bases\Alpha");
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\"")
+        };
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { alpha }, processes, Translate);
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            plan.AllProcesses, Array.Empty<int>(), Translate, plan.BaseNamesByPid);
+
+        Assert.Contains("Базы: alpha", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("alpha, alpha", summary, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void BuildMenuItems_GroupedPlan_FlattensProcessesInGroupOrder()
     {
@@ -606,6 +710,11 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllConfirmFormatKey], StringComparison.Ordinal);
         Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllSummaryFormatKey], StringComparison.Ordinal);
         Assert.Contains("{1}", strings[KillProcessesMenuPlanner.KillAllSummaryFormatKey], StringComparison.Ordinal);
+
+        // Сводка массового завершения перечисляет базы (доработка автора issue #134).
+        Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllBasesFormatKey], StringComparison.Ordinal);
+        Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllFailedBasesFormatKey], StringComparison.Ordinal);
+        Assert.Equal(", ", strings[KillProcessesMenuPlanner.BasesSeparatorKey]);
     }
 
     [Fact]
@@ -629,6 +738,9 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains(KillProcessesMenuPlanner.KillAllTitleKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillAllConfirmFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillAllSummaryFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllBasesFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllFailedBasesFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.BasesSeparatorKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.GroupHeaderFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.UnknownBaseKey, ru);
     }
@@ -720,8 +832,11 @@ public sealed class Issue134KillProcessesTests
             Assert.Contains("KillProcessesMenuEntryKind.KillAll", source, StringComparison.Ordinal);
             Assert.Contains("KillProcessesMenuEntryKind.BaseGroup", source, StringComparison.Ordinal);
             Assert.Contains("plan.AllProcesses", source, StringComparison.Ordinal);
+            // Имена баз для сводки берутся из плана (доработка автора issue #134).
+            Assert.Contains("plan.BaseNamesByPid", source, StringComparison.Ordinal);
             Assert.Contains("KillProcessesMenuPlanner.KillAllConfirmFormatKey", source, StringComparison.Ordinal);
-            Assert.Contains("KillProcessesMenuPlanner.KillAllSummaryFormatKey", source, StringComparison.Ordinal);
+            // Сводку собирает общий слой — в оболочках нет хардкода текста отчёта.
+            Assert.Contains("KillProcessesMenuPlanner.FormatKillAllSummary(", source, StringComparison.Ordinal);
             Assert.Contains("dialogs.ShowWarning(summary, title);", source, StringComparison.Ordinal);
             Assert.Contains("dialogs.ShowInfo(summary, title);", source, StringComparison.Ordinal);
             // «Завершить все» внутри подменю базы: список процессов берётся из элемента
@@ -742,10 +857,10 @@ public sealed class Issue134KillProcessesTests
 
         // Дочерние пункты группы создаются тем же методом, что понимает KillAll —
         // иначе вложенный «Завершить все» отрисовался бы как пункт процесса.
-        Assert.Contains(
-            "CreateKillProcessMenuItem(child, plan.AllProcesses)", wpf, StringComparison.Ordinal);
-        Assert.Contains(
-            "CreateAvaloniaKillProcessMenuItem(child, plan.AllProcesses)", avalonia, StringComparison.Ordinal);
+        Assert.Contains("CreateKillProcessMenuItem(", wpf, StringComparison.Ordinal);
+        Assert.Contains("child, plan.AllProcesses", wpf, StringComparison.Ordinal);
+        Assert.Contains("CreateAvaloniaKillProcessMenuItem(", avalonia, StringComparison.Ordinal);
+        Assert.Contains("child, plan.AllProcesses", avalonia, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -778,6 +893,9 @@ public sealed class Issue134KillProcessesTests
         [KillProcessesMenuPlanner.KillAllTitleKey] = "Завершить все",
         [KillProcessesMenuPlanner.KillAllConfirmFormatKey] = "Завершить все процессы ({0})?",
         [KillProcessesMenuPlanner.KillAllSummaryFormatKey] = "Завершено: {0}, ошибок: {1}",
+        [KillProcessesMenuPlanner.KillAllBasesFormatKey] = "Базы: {0}",
+        [KillProcessesMenuPlanner.KillAllFailedBasesFormatKey] = "Не удалось завершить процессы баз: {0}",
+        [KillProcessesMenuPlanner.BasesSeparatorKey] = ", ",
         [KillProcessesMenuPlanner.GroupHeaderFormatKey] = "{0} ({1})",
         [KillProcessesMenuPlanner.UnknownBaseKey] = "база без имени",
     };

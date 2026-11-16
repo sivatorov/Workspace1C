@@ -2417,6 +2417,9 @@
     "KillProcesses.KillAllTitle": "Завершить все",
     "KillProcesses.KillAllConfirmFormat": "Завершить все процессы выбранных баз ({0})?\n\nНесохранённые данные в открытых сеансах 1С будут потеряны.\nПродолжить?",
     "KillProcesses.KillAllSummaryFormat": "Завершено процессов: {0}. Не удалось завершить: {1}.",
+    "KillProcesses.KillAllBasesFormat": "Базы: {0}",
+    "KillProcesses.KillAllFailedBasesFormat": "Не удалось завершить процессы баз: {0}",
+    "KillProcesses.BasesSeparator": ", ",
     "KillProcesses.GroupHeaderFormat": "{0} ({1})",
     "KillProcesses.UnknownBase": "база без имени",
 
