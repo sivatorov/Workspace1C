@@ -2142,6 +2142,11 @@
     "Main.ErrSaveBasesTitle": "Save error",
     "Main.FlatFound": "Found",
     "Main.FlatAllBases": "All bases",
+    "Main.TreeRoot.All": "All",
+    "Main.TreeRoot.Favorites": "Favorites",
+    "Main.TreeRoot.Recent": "Recent",
+    "Main.TreeRoot.Running": "Running",
+    "Main.TreeRoot.Found": "Found",
 
     "Main.PromptImportEmpty": "The infobase list is empty.\n\nDo you want to load bases from the standard 1C file (ibases.v8i)?",
     "Main.LoadBasesTitle": "Load bases",

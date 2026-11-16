@@ -2142,6 +2142,11 @@
     "Main.ErrSaveBasesTitle": "Ошибка сохранения",
     "Main.FlatFound": "Найдено",
     "Main.FlatAllBases": "Все базы",
+    "Main.TreeRoot.All": "Все",
+    "Main.TreeRoot.Favorites": "Избранное",
+    "Main.TreeRoot.Recent": "Недавние",
+    "Main.TreeRoot.Running": "Запущенные",
+    "Main.TreeRoot.Found": "Найдено",
 
     "Main.PromptImportEmpty": "Список информационных баз пуст.\n\nХотите загрузить базы из стандартного файла 1С (ibases.v8i)?",
     "Main.LoadBasesTitle": "Загрузка баз",

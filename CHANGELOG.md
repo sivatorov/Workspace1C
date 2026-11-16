@@ -11,6 +11,40 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.70] — 2026-11-16
+
+### Изменено
+
+- **Корень дерева баз подписывается именем раздела (issue #133, ArtyoZ).**
+  При пустом поле поиска корневой узел в разделах «Все», «Избранное», «Недавние»
+  и «Запущенные» показывает имя раздела, а не «Найдено»; «Найдено» остаётся только
+  при непустом поиске. Счётчик «(N)» и его формат не изменились.
+  Правило вынесено в чистую функцию
+  [`TreeRootHeaderResolver`](Workspace1C/Services/TreeRootHeaderResolver.cs:1)
+  (по разделу, признаку активного поиска и количеству — ключ подписи и полный текст),
+  поэтому поведение одинаково в обеих оболочках: WPF
+  [`MainViewModel.Theme.cs`](Workspace1C/ViewModels/MainViewModel.Theme.cs:987)
+  и Avalonia
+  [`MainViewModel.Avalonia.cs`](Workspace1C/ViewModels/MainViewModel.Avalonia.cs:1309).
+  Узел раздела «Все» сохраняет маркер «Все базы» (иконку базы), но подписывается
+  как «Все» — ключ маркера обновлён в
+  [`GroupNodeViewModel.cs`](Workspace1C/ViewModels/GroupNodeViewModel.cs:263)
+  и [`GroupNodeViewModel.Avalonia.cs`](Workspace1C/ViewModels/GroupNodeViewModel.Avalonia.cs:245).
+  Новые ключи локализации ru/en: `Main.TreeRoot.All`, `Main.TreeRoot.Favorites`,
+  `Main.TreeRoot.Recent`, `Main.TreeRoot.Running`, `Main.TreeRoot.Found`
+  ([`ru.json`](Workspace1C/Localization/Languages/ru.json:2145),
+  [`en.json`](Workspace1C/Localization/Languages/en.json:2145)).
+
+### Тесты
+
+- `Workspace1C.Tests/Issue133TreeRootHeaderTests.cs`: пустой поиск по каждому разделу
+  (ключ и текст ru/en), активный поиск («Найдено»), счётчик и пустой список,
+  маркер узла «Все», совпадение набора ключей локализации ru/en и source-гварды
+  обеих платформ (WPF и Avalonia используют общий резолвер; разметка выводит
+  `DisplayName` + `GroupCountSuffix`).
+- `Release100159Tests`: ожидания версии обновлены до 1.0.1.70.
+- `GroupNodeViewModelTests`: маркер «Все базы» проверяется по общему ключу раздела.
+
 ## [1.0.1.69] — 2026-11-15
 
 ### Добавлено

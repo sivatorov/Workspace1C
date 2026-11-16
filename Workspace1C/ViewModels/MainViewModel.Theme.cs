@@ -982,15 +982,20 @@ public partial class MainViewModel : ViewModelBase
             // группировка по группам теряет смысл.
             if (flatMode)
             {
-                var filterActive = IsFilterModeActive();
+                // Подпись корня (issue #133): при пустом поле поиска — имя раздела
+                // («Все»/«Избранное»/«Недавние»/«Запущенные»), при непустом — «Найдено».
+                // Правило общее для WPF и Avalonia — TreeRootHeaderResolver.
+                var header = TreeRootHeaderResolver.Resolve(
+                    TreeRootHeaderResolver.FromListViewMode(_listViewMode),
+                    !string.IsNullOrWhiteSpace(SearchText));
                 // Постоянный плоский узел (issue #21, Этап C): переиспользуем один узел и
                 // обновляем только его содержимое (маркер/имя + Items одним Reset) — контейнер
                 // корневого узла в TreeView не пересоздаётся при каждом переключении вкладки.
                 _flatNode ??= new GroupNodeViewModel(null);
                 _flatNode.ResetFlatContent(
                     visible,
-                    displayName: filterActive ? LocalizationManager.T("Main.FlatFound") : null,
-                    marker: filterActive ? null : GroupNodeViewModel.AllBasesMarker);
+                    displayName: LocalizationManager.T(header.NameKey),
+                    marker: header.UseAllBasesMarker ? GroupNodeViewModel.AllBasesMarker : null);
                 _flatNode.IsExpanded = true;
             }
             else if (!(_groupedTreeCacheValid && _groupedTreeCache is not null))

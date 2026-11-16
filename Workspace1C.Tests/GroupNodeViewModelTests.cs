@@ -1,5 +1,6 @@
 using Workspace1C.Localization;
 using Workspace1C.Models;
+using Workspace1C.Services;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -352,8 +353,8 @@ public sealed class GroupNodeViewModelTests
     [Fact]
     public void ResetFlatContent_SwitchesMarkerAndDisplayName()
     {
-        // Смена режима: «Найдено» (поиск/фильтр, marker == null) vs «Все базы»
-        // (отключённая группировка, AllBasesMarker). Свойства перечитываются.
+        // Смена режима: «Найдено» (поиск/фильтр, marker == null) vs «Все»
+        // (отключённая группировка, AllBasesMarker; issue #133). Свойства перечитываются.
         var node = new GroupNodeViewModel(null);
         var bases = new[] { CreateBase() };
 
@@ -364,7 +365,7 @@ public sealed class GroupNodeViewModelTests
         node.ResetFlatContent(bases, displayName: null, marker: GroupNodeViewModel.AllBasesMarker);
         Assert.Equal(GroupNodeViewModel.AllBasesMarker, node.Marker);
         // В тестовой среде LocalizationManager не инициализирован и T возвращает ключ.
-        Assert.Equal(LocalizationManager.T("Main.FlatAllBases"), node.DisplayName);
+        Assert.Equal(LocalizationManager.T(TreeRootHeaderResolver.AllKey), node.DisplayName);
     }
 
     [Fact]

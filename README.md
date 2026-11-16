@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.69-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.70-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.69**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.70**
 (поддерживается **более 6 800 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -205,6 +205,11 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Корень дерева баз показывает имя раздела (1.0.1.70, Windows и Linux)** —
+  при пустом поле поиска корень в разделах «Все», «Избранное», «Недавние» и
+  «Запущенные» подписан именем раздела, а «Найдено» появляется только при
+  непустом поиске; счётчик баз сохранён (issue #133). Подробности — в
+  [CHANGELOG.md](CHANGELOG.md).
 - **Иконка программы из файла — по галочке, иначе иконка исполняемого файла
   (1.0.1.69, Windows и Linux)** — в редакторе «Мои программы» появилась галочка
   «Иконка из файла»: без неё показывается основная иконка запускаемого файла

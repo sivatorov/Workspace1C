@@ -6,6 +6,7 @@ using Workspace1C.Collections;
 using Workspace1C.Converters;
 using Workspace1C.Localization;
 using Workspace1C.Models;
+using Workspace1C.Services;
 
 namespace Workspace1C.ViewModels;
 
@@ -258,7 +259,8 @@ public class GroupNodeViewModel : ViewModelBase
     private static string MarkerToKey(string marker) => marker switch
     {
         PinnedMarker => "Main.Pinned",
-        AllBasesMarker => "Main.FlatAllBases",
+        // Issue #133: корень «Все» подписывается именем раздела, а не «Все базы».
+        AllBasesMarker => TreeRootHeaderResolver.AllKey,
         NoGroupMarker => "Group.NoGroup",
         _ => marker
     };
