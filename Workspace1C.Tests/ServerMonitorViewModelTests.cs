@@ -319,6 +319,9 @@ public sealed class ServerMonitorViewModelTests
         // таймер автообновления останавливается — во время подключения тик таймера не
         // смешивает старый контекст с новым адресом; после успешного подключения (галка
         // стоит) таймер возобновляется.
+        // Проверка детерминированная: вместо фиксированной паузы «cluster list» держится
+        // затвором (под нагрузкой полного прогона Task.Delay(50) мог «проснуться» уже
+        // после завершения переподключения, и тест падал ложно).
         var client = new FakeRacClient();
         var vm = new ServerMonitorViewModel(client, new RecordingDialogs());
 
@@ -329,13 +332,17 @@ public sealed class ServerMonitorViewModelTests
 
         // Переподключение к другому серверу с «медленным» rac: пока идёт запрос
         // «cluster list», таймер должен быть остановлен (не тикает «микс»).
-        client.ClustersDelay = TimeSpan.FromMilliseconds(300);
+        client.ClustersStarted = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        client.ClustersGate = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
         var reconnect = vm.ConnectAsync();
-        await Task.Delay(50);
+        await client.ClustersStarted.Task.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.False(vm.AutoRefreshActive);
 
-        // После успешного завершения подключения таймер восстановлен (галка стоит).
-        await reconnect;
+        // Отпускаем «cluster list»: подключение завершается успешно, таймер восстановлен.
+        client.ClustersGate.SetResult();
+        await reconnect.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(vm.HasConnected);
         Assert.True(vm.AutoRefreshActive);
     }
@@ -2780,6 +2787,14 @@ public sealed class ServerMonitorViewModelTests
         /// подключения, во время которого таймер автообновления должен быть остановлен.</summary>
         public TimeSpan ClustersDelay { get; set; } = TimeSpan.Zero;
 
+        /// <summary>Сигнал «запрос cluster list начался» — детерминированное ожидание
+        /// вместо фиксированной паузы (issue #77).</summary>
+        public TaskCompletionSource? ClustersStarted { get; set; }
+
+        /// <summary>Затвор «cluster list»: пока не установлен, ответ не возвращается —
+        /// подключение гарантированно «висит» столько, сколько нужно тесту (issue #77).</summary>
+        public TaskCompletionSource? ClustersGate { get; set; }
+
         /// <summary>Сколько раз запрошены регламентные задания.</summary>
         public int JobCalls { get; private set; }
 
@@ -2819,6 +2834,11 @@ public sealed class ServerMonitorViewModelTests
             RacConnectionParams parameters, CancellationToken cancellationToken = default)
         {
             LastParams = parameters;
+            // issue #77: детерминированная имитация идущего подключения — тест узнаёт,
+            // что запрос начался, и сам решает, когда его отпустить.
+            ClustersStarted?.TrySetResult();
+            if (ClustersGate is { } gate)
+                await gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             // issue #77: имитация идущего подключения — таймер автообновления в это
             // время должен быть остановлен.
             if (ClustersDelay > TimeSpan.Zero)

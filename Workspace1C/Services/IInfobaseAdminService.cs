@@ -40,10 +40,18 @@ public interface IInfobaseAdminService
 
     /// <summary>
     /// Установленные платформы, в каталоге <c>bin</c> которых есть оснастка консоли
-    /// администрирования серверов (<c>1CV8Servers.msc</c>), новейшие первыми.
-    /// На Linux внешней консоли нет — пустой список.
+    /// администрирования серверов (<c>1CV8Servers.msc</c> и альтернативные имена,
+    /// issue #135), новейшие первыми. На Linux внешней консоли нет — пустой список.
     /// </summary>
     IReadOnlyList<ServerConsoleCandidate> GetServerConsoleCandidates();
+
+    /// <summary>
+    /// Все установленные платформы со статусом оснастки консоли администрирования
+    /// серверов (issue #135). Диалог выбора версии показывается, когда платформ
+    /// больше одной, и отображает статус по каждой версии — даже если оснастка не
+    /// найдена ни в одной из них. На Linux внешней консоли нет — пустой список.
+    /// </summary>
+    IReadOnlyList<ServerConsolePlatformOption> GetServerConsolePlatformOptions();
 
     /// <summary>
     /// Регистрирует компоненты внешней консоли (<c>radmin.dll</c>, <c>comctrl.dll</c>)

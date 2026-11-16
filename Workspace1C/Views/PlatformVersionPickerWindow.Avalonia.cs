@@ -30,6 +30,8 @@ namespace Workspace1C
         private bool _sortAscending; // по умолчанию — свежие версии сверху
         private string _archFilter = "all";
         private bool _isRestoringSelection; // перестроение дерева: гасим SelectionChanged(null) (#304)
+        // Статус по каждой версии (issue #135): «оснастка найдена/не найдена».
+        private readonly IReadOnlyDictionary<string, string>? _statusByVariant;
 
         // Целевой узел для первичного выделения текущей версии (и его предки).
         private PlatformVersionGroup? _initialLeaf;
@@ -47,12 +49,17 @@ namespace Workspace1C
         /// <param name="currentVersion">Текущая (сохранённая) версия — подсвечивается в дереве.</param>
         /// <param name="useProvidedVersionsOnly">
         /// true — показывать только переданный список (issue #135: внешняя консоль предлагает
-        /// лишь версии, в которых реально есть 1CV8Servers.msc), не подмешивая все установленные.
+        /// лишь переданные версии), не подмешивая все установленные.
+        /// </param>
+        /// <param name="statusByVariant">
+        /// Статус по каждой версии (issue #135): «оснастка найдена: 1CV8Servers64.msc» или
+        /// «оснастка не найдена» — показывается справа от названия сборки. null — без статусов.
         /// </param>
         public PlatformVersionPickerWindow(
             IEnumerable<string> installedPlatformVersions,
             string currentVersion,
-            bool useProvidedVersionsOnly = false)
+            bool useProvidedVersionsOnly = false,
+            IReadOnlyDictionary<string, string>? statusByVariant = null)
         {
             Title = LocalizationManager.T("PlatformVersionPicker.Title");
             Width = 520;
@@ -61,6 +68,7 @@ namespace Workspace1C
             MinHeight = 400;
 
             _currentVersion = currentVersion ?? "";
+            _statusByVariant = statusByVariant;
 
             var extras = PlatformVersionService.GetAdditionalSearchPaths();
             if (!useProvidedVersionsOnly)
@@ -323,6 +331,24 @@ namespace Workspace1C
                 if (thin)
                     text.Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706");
                 panel.Children.Add(text);
+
+                // Статус оснастки консоли администрирования серверов (issue #135):
+                // видно, в каких версиях платформы она реально найдена.
+                if (!string.IsNullOrWhiteSpace(node.StatusHint))
+                {
+                    var status = new TextBlock
+                    {
+                        Text = node.StatusHint,
+                        FontSize = 11,
+                        Margin = new Thickness(8, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        Foreground = Themes.ThemeBrushes.Get("TextSecondaryBrush", "#6B7280")
+                    };
+                    ToolTip.SetTip(status, LocalizationManager.T("Admin.ServerConsolePickAnyHint"));
+                    panel.Children.Add(status);
+                }
+
                 return panel;
             }
             return new TextBlock { Text = item?.ToString() ?? string.Empty };
@@ -345,6 +371,9 @@ namespace Workspace1C
             if (_sortAscending)
                 tree = ReverseTreeOrder(tree);
 
+            // Статус оснастки по каждой версии (issue #135): видно, где консоль доступна.
+            ApplyStatusHints(tree);
+
             // При замене ItemsSource SelectionChanged приходит с null (старый узел удалён):
             // гасим событие, чтобы не сбрасывать _selectedVersion до восстановления выбора (#304).
             _isRestoringSelection = true;
@@ -363,6 +392,28 @@ namespace Workspace1C
             finally
             {
                 _isRestoringSelection = false;
+            }
+        }
+
+        /// <summary>
+        /// Проставляет статус оснастки листьям дерева (issue #135): пользователь видит,
+        /// в каких версиях платформы внешняя консоль администрирования серверов доступна.
+        /// </summary>
+        private void ApplyStatusHints(IEnumerable<PlatformVersionGroup> nodes)
+        {
+            if (_statusByVariant is null)
+                return;
+
+            foreach (var node in nodes)
+            {
+                if (node.IsLeaf && !string.IsNullOrWhiteSpace(node.Variant)
+                    && _statusByVariant.TryGetValue(node.Variant!, out var status))
+                {
+                    node.StatusHint = status;
+                }
+
+                if (node.Children.Count > 0)
+                    ApplyStatusHints(node.Children);
             }
         }
 

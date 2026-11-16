@@ -257,6 +257,13 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
+                            <!-- Статус оснастки консоли администрирования серверов (issue #135):
+                                 видно, в каких версиях платформы она реально найдена. -->
+                            <TextBlock Text="{Binding StatusHint}" Margin="8,0,0,0"
+                                       FontSize="11" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextTrimming="CharacterEllipsis"
+                                       ToolTip="{loc:Loc Admin.ServerConsolePickAnyHint}"/>
                         </StackPanel>
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>

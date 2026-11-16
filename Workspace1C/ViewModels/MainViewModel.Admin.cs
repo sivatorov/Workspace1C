@@ -99,23 +99,28 @@ public partial class MainViewModel
     private void ExecuteOpenServerConsole()
     {
         var service = AppServices.GetRequiredService<IInfobaseAdminService>();
+        var options = service.GetServerConsolePlatformOptions();
         var candidates = service.GetServerConsoleCandidates();
-        var candidate = PickServerConsoleCandidate(candidates);
 
-        // Пользователь отменил выбор версии — молча выходим, ничего не запуская.
-        if (candidates.Count > 0 && candidate is null)
-            return;
+        // Выбор версии — всегда при нескольких платформах (issue #135): диалог показывает
+        // статус оснастки по каждой версии, даже если она не найдена ни в одной из них.
+        var selected = PickServerConsoleVersion(options, candidates);
+        if (selected is null && ServerConsolePlanner.ShouldShowPlatformPicker(options))
+            return; // пользователь отменил выбор версии — ничего не запускаем
 
         var result = service.OpenServerAdminConsole(
-            SelectedInfobase, candidate?.Display ?? ServerConsolePlatformVersion);
+            SelectedInfobase, selected ?? ServerConsolePlatformVersion);
         if (result.Success)
             return;
 
+        // Диалог ошибки показывает диагностику (проверенные каталоги и найденные .msc):
+        // ServerConsoleMessages.Format добавляет её к локализованной причине отказа.
         var title = LocalizationManager.T("Admin.ServerConsoleTitle");
         _dialogs.ShowError(ServerConsoleMessages.Format(result), title);
 
-        // Если причина — сбой запуска, предлагаем зарегистрировать компоненты консоли.
-        if (result.ErrorKey == ServerConsolePlanner.ErrorLaunchFailed &&
+        // Оснастка не найдена или запуск не удался — предлагаем зарегистрировать
+        // компоненты консоли (radmin.dll, comctrl.dll), как просил автор issue #135.
+        if (result.CanOfferRegistration &&
             _dialogs.Confirm(
                 LocalizationManager.T("Admin.ServerConsoleOfferRegister"), title))
         {
@@ -126,17 +131,14 @@ public partial class MainViewModel
     private void ExecuteRegisterServerConsoleComponents()
     {
         var service = AppServices.GetRequiredService<IInfobaseAdminService>();
+        var options = service.GetServerConsolePlatformOptions();
         var candidates = service.GetServerConsoleCandidates();
-        var candidate = PickServerConsoleCandidate(candidates);
-        if (candidate is null)
-        {
-            // Нет платформы с оснасткой (или выбор отменён) — показываем точную причину сервиса.
-            ShowServerConsoleRegistrationResult(
-                service.RegisterServerConsoleComponents(ServerConsolePlatformVersion));
-            return;
-        }
 
-        var version = candidate.Display;
+        var selected = PickServerConsoleVersion(options, candidates);
+        if (selected is null && ServerConsolePlanner.ShouldShowPlatformPicker(options))
+            return; // выбор версии отменён
+
+        var version = selected ?? ServerConsolePlatformVersion;
         // regsvr32 с UAC ждёт действия пользователя — не блокируем UI-поток.
         _ = Task.Run(() =>
         {
@@ -146,27 +148,36 @@ public partial class MainViewModel
     }
 
     /// <summary>
-    /// Выбор версии платформы для консоли: единственная версия — без диалога,
-    /// несколько — диалог только по установленным версиям с оснасткой.
+    /// Выбор версии платформы для консоли (issue #135). Диалог показывается всегда,
+    /// когда установлено больше одной платформы: пользователь видит статус оснастки
+    /// по каждой версии, даже если оснастка не найдена ни в одной из них.
+    /// Возвращает выбранный вариант («8.3.27.1688 (64)») или null при отмене.
     /// </summary>
-    private ServerConsoleCandidate? PickServerConsoleCandidate(
+    private string? PickServerConsoleVersion(
+        IReadOnlyList<ServerConsolePlatformOption> options,
         IReadOnlyList<ServerConsoleCandidate> candidates)
     {
-        if (candidates.Count == 0)
-            return null;
+        var variants = BuildServerConsoleVariants(options, candidates);
+        if (variants.Count == 0)
+            return string.IsNullOrWhiteSpace(ServerConsolePlatformVersion)
+                ? null
+                : ServerConsolePlatformVersion;
 
-        if (!ServerConsolePlanner.ShouldShowPicker(candidates))
+        if (variants.Count == 1)
         {
-            var only = candidates[0];
+            var only = variants[0];
             if (string.IsNullOrWhiteSpace(ServerConsolePlatformVersion))
-                ServerConsolePlatformVersion = only.Display;
-            return ServerConsolePlanner.ChoosePreferred(candidates, ServerConsolePlatformVersion) ?? only;
+                ServerConsolePlatformVersion = only;
+            return ServerConsolePlanner.ChoosePreferredPlatform(options, ServerConsolePlatformVersion)?.Display
+                   ?? ServerConsolePlanner.ChoosePreferred(candidates, ServerConsolePlatformVersion)?.Display
+                   ?? only;
         }
 
         var dialog = new Workspace1C.PlatformVersionPickerWindow(
-            candidates.Select(c => c.Display).ToList(),
+            variants,
             ServerConsolePlatformVersion,
-            useProvidedVersionsOnly: true);
+            useProvidedVersionsOnly: true,
+            statusByVariant: ServerConsoleMessages.BuildPlatformStatuses(options));
         if (Application.Current?.MainWindow is { } owner)
             dialog.Owner = owner;
         if (dialog.ShowDialog() != true)
@@ -177,7 +188,27 @@ public partial class MainViewModel
             return null;
 
         ServerConsolePlatformVersion = selected;
-        return ServerConsolePlanner.ChoosePreferred(candidates, selected);
+        return selected;
+    }
+
+    /// <summary>
+    /// Варианты для диалога выбора версии (issue #135): все установленные платформы,
+    /// а если их список пуст — платформы с оснасткой.
+    /// </summary>
+    private static List<string> BuildServerConsoleVariants(
+        IReadOnlyList<ServerConsolePlatformOption> options,
+        IReadOnlyList<ServerConsoleCandidate> candidates)
+    {
+        var variants = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var display in options.Select(o => o.Display).Concat(candidates.Select(c => c.Display)))
+        {
+            if (string.IsNullOrWhiteSpace(display) || !seen.Add(display))
+                continue;
+            variants.Add(display);
+        }
+
+        return variants;
     }
 
     private void ShowServerConsoleRegistrationResult(ServerConsoleRegistrationResult result)

@@ -177,20 +177,8 @@ public sealed class InfobaseAdminService : IInfobaseAdminService
         var baseLabel = infobase is null ? string.Empty : $" для базы «{infobase.Name}»";
 
 #if WINDOWS
-        var candidates = GetServerConsoleCandidates();
-
-        // Причина отказа по каждой ветке — наружу (issue #135), иначе пункт меню
-        // «молча ничего не делает»: раньше bool терялся за общим текстом.
-        if (candidates.Count == 0)
-        {
-            var resolvedBinDir = OneCPlatformLocator.ResolveBinDirectory(infobase);
-            var anyPlatform = PlatformVersionService.FindPlatformVersionDirs("64").Count > 0
-                           || PlatformVersionService.FindPlatformVersionDirs("32").Count > 0;
-            var failure = ServerConsolePlanner.EvaluateAvailability(candidates, resolvedBinDir, anyPlatform);
-            _logger.Warn(
-                $"Консоль администрирования серверов 1С{baseLabel}: {ServerConsoleMessages.Format(failure)}");
-            return failure;
-        }
+        var options = GetServerConsolePlatformOptions();
+        var candidates = ToCandidates(options);
 
         // Версия из диалога/настроек имеет приоритет; затем — версия базы; затем новейшая.
         var preferred = platformVersion;
@@ -199,72 +187,94 @@ public sealed class InfobaseAdminService : IInfobaseAdminService
 
         var candidate = ServerConsolePlanner.ChoosePreferred(candidates, preferred)
                         ?? ServerConsolePlanner.ChoosePreferred(candidates, null);
+
+        // Диагностика (issue #135): проверенные каталоги, найденные .msc, число платформ
+        // и выбранная стратегия запуска — попадает в отказ и в диалог ошибки.
+        var diagnostics = ServerConsolePlanner.BuildDiagnostics(
+            options,
+            ServerConsoleLaunchStrategies.None,
+            candidate?.Display,
+            candidate?.SnapInPath);
+
+        // Причина отказа по каждой ветке — наружу (issue #135), иначе пункт меню
+        // «молча ничего не делает»: раньше bool терялся за общим текстом.
         if (candidate is null)
         {
-            var failure = ServerConsoleResult.Fail(ServerConsolePlanner.ErrorSnapInNotFound);
+            // Не тупик (issue #135, п. 3d): отказ с диагностикой и признаками
+            // CanOfferPlatformPicker/CanOfferRegistration для предложения действий в UI.
+            var resolvedBinDir = OneCPlatformLocator.ResolveBinDirectory(infobase);
+            var failure = ServerConsolePlanner.EvaluateAvailability(
+                candidates, resolvedBinDir, anyPlatformFound: options.Count > 0, diagnostics);
             _logger.Warn(
                 $"Консоль администрирования серверов 1С{baseLabel}: {ServerConsoleMessages.Format(failure)}");
             return failure;
         }
 
-        // Оснастку запускаем через mmc.exe, а не shell-ассоциацией .msc: так путь
-        // передаётся явно, работает при отсутствии ассоциации и позволяет учесть
-        // разрядность. Для 32-битной платформы её radmin.dll — 32-битный COM-сервер,
-        // который 64-битный mmc.exe не загрузит, поэтому добавляем /32.
-        var use32Bit = ServerConsolePlanner.ShouldUse32Bit(candidate.Architecture);
-        var arguments = ServerConsolePlanner.BuildMmcArguments(candidate.SnapInPath, use32Bit);
+        // Каскад стратегий запуска (issue #135), каждая попытка логируется:
+        // a) mmc.exe "основной .msc" (+ /32 для 32-битной платформы);
+        // b) mmc.exe с явным /32 или без него для альтернативного файла оснастки;
+        // c) запуск .msc через оболочку (UseShellExecute=true).
         var mmc = ServerConsolePlanner.ResolveMmcExecutable(Environment.SystemDirectory, File.Exists);
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = mmc,
-                Arguments = arguments,
-                UseShellExecute = false
-            });
-            _logger.Info(
-                $"Консоль администрирования серверов 1С{baseLabel}: запущен {mmc} {arguments} " +
-                $"(версия {candidate.Display}).");
-            return ServerConsoleResult.Ok(candidate.SnapInPath);
-        }
-        catch (Exception ex)
-        {
-            _logger.Error(
-                $"Консоль администрирования серверов 1С{baseLabel}: не удалось запустить {mmc} {arguments}. " +
-                ex.Message, ex);
+        var plan = ServerConsolePlanner.BuildLaunchPlan(candidate, mmc);
+        var errors = new List<string>();
 
-            // Откат на прежний shell-запуск оснастки: сработает, если ассоциация .msc
-            // настроена, а mmc.exe недоступен по нестандартной причине.
+        foreach (var attempt in plan)
+        {
+            var commandLine = $"{attempt.FileName} {attempt.Arguments}".TrimEnd();
             try
             {
+                _logger.Info(
+                    $"Консоль администрирования серверов 1С{baseLabel}: попытка запуска " +
+                    $"({attempt.Strategy}) {commandLine}");
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = candidate.SnapInPath,
-                    UseShellExecute = true
+                    FileName = attempt.FileName,
+                    Arguments = attempt.Arguments ?? string.Empty,
+                    UseShellExecute = attempt.UseShellExecute
                 });
                 _logger.Info(
-                    $"Консоль администрирования серверов 1С{baseLabel}: оснастка запущена через оболочку " +
-                    $"{candidate.SnapInPath}.");
-                return ServerConsoleResult.Ok(candidate.SnapInPath);
+                    $"Консоль администрирования серверов 1С{baseLabel}: запущено " +
+                    $"({attempt.Strategy}) {commandLine} (версия {candidate.Display}).");
+                return ServerConsoleResult.Ok(
+                    attempt.SnapInPath ?? candidate.SnapInPath,
+                    diagnostics.WithStrategy(attempt.Strategy));
             }
-            catch (Exception fallbackEx)
+            catch (Exception ex)
             {
-                _logger.Error(
-                    $"Консоль администрирования серверов 1С{baseLabel}: запуск через оболочку тоже не удался. " +
-                    fallbackEx.Message, fallbackEx);
-                return ServerConsoleResult.Fail(ServerConsolePlanner.ErrorLaunchFailed, fallbackEx.Message);
+                errors.Add($"{commandLine}: {ex.Message}");
+                _logger.Warn(
+                    $"Консоль администрирования серверов 1С{baseLabel}: попытка {attempt.Strategy} " +
+                    $"не удалась: {ex.Message}");
             }
         }
+
+        var failedDiagnostics = diagnostics.WithStrategy(ServerConsoleLaunchStrategies.None);
+        var launchFailure = ServerConsoleResult.Fail(
+            ServerConsolePlanner.ErrorLaunchFailed,
+            string.Join(Environment.NewLine, errors),
+            failedDiagnostics);
+        _logger.Error(
+            $"Консоль администрирования серверов 1С{baseLabel}: все стратегии запуска не удались. " +
+            ServerConsoleMessages.Format(launchFailure));
+        return launchFailure;
 #else
         // На Linux внешней консоли (оснастки MMC) нет: сообщаем причину, а не молчим.
         _logger.Warn(
             $"Консоль администрирования серверов 1С{baseLabel}: внешняя оснастка доступна только в Windows.");
-        return ServerConsoleResult.Fail(ServerConsolePlanner.ErrorWindowsOnly);
+        return ServerConsoleResult.Fail(
+            ServerConsolePlanner.ErrorWindowsOnly,
+            null,
+            new ServerConsoleDiagnostics(
+                Array.Empty<string>(), Array.Empty<string>(), 0, ServerConsoleLaunchStrategies.WindowsOnly));
 #endif
     }
 
     /// <inheritdoc />
     public IReadOnlyList<ServerConsoleCandidate> GetServerConsoleCandidates()
+        => ToCandidates(GetServerConsolePlatformOptions());
+
+    /// <inheritdoc />
+    public IReadOnlyList<ServerConsolePlatformOption> GetServerConsolePlatformOptions()
     {
 #if WINDOWS
         var sources = new List<(string Version, string BinDir, string Architecture)>();
@@ -274,30 +284,65 @@ public sealed class InfobaseAdminService : IInfobaseAdminService
                 sources.Add((version, binDir, architecture));
         }
 
-        return ServerConsolePlanner.ListCandidates(sources, File.Exists);
+        // Расширенный поиск оснастки (issue #135): точные имена + маски в bin, .. и ..\common.
+        return ServerConsolePlanner.ListPlatformOptions(sources, File.Exists, EnumerateMscFiles);
 #else
-        return Array.Empty<ServerConsoleCandidate>();
+        return Array.Empty<ServerConsolePlatformOption>();
 #endif
     }
+
+    /// <summary>Кандидаты запуска из списка установленных платформ (только с оснасткой).</summary>
+    private static IReadOnlyList<ServerConsoleCandidate> ToCandidates(
+        IReadOnlyList<ServerConsolePlatformOption> options)
+    {
+        var result = new List<ServerConsoleCandidate>();
+        foreach (var option in options)
+        {
+            var candidate = option.ToCandidate();
+            if (candidate is not null)
+                result.Add(candidate);
+        }
+        return result;
+    }
+
+#if WINDOWS
+    /// <summary>
+    /// Перечисление файлов <c>.msc</c> для поиска оснастки по маске (issue #135):
+    /// недоступный каталог не должен срывать поиск.
+    /// </summary>
+    private static IEnumerable<string> EnumerateMscFiles(string directory)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
+                return Array.Empty<string>();
+            return Directory.EnumerateFiles(directory, "*.msc").ToList();
+        }
+        catch
+        {
+            return Array.Empty<string>();
+        }
+    }
+#endif
 
     /// <inheritdoc />
     public ServerConsoleRegistrationResult RegisterServerConsoleComponents(string? platformVersion)
     {
 #if WINDOWS
-        var candidates = GetServerConsoleCandidates();
-        var candidate = ServerConsolePlanner.ChoosePreferred(candidates, platformVersion);
-        if (candidate is null)
+        // Регистрация компонентов не требует самой оснастки (issue #135): автор issue
+        // просил зарегистрировать radmin.dll и comctrl.dll в каталоге платформы.
+        var (binDir, is64Bit) = ResolveRegistrationTarget(platformVersion);
+        if (string.IsNullOrWhiteSpace(binDir))
         {
             _logger.Warn(
-                "Регистрация компонентов консоли: не найдена установленная платформа с оснасткой 1CV8Servers.msc.");
+                "Регистрация компонентов консоли: не найдена установленная платформа 1С.");
             return new ServerConsoleRegistrationResult(
                 false, null, ServerConsolePlanner.ErrorRegisterNoPlatform,
                 Array.Empty<ServerConsoleRegistrationItem>());
         }
 
-        var dlls = ServerConsolePlanner.ListRegistrationDlls(candidate.BinDir, File.Exists);
+        var dlls = ServerConsolePlanner.ListRegistrationDlls(binDir, File.Exists);
         var items = new List<ServerConsoleRegistrationItem>();
-        var is64Bit = string.Equals(candidate.Architecture, "64", StringComparison.Ordinal);
 
         foreach (var dll in dlls)
         {
@@ -319,15 +364,15 @@ public sealed class InfobaseAdminService : IInfobaseAdminService
         if (items.All(item => !item.FileExists))
         {
             _logger.Warn(
-                $"Регистрация компонентов консоли: в каталоге {candidate.BinDir} нет radmin.dll и comctrl.dll.");
+                $"Регистрация компонентов консоли: в каталоге {binDir} нет radmin.dll и comctrl.dll.");
             return new ServerConsoleRegistrationResult(
-                false, candidate.BinDir, ServerConsolePlanner.ErrorRegisterNoFiles, items);
+                false, binDir, ServerConsolePlanner.ErrorRegisterNoFiles, items);
         }
 
         // Успех — только если все НАЙДЕННЫЕ DLL зарегистрированы; отсутствие одной
         // из них не делает регистрацию второй неудачной, но отчёт покажет пропуск.
         var allRegistered = items.Where(item => item.FileExists).All(item => item.Success);
-        return new ServerConsoleRegistrationResult(allRegistered, candidate.BinDir, null, items);
+        return new ServerConsoleRegistrationResult(allRegistered, binDir, null, items);
 #else
         _logger.Warn("Регистрация компонентов консоли: доступна только в Windows.");
         return new ServerConsoleRegistrationResult(
@@ -337,6 +382,41 @@ public sealed class InfobaseAdminService : IInfobaseAdminService
     }
 
 #if WINDOWS
+    /// <summary>
+    /// Каталог <c>bin</c> и разрядность для регистрации компонентов консоли (issue #135):
+    /// платформа выбирается по варианту версии, а при его отсутствии — новейшая
+    /// установленная. Оснастка <c>.msc</c> для регистрации не требуется — radmin.dll
+    /// и comctrl.dll лежат в том же каталоге платформы.
+    /// </summary>
+    private (string? BinDir, bool Is64Bit) ResolveRegistrationTarget(string? platformVersion)
+    {
+        var options = GetServerConsolePlatformOptions();
+        var option = ServerConsolePlanner.ChoosePreferredPlatform(options, platformVersion);
+        if (option is not null)
+            return (option.BinDir, string.Equals(option.Architecture, "64", StringComparison.Ordinal));
+
+        // Платформа могла быть не найдена штатным поиском — разрешаем каталог по версии.
+        if (!string.IsNullOrWhiteSpace(platformVersion))
+        {
+            PlatformVersionService.ParseVariantOptionalArch(
+                platformVersion!, out var version, out var architecture);
+            if (!string.IsNullOrWhiteSpace(version))
+            {
+                var architectures = string.IsNullOrWhiteSpace(architecture)
+                    ? new[] { "64", "32" }
+                    : new[] { architecture!, architecture == "64" ? "32" : "64" };
+                foreach (var arch in architectures)
+                {
+                    var binDir = PlatformVersionService.ResolveVersionBinDirectory(version!, arch);
+                    if (!string.IsNullOrWhiteSpace(binDir))
+                        return (binDir, arch == "64");
+                }
+            }
+        }
+
+        return (null, true);
+    }
+
     /// <summary>
     /// Регистрирует один компонент консоли через regsvr32 нужной разрядности с
     /// повышением прав (UAC). Возвращает (успех, текст ошибки).

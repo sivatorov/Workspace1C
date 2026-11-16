@@ -73,6 +73,42 @@ public sealed class Issue134KillProcessesTests
         Assert.Equal("weird-proc", KillProcessesMenuPlanner.ApplicationDisplayName("weird-proc", "", Translate));
     }
 
+    // ===================== Имя пользователя из командной строки (/N) =====================
+
+    [Theory]
+    [InlineData("/N\"superadmin\"", "superadmin")]
+    [InlineData("/N superadmin", "superadmin")]
+    [InlineData("/Nsuperadmin", "superadmin")]
+    [InlineData("-N\"superadmin\"", "superadmin")]
+    [InlineData("-N superadmin", "superadmin")]
+    [InlineData("-Nsuperadmin", "superadmin")]
+    [InlineData("ENTERPRISE /F\"C:\\Bases\\Alpha\" /N\"superadmin\"", "superadmin")]
+    [InlineData("ENTERPRISE /N\"Иван Петров\" /P\"secret\"", "Иван Петров")]
+    [InlineData("ENTERPRISE /n\"superadmin\"", "superadmin")]
+    [InlineData("-n superadmin", "superadmin")]
+    [InlineData("/N\"a\"\"b\"", "a\"b")]
+    public void TryExtractUserNameFromCommandLine_SupportedForms(
+        string commandLine, string expected)
+    {
+        Assert.True(KillProcessesMenuPlanner.TryExtractUserNameFromCommandLine(commandLine, out var userName));
+        Assert.Equal(expected, userName);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("ENTERPRISE /F\"C:\\Bases\\Alpha\"")]
+    [InlineData("ENTERPRISE /N")]
+    [InlineData("ENTERPRISE /N \"\"")]
+    [InlineData("ENTERPRISE /N /P secret")]
+    [InlineData("ENTERPRISE /Out/Nfoo")]
+    [InlineData("ENTERPRISE /IBNameN")]
+    public void TryExtractUserNameFromCommandLine_NoUser_ReturnsFalse(string? commandLine)
+    {
+        Assert.False(KillProcessesMenuPlanner.TryExtractUserNameFromCommandLine(commandLine, out var userName));
+        Assert.Null(userName);
+    }
+
     // ===================== Подпись пункта меню =====================
 
     private static RunningOneCProcessDetails Process(
@@ -136,6 +172,45 @@ public sealed class Issue134KillProcessesTests
         Assert.Equal(
             "superadmin, myproc, 03:04:05 02.01.2026, 5566",
             KillProcessesMenuPlanner.FormatItemLabel(process, Translate));
+    }
+
+    [Fact]
+    public void FormatItemLabel_UserNameTakesPriorityOverCommandLine()
+    {
+        // Владелец процесса важнее значения /N из командной строки.
+        var process = Process(
+            commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\" /N\"from-command-line\"",
+            userName: "owner",
+            startTime: new DateTime(2026, 11, 16, 9, 9, 55));
+
+        Assert.Equal(
+            "owner, тонкий клиент, 09:09:55 16.11.2026, 5566",
+            KillProcessesMenuPlanner.FormatItemLabel(process, Translate));
+    }
+
+    [Fact]
+    public void FormatItemLabel_UserNameFromCommandLine_WhenOwnerUnknown()
+    {
+        // Пункт 1 автора issue: имя пользователя из параметра /N.
+        var process = Process(
+            commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\" /N\"superadmin\"",
+            userName: null,
+            startTime: new DateTime(2026, 11, 16, 9, 9, 55));
+
+        Assert.Equal(
+            "superadmin, тонкий клиент, 09:09:55 16.11.2026, 5566",
+            KillProcessesMenuPlanner.FormatItemLabel(process, Translate));
+    }
+
+    [Fact]
+    public void ResolveUserName_PrefersOwner_ThenCommandLine_ThenNull()
+    {
+        Assert.Equal("owner", KillProcessesMenuPlanner.ResolveUserName(
+            Process(userName: "owner", commandLine: "ENTERPRISE /N\"cmd\"")));
+        Assert.Equal("cmd", KillProcessesMenuPlanner.ResolveUserName(
+            Process(userName: "  ", commandLine: "ENTERPRISE /N\"cmd\"")));
+        Assert.Null(KillProcessesMenuPlanner.ResolveUserName(
+            Process(userName: null, commandLine: "ENTERPRISE")));
     }
 
     // ===================== Сортировка по времени старта =====================
@@ -295,6 +370,139 @@ public sealed class Issue134KillProcessesTests
             items[0].Label);
     }
 
+    // ===================== План меню: одна и несколько баз =====================
+
+    [Fact]
+    public void BuildMenuPlan_OneBase_IsFlatWithoutKillAll()
+    {
+        var alpha = FileBase("alpha", @"C:\Bases\Alpha");
+        var processes = new[]
+        {
+            Process(pid: 2, startTime: new DateTime(2026, 11, 16, 10, 0, 0),
+                commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 1, startTime: new DateTime(2026, 11, 16, 8, 0, 0),
+                commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\"")
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { alpha }, processes, Translate);
+
+        Assert.False(plan.IsEmpty);
+        Assert.False(plan.IsGrouped);
+        Assert.All(plan.Entries, entry => Assert.Equal(KillProcessesMenuEntryKind.Process, entry.Kind));
+        Assert.Equal(new[] { 1, 2 }, plan.Entries.Select(entry => entry.Process!.Pid));
+        Assert.Equal(new[] { 1, 2 }, plan.AllProcesses.Select(process => process.Pid));
+    }
+
+    [Fact]
+    public void BuildMenuPlan_MultipleBases_KillAllFirstThenGroupsInSelectionOrder()
+    {
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 3, processName: "1cv8.exe", commandLine: "DESIGNER /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 11, 0, 0)),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 9, 0, 0)),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"",
+                startTime: new DateTime(2026, 11, 16, 8, 0, 0))
+        };
+
+        // Порядок групп — порядок баз в выделении: ЗКГУ, затем БГУ.
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+
+        Assert.True(plan.IsGrouped);
+        Assert.Equal(3, plan.Entries.Count);
+
+        // Пункт 2 автора issue: «Завершить все» — отдельный верхний пункт.
+        Assert.Equal(KillProcessesMenuEntryKind.KillAll, plan.Entries[0].Kind);
+        Assert.Equal("Завершить все", plan.Entries[0].Label);
+
+        Assert.Equal(KillProcessesMenuEntryKind.BaseGroup, plan.Entries[1].Kind);
+        Assert.Equal("zkgu (2)", plan.Entries[1].Label);
+        Assert.Equal(new[] { 2, 3 }, plan.Entries[1].Children!.Select(entry => entry.Process!.Pid));
+
+        Assert.Equal(KillProcessesMenuEntryKind.BaseGroup, plan.Entries[2].Kind);
+        Assert.Equal("bgu (1)", plan.Entries[2].Label);
+        Assert.Equal(new[] { 1 }, plan.Entries[2].Children!.Select(entry => entry.Process!.Pid));
+
+        Assert.Equal(new[] { 2, 3, 1 }, plan.AllProcesses.Select(process => process.Pid));
+    }
+
+    [Fact]
+    public void BuildMenuPlan_BasesWithoutProcesses_AreHidden()
+    {
+        var withProcess = FileBase("with", @"C:\Bases\With");
+        var withoutProcess = FileBase("without", @"C:\Bases\Without");
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\With\"")
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(
+            new[] { withoutProcess, withProcess }, processes, Translate);
+
+        // Процессы есть только у одной базы — прежний плоский список.
+        Assert.False(plan.IsGrouped);
+        Assert.Single(plan.Entries);
+        Assert.Equal(KillProcessesMenuEntryKind.Process, plan.Entries[0].Kind);
+    }
+
+    [Fact]
+    public void BuildMenuPlan_NoProcesses_IsEmpty()
+    {
+        var file = FileBase("file", @"C:\Bases\Alpha");
+
+        Assert.True(KillProcessesMenuPlanner.BuildMenuPlan(
+            new[] { file }, Array.Empty<RunningOneCProcessDetails>(), Translate).IsEmpty);
+        Assert.True(KillProcessesMenuPlanner.BuildMenuPlan(
+            new[] { file }, null, Translate).IsEmpty);
+        Assert.True(KillProcessesMenuPlanner.BuildMenuPlan(
+            null, new[] { Process() }, Translate).IsEmpty);
+    }
+
+    [Fact]
+    public void BuildMenuPlan_UnnamedBase_UsesLocalizedPlaceholder()
+    {
+        var unnamed = new Infobase
+        {
+            Id = "unnamed",
+            Name = "   ",
+            Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = @"C:\Bases\Alpha" }
+        };
+        var other = FileBase("other", @"C:\Bases\Other");
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(
+            new[] { unnamed, other },
+            new[]
+            {
+                Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+                Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\Other\"")
+            },
+            Translate);
+
+        Assert.Equal("база без имени (1)", plan.Entries[1].Label);
+    }
+
+    [Fact]
+    public void BuildMenuItems_GroupedPlan_FlattensProcessesInGroupOrder()
+    {
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 10, 0, 0)),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"",
+                startTime: new DateTime(2026, 11, 16, 8, 0, 0))
+        };
+
+        var items = KillProcessesMenuPlanner.BuildMenuItems(
+            new[] { zkgu, bgu }, processes, Translate);
+
+        Assert.Equal(new[] { 2, 1 }, items.Select(item => item.Process.Pid));
+    }
+
     // ===================== Локализация =====================
 
     [Theory]
@@ -324,6 +532,22 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains("{1}", strings[KillProcessesMenuPlanner.KillFailedDetailKey], StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("ru.json", "Завершить все", "база без имени")]
+    [InlineData("en.json", "Terminate all", "unnamed infobase")]
+    public void Localization_HasKillAllAndGroupingKeys(
+        string file, string killAllTitle, string unknownBase)
+    {
+        var strings = LoadStrings(file);
+
+        Assert.Equal(killAllTitle, strings[KillProcessesMenuPlanner.KillAllTitleKey]);
+        Assert.Equal(unknownBase, strings[KillProcessesMenuPlanner.UnknownBaseKey]);
+        Assert.Equal("{0} ({1})", strings[KillProcessesMenuPlanner.GroupHeaderFormatKey]);
+        Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllConfirmFormatKey], StringComparison.Ordinal);
+        Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllSummaryFormatKey], StringComparison.Ordinal);
+        Assert.Contains("{1}", strings[KillProcessesMenuPlanner.KillAllSummaryFormatKey], StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Localization_RuAndEn_HaveSameKillProcessesKeySet()
     {
@@ -342,6 +566,11 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains(KillProcessesMenuPlanner.ConfirmKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillFailedKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillFailedDetailKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllTitleKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllConfirmFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllSummaryFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.GroupHeaderFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.UnknownBaseKey, ru);
     }
 
     [Fact]
@@ -368,7 +597,7 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains("KillProcessesMenuPlanner.MenuTitleKey", source, StringComparison.Ordinal);
         Assert.Contains("_killProcessesMenu = killProcessesMenu;", source, StringComparison.Ordinal);
         Assert.Contains("batchMenu.Items.Add(killProcessesMenu);", source, StringComparison.Ordinal);
-        Assert.Contains("KillProcessesMenuPlanner.BuildMenuItems(", source, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.BuildMenuPlan(", source, StringComparison.Ordinal);
         Assert.Contains("_viewModel.BatchOperationTargetsIncludingGroup", source, StringComparison.Ordinal);
     }
 
@@ -403,7 +632,7 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains("KillProcessesMenuPlanner.MenuTitleKey", source, StringComparison.Ordinal);
         Assert.Contains("_killProcessesMenu = killProcessesMenu;", source, StringComparison.Ordinal);
         Assert.Contains("batchMenu.Items.Add(killProcessesMenu);", source, StringComparison.Ordinal);
-        Assert.Contains("KillProcessesMenuPlanner.BuildMenuItems(", source, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.BuildMenuPlan(", source, StringComparison.Ordinal);
         Assert.Contains("_vm.BatchOperationTargetsIncludingGroup", source, StringComparison.Ordinal);
     }
 
@@ -417,6 +646,28 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains("process.StartTimeToken", source, StringComparison.Ordinal);
         Assert.Contains("killer.LastError", source, StringComparison.Ordinal);
         Assert.Contains("_vm?.RefreshRunningFlags();", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BothPlatforms_RenderGroupedPlanAndKillAll()
+    {
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.ContextMenu.cs"));
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
+
+        foreach (var source in new[] { wpf, avalonia })
+        {
+            // Вложенные группы по базам и верхний пункт «Завершить все» — в обеих оболочках.
+            Assert.Contains("KillProcessesMenuEntryKind.KillAll", source, StringComparison.Ordinal);
+            Assert.Contains("KillProcessesMenuEntryKind.BaseGroup", source, StringComparison.Ordinal);
+            Assert.Contains("plan.AllProcesses", source, StringComparison.Ordinal);
+            Assert.Contains("KillProcessesMenuPlanner.KillAllConfirmFormatKey", source, StringComparison.Ordinal);
+            Assert.Contains("KillProcessesMenuPlanner.KillAllSummaryFormatKey", source, StringComparison.Ordinal);
+            Assert.Contains("dialogs.ShowWarning(summary, title);", source, StringComparison.Ordinal);
+            Assert.Contains("dialogs.ShowInfo(summary, title);", source, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("OnKillAllProcesses_Click", wpf, StringComparison.Ordinal);
+        Assert.Contains("OnKillAllProcessesClick", avalonia, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -446,6 +697,11 @@ public sealed class Issue134KillProcessesTests
         [KillProcessesMenuPlanner.ThickClientKey] = "толстый клиент",
         [KillProcessesMenuPlanner.ConfiguratorKey] = "конфигуратор",
         [KillProcessesMenuPlanner.WebClientKey] = "веб-клиент",
+        [KillProcessesMenuPlanner.KillAllTitleKey] = "Завершить все",
+        [KillProcessesMenuPlanner.KillAllConfirmFormatKey] = "Завершить все процессы ({0})?",
+        [KillProcessesMenuPlanner.KillAllSummaryFormatKey] = "Завершено: {0}, ошибок: {1}",
+        [KillProcessesMenuPlanner.GroupHeaderFormatKey] = "{0} ({1})",
+        [KillProcessesMenuPlanner.UnknownBaseKey] = "база без имени",
     };
 
     private static string Translate(string key) =>

@@ -19,20 +19,28 @@ namespace Workspace1C
         private bool _sortAscending = false; // по умолчанию — свежие версии сверху
         private string _archFilter = "all"; // all | x32 | x64
         private bool _isRestoringSelection; // перестроение дерева: гасим SelectionChanged(null) (#304)
+        // Статус по каждой версии (issue #135): «оснастка найдена/не найдена».
+        private readonly IReadOnlyDictionary<string, string>? _statusByVariant;
 
         /// <param name="installedPlatformVersions">Варианты версий для выбора.</param>
         /// <param name="currentVersion">Текущая (сохранённая) версия — подсвечивается в дереве.</param>
         /// <param name="useProvidedVersionsOnly">
         /// true — показывать только переданный список (issue #135: внешняя консоль предлагает
-        /// лишь версии, в которых реально есть 1CV8Servers.msc), не подмешивая все установленные.
+        /// лишь переданные версии), не подмешивая все установленные.
+        /// </param>
+        /// <param name="statusByVariant">
+        /// Статус по каждой версии (issue #135): «оснастка найдена: 1CV8Servers64.msc» или
+        /// «оснастка не найдена» — показывается справа от названия сборки. null — без статусов.
         /// </param>
         public PlatformVersionPickerWindow(
             IEnumerable<string> installedPlatformVersions,
             string currentVersion,
-            bool useProvidedVersionsOnly = false)
+            bool useProvidedVersionsOnly = false,
+            IReadOnlyDictionary<string, string>? statusByVariant = null)
         {
             InitializeComponent();
             _currentVersion = currentVersion ?? "";
+            _statusByVariant = statusByVariant;
 
             var extras = PlatformVersionService.GetAdditionalSearchPaths();
             if (!useProvidedVersionsOnly)
@@ -77,6 +85,9 @@ namespace Workspace1C
             if (_sortAscending)
                 tree = ReverseTreeOrder(tree);
 
+            // Статус оснастки по каждой версии (issue #135): видно, где консоль доступна.
+            ApplyStatusHints(tree);
+
             // Во время перестроения SelectedItemChanged приходит с null (старый узел удалён
             // из Items): гасим его, чтобы не сбрасывать _selectedVersion до восстановления
             // выбора (issue #304). Команды не триггерятся и в отложенной части — до конца
@@ -106,6 +117,28 @@ namespace Workspace1C
                     _isRestoringSelection = false;
                 }
             }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        /// <summary>
+        /// Проставляет статус оснастки листьям дерева (issue #135): пользователь видит,
+        /// в каких версиях платформы внешняя консоль администрирования серверов доступна.
+        /// </summary>
+        private void ApplyStatusHints(IEnumerable<PlatformVersionGroup> nodes)
+        {
+            if (_statusByVariant is null)
+                return;
+
+            foreach (var node in nodes)
+            {
+                if (node.IsLeaf && !string.IsNullOrWhiteSpace(node.Variant)
+                    && _statusByVariant.TryGetValue(node.Variant!, out var status))
+                {
+                    node.StatusHint = status;
+                }
+
+                if (node.Children.Count > 0)
+                    ApplyStatusHints(node.Children);
+            }
         }
 
         private static List<PlatformVersionGroup> ReverseTreeOrder(List<PlatformVersionGroup> roots)

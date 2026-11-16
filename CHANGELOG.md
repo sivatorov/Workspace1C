@@ -11,6 +11,70 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.75] — 2026-11-16
+
+### Исправлено
+
+- **Внешняя консоль администрирования серверов: расширенный поиск оснастки и диагностика
+  отказа (issue #135, ArtyoZ).** Поиск оснастки больше не ограничен файлом `1CV8Servers.msc`
+  в каталоге `bin`: проверяются альтернативные имена (`1CV8Servers64.msc`,
+  `1CV8Servers32.msc`, `1CV8Servers_x64.msc`, `1CV8Servers_x86.msc`,
+  `1CV8ServersAdmin.msc`, `1CV8Admin.msc`, `1CV8Server.msc`) и маски `*servers*.msc` /
+  `*admin*.msc` регистронезависимо в `bin`, каталоге версии и `common`. Дубли
+  отбрасываются по полному пути, приоритет — у канонического имени:
+  [`ServerConsolePlanner.FindSnapIn`](Workspace1C/Services/ServerConsolePlanner.cs:316).
+  Запуск выполняется каскадом стратегий: `mmc.exe` с основным `.msc` (с `/32` для
+  32-битной платформы) → `mmc` с альтернативным файлом (с `/32` и без) → запуск `.msc`
+  через оболочку; каждая попытка логируется с командой и текстом ошибки —
+  [`InfobaseAdminService.OpenServerAdminConsole`](Workspace1C/Services/InfobaseAdminService.cs:171).
+  Отказ теперь содержит диагностику (сколько платформ найдено, какие каталоги проверены,
+  какие `.msc` найдены, какая стратегия применялась) и признаки «можно предложить выбор
+  версии» / «можно предложить регистрацию компонентов» (`CanOfferPlatformPicker` /
+  `CanOfferRegistration`). Регистрация `radmin.dll`/`comctrl.dll` больше не требует
+  найденной `.msc`: каталог платформы определяется по версии и разрядности —
+  [`ResolveRegistrationTarget`](Workspace1C/Services/InfobaseAdminService.cs:391).
+- **Подменю «Завершить процессы»: имя пользователя из `/N` и группировка по базам
+  (issue #134, ArtyoZ).** Имя пользователя берётся из владельца процесса, а при его
+  отсутствии — из параметра `/N` командной строки (`/N"superadmin"`, `/N superadmin`,
+  `/Nsuperadmin`, `-N`, регистр не важен) —
+  [`KillProcessesMenuPlanner.ResolveUserName`](Workspace1C/Services/KillProcessesMenuPlanner.cs:505).
+  При выделении нескольких баз первым пунктом подменю появляется «Завершить все» с одним
+  подтверждением и сводкой «завершено/не удалось», индикаторы запуска обновляются.
+  Процессы группируются по выделенным базам в порядке выделения, внутри группы — по
+  времени старта; базы без запущенных процессов скрыты; при одной базе меню осталось
+  плоским.
+
+### Добавлено
+
+- **Единый диалог выбора версии платформы для внешней консоли (issue #135).** Диалог
+  показывается всегда, когда установлено больше одной платформы, и показывает статус
+  оснастки у каждой версии («оснастка найдена: …» / «оснастка не найдена») — WPF и
+  Avalonia: [`PlatformVersionPickerWindow`](Workspace1C/Views/PlatformVersionPickerWindow.xaml.cs:88),
+  [`PlatformVersionPickerWindow.Avalonia.cs`](Workspace1C/Views/PlatformVersionPickerWindow.Avalonia.cs:374),
+  подпись — [`PlatformVersionGroup.StatusHint`](Workspace1C/Models/PlatformVersionGroup.cs:66).
+- **Общий чистый слой меню «Завершить процессы» (issue #134).** Планирование вынесено в
+  [`KillProcessesMenuPlanner`](Workspace1C/Services/KillProcessesMenuPlanner.cs:113)
+  (`KillProcessesMenuPlan`/`KillProcessesMenuEntry`), рендер и обработчики — в WPF
+  [`MainWindow.ContextMenu.cs`](Workspace1C/Views/MainWindow.ContextMenu.cs:458) и Avalonia
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:3457);
+  [`BuildMenuItems`](Workspace1C/Services/KillProcessesMenuPlanner.cs:473) сохранён для
+  обратной совместимости.
+
+### Тесты
+
+- `Workspace1C.Tests/Issue135ServerConsoleTests.cs` расширен до 75 тестов: альтернативные
+  имена и маски оснастки, дедупликация по полному пути, приоритет канонического имени,
+  каскад стратегий запуска, диагностика отказа и признаки предлагаемых действий, статусы
+  оснастки в диалоге выбора версии, регистрация компонентов без `.msc`.
+- `Workspace1C.Tests/Issue134KillProcessesTests.cs` расширен до 73 тестов: имя пользователя
+  из `/N` во всех формах, группировка по базам в порядке выделения и по времени старта
+  внутри группы, пункт «Завершить все», скрытие баз без процессов, плоское меню при одной
+  базе, обратная совместимость `BuildMenuItems`.
+- `Release100159Tests`: ожидания версии обновлены до 1.0.1.75.
+- Полный прогон: **7065 тестов**, все зелёные.
+- Issue #133 проверен по последнему комментарию автора: исправление подтверждено в 1.0.1.74,
+  изменений в коде не потребовалось.
+
 ## [1.0.1.74] — 2026-11-16
 
 ### Исправлено

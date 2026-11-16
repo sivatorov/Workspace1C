@@ -453,27 +453,63 @@ public partial class MainWindow
             processes = Array.Empty<RunningOneCProcessDetails>();
         }
 
-        var items = KillProcessesMenuPlanner.BuildMenuItems(
+        // План меню (issue #134): одна база — плоский список; несколько баз —
+        // «Завершить все» первым пунктом и вложенные группы по базам.
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(
             _viewModel.BatchOperationTargetsIncludingGroup, processes, LocalizationManager.T);
-        if (items.Count == 0)
+        if (plan.IsEmpty)
         {
             menu.Visibility = Visibility.Collapsed;
             return;
         }
 
-        foreach (var item in items)
+        foreach (var entry in plan.Entries)
         {
-            var processItem = new MenuItem
+            switch (entry.Kind)
             {
-                Header = item.Label,
-                Style = TryFindResource("ModernMenuItem") as Style,
-                Tag = item.Process,
-            };
-            processItem.Click += OnKillProcess_Click;
-            menu.Items.Add(processItem);
+                case KillProcessesMenuEntryKind.KillAll:
+                    var killAllItem = new MenuItem
+                    {
+                        Header = entry.Label,
+                        Style = TryFindResource("ModernMenuItem") as Style,
+                        Tag = plan.AllProcesses,
+                    };
+                    killAllItem.Icon = CreateRowMenuIcon("CloseNetwork", "@ErrorBrush");
+                    killAllItem.Click += OnKillAllProcesses_Click;
+                    menu.Items.Add(killAllItem);
+                    break;
+
+                case KillProcessesMenuEntryKind.BaseGroup:
+                    var groupItem = new MenuItem
+                    {
+                        Header = entry.Label,
+                        Style = TryFindResource("ModernMenuItem") as Style,
+                    };
+                    foreach (var child in entry.Children ?? Array.Empty<KillProcessesMenuEntry>())
+                        groupItem.Items.Add(CreateKillProcessMenuItem(child));
+                    menu.Items.Add(groupItem);
+                    break;
+
+                default:
+                    menu.Items.Add(CreateKillProcessMenuItem(entry));
+                    break;
+            }
         }
 
         menu.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Пункт конкретного процесса плана подменю (issue #134).</summary>
+    private MenuItem CreateKillProcessMenuItem(KillProcessesMenuEntry entry)
+    {
+        var item = new MenuItem
+        {
+            Header = entry.Label,
+            Style = TryFindResource("ModernMenuItem") as Style,
+            Tag = entry.Process,
+        };
+        item.Click += OnKillProcess_Click;
+        return item;
     }
 
     /// <summary>
@@ -528,6 +564,62 @@ public partial class MainWindow
                 : string.Format(LocalizationManager.T(KillProcessesMenuPlanner.KillFailedDetailKey), process.Pid, reason);
             dialogs.ShowWarning(message, title);
         }
+
+        // Индикаторы «база запущена» обновляются сразу, не дожидаясь таймера.
+        _viewModel?.RefreshRunningFlags();
+    }
+
+    /// <summary>
+    /// Клик по верхнему пункту «Завершить все» (issue #134, несколько баз):
+    /// одно подтверждение → последовательное завершение всех процессов плана с
+    /// отчётом «завершено/не удалось» → обновление индикаторов запуска. Ошибки
+    /// отдельных процессов не прерывают остальные.
+    /// </summary>
+    private void OnKillAllProcesses_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: IReadOnlyList<RunningOneCProcessDetails> processes }
+            || processes.Count == 0)
+            return;
+
+        var title = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey);
+        var dialogs = AppServices.TryGetService<IDialogService>();
+
+        var confirmText = string.Format(
+            LocalizationManager.T(KillProcessesMenuPlanner.KillAllConfirmFormatKey), processes.Count);
+        if (dialogs is null || !dialogs.Confirm(confirmText, title))
+            return;
+
+        var killer = AppServices.TryGetService<IOneCProcessKiller>();
+        var killed = 0;
+        var failed = 0;
+        foreach (var process in processes)
+        {
+            try
+            {
+                if (killer is not null && killer.Kill(
+                        process.Pid,
+                        string.IsNullOrEmpty(process.StartTimeToken) ? null : process.StartTimeToken))
+                {
+                    killed++;
+                }
+                else
+                {
+                    failed++;
+                }
+            }
+            catch
+            {
+                // Нет прав/процесс уже завершён — считаем ошибкой, продолжаем остальные.
+                failed++;
+            }
+        }
+
+        var summary = string.Format(
+            LocalizationManager.T(KillProcessesMenuPlanner.KillAllSummaryFormatKey), killed, failed);
+        if (failed > 0)
+            dialogs.ShowWarning(summary, title);
+        else
+            dialogs.ShowInfo(summary, title);
 
         // Индикаторы «база запущена» обновляются сразу, не дожидаясь таймера.
         _viewModel?.RefreshRunningFlags();
