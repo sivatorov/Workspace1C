@@ -2389,6 +2389,18 @@
     "ProcessInspector.Mode.Service": "Service",
     "ProcessInspector.Hint": "Double-click a row with a known infobase to jump to it in the main window. The list refreshes automatically.",
 
+    "KillProcesses.MenuTitle": "Terminate processes",
+    "KillProcesses.ItemFormat": "{0}, {1}, {2}, {3}",
+    "KillProcesses.Confirm": "Terminate process \"{0}\"?\n\nUnsaved data in open 1C sessions will be lost.\nContinue?",
+    "KillProcesses.KillFailedFormat": "Could not terminate process {0}: no rights or the process has already exited.",
+    "KillProcesses.KillFailedDetailFormat": "Could not terminate process {0}. {1}",
+    "KillProcesses.UnknownUser": "user not determined",
+    "KillProcesses.UnknownStartTime": "—",
+    "KillProcesses.ThinClient": "thin client",
+    "KillProcesses.ThickClient": "thick client",
+    "KillProcesses.Configurator": "configurator",
+    "KillProcesses.WebClient": "web client",
+
     "Diagnostics.Title": "Connection diagnostics",
     "Diagnostics.Run": "Run",
     "Diagnostics.Retry": "Retry",

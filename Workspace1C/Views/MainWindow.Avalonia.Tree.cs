@@ -47,6 +47,14 @@ namespace Workspace1C
         /// заголовок и видимость обновляет Opening (issue #56).</summary>
         private MenuItem? _batchMenu;
 
+        /// <summary>
+        /// Подменю «Завершить процессы» блока «Для выделенных (N)…» (issue #134):
+        /// строится вместе с batch-блоком, наполняется в Opening процессами выделенных
+        /// баз (для группы — всех баз группы) по общему чистому слою
+        /// <see cref="KillProcessesMenuPlanner"/> (та же логика, что в WPF).
+        /// </summary>
+        private MenuItem? _killProcessesMenu;
+
         /// <summary>Меню построено для выбранной группы (issue #105): при смене контекста
         /// (группа ↔ база) содержимое меню перестраивается в Opening с фильтрацией
         /// неприменимых к группе пунктов.</summary>
@@ -2916,6 +2924,7 @@ namespace Workspace1C
             _customActionsMenu = null;
             _customActionsSeparator = null;
             _batchMenu = null;
+            _killProcessesMenu = null;
 
             // Компоновка контекстного меню базы (issue #56): стандартная при выключенной
             // правке структуры (обратная совместимость: меню выглядит как раньше — структура,
@@ -2972,6 +2981,11 @@ namespace Workspace1C
                     // перестраивается каждый раз, как batch-блок.
                     PopulateCustomActionsMenu();
                 }
+
+                // Завершение процессов выделенных баз (issue #134): подменю блока
+                // «Для выделенных (N)…» наполняется при каждом открытии меню —
+                // состав процессов и цели меняются между открытиями.
+                PopulateKillProcessesMenu(restricted);
 
                 // Чистка «висячих» разделителей (issue #105, доработка 7OH): разделитель
                 // показывается только между двумя видимыми пунктами — в начале/в конце
@@ -3378,8 +3392,126 @@ namespace Workspace1C
             // Смена платформы выделенных баз (issue #54, переработка по комментарию 7OH):
             // отдельное окно выбора установленной версии вместо галочки в «Замене строк…».
             batchMenu.Items.Add(BatchMenuAction("Main.BatchChangePlatform", OnBatchChangePlatformClick, "IconPackageVariant", "@SuccessBrush"));
+            // Завершение процессов выделенных баз (issue #134, автор ArtyoZ): подменю
+            // с процессами выделенных баз/группы, сортировка по времени старта,
+            // завершение ровно выбранного процесса. Наполняется в Opening.
+            var killProcessesMenu = new MenuItem
+            {
+                Header = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey),
+                IsVisible = false,
+            };
+            killProcessesMenu.Styled(Themes.ControlThemes.ModernMenuItem);
+            killProcessesMenu.Icon = MenuIcon("IconClose", "@ErrorBrush");
+            _killProcessesMenu = killProcessesMenu;
+            batchMenu.Items.Add(killProcessesMenu);
             batchMenu.Items.Add(BatchMenuAction("Main.BatchDelete", OnBatchDeleteClick, "IconDelete", "@ErrorBrush"));
             _batchMenu = batchMenu;
+        }
+
+        /// <summary>
+        /// Наполняет подменю «Завершить процессы» (issue #134): процессы выделенных
+        /// баз (для группы — всех баз группы), отсортированные по времени старта.
+        /// Нет процессов — подменю скрыто. Любая ошибка WMI/доступа не роняет меню.
+        /// </summary>
+        private void PopulateKillProcessesMenu(bool restricted)
+        {
+            var menu = _killProcessesMenu;
+            if (menu is null)
+                return;
+
+            menu.Items.Clear();
+            if (restricted || _vm is null)
+            {
+                menu.IsVisible = false;
+                return;
+            }
+
+            IReadOnlyList<RunningOneCProcessDetails> processes;
+            try
+            {
+                processes = AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails()
+                    ?? Array.Empty<RunningOneCProcessDetails>();
+            }
+            catch
+            {
+                // Нет прав/WMI недоступен — подменю просто не показывается.
+                processes = Array.Empty<RunningOneCProcessDetails>();
+            }
+
+            var items = KillProcessesMenuPlanner.BuildMenuItems(
+                _vm.BatchOperationTargetsIncludingGroup, processes, LocalizationManager.T);
+            if (items.Count == 0)
+            {
+                menu.IsVisible = false;
+                return;
+            }
+
+            foreach (var item in items)
+            {
+                var processItem = new MenuItem
+                {
+                    Header = item.Label,
+                    Tag = item.Process,
+                };
+                processItem.Styled(Themes.ControlThemes.ModernMenuItem);
+                processItem.Click += (_, _) => OnKillProcessClick(item.Process);
+                menu.Items.Add(processItem);
+            }
+
+            menu.IsVisible = true;
+        }
+
+        /// <summary>
+        /// Клик по пункту «Завершить процессы» (issue #134): подтверждение →
+        /// <see cref="IOneCProcessKiller.Kill"/> ровно выбранного процесса (с токеном
+        /// времени старта на Linux) → обновление индикаторов запуска. Ошибка
+        /// показывается локализованно с текстом причины из <see cref="IOneCProcessKiller.LastError"/>.
+        /// </summary>
+        private void OnKillProcessClick(RunningOneCProcessDetails process)
+        {
+            if (process is null)
+                return;
+
+            var title = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey);
+            var dialogs = AppServices.TryGetService<IDialogService>();
+
+            var label = KillProcessesMenuPlanner.FormatItemLabel(process, LocalizationManager.T);
+            var confirmText = string.Format(
+                LocalizationManager.T(KillProcessesMenuPlanner.ConfirmKey), label);
+            if (dialogs is null || !dialogs.Confirm(confirmText, title))
+                return;
+
+            var killed = false;
+            string? reason = null;
+            try
+            {
+                var killer = AppServices.TryGetService<IOneCProcessKiller>();
+                if (killer is not null)
+                {
+                    killed = killer.Kill(
+                        process.Pid,
+                        string.IsNullOrEmpty(process.StartTimeToken) ? null : process.StartTimeToken);
+                    reason = killer.LastError;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Любая ошибка завершения (нет прав, процесс уже завершён, /proc) —
+                // сообщение пользователю, интерфейс не падает.
+                killed = false;
+                reason = ex.Message;
+            }
+
+            if (!killed && dialogs is not null)
+            {
+                var message = string.IsNullOrWhiteSpace(reason)
+                    ? string.Format(LocalizationManager.T(KillProcessesMenuPlanner.KillFailedKey), process.Pid)
+                    : string.Format(LocalizationManager.T(KillProcessesMenuPlanner.KillFailedDetailKey), process.Pid, reason);
+                dialogs.ShowWarning(message, title);
+            }
+
+            // Индикаторы «база запущена» обновляются сразу, не дожидаясь таймера.
+            _vm?.RefreshRunningFlags();
         }
 
         /// <summary>

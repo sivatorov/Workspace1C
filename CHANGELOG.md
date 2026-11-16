@@ -11,6 +11,54 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.71] — 2026-11-16
+
+### Добавлено
+
+- **Подменю «Завершить процессы» в контекстном меню списка баз (issue #134, ArtyoZ).**
+  В блоке «Для выделенных (N)…» (для выделенной группы — «Для группы (N)…»)
+  появилось подменю с запущенными процессами 1С выделенных баз (для группы — всех
+  баз группы). Пункты отсортированы по времени старта и подписаны
+  «пользователь, приложение, время старта, PID», например
+  «superadmin, тонкий клиент, 09:09:55 16.11.2026, 5566»; процессы без времени
+  старта — в конце списка, неизвестный пользователь — «пользователь не определён».
+  Нет процессов — подменю скрыто.
+  Чистый слой без UI — [`KillProcessesMenuPlanner`](Workspace1C/Services/KillProcessesMenuPlanner.cs:1):
+  классификация приложения (`1cv8c` — тонкий клиент, `1cv8`/`1cv8x64` с DESIGNER/CONFIG —
+  конфигуратор, без них — толстый клиент, `1cv8s` — веб-клиент, имена на Linux — без
+  `.exe`), подпись пункта, стабильная сортировка по времени старта и отбор процессов
+  выделенных баз через [`RunningInfobaseMatcher`](Workspace1C/Services/RunningInfobaseMatcher.cs:262)
+  без дублей PID.
+  WPF: подменю строится в
+  [`MainWindow.ContextMenu.cs`](Workspace1C/Views/MainWindow.ContextMenu.cs:431)
+  и наполняется при открытии меню из
+  [`MainWindow.Columns.cs`](Workspace1C/Views/MainWindow.Columns.cs:151).
+  Avalonia: то же поведение и общий слой —
+  [`MainWindow.Avalonia.Tree.cs`](Workspace1C/Views/MainWindow.Avalonia.Tree.cs:3416).
+  Клик по пункту спрашивает подтверждение и завершает ровно выбранный процесс через
+  [`IOneCProcessKiller.Kill(pid, startTimeToken)`](Workspace1C/Services/IOneCProcessKiller.cs:22)
+  (на Linux сверяется токен времени старта); при отказе показывается локализованная
+  причина из `LastError`, при успехе индикаторы запуска обновляются сразу. Ошибки
+  WMI/доступа не роняют интерфейс.
+  Новые ключи локализации ru/en: `KillProcesses.MenuTitle`, `KillProcesses.ItemFormat`,
+  `KillProcesses.Confirm`, `KillProcesses.KillFailedFormat`,
+  `KillProcesses.KillFailedDetailFormat`, `KillProcesses.UnknownUser`,
+  `KillProcesses.UnknownStartTime`, `KillProcesses.ThinClient`,
+  `KillProcesses.ThickClient`, `KillProcesses.Configurator`, `KillProcesses.WebClient`
+  ([`ru.json`](Workspace1C/Localization/Languages/ru.json:2392),
+  [`en.json`](Workspace1C/Localization/Languages/en.json:2392)).
+
+### Тесты
+
+- `Workspace1C.Tests/Issue134KillProcessesTests.cs`: классификатор приложения
+  (1cv8/1cv8c/1cv8x64/DESIGNER/CONFIG/1cv8s/неизвестное, имена без `.exe`),
+  формат подписи (все поля, неизвестный пользователь/время, кириллица),
+  сортировка (в том числе равные времена и отсутствие времени), отбор по
+  выделенным базам и группе, отсутствие дублей PID, совпадение ключей локализации
+  ru/en и source-гварды WPF/Avalonia (подменю в блоке «Для выделенных», вызов
+  киллера с токеном времени старта, обновление индикаторов).
+- `Release100159Tests`: ожидания версии обновлены до 1.0.1.71.
+
 ## [1.0.1.70] — 2026-11-16
 
 ### Изменено

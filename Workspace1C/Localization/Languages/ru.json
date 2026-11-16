@@ -2389,6 +2389,18 @@
     "ProcessInspector.Mode.Service": "Служебный",
     "ProcessInspector.Hint": "Двойной клик по строке с известной базой — переход к базе в главном окне. Список обновляется автоматически.",
 
+    "KillProcesses.MenuTitle": "Завершить процессы",
+    "KillProcesses.ItemFormat": "{0}, {1}, {2}, {3}",
+    "KillProcesses.Confirm": "Завершить процесс «{0}»?\n\nНесохранённые данные в открытых сеансах 1С будут потеряны.\nПродолжить?",
+    "KillProcesses.KillFailedFormat": "Не удалось завершить процесс {0}: нет прав либо процесс уже завершён.",
+    "KillProcesses.KillFailedDetailFormat": "Не удалось завершить процесс {0}. {1}",
+    "KillProcesses.UnknownUser": "пользователь не определён",
+    "KillProcesses.UnknownStartTime": "—",
+    "KillProcesses.ThinClient": "тонкий клиент",
+    "KillProcesses.ThickClient": "толстый клиент",
+    "KillProcesses.Configurator": "конфигуратор",
+    "KillProcesses.WebClient": "веб-клиент",
+
     "Diagnostics.Title": "Диагностика подключения",
     "Diagnostics.Run": "Проверить",
     "Diagnostics.Retry": "Повторить",

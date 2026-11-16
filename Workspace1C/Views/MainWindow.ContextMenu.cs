@@ -1,5 +1,7 @@
 #if WINDOWS
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -24,6 +26,14 @@ public partial class MainWindow
 {
     /// <summary>Подменю «Пользовательские действия…» код-меню (наполняется в Opened).</summary>
     private MenuItem? _customActionsMenu;
+
+    /// <summary>
+    /// Подменю «Завершить процессы» блока «Для выделенных (N)…» (issue #134):
+    /// строится один раз вместе с batch-блоком, наполняется в Opened процессами
+    /// выделенных баз (для группы — всех баз группы) по общему чистому слою
+    /// <see cref="KillProcessesMenuPlanner"/>.
+    /// </summary>
+    private MenuItem? _killProcessesMenu;
 
     /// <summary>Разделитель перед подменю «Пользовательские действия…»: управляется вместе с ним.</summary>
     private Separator? _customActionsSeparator;
@@ -67,6 +77,7 @@ public partial class MainWindow
         target.Clear();
         _customActionsMenu = null;
         _customActionsSeparator = null;
+        _killProcessesMenu = null;
 
         if (_viewModel is null)
         {
@@ -395,7 +406,131 @@ public partial class MainWindow
         // Смена платформы выделенных баз (issue #54, переработка по комментарию 7OH):
         // отдельное окно «Сменить платформу» вместо встроенной галочки в «Замене строк…».
         batchMenu.Items.Add(CreateBatchAction("Main.BatchChangePlatform", "PackageVariant", "@SuccessBrush", OnBatchChangePlatform_Click));
+        // Завершение процессов выделенных баз (issue #134, автор ArtyoZ): подменю
+        // с процессами выделенных баз/группы, сортировка по времени старта,
+        // завершение ровно выбранного процесса. Наполняется в Opened — процессы
+        // меняются между открытиями меню.
+        var killProcessesMenu = new MenuItem
+        {
+            Header = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey),
+            Style = TryFindResource("ModernMenuItem") as Style,
+            Visibility = Visibility.Collapsed,
+        };
+        killProcessesMenu.Icon = CreateRowMenuIcon("CloseNetwork", "@ErrorBrush");
+        _killProcessesMenu = killProcessesMenu;
+        batchMenu.Items.Add(killProcessesMenu);
         batchMenu.Items.Add(CreateBatchAction("Main.BatchDelete", "Delete", "@ErrorBrush", OnBatchDelete_Click));
+    }
+
+    /// <summary>
+    /// Наполняет подменю «Завершить процессы» (issue #134): процессы выделенных
+    /// баз (для группы — всех баз группы), отсортированные по времени старта.
+    /// Нет процессов — подменю скрыто. Любая ошибка WMI/доступа не роняет меню:
+    /// список просто остаётся пустым.
+    /// </summary>
+    private void PopulateKillProcessesMenu(bool restricted)
+    {
+        var menu = _killProcessesMenu;
+        if (menu is null)
+            return;
+
+        menu.Items.Clear();
+        if (restricted || _viewModel is null)
+        {
+            menu.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        IReadOnlyList<RunningOneCProcessDetails> processes;
+        try
+        {
+            processes = AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails()
+                ?? Array.Empty<RunningOneCProcessDetails>();
+        }
+        catch
+        {
+            // Нет прав/WMI недоступен — подменю просто не показывается.
+            processes = Array.Empty<RunningOneCProcessDetails>();
+        }
+
+        var items = KillProcessesMenuPlanner.BuildMenuItems(
+            _viewModel.BatchOperationTargetsIncludingGroup, processes, LocalizationManager.T);
+        if (items.Count == 0)
+        {
+            menu.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        foreach (var item in items)
+        {
+            var processItem = new MenuItem
+            {
+                Header = item.Label,
+                Style = TryFindResource("ModernMenuItem") as Style,
+                Tag = item.Process,
+            };
+            processItem.Click += OnKillProcess_Click;
+            menu.Items.Add(processItem);
+        }
+
+        menu.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Клик по пункту «Завершить процессы» (issue #134): подтверждение →
+    /// <see cref="IOneCProcessKiller.Kill"/> ровно выбранного процесса (с токеном
+    /// времени старта на Linux) → обновление индикаторов запуска. Ошибка
+    /// показывается локализованно с текстом причины из <see cref="IOneCProcessKiller.LastError"/>.
+    /// </summary>
+    private void OnKillProcess_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: RunningOneCProcessDetails process })
+            return;
+
+        var title = LocalizationManager.T(KillProcessesMenuPlanner.MenuTitleKey);
+        var dialogs = AppServices.TryGetService<IDialogService>();
+
+        var label = KillProcessesMenuPlanner.FormatItemLabel(process, LocalizationManager.T);
+        var confirmText = string.Format(
+            LocalizationManager.T(KillProcessesMenuPlanner.ConfirmKey), label);
+        if (dialogs is null || !dialogs.Confirm(confirmText, title))
+            return;
+
+        var killed = false;
+        string? reason = null;
+        try
+        {
+            var killer = AppServices.TryGetService<IOneCProcessKiller>();
+            if (killer is null)
+            {
+                reason = null;
+            }
+            else
+            {
+                killed = killer.Kill(
+                    process.Pid,
+                    string.IsNullOrEmpty(process.StartTimeToken) ? null : process.StartTimeToken);
+                reason = killer.LastError;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Любая ошибка завершения (нет прав, процесс уже завершён, WMI) —
+            // сообщение пользователю, интерфейс не падает.
+            killed = false;
+            reason = ex.Message;
+        }
+
+        if (!killed && dialogs is not null)
+        {
+            var message = string.IsNullOrWhiteSpace(reason)
+                ? string.Format(LocalizationManager.T(KillProcessesMenuPlanner.KillFailedKey), process.Pid)
+                : string.Format(LocalizationManager.T(KillProcessesMenuPlanner.KillFailedDetailKey), process.Pid, reason);
+            dialogs.ShowWarning(message, title);
+        }
+
+        // Индикаторы «база запущена» обновляются сразу, не дожидаясь таймера.
+        _viewModel?.RefreshRunningFlags();
     }
 
     /// <summary>Пункт пакетной операции (0.3.9.90): подпись, значок, обработчик клика.</summary>
