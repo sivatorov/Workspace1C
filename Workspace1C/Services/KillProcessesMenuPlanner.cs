@@ -53,18 +53,23 @@ public enum KillProcessesMenuEntryKind
 
 /// <summary>
 /// Неизменяемый элемент плана подменю «Завершить процессы» (issue #134): пункт
-/// процесса, группа базы с вложенными пунктами либо верхний пункт «Завершить все».
-/// Подпись уже локализована чистым слоем — окна её не собирают.
+/// процесса, группа базы с вложенными пунктами либо пункт «Завершить все»
+/// (верхний или внутри группы базы). Подпись уже локализована чистым слоем —
+/// окна её не собирают.
 /// </summary>
 /// <param name="Kind">Вид элемента.</param>
 /// <param name="Label">Готовая подпись пункта или заголовка группы.</param>
 /// <param name="Process">Процесс для пункта <see cref="KillProcessesMenuEntryKind.Process"/>.</param>
 /// <param name="Children">Вложенные пункты группы (только для <see cref="KillProcessesMenuEntryKind.BaseGroup"/>).</param>
+/// <param name="Processes">Процессы для пункта <see cref="KillProcessesMenuEntryKind.KillAll"/>:
+/// все процессы плана для верхнего пункта либо процессы одной базы для пункта внутри
+/// группы (доработка автора issue #134 от 16.11.2026).</param>
 public sealed record KillProcessesMenuEntry(
     KillProcessesMenuEntryKind Kind,
     string Label,
     RunningOneCProcessDetails? Process = null,
-    IReadOnlyList<KillProcessesMenuEntry>? Children = null);
+    IReadOnlyList<KillProcessesMenuEntry>? Children = null,
+    IReadOnlyList<RunningOneCProcessDetails>? Processes = null);
 
 /// <summary>
 /// Неизменяемый план подменю «Завершить процессы» (issue #134, доработки автора
@@ -378,6 +383,12 @@ public static class KillProcessesMenuPlanner
     /// по базам в порядке выделения. Внутри группы процессы отсортированы по
     /// времени старта; базы без запущенных процессов не показываются. Пустой
     /// план — подменю скрывается.
+    /// <para>
+    /// Доработка автора issue #134 (16.11.2026): если в базе запущено несколько
+    /// процессов, пункт «Завершить все» появляется и внутри подменю этой базы
+    /// (для одной выделенной базы — первым пунктом плоского списка), чтобы не
+    /// завершать процессы по одному.
+    /// </para>
     /// </summary>
     public static KillProcessesMenuPlan BuildMenuPlan(
         IEnumerable<Infobase>? infobases,
@@ -432,38 +443,54 @@ public static class KillProcessesMenuPlanner
 
         var allProcesses = groups.SelectMany(group => group.Processes).ToList();
 
-        // Одна база с процессами — прежний плоский список (v1.0.1.74).
+        // Одна база с процессами — плоский список (v1.0.1.74); при нескольких
+        // процессах первым пунктом идёт «Завершить все» (issue #134, доработка
+        // автора от 16.11.2026).
         if (groups.Count == 1)
         {
-            var flat = groups[0].Processes
-                .Select(process => new KillProcessesMenuEntry(
-                    KillProcessesMenuEntryKind.Process, FormatItemLabel(process, translate), process))
-                .ToList();
+            var onlyProcesses = groups[0].Processes;
+            var flat = new List<KillProcessesMenuEntry>(onlyProcesses.Count + 1);
+            if (onlyProcesses.Count > 1)
+                flat.Add(CreateKillAllEntry(translate, onlyProcesses));
+            flat.AddRange(onlyProcesses.Select(process => new KillProcessesMenuEntry(
+                KillProcessesMenuEntryKind.Process, FormatItemLabel(process, translate), process)));
             return new KillProcessesMenuPlan(flat, allProcesses, IsGrouped: false);
         }
 
         // Несколько баз — «Завершить все» первым пунктом, затем группы по базам.
         var entries = new List<KillProcessesMenuEntry>(groups.Count + 1)
         {
-            new(KillProcessesMenuEntryKind.KillAll, translate(KillAllTitleKey))
+            CreateKillAllEntry(translate, allProcesses)
         };
 
         foreach (var (infobase, groupProcesses) in groups)
         {
-            var children = groupProcesses
-                .Select(process => new KillProcessesMenuEntry(
-                    KillProcessesMenuEntryKind.Process, FormatItemLabel(process, translate), process))
-                .ToList();
+            var children = new List<KillProcessesMenuEntry>(groupProcesses.Count + 1);
+            // Несколько процессов в одной базе — «Завершить все» внутри её подменю.
+            if (groupProcesses.Count > 1)
+                children.Add(CreateKillAllEntry(translate, groupProcesses));
+            children.AddRange(groupProcesses.Select(process => new KillProcessesMenuEntry(
+                KillProcessesMenuEntryKind.Process, FormatItemLabel(process, translate), process)));
+
             var header = string.Format(
                 translate(GroupHeaderFormatKey),
                 BaseDisplayName(infobase, translate),
-                children.Count);
+                groupProcesses.Count);
             entries.Add(new KillProcessesMenuEntry(
                 KillProcessesMenuEntryKind.BaseGroup, header, Children: children));
         }
 
         return new KillProcessesMenuPlan(entries, allProcesses, IsGrouped: true);
     }
+
+    /// <summary>
+    /// Пункт «Завершить все» для набора процессов (issue #134): подпись локализуется,
+    /// процессы передаются в элемент плана, чтобы окно завершало ровно их — весь план
+    /// (верхний пункт) или процессы одной базы (пункт внутри группы).
+    /// </summary>
+    private static KillProcessesMenuEntry CreateKillAllEntry(
+        Func<string, string> translate, IReadOnlyList<RunningOneCProcessDetails> processes)
+        => new(KillProcessesMenuEntryKind.KillAll, translate(KillAllTitleKey), Processes: processes);
 
     /// <summary>
     /// Плоский список пунктов (обратная совместимость v1.0.1.74, issue #134):

@@ -3467,28 +3467,19 @@ namespace Workspace1C
                 switch (entry.Kind)
                 {
                     case KillProcessesMenuEntryKind.KillAll:
-                        var killAllItem = new MenuItem
-                        {
-                            Header = entry.Label,
-                            Tag = plan.AllProcesses,
-                        };
-                        killAllItem.Styled(Themes.ControlThemes.ModernMenuItem);
-                        killAllItem.Icon = MenuIcon("IconClose", "@ErrorBrush");
-                        var killAllProcesses = plan.AllProcesses;
-                        killAllItem.Click += (_, _) => OnKillAllProcessesClick(killAllProcesses);
-                        menu.Items.Add(killAllItem);
+                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(entry, plan.AllProcesses));
                         break;
 
                     case KillProcessesMenuEntryKind.BaseGroup:
                         var groupItem = new MenuItem { Header = entry.Label };
                         groupItem.Styled(Themes.ControlThemes.ModernMenuItem);
                         foreach (var child in entry.Children ?? Array.Empty<KillProcessesMenuEntry>())
-                            groupItem.Items.Add(CreateAvaloniaKillProcessMenuItem(child));
+                            groupItem.Items.Add(CreateAvaloniaKillProcessMenuItem(child, plan.AllProcesses));
                         menu.Items.Add(groupItem);
                         break;
 
                     default:
-                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(entry));
+                        menu.Items.Add(CreateAvaloniaKillProcessMenuItem(entry, plan.AllProcesses));
                         break;
                 }
             }
@@ -3496,15 +3487,30 @@ namespace Workspace1C
             menu.IsVisible = true;
         }
 
-        /// <summary>Пункт конкретного процесса плана подменю (issue #134).</summary>
-        private MenuItem CreateAvaloniaKillProcessMenuItem(KillProcessesMenuEntry entry)
+        /// <summary>
+        /// Пункт плана подменю (issue #134): конкретный процесс либо «Завершить все».
+        /// Вложенный пункт «Завершить все» (несколько процессов в одной базе) завершает
+        /// только процессы своей группы — их список лежит в самом элементе плана.
+        /// </summary>
+        private MenuItem CreateAvaloniaKillProcessMenuItem(
+            KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
         {
             var item = new MenuItem
             {
                 Header = entry.Label,
-                Tag = entry.Process,
+                Tag = entry.Kind == KillProcessesMenuEntryKind.KillAll
+                    ? entry.Processes ?? allProcesses
+                    : entry.Process,
             };
             item.Styled(Themes.ControlThemes.ModernMenuItem);
+
+            if (entry.Kind == KillProcessesMenuEntryKind.KillAll)
+            {
+                item.Icon = MenuIcon("IconClose", "@ErrorBrush");
+                var killAllProcesses = entry.Processes ?? allProcesses;
+                item.Click += (_, _) => OnKillAllProcessesClick(killAllProcesses);
+                return item;
+            }
 
             var process = entry.Process;
             if (process is not null)

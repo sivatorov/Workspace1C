@@ -468,15 +468,7 @@ public partial class MainWindow
             switch (entry.Kind)
             {
                 case KillProcessesMenuEntryKind.KillAll:
-                    var killAllItem = new MenuItem
-                    {
-                        Header = entry.Label,
-                        Style = TryFindResource("ModernMenuItem") as Style,
-                        Tag = plan.AllProcesses,
-                    };
-                    killAllItem.Icon = CreateRowMenuIcon("CloseNetwork", "@ErrorBrush");
-                    killAllItem.Click += OnKillAllProcesses_Click;
-                    menu.Items.Add(killAllItem);
+                    menu.Items.Add(CreateKillAllMenuItem(entry, plan.AllProcesses));
                     break;
 
                 case KillProcessesMenuEntryKind.BaseGroup:
@@ -486,12 +478,12 @@ public partial class MainWindow
                         Style = TryFindResource("ModernMenuItem") as Style,
                     };
                     foreach (var child in entry.Children ?? Array.Empty<KillProcessesMenuEntry>())
-                        groupItem.Items.Add(CreateKillProcessMenuItem(child));
+                        groupItem.Items.Add(CreateKillProcessMenuItem(child, plan.AllProcesses));
                     menu.Items.Add(groupItem);
                     break;
 
                 default:
-                    menu.Items.Add(CreateKillProcessMenuItem(entry));
+                    menu.Items.Add(CreateKillProcessMenuItem(entry, plan.AllProcesses));
                     break;
             }
         }
@@ -499,8 +491,34 @@ public partial class MainWindow
         menu.Visibility = Visibility.Visible;
     }
 
+    /// <summary>
+    /// Пункт плана подменю (issue #134): конкретный процесс либо «Завершить все».
+    /// Вложенный пункт «Завершить все» (несколько процессов в одной базе) завершает
+    /// только процессы своей группы — их список лежит в самом элементе плана.
+    /// </summary>
+    private MenuItem CreateKillProcessMenuItem(
+        KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
+        => entry.Kind == KillProcessesMenuEntryKind.KillAll
+            ? CreateKillAllMenuItem(entry, allProcesses)
+            : CreateProcessMenuItem(entry);
+
+    /// <summary>Пункт «Завершить все» — верхний или внутри подменю базы (issue #134).</summary>
+    private MenuItem CreateKillAllMenuItem(
+        KillProcessesMenuEntry entry, IReadOnlyList<RunningOneCProcessDetails> allProcesses)
+    {
+        var item = new MenuItem
+        {
+            Header = entry.Label,
+            Style = TryFindResource("ModernMenuItem") as Style,
+            Tag = entry.Processes ?? allProcesses,
+        };
+        item.Icon = CreateRowMenuIcon("CloseNetwork", "@ErrorBrush");
+        item.Click += OnKillAllProcesses_Click;
+        return item;
+    }
+
     /// <summary>Пункт конкретного процесса плана подменю (issue #134).</summary>
-    private MenuItem CreateKillProcessMenuItem(KillProcessesMenuEntry entry)
+    private MenuItem CreateProcessMenuItem(KillProcessesMenuEntry entry)
     {
         var item = new MenuItem
         {

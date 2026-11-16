@@ -65,6 +65,13 @@ public sealed class Issue135ServerConsoleTests
     private static string VersionDir(string version, string arch = "64")
         => Path.GetDirectoryName(Bin(version, arch))!;
 
+    /// <summary>Корень установки платформы 1С (<c>C:\Program Files\1cv8</c>).</summary>
+    private static string PlatformRoot(string arch = "64")
+        => Path.Combine(
+            "C:",
+            arch == "32" ? "Program Files (x86)" : "Program Files",
+            "1cv8");
+
     private static string Bin(string version, string arch = "64")
         => Path.Combine(
             "C:",
@@ -557,6 +564,82 @@ public sealed class Issue135ServerConsoleTests
         Assert.Contains(bin, search.CheckedDirectories);
         Assert.Contains(VersionDir("8.3.27.1688"), search.CheckedDirectories);
         Assert.Contains(common, search.CheckedDirectories);
+    }
+
+    // ============ Общий каталог платформы (issue #135, комментарий 16.11.2026) ============
+    //
+    // Автор issue: оснастка лежит в «C:\Program Files\1cv8\common\1CV8 Servers (x86-64).msc»,
+    // приложение её не находило. Причина: проверялся только «<версия>\common», а общий
+    // каталог платформы — уровнем выше, в корне «1cv8».
+
+    [Fact]
+    public void GetSnapInSearchDirectories_IncludesPlatformRootAndItsCommon()
+    {
+        var bin = Bin("8.3.27.1688");
+
+        var directories = ServerConsolePlanner.GetSnapInSearchDirectories(bin);
+
+        Assert.Equal(
+            new[]
+            {
+                bin,
+                VersionDir("8.3.27.1688"),
+                Path.Combine(VersionDir("8.3.27.1688"), "common"),
+                PlatformRoot(),
+                Path.Combine(PlatformRoot(), "common")
+            },
+            directories);
+        Assert.Equal(directories.Count, directories.Distinct(StringComparer.OrdinalIgnoreCase).Count());
+    }
+
+    [Fact]
+    public void FindSnapIn_FindsSnapInInPlatformRootCommon()
+    {
+        var bin = Bin("8.3.27.1688");
+        var common = Path.Combine(PlatformRoot(), "common");
+        var snapIn = Path.Combine(common, "1CV8 Servers (x86-64).msc");
+
+        var search = ServerConsolePlanner.FindSnapIn(
+            bin, Files(snapIn), Enumerate((common, new[] { snapIn })));
+
+        Assert.Equal(snapIn, search.SnapInPath);
+        Assert.Contains(PlatformRoot(), search.CheckedDirectories);
+        Assert.Contains(common, search.CheckedDirectories);
+        Assert.Equal(snapIn, Assert.Single(search.FoundSnapIns));
+    }
+
+    [Fact]
+    public void ListCandidates_FindsSnapInInPlatformRootCommon()
+    {
+        var bin = Bin("8.3.27.1688");
+        var common = Path.Combine(PlatformRoot(), "common");
+        var snapIn = Path.Combine(common, "1CV8 Servers (x86-64).msc");
+
+        var candidates = ServerConsolePlanner.ListCandidates(
+            new[] { ("8.3.27.1688", bin, "64") }, Files(snapIn),
+            Enumerate((common, new[] { snapIn })));
+
+        var candidate = Assert.Single(candidates);
+        Assert.Equal(snapIn, candidate.SnapInPath);
+        Assert.Equal("8.3.27.1688 (64)", candidate.Display);
+    }
+
+    [Fact]
+    public void FindSnapIn_MaskMatches_AreOrderedStably()
+    {
+        // Directory.EnumerateFiles не гарантирует порядок: без сортировки «основным»
+        // становился случайный файл, а от него зависит стратегия запуска.
+        var bin = Bin("8.3.27.1688");
+        var first = Path.Combine(bin, "1CV8 Servers (x86-64).msc");
+        var second = Path.Combine(bin, "1CV8 Servers (x86).msc");
+
+        var search = ServerConsolePlanner.FindSnapIn(
+            bin, _ => false, Enumerate((bin, new[] { first, second })));
+
+        // Порядок — по имени файла (OrdinalIgnoreCase): «(x86)» идёт раньше «(x86-64)»,
+        // потому что ')' < '-'. Главное — результат воспроизводим между запусками.
+        Assert.Equal(second, search.SnapInPath);
+        Assert.Equal(new[] { second, first }, search.FoundSnapIns);
     }
 
     [Fact]

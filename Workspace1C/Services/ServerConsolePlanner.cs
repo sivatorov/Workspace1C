@@ -226,8 +226,9 @@ public sealed record ServerConsoleRegistrationResult(
 /// <summary>
 /// Чистая логика внешней консоли администрирования серверов 1С (issue #135):
 /// расширенный поиск оснастки (<c>1CV8Servers.msc</c> и альтернативные имена,
-/// маски <c>*servers*.msc</c>/<c>*admin*.msc</c> в <c>bin</c>, <c>..</c> и
-/// <c>..\common</c>), отбор установленных платформ, выбор версии, построение
+/// маски <c>*servers*.msc</c>/<c>*admin*.msc</c> в <c>bin</c>, каталоге версии,
+/// его <c>common</c>, корне платформы и общем каталоге
+/// <c><корень>\common</c>), отбор установленных платформ, выбор версии, построение
 /// каскада команд <c>mmc.exe</c>/оболочки, команды <c>regsvr32</c>, список
 /// компонентов для регистрации и диагностика причины отказа по каждой ветке.
 /// Без UI и без прямого обращения к диску (проверка существования и перечисление
@@ -283,8 +284,13 @@ public static class ServerConsolePlanner
 
     /// <summary>
     /// Каталоги, в которых ищется оснастка (issue #135): <c>bin</c>, каталог версии
-    /// (<c>..</c>) и общий каталог платформы (<c>..\common</c>). В каталоге версии
-    /// некоторых сборок оснастка лежит не в <c>bin</c>.
+    /// (<c>..</c>), его <c>common</c>, корень платформы (<c>..\..</c>, например
+    /// <c>C:\Program Files\1cv8</c>) и общий каталог платформы
+    /// (<c>..\..\common</c>). Именно в корне платформы лежит оснастка в стандартной
+    /// раскладке — <c>C:\Program Files\1cv8\common\1CV8 Servers (x86-64).msc</c>;
+    /// до v1.0.1.76 проверялся только <c><версия>\common</c>, поэтому такая
+    /// оснастка не находилась (комментарий автора issue #135 от 16.11.2026).
+    /// Пути дедуплицируются (регистр не важен), порядок — от частного к общему.
     /// </summary>
     public static IReadOnlyList<string> GetSnapInSearchDirectories(string? binDir)
     {
@@ -292,16 +298,36 @@ public static class ServerConsolePlanner
         if (string.IsNullOrWhiteSpace(binDir))
             return result;
 
-        var trimmed = binDir.Trim().TrimEnd(
-            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        result.Add(trimmed);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        var parent = Path.GetDirectoryName(trimmed);
-        if (!string.IsNullOrWhiteSpace(parent))
+        void Add(string? directory)
         {
-            result.Add(parent!);
-            result.Add(Path.Combine(parent!, "common"));
+            if (string.IsNullOrWhiteSpace(directory))
+                return;
+            var trimmed = directory!.Trim().TrimEnd(
+                Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (trimmed.Length == 0)
+                return;
+            if (seen.Add(trimmed))
+                result.Add(trimmed);
         }
+
+        var bin = binDir.Trim().TrimEnd(
+            Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        Add(bin);
+
+        // Каталог версии: <корень платформы>\<версия>. Если передан не ...\bin,
+        // а сам каталог версии (нестандартная раскладка), родитель всё равно
+        // проверяется — лишняя проверка существования ничего не стоит.
+        var versionDir = Path.GetDirectoryName(bin);
+        Add(versionDir);
+        Add(versionDir is null ? null : Path.Combine(versionDir, "common"));
+
+        // Корень платформы (<...>\1cv8) и его общий каталог common — стандартное
+        // место оснастки консоли администрирования серверов (issue #135).
+        var platformRoot = versionDir is null ? null : Path.GetDirectoryName(versionDir);
+        Add(platformRoot);
+        Add(platformRoot is null ? null : Path.Combine(platformRoot, "common"));
 
         return result;
     }
@@ -343,6 +369,9 @@ public static class ServerConsolePlanner
         }
 
         // 2. Поиск по маске: покрывает нестандартные имена и регистр файла.
+        //    Файлы одного каталога перебираются в стабильном порядке имён (issue #135):
+        //    иначе Directory.EnumerateFiles даёт разный «первый» .msc от запуска к запуску,
+        //    а именно он выбирается основным, пока остальные идут в каскад альтернатив.
         if (enumerateFiles is not null)
         {
             foreach (var directory in checkedDirectories)
@@ -358,14 +387,13 @@ public static class ServerConsolePlanner
                     continue;
                 }
 
-                foreach (var file in files)
+                foreach (var file in files
+                             .Where(file => !string.IsNullOrWhiteSpace(file))
+                             .Select(file => Path.IsPathRooted(file) ? file : Path.Combine(directory, file))
+                             .Where(file => MatchesSnapInMask(Path.GetFileName(file)))
+                             .OrderBy(file => Path.GetFileName(file), StringComparer.OrdinalIgnoreCase))
                 {
-                    if (string.IsNullOrWhiteSpace(file))
-                        continue;
-                    var name = Path.GetFileName(file);
-                    if (!MatchesSnapInMask(name))
-                        continue;
-                    Add(Path.IsPathRooted(file) ? file : Path.Combine(directory, name));
+                    Add(file);
                 }
             }
         }

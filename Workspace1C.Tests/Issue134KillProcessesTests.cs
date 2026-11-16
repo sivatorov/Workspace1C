@@ -373,8 +373,29 @@ public sealed class Issue134KillProcessesTests
     // ===================== План меню: одна и несколько баз =====================
 
     [Fact]
-    public void BuildMenuPlan_OneBase_IsFlatWithoutKillAll()
+    public void BuildMenuPlan_OneBaseWithSingleProcess_IsFlatWithoutKillAll()
     {
+        var alpha = FileBase("alpha", @"C:\Bases\Alpha");
+        var processes = new[]
+        {
+            Process(pid: 1, startTime: new DateTime(2026, 11, 16, 8, 0, 0),
+                commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\"")
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { alpha }, processes, Translate);
+
+        Assert.False(plan.IsEmpty);
+        Assert.False(plan.IsGrouped);
+        Assert.All(plan.Entries, entry => Assert.Equal(KillProcessesMenuEntryKind.Process, entry.Kind));
+        Assert.Equal(new[] { 1 }, plan.Entries.Select(entry => entry.Process!.Pid));
+        Assert.Equal(new[] { 1 }, plan.AllProcesses.Select(process => process.Pid));
+    }
+
+    [Fact]
+    public void BuildMenuPlan_OneBaseWithSeveralProcesses_KillAllFirst()
+    {
+        // Доработка автора issue #134 от 16.11.2026: одна выделенная база с двумя
+        // процессами — «Завершить все» первым пунктом, затем сами процессы.
         var alpha = FileBase("alpha", @"C:\Bases\Alpha");
         var processes = new[]
         {
@@ -388,8 +409,11 @@ public sealed class Issue134KillProcessesTests
 
         Assert.False(plan.IsEmpty);
         Assert.False(plan.IsGrouped);
-        Assert.All(plan.Entries, entry => Assert.Equal(KillProcessesMenuEntryKind.Process, entry.Kind));
-        Assert.Equal(new[] { 1, 2 }, plan.Entries.Select(entry => entry.Process!.Pid));
+        Assert.Equal(3, plan.Entries.Count);
+        Assert.Equal(KillProcessesMenuEntryKind.KillAll, plan.Entries[0].Kind);
+        Assert.Equal("Завершить все", plan.Entries[0].Label);
+        Assert.Equal(new[] { 1, 2 }, plan.Entries[0].Processes!.Select(process => process.Pid));
+        Assert.Equal(new[] { 1, 2 }, plan.Entries.Skip(1).Select(entry => entry.Process!.Pid));
         Assert.Equal(new[] { 1, 2 }, plan.AllProcesses.Select(process => process.Pid));
     }
 
@@ -417,16 +441,52 @@ public sealed class Issue134KillProcessesTests
         // Пункт 2 автора issue: «Завершить все» — отдельный верхний пункт.
         Assert.Equal(KillProcessesMenuEntryKind.KillAll, plan.Entries[0].Kind);
         Assert.Equal("Завершить все", plan.Entries[0].Label);
+        Assert.Equal(new[] { 2, 3, 1 }, plan.Entries[0].Processes!.Select(process => process.Pid));
 
+        // ЗКГУ: два процесса — «Завершить все» внутри группы, затем сами процессы.
         Assert.Equal(KillProcessesMenuEntryKind.BaseGroup, plan.Entries[1].Kind);
         Assert.Equal("zkgu (2)", plan.Entries[1].Label);
-        Assert.Equal(new[] { 2, 3 }, plan.Entries[1].Children!.Select(entry => entry.Process!.Pid));
+        Assert.Equal(KillProcessesMenuEntryKind.KillAll, plan.Entries[1].Children![0].Kind);
+        Assert.Equal(
+            new[] { 2, 3 },
+            plan.Entries[1].Children![0].Processes!.Select(process => process.Pid));
+        Assert.Equal(
+            new[] { 2, 3 },
+            plan.Entries[1].Children!.Skip(1).Select(entry => entry.Process!.Pid));
 
+        // БГУ: один процесс — вложенного «Завершить все» нет.
         Assert.Equal(KillProcessesMenuEntryKind.BaseGroup, plan.Entries[2].Kind);
         Assert.Equal("bgu (1)", plan.Entries[2].Label);
+        Assert.All(
+            plan.Entries[2].Children!,
+            entry => Assert.Equal(KillProcessesMenuEntryKind.Process, entry.Kind));
         Assert.Equal(new[] { 1 }, plan.Entries[2].Children!.Select(entry => entry.Process!.Pid));
 
         Assert.Equal(new[] { 2, 3, 1 }, plan.AllProcesses.Select(process => process.Pid));
+    }
+
+    [Fact]
+    public void BuildMenuPlan_GroupKillAll_ContainsOnlyGroupProcesses()
+    {
+        // «Завершить все» внутри группы завершает процессы этой базы, а не всего плана.
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 3, processName: "1cv8.exe", commandLine: "DESIGNER /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 11, 0, 0)),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\"",
+                startTime: new DateTime(2026, 11, 16, 9, 0, 0)),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\"",
+                startTime: new DateTime(2026, 11, 16, 8, 0, 0))
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+        var groupKillAll = plan.Entries[1].Children![0];
+
+        Assert.Equal(KillProcessesMenuEntryKind.KillAll, groupKillAll.Kind);
+        Assert.DoesNotContain(groupKillAll.Processes!, process => process.Pid == 1);
+        Assert.Equal(2, groupKillAll.Processes!.Count);
     }
 
     [Fact]
@@ -664,10 +724,28 @@ public sealed class Issue134KillProcessesTests
             Assert.Contains("KillProcessesMenuPlanner.KillAllSummaryFormatKey", source, StringComparison.Ordinal);
             Assert.Contains("dialogs.ShowWarning(summary, title);", source, StringComparison.Ordinal);
             Assert.Contains("dialogs.ShowInfo(summary, title);", source, StringComparison.Ordinal);
+            // «Завершить все» внутри подменю базы: список процессов берётся из элемента
+            // плана (entry.Processes), а не из всего плана (issue #134, доработка автора).
+            Assert.Contains("entry.Processes", source, StringComparison.Ordinal);
         }
 
+        Assert.Contains("CreateKillAllMenuItem", wpf, StringComparison.Ordinal);
         Assert.Contains("OnKillAllProcesses_Click", wpf, StringComparison.Ordinal);
         Assert.Contains("OnKillAllProcessesClick", avalonia, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BothPlatforms_GroupChildrenGoThroughKillAllAwareFactory()
+    {
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.ContextMenu.cs"));
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
+
+        // Дочерние пункты группы создаются тем же методом, что понимает KillAll —
+        // иначе вложенный «Завершить все» отрисовался бы как пункт процесса.
+        Assert.Contains(
+            "CreateKillProcessMenuItem(child, plan.AllProcesses)", wpf, StringComparison.Ordinal);
+        Assert.Contains(
+            "CreateAvaloniaKillProcessMenuItem(child, plan.AllProcesses)", avalonia, StringComparison.Ordinal);
     }
 
     [Fact]
