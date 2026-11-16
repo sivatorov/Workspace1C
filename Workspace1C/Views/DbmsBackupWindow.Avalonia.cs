@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Workspace1C.Localization;
 using Workspace1C.Services;
 using Workspace1C.ViewModels;
