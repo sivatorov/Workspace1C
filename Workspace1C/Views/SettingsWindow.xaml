@@ -1892,6 +1892,18 @@
                                                     Height="34" FontSize="13"
                                                     Style="{StaticResource ModernTextBox}"/>
                             </Grid>
+                            <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ). -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="260"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{loc:Loc Settings.Hotkeys.ProcessInspector}" VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <controls:HotkeyBox x:Name="HotkeyProcessInspectorBox" Grid.Column="1"
+                                                    Height="34" FontSize="13"
+                                                    Style="{StaticResource ModernTextBox}"/>
+                            </Grid>
                             <!-- Управление службами (issue #11): Ctrl+Shift+S по умолчанию. -->
                             <Grid Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions>

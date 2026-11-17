@@ -1091,6 +1091,15 @@ namespace Workspace1C
             _utilitiesButton = utilitiesBtn;
             panel.Children.Add(utilitiesBtn);
 
+            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): быстрый доступ
+            // рядом с «Утилитами» — та же команда, что пункт «Утилиты → Операции».
+            var processInspectorBtn = TopBarIconButton(
+                "IconApplicationCog",
+                LocalizationManager.T("Main.ProcessInspectorTooltip"),
+                "@InfoBrush");
+            processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
+            panel.Children.Add(processInspectorBtn);
+
             // «Актуальные релизы» перенесены в подменю «Утилиты» (issue #279), отдельная
             // кнопка на панели не нужна — в меню команда уже есть (пункт первый).
             panel.Children.Add(CommandPanelSeparator());
@@ -2697,8 +2706,10 @@ namespace Workspace1C
 
                 // Состояние «файл обновления скачан и готов к установке» (issue #116,
                 // v1.0.1.58): зелёная галочка вместо «внимания», клик — сразу диалог
-                // установки готового файла (без сетевой проверки).
-                var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
+                // установки готового файла (без сетевой проверки). Issue #116 (17.11.2026):
+                // готовым считается только файл ДОСТУПНОГО релиза — пока в фоне качается
+                // более новая версия, старый скачанный файл не показываем как готовый.
+                var isReady = updateService.IsReadyFor(updateService.AvailableRelease);
                 var hasRelease = updateService.AvailableRelease is not null;
                 // v1.0.1.61: видимость значка больше не зависит от режима обновления —
                 // в авто-режимах без релиза он тоже доступен для ручной проверки.
@@ -2790,9 +2801,9 @@ namespace Workspace1C
             try
             {
                 var updateService = AppServices.GetRequiredService<UpdateService>();
-                // Файл обновления уже скачан (issue #116 v1.0.1.58): открываем сразу
-                // диалог установки готового файла, без сетевой проверки.
-                if (updateService.IsReadyFor(updateService.ReadyRelease))
+                // Issue #116: готовый файл — только у ДОСТУПНОГО релиза, иначе проверяем новую.
+                if (updateService.IsReadyFor(updateService.ReadyRelease)
+                    && updateService.IsReadyFor(updateService.AvailableRelease))
                 {
                     await updateService.OpenReadyInstallAsync();
                     return;

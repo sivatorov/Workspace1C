@@ -3535,6 +3535,8 @@ namespace Workspace1C
             // Администрирование ИБ (Этап 6, функция №29 + консоль серверов).
             var hotkeyCheckIntegrity = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.CheckIntegrity"), _viewModel.HotkeyCheckIntegrity);
             var hotkeyServerConsole = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.ServerConsole"), _viewModel.HotkeyServerConsole);
+            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): Ctrl+Alt+I.
+            var hotkeyProcessInspector = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.ProcessInspector"), _viewModel.HotkeyProcessInspector);
             // Управление службами (issue #11): Ctrl+Shift+S по умолчанию.
             var hotkeyServices = HotkeyRow(hotkeys, LocalizationManager.T("Settings.Hotkeys.Services"), _viewModel.HotkeyServices);
             // Меню служб (issue #11, пункт 6): Ctrl+Shift+Alt+S по умолчанию.
@@ -3828,6 +3830,8 @@ namespace Workspace1C
                     (LocalizationManager.T("AppLock.LockTitle"), hotkeyLockApp),
                     (LocalizationManager.T("Admin.CheckIntegrityTitle"), hotkeyCheckIntegrity),
                     (LocalizationManager.T("Admin.ServerConsoleTitle"), hotkeyServerConsole),
+                    // Инспектор процессов 1С (issue #134, доработка ArtyoZ).
+                    (LocalizationManager.T("ProcessInspector.Title"), hotkeyProcessInspector),
                     // Меню служб (issue #11, пункт 6): по умолчанию Ctrl+Shift+Alt+S;
                     // конфликт с другими сочетаниями проверяется наравне с ними.
                     (LocalizationManager.T("Settings.Hotkeys.ServicesMenu"), hotkeyServicesMenu),
@@ -4008,11 +4012,15 @@ namespace Workspace1C
                     hotkeyClearSearch.Value, hotkeyClearTags.Value, hotkeyRightPanelDetails.Value,
                     hotkeySwitchUser.Value, hotkeyFindInList.Value, hotkeySessionLock.Value, hotkeyLockApp.Value,
                     hotkeyCheckIntegrity.Value, hotkeyServerConsole.Value,
-                    hotkeyServices.Value,
+                    processInspector: hotkeyProcessInspector.Value,
+                    hotkeyServices: hotkeyServices.Value,
                     servicesMenu: hotkeyServicesMenu.Value,
-                    hotkeyZoomIn.Value, hotkeyZoomOut.Value, hotkeyZoomReset.Value,
-                    hotkeyCommandPalette.Value, hotkeyPlatformUpdate.Value,
-                    hotkeyShowRunning.Value,
+                    zoomIn: hotkeyZoomIn.Value,
+                    zoomOut: hotkeyZoomOut.Value,
+                    zoomReset: hotkeyZoomReset.Value,
+                    commandPalette: hotkeyCommandPalette.Value,
+                    platformUpdate: hotkeyPlatformUpdate.Value,
+                    showRunning: hotkeyShowRunning.Value,
                     bookmarksMenu: hotkeyBookmarksMenu.Value,
                     collectDiagnostics: hotkeyCollectDiagnostics.Value);
 

@@ -455,21 +455,21 @@ public sealed class Issue116UpdateIntervalTests
     // ===================== Растягивание окон обновления =====================
 
     [Fact]
-    public void Wpf_UpdateAvailableWindow_LocksWidthAndHeight()
+    public void Wpf_UpdateAvailableWindow_FitsContentWithoutManualSizeLocks()
     {
-        // WndProc фиксирует и ширину (issue #162/#157), и высоту
-        // (issue #116 v1.0.1.54 — запрет вертикального растягивания).
-        var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
-        Assert.Contains("FixedHeightDips", code);
-        Assert.Contains("FixedHeightPx", code);
-        Assert.Contains("DpiScaleY", code);
-        Assert.Contains("mmi.MinTrackSize.Y = h;", code);
-        Assert.Contains("mmi.MaxTrackSize.Y = h;", code);
-        Assert.Contains("rc.Top = rc.Bottom - h;", code);
-        Assert.Contains("rc.Bottom = rc.Top + h;", code);
-        // Вертикальная прокрутка «Что нового» внутри окна сохранена (разметка окна).
+        // Issue #116 (17.11.2026 14:07): ручная фиксация габаритов через WndProc
+        // убрана — она давала скачок размера после показа. Окно подстраивается под
+        // содержимое средствами XAML (SizeToContent) и не растягивается мышью.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
+        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml);
+        Assert.Contains("ResizeMode=\"NoResize\"", xaml);
+        // Вертикальная прокрутка «Что нового» внутри окна сохранена (разметка окна).
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml);
+
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+        Assert.DoesNotContain("FixedHeightDips", code);
+        Assert.DoesNotContain("FixedHeightPx", code);
+        Assert.DoesNotContain("WndProc", code);
     }
 
     [Fact]

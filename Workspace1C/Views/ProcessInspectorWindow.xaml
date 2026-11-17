@@ -44,8 +44,9 @@
         <DataGrid x:Name="ProcessesGrid" Grid.Row="2"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
-                  SelectionMode="Single" SelectionUnit="FullRow"
+                  SelectionMode="Extended" SelectionUnit="FullRow"
                   SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                  SelectionChanged="OnGrid_SelectionChanged"
                   GridLinesVisibility="Horizontal"
                   RowHeight="38"
                   AlternatingRowBackground="{DynamicResource CardBackgroundBrush}"
@@ -83,7 +84,7 @@
                 <DataGridTextColumn Width="*" Header="{loc:Loc ProcessInspector.StartTime}"
                                     Binding="{Binding StartTimeText}"
                                     ElementStyle="{StaticResource CenteredCellText}"/>
-                <DataGridTextColumn Width="70" Header="PID"
+                <DataGridTextColumn Width="70" Header="{loc:Loc ProcessInspector.Pid}"
                                     Binding="{Binding Pid}"
                                     ElementStyle="{StaticResource CenteredCellText}"/>
                 <DataGridTextColumn Width="1.6*" Header="{loc:Loc ProcessInspector.Connection}"
@@ -115,8 +116,16 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <!-- Кнопки: «Обновить», «Завершить процесс», «Закрыть» -->
+        <!-- Кнопки: «Колонки», «Обновить», «Завершить процесс», «Закрыть» -->
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
+            <Button x:Name="ColumnsButton" Style="{StaticResource ModernButton}"
+                    Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
+                    Click="OnColumns_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="▦" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc ProcessInspector.Columns}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
             <Button x:Name="RefreshButton" Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
                     Click="OnRefresh_Click">

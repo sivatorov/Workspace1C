@@ -552,6 +552,8 @@ public partial class MainViewModel : ViewModelBase
         string clearSearch, string clearTags, string rightPanelDetails, string switchUser,
         string findInList = "", string sessionLock = "", string lockApp = "",
         string checkIntegrity = "", string serverConsole = "",
+        // Инспектор процессов 1С (issue #134, доработка ArtyoZ): Ctrl+Alt+I.
+        string processInspector = "",
         // Управление службами (issue #11): настраиваемый хоткей, по умолчанию Ctrl+Shift+S.
         string hotkeyServices = "",
         // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.
@@ -594,6 +596,8 @@ public partial class MainViewModel : ViewModelBase
         // Администрирование ИБ (Этап 6, функция №29 + консоль серверов).
         _settings.HotkeyCheckIntegrity = checkIntegrity ?? string.Empty;
         _settings.HotkeyServerConsole = serverConsole ?? string.Empty;
+        // Инспектор процессов 1С (issue #134, доработка ArtyoZ).
+        _settings.HotkeyProcessInspector = processInspector ?? string.Empty;
         // Управление службами (issue #11).
         _settings.HotkeyServices = hotkeyServices ?? string.Empty;
         // Меню служб (issue #11, пункт 6).
@@ -636,6 +640,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HotkeyLockApp));
         OnPropertyChanged(nameof(HotkeyCheckIntegrity));
         OnPropertyChanged(nameof(HotkeyServerConsole));
+        OnPropertyChanged(nameof(HotkeyProcessInspector));
         OnPropertyChanged(nameof(HotkeyServices));
         OnPropertyChanged(nameof(HotkeyServicesMenu));
         // «Собрать диагностику» (issue #99, v1.0.1.23).

@@ -189,6 +189,8 @@ public class CustomActionEditViewModel : ViewModelBase
                     settings.HotkeyRightPanelDetails, settings.HotkeyShowAll, settings.HotkeyShowFavorites,
                     settings.HotkeyShowRecent, settings.HotkeyShowRunning, settings.HotkeyZoomIn, settings.HotkeyZoomOut,
                     settings.HotkeyZoomReset, settings.HotkeyCheckIntegrity, settings.HotkeyServerConsole,
+                    // Инспектор процессов 1С (issue #134, доработка ArtyoZ): сочетание занято системно.
+                    settings.HotkeyProcessInspector,
                     settings.ScreenshotHotkey
                 });
             }

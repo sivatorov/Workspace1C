@@ -48,18 +48,34 @@ internal sealed class MaterialMessageWindowAvalonia : Window
     /// под сообщением в ручных режимах, когда блок описания скрыт.
     /// </param>
     /// <param name="onNotesLink">Действие по клику на ссылку «Что нового» (диалог не закрывается).</param>
+    /// <param name="fitContent">
+    /// Issue #116 (17.11.2026 14:07): подгонять окно под содержимое по обеим осям.
+    /// Для диалога обновления — true: окно сразу открывается нужного размера и не
+    /// меняет его скачком. Для обычных сообщений остаётся прежняя фиксированная
+    /// ширина и высота по содержимому.
+    /// </param>
     public MaterialMessageWindowAvalonia(
         string message, string title, MaterialMessageKind kind, string? markdownBody = null,
         string? skipButtonText = null, string? okButtonText = null,
-        string? notesLinkText = null, Action? onNotesLink = null)
+        string? notesLinkText = null, Action? onNotesLink = null, bool fitContent = false)
     {
         Title = title;
-        Width = 440;
-        SizeToContent = SizeToContent.Height;
-        // Высота окна жёстко фиксирована по контенту: CanResize=false запрещает
-        // перетаскивание границ оконным менеджером, SizeToContent=Height подбирает
-        // высоту по содержимому (issue #116 v1.0.1.54 — окна обновления не должны
-        // растягиваться по вертикали, как WPF-версия UpdateAvailableWindow).
+        if (fitContent)
+        {
+            // Ширина и высота — по содержимому в разумных пределах; CanResize=false
+            // запрещает менять размер мышью. Никакого ручного измерения после показа:
+            // Avalonia считает размер до первого отображения, скачка нет.
+            MinWidth = 440;
+            MaxWidth = 760;
+            SizeToContent = SizeToContent.WidthAndHeight;
+        }
+        else
+        {
+            Width = 440;
+            SizeToContent = SizeToContent.Height;
+        }
+        // CanResize=false запрещает перетаскивание границ оконным менеджером
+        // (issue #116 v1.0.1.54 — окна обновления не должны растягиваться).
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SystemDecorations = SystemDecorations.Full;

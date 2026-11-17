@@ -43,13 +43,12 @@ public static class ProcessCommandLineParser
 
     /// <summary>
     /// Пользователь из ключа /N (или /N"Имя"). Возвращает null, если пользователь
-    /// не задан. Значение — остаток строки до следующего ключа «/» или «-», без кавычек.
+    /// не задан. Разбор выполняет общий <see cref="ProcessCommandLineUserParser"/>
+    /// (issue #134): поддерживаются формы <c>/N"Имя"</c>, <c>/N Имя</c>,
+    /// <c>/NИмя</c> и <c>-N</c>.
     /// </summary>
-    public static string? ExtractUser(string? commandLine)
-    {
-        var value = ExtractValue(commandLine, "N");
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
+    public static string? ExtractUser(string? commandLine) =>
+        ProcessCommandLineUserParser.ExtractUserName(commandLine);
 
     /// <summary>
     /// Краткая строка подключения из командной строки: для файловой базы — «/F <путь>»,

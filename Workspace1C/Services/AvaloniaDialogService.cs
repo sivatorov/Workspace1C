@@ -63,7 +63,8 @@ namespace Workspace1C.Services
                 return false;
             }
             var win = new MaterialMessageWindowAvalonia(
-                summary, resolvedTitle, MaterialMessageKind.Question, markdownBody);
+                summary, resolvedTitle, MaterialMessageKind.Question, markdownBody,
+                fitContent: true);
             return ShowModalSync(win);
         }
 
@@ -97,7 +98,8 @@ namespace Workspace1C.Services
             }
             var win = new MaterialMessageWindowAvalonia(
                 summary, resolvedTitle, MaterialMessageKind.Question,
-                markdownBody, skipButtonText, okButtonText, notesLinkText, showNotes);
+                markdownBody, skipButtonText, okButtonText, notesLinkText, showNotes,
+                fitContent: true);
             ShowModalSync(win);
             return win.SkipClicked
                 ? UpdateDialogResult.Skipped

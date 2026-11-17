@@ -1,6 +1,7 @@
 #if LINUX
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -22,14 +23,24 @@ namespace Workspace1C
     /// Окно «Инспектор процессов 1С» (0.3.9.93, Avalonia/Linux): таблица всех запущенных
     /// процессов платформы 1С (база/режим/пользователь/время старта/PID/строка
     /// подключения/значок сопоставления) с автообновлением по таймеру, кнопкой
-    /// «Обновить» и завершением выбранного процесса с подтверждением. Двойной клик
+    /// «Обновить» и завершением выбранных процессов с подтверждением. Двойной клик
     /// по строке с известной базой — переход к базе в главном окне (FindInList-механика).
     /// Вся логика — в чистой ViewModel <see cref="ProcessInspectorViewModel"/>.
+    /// <para>
+    /// issue #134 (доработка ArtyoZ): мультивыделение (Ctrl/Shift) и массовое
+    /// завершение, меню «Колонки» для скрытия ненужных колонок (выбор сохраняется
+    /// в настройках). Шапка и строки перестраиваются при изменении набора колонок.
+    /// </para>
     /// </summary>
     public sealed class ProcessInspectorWindow : ModalWindowBase
     {
         private readonly ProcessInspectorViewModel _vm;
         private readonly ListBox _grid = new();
+        private readonly Grid _header = new() { Margin = new Thickness(0, 0, 0, 4) };
+
+        /// <summary>Ключи локализации заголовков колонок по значению перечисления.</summary>
+        private static readonly Dictionary<ProcessInspectorColumn, string> ColumnTitleKeys =
+            ProcessInspectorViewModel.AllColumns.ToDictionary(info => info.Column, info => info.TitleKey);
 
         /// <param name="infobases">Все базы списка (для сопоставления командных строк).</param>
         /// <param name="openBase">Переход к базе в главном окне (FindInList-механика).</param>
@@ -47,13 +58,20 @@ namespace Workspace1C
             var killer = AppServices.GetRequiredService<IOneCProcessKiller>();
             var dialogs = AppServices.GetRequiredService<IDialogService>();
 
+            // issue #134: скрытые колонки хранятся в настройках приложения.
+            var repository = AppServices.TryGetService<IInfobaseRepository>();
+            var settings = repository?.LoadSettings() ?? new AppSettings();
+            Action? saveSettings = repository is null ? null : () => repository.SaveSettings(settings);
+
             _vm = new ProcessInspectorViewModel(
                 service,
                 killer,
                 dialogs,
                 infobases,
                 openBase,
-                action => Dispatcher.UIThread.Post(action));
+                action => Dispatcher.UIThread.Post(action),
+                settings,
+                saveSettings);
 
             DataContext = _vm;
             Closed += (_, _) => _vm.Dispose();
@@ -76,16 +94,36 @@ namespace Workspace1C
             };
             summary.Bind(TextBlock.TextProperty, new Binding("SummaryText"));
 
-            // Таблица процессов: шапка с фиксированными колонками и строки.
+            // Таблица процессов: шапка с видимыми колонками и строки (issue #134).
             _grid.ItemsSource = _vm.Processes;
+            // Мультивыделение (issue #134): Ctrl/Shift выделяют несколько строк,
+            // кнопка «Завершить процесс» действует на весь набор.
+            _grid.SelectionMode = SelectionMode.Multiple;
             // Двусторонняя привязка выбора (issue #342): клик по строке обновляет
             // SelectedRow во ViewModel, а восстановление после автообновления возвращает
             // выделение в контрол. Без неё выделение сбрасывалось при каждом опросе (~5 с)
             // и «Завершить процесс» находила SelectedRow == null.
             _grid.Bind(ListBox.SelectedItemProperty, new Binding("SelectedRow") { Mode = BindingMode.TwoWay });
-            _grid.ItemTemplate = new FuncDataTemplate<ProcessRowViewModel>((row, _) => BuildRow(row));
+            _grid.SelectionChanged += (_, _) =>
+            {
+                var selected = _grid.SelectedItems;
+                _vm.SetSelectedRows(selected is null
+                    ? Array.Empty<ProcessRowViewModel>()
+                    : selected.Cast<ProcessRowViewModel>().ToList());
+            };
             _grid.DoubleTapped += OnGrid_DoubleTapped;
             ScrollViewer.SetHorizontalScrollBarVisibility(_grid, ScrollBarVisibility.Disabled);
+
+            // issue #134: набор видимых колонок изменён — перестраиваем шапку и строки,
+            // выделение восстановлено после автообновления — переставляем SelectedItems.
+            _vm.ColumnsChanged += (_, _) => RebuildTable();
+            _vm.SelectionRestored += (_, _) => RestoreSelectedRows();
+
+            var tableLayout = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(_header, Dock.Top);
+            tableLayout.Children.Add(_header);
+            tableLayout.Children.Add(_grid);
+            RebuildTable();
 
             // Подсказка внизу.
             var hint = new TextBlock
@@ -97,9 +135,14 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap
             };
 
-            // Кнопки: «Обновить», «Завершить процесс», «Закрыть».
+            // Кнопки: «Колонки», «Обновить», «Завершить процесс», «Закрыть».
+            Button? columnsButton = null;
+            columnsButton = BuildActionButton(
+                LocalizationManager.T("ProcessInspector.Columns"),
+                () => ShowColumnsMenu(columnsButton),
+                "▦");
             var refreshButton = BuildActionButton(LocalizationManager.T("ProcessInspector.Refresh"), () => _vm.Refresh(), "⟳");
-            var killButton = BuildActionButton(LocalizationManager.T("ProcessInspector.KillProcess"), _vm.KillSelected, "✕");
+            var killButton = BuildActionButton(LocalizationManager.T("ProcessInspector.KillProcess"), _vm.KillSelectedMany, "✕");
             killButton.Width = 170;
             var closeButton = BuildCloseButton();
 
@@ -109,7 +152,7 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 8,
                 Margin = new Thickness(0, 14, 0, 0),
-                Children = { refreshButton, killButton, closeButton }
+                Children = { columnsButton, refreshButton, killButton, closeButton }
             };
 
             var grid = new Grid
@@ -126,7 +169,7 @@ namespace Workspace1C
             };
             Place(grid, title, 0);
             Place(grid, summary, 1);
-            Place(grid, _grid, 2);
+            Place(grid, tableLayout, 2);
             Place(grid, buttons, 3);
             Place(grid, hint, 4);
             Content = grid;
@@ -175,62 +218,149 @@ namespace Workspace1C
             return button;
         }
 
-        /// <summary>Строка таблицы: база, режим, пользователь, время старта, PID, строка подключения, значок.</summary>
-        private Control BuildRow(ProcessRowViewModel row)
+        /// <summary>
+        /// Перестраивает шапку и шаблон строк по текущему набору видимых колонок
+        /// (issue #134). Скрытые колонки не создаются вовсе.
+        /// </summary>
+        private void RebuildTable()
         {
-            var name = new TextBlock { FontWeight = FontWeight.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
-            name.Bind(TextBlock.TextProperty, new Binding("BaseName"));
-            var subtitle = new TextBlock { FontSize = 11, Opacity = 0.6, TextTrimming = TextTrimming.CharacterEllipsis };
-            subtitle.Bind(TextBlock.TextProperty, new Binding("Subtitle"));
+            var columns = ProcessInspectorViewModel.AllColumns
+                .Select(info => info.Column)
+                .Where(_vm.IsColumnVisible)
+                .ToList();
 
-            var nameCell = new StackPanel
+            _header.Children.Clear();
+            _header.ColumnDefinitions.Clear();
+            for (var i = 0; i < columns.Count; i++)
             {
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 2, 8, 2),
-                Children = { name, subtitle }
-            };
-
-            var mode = CellText("ModeText", bold: true);
-            var user = CellText("UserName");
-            var startTime = CellText("StartTimeText");
-
-            var pid = CellText("Pid");
-
-            var connection = CellText("ConnectionText");
-            ToolTip.SetTip(connection, new Binding("FullCommandLine"));
-
-            // Значок-флаг: зелёный «●» — известная база, серый «○» — неизвестная.
-            var knownDot = new TextBlock
-            {
-                Text = row.IsKnown ? "●" : "○",
-                FontSize = 14,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush")
-            };
-
-            var rowGrid = new Grid
-            {
-                ColumnDefinitions =
+                var column = columns[i];
+                _header.ColumnDefinitions.Add(new ColumnDefinition(WidthOf(column))
                 {
-                    new ColumnDefinition(new GridLength(2, GridUnitType.Star)),
-                    new ColumnDefinition(new GridLength(1.1, GridUnitType.Star)),
-                    new ColumnDefinition(new GridLength(1.1, GridUnitType.Star)),
-                    new ColumnDefinition(GridLength.Auto),
-                    new ColumnDefinition(new GridLength(60)),
-                    new ColumnDefinition(new GridLength(1.6, GridUnitType.Star)),
-                    new ColumnDefinition(new GridLength(96))
-                },
-                Children = { nameCell, mode, user, startTime, pid, connection, knownDot }
-            };
-            Grid.SetColumn(nameCell, 0);
-            Grid.SetColumn(mode, 1);
-            Grid.SetColumn(user, 2);
-            Grid.SetColumn(startTime, 3);
-            Grid.SetColumn(pid, 4);
-            Grid.SetColumn(connection, 5);
-            Grid.SetColumn(knownDot, 6);
+                    MinWidth = MinWidthOf(column)
+                });
+
+                var title = new TextBlock
+                {
+                    Text = LocalizationManager.T(ColumnTitleKeys[column]),
+                    FontWeight = FontWeight.SemiBold,
+                    FontSize = 12,
+                    Margin = new Thickness(8, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                };
+                Grid.SetColumn(title, i);
+                _header.Children.Add(title);
+            }
+
+            _grid.ItemTemplate = new FuncDataTemplate<ProcessRowViewModel>(
+                (row, _) => BuildRow(row, columns));
+
+            // После смены шаблона контейнеры пересоздаются — возвращаем выделение.
+            RestoreSelectedRows();
+        }
+
+        /// <summary>Ширина колонки в разметке шапки и строк (issue #134).</summary>
+        private static GridLength WidthOf(ProcessInspectorColumn column) => column switch
+        {
+            ProcessInspectorColumn.Base => new GridLength(2, GridUnitType.Star),
+            ProcessInspectorColumn.Mode => new GridLength(1.1, GridUnitType.Star),
+            ProcessInspectorColumn.User => new GridLength(1.1, GridUnitType.Star),
+            ProcessInspectorColumn.StartTime => GridLength.Auto,
+            ProcessInspectorColumn.Pid => new GridLength(60),
+            ProcessInspectorColumn.Connection => new GridLength(1.6, GridUnitType.Star),
+            ProcessInspectorColumn.Known => new GridLength(96),
+            _ => new GridLength(1, GridUnitType.Star)
+        };
+
+        /// <summary>Минимальная ширина колонки: заголовок не обрезается полностью.</summary>
+        private static double MinWidthOf(ProcessInspectorColumn column) => column switch
+        {
+            ProcessInspectorColumn.Base => 160,
+            ProcessInspectorColumn.Mode => 110,
+            ProcessInspectorColumn.User => 110,
+            ProcessInspectorColumn.StartTime => 130,
+            ProcessInspectorColumn.Pid => 60,
+            ProcessInspectorColumn.Connection => 160,
+            ProcessInspectorColumn.Known => 96,
+            _ => 80
+        };
+
+        /// <summary>Строка таблицы: только видимые колонки (issue #134).</summary>
+        private Control BuildRow(ProcessRowViewModel row, IReadOnlyList<ProcessInspectorColumn> columns)
+        {
+            var rowGrid = new Grid();
+            for (var i = 0; i < columns.Count; i++)
+            {
+                rowGrid.ColumnDefinitions.Add(new ColumnDefinition(WidthOf(columns[i]))
+                {
+                    MinWidth = MinWidthOf(columns[i])
+                });
+
+                var cell = BuildCell(row, columns[i]);
+                Grid.SetColumn(cell, i);
+                rowGrid.Children.Add(cell);
+            }
+
             return rowGrid;
+        }
+
+        /// <summary>Ячейка строки для колонки (issue #134).</summary>
+        private Control BuildCell(ProcessRowViewModel row, ProcessInspectorColumn column)
+        {
+            switch (column)
+            {
+                case ProcessInspectorColumn.Base:
+                    var name = new TextBlock
+                    {
+                        FontWeight = FontWeight.SemiBold,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    };
+                    name.Bind(TextBlock.TextProperty, new Binding("BaseName"));
+                    var subtitle = new TextBlock
+                    {
+                        FontSize = 11,
+                        Opacity = 0.6,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    };
+                    subtitle.Bind(TextBlock.TextProperty, new Binding("Subtitle"));
+                    return new StackPanel
+                    {
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(4, 2, 8, 2),
+                        Children = { name, subtitle }
+                    };
+
+                case ProcessInspectorColumn.Mode:
+                    return CellText("ModeText", bold: true);
+
+                case ProcessInspectorColumn.User:
+                    return CellText("UserName");
+
+                case ProcessInspectorColumn.StartTime:
+                    return CellText("StartTimeText");
+
+                case ProcessInspectorColumn.Pid:
+                    return CellText("Pid");
+
+                case ProcessInspectorColumn.Connection:
+                    var connection = CellText("ConnectionText");
+                    ToolTip.SetTip(connection, new Binding("FullCommandLine"));
+                    return connection;
+
+                case ProcessInspectorColumn.Known:
+                    // Значок-флаг: зелёный «●» — известная база, серый «○» — неизвестная.
+                    return new TextBlock
+                    {
+                        Text = row.IsKnown ? "●" : "○",
+                        FontSize = 14,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Foreground = Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush")
+                    };
+
+                default:
+                    return CellText(string.Empty);
+            }
         }
 
         private static Control CellText(string property, bool bold = false)
@@ -242,8 +372,61 @@ namespace Workspace1C
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 FontWeight = bold ? FontWeight.SemiBold : FontWeight.Normal
             };
-            text.Bind(TextBlock.TextProperty, new Binding(property));
+            if (property.Length > 0)
+                text.Bind(TextBlock.TextProperty, new Binding(property));
             return text;
+        }
+
+        /// <summary>
+        /// Меню «Колонки» (issue #134): чек-лист всех колонок инспектора.
+        /// </summary>
+        private void ShowColumnsMenu(Button? anchor)
+        {
+            var menu = new ContextMenu();
+            menu.Styled(ControlThemes.ModernContextMenu);
+
+            foreach (var info in ProcessInspectorViewModel.AllColumns)
+            {
+                var column = info.Column;
+                var visible = _vm.IsColumnVisible(column);
+                var item = new MenuItem
+                {
+                    Header = (visible ? "✓ " : "   ") + LocalizationManager.T(info.TitleKey)
+                };
+                item.Styled(ControlThemes.ModernMenuItem);
+                item.Click += (_, _) => _vm.SetColumnVisible(column, !_vm.IsColumnVisible(column));
+                menu.Items.Add(item);
+            }
+
+            if (anchor is not null)
+            {
+                menu.PlacementTarget = anchor;
+                menu.Placement = PlacementMode.Bottom;
+                menu.Open(anchor);
+            }
+        }
+
+        /// <summary>
+        /// Переставляет выделение ListBox по восстановленному набору ViewModel
+        /// (issue #134: восстанавливаются все ранее выбранные строки).
+        /// </summary>
+        private void RestoreSelectedRows()
+        {
+            var selected = _grid.SelectedItems;
+            if (selected is null)
+                return;
+
+            var desired = _vm.SelectedRows.ToList();
+            var current = selected.Cast<ProcessRowViewModel>().ToList();
+            if (current.Count == desired.Count && current.All(desired.Contains))
+                return;
+
+            selected.Clear();
+            foreach (var row in desired)
+            {
+                if (_vm.Processes.Contains(row))
+                    selected.Add(row);
+            }
         }
 
         private void OnGrid_DoubleTapped(object? sender, TappedEventArgs e)

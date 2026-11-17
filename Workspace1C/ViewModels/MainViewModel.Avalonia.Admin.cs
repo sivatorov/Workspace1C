@@ -43,6 +43,12 @@ public partial class MainViewModel
     /// <summary>Горячая клавиша «Консоль администрирования серверов 1С».</summary>
     public string HotkeyServerConsole => _settings.HotkeyServerConsole;
 
+    /// <summary>
+    /// Горячая клавиша открытия «Инспектора процессов 1С» (issue #134, доработка
+    /// ArtyoZ, по умолчанию Ctrl+Alt+I).
+    /// </summary>
+    public string HotkeyProcessInspector => _settings.HotkeyProcessInspector;
+
     /// <summary>Команда проверки целостности файловой ИБ через chdbfl (функция №29).</summary>
     public ICommand CheckIntegrityCommand =>
         _checkIntegrityCommand ??= new RelayCommand(

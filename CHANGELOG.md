@@ -11,6 +11,77 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.83] — 2026-11-17
+
+### Исправлено
+
+- **Диалог и режим обновления (issue #116, 7OH, aleksandr-ermakov).** Три пункта по последним
+  комментариям авторов issue:
+  - убрано лишнее системное уведомление «Доступна новая версия» при инициированном
+    пользователем обновлении — ручной проверке и клике по значку в подвале окна. Решение
+    принимает чистая функция [`UpdateNotificationPolicy.ShouldNotify`](Workspace1C/Services/UpdateNotificationPolicy.cs:31):
+    уведомление осталось только на фоновых путях проверки
+    ([`UpdateService`](Workspace1C/Services/UpdateService.cs:722),
+    [`UpdateService.Avalonia`](Workspace1C/Services/UpdateService.Avalonia.cs:613)).
+    После ручной установки больше не показывается и уведомление «Приложение обновлено»:
+    маркер хранит флаг [`NotifyOnNextStart`](Workspace1C/Services/PendingUpdateStore.cs:206),
+    а обе оболочки проверяют его перед показом
+    ([`PendingUpdateStore.ShouldNotifyForMarker`](Workspace1C/Services/PendingUpdateStore.cs:158),
+    [`App.xaml.cs`](Workspace1C/App.xaml.cs:395), [`App.axaml.cs`](Workspace1C/App.axaml.cs:456)).
+  - кнопка запуска обновления во всех режимах называется **«Обновить»**
+    ([`UpdateAvailableWindow.xaml`](Workspace1C/Services/UpdateAvailableWindow.xaml:85)), а окно
+    подгоняется под содержимое без скачков размера: убраны ручные измерения размера и
+    WndProc-фиксация в WPF
+    ([`UpdateAvailableWindow.xaml.cs`](Workspace1C/Services/UpdateAvailableWindow.xaml.cs:111)) —
+    размер целиком задаёт `SizeToContent="WidthAndHeight"`; в Avalonia включён режим
+    [`fitContent`](Workspace1C/Services/MaterialMessageWindow.Avalonia.cs:51), который передаёт
+    [`AvaloniaDialogService.ConfirmUpdateWithSkip`](Workspace1C/Services/AvaloniaDialogService.cs:89).
+  - режим «Загружать с предложением установки» теперь догоняет новые версии: если после
+    готового файла вышел более новый релиз, файл перекачивается в фоне, а старый удаляется
+    только после успешной загрузки. Решения вынесены в
+    [`UpdateRedownloadPolicy.ShouldDownload`](Workspace1C/Services/UpdateRedownloadPolicy.cs:22)
+    и [`ShouldCleanup`](Workspace1C/Services/UpdateRedownloadPolicy.cs:36), применяются в
+    [`UpdateService`](Workspace1C/Services/UpdateService.cs:350) и
+    [`UpdateService.Avalonia`](Workspace1C/Services/UpdateService.Avalonia.cs:418); повторная
+    загрузка запускается при проверке обновления и клике по значку в подвале
+    ([`MainWindow.Updates.cs`](Workspace1C/Views/MainWindow.Updates.cs:212),
+    [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:2804)). Две загрузки
+    одновременно не идут.
+  - тесты — `Issue116ManualUpdateNoNotificationTests`, `Issue116UpdateRedownloadTests`;
+    обновлены `Issue116ManualUpdateDialogTests`, `Issue116UpdateIntervalTests`,
+    `Issue116BackgroundDownloadTests`.
+
+### Изменено
+
+- **Инспектор процессов 1С вместо подменю «Завершить процессы» (issue #134, ArtyoZ).** По
+  последнему комментарию автора прежнее решение с подменю «Завершить процессы» в контекстном
+  меню баз отменено, доработан «Инспектор процессов 1С»:
+  - откат: удалены подменю «Завершить процессы» и планировщик `KillProcessesMenuPlanner`
+    (WPF и Avalonia), отчёт пункта «Утилиты → Операции → Завершить процессы 1С» возвращён
+    к прежнему виду, удалены ключи локализации `KillProcesses.*`;
+  - мультивыбор строк в Инспекторе
+    ([`ProcessInspectorWindow.xaml`](Workspace1C/Views/ProcessInspectorWindow.xaml:47) — `DataGrid`
+    `Extended`, [`ProcessInspectorWindow.Avalonia`](Workspace1C/Views/ProcessInspectorWindow.Avalonia.cs:101) —
+    `ListBox` `Multiple`) и массовое завершение выбранных процессов с одним подтверждением и
+    сводкой «завершено / не удалось»
+    ([`ProcessInspectorViewModel.KillSelectedMany`](Workspace1C/ViewModels/ProcessInspectorViewModel.cs:294));
+  - колонка «Пользователь» заполняется из параметра `/N` командной строки процесса, если
+    владелец недоступен
+    ([`ProcessCommandLineUserParser`](Workspace1C/Services/ProcessCommandLineUserParser.cs:18),
+    [`ProcessRowViewModel`](Workspace1C/ViewModels/ProcessRowViewModel.cs:72));
+  - скрытие и показ колонок списка с сохранением в
+    [`AppSettings.ProcessInspectorHiddenColumns`](Workspace1C/Models/AppSettings.cs:587)
+    ([`ProcessInspectorViewModel.SetColumnVisible`](Workspace1C/ViewModels/ProcessInspectorViewModel.cs:213));
+  - настраиваемая горячая клавиша открытия Инспектора —
+    [`AppSettings.HotkeyProcessInspector`](Workspace1C/Models/AppSettings.cs:1088), по умолчанию
+    `Ctrl+Alt+I`; в настройках обеих оболочек и в списке занятых сочетаний
+    ([`SettingsWindow.Hotkeys.cs`](Workspace1C/Views/SettingsWindow.Hotkeys.cs:58),
+    [`CustomActionEditViewModel`](Workspace1C/ViewModels/CustomActionEditViewModel.cs:192));
+  - кнопка открытия Инспектора на панели рядом с «Утилитами» (WPF и Avalonia) —
+    [`MainWindow.xaml`](Workspace1C/Views/MainWindow.xaml:694),
+    [`MainWindow.Avalonia.cs`](Workspace1C/Views/MainWindow.Avalonia.cs:1097);
+  - тесты — `Issue134ProcessInspectorTests` (46 тестов).
+
 ## [1.0.1.82] — 2026-11-17
 
 ### Изменено

@@ -87,16 +87,24 @@ public sealed class Issue116ManualUpdateDialogTests
     }
 
     [Fact]
-    public void Wpf_RefreshWindowSize_UsesBothAxesAndUpdatesLockedSize()
+    public void Wpf_WindowSize_ReliesOnSizeToContent_WithoutManualMeasurement()
     {
+        // Issue #116 (комментарий 7OH от 17.11.2026 14:07): окно «поплыло» из-за
+        // ручного измерения размера. Размер обязан считаться только SizeToContent
+        // из XAML — без WndProc, сброса в Manual и зафиксированных габаритов.
         var source = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
 
-        Assert.Contains("SizeToContent.WidthAndHeight", source, StringComparison.Ordinal);
-        Assert.Contains("CaptureFixedSize();", source, StringComparison.Ordinal);
-        // WndProc фиксирует последний измеренный размер, а не габариты прошлого этапа.
-        Assert.Contains("_lockedWidthDips", source, StringComparison.Ordinal);
-        Assert.Contains("_lockedHeightDips", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent = SizeToContent.Manual", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CaptureFixedSize", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_lockedWidthDips", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("_lockedHeightDips", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WndProc", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WmGetMinMaxInfo", source, StringComparison.Ordinal);
+
+        // Пересчёт разметки после смены этапа остаётся безопасным (без смены габаритов).
+        Assert.Contains("private void RefreshWindowSize()", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateLayout();", source, StringComparison.Ordinal);
     }
 
     [Fact]

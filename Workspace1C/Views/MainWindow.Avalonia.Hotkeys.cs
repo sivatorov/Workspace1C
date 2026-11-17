@@ -205,6 +205,8 @@ namespace Workspace1C
             // проверка целостности файловой ИБ (chdbfl) и консоль администрирования серверов 1С.
             AddHotkey(_vm.HotkeyCheckIntegrity, _vm.CheckIntegrityCommand);
             AddHotkey(_vm.HotkeyServerConsole, _vm.OpenServerConsoleCommand);
+            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): Ctrl+Alt+I.
+            AddHotkey(_vm.HotkeyProcessInspector, _vm.ProcessInspectorCommand);
             // Управление службами (issue #11): Ctrl+Shift+S по умолчанию.
             AddHotkey(_vm.HotkeyServices, _vm.ShowServicesCommand);
             // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.

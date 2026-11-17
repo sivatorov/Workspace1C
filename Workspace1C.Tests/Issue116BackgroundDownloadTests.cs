@@ -169,7 +169,10 @@ public sealed class Issue116BackgroundDownloadTests
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
         Assert.Contains("x:Name=\"InstallButton\"", xaml);
-        Assert.Contains("{loc:Loc Update.Install}", xaml);
+        // Issue #116 (17.11.2026 14:07): основная кнопка называется «Обновить»
+        // и когда файл уже скачан (действие — применить готовый файл).
+        Assert.Contains("x:Name=\"InstallText\" Text=\"{loc:Loc Update.Update}\"", xaml);
+        Assert.DoesNotContain("{loc:Loc Update.Install}", xaml);
 
         var code = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));

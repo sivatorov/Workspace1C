@@ -580,6 +580,12 @@ public class AppSettings
     /// </summary>
     public List<string> AdditionalCacheRoots { get; set; } = new();
 
+    /// <summary>
+    /// Скрытые колонки окна «Инспектор процессов 1С» (issue #134): имена членов
+    /// перечисления <c>ProcessInspectorColumn</c>. Пустой список — все колонки видимы.
+    /// </summary>
+    public List<string> ProcessInspectorHiddenColumns { get; set; } = new();
+
     /// <summary>Сохранённая ширина окна приложения (0 — по умолчанию).</summary>
     public double WindowWidth { get; set; }
 
@@ -1075,6 +1081,13 @@ public class AppSettings
     public string HotkeyServerConsole { get; set; } = "Ctrl+Alt+S";
 
     /// <summary>
+    /// Горячая клавиша открытия окна «Инспектор процессов 1С» (issue #134,
+    /// доработка ArtyoZ, по умолчанию Ctrl+Alt+I). Настраивается в
+    /// «Настройки → Клавиши».
+    /// </summary>
+    public string HotkeyProcessInspector { get; set; } = "Ctrl+Alt+I";
+
+    /// <summary>
     /// Выбранная версия платформы для внешней консоли администрирования серверов
     /// (issue #135), формат варианта «8.3.27.1688 (64)». Пусто — новейшая установленная
     /// версия, в каталоге bin которой есть оснастка 1CV8Servers.msc.
@@ -1324,6 +1337,9 @@ public class AppSettings
         ColumnOrder ??= new List<string>();
         FavoriteHotkeyIds ??= new List<string>();
         TemplateCatalogPaths ??= new List<string>();
+        // issue #134: скрытые колонки «Инспектора процессов 1С» — легаси-файл без
+        // поля получает пустой список (все колонки видимы).
+        ProcessInspectorHiddenColumns ??= new List<string>();
         ElementFonts ??= new Dictionary<string, ElementFontSettings>();
         FileSizeCache ??= new Dictionary<string, FileSizeCacheEntry>();
         // Глубина истории размеров (п.7, 1.0.0.89): 0/отрицательное — 365 дней по умолчанию,

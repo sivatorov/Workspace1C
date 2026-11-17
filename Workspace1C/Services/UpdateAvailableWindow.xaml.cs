@@ -1,11 +1,8 @@
 #if WINDOWS
 using System;
 using System.IO;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Interop;
-using System.Windows.Media;
 using System.Windows.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -35,7 +32,7 @@ public partial class UpdateAvailableWindow : Window
     /// В ручных режимах (<see cref="AppUpdateMode.Manual"/>, <see cref="AppUpdateMode.NotifyOnly"/>)
     /// передаётся <c>false</c> — пользователь сам запросил обновление и уже знает, что
     /// ищет; подпись и описание скрываются целиком (без пустого места), окно ужимается
-    /// по высоте за счёт <c>SizeToContent="Height"</c>. В автоматических режимах
+    /// за счёт <c>SizeToContent="WidthAndHeight"</c>. В автоматических режимах
     /// (<see cref="AppUpdateMode.InstallOnStartup"/>, <see cref="AppUpdateMode.DownloadAskInstall"/>)
     /// блок остаётся.
     /// </param>
@@ -104,20 +101,17 @@ public partial class UpdateAvailableWindow : Window
         }
 
         // Issue #116 (v1.0.1.58): если файл обновления уже скачан в фоне (режим
-        // «Загружать с предложением установки»), вместо «Обновить» показывается
-        // «Установить» — она сразу применяет готовый файл по логике автообновления.
+        // «Загружать с предложением установки»), кнопка сразу применяет готовый
+        // файл по логике автообновления. С 17.11.2026 её подпись тоже «Обновить».
         InstallButton.Visibility = readyToInstall ? Visibility.Visible : Visibility.Collapsed;
         DownloadButton.Visibility = readyToInstall ? Visibility.Collapsed : Visibility.Visible;
         InstallButton.IsDefault = readyToInstall;
         DownloadButton.IsDefault = !readyToInstall;
 
-        // Issue #116 (1.0.1.82): окно подстраивается под содержимое по обеим осям;
-        // зафиксированные габариты пересчитываются после отрисовки каждого этапа.
-        Loaded += (_, _) =>
-        {
-            CaptureFixedSize();
-            (readyToInstall ? InstallButton : DownloadButton).Focus();
-        };
+        // Issue #116 (17.11.2026 14:07): размер окна целиком определяет
+        // SizeToContent="WidthAndHeight" в XAML — ручного измерения и фиксации
+        // габаритов нет, поэтому окно не «прыгает» после первого показа.
+        Loaded += (_, _) => (readyToInstall ? InstallButton : DownloadButton).Focus();
 
         // Закрытие окна по Esc (issue #371): единообразно с остальными окнами приложения
         // (ActualReleasesWindow и др.). Во время скачивания окно не закрывается — как и
@@ -142,25 +136,12 @@ public partial class UpdateAvailableWindow : Window
         Close();
     }
 
-    /// <summary>
-    /// Навешиваем перехватчик Win32-сообщений сразу после инициализации окна,
-    /// чтобы жёстко зафиксировать его размер независимо от кастомного Window-Chrome
-    /// (MaterialDesignThemes обходит ResizeMode="NoResize").
-    /// </summary>
-    protected override void OnSourceInitialized(EventArgs e)
-    {
-        base.OnSourceInitialized(e);
-        var handle = new WindowInteropHelper(this).Handle;
-        if (handle != IntPtr.Zero)
-            HwndSource.FromHwnd(handle)?.AddHook(WndProc);
-    }
-
     /// <summary>Обрезает ведущий символ «v» у тега версии для отображения.</summary>
     private static string NormalizeTag(string tag) =>
         !string.IsNullOrEmpty(tag) && (tag[0] == 'v' || tag[0] == 'V') ? tag.Substring(1) : tag;
 
     /// <summary>
-    /// «Скачать»: скрываем предложение, показываем прогресс и запускаем загрузку.
+    /// «Обновить»: скрываем предложение, показываем прогресс и запускаем загрузку.
     /// По завершении загрузки остаёмся в этом же окне и спрашиваем, как применить обновление.
     /// </summary>
     private async void OnDownloadClick(object sender, RoutedEventArgs e)
@@ -401,36 +382,18 @@ public partial class UpdateAvailableWindow : Window
     }
 
     /// <summary>
-    /// Принудительно пересчитывает размер окна по содержимому текущего этапа
-    /// (issues #157, #116). WPF не всегда пересобирает окно с авто-подбором размера
-    /// после изменения <c>Visibility</c> блоков (предложение → скачивание → применение →
-    /// ошибка), поэтому сбрасываем авто-подбор в Manual, заново меряем содержимое и
-    /// возвращаем обратно. Так окно каждый раз подстраивается именно под текущий этап:
-    /// габариты не «застревают» от длинного описания изменений или предыдущего диалога,
-    /// а прогресс-бар и кнопки не обрезаются и не остаётся пустоты снизу.
-    /// <para>
-    /// issue #116 (1.0.1.82): авто-подбор теперь по обеим осям — окно подгоняется
-    /// под содержимое, а не под фиксированную ширину 680 и минимальную высоту 320.
-    /// </para>
+    /// Пересчитывает компоновку текущего этапа. Размер окна при этом НЕ измеряется
+    /// и не фиксируется вручную (issue #116, комментарий 7OH от 17.11.2026 14:07):
+    /// его целиком определяет <c>SizeToContent="WidthAndHeight"</c> из XAML. Ручной
+    /// сброс в <c>SizeToContent.Manual</c> и обратно давал заметный скачок размера
+    /// после первого показа, поэтому оставлен только безопасный пересчёт разметки.
     /// </summary>
     private void RefreshWindowSize()
     {
         try
         {
-            if (!IsLoaded)
-                return;
-
-            // Сброс в Manual (авто-подбор выключен) и принудительный перерасчёт заставляют
-            // окно заново измерить содержимое текущего этапа, после чего возвращаем
-            // авто-подбор по обеим осям и запоминаем фактический размер для WndProc.
-            SizeToContent = SizeToContent.Manual;
-            InvalidateMeasure();
-            UpdateLayout();
-
-            SizeToContent = SizeToContent.WidthAndHeight;
-            InvalidateMeasure();
-            UpdateLayout();
-            CaptureFixedSize();
+            if (IsLoaded)
+                UpdateLayout();
         }
         catch
         {
@@ -494,200 +457,5 @@ public partial class UpdateAvailableWindow : Window
         }
     }
 
-    private const int WmGetMinMaxInfo = 0x0024;
-    private const int WmSizing = 0x0214;
-
-    // Ориентиры сторон для WM_SIZING.
-    private const int WmszLeft = 1;
-    private const int WmszRight = 2;
-    private const int WmszTop = 3;
-    private const int WmszTopLeft = 4;
-    private const int WmszBottomLeft = 5;
-    private const int WmszBottom = 6;
-    private const int WmszTopRight = 7;
-    private const int WmszBottomRight = 8;
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PoINT { public int X; public int Y; }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MinMaxInfo
-    {
-        public PoINT Reserved;
-        public PoINT MaxSize;
-        public PoINT MaxPosition;
-        public PoINT MinTrackSize;
-        public PoINT MaxTrackSize;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct RECT
-    {
-        public int Left;
-        public int Top;
-        public int Right;
-        public int Bottom;
-    }
-
-    // Зафиксированные габариты окна (issue #116, 1.0.1.82): пересчитываются после
-    // каждого этапа, чтобы WndProc не возвращал размеры предыдущего содержимого.
-    private double _lockedWidthDips;
-    private double _lockedHeightDips;
-
-    /// <summary>
-    /// Запоминает фактический размер окна после пересчёта содержимого: именно эти
-    /// габариты фиксирует WndProc (WM_GETMINMAXINFO / WM_SIZING).
-    /// </summary>
-    private void CaptureFixedSize()
-    {
-        if (ActualWidth > 0)
-            _lockedWidthDips = ActualWidth;
-        if (ActualHeight > 0)
-            _lockedHeightDips = ActualHeight;
-    }
-
-    /// <summary>
-    /// Возвращает фиксированную ширину окна в DIP (device-independent units), которую
-    /// нельзя изменить мышью: последний измеренный размер, иначе фактический,
-    /// иначе — разумный минимум (issue #116, 1.0.1.82).
-    /// </summary>
-    private double FixedWidthDips
-    {
-        get
-        {
-            if (_lockedWidthDips > 0)
-                return _lockedWidthDips;
-            if (ActualWidth > 0)
-                return ActualWidth;
-            return double.IsNaN(Width) || Width <= 0 ? 440 : Width;
-        }
-    }
-
-    /// <summary>
-    /// Возвращает фиксированную высоту окна в DIP (device-independent units),
-    /// которую нельзя изменить мышью (issue #116 v1.0.1.54: окно подтверждения
-    /// перезапуска нельзя растягивать по вертикали). Значение берётся из последнего
-    /// измерения содержимого, поэтому окно не «застревает» на высоте другого этапа.
-    /// </summary>
-    private double FixedHeightDips
-    {
-        get
-        {
-            if (_lockedHeightDips > 0)
-                return _lockedHeightDips;
-            if (ActualHeight > 0)
-                return ActualHeight;
-            return double.IsNaN(Height) || Height <= 0 ? 200 : Height;
-        }
-    }
-
-    /// <summary>
-    /// Текущий DPI-масштаб окна по горизонтали (1.0 = 100%). WPF измеряет размеры
-    /// (<see cref="Window.Width"/>, <see cref="FrameworkElement.ActualWidth"/>) в DIP,
-    /// а Win32-структуры <see cref="MinMaxInfo"/> и <see cref="RECT"/> (WM_GETMINMAXINFO,
-    /// WM_SIZING) оперируют физическими пикселями экрана.
-    /// </summary>
-    private double DpiScaleX
-    {
-        get
-        {
-            var source = PresentationSource.FromVisual(this);
-            return source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
-        }
-    }
-
-    /// <summary>Текущий DPI-масштаб окна по вертикали (см. <see cref="DpiScaleX"/>).</summary>
-    private double DpiScaleY
-    {
-        get
-        {
-            var source = PresentationSource.FromVisual(this);
-            return source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
-        }
-    }
-
-    /// <summary>
-    /// Фиксированная ширина окна в физических пикселях — то значение, которое надо
-    /// подставлять в Win32-структуры MINMAXINFO/RECT. Без перевода DIP→px при масштабе
-    /// Windows 125%/150%/200% ширина принудительно сжималась до Width/Dpi (например
-    /// 680/1.5 ≈ 453 DIP): окно становилось узким как у диалога сообщения (~440),
-    /// и кнопки/прогресс-бар выходили за его правый край (issue #157).
-    /// </summary>
-    private int FixedWidthPx => (int)Math.Round(FixedWidthDips * DpiScaleX);
-
-    /// <summary>Фиксированная высота окна в физических пикселях (см. <see cref="FixedWidthPx"/>,
-    /// issue #116 v1.0.1.54 — запрет вертикального растягивания).</summary>
-    private int FixedHeightPx => (int)Math.Round(FixedHeightDips * DpiScaleY);
-
-    /// <summary>
-    /// Перехватывает WM_GETMINMAXINFO и WM_SIZING, жёстко фиксируя ширину И высоту
-    /// окна. Фиксация ширины блокирует «схлопывание» окна при перетаскивании
-    /// правой/левой границы, которое обходит ResizeMode="NoResize" из-за кастомного
-    /// Window-Chrome MaterialDesign (issue #162). Фиксация высоты запрещает
-    /// вертикальное растягивание окна подтверждения перезапуска (issue #116
-    /// v1.0.1.54: «окна обновления растягиваются странно»); высоту контента
-    /// по-прежнему подстраивает SizeToContent="Height" — программные изменения
-    /// размера под WmGetMinMaxInfo/WmSizing не подпадают. В Win32-структуры
-    /// подставляются физические пиксели (с учётом DPI), иначе при масштабе
-    /// экрана >100% окно принудительно сжималось и обрезало контент.
-    /// </summary>
-    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
-    {
-        switch (msg)
-        {
-            case WmGetMinMaxInfo:
-            {
-                var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
-
-                // Ширина и высота фиксированы: MinTrackSize == MaxTrackSize ==
-                // фактическим габаритам, поэтому изменение размера мышью невозможно.
-                // Значения в физических пикселях.
-                int w = FixedWidthPx;
-                int h = FixedHeightPx;
-                mmi.MinTrackSize.X = w;
-                mmi.MaxTrackSize.X = w;
-                mmi.MinTrackSize.Y = h;
-                mmi.MaxTrackSize.Y = h;
-                Marshal.StructureToPtr(mmi, lParam, true);
-                handled = true;
-                break;
-            }
-            case WmSizing:
-            {
-                // Дополнительная защита на случай, если кастомный Chrome инициирует изменение
-                // размера в обход MINMAXINFO: принудительно возвращаем фиксированные ширину
-                // и высоту (в физических пикселях, чтобы не сузить окно при масштабе >100%).
-                var rc = Marshal.PtrToStructure<RECT>(lParam);
-                int w = FixedWidthPx;
-                int h = FixedHeightPx;
-                switch (wParam.ToInt32())
-                {
-                    case WmszLeft:
-                    case WmszTopLeft:
-                    case WmszBottomLeft:
-                        rc.Left = rc.Right - w;
-                        break;
-                    default:
-                        rc.Right = rc.Left + w;
-                        break;
-                }
-                switch (wParam.ToInt32())
-                {
-                    case WmszTop:
-                    case WmszTopLeft:
-                    case WmszTopRight:
-                        rc.Top = rc.Bottom - h;
-                        break;
-                    default:
-                        rc.Bottom = rc.Top + h;
-                        break;
-                }
-                Marshal.StructureToPtr(rc, lParam, true);
-                handled = true;
-                break;
-            }
-        }
-        return IntPtr.Zero;
-    }
 }
 #endif

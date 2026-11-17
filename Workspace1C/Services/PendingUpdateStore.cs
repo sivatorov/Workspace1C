@@ -61,7 +61,12 @@ public sealed class PendingUpdateStore
     /// <param name="releaseNotes">Описание изменений выпуска (issue #44): попадает в
     /// уведомление «Приложение обновлено до версии X» после перезапуска.</param>
     /// <param name="releaseUrl">Ссылка на страницу релиза.</param>
-    public void Write(string version, string? releaseNotes = null, string? releaseUrl = null)
+    /// <param name="notifyOnNextStart">Показывать ли уведомление «Приложение обновлено»
+    /// после перезапуска (issue #116). Для обновлений, инициированных пользователем
+    /// вручную, уведомление не нужно — пользователь и так знает, что нажал «Обновить».</param>
+    public void Write(
+        string version, string? releaseNotes = null, string? releaseUrl = null,
+        bool notifyOnNextStart = true)
     {
         try
         {
@@ -70,7 +75,8 @@ public sealed class PendingUpdateStore
             {
                 Version = version ?? string.Empty,
                 ReleaseNotes = releaseNotes ?? string.Empty,
-                ReleaseUrl = releaseUrl ?? string.Empty
+                ReleaseUrl = releaseUrl ?? string.Empty,
+                NotifyOnNextStart = notifyOnNextStart
             });
             // Атомарная запись (как ServerListStore.Save): временный файл + замена.
             var tempPath = FilePath + ".tmp";
@@ -148,6 +154,17 @@ public sealed class PendingUpdateStore
         return NormalizeTag(markerVersion) == NormalizeTag(currentVersion);
     }
 
+    /// <summary>
+    /// Чистая функция решения по маркеру (issue #116): уведомление показывается,
+    /// только если обновление было фоновым (<see cref="PendingUpdateMarker.NotifyOnNextStart"/>)
+    /// и версия маркера совпала с запущенной. Ручное обновление («Обновить»/«Установить»)
+    /// уведомления после перезапуска не требует.
+    /// </summary>
+    public static bool ShouldNotifyForMarker(PendingUpdateMarker? marker, string? currentVersion)
+        => marker is not null
+           && marker.NotifyOnNextStart
+           && ShouldNotify(marker.Version, currentVersion);
+
     private static string NormalizeTag(string value)
     {
         var trimmed = value.Trim();
@@ -179,4 +196,12 @@ public sealed class PendingUpdateMarker
 
     /// <summary>Ссылка на страницу релиза (issue #44).</summary>
     public string? ReleaseUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Показывать ли уведомление «Приложение обновлено до версии X» после перезапуска
+    /// (issue #116). True — фоновое обновление (пользователь мог не знать о нём);
+    /// False — пользователь сам нажал «Обновить»/«Установить». У маркеров прежних
+    /// версий поле отсутствует и читается как true — прежнее поведение сохраняется.
+    /// </summary>
+    public bool NotifyOnNextStart { get; set; } = true;
 }

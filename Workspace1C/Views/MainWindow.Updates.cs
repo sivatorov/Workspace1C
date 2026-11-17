@@ -156,8 +156,10 @@ public partial class MainWindow
 
             // Состояние «файл обновления скачан и готов к установке» (issue #116,
             // v1.0.1.58): зелёная галочка вместо «внимания», клик — сразу диалог
-            // установки готового файла (без сетевой проверки).
-            var isReady = updateService.IsReadyFor(updateService.ReadyRelease);
+            // установки готового файла (без сетевой проверки). Issue #116 (17.11.2026):
+            // готовым считается только файл ДОСТУПНОГО релиза — пока в фоне качается
+            // более новая версия, старый скачанный файл не показываем как готовый.
+            var isReady = updateService.IsReadyFor(updateService.AvailableRelease);
             var hasRelease = updateService.AvailableRelease is not null;
             // v1.0.1.61: видимость значка больше не зависит от режима обновления —
             // в авто-режимах без релиза он тоже доступен для ручной проверки.
@@ -207,9 +209,9 @@ public partial class MainWindow
         try
         {
             var updateService = AppServices.GetRequiredService<UpdateService>();
-            // Файл обновления уже скачан (issue #116 v1.0.1.58): открываем сразу
-            // диалог установки готового файла, без сетевой проверки.
-            if (updateService.IsReadyFor(updateService.ReadyRelease))
+            // Issue #116: готовый файл — только у ДОСТУПНОГО релиза, иначе проверяем новую.
+            if (updateService.IsReadyFor(updateService.ReadyRelease)
+                && updateService.IsReadyFor(updateService.AvailableRelease))
             {
                 updateService.ShowReadyInstallDialog();
                 return;

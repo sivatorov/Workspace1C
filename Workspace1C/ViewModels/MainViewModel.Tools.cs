@@ -1521,20 +1521,9 @@ public partial class MainViewModel : ViewModelBase
             LocalizationManager.T("Main.RemoveMissingTitle"));
     }
 
-    /// <summary>
-    /// Завершает процессы 1cv8 / 1cv8c и связанные.
-    /// issue #134 (v1.0.1.79): сводка перечисляет базы, к которым относились
-    /// процессы, — раньше пункт «Утилиты → Операции → Завершить процессы 1С»
-    /// показывал только счётчик, и автор issue не подтвердил исправление.
-    /// </summary>
+    /// <summary>Завершает процессы 1cv8 / 1cv8c и связанные.</summary>
     private void KillOneCProcesses(object? parameter)
     {
-        // Снимок с командными строками: по нему строится карта «PID → имя базы».
-        // Завершение при этом работает как раньше — KillOneCProcesses() завершает
-        // все процессы платформы, включая серверные (ragent/rmngr/rphost).
-        var snapshot = InfobaseMaintenanceService.ExtendSnapshotForKillReport(
-            AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails());
-
         var count = InfobaseMaintenanceService.CountOneCProcesses();
         if (count == 0)
         {
@@ -1548,55 +1537,11 @@ public partial class MainViewModel : ViewModelBase
                 LocalizationManager.T("Main.KillProcessesTitle")))
             return;
 
-        var baseNamesByPid = KillProcessesMenuPlanner.BuildBaseNamesByPid(
-            Infobases, snapshot, LocalizationManager.T);
-
-        // issue #134 (1.0.1.80): причина «только счётчики» должна быть видна в журнале —
-        // размер снимка/карты и командные строки несопоставленных клиентских процессов.
-        LogKillReportDiagnostics(snapshot, baseNamesByPid);
-
         var killed = InfobaseMaintenanceService.KillOneCProcesses();
-
-        // Повторный опрос: живыми остались те PID снимка, которые завершить не удалось.
-        var failedPids = InfobaseMaintenanceService.FindAliveOneCProcessIds(
-            snapshot.Select(process => process.Pid));
-
-        _logger.Info($"Завершено процессов 1С: {killed}, не удалось: {failedPids.Count}");
-
-        // Снимок пуст (процессы опросить не удалось) — прежний текст со счётчиком;
-        // иначе сводку собирает общий слой: счётчики, названия баз и строка ошибок.
-        var message = snapshot.Count > 0
-            ? KillProcessesMenuPlanner.FormatKillAllSummary(
-                snapshot, failedPids, LocalizationManager.T, baseNamesByPid)
-            : string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed);
-
-        _dialogs.ShowInfo(message, LocalizationManager.T("Main.OneCProcessesTitle"));
-    }
-
-    /// <summary>
-    /// Диагностика сводки завершения процессов (issue #134, 1.0.1.80): в журнал пишется
-    /// размер снимка и карты «PID → имя базы», а для клиентских процессов без базы —
-    /// PID и командная строка. Без этой записи причина «в отчёте только счётчики»
-    /// у пользователя не видна.
-    /// </summary>
-    private void LogKillReportDiagnostics(
-        IReadOnlyList<RunningOneCProcessDetails> snapshot,
-        IReadOnlyDictionary<int, string> baseNamesByPid)
-    {
-        _logger.Info($"Завершение процессов 1С: снимок {snapshot.Count}, имён баз {baseNamesByPid.Count}");
-        foreach (var process in snapshot)
-        {
-            var processName = process.ProcessName ?? string.Empty;
-            if (!processName.StartsWith("1cv8", StringComparison.OrdinalIgnoreCase)
-                || baseNamesByPid.ContainsKey(process.Pid))
-            {
-                continue;
-            }
-
-            _logger.Warn(
-                $"Не удалось сопоставить процесс 1С PID {process.Pid} с базой. " +
-                $"Командная строка: {process.CommandLine}");
-        }
+        _logger.Info($"Завершено процессов 1С: {killed}");
+        _dialogs.ShowInfo(
+            string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed),
+            LocalizationManager.T("Main.OneCProcessesTitle"));
     }
 
 
@@ -2791,6 +2736,8 @@ public partial class MainViewModel : ViewModelBase
         string? hotkeyLockApp = null,
         string? hotkeyCheckIntegrity = null,
         string? hotkeyServerConsole = null,
+        // Инспектор процессов 1С (issue #134, доработка ArtyoZ): Ctrl+Alt+I.
+        string? hotkeyProcessInspector = null,
         // Управление службами (issue #11): настраиваемый хоткей, по умолчанию Ctrl+Shift+S.
         string? hotkeyServices = null,
         // Меню служб (issue #11, пункт 6): настраиваемый хоткей, по умолчанию Ctrl+Shift+Alt+S.
@@ -2858,6 +2805,8 @@ public partial class MainViewModel : ViewModelBase
         if (hotkeyLockApp != null) _hotkeyLockApp = hotkeyLockApp.Trim();
         if (hotkeyCheckIntegrity != null) _hotkeyCheckIntegrity = hotkeyCheckIntegrity.Trim();
         if (hotkeyServerConsole != null) _hotkeyServerConsole = hotkeyServerConsole.Trim();
+        // Инспектор процессов 1С (issue #134, доработка ArtyoZ).
+        if (hotkeyProcessInspector != null) _hotkeyProcessInspector = hotkeyProcessInspector.Trim();
         // Управление службами (issue #11): применяем хоткей из окна настроек.
         if (hotkeyServices != null) HotkeyServices = hotkeyServices.Trim();
         // Меню служб (issue #11, пункт 6): применяем хоткей из окна настроек.
@@ -2903,6 +2852,7 @@ public partial class MainViewModel : ViewModelBase
         OnPropertyChanged(nameof(HotkeyCollectDiagnostics));
         OnPropertyChanged(nameof(HotkeyCheckIntegrity));
         OnPropertyChanged(nameof(HotkeyServerConsole));
+        OnPropertyChanged(nameof(HotkeyProcessInspector));
         OnPropertyChanged(nameof(HotkeyServices));
         OnPropertyChanged(nameof(HotkeyServicesMenu));
         OnPropertyChanged(nameof(RememberWindowLayout));

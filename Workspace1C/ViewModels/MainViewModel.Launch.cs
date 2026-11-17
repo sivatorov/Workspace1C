@@ -782,6 +782,8 @@ public partial class MainViewModel : ViewModelBase
         // Администрирование ИБ (Этап 6, функция №29 + консоль серверов).
         s.HotkeyCheckIntegrity = _hotkeyCheckIntegrity;
         s.HotkeyServerConsole = _hotkeyServerConsole;
+        // Инспектор процессов 1С (issue #134, доработка ArtyoZ).
+        s.HotkeyProcessInspector = _hotkeyProcessInspector;
         // Выбранная версия платформы для внешней консоли (issue #135).
         s.ServerConsolePlatformVersion = _serverConsolePlatformVersion;
         // Управление службами (issue #11): хоткей по умолчанию Ctrl+Shift+S.

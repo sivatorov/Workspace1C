@@ -172,6 +172,9 @@ namespace Workspace1C
                 HotkeyCheckIntegrityBox.Value = viewModel.HotkeyCheckIntegrity;
             if (HotkeyServerConsoleBox != null)
                 HotkeyServerConsoleBox.Value = viewModel.HotkeyServerConsole;
+            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): Ctrl+Alt+I.
+            if (HotkeyProcessInspectorBox != null)
+                HotkeyProcessInspectorBox.Value = viewModel.HotkeyProcessInspector;
             // Управление службами (issue #11): Ctrl+Shift+S по умолчанию.
             if (HotkeyServicesBox != null)
                 HotkeyServicesBox.Value = viewModel.HotkeyServices;
@@ -732,6 +735,7 @@ namespace Workspace1C
             var hkLockApp = ReadHotkeyBox(HotkeyLockAppBox);
             var hkCheckIntegrity = ReadHotkeyBox(HotkeyCheckIntegrityBox);
             var hkServerConsole = ReadHotkeyBox(HotkeyServerConsoleBox);
+            var hkProcessInspector = ReadHotkeyBox(HotkeyProcessInspectorBox);
             var hkServices = ReadHotkeyBox(HotkeyServicesBox);
             // Меню служб (issue #11, пункт 6): настраиваемая горячая клавиша.
             var hkServicesMenu = ReadHotkeyBox(HotkeyServicesMenuBox);
@@ -771,6 +775,8 @@ namespace Workspace1C
                 (LocalizationManager.T("AppLock.LockTitle"), hkLockApp),
                 (LocalizationManager.T("Admin.CheckIntegrityTitle"), hkCheckIntegrity),
                 (LocalizationManager.T("Admin.ServerConsoleTitle"), hkServerConsole),
+                // Инспектор процессов 1С (issue #134, доработка ArtyoZ).
+                (LocalizationManager.T("ProcessInspector.Title"), hkProcessInspector),
                 (LocalizationManager.T("Services.MenuItem"), hkServices),
                 (LocalizationManager.T("Settings.Hotkeys.ServicesMenu"), hkServicesMenu),
                 // «Собрать диагностику» (issue #99, v1.0.1.23).
@@ -893,6 +899,7 @@ namespace Workspace1C
                 hotkeyLockApp: hkLockApp,
                 hotkeyCheckIntegrity: hkCheckIntegrity,
                 hotkeyServerConsole: hkServerConsole,
+                hotkeyProcessInspector: hkProcessInspector,
                 hotkeyServices: hkServices,
                 hotkeyServicesMenu: hkServicesMenu,
                 hotkeyCollectDiagnostics: hkCollectDiagnostics,

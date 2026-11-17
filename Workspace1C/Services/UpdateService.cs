@@ -83,6 +83,28 @@ public sealed class UpdateService : IAppUpdateService
     private int _intervalMinutes;
     private int _periodicCheckBusy;
 
+    // ---- Issue #116 (17.11.2026): уведомления и перекачивание более новой версии ----
+
+    /// <summary>Счётчик выполняющихся действий пользователя с обновлением (ручная
+    /// проверка, диалог). Пока он больше нуля, фоновые проверки НЕ показывают
+    /// системное уведомление «Доступна новая версия».</summary>
+    private int _userActionDepth;
+
+    /// <summary>Тег релиза, который пользователь уже увидел в ручном действии:
+    /// фоновая проверка не должна «догонять» его тем же уведомлением.</summary>
+    private string? _userActionReleaseTag;
+
+    /// <summary>Тег релиза, о котором уже показано фоновое уведомление (без повторов).</summary>
+    private string? _lastNotifiedReleaseTag;
+
+    /// <summary>1 — фоновая загрузка обновления уже идёт: параллельно вторую не
+    /// запускаем (issue #116, комментарий 7OH от 17.11.2026 14:30).</summary>
+    private int _backgroundDownloadBusy;
+
+    /// <summary>Релиз, который нужно скачать после завершения текущей фоновой
+    /// загрузки (если за время загрузки вышла ещё более новая версия).</summary>
+    private ReleaseInfo? _pendingBackgroundDownload;
+
     /// <summary>
     /// Устанавливает периодичность фоновой проверки обновлений (issue #116 п.2):
     /// 0 — только при запуске и вручную (таймер выключен), положительное значение —
@@ -107,13 +129,17 @@ public sealed class UpdateService : IAppUpdateService
     /// <summary>
     /// Тик периодической проверки (issue #116 п.2). Guard от спама: режим Manual
     /// не проверяется; пока найденный релиз не обработан (<see cref="AvailableRelease"/>
-    /// заполнен) — повторно не спамим (после «Пропустить эту версию» проверка
-    /// продолжается, пропущенный релиз фильтруется существующей логикой); предыдущая
-    /// проверка не перекрывается.
+    /// заполнен) — повторно не спамим. Исключение — режим «Загружать с предложением
+    /// установки»: проверка продолжается и после того, как версия найдена/скачана,
+    /// иначе приложение «застревало» на первой скачанной версии и не замечало
+    /// выпущенные позже (issue #116, комментарий 7OH от 17.11.2026 14:30).
+    /// Предыдущая проверка не перекрывается.
     /// </summary>
     private async void RunPeriodicCheck()
     {
-        if (Mode == AppUpdateMode.Manual || AvailableRelease is not null)
+        if (Mode == AppUpdateMode.Manual)
+            return;
+        if (AvailableRelease is not null && Mode != AppUpdateMode.DownloadAskInstall)
             return;
         if (System.Threading.Interlocked.CompareExchange(ref _periodicCheckBusy, 1, 0) != 0)
             return;
@@ -149,6 +175,14 @@ public sealed class UpdateService : IAppUpdateService
     {
         if (ReferenceEquals(AvailableRelease, release))
             return;
+        // Та же версия, полученная повторной фоновой проверкой: объект обновляем,
+        // но событие не поднимаем — иначе подвал мигал бы на каждом интервале.
+        if (AvailableRelease is not null && release is not null
+            && string.Equals(AvailableRelease.TagName, release.TagName, StringComparison.Ordinal))
+        {
+            AvailableRelease = release;
+            return;
+        }
         AvailableRelease = release;
         try { AvailableReleaseChanged?.Invoke(); }
         catch { /* подписчик не должен ронять проверку обновлений */ }
@@ -309,10 +343,25 @@ public sealed class UpdateService : IAppUpdateService
     /// </summary>
     public void StartBackgroundDownload(ReleaseInfo release)
     {
-        if (release is null || IsReadyFor(release) || IsUpdateDownloadInProgress(release))
+        if (release is null)
+            return;
+        // Issue #116 (17.11.2026): перекачиваем только версию НОВЕЕ уже скачанной.
+        // Та же или более старая версия (отставание GitHub API) готовый файл не трогает.
+        if (!UpdateRedownloadPolicy.ShouldDownload(release, ReadyRelease, IsReadyFor(ReadyRelease)))
+            return;
+        if (IsReadyFor(release) || IsUpdateDownloadInProgress(release))
             return;
         if (string.IsNullOrWhiteSpace(release.DownloadUrl))
             return;
+
+        // Параллельно две загрузки не запускаем: если одна уже идёт, запоминаем
+        // самый новый релиз и начнём его сразу после завершения текущей.
+        if (System.Threading.Interlocked.CompareExchange(ref _backgroundDownloadBusy, 1, 0) != 0)
+        {
+            System.Threading.Volatile.Write(ref _pendingBackgroundDownload, release);
+            return;
+        }
+
         _ = DownloadInBackgroundAsync(release);
     }
 
@@ -332,12 +381,22 @@ public sealed class UpdateService : IAppUpdateService
                 return;
 
             // Успешная загрузка: устаревший скачанный файл обновления больше не нужен.
-            UpdateDownloadCleanup.RemoveStaleDownload(previousReadyPath, path);
+            // При неудаче (path == null) старый файл остаётся нетронутым.
+            if (UpdateRedownloadPolicy.ShouldCleanup(previousReadyPath, path))
+                UpdateDownloadCleanup.RemoveStaleDownload(previousReadyPath, path);
             SetReadyState(release, path);
         }
         catch
         {
             // Фоновая загрузка не должна ронять приложение.
+        }
+        finally
+        {
+            System.Threading.Interlocked.Exchange(ref _backgroundDownloadBusy, 0);
+            // Пока шла загрузка, мог выйти ещё более новый релиз — начинаем его.
+            var pending = System.Threading.Interlocked.Exchange(ref _pendingBackgroundDownload, null);
+            if (pending is not null)
+                StartBackgroundDownload(pending);
         }
     }
 
@@ -363,8 +422,10 @@ public sealed class UpdateService : IAppUpdateService
                 return false;
 
             // Маркер об успешном обновлении (issue #10): уведомление о завершении
-            // отправит новая версия при следующем старте.
-            try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
+            // отправит новая версия при следующем старте. Issue #116: установку
+            // инициировал пользователь («Установить» в диалоге) — уведомление
+            // «Приложение обновлено» после перезапуска не нужно.
+            try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl, notifyOnNextStart: false); }
             catch { /* маркер сервисный — установка не должна срываться */ }
 
             // Issue #129: флаг «Считать версию прошлой» сбрасывается — новая версия
@@ -383,8 +444,7 @@ public sealed class UpdateService : IAppUpdateService
     /// <summary>
     /// Открывает диалог обновления для уже скачанного релиза (issue #116): без
     /// сетевой проверки — файл готов, окно <see cref="UpdateAvailableWindow"/>
-    /// само покажет кнопку «Установить» вместо «Скачать». Клик по значку готовности
-    /// в статус-баре.
+    /// само покажет кнопку «Обновить». Клик по значку готовности в статус-баре.
     /// </summary>
     public void ShowReadyInstallDialog()
     {
@@ -494,7 +554,15 @@ public sealed class UpdateService : IAppUpdateService
                     // при запуске», но установка молча НЕ применяется. Диалог не
                     // показывается: когда файл готов, значок в статус-баре отражает
                     // готовность, клик по нему открывает диалог со списком изменений
-                    // и кнопкой «Установить».
+                    // и кнопкой «Обновить» (применение готового файла).
+                    // Issue #116 (17.11.2026): если уже скачан файл не старше
+                    // предложенного (GitHub API отстаёт), готовое состояние не теряем.
+                    if (ReadyRelease is not null && IsReadyFor(ReadyRelease)
+                        && !UpdateRedownloadPolicy.ShouldDownload(release, ReadyRelease, true))
+                    {
+                        SetAvailableRelease(ReadyRelease);
+                        return;
+                    }
                     SetAvailableRelease(release);
                     StartBackgroundDownload(release);
                     return;
@@ -528,6 +596,9 @@ public sealed class UpdateService : IAppUpdateService
     /// </summary>
     public async Task CheckForUpdatesManualAsync()
     {
+        // Issue #116 (17.11.2026 14:04): пользователь сам инициировал проверку —
+        // фоновые уведомления о найденной версии показывать нельзя.
+        BeginUserAction();
         try
         {
             var release = await _gitHub.GetLatestReleaseAsync().ConfigureAwait(false);
@@ -559,8 +630,10 @@ public sealed class UpdateService : IAppUpdateService
             }
 
             // Новая версия найдена — фиксируем состояние для ссылки «Обновить»
-            // в подвале главного окна (issue #116).
+            // в подвале главного окна (issue #116). Тег запоминаем: если фоновая
+            // проверка завершится позже, она не покажет уведомление о том же релизе.
             SetAvailableRelease(release);
+            RememberUserActionRelease(release);
 
             if (Mode == AppUpdateMode.InstallOnStartup)
             {
@@ -575,7 +648,10 @@ public sealed class UpdateService : IAppUpdateService
                 }
 
                 // Режим «обновлять при запуске» — применяем новую версию без вопросов.
-                if (await DownloadAndInstallAutoAsync(release).ConfigureAwait(false))
+                // Issue #116: установка инициирована пользователем — уведомление
+                // «Приложение обновлено» после перезапуска не нужно.
+                if (await DownloadAndInstallAutoAsync(release, notifyOnNextStart: false)
+                        .ConfigureAwait(false))
                     SetAvailableRelease(null);
                 return;
             }
@@ -595,6 +671,10 @@ public sealed class UpdateService : IAppUpdateService
                 LocalizationManager.T("Update.CheckFailed"),
                 LocalizationManager.T(CheckResultTitleKey)));
         }
+        finally
+        {
+            EndUserAction();
+        }
     }
 
     /// <summary>
@@ -608,6 +688,9 @@ public sealed class UpdateService : IAppUpdateService
     /// </summary>
     private void ShowUpdateDialog(ReleaseInfo release)
     {
+        // Issue #116: открытие диалога — тоже действие пользователя; фоновые
+        // уведомления на это время подавлены.
+        BeginUserAction();
         try
         {
             var window = new UpdateAvailableWindow(
@@ -618,6 +701,10 @@ public sealed class UpdateService : IAppUpdateService
         {
             // Диалог не должен ронять приложение.
         }
+        finally
+        {
+            EndUserAction();
+        }
     }
 
     /// <summary>
@@ -627,8 +714,19 @@ public sealed class UpdateService : IAppUpdateService
     /// страницу релиза. Вызывается из фоновой проверки при молчаливом автообновлении;
     /// ошибки уведомления не влияют на обновление.
     /// </summary>
-    private void NotifyUpdateAvailable(ReleaseInfo release)
+    private void NotifyUpdateAvailable(
+        ReleaseInfo release,
+        UpdateNotificationOrigin origin = UpdateNotificationOrigin.Background)
     {
+        // Issue #116: уведомление допустимо только на фоновом пути. Ручное действие
+        // пользователя и уже увиденный им тег релиза уведомление не показывают.
+        if (!UpdateNotificationPolicy.ShouldNotify(origin, IsUserActionInProgress))
+            return;
+        if (IsUserActionRelease(release))
+            return;
+        if (IsLastNotifiedRelease(release))
+            return;
+
         try
         {
             _notifications.Show(
@@ -636,12 +734,42 @@ public sealed class UpdateService : IAppUpdateService
                 BuildUpdateAvailableMessage(release),
                 NotificationKind.Info,
                 NotificationEvent.Update);
+            System.Threading.Volatile.Write(ref _lastNotifiedReleaseTag, release.TagName);
         }
         catch
         {
             // Уведомление не должно ронять фоновую проверку.
         }
     }
+
+    /// <summary>Начинает действие пользователя с обновлением (ручная проверка/диалог):
+    /// пока счётчик больше нуля, фоновые уведомления подавлены (issue #116).</summary>
+    private void BeginUserAction()
+        => System.Threading.Interlocked.Increment(ref _userActionDepth);
+
+    /// <summary>Завершает действие пользователя с обновлением.</summary>
+    private void EndUserAction()
+        => System.Threading.Interlocked.Decrement(ref _userActionDepth);
+
+    /// <summary>True — сейчас выполняется действие пользователя с обновлением.</summary>
+    private bool IsUserActionInProgress
+        => System.Threading.Volatile.Read(ref _userActionDepth) > 0;
+
+    /// <summary>Запоминает тег релиза, показанного пользователю в ручном действии.</summary>
+    private void RememberUserActionRelease(ReleaseInfo release)
+        => System.Threading.Volatile.Write(ref _userActionReleaseTag, release?.TagName);
+
+    /// <summary>True — этот релиз пользователь уже увидел в ручном действии.</summary>
+    private bool IsUserActionRelease(ReleaseInfo release)
+        => string.Equals(
+            System.Threading.Volatile.Read(ref _userActionReleaseTag),
+            release.TagName, StringComparison.Ordinal);
+
+    /// <summary>True — фоновое уведомление об этом релизе уже показывалось.</summary>
+    private bool IsLastNotifiedRelease(ReleaseInfo release)
+        => string.Equals(
+            System.Threading.Volatile.Read(ref _lastNotifiedReleaseTag),
+            release.TagName, StringComparison.Ordinal);
 
     /// <summary>
     /// Текст уведомления о доступной новой версии (issue #44; issue #116): заголовок
@@ -676,7 +804,14 @@ public sealed class UpdateService : IAppUpdateService
     /// <c>false</c> — применить не удалось. Ошибки по-прежнему показываются, но наружу
     /// не выбрасываются.
     /// </returns>
-    public async Task<bool> DownloadAndInstallAutoAsync(ReleaseInfo release)
+    public Task<bool> DownloadAndInstallAutoAsync(ReleaseInfo release)
+        => DownloadAndInstallAutoAsync(release, notifyOnNextStart: true);
+
+    /// <param name="notifyOnNextStart">Issue #116: показывать ли уведомление
+    /// «Приложение обновлено» после перезапуска. Фоновое автообновление — true;
+    /// установка по кнопке «Обновить» из ручной проверки — false.</param>
+    public async Task<bool> DownloadAndInstallAutoAsync(
+        ReleaseInfo release, bool notifyOnNextStart)
     {
         try
         {
@@ -722,8 +857,13 @@ public sealed class UpdateService : IAppUpdateService
             // Маркер об успешном обновлении (issue #10): помощник запущен и обновление
             // применится уже после нашего выхода, поэтому уведомление о завершении
             // из этого процесса до Telegram не доедет. Пишем версию, на которую
-            // обновляемся; новая версия отправит уведомление при следующем старте.
-            try { _pendingUpdate.Write(release.TagName, release.Body, release.HtmlUrl); }
+            // обновляемся; новая версия отправит уведомление при следующем старте
+            // (issue #116: только если обновление было фоновым).
+            try
+            {
+                _pendingUpdate.Write(
+                    release.TagName, release.Body, release.HtmlUrl, notifyOnNextStart);
+            }
             catch { /* маркер сервисный — обновление не должно срываться */ }
 
             // Issue #129: флаг «Считать версию прошлой» сбрасывается — новая версия

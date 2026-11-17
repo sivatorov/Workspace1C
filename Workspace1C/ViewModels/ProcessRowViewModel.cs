@@ -56,10 +56,22 @@ public sealed class ProcessRowViewModel
     /// <summary>Колонка «Режим»: 1С:Предприятие / Конфигуратор / Служебный.</summary>
     public string ModeText => DetectModeText(_details.CommandLine);
 
-    /// <summary>Колонка «Пользователь» (из /N либо владелец процесса); пусто, если неизвестен.</summary>
-    public string UserName => string.IsNullOrWhiteSpace(_details.UserName)
-        ? string.Empty
-        : _details.UserName;
+    /// <summary>
+    /// Колонка «Пользователь»: владелец процесса, а если он не определён — имя из
+    /// параметра <c>/N</c> командной строки (issue #134, формы <c>/N"superadmin"</c>,
+    /// <c>/N superadmin</c>, <c>/Nsuperadmin</c>, <c>-N</c>). Пусто — оба источника пусты.
+    /// </summary>
+    public string UserName
+    {
+        get
+        {
+            var owner = _details.UserName?.Trim();
+            if (!string.IsNullOrWhiteSpace(owner))
+                return owner;
+
+            return ProcessCommandLineUserParser.ExtractUserName(_details.CommandLine) ?? string.Empty;
+        }
+    }
 
     /// <summary>Колонка «Время запуска» (локальное).</summary>
     public string StartTimeText => _details.StartTime.HasValue

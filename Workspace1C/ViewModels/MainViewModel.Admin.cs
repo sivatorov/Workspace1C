@@ -22,6 +22,7 @@ public partial class MainViewModel
     private string _serverConsolePlatformVersion = string.Empty;
     private string _hotkeyCheckIntegrity = "Ctrl+Alt+Q";
     private string _hotkeyServerConsole = "Ctrl+Alt+S";
+    private string _hotkeyProcessInspector = "Ctrl+Alt+I";
 
     /// <summary>
     /// Выбранная версия платформы для внешней консоли администрирования серверов
@@ -56,6 +57,20 @@ public partial class MainViewModel
         set
         {
             if (SetProperty(ref _hotkeyServerConsole, NormalizeHotkey(value, "Ctrl+Alt+S")))
+                ScheduleSaveSettings();
+        }
+    }
+
+    /// <summary>
+    /// Горячая клавиша открытия «Инспектора процессов 1С» (issue #134, доработка
+    /// ArtyoZ, по умолчанию Ctrl+Alt+I).
+    /// </summary>
+    public string HotkeyProcessInspector
+    {
+        get => _hotkeyProcessInspector;
+        set
+        {
+            if (SetProperty(ref _hotkeyProcessInspector, NormalizeHotkey(value, "Ctrl+Alt+I")))
                 ScheduleSaveSettings();
         }
     }

@@ -395,7 +395,9 @@ namespace Workspace1C
             {
                 var store = AppServices.GetRequiredService<PendingUpdateStore>();
                 var marker = store.ReadMarkerAndClear();
-                if (marker is null || !PendingUpdateStore.ShouldNotify(marker.Version, VersionInfo.Display()))
+                // Issue #116: ручное обновление («Обновить»/«Установить») не требует
+                // уведомления после перезапуска — пользователь сам его запустил.
+                if (marker is null || !PendingUpdateStore.ShouldNotifyForMarker(marker, VersionInfo.Display()))
                     return;
 
                 // Описание изменений (issue #44): из маркера, а если его записала прежняя

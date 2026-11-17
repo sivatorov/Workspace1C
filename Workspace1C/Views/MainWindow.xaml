@@ -689,6 +689,16 @@
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
+                            <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ):
+                                 быстрый доступ рядом с «Утилитами». -->
+                            <Button x:Name="ProcessInspectorButton"
+                                    Command="{Binding ProcessInspectorCommand}"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="8,7"
+                                    ToolTip="{loc:Loc Main.ProcessInspectorTooltip}">
+                                <Path Width="18" Height="18" Stretch="Uniform"
+                                      Data="{DynamicResource IconApplicationCog}"
+                                      Fill="{DynamicResource InfoBrush}"/>
+                            </Button>
                             <!-- «Настройки»: тема, компактный режим, настройки, справка -->
                             <Button x:Name="ThemeToggleButton" Click="OnToggleTheme_Click"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" ToolTip="{loc:Loc Main.Theme}">
