@@ -534,10 +534,10 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
-        /// Системное уведомление «Доступна новая версия X.Y.Z» с описанием изменений
-        /// (функция №4; issue #44): к тексту добавляется «Что нового:» из описания
-        /// выпуска (release.Body) и ссылка на страницу релиза — как список изменений
-        /// в главном окне. Вызывается из фоновой проверки при молчаливом автообновлении;
+        /// Системное уведомление «Доступна новая версия X.Y.Z» (функция №4; issue #44).
+        /// Issue #116: описание выпуска в уведомление больше НЕ добавляется — обрезанный
+        /// список изменений не давал полной картины; остаются заголовок и ссылка на
+        /// страницу релиза. Вызывается из фоновой проверки при молчаливом автообновлении;
         /// ошибки уведомления не влияют на обновление.
         /// </summary>
         private void NotifyUpdateAvailable(ReleaseInfo release)
@@ -557,37 +557,21 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
-        /// Текст уведомления о доступной новой версии (issue #44): заголовок «Доступна
-        /// новая версия X», затем «Что нового:» с описанием выпуска (до
-        /// <see cref="MaxUpdateNotesLength"/> символов) и ссылкой на страницу релиза.
-        /// Пустое/недоступное описание не ломает уведомление — остаётся заголовок.
+        /// Текст уведомления о доступной новой версии (issue #44; issue #116): заголовок
+        /// «Доступна новая версия X» и ссылка на страницу релиза. Описание выпуска
+        /// (release.Body) в уведомление НЕ добавляется: обрезанный «Что нового» не содержит
+        /// полного списка изменений и только занимает место — полный список доступен по
+        /// ссылке на релиз. Метод internal — чтобы сборка тестов проверяла состав текста
+        /// без запуска уведомления.
         /// </summary>
-        private static string BuildUpdateAvailableMessage(ReleaseInfo release)
+        internal static string BuildUpdateAvailableMessage(ReleaseInfo release)
         {
-            var header = string.Format(LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
-            var notes = TruncateReleaseNotes(release.Body);
-            var message = string.IsNullOrWhiteSpace(notes)
-                ? header
-                : header + Environment.NewLine + Environment.NewLine +
-                  LocalizationManager.T("Notify.ReleaseNotes") + Environment.NewLine + notes;
-
+            var message = string.Format(
+                LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
             if (!string.IsNullOrWhiteSpace(release.HtmlUrl))
                 message += Environment.NewLine + release.HtmlUrl;
 
             return message;
-        }
-
-        /// <summary>Максимальная длина описания изменений в уведомлении (символов).</summary>
-        private const int MaxUpdateNotesLength = 2000;
-
-        private static string TruncateReleaseNotes(string? body)
-        {
-            if (string.IsNullOrWhiteSpace(body))
-                return string.Empty;
-            var text = body.Trim();
-            return text.Length <= MaxUpdateNotesLength
-                ? text
-                : text[..MaxUpdateNotesLength].TrimEnd() + "…";
         }
 
         /// <summary>
@@ -841,7 +825,9 @@ namespace Workspace1C.Services
             var summary = current + Environment.NewLine + offered
                 + Environment.NewLine + Environment.NewLine
                 + LocalizationManager.T("Update.DownloadPrompt");
-            var result = ConfirmUpdateWithResult(summary, release.Body);
+            // Issue #116: в ручных режимах (Manual/NotifyOnly) описание релиза в диалог
+            // не передаётся — пользователь сам запросил обновление и уже знает, что ищет.
+            var result = ConfirmUpdateWithResult(summary, ReleaseNotesForDialog(release));
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
@@ -943,7 +929,8 @@ namespace Workspace1C.Services
                 : LocalizationManager.T("Update.AdminPromptGeneric");
 
             // Повышение прав запускаем только после явного согласия пользователя.
-            var result = ConfirmUpdateWithResult(prompt, release.Body);
+            // Issue #116: описание релиза передаётся только в автоматических режимах.
+            var result = ConfirmUpdateWithResult(prompt, ReleaseNotesForDialog(release));
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
@@ -2188,8 +2175,18 @@ rmdir ""$WORK_DIR"" 2>/dev/null || true
         private static string Bq(string value) => value.Replace("'", "'\\''");
 
         /// <summary>
+        /// Описание релиза для передачи в диалог подтверждения (issue #116):
+        /// в ручных режимах (<see cref="AppUpdateMode.Manual"/>, <see cref="AppUpdateMode.NotifyOnly"/>)
+        /// возвращается <c>null</c> — блок «Что нового» в диалоге не показывается;
+        /// в автоматических режимах — тело релиза, как раньше.
+        /// </summary>
+        private string? ReleaseNotesForDialog(ReleaseInfo release)
+            => AppUpdateModeHelper.ShouldShowReleaseNotes(Mode) ? release.Body : null;
+
+        /// <summary>
         /// Запрашивает подтверждение скачивания/применения обновления. На Avalonia
-        /// показывает также описание релиза «Что нового» в формате markdown.
+        /// показывает также описание релиза «Что нового» в формате markdown
+        /// (в ручных режимах не показывается — issue #116).
         /// </summary>
         private bool ConfirmUpdate(string summary, string? body)
         {

@@ -30,7 +30,17 @@ public partial class UpdateAvailableWindow : Window
     // файл ещё понадобится помощнику, удалять его нельзя (issue #302).
     private bool _applyScheduled;
 
-    public UpdateAvailableWindow(ReleaseInfo release, UpdateService service)
+    /// <param name="showReleaseNotes">
+    /// Issue #116: показывать ли блок «Что нового» (подпись и описание релиза).
+    /// В ручных режимах (<see cref="AppUpdateMode.Manual"/>, <see cref="AppUpdateMode.NotifyOnly"/>)
+    /// передаётся <c>false</c> — пользователь сам запросил обновление и уже знает, что
+    /// ищет; подпись и описание скрываются целиком (без пустого места), окно ужимается
+    /// по высоте за счёт <c>SizeToContent="Height"</c>. В автоматических режимах
+    /// (<see cref="AppUpdateMode.InstallOnStartup"/>, <see cref="AppUpdateMode.DownloadAskInstall"/>)
+    /// блок остаётся.
+    /// </param>
+    public UpdateAvailableWindow(
+        ReleaseInfo release, UpdateService service, bool showReleaseNotes = true)
     {
         InitializeComponent();
         _release = release;
@@ -48,13 +58,25 @@ public partial class UpdateAvailableWindow : Window
                 LocalizationManager.T("Common.VersionEffective")));
         NewVersionText.Text = string.Format(
             LocalizationManager.T("Update.NewVersion"), NormalizeTag(release.TagName));
-        WhatsNewLabel.Text = LocalizationManager.T("Update.WhatsNew");
-        // Текст «Что нового» рендерим как markdown со стилями (заголовки, жирный,
-        // списки и т.п.). При отсутствии описания показываем обычный текст-заглушку.
-        var body = string.IsNullOrWhiteSpace(release.Body)
-            ? LocalizationManager.T("Update.NoDescription")
-            : release.Body;
-        BodyViewer.Document = MarkdownRenderer.ToFlowDocument(body);
+
+        if (showReleaseNotes)
+        {
+            WhatsNewLabel.Text = LocalizationManager.T("Update.WhatsNew");
+            // Текст «Что нового» рендерим как markdown со стилями (заголовки, жирный,
+            // списки и т.п.). При отсутствии описания показываем обычный текст-заглушку.
+            var body = string.IsNullOrWhiteSpace(release.Body)
+                ? LocalizationManager.T("Update.NoDescription")
+                : release.Body;
+            BodyViewer.Document = MarkdownRenderer.ToFlowDocument(body);
+        }
+        else
+        {
+            // Issue #116: в ручных режимах блок «Что нового» не показываем вовсе —
+            // подпись и описание скрыты, пустого места не остаётся (SizeToContent
+            // пересчитает высоту окна по фактическому содержимому).
+            WhatsNewLabel.Visibility = Visibility.Collapsed;
+            BodyViewer.Visibility = Visibility.Collapsed;
+        }
 
         // На старте главного окна ещё нет, и первым MainWindow становится само это
         // окно: присваивание Owner самому себе бросает ArgumentException. Без

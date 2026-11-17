@@ -8,23 +8,77 @@ namespace Workspace1C.Services;
 /// Linux:   ~/.config/Workspace1C (XDG_CONFIG_HOME или ~/.config).
 /// Единая точка расчёта каталога данных и каталога логов, чтобы все сервисы
 /// (InfobaseRepository, FileAppLogger и др.) писали в одно место.
+/// <para>
+/// issue #136: если предпочтительный каталог недоступен для записи (например,
+/// программа установлена в <c>C:\Program Files</c>, а портативный каталог рядом
+/// с exe защищён от записи), однократно выбирается резервный каталог — см.
+/// <see cref="AppDataDirectory"/>, <see cref="IsFallbackActive"/> и
+/// <see cref="FallbackReason"/>. Это избавляет от <c>UnauthorizedAccessException</c>
+/// при каждом сохранении настроек интерфейса.
+/// </para>
 /// </summary>
 public static class PlatformPaths
 {
+    private static readonly object ResolutionLock = new();
+    private static bool _resolutionDone;
+    private static string? _resolvedDataDirectory;
+    private static bool _fallbackActive;
+    private static string? _fallbackReason;
+
     /// <summary>
     /// Каталог данных приложения (infobases.json, groups.json, settings.json).
     /// В портативном режиме (<see cref="PortablePaths.IsPortable"/>) возвращается каталог
     /// рядом с исполняемым файлом (<see cref="PortablePaths.PortableAppDataDirectory"/>),
     /// что позволяет переносить все настройки вместе со сменным носителем (функция №1
     /// StartManager, Этап 10). Иначе — системный каталог профиля.
+    /// <para>
+    /// issue #136: каталог определяется однократно и кэшируется. Если запись в него
+    /// невозможна, возвращается резервный каталог (Windows: <c>%LOCALAPPDATA%\Workspace1C</c>,
+    /// Linux: <c>$XDG_DATA_HOME</c>/<c>~/.local/share/Workspace1C</c>, последний резерв —
+    /// <c><temp>/Workspace1C</c>). Признак и причина перехода доступны через
+    /// <see cref="IsFallbackActive"/> и <see cref="FallbackReason"/>.
+    /// </para>
     /// </summary>
-    public static string AppDataDirectory =>
+    public static string AppDataDirectory => ResolveDataDirectoryCached();
+
+    /// <summary>
+    /// Каталог данных, который приложение предпочитает использовать: портативный
+    /// (рядом с exe) либо системный каталог профиля. Может оказаться недоступным
+    /// для записи — фактический каталог см. <see cref="AppDataDirectory"/> (issue #136).
+    /// </summary>
+    public static string PreferredDataDirectory =>
         PortablePaths.TryResolveDataDirectory() ?? DefaultAppDataDirectory;
+
+    /// <summary>
+    /// Признак того, что предпочтительный каталог данных недоступен для записи
+    /// и приложение использует резервный (issue #136).
+    /// </summary>
+    public static bool IsFallbackActive
+    {
+        get
+        {
+            _ = ResolveDataDirectoryCached();
+            return _fallbackActive;
+        }
+    }
+
+    /// <summary>
+    /// Причина перехода на резервный каталог данных; <c>null</c>, если fallback
+    /// не активен (issue #136).
+    /// </summary>
+    public static string? FallbackReason
+    {
+        get
+        {
+            _ = ResolveDataDirectoryCached();
+            return _fallbackReason;
+        }
+    }
 
     /// <summary>
     /// Системный каталог данных приложения по умолчанию (без учёта портативного режима).
     /// Windows: %APPDATA%\Workspace1C; Linux: ~/.config/Workspace1C.
-/// При первом обращении переносит данные из каталога прежней версии (ConfigurationManagement).
+    /// При первом обращении переносит данные из каталога прежней версии (ConfigurationManagement).
     /// </summary>
     public static string DefaultAppDataDirectory
     {
@@ -123,6 +177,182 @@ public static class PlatformPaths
             return Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 #endif
         }
+    }
+
+    /// <summary>
+    /// Результат выбора каталога данных (issue #136).
+    /// </summary>
+    internal readonly record struct DataDirectoryResolution(
+        string DirectoryPath, bool IsFallback, string? Reason);
+
+    /// <summary>
+    /// Однократное кэшированное определение фактического каталога данных (issue #136).
+    /// </summary>
+    private static string ResolveDataDirectoryCached()
+    {
+        if (_resolutionDone)
+            return _resolvedDataDirectory!;
+
+        lock (ResolutionLock)
+        {
+            if (_resolutionDone)
+                return _resolvedDataDirectory!;
+
+            var resolution = ResolveDataDirectory(PreferredDataDirectory, BuildFallbackDirectories());
+            _resolvedDataDirectory = resolution.DirectoryPath;
+            _fallbackActive = resolution.IsFallback;
+            _fallbackReason = resolution.Reason;
+            _resolutionDone = true;
+            return _resolvedDataDirectory;
+        }
+    }
+
+    /// <summary>
+    /// Выбирает первый каталог, в который реально можно писать: сначала
+    /// <paramref name="preferredDirectory"/>, затем <paramref name="fallbackDirectories"/>
+    /// по порядку (issue #136). Если ни один не доступен, возвращает предпочтительный
+    /// каталог с признаком fallback: дальнейшие ошибки записи обрабатываются вызывающим
+    /// кодом, чтобы интерфейс не показывал диалог на каждое действие пользователя.
+    /// </summary>
+    internal static DataDirectoryResolution ResolveDataDirectory(
+        string preferredDirectory,
+        IEnumerable<string> fallbackDirectories)
+    {
+        if (IsWritableDirectory(preferredDirectory, out var preferredError))
+            return new DataDirectoryResolution(preferredDirectory, false, null);
+
+        var reason = $"Каталог данных «{preferredDirectory}» недоступен для записи: {preferredError}";
+        var tried = new List<string> { preferredDirectory };
+
+        foreach (var candidate in fallbackDirectories)
+        {
+            if (string.IsNullOrWhiteSpace(candidate))
+                continue;
+            // Один и тот же каталог не проверяем дважды (регистр в путях Windows не значим).
+            if (tried.Any(t => string.Equals(t, candidate, StringComparison.OrdinalIgnoreCase)))
+                continue;
+            tried.Add(candidate);
+            if (IsWritableDirectory(candidate, out _))
+                return new DataDirectoryResolution(candidate, true, reason);
+        }
+
+        return new DataDirectoryResolution(preferredDirectory, true, reason);
+    }
+
+    /// <summary>
+    /// Резервные каталоги данных по убыванию приоритета (issue #136):
+    /// Windows — <c>%LOCALAPPDATA%\Workspace1C</c>;
+    /// Linux — <c>$XDG_DATA_HOME</c> или <c>~/.local/share/Workspace1C</c>;
+    /// последний резерв — <c><temp>/Workspace1C</c>.
+    /// </summary>
+    internal static IReadOnlyList<string> BuildFallbackDirectories()
+    {
+        var result = new List<string>();
+
+#if LINUX
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var dataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+        var localData = !string.IsNullOrWhiteSpace(dataHome)
+            ? dataHome
+            : string.IsNullOrEmpty(home)
+                ? null
+                : Path.Combine(home, ".local", "share");
+#else
+        var localData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+#endif
+        if (!string.IsNullOrWhiteSpace(localData))
+            result.Add(Path.Combine(localData!, AppFolderName));
+
+        try
+        {
+            result.Add(Path.Combine(Path.GetTempPath(), AppFolderName));
+        }
+        catch
+        {
+            // Temp недоступен — остаются только системные кандидаты.
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Проверяет, что в каталог можно писать: создаёт его, записывает и удаляет
+    /// пробный файл. Любая ошибка (нет прав, путь занят файлом, диск только для чтения)
+    /// означает «недоступен» (issue #136).
+    /// </summary>
+    internal static bool IsWritableDirectory(string? directory, out string? error)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            error = "каталог не задан";
+            return false;
+        }
+
+        string? probePath = null;
+        try
+        {
+            Directory.CreateDirectory(directory);
+            probePath = Path.Combine(directory, ".w1c-write-probe-" + Guid.NewGuid().ToString("N") + ".tmp");
+            File.WriteAllText(probePath, "probe");
+            File.Delete(probePath);
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+        finally
+        {
+            if (probePath is not null)
+            {
+                try
+                {
+                    if (File.Exists(probePath))
+                        File.Delete(probePath);
+                }
+                catch
+                {
+                    // Пробный файл — вспомогательный: не мешаем выбору каталога.
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Сбрасывает кэш выбора каталога данных (только для тестов, issue #136).
+    /// </summary>
+    internal static void ResetDataDirectoryCacheForTests()
+    {
+        lock (ResolutionLock)
+        {
+            _resolutionDone = false;
+            _resolvedDataDirectory = null;
+            _fallbackActive = false;
+            _fallbackReason = null;
+        }
+    }
+
+    /// <summary>
+    /// Заполняет кэш результатом явного выбора каталога (только для тестов, issue #136):
+    /// позволяет проверить <see cref="AppDataDirectory"/>, <see cref="LogDirectory"/>,
+    /// <see cref="IsFallbackActive"/> и <see cref="FallbackReason"/> без записи
+    /// в реальный <c>%APPDATA%</c>.
+    /// </summary>
+    internal static DataDirectoryResolution ResolveDataDirectoryForTests(
+        string preferredDirectory,
+        IEnumerable<string> fallbackDirectories)
+    {
+        var resolution = ResolveDataDirectory(preferredDirectory, fallbackDirectories);
+        lock (ResolutionLock)
+        {
+            _resolvedDataDirectory = resolution.DirectoryPath;
+            _fallbackActive = resolution.IsFallback;
+            _fallbackReason = resolution.Reason;
+            _resolutionDone = true;
+        }
+        return resolution;
     }
 
     /// <summary>

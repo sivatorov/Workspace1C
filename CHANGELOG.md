@@ -11,6 +11,51 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.78] — 2026-11-17
+
+### Исправлено
+
+- **Сохранение настроек при установке в «Program Files» (issue #136, leonvlas, 7OH).**
+  Если программа установлена в `C:\Program Files`, а портативный каталог рядом с exe
+  защищён от записи, `File.Replace` падал с `UnauthorizedAccessException` — и глобальный
+  обработчик показывал диалог «Ошибка интерфейса» на каждое сворачивание группы (и любое
+  другое действие, сохраняющее настройки). Теперь каталог данных выбирается один раз,
+  кэшируется и проверяется записью пробного файла:
+  [`AppDataDirectory`](Workspace1C/Services/PlatformPaths.cs:42) возвращает первый
+  доступный каталог — предпочтительный (портативный рядом с exe либо профиль), затем
+  `%LOCALAPPDATA%\Workspace1C` на Windows, `$XDG_DATA_HOME`/`~/.local/share/Workspace1C`
+  на Linux, последний резерв — `<temp>/Workspace1C`
+  ([`BuildFallbackDirectories`](Workspace1C/Services/PlatformPaths.cs:248),
+  [`IsWritableDirectory`](Workspace1C/Services/PlatformPaths.cs:283)); признак и причина
+  перехода доступны через [`IsFallbackActive`](Workspace1C/Services/PlatformPaths.cs:56)
+  и [`FallbackReason`](Workspace1C/Services/PlatformPaths.cs:69).
+  Атомарная запись получила резервный путь: если `File.Replace`/`File.Move` невозможны,
+  временный файл копируется поверх целевого, затем содержимое пишется напрямую —
+  [`WriteAtomic`](Workspace1C/Services/InfobaseRepository.cs:454) и
+  [`WriteAtomicAsync`](Workspace1C/Services/InfobaseRepository.cs:496).
+  [`SaveSettings`](Workspace1C/Services/InfobaseRepository.cs:318) и
+  [`SaveSettingsAsync`](Workspace1C/Services/InfobaseRepository.cs:356) больше не
+  пробрасывают ошибку записи: она однократно пишется в журнал, а изменения остаются
+  в памяти текущего сеанса. Тесты — `Issue136DataDirectoryFallbackTests` (17 тестов:
+  выбор каталога и порядок резервов, признак и причина fallback, резервная запись,
+  однократное журналирование, сохранение настроек без исключения).
+- **«Что нового» в ручных режимах обновления и в уведомлении (issue #116, 7OH).**
+  В диалоге обновления блок «Что нового» теперь скрыт в режимах «Проверять вручную»
+  и «Только уведомлять»: подпись и описание не показываются вовсе, окно ужимается по
+  высоте; в остальных режимах («Устанавливать при запуске» и «Загружать с предложением
+  установки») блок остаётся. Решение принимает
+  [`AppUpdateModeHelper.ShouldShowReleaseNotes`](Workspace1C/Models/AppUpdateMode.cs:102),
+  WPF передаёт его в
+  [`UpdateAvailableWindow`](Workspace1C/Services/UpdateAvailableWindow.xaml.cs:42),
+  Avalonia — в описание релиза диалога
+  ([`ReleaseNotesForDialog`](Workspace1C/Services/UpdateService.Avalonia.cs:2183)).
+  Из системного уведомления «Доступна новая версия» убран обрезанный блок
+  «Что нового:» — остались заголовок и ссылка на страницу релиза
+  ([`BuildUpdateAvailableMessage`](Workspace1C/Services/UpdateService.cs:654)).
+  Кнопки диалога и «Пропустить эту версию» не менялись. Тесты —
+  `Issue116UpdateNotesHiddenTests` (15 тестов: скрытие и показ блока по режимам,
+  состав текста уведомления, неизменность кнопок и «Пропустить эту версию»).
+
 ## [1.0.1.77] — 2026-11-16
 
 ### Изменено

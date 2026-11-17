@@ -602,12 +602,16 @@ public sealed class UpdateService : IAppUpdateService
     /// отображает прогресс и по завершении спрашивает, как применить обновление
     /// («Перезапустить сейчас» или «Обновить после закрытия») — без системного
     /// MessageBox. Все ошибки обрабатываются внутри окна/метода.
+    /// <para>Issue #116: в ручных режимах (<see cref="AppUpdateMode.Manual"/>,
+    /// <see cref="AppUpdateMode.NotifyOnly"/>) блок «Что нового» в диалоге скрывается —
+    /// пользователь сам запросил обновление и уже знает, что ищет.</para>
     /// </summary>
     private void ShowUpdateDialog(ReleaseInfo release)
     {
         try
         {
-            var window = new UpdateAvailableWindow(release, this);
+            var window = new UpdateAvailableWindow(
+                release, this, AppUpdateModeHelper.ShouldShowReleaseNotes(Mode));
             window.ShowDialog();
         }
         catch
@@ -617,10 +621,10 @@ public sealed class UpdateService : IAppUpdateService
     }
 
     /// <summary>
-    /// Системное уведомление «Доступна новая версия X.Y.Z» с описанием изменений
-    /// (функция №4; issue #44): к тексту добавляется «Что нового:» из описания
-    /// выпуска (release.Body) и ссылка на страницу релиза — как список изменений
-    /// в главном окне. Вызывается из фоновой проверки при молчаливом автообновлении;
+    /// Системное уведомление «Доступна новая версия X.Y.Z» (функция №4; issue #44).
+    /// Issue #116: описание выпуска в уведомление больше НЕ добавляется — обрезанный
+    /// список изменений не давал полной картины; остаются заголовок и ссылка на
+    /// страницу релиза. Вызывается из фоновой проверки при молчаливом автообновлении;
     /// ошибки уведомления не влияют на обновление.
     /// </summary>
     private void NotifyUpdateAvailable(ReleaseInfo release)
@@ -640,37 +644,21 @@ public sealed class UpdateService : IAppUpdateService
     }
 
     /// <summary>
-    /// Текст уведомления о доступной новой версии (issue #44): заголовок «Доступна
-    /// новая версия X», затем «Что нового:» с описанием выпуска (до
-    /// <see cref="MaxUpdateNotesLength"/> символов) и ссылкой на страницу релиза.
-    /// Пустое/недоступное описание не ломает уведомление — остаётся заголовок.
+    /// Текст уведомления о доступной новой версии (issue #44; issue #116): заголовок
+    /// «Доступна новая версия X» и ссылка на страницу релиза. Описание выпуска
+    /// (release.Body) в уведомление НЕ добавляется: обрезанный «Что нового» не содержит
+    /// полного списка изменений и только занимает место — полный список доступен по
+    /// ссылке на релиз. Метод internal — чтобы сборка тестов проверяла состав текста
+    /// без запуска уведомления.
     /// </summary>
-    private static string BuildUpdateAvailableMessage(ReleaseInfo release)
+    internal static string BuildUpdateAvailableMessage(ReleaseInfo release)
     {
-        var header = string.Format(LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
-        var notes = TruncateReleaseNotes(release.Body);
-        var message = string.IsNullOrWhiteSpace(notes)
-            ? header
-            : header + Environment.NewLine + Environment.NewLine +
-              LocalizationManager.T("Notify.ReleaseNotes") + Environment.NewLine + notes;
-
+        var message = string.Format(
+            LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
         if (!string.IsNullOrWhiteSpace(release.HtmlUrl))
             message += Environment.NewLine + release.HtmlUrl;
 
         return message;
-    }
-
-    /// <summary>Максимальная длина описания изменений в уведомлении (символов).</summary>
-    private const int MaxUpdateNotesLength = 2000;
-
-    private static string TruncateReleaseNotes(string? body)
-    {
-        if (string.IsNullOrWhiteSpace(body))
-            return string.Empty;
-        var text = body.Trim();
-        return text.Length <= MaxUpdateNotesLength
-            ? text
-            : text[..MaxUpdateNotesLength].TrimEnd() + "…";
     }
 
     /// <summary>

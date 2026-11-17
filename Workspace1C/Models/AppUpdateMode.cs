@@ -88,4 +88,17 @@ public static class AppUpdateModeHelper
     /// </summary>
     public static (bool CheckForUpdatesOnStartup, bool AutoUpdateEnabled) ToLegacyFlags(AppUpdateMode mode)
         => (mode != AppUpdateMode.Manual, mode == AppUpdateMode.InstallOnStartup);
+
+    /// <summary>
+    /// Показывать ли описание релиза («Что нового») в диалоге обновления (issue #116).
+    /// В ручных режимах <see cref="AppUpdateMode.Manual"/> и <see cref="AppUpdateMode.NotifyOnly"/>
+    /// пользователь сам инициировал проверку и уже знает, что ищет обновление, — блок
+    /// описания в диалоге лишний и скрывается. В автоматических режимах
+    /// <see cref="AppUpdateMode.InstallOnStartup"/> и <see cref="AppUpdateMode.DownloadAskInstall"/>
+    /// описание остаётся: пользователь узнаёт об обновлении неожиданно.
+    /// <para>Единая точка решения для обеих оболочек (WPF и Avalonia), чтобы поведение
+    /// не расходилось и покрывалось тестами.</para>
+    /// </summary>
+    internal static bool ShouldShowReleaseNotes(AppUpdateMode mode)
+        => mode is not (AppUpdateMode.Manual or AppUpdateMode.NotifyOnly);
 }

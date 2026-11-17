@@ -308,6 +308,12 @@ public class InfobaseRepository : IInfobaseRepository
 
     /// <summary>
     /// Сохраняет настройки интерфейса в файл.
+    /// <para>
+    /// issue #136: ошибки записи (в том числе <c>UnauthorizedAccessException</c> при
+    /// установке в <c>C:\Program Files</c>) не пробрасываются наружу — иначе глобальный
+    /// обработчик показывал бы диалог «Ошибка интерфейса» на каждое сворачивание группы.
+    /// Ошибка однократно пишется в журнал; изменения остаются в памяти текущего сеанса.
+    /// </para>
     /// </summary>
     public void SaveSettings(AppSettings settings)
     {
@@ -315,7 +321,17 @@ public class InfobaseRepository : IInfobaseRepository
         Console.Error.WriteLine("[l10n-debug] SaveSettings: Language=" + settings.Language + ", file=" + SettingsPath);
 #endif
         settings.SchemaVersion = ConfigSchemaVersion;
-        WriteAtomic(SettingsPath, JsonSerializer.Serialize(settings, SettingsJsonOptions));
+        // Сериализация — ошибка данных, а не прав доступа: её не скрываем.
+        var json = JsonSerializer.Serialize(settings, SettingsJsonOptions);
+        try
+        {
+            WriteAtomic(SettingsPath, json);
+        }
+        catch (Exception ex)
+        {
+            // issue #136: сохранение настроек — вспомогательная операция для интерфейса.
+            LogSettingsSaveFailureOnce(ex);
+        }
     }
 
 
@@ -333,11 +349,27 @@ public class InfobaseRepository : IInfobaseRepository
         await WriteAtomicAsync(GroupsPath, json, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Асинхронно сохраняет настройки интерфейса. Ошибки записи, как и в
+    /// <see cref="SaveSettings"/>, не пробрасываются наружу (issue #136).
+    /// </summary>
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         settings.SchemaVersion = ConfigSchemaVersion;
         var json = JsonSerializer.Serialize(settings, SettingsJsonOptions);
-        await WriteAtomicAsync(SettingsPath, json, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await WriteAtomicAsync(SettingsPath, json, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw; // Отмена — не ошибка записи, её обрабатывает вызывающий код.
+        }
+        catch (Exception ex)
+        {
+            // issue #136: интерфейс не должен получать исключение на каждое действие.
+            LogSettingsSaveFailureOnce(ex);
+        }
     }
 
     /// <summary>
@@ -366,8 +398,58 @@ public class InfobaseRepository : IInfobaseRepository
     }
 
     /// <summary>
+    /// Тестовый переключатель: заставляет <see cref="WriteAtomic"/> и
+    /// <see cref="WriteAtomicAsync"/> сразу использовать резервную запись,
+    /// как будто <see cref="File.Replace"/>/<see cref="File.Move"/> не удались
+    /// (issue #136). В обычной работе всегда <c>false</c>.
+    /// </summary>
+    internal static bool ForceFallbackWriteForTests { get; set; }
+
+    /// <summary>
+    /// Флаг «об ошибке сохранения настроек уже сообщили»: при недоступном каталоге
+    /// данных не засоряем журнал одной и той же записью на каждое действие (issue #136).
+    /// </summary>
+    private static int _settingsSaveFailureLogged;
+
+    /// <summary>
+    /// Однократно сообщает об ошибке сохранения настроек интерфейса: в журнал приложения,
+    /// а если журнал ещё не настроен — в отладочный вывод (issue #136). Не бросает.
+    /// </summary>
+    private static void LogSettingsSaveFailureOnce(Exception exception)
+    {
+        if (Interlocked.Exchange(ref _settingsSaveFailureLogged, 1) != 0)
+            return;
+
+        try
+        {
+            var logger = AppServices.TryGetService<IAppLogger>();
+            if (logger is not null)
+            {
+                logger.Error(
+                    "Не удалось сохранить настройки интерфейса: запись в каталог данных не выполнена. " +
+                    "Изменения текущего сеанса остаются в памяти, диалог не показывается (issue #136).",
+                    exception);
+                return;
+            }
+        }
+        catch
+        {
+            // Журнал недоступен — ниже используем отладочный вывод.
+        }
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Не удалось сохранить настройки интерфейса (issue #136): {exception}");
+    }
+
+    /// <summary>
     /// Атомарная запись: сначала во временный файл, затем замена целевого.
     /// Снижает риск повреждения данных при сбое/отключении питания.
+    /// <para>
+    /// issue #136: если замена невозможна из-за прав доступа (например, каталог
+    /// данных защищён от записи), выполняется резервная запись — копирование
+    /// временного файла поверх целевого, затем прямая запись содержимого.
+    /// Исключение пробрасывается только если не удались все способы.
+    /// </para>
     /// </summary>
     private static void WriteAtomic(string targetPath, string content)
     {
@@ -376,16 +458,40 @@ public class InfobaseRepository : IInfobaseRepository
             Directory.CreateDirectory(directory);
 
         var tempPath = targetPath + ".tmp";
-        File.WriteAllText(tempPath, content);
-        // File.Replace надёжнее на Windows при существующем файле; иначе Move.
-        if (File.Exists(targetPath))
-            File.Replace(tempPath, targetPath, null);
-        else
-            File.Move(tempPath, targetPath);
+        try
+        {
+            File.WriteAllText(tempPath, content);
+
+            if (!ForceFallbackWriteForTests)
+            {
+                try
+                {
+                    // File.Replace надёжнее на Windows при существующем файле; иначе Move.
+                    if (File.Exists(targetPath))
+                        File.Replace(tempPath, targetPath, null);
+                    else
+                        File.Move(tempPath, targetPath);
+                    return;
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                {
+                    // issue #136: переходим к резервной записи ниже.
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Атомарная запись «{targetPath}» не удалась ({ex.GetType().Name}): {ex.Message}. " +
+                        "Используется резервная запись.");
+                }
+            }
+
+            WriteFallback(tempPath, targetPath, content);
+        }
+        finally
+        {
+            TryDeleteTempFile(tempPath);
+        }
     }
 
     /// <summary>
-    /// Асинхронная атомарная запись через временный файл.
+    /// Асинхронная атомарная запись через временный файл (issue #136 — с резервной записью).
     /// </summary>
     private static async Task WriteAtomicAsync(string targetPath, string content, CancellationToken cancellationToken)
     {
@@ -394,10 +500,112 @@ public class InfobaseRepository : IInfobaseRepository
             Directory.CreateDirectory(directory);
 
         var tempPath = targetPath + ".tmp";
-        await File.WriteAllTextAsync(tempPath, content, cancellationToken).ConfigureAwait(false);
-        if (File.Exists(targetPath))
-            File.Replace(tempPath, targetPath, null);
-        else
-            File.Move(tempPath, targetPath);
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, content, cancellationToken).ConfigureAwait(false);
+
+            if (!ForceFallbackWriteForTests)
+            {
+                try
+                {
+                    if (File.Exists(targetPath))
+                        File.Replace(tempPath, targetPath, null);
+                    else
+                        File.Move(tempPath, targetPath);
+                    return;
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"Атомарная запись «{targetPath}» не удалась ({ex.GetType().Name}): {ex.Message}. " +
+                        "Используется резервная запись.");
+                }
+            }
+
+            await WriteFallbackAsync(tempPath, targetPath, content, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            TryDeleteTempFile(tempPath);
+        }
+    }
+
+    /// <summary>
+    /// Резервная запись при недоступности <see cref="File.Replace"/>/<see cref="File.Move"/>
+    /// (issue #136): копирование временного файла поверх целевого, затем прямая запись
+    /// содержимого. Исключение — только если не удались оба способа.
+    /// </summary>
+    private static void WriteFallback(string tempPath, string targetPath, string content)
+    {
+        try
+        {
+            File.Copy(tempPath, targetPath, overwrite: true);
+            return;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Копирование «{tempPath}» → «{targetPath}» не удалось ({ex.GetType().Name}): {ex.Message}. " +
+                "Используется прямая запись.");
+        }
+
+        try
+        {
+            File.WriteAllText(targetPath, content);
+        }
+        catch (Exception ex)
+        {
+            throw new IOException(
+                $"Не удалось сохранить файл «{targetPath}»: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Асинхронный вариант резервной записи (issue #136).
+    /// </summary>
+    private static async Task WriteFallbackAsync(
+        string tempPath, string targetPath, string content, CancellationToken cancellationToken)
+    {
+        try
+        {
+            File.Copy(tempPath, targetPath, overwrite: true);
+            return;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"Копирование «{tempPath}» → «{targetPath}» не удалось ({ex.GetType().Name}): {ex.Message}. " +
+                "Используется прямая запись.");
+        }
+
+        try
+        {
+            await File.WriteAllTextAsync(targetPath, content, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            throw new IOException(
+                $"Не удалось сохранить файл «{targetPath}»: {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Удаляет временный файл после записи; ошибки игнорируются (issue #136).
+    /// </summary>
+    private static void TryDeleteTempFile(string tempPath)
+    {
+        try
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+        }
+        catch
+        {
+            // Временный файл не должен мешать сохранению данных.
+        }
     }
 }
