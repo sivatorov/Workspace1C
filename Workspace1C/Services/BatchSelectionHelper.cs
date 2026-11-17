@@ -216,6 +216,42 @@ public static class BatchSelectionHelper
     public static int EffectiveBatchCount(int batchMarkedCount, bool hasSingleSelected) =>
         batchMarkedCount > 0 ? batchMarkedCount : hasSingleSelected ? 1 : 0;
 
+    /// <summary>
+    /// Целевые базы пакетной операции с учётом выбранной группы (issue #137): при
+    /// мультивыделении (Ctrl/Shift) — выделенные базы; при выбранном узле группы —
+    /// все базы группы, включая вложенные; при узле «Без группы» — базы без группы
+    /// (issue #113); иначе — одиночная выделенная база. Чистая функция без
+    /// платформенных зависимостей: используется обеими оболочками и юнит-тестами
+    /// (раньше блок «Для группы (N)…» молча ничего не делал, потому что цели
+    /// считались только по мультивыделению).
+    /// </summary>
+    /// <param name="batchMarkedCount">Размер набора мультивыделения (Ctrl/Shift).</param>
+    /// <param name="batchSelectedBases">Базы мультивыделения в порядке списка.</param>
+    /// <param name="hasGroupTarget">Выбран узел реальной группы (не «Без группы»).</param>
+    /// <param name="groupBases">Базы выбранной группы, включая вложенные.</param>
+    /// <param name="hasNoGroupTarget">Выбран служебный узел «Без группы».</param>
+    /// <param name="noGroupBases">Базы без группы.</param>
+    /// <param name="singleSelected">Одиночная выделенная база без Ctrl (может быть null).</param>
+    public static IReadOnlyList<Infobase> ResolveBatchTargets(
+        int batchMarkedCount,
+        IReadOnlyList<Infobase>? batchSelectedBases,
+        bool hasGroupTarget,
+        IReadOnlyList<Infobase>? groupBases,
+        bool hasNoGroupTarget,
+        IReadOnlyList<Infobase>? noGroupBases,
+        Infobase? singleSelected)
+    {
+        if (batchMarkedCount > 0)
+            return batchSelectedBases ?? Array.Empty<Infobase>();
+        if (hasGroupTarget)
+            return groupBases ?? Array.Empty<Infobase>();
+        if (hasNoGroupTarget)
+            return noGroupBases ?? Array.Empty<Infobase>();
+        return singleSelected is null
+            ? Array.Empty<Infobase>()
+            : new[] { singleSelected };
+    }
+
 
     /// <summary>
     /// Снимок клика, которым закрыли контекстное меню дерева (issue #340, новый подход):

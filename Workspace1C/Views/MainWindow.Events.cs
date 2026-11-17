@@ -1305,10 +1305,13 @@ namespace Workspace1C
 
         // ======================= Пакетные операции (0.3.9.90) =======================
 
-        /// <summary>Назначить теги всем базам мультивыделения (issue #315).</summary>
+        /// <summary>
+        /// Назначить теги всем целевым базам — мультивыделению либо выбранной группе
+        /// (issue #315; группа — issue #137: guard раньше считал только мультивыделение).
+        /// </summary>
         private void OnBatchAssignTag_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var dlg = new TagPickWindow(_viewModel.AvailableTags)
             {
@@ -1322,10 +1325,13 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
-        /// <summary>Переместить все базы мультивыделения в выбранную группу.</summary>
+        /// <summary>
+        /// Переместить целевые базы (мультивыделение либо выбранную группу) в другую
+        /// группу (issue #137: для группы пункт молча ничего не делал).
+        /// </summary>
         private void OnBatchMoveToGroup_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var picker = new GroupPickerWindow(
                 _viewModel.Groups,
@@ -1339,10 +1345,13 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
-        /// <summary>Добавить все базы мультивыделения в избранное.</summary>
+        /// <summary>
+        /// Добавить целевые базы (мультивыделение либо группу) в избранное
+        /// (issue #137: для группы пункт молча ничего не делал).
+        /// </summary>
         private void OnBatchAddFavorites_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _viewModel.AddBatchToFavorites();
             _viewModel.ClearBatchSelection();
@@ -1379,7 +1388,7 @@ namespace Workspace1C
             // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             try
             {
-                if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+                if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                     return;
                 await _viewModel.RunBatchBackupAsync();
                 _viewModel.ClearBatchSelection();
@@ -1440,19 +1449,22 @@ namespace Workspace1C
             _viewModel.ClearBatchSelection();
         }
 
-        /// <summary>Проверить доступность баз мультивыделения.</summary>
+        /// <summary>Проверить доступность целевых баз — мультивыделения либо группы.</summary>
         private void OnBatchCheckAvailability_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _viewModel.CheckBatchAvailability();
             _viewModel.ClearBatchSelection();
         }
 
-        /// <summary>Удалить все базы мультивыделения (общее окно подтверждения по каждой).</summary>
+        /// <summary>
+        /// Удалить целевые базы — мультивыделение либо группу (по каждой базе отдельное
+        /// окно подтверждения с её именем).
+        /// </summary>
         private void OnBatchDelete_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _viewModel.DeleteBatch();
             _viewModel.ClearBatchSelection();
@@ -1465,7 +1477,7 @@ namespace Workspace1C
         /// </summary>
         private void OnBatchConnectionReplace_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var candidates = _viewModel.GetConnectionReplaceCandidates(ConnectionReplaceScope.BatchSelected);
             if (candidates.Count == 0)
@@ -1510,7 +1522,7 @@ namespace Workspace1C
         /// </summary>
         private void OnBatchChangePlatform_Click(object sender, RoutedEventArgs e)
         {
-            if (_viewModel is null || _viewModel.BatchOperationTargetCount == 0)
+            if (_viewModel is null || _viewModel.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var candidates = _viewModel.GetConnectionReplaceCandidates(ConnectionReplaceScope.BatchSelected);
             if (candidates.Count == 0)

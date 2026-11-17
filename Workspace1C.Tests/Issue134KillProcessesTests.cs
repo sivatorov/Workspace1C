@@ -667,6 +667,121 @@ public sealed class Issue134KillProcessesTests
         Assert.Equal(new[] { 2, 1 }, items.Select(item => item.Process.Pid));
     }
 
+    // ============ Карта «PID → имя базы» для пункта «Утилиты» (v1.0.1.79) ============
+
+    [Fact]
+    public void BuildBaseNamesByPid_MapsOnlyMatchedProcesses()
+    {
+        // issue #134 (v1.0.1.79): пункт «Утилиты → Завершить процессы 1С» завершает
+        // все процессы, поэтому карта строится по всему списку баз приложения.
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\""),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\""),
+            // Процесс вне списка баз (серверный или чужая база) — без имени базы.
+            Process(pid: 3, processName: "rphost.exe", commandLine: "")
+        };
+
+        var map = KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            new[] { bgu, zkgu }, processes, Translate);
+
+        Assert.Equal(2, map.Count);
+        Assert.Equal("bgu", map[1]);
+        Assert.Equal("zkgu", map[2]);
+        Assert.False(map.ContainsKey(3));
+    }
+
+    [Fact]
+    public void BuildBaseNamesByPid_SameRulesAsMenuPlan()
+    {
+        // Карта и план подменю строятся одним шагом — правила совпадают:
+        // порядок баз, отбор матчером, PID только у первой найденной базы.
+        var bgu = FileBase("bgu", @"C:\Bases\BGU");
+        var zkgu = FileBase("zkgu", @"C:\Bases\ZKGU");
+        var processes = new[]
+        {
+            Process(pid: 3, processName: "1cv8.exe", commandLine: "DESIGNER /F\"C:\\Bases\\ZKGU\""),
+            Process(pid: 2, commandLine: "ENTERPRISE /F\"C:\\Bases\\ZKGU\""),
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\BGU\""),
+            Process(pid: 4, commandLine: "")
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { zkgu, bgu }, processes, Translate);
+        var map = KillProcessesMenuPlanner.BuildBaseNamesByPid(new[] { zkgu, bgu }, processes, Translate);
+
+        Assert.NotNull(plan.BaseNamesByPid);
+        Assert.Equal(
+            plan.BaseNamesByPid!.OrderBy(pair => pair.Key),
+            map.OrderBy(pair => pair.Key));
+    }
+
+    [Fact]
+    public void BuildBaseNamesByPid_UnnamedBase_UsesLocalizedPlaceholder()
+    {
+        var unnamed = new Infobase
+        {
+            Id = "unnamed",
+            Name = "   ",
+            Connection = new ConnectionSettings { Type = ConnectionType.File, FilePath = @"C:\Bases\Alpha" }
+        };
+
+        var map = KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            new[] { unnamed },
+            new[] { Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\"") },
+            Translate);
+
+        Assert.Equal("база без имени", map[1]);
+    }
+
+    [Fact]
+    public void BuildBaseNamesByPid_NoBasesOrProcesses_IsEmpty()
+    {
+        var file = FileBase("file", @"C:\Bases\Alpha");
+
+        Assert.Empty(KillProcessesMenuPlanner.BuildBaseNamesByPid(null, new[] { Process() }, Translate));
+        Assert.Empty(KillProcessesMenuPlanner.BuildBaseNamesByPid(new[] { file }, null, Translate));
+        Assert.Empty(KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            new[] { file }, Array.Empty<RunningOneCProcessDetails>(), Translate));
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_UtilityPath_WithHelperMap_ListsBases()
+    {
+        // Сводка пункта «Утилиты → Завершить процессы 1С»: карта из хелпера,
+        // базы перечислены, ошибки — отдельной строкой (issue #134, v1.0.1.79).
+        var alpha = FileBase("alpha", @"C:\Bases\Alpha");
+        var beta = FileBase("beta", @"C:\Bases\Beta");
+        var processes = new[]
+        {
+            Process(pid: 10, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 11, commandLine: "ENTERPRISE /F\"C:\\Bases\\Beta\""),
+            Process(pid: 12, processName: "rphost.exe", commandLine: "")
+        };
+
+        var map = KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            new[] { alpha, beta }, processes, Translate);
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, new[] { 11 }, Translate, map);
+
+        Assert.Contains("Завершено: 2, ошибок: 1", summary, StringComparison.Ordinal);
+        Assert.Contains("Базы: alpha, beta", summary, StringComparison.Ordinal);
+        Assert.Contains("Не удалось завершить процессы баз: beta", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_UtilityPath_WithoutMap_KeepsCountersOnly()
+    {
+        // Снимка нет (WMI недоступен) — карты нет: прежний текст со счётчиками.
+        var processes = new[] { Process(pid: 1), Process(pid: 2) };
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, new[] { 2 }, Translate, baseNamesByPid: null);
+
+        Assert.Equal("Завершено: 1, ошибок: 1", summary);
+    }
+
     // ===================== Локализация =====================
 
     [Theory]
@@ -878,6 +993,50 @@ public sealed class Issue134KillProcessesTests
         }
     }
 
+    // ====== Source-гварды: пункт «Утилиты → Завершить процессы 1С» (v1.0.1.79) ======
+
+    [Fact]
+    public void Wpf_UtilityKillProcesses_ReportsBasesAndFailedPids()
+    {
+        // issue #134: автор не подтвердил исправление 1.0.1.78 — пункт «Утилиты»
+        // показывал только счётчик. Теперь сводка строится общим слоем.
+        var source = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Tools.cs"));
+        var method = ExtractMethod(source, "private void KillOneCProcesses(object? parameter)");
+
+        // Снимок с командными строками, карта «PID → имя базы», сводка общего слоя.
+        Assert.Contains("GetRunningDetails()", method, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.BuildBaseNamesByPid(", method, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.FormatKillAllSummary(", method, StringComparison.Ordinal);
+        // Ошибки завершения определяются повторным опросом процессов.
+        Assert.Contains("FindAliveOneCProcessIds(", method, StringComparison.Ordinal);
+
+        // Сообщение собирает общий слой: прежний текст со счётчиком остался только
+        // запасным вариантом, когда снимка процессов получить не удалось.
+        var summaryIndex = method.IndexOf(
+            "KillProcessesMenuPlanner.FormatKillAllSummary(", StringComparison.Ordinal);
+        var legacyIndex = method.IndexOf("Main.ProcessesKilled", StringComparison.Ordinal);
+        Assert.True(summaryIndex >= 0, "Сводка общего слоя не используется.");
+        Assert.True(legacyIndex > summaryIndex,
+            "Сообщение только из Main.ProcessesKilled осталось основным путём.");
+    }
+
+    [Fact]
+    public void Avalonia_UtilityKillProcesses_ReportsBasesAndFailedPids()
+    {
+        var source = ReadProjectFile(
+            Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Avalonia.Tools.cs"));
+        var method = ExtractMethod(source, "public void KillOneCProcesses()");
+
+        Assert.Contains("GetRunningDetails()", method, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.BuildBaseNamesByPid(", method, StringComparison.Ordinal);
+        Assert.Contains("KillProcessesMenuPlanner.FormatKillAllSummary(", method, StringComparison.Ordinal);
+        Assert.Contains("FindStillRunningPids(", method, StringComparison.Ordinal);
+
+        // Прежнего сообщения «только счётчик» в этом пункте больше нет.
+        Assert.DoesNotContain("Main.ProcessesKilled", method, StringComparison.Ordinal);
+        Assert.DoesNotContain("Main.ProcessesKillFailed", method, StringComparison.Ordinal);
+    }
+
     // ===================== Вспомогательное =====================
 
     /// <summary>Мини-словарь русских значений новых ключей (без инициализации LocalizationManager).</summary>
@@ -902,6 +1061,37 @@ public sealed class Issue134KillProcessesTests
 
     private static string Translate(string key) =>
         RuStrings.TryGetValue(key, out var value) ? value : key;
+
+    /// <summary>
+    /// Тело метода из исходника: от подписи до закрывающей скобки метода. Нужен
+    /// source-гвардам, чтобы проверять конкретный метод, а не весь файл.
+    /// </summary>
+    private static string ExtractMethod(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Метод не найден: {signature}");
+
+        var open = source.IndexOf('{', start);
+        Assert.True(open > start, $"Не найдено тело метода: {signature}");
+
+        var depth = 0;
+        for (var i = open; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    return source[start..(i + 1)];
+            }
+        }
+
+        Assert.Fail($"Не закрыто тело метода: {signature}");
+        return string.Empty;
+    }
 
     private static string ReadProjectFile(string relativePath)
     {

@@ -23,12 +23,15 @@ public partial class MainViewModel
         LocalizationManager.T("Main.BatchForSelected"),
         BatchOperationTargetCount);
 
-    /// <summary>Назначает введённый тег всем базам мультивыделения.</summary>
+    /// <summary>
+    /// Назначает введённый тег всем целевым базам — мультивыделению либо группе
+    /// (issue #137: блок «Для группы (N)…» раньше молча ничего не делал).
+    /// </summary>
     public void AssignTagToBatch(string? tag)
     {
         if (string.IsNullOrWhiteSpace(tag))
             return;
-        var bases = BatchOperationTargets.ToList();
+        var bases = BatchOperationTargetsIncludingGroup.ToList();
         if (bases.Count == 0)
             return;
 
@@ -60,7 +63,7 @@ public partial class MainViewModel
             .ToList();
         if (list is null || list.Count == 0)
             return;
-        var bases = BatchOperationTargets.ToList();
+        var bases = BatchOperationTargetsIncludingGroup.ToList();
         if (bases.Count == 0)
             return;
 
@@ -83,10 +86,13 @@ public partial class MainViewModel
         RefreshTagFilterItems();
     }
 
-    /// <summary>Добавляет все базы мультивыделения в избранное (без снятия).</summary>
+    /// <summary>
+    /// Добавляет целевые базы (мультивыделение либо группу) в избранное без снятия
+    /// (issue #137: для выбранной группы пункт раньше не срабатывал).
+    /// </summary>
     public void AddBatchToFavorites()
     {
-        foreach (var ib in BatchOperationTargets.ToList())
+        foreach (var ib in BatchOperationTargetsIncludingGroup.ToList())
         {
             if (ib.IsFavorite)
                 continue;
@@ -109,10 +115,13 @@ public partial class MainViewModel
         ScheduleSave();
     }
 
-    /// <summary>Перемещает все базы мультивыделения в выбранную группу.</summary>
+    /// <summary>
+    /// Перемещает целевые базы (мультивыделение либо выбранную группу) в указанную
+    /// группу (issue #137: для группы пункт «Переместить в группу» не срабатывал).
+    /// </summary>
     public void MoveBatchToGroup(string groupFullPath)
     {
-        foreach (var ib in BatchOperationTargets.ToList())
+        foreach (var ib in BatchOperationTargetsIncludingGroup.ToList())
             MoveInfobaseToGroup(ib, groupFullPath);
     }
 
@@ -123,7 +132,7 @@ public partial class MainViewModel
     /// </summary>
     public async Task RunBatchBackupAsync()
     {
-        var bases = BatchOperationTargets.ToList();
+        var bases = BatchOperationTargetsIncludingGroup.ToList();
         if (bases.Count == 0)
             return;
 
@@ -149,13 +158,16 @@ public partial class MainViewModel
         win.ShowDialog();
     }
 
-    /// <summary>Проверяет доступность только баз мультивыделения.</summary>
+    /// <summary>
+    /// Проверяет доступность целевых баз — мультивыделения либо выбранной группы
+    /// (issue #137: блок «Для группы (N)…» должен работать целиком).
+    /// </summary>
     public void CheckBatchAvailability()
     {
         if (_availabilityCheckRunning)
             return;
 
-        var targets = BatchOperationTargets.ToList();
+        var targets = BatchOperationTargetsIncludingGroup.ToList();
         if (targets.Count == 0)
         {
             _dialogs.ShowInfo(LocalizationManager.T("Main.ConfigListEmpty"),
@@ -174,13 +186,14 @@ public partial class MainViewModel
     }
 
     /// <summary>
-    /// Удаляет все базы мультивыделения: для каждой открывается общее окно
-    /// подтверждения (<see cref="Workspace1C.DeleteInfobaseWindow"/>).
-    /// Физическое удаление каталога — по флагу окна.
+    /// Удаляет целевые базы (мультивыделение либо выбранную группу): для каждой
+    /// открывается отдельное окно подтверждения с именем базы
+    /// (<see cref="Workspace1C.DeleteInfobaseWindow"/>). Физическое удаление
+    /// каталога — по флагу окна. Issue #137: для группы пункт раньше не срабатывал.
     /// </summary>
     public void DeleteBatch()
     {
-        var bases = BatchOperationTargets.ToList();
+        var bases = BatchOperationTargetsIncludingGroup.ToList();
         if (bases.Count == 0)
             return;
 

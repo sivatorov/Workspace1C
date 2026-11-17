@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.78-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.79-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.78**
-(поддерживается **7109 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.79**
+(поддерживается **7127 юнит-тестов**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,16 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Пункты подменю «Для группы» контекстного меню (1.0.1.79, Windows и Linux)** —
+  «Назначить тег», «Переместить в группу», «Добавить в Избранное», «Сменить платформу»,
+  а также резервирование, проверка доступности, удаление и замена строк подключения
+  теперь применяются ко всем базам выбранной группы, включая вложенные, а не только
+  к мультивыделению (issue #137, ArtyoZ). Подробности — в [CHANGELOG.md](CHANGELOG.md).
+- **Сводка «Завершить процессы 1С» с названиями баз (1.0.1.79, Windows и Linux)** —
+  пункт «Утилиты → Операции → Завершить процессы 1С» теперь, как и контекстное меню,
+  перечисляет затронутые базы, а при сбоях отдельно — базы, процессы которых завершить
+  не удалось; раньше здесь показывался только счётчик (issue #134, ArtyoZ).
+  Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Сохранение настроек при установке в «Program Files» (1.0.1.78, Windows и Linux)** —
   если предпочтительный каталог данных недоступен для записи, программа однократно
   выбирает резервный (`%LOCALAPPDATA%\Workspace1C` на Windows,

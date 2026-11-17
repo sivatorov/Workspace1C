@@ -1521,9 +1521,20 @@ public partial class MainViewModel : ViewModelBase
             LocalizationManager.T("Main.RemoveMissingTitle"));
     }
 
-    /// <summary>Завершает процессы 1cv8 / 1cv8c и связанные.</summary>
+    /// <summary>
+    /// Завершает процессы 1cv8 / 1cv8c и связанные.
+    /// issue #134 (v1.0.1.79): сводка перечисляет базы, к которым относились
+    /// процессы, — раньше пункт «Утилиты → Операции → Завершить процессы 1С»
+    /// показывал только счётчик, и автор issue не подтвердил исправление.
+    /// </summary>
     private void KillOneCProcesses(object? parameter)
     {
+        // Снимок с командными строками: по нему строится карта «PID → имя базы».
+        // Завершение при этом работает как раньше — KillOneCProcesses() завершает
+        // все процессы платформы, включая серверные (ragent/rmngr/rphost).
+        var snapshot = InfobaseMaintenanceService.ExtendSnapshotForKillReport(
+            AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails());
+
         var count = InfobaseMaintenanceService.CountOneCProcesses();
         if (count == 0)
         {
@@ -1537,11 +1548,25 @@ public partial class MainViewModel : ViewModelBase
                 LocalizationManager.T("Main.KillProcessesTitle")))
             return;
 
+        var baseNamesByPid = KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            Infobases, snapshot, LocalizationManager.T);
+
         var killed = InfobaseMaintenanceService.KillOneCProcesses();
-        _logger.Info($"Завершено процессов 1С: {killed}");
-        _dialogs.ShowInfo(
-            string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed),
-            LocalizationManager.T("Main.OneCProcessesTitle"));
+
+        // Повторный опрос: живыми остались те PID снимка, которые завершить не удалось.
+        var failedPids = InfobaseMaintenanceService.FindAliveOneCProcessIds(
+            snapshot.Select(process => process.Pid));
+
+        _logger.Info($"Завершено процессов 1С: {killed}, не удалось: {failedPids.Count}");
+
+        // Снимок пуст (процессы опросить не удалось) — прежний текст со счётчиком;
+        // иначе сводку собирает общий слой: счётчики, названия баз и строка ошибок.
+        var message = snapshot.Count > 0
+            ? KillProcessesMenuPlanner.FormatKillAllSummary(
+                snapshot, failedPids, LocalizationManager.T, baseNamesByPid)
+            : string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed);
+
+        _dialogs.ShowInfo(message, LocalizationManager.T("Main.OneCProcessesTitle"));
     }
 
 

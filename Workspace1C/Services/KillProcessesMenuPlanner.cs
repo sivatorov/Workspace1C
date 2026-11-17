@@ -428,46 +428,7 @@ public static class KillProcessesMenuPlanner
         if (translate is null)
             throw new ArgumentNullException(nameof(translate));
 
-        if (processes is null || processes.Count == 0)
-            return KillProcessesMenuPlan.Empty;
-
-        // Порядок баз в выделении сохраняется; дубли Id отбрасываются.
-        var targets = new List<Infobase>();
-        var seenBaseIds = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var infobase in infobases ?? Enumerable.Empty<Infobase>())
-        {
-            if (infobase?.Connection is null)
-                continue;
-            if (!string.IsNullOrWhiteSpace(infobase.Id) && !seenBaseIds.Add(infobase.Id))
-                continue;
-            targets.Add(infobase);
-        }
-
-        if (targets.Count == 0)
-            return KillProcessesMenuPlan.Empty;
-
-        // Процессы каждой базы — одним проходом матчера по всем выделенным базам
-        // (сохраняется его семантика: прямые ключи, /IBConnectionString и /IBName
-        // только при уникальном имени). PID, уже отнесённый к более ранней базе,
-        // повторно не показывается.
-        var matchedByBase = MatchByBase(targets, processes);
-        var groups = new List<(Infobase Infobase, IReadOnlyList<RunningOneCProcessDetails> Processes)>();
-        var seenPids = new HashSet<int>();
-        foreach (var infobase in targets)
-        {
-            if (string.IsNullOrWhiteSpace(infobase.Id)
-                || !matchedByBase.TryGetValue(infobase.Id, out var matched))
-                continue;
-
-            var unique = matched.Where(process => !seenPids.Contains(process.Pid)).ToList();
-            if (unique.Count == 0)
-                continue;
-
-            foreach (var process in unique)
-                seenPids.Add(process.Pid);
-            groups.Add((infobase, SortByStartTime(unique)));
-        }
-
+        var groups = CollectGroups(infobases, processes);
         if (groups.Count == 0)
             return KillProcessesMenuPlan.Empty;
 
@@ -475,13 +436,7 @@ public static class KillProcessesMenuPlanner
 
         // PID → имя базы: сводка массового завершения перечисляет базы, к которым
         // относились завершаемые процессы (доработка автора issue #134 от 16.11.2026).
-        var baseNamesByPid = new Dictionary<int, string>(allProcesses.Count);
-        foreach (var (infobase, groupProcesses) in groups)
-        {
-            var baseName = BaseDisplayName(infobase, translate);
-            foreach (var process in groupProcesses)
-                baseNamesByPid.TryAdd(process.Pid, baseName);
-        }
+        var baseNamesByPid = BuildBaseNamesFromGroups(groups, translate);
 
         // Одна база с процессами — плоский список (v1.0.1.74); при нескольких
         // процессах первым пунктом идёт «Завершить все» (issue #134, доработка
@@ -521,6 +476,111 @@ public static class KillProcessesMenuPlanner
         }
 
         return new KillProcessesMenuPlan(entries, allProcesses, IsGrouped: true, baseNamesByPid);
+    }
+
+    /// <summary>
+    /// Карта «PID → отображаемое имя базы» по снимку процессов (issue #134,
+    /// доработка для v1.0.1.79): пункт «Утилиты → Операции → Завершить процессы 1С»
+    /// завершает все найденные процессы, поэтому в сводке нужны названия баз, а не
+    /// только счётчик.
+    /// <para>
+    /// Правила те же, что у плана подменю (<see cref="BuildMenuPlan"/>): базы
+    /// перечисляются в переданном порядке, сопоставление — существующий
+    /// <see cref="RunningInfobaseMatcher"/> (через <see cref="MatchByBase"/>), PID
+    /// попадает в карту один раз — по первой базе, где он найден. Процессы без
+    /// совпадения (серверные, чужие) в карту не входят: в сводке они учитываются
+    /// только счётчиком.
+    /// </para>
+    /// </summary>
+    /// <param name="infobases">Базы приложения — по ним строится карта имён.</param>
+    /// <param name="processes">Снимок процессов с командными строками.</param>
+    /// <param name="translate">Функция локализации (для подписи базы без имени).</param>
+    /// <returns>Карта «PID → имя базы»; пустая — если сопоставить нечего.</returns>
+    public static IReadOnlyDictionary<int, string> BuildBaseNamesByPid(
+        IEnumerable<Infobase>? infobases,
+        IReadOnlyList<RunningOneCProcessDetails>? processes,
+        Func<string, string> translate)
+    {
+        if (translate is null)
+            throw new ArgumentNullException(nameof(translate));
+
+        return BuildBaseNamesFromGroups(CollectGroups(infobases, processes), translate);
+    }
+
+    /// <summary>
+    /// Группы «база → её процессы» в порядке перечисления баз (issue #134):
+    /// общий шаг плана подменю и карты «PID → имя базы», чтобы оба результата
+    /// строились по одним правилам. Дубли Id баз отбрасываются; PID, уже
+    /// отнесённый к более ранней базе, повторно не показывается; внутри базы
+    /// процессы отсортированы по времени старта.
+    /// </summary>
+    private static List<(Infobase Infobase, IReadOnlyList<RunningOneCProcessDetails> Processes)> CollectGroups(
+        IEnumerable<Infobase>? infobases, IReadOnlyList<RunningOneCProcessDetails>? processes)
+    {
+        var groups = new List<(Infobase Infobase, IReadOnlyList<RunningOneCProcessDetails> Processes)>();
+        if (processes is null || processes.Count == 0)
+            return groups;
+
+        // Порядок баз в выделении сохраняется; дубли Id отбрасываются.
+        var targets = new List<Infobase>();
+        var seenBaseIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var infobase in infobases ?? Enumerable.Empty<Infobase>())
+        {
+            if (infobase?.Connection is null)
+                continue;
+            if (!string.IsNullOrWhiteSpace(infobase.Id) && !seenBaseIds.Add(infobase.Id))
+                continue;
+            targets.Add(infobase);
+        }
+
+        if (targets.Count == 0)
+            return groups;
+
+        // Процессы каждой базы — одним проходом матчера по всем переданным базам
+        // (сохраняется его семантика: прямые ключи, /IBConnectionString и /IBName
+        // только при уникальном имени). PID, уже отнесённый к более ранней базе,
+        // повторно не показывается.
+        var matchedByBase = MatchByBase(targets, processes);
+        var seenPids = new HashSet<int>();
+        foreach (var infobase in targets)
+        {
+            if (string.IsNullOrWhiteSpace(infobase.Id)
+                || !matchedByBase.TryGetValue(infobase.Id, out var matched))
+                continue;
+
+            var unique = matched.Where(process => process is not null && !seenPids.Contains(process.Pid)).ToList();
+            if (unique.Count == 0)
+                continue;
+
+            foreach (var process in unique)
+                seenPids.Add(process.Pid);
+            groups.Add((infobase, SortByStartTime(unique)));
+        }
+
+        return groups;
+    }
+
+    /// <summary>
+    /// Карта «PID → имя базы» по готовым группам: имена берутся в порядке групп,
+    /// PID добавляется один раз (повторный <c>TryAdd</c> не перезаписывает имя).
+    /// </summary>
+    private static Dictionary<int, string> BuildBaseNamesFromGroups(
+        IReadOnlyList<(Infobase Infobase, IReadOnlyList<RunningOneCProcessDetails> Processes)> groups,
+        Func<string, string> translate)
+    {
+        var baseNamesByPid = new Dictionary<int, string>(
+            groups.Sum(group => group.Processes.Count));
+        foreach (var (infobase, groupProcesses) in groups)
+        {
+            var baseName = BaseDisplayName(infobase, translate);
+            foreach (var process in groupProcesses)
+            {
+                if (process is not null)
+                    baseNamesByPid.TryAdd(process.Pid, baseName);
+            }
+        }
+
+        return baseNamesByPid;
     }
 
     /// <summary>

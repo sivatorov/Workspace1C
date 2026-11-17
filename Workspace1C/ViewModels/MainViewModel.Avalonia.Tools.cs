@@ -187,7 +187,11 @@ public partial class MainViewModel : ViewModelBase
             LocalizationManager.T("Main.RemoveMissingTitle"));
     }
 
-    /// <summary>Завершает запущенные процессы платформы 1С.</summary>
+    /// <summary>
+    /// Завершает запущенные процессы платформы 1С.
+    /// issue #134 (v1.0.1.79): сводка перечисляет базы, к которым относились
+    /// процессы, — раньше здесь был только счётчик.
+    /// </summary>
     public void KillOneCProcesses()
     {
         // Один снимок на вопрос и на действие: между ними процессы приходят
@@ -218,14 +222,48 @@ public partial class MainViewModel : ViewModelBase
         if (!_dialog.Confirm(question, LocalizationManager.T("Main.KillProcessesTitle")))
             return;
 
-        var (killed, failed) = InfobaseMaintenanceService.KillOneCProcesses(snapshot);
-        _logger.Info($"Завершено процессов 1С: {killed}, не удалось: {failed}");
+        // Снимок SnapshotOneCProcesses командных строк не содержит, а для карты
+        // «PID → имя базы» они нужны: подробности берём у того же сервиса, что и
+        // контекстное меню, — карта строится единообразно на обеих платформах.
+        var processDetails = AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails()
+            ?? Array.Empty<RunningOneCProcessDetails>();
+        var baseNamesByPid = KillProcessesMenuPlanner.BuildBaseNamesByPid(
+            _allInfobases, processDetails, LocalizationManager.T);
 
-        var message = string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed);
-        if (failed > 0)
-            message += "\n" + string.Format(LocalizationManager.T("Main.ProcessesKillFailed"), failed);
+        var (killed, _) = InfobaseMaintenanceService.KillOneCProcesses(snapshot);
+
+        // Повторный снимок: живыми остались те PID, которые завершить не удалось
+        // (сверяем и время старта — номер ядро переиспользует).
+        var failedPids = FindStillRunningPids(snapshot);
+
+        _logger.Info($"Завершено процессов 1С: {killed}, не удалось: {failedPids.Count}");
+
+        // Сводку собирает общий слой: счётчики, названия баз и строка о базах,
+        // процессы которых завершить не удалось (issue #134, v1.0.1.79).
+        var reportProcesses = snapshot
+            .Select(p => new RunningOneCProcessDetails(p.Pid, p.Name, string.Empty, null, p.StartTime, null))
+            .ToList();
+        var message = KillProcessesMenuPlanner.FormatKillAllSummary(
+            reportProcesses, failedPids, LocalizationManager.T, baseNamesByPid);
 
         _dialog.ShowInfo(message, LocalizationManager.T("Main.OneCProcessesTitle"));
+    }
+
+    /// <summary>
+    /// PID снимка, которые остались живы после попытки завершения (issue #134,
+    /// v1.0.1.79): повторный опрос тем же перечислением процессов, сверка PID и
+    /// времени старта — одного номера недостаточно, ядро его переиспользует.
+    /// </summary>
+    private static IReadOnlyList<int> FindStillRunningPids(
+        IReadOnlyList<InfobaseMaintenanceService.OneCProcessInfo> snapshot)
+    {
+        var alive = new HashSet<(int Pid, string? StartTime)>(
+            InfobaseMaintenanceService.SnapshotOneCProcesses().Select(p => (p.Pid, p.StartTime)));
+
+        return snapshot
+            .Where(p => alive.Contains((p.Pid, p.StartTime)))
+            .Select(p => p.Pid)
+            .ToList();
     }
 
     /// <summary>Очищает список баз и групп целиком. Сами базы на диске не трогает.</summary>

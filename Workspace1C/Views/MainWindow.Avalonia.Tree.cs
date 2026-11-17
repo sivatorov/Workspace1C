@@ -3732,10 +3732,13 @@ namespace Workspace1C
 
         // ======================= Пакетные операции (0.3.9.90) =======================
 
-        /// <summary>Назначить теги всем базам мультивыделения (issue #315).</summary>
+        /// <summary>
+        /// Назначить теги всем целевым базам — мультивыделению либо выбранной группе
+        /// (issue #315; группа — issue #137: guard раньше считал только мультивыделение).
+        /// </summary>
         private void OnBatchAssignTagClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var dlg = new TagPickWindow(_vm.TagFilterItems.Select(t => t.Name));
             // Пустой выбор (ничего не отмечено и новый тег не добавлен)
@@ -3746,10 +3749,13 @@ namespace Workspace1C
             _vm.ClearBatchSelection();
         }
 
-        /// <summary>Переместить все базы мультивыделения в выбранную группу.</summary>
+        /// <summary>
+        /// Переместить целевые базы (мультивыделение либо выбранную группу) в другую
+        /// группу (issue #137: для группы пункт молча ничего не делал).
+        /// </summary>
         private void OnBatchMoveToGroupClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var picker = new GroupPickerWindow(_vm.Groups, allowNone: true);
             if (!picker.ShowDialogSync(this))
@@ -3758,10 +3764,13 @@ namespace Workspace1C
             _vm.ClearBatchSelection();
         }
 
-        /// <summary>Добавить все базы мультивыделения в избранное.</summary>
+        /// <summary>
+        /// Добавить целевые базы (мультивыделение либо группу) в избранное
+        /// (issue #137: для группы пункт молча ничего не делал).
+        /// </summary>
         private void OnBatchAddFavoritesClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.AddBatchToFavorites();
             _vm.ClearBatchSelection();
@@ -3798,7 +3807,7 @@ namespace Workspace1C
             // без контекста операции (аудит async void, шаблон RelayCommand.Execute).
             try
             {
-                if (_vm is null || _vm.BatchOperationTargetCount == 0)
+                if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                     return;
                 await _vm.RunBatchBackupAsync();
                 _vm.ClearBatchSelection();
@@ -3859,19 +3868,22 @@ namespace Workspace1C
             _vm.ClearBatchSelection();
         }
 
-        /// <summary>Проверить доступность баз мультивыделения.</summary>
+        /// <summary>Проверить доступность целевых баз — мультивыделения либо группы.</summary>
         private void OnBatchCheckAvailabilityClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.CheckBatchAvailability();
             _vm.ClearBatchSelection();
         }
 
-        /// <summary>Удалить все базы мультивыделения (общее окно подтверждения по каждой).</summary>
+        /// <summary>
+        /// Удалить целевые базы — мультивыделение либо группу (по каждой базе отдельное
+        /// окно подтверждения с её именем).
+        /// </summary>
         private void OnBatchDeleteClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             _vm.DeleteBatch();
             _vm.ClearBatchSelection();
@@ -3884,7 +3896,7 @@ namespace Workspace1C
         /// </summary>
         private void OnBatchConnectionReplaceClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var candidates = _vm.GetConnectionReplaceCandidates(ConnectionReplaceScope.BatchSelected);
             if (candidates.Count == 0)
@@ -3929,7 +3941,7 @@ namespace Workspace1C
         /// </summary>
         private void OnBatchChangePlatformClick()
         {
-            if (_vm is null || _vm.BatchOperationTargetCount == 0)
+            if (_vm is null || _vm.BatchOperationTargetCountIncludingGroup == 0)
                 return;
             var candidates = _vm.GetConnectionReplaceCandidates(ConnectionReplaceScope.BatchSelected);
             if (candidates.Count == 0)

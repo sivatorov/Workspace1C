@@ -266,15 +266,16 @@ public partial class MainViewModel
     /// по этим целям.
     /// </summary>
     public IReadOnlyList<Infobase> BatchOperationTargetsIncludingGroup =>
-        _batchSelectedIds.Count > 0
-            ? BatchSelectedInfobases
-            : SelectedGroupNode is { Group: not null } groupNode
+        BatchSelectionHelper.ResolveBatchTargets(
+            _batchSelectedIds.Count,
+            BatchSelectedInfobases,
+            SelectedGroupNode is { Group: not null },
+            SelectedGroupNode is { Group: not null } groupNode
                 ? GetGroupInfobases(groupNode)
-                : IsNoGroupBatchTarget
-                    ? GetNoGroupInfobases()
-                    : SelectedInfobase is { } singleWithGroup
-                        ? new[] { singleWithGroup }
-                        : Array.Empty<Infobase>();
+                : Array.Empty<Infobase>(),
+            IsNoGroupBatchTarget,
+            IsNoGroupBatchTarget ? GetNoGroupInfobases() : Array.Empty<Infobase>(),
+            SelectedInfobase);
 
     /// <summary>Число целевых баз с учётом выбранной группы (для заголовка меню, issue #85).</summary>
     public int BatchOperationTargetCountIncludingGroup => BatchOperationTargetsIncludingGroup.Count;
