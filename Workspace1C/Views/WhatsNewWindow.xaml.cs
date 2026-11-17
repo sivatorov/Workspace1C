@@ -19,19 +19,45 @@ namespace Workspace1C
         private bool _githubFallbackLoaded;
 
         /// <param name="settings">Настройки профиля: читаются галкой, сохраняет вызывающий.</param>
-        public WhatsNewWindow(Models.AppSettings settings)
+        /// <param name="versionOverride">
+        /// Версия для показа; <c>null</c> — текущая (эффективная) версия приложения.
+        /// Issue #116 (1.0.1.82): диалог обновления передаёт сюда версию нового релиза.
+        /// </param>
+        /// <param name="markdownBodyOverride">
+        /// Готовое тело релиза в markdown; <c>null</c> — обычный поиск сводки
+        /// (захардкоженная сводка → GitHub-релиз → CHANGELOG).
+        /// </param>
+        public WhatsNewWindow(
+            Models.AppSettings settings,
+            string? versionOverride = null,
+            string? markdownBodyOverride = null)
         {
             InitializeComponent();
             _settings = settings;
 
             // Issue #129: при флаге «Считать версию прошлой» окно показывает
             // ЭФФЕКТИВНУЮ версию (предыдущий релиз), а не реальную сборку.
-            var version = WhatsNewService.EffectiveVersion;
+            var version = string.IsNullOrWhiteSpace(versionOverride)
+                ? WhatsNewService.EffectiveVersion
+                : versionOverride.Trim();
             TitleText.Text = string.Format(
                 LocalizationManager.T("WhatsNew.TitleFormat"), version);
             Title = string.Format(
                 LocalizationManager.T("WhatsNew.TitleFormat"), version);
             ShowOnStartCheck.IsChecked = settings.ShowWhatsNewOnStart;
+
+            if (!string.IsNullOrWhiteSpace(markdownBodyOverride))
+            {
+                // Issue #116 (1.0.1.82): изменения НОВОЙ версии из диалога обновления —
+                // тело релиза рендерим как markdown (заголовки, списки, жирный).
+                NotesHost.Children.Add(new System.Windows.Controls.FlowDocumentScrollViewer
+                {
+                    Document = MarkdownRenderer.ToFlowDocument(markdownBodyOverride),
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                });
+                return;
+            }
 
             var notes = WhatsNewService.GetReleaseNotes(version);
             if (notes is not null)

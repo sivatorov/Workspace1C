@@ -11,6 +11,78 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.82] — 2026-11-17
+
+### Изменено
+
+- **Диалог ручного обновления (issue #116, aleksandr-ermakov).** По замечаниям автора issue:
+  кнопка «Скачать» заменена на **«Обновить»** (`Update.Update`); в режиме без предварительной
+  загрузки заголовок расширен до **«Доступна новая версия приложения для загрузки»**
+  (`Update.NewVersionAvailableForDownload`), чтобы было понятно, что версия будет именно
+  загружена; добавлена ссылка **«Что нового»**, открывающая стандартный диалог изменений
+  новой версии с телом её GitHub-релиза
+  ([`OnWhatsNewLinkClick`](Workspace1C/Services/UpdateAvailableWindow.xaml.cs:250),
+  [`WhatsNewWindow`](Workspace1C/Views/WhatsNewWindow.xaml.cs:30) — новые параметры
+  `versionOverride`/`markdownBodyOverride`); окно подгоняется под содержимое по обеим осям
+  (`SizeToContent="WidthAndHeight"`, без `MinHeight="320"`), а WndProc фиксирует последний
+  измеренный размер ([`RefreshWindowSize`](Workspace1C/Services/UpdateAvailableWindow.xaml.cs:412)).
+  То же поведение в Avalonia/Linux: текст основной кнопки и ссылка «Что нового» в
+  [`MaterialMessageWindowAvalonia`](Workspace1C/Services/MaterialMessageWindow.Avalonia.cs:42),
+  передача из [`UpdateService.Avalonia`](Workspace1C/Services/UpdateService.Avalonia.cs:804).
+  Тесты — `Issue116ManualUpdateDialogTests` (11 тестов: XAML и код-бихайнд WPF, Avalonia,
+  локализация ru/en).
+
+## [1.0.1.81] — 2026-11-17
+
+### Исправлено
+
+- **Несколько пользователей на одной машине больше не перезаписывают настройки друг друга
+  (issue #136, leonvlas).** Автор issue спросил, корректно ли сохраняются настройки, если
+  на одном компьютере работают несколько учётных записей (терминальный режим). Обычная
+  установка уже персональна: каталог данных — `%APPDATA%\Workspace1C`, резервы —
+  `%LOCALAPPDATA%\Workspace1C` и `<temp>\Workspace1C`
+  ([`AppDataDirectory`](Workspace1C/Services/PlatformPaths.cs:42),
+  [`BuildFallbackDirectories`](Workspace1C/Services/PlatformPaths.cs:248)). Но портативная
+  установка в машинном каталоге (`C:\Program Files`, `%ProgramData%`) или общий `%TEMP%`
+  давали один каталог на всех. Теперь к такому каталогу добавляется персональный сегмент
+  `users/<логин>-<хэш профиля>`
+  ([`ApplyPerUserGuard`](Workspace1C/Services/PlatformPaths.cs:200),
+  [`UserDataSegment`](Workspace1C/Services/PlatformPaths.cs:112)); сменный носитель
+  сохраняет прежний путь, старые данные переносятся best-effort. Признак и причина —
+  [`IsSharedDirectoryGuardActive`](Workspace1C/Services/PlatformPaths.cs:80) и
+  [`SharedDirectoryGuardReason`](Workspace1C/Services/PlatformPaths.cs:94); журналы
+  следуют за персональным каталогом
+  ([`LogDirectory`](Workspace1C/Services/PlatformPaths.cs:602)), а портативный перенос
+  пишет в фактический каталог данных ([`EnsurePortableData`](Workspace1C/Services/PortablePaths.cs:80)).
+  Тесты — `Issue136MultiUserDataDirectoryTests` (16 тестов: сегмент, машинные/личные
+  каталоги, миграция, разные пользователи, диагностика, каталог логов).
+
+## [1.0.1.80] — 2026-11-17
+
+### Исправлено
+
+- **Сводка «Завершить процессы» больше не ограничивается счётчиками (issue #134, ArtyoZ).**
+  Автор не подтвердил исправление 1.0.1.79: и в подменю «Для выделенных → Завершить процессы»,
+  и в пункте «Утилиты → Операции → Завершить процессы 1С» отчёт по-прежнему показывал только
+  числа. Причина найдена: и сопоставление процессов, и план подменю требовали непустой `Id`
+  базы ([`RunningInfobaseMatcher.MatchProcesses`](Workspace1C/Services/RunningInfobaseMatcher.cs:302),
+  [`KillProcessesMenuPlanner.CollectGroups`](Workspace1C/Services/KillProcessesMenuPlanner.cs:517)),
+  а у баз, импортированных из кластера 1С
+  ([`RacInfobaseMapper`](Workspace1C/Services/RacInfobaseMapper.cs:38)), `Id` пуст; вдобавок
+  сводка молча возвращала счётчики при пустой карте имён. Теперь ключ базы строит
+  [`GetBaseKey`](Workspace1C/Services/RunningInfobaseMatcher.cs:61), отсутствующие `Id`
+  восстанавливаются при загрузке списка баз
+  ([`NormalizeInfobases`](Workspace1C/Services/InfobaseRepository.cs:150)), имя базы при пустой
+  карте извлекается из командной строки процесса
+  ([`DescribeBaseFromCommandLine`](Workspace1C/Services/KillProcessesMenuPlanner.cs:690)),
+  а клиентские процессы без определённой базы перечисляются отдельной строкой
+  «Не удалось определить базы для процессов: …»
+  ([`FormatKillAllSummary`](Workspace1C/Services/KillProcessesMenuPlanner.cs:613)).
+  Клиент-серверные базы с пустым `DatabaseName` сопоставляются по названию карточки, а обе
+  оболочки пишут диагностику в журнал (`LogKillReportDiagnostics`). Тесты —
+  `Issue134KillProcessesTests` (база без `Id`, имена из `/F`, `/S`, `/IBName`, неопределённые
+  и серверные процессы, диагностика) и `Issue134InfobaseIdNormalizationTests` (4 теста).
+
 ## [1.0.1.79] — 2026-11-17
 
 ### Исправлено

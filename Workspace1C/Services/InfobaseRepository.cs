@@ -90,9 +90,30 @@ public class InfobaseRepository : IInfobaseRepository
             var json = File.ReadAllText(InfobasesPath);
             // Отбрасываем пустые элементы, которые могли прийти из легаси/повреждённого файла
             // (иначе потребители спотыкались бы о null и старт «зависал») (issue #64).
-            return (JsonSerializer.Deserialize<List<Infobase>>(json, JsonOptions) ?? new List<Infobase>())
+            var infobases = (JsonSerializer.Deserialize<List<Infobase>>(json, JsonOptions) ?? new List<Infobase>())
                 .Where(i => i is not null)
                 .ToList();
+
+            // issue #134 (1.0.1.80): у баз, импортированных из кластера (RacInfobaseMapper
+            // создаёт их с Id = ""), идентификатора не было вовсе. Матчер процессов и план
+            // подменю «Завершить процессы» такие базы пропускали — в отчёте оставались
+            // только счётчики, а подменю для них не появлялось. Восстанавливаем Id так же,
+            // как это давно делается для групп (NormalizeGroups), и сохраняем файл, чтобы
+            // починка сохранялась между запусками.
+            if (NormalizeInfobases(infobases))
+            {
+                try
+                {
+                    Save(infobases);
+                }
+                catch
+                {
+                    // Сохранение — вспомогательное: даже при отказе записи текущий сеанс
+                    // работает с восстановленными идентификаторами.
+                }
+            }
+
+            return infobases;
         }
         catch (Exception ex)
         {
@@ -147,6 +168,44 @@ public class InfobaseRepository : IInfobaseRepository
             QuarantineCorruptFile(GroupsPath, "corrupt");
             return new List<Group>();
         }
+    }
+
+    /// <summary>
+    /// Восстанавливает корректность списка баз (issue #134, 1.0.1.80): генерирует
+    /// отсутствующие идентификаторы и устраняет дубликаты, сохраняя уже корректные Id.
+    /// Возвращает <c>true</c>, если список был изменён (тогда вызывающий сохраняет файл).
+    /// <para>
+    /// Без этого базы с пустым Id (например импортированные из кластера 1С) не участвовали
+    /// в сопоставлении процессов и не попадали в сводку завершения процессов — автор issue
+    /// видел только счётчики.
+    /// </para>
+    /// </summary>
+    internal static bool NormalizeInfobases(List<Infobase> infobases)
+    {
+        var changed = false;
+        var usedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var infobase in infobases)
+        {
+            if (infobase is null)
+                continue;
+
+            if (string.IsNullOrWhiteSpace(infobase.Id))
+            {
+                infobase.Id = Guid.NewGuid().ToString("D");
+                changed = true;
+            }
+
+            // Дубликат Id ломает сопоставление «процесс → база»: оставляем первый,
+            // остальным выдаём новый идентификатор.
+            while (!usedIds.Add(infobase.Id))
+            {
+                infobase.Id = Guid.NewGuid().ToString("D");
+                changed = true;
+            }
+        }
+
+        return changed;
     }
 
     /// <summary>

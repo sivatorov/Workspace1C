@@ -76,6 +76,13 @@ public static class PortablePaths
     /// При первом запуске в портативном режиме переносит данные из системного каталога
     /// профиля в портативный каталог, если портативный каталог ещё пуст. Ошибки глушатся —
     /// перенос не должен блокировать запуск.
+    /// <para>
+    /// issue #136 (1.0.1.81): перенос идёт в фактический каталог данных
+    /// (<see cref="PlatformPaths.AppDataDirectory"/>), а не в сырой каталог рядом с exe:
+    /// если портативная установка лежит в машинном каталоге (Program Files/ProgramData),
+    /// фактические данные находятся в персональном подкаталоге <c>users/<сегмент></c>,
+    /// и разные пользователи не смешивают настройки.
+    /// </para>
     /// </summary>
     public static void EnsurePortableData()
     {
@@ -84,11 +91,19 @@ public static class PortablePaths
 
         try
         {
-            var target = PortableAppDataDirectory;
+            var target = PlatformPaths.AppDataDirectory;
+            var source = PlatformPaths.DefaultAppDataDirectory;
+            if (string.Equals(
+                    PlatformPaths.NormalizeDirectoryPath(target),
+                    PlatformPaths.NormalizeDirectoryPath(source),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return; // источник и цель совпадают — переносить нечего
+            }
+
             if (Directory.Exists(target) && Directory.EnumerateFileSystemEntries(target).Any())
                 return; // портативные данные уже есть — не затираем их системными
 
-            var source = PlatformPaths.DefaultAppDataDirectory;
             if (!Directory.Exists(source))
                 return;
 

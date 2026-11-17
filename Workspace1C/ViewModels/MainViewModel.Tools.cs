@@ -1551,6 +1551,10 @@ public partial class MainViewModel : ViewModelBase
         var baseNamesByPid = KillProcessesMenuPlanner.BuildBaseNamesByPid(
             Infobases, snapshot, LocalizationManager.T);
 
+        // issue #134 (1.0.1.80): причина «только счётчики» должна быть видна в журнале —
+        // размер снимка/карты и командные строки несопоставленных клиентских процессов.
+        LogKillReportDiagnostics(snapshot, baseNamesByPid);
+
         var killed = InfobaseMaintenanceService.KillOneCProcesses();
 
         // Повторный опрос: живыми остались те PID снимка, которые завершить не удалось.
@@ -1567,6 +1571,32 @@ public partial class MainViewModel : ViewModelBase
             : string.Format(LocalizationManager.T("Main.ProcessesKilled"), killed);
 
         _dialogs.ShowInfo(message, LocalizationManager.T("Main.OneCProcessesTitle"));
+    }
+
+    /// <summary>
+    /// Диагностика сводки завершения процессов (issue #134, 1.0.1.80): в журнал пишется
+    /// размер снимка и карты «PID → имя базы», а для клиентских процессов без базы —
+    /// PID и командная строка. Без этой записи причина «в отчёте только счётчики»
+    /// у пользователя не видна.
+    /// </summary>
+    private void LogKillReportDiagnostics(
+        IReadOnlyList<RunningOneCProcessDetails> snapshot,
+        IReadOnlyDictionary<int, string> baseNamesByPid)
+    {
+        _logger.Info($"Завершение процессов 1С: снимок {snapshot.Count}, имён баз {baseNamesByPid.Count}");
+        foreach (var process in snapshot)
+        {
+            var processName = process.ProcessName ?? string.Empty;
+            if (!processName.StartsWith("1cv8", StringComparison.OrdinalIgnoreCase)
+                || baseNamesByPid.ContainsKey(process.Pid))
+            {
+                continue;
+            }
+
+            _logger.Warn(
+                $"Не удалось сопоставить процесс 1С PID {process.Pid} с базой. " +
+                $"Командная строка: {process.CommandLine}");
+        }
     }
 
 

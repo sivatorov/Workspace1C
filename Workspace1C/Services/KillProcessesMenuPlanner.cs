@@ -186,6 +186,13 @@ public static class KillProcessesMenuPlanner
     /// </summary>
     public const string KillAllFailedBasesFormatKey = "KillProcesses.KillAllFailedBasesFormat";
 
+    /// <summary>
+    /// Ключ строки сводки о клиентских процессах, для которых базу определить не удалось
+    /// (issue #134, 1.0.1.80): вместо молчаливого показа одних счётчиков отчёт явно
+    /// перечисляет PID таких процессов.
+    /// </summary>
+    public const string KillAllUndeterminedFormatKey = "KillProcesses.KillAllUndeterminedFormat";
+
     /// <summary>Ключ разделителя названий баз в сводке («, »).</summary>
     public const string BasesSeparatorKey = "KillProcesses.BasesSeparator";
 
@@ -370,7 +377,7 @@ public static class KillProcessesMenuPlanner
     private static Dictionary<string, List<RunningOneCProcessDetails>> MatchByBase(
         IReadOnlyList<Infobase> bases, IReadOnlyList<RunningOneCProcessDetails> processes)
     {
-        var result = new Dictionary<string, List<RunningOneCProcessDetails>>(StringComparer.Ordinal);
+        var result = new Dictionary<string, List<RunningOneCProcessDetails>>(StringComparer.OrdinalIgnoreCase);
         if (bases.Count == 0 || processes.Count == 0)
             return result;
 
@@ -510,9 +517,11 @@ public static class KillProcessesMenuPlanner
     /// <summary>
     /// Группы «база → её процессы» в порядке перечисления баз (issue #134):
     /// общий шаг плана подменю и карты «PID → имя базы», чтобы оба результата
-    /// строились по одним правилам. Дубли Id баз отбрасываются; PID, уже
-    /// отнесённый к более ранней базе, повторно не показывается; внутри базы
-    /// процессы отсортированы по времени старта.
+    /// строились по одним правилам. Дубли баз отбрасываются по ключу
+    /// <see cref="RunningInfobaseMatcher.GetBaseKey"/> (не по Id — у баз из кластера
+    /// Id может отсутствовать, issue #134, 1.0.1.80); PID, уже отнесённый к более
+    /// ранней базе, повторно не показывается; внутри базы процессы отсортированы
+    /// по времени старта.
     /// </summary>
     private static List<(Infobase Infobase, IReadOnlyList<RunningOneCProcessDetails> Processes)> CollectGroups(
         IEnumerable<Infobase>? infobases, IReadOnlyList<RunningOneCProcessDetails>? processes)
@@ -521,16 +530,17 @@ public static class KillProcessesMenuPlanner
         if (processes is null || processes.Count == 0)
             return groups;
 
-        // Порядок баз в выделении сохраняется; дубли Id отбрасываются.
-        var targets = new List<Infobase>();
-        var seenBaseIds = new HashSet<string>(StringComparer.Ordinal);
+        // Порядок баз в выделении сохраняется; дубли отбрасываются по ключу базы.
+        var targets = new List<(string Key, Infobase Infobase)>();
+        var seenBaseKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var infobase in infobases ?? Enumerable.Empty<Infobase>())
         {
             if (infobase?.Connection is null)
                 continue;
-            if (!string.IsNullOrWhiteSpace(infobase.Id) && !seenBaseIds.Add(infobase.Id))
+            var key = RunningInfobaseMatcher.GetBaseKey(infobase);
+            if (!seenBaseKeys.Add(key))
                 continue;
-            targets.Add(infobase);
+            targets.Add((key, infobase));
         }
 
         if (targets.Count == 0)
@@ -540,12 +550,11 @@ public static class KillProcessesMenuPlanner
         // (сохраняется его семантика: прямые ключи, /IBConnectionString и /IBName
         // только при уникальном имени). PID, уже отнесённый к более ранней базе,
         // повторно не показывается.
-        var matchedByBase = MatchByBase(targets, processes);
+        var matchedByBase = MatchByBase(targets.Select(target => target.Infobase).ToList(), processes);
         var seenPids = new HashSet<int>();
-        foreach (var infobase in targets)
+        foreach (var (key, infobase) in targets)
         {
-            if (string.IsNullOrWhiteSpace(infobase.Id)
-                || !matchedByBase.TryGetValue(infobase.Id, out var matched))
+            if (!matchedByBase.TryGetValue(key, out var matched))
                 continue;
 
             var unique = matched.Where(process => process is not null && !seenPids.Contains(process.Pid)).ToList();
@@ -598,10 +607,17 @@ public static class KillProcessesMenuPlanner
     /// процессы. Раньше при завершении нескольких процессов отчёт показывал только
     /// числа — автор попросил указывать хотя бы названия баз.
     /// <para>
+    /// issue #134 (1.0.1.80): отчёт больше не деградирует молча. Имя базы берётся
+    /// из карты «PID → имя базы», а если карты нет или в ней нет PID (например WMI
+    /// не отдал командные строки), — из самой командной строки процесса
+    /// (<see cref="DescribeBaseFromCommandLine"/>). Клиентские процессы, для которых
+    /// базу определить не удалось, перечисляются отдельной строкой, поэтому
+    /// пользователь никогда не видит «только счётчики» без пояснения.
+    /// </para>
+    /// <para>
     /// Базы перечисляются в порядке процессов (порядок выделения), без повторов.
     /// При ошибках добавляется отдельная строка с базами, процессы которых завершить
-    /// не удалось. Если карта «PID → имя базы» неизвестна, возвращается прежний текст
-    /// со счётчиками (обратная совместимость).
+    /// не удалось.
     /// </para>
     /// </summary>
     /// <param name="processes">Процессы, которые пытались завершить.</param>
@@ -630,7 +646,7 @@ public static class KillProcessesMenuPlanner
         summary.Append(string.Format(
             translate(KillAllSummaryFormatKey), killedCount, failedCount));
 
-        if (list.Count == 0 || baseNamesByPid is null || baseNamesByPid.Count == 0)
+        if (list.Count == 0)
             return summary.ToString();
 
         var separator = translate(BasesSeparatorKey);
@@ -654,8 +670,106 @@ public static class KillProcessesMenuPlanner
             }
         }
 
+        // Клиентские процессы без определённой базы — отдельной строкой, а не молча.
+        // Серверные процессы (ragent/rmngr/rphost) к базам не относятся, их не перечисляем.
+        var undeterminedPids = list
+            .Where(process => IsClientProcess(process.ProcessName)
+                && ResolveBaseName(process, baseNamesByPid) is null)
+            .Select(process => process.Pid)
+            .Distinct()
+            .ToList();
+        if (undeterminedPids.Count > 0)
+        {
+            summary.AppendLine();
+            summary.Append(string.Format(
+                translate(KillAllUndeterminedFormatKey), string.Join(separator, undeterminedPids)));
+        }
+
         return summary.ToString();
     }
+
+    /// <summary>
+    /// Отображаемое имя базы для процесса: карта «PID → имя базы», затем разбор
+    /// командной строки (issue #134, 1.0.1.80). null — базу определить не удалось.
+    /// </summary>
+    private static string? ResolveBaseName(
+        RunningOneCProcessDetails process, IReadOnlyDictionary<int, string>? baseNamesByPid)
+    {
+        if (baseNamesByPid is not null
+            && baseNamesByPid.TryGetValue(process.Pid, out var name)
+            && !string.IsNullOrWhiteSpace(name))
+        {
+            return name.Trim();
+        }
+
+        return DescribeBaseFromCommandLine(process.CommandLine);
+    }
+
+    /// <summary>
+    /// Имя базы из командной строки процесса 1С (issue #134, 1.0.1.80): ключи
+    /// <c>/IBConnectionString</c> (Ref или File), <c>/IBName</c>, <c>/S</c>
+    /// (последний сегмент «сервер\база») и <c>/F</c> (последний сегмент пути).
+    /// Чистая функция без платформенных зависимостей — используется сводкой, когда
+    /// карта «PID → имя базы» пуста (WMI не отдал командные строки или база без Id).
+    /// </summary>
+    public static string? DescribeBaseFromCommandLine(string? commandLine)
+    {
+        var line = commandLine ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(line))
+            return null;
+
+        if (RunningInfobaseMatcher.TryExtractValue(line, "IBConnectionString", out var connectionString)
+            && !string.IsNullOrWhiteSpace(connectionString))
+        {
+            var parts = RunningInfobaseMatcher.ParseConnectionString(connectionString);
+            if (parts.TryGetValue("Ref", out var reference) && !string.IsNullOrWhiteSpace(reference))
+                return reference.Trim();
+            if (parts.TryGetValue("File", out var file))
+            {
+                var fileName = LastPathSegment(file);
+                if (fileName.Length > 0)
+                    return fileName;
+            }
+        }
+
+        if (RunningInfobaseMatcher.TryExtractValue(line, "IBName", out var ibName)
+            && !string.IsNullOrWhiteSpace(ibName))
+        {
+            return ibName.Trim();
+        }
+
+        if (RunningInfobaseMatcher.TryExtractValue(line, "S", out var serverValue)
+            && !string.IsNullOrWhiteSpace(serverValue))
+        {
+            var slash = Math.Max(serverValue.LastIndexOf('\\'), serverValue.LastIndexOf('/'));
+            var databaseName = (slash >= 0 ? serverValue[(slash + 1)..] : serverValue).Trim();
+            if (databaseName.Length > 0)
+                return databaseName;
+        }
+
+        if (RunningInfobaseMatcher.TryExtractValue(line, "F", out var filePath))
+        {
+            var fileName = LastPathSegment(filePath);
+            if (fileName.Length > 0)
+                return fileName;
+        }
+
+        return null;
+    }
+
+    /// <summary>Последний сегмент пути без кавычек и хвостовых разделителей.</summary>
+    private static string LastPathSegment(string? path)
+    {
+        var value = (path ?? string.Empty).Trim().Trim('"').Trim().TrimEnd('\\', '/');
+        if (value.Length == 0)
+            return string.Empty;
+        var slash = value.LastIndexOfAny(new[] { '\\', '/' });
+        return (slash >= 0 ? value[(slash + 1)..] : value).Trim();
+    }
+
+    /// <summary>True — процесс клиента платформы 1С (<c>1cv8</c>, <c>1cv8c</c>, <c>1cv8s</c>…).</summary>
+    private static bool IsClientProcess(string? processName) =>
+        ProcessFileName(processName).StartsWith("1cv8", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Уникальные имена баз по процессам в порядке появления. <paramref name="onlyPids"/>
@@ -663,18 +777,19 @@ public static class KillProcessesMenuPlanner
     /// </summary>
     private static List<string> DistinctBaseNames(
         IReadOnlyList<RunningOneCProcessDetails> processes,
-        IReadOnlyDictionary<int, string> baseNamesByPid,
+        IReadOnlyDictionary<int, string>? baseNamesByPid,
         HashSet<int>? onlyPids = null)
     {
         var names = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var process in processes)
         {
             if (process is null)
                 continue;
             if (onlyPids is not null && !onlyPids.Contains(process.Pid))
                 continue;
-            if (!baseNamesByPid.TryGetValue(process.Pid, out var name) || string.IsNullOrWhiteSpace(name))
+            var name = ResolveBaseName(process, baseNamesByPid);
+            if (string.IsNullOrWhiteSpace(name))
                 continue;
             if (seen.Add(name))
                 names.Add(name);

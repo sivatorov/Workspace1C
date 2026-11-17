@@ -39,9 +39,19 @@ internal sealed class MaterialMessageWindowAvalonia : Window
     /// диалога обновления, чтобы пользователь мог «пропустить эту версию». При
     /// пустом значении кнопка не добавляется.
     /// </param>
+    /// <param name="okButtonText">
+    /// Необязательный текст основной кнопки (issue #116, 1.0.1.82): в диалоге
+    /// обновления вместо «Да» показывается «Обновить».
+    /// </param>
+    /// <param name="notesLinkText">
+    /// Необязательный текст ссылки «Что нового» (issue #116, 1.0.1.82): показывается
+    /// под сообщением в ручных режимах, когда блок описания скрыт.
+    /// </param>
+    /// <param name="onNotesLink">Действие по клику на ссылку «Что нового» (диалог не закрывается).</param>
     public MaterialMessageWindowAvalonia(
         string message, string title, MaterialMessageKind kind, string? markdownBody = null,
-        string? skipButtonText = null)
+        string? skipButtonText = null, string? okButtonText = null,
+        string? notesLinkText = null, Action? onNotesLink = null)
     {
         Title = title;
         Width = 440;
@@ -90,9 +100,11 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         // (issue #26): заливка AccentBrush, контрастный текст TextOnAccentBrush —
         // как во всех остальных диалогах приложения; прежняя жёстко-зелёная #16A34A
         // с белым текстом убрана (Windows-версия переведена на тот же контракт).
-        var okText = kind == MaterialMessageKind.Question
-            ? LocalizationManager.T("Common.Yes")
-            : LocalizationManager.T("Common.Ok");
+        var okText = !string.IsNullOrWhiteSpace(okButtonText)
+            ? okButtonText
+            : kind == MaterialMessageKind.Question
+                ? LocalizationManager.T("Common.Yes")
+                : LocalizationManager.T("Common.Ok");
         Button okButton = new()
         {
             Content = new TextBlock
@@ -199,6 +211,24 @@ internal sealed class MaterialMessageWindowAvalonia : Window
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Content = MarkdownRenderer.ToStackPanel(effective)
             });
+        }
+
+        // Issue #116 (1.0.1.82): ссылка «Что нового» — открывает стандартный диалог
+        // изменений новой версии, не закрывая этот диалог.
+        if (!string.IsNullOrWhiteSpace(notesLinkText))
+        {
+            Button notesLink = new()
+            {
+                Content = notesLinkText,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MinWidth = 0,
+                Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0)
+            };
+            notesLink.Styled(ControlThemes.SecondaryButton);
+            notesLink.Click += (_, _) => onNotesLink?.Invoke();
+            content.Children.Add(notesLink);
         }
 
         content.Children.Add(buttonsPanel);

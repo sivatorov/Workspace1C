@@ -230,6 +230,9 @@ public partial class MainViewModel : ViewModelBase
         var baseNamesByPid = KillProcessesMenuPlanner.BuildBaseNamesByPid(
             _allInfobases, processDetails, LocalizationManager.T);
 
+        // issue #134 (1.0.1.80): диагностика — почему у части процессов нет имени базы.
+        LogKillReportDiagnostics(processDetails, baseNamesByPid);
+
         var (killed, _) = InfobaseMaintenanceService.KillOneCProcesses(snapshot);
 
         // Повторный снимок: живыми остались те PID, которые завершить не удалось
@@ -247,6 +250,31 @@ public partial class MainViewModel : ViewModelBase
             reportProcesses, failedPids, LocalizationManager.T, baseNamesByPid);
 
         _dialog.ShowInfo(message, LocalizationManager.T("Main.OneCProcessesTitle"));
+    }
+
+    /// <summary>
+    /// Диагностика сводки завершения процессов (issue #134, 1.0.1.80): размер снимка
+    /// и карты «PID → имя базы», а для клиентских процессов без базы — PID и командная
+    /// строка. Без этой записи причина «в отчёте только счётчики» не видна.
+    /// </summary>
+    private void LogKillReportDiagnostics(
+        IReadOnlyList<RunningOneCProcessDetails> processDetails,
+        IReadOnlyDictionary<int, string> baseNamesByPid)
+    {
+        _logger.Info($"Завершение процессов 1С: снимок {processDetails.Count}, имён баз {baseNamesByPid.Count}");
+        foreach (var process in processDetails)
+        {
+            var processName = process.ProcessName ?? string.Empty;
+            if (!processName.StartsWith("1cv8", StringComparison.OrdinalIgnoreCase)
+                || baseNamesByPid.ContainsKey(process.Pid))
+            {
+                continue;
+            }
+
+            _logger.Warn(
+                $"Не удалось сопоставить процесс 1С PID {process.Pid} с базой. " +
+                $"Командная строка: {process.CommandLine}");
+        }
     }
 
     /// <summary>

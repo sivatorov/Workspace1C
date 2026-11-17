@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text;
 
 namespace Workspace1C.Services;
 
@@ -24,6 +25,14 @@ public static class PlatformPaths
     private static string? _resolvedDataDirectory;
     private static bool _fallbackActive;
     private static string? _fallbackReason;
+    private static bool _sharedGuardActive;
+    private static string? _sharedGuardReason;
+
+    /// <summary>
+    /// Переопределение сегмента пользователя (тесты, issue #136, 1.0.1.81): позволяет
+    /// проверить разделение данных двух учётных записей без входа под ними.
+    /// </summary>
+    internal static Func<string>? UserSegmentOverride { get; set; }
 
     /// <summary>
     /// Каталог данных приложения (infobases.json, groups.json, settings.json).
@@ -74,6 +83,41 @@ public static class PlatformPaths
             return _fallbackReason;
         }
     }
+
+    /// <summary>
+    /// Признак того, что каталог данных разделён по учётным записям внутри общего
+    /// каталога (issue #136, 1.0.1.81): портативная установка в машинном каталоге
+    /// (<c>C:\Program Files</c>, <c>%ProgramData%</c>) или резервный <c>%TEMP%</c>,
+    /// не входящий в профиль пользователя.
+    /// </summary>
+    public static bool IsSharedDirectoryGuardActive
+    {
+        get
+        {
+            _ = ResolveDataDirectoryCached();
+            return _sharedGuardActive;
+        }
+    }
+
+    /// <summary>
+    /// Причина включения персонального сегмента; <c>null</c>, если разделение
+    /// по пользователям не потребовалось (issue #136, 1.0.1.81).
+    /// </summary>
+    public static string? SharedDirectoryGuardReason
+    {
+        get
+        {
+            _ = ResolveDataDirectoryCached();
+            return _sharedGuardReason;
+        }
+    }
+
+    /// <summary>
+    /// Сегмент каталога для текущей учётной записи (issue #136, 1.0.1.81): безопасное
+    /// имя пользователя плюс стабильный короткий хэш профиля, чтобы одинаковые имена
+    /// в разных доменах/машинах не смешивали данные.
+    /// </summary>
+    public static string UserDataSegment => UserSegmentOverride?.Invoke() ?? BuildUserDataSegment();
 
     /// <summary>
     /// Системный каталог данных приложения по умолчанию (без учёта портативного режима).
@@ -199,11 +243,208 @@ public static class PlatformPaths
                 return _resolvedDataDirectory!;
 
             var resolution = ResolveDataDirectory(PreferredDataDirectory, BuildFallbackDirectories());
-            _resolvedDataDirectory = resolution.DirectoryPath;
-            _fallbackActive = resolution.IsFallback;
-            _fallbackReason = resolution.Reason;
+
+            // issue #136 (1.0.1.81): если выбранный каталог общий для нескольких
+            // пользователей (портативная установка в Program Files/ProgramData или
+            // %TEMP% вне профиля), данные разделяются по учётной записи.
+            var guarded = ApplyPerUserGuard(
+                resolution, PortablePaths.IsPortable, IsMachineWideDirectory, UserDataSegment);
+
+            _resolvedDataDirectory = guarded.DirectoryPath;
+            _fallbackActive = guarded.IsFallback;
+            _fallbackReason = guarded.Reason;
+            _sharedGuardActive = !string.Equals(
+                guarded.DirectoryPath, resolution.DirectoryPath, StringComparison.OrdinalIgnoreCase);
+            _sharedGuardReason = _sharedGuardActive ? guarded.Reason : null;
             _resolutionDone = true;
             return _resolvedDataDirectory;
+        }
+    }
+
+    /// <summary>
+    /// Добавляет персональный сегмент <c>users/<сегмент></c> к общему каталогу
+    /// данных (issue #136, 1.0.1.81). Для портативного режима сегмент добавляется только
+    /// в машинных каталогах (сменный носитель сохраняет прежний путь); для обычной
+    /// установки — когда каталог не входит в профиль пользователя. Перед возвратом
+    /// данные прежнего общего каталога best-effort переносятся в персональный.
+    /// </summary>
+    internal static DataDirectoryResolution ApplyPerUserGuard(
+        DataDirectoryResolution resolution,
+        bool portableMode,
+        Func<string, bool> isMachineWide,
+        string userSegment)
+    {
+        if (!RequiresPerUserSegment(resolution.DirectoryPath, portableMode, isMachineWide))
+            return resolution;
+
+        var segment = string.IsNullOrWhiteSpace(userSegment) ? "user" : userSegment.Trim();
+        var guardedDirectory = Path.Combine(resolution.DirectoryPath, "users", segment);
+        EnsureMigratedToPerUserDirectory(resolution.DirectoryPath, guardedDirectory);
+
+        var reason = resolution.Reason is null
+            ? $"Каталог данных «{resolution.DirectoryPath}» общий для нескольких пользователей — " +
+              $"данные разделены по учётной записи: «{guardedDirectory}»"
+            : resolution.Reason + $" Данные разделены по учётной записи: «{guardedDirectory}».";
+
+        return new DataDirectoryResolution(guardedDirectory, resolution.IsFallback, reason);
+    }
+
+    /// <summary>
+    /// Нужен ли персональный сегмент для каталога (issue #136, 1.0.1.81):
+    /// портативный режим — только для машинных каталогов; обычный — для любого
+    /// каталога вне профиля пользователя (общий <c>%TEMP%</c> и т.п.).
+    /// </summary>
+    internal static bool RequiresPerUserSegment(
+        string? directory, bool portableMode, Func<string, bool> isMachineWide)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            return false;
+
+        if (isMachineWide is null)
+            throw new ArgumentNullException(nameof(isMachineWide));
+
+        return portableMode
+            ? isMachineWide(directory!)
+            : !IsUserPrivateDirectory(directory!);
+    }
+
+    /// <summary>
+    /// True — каталог находится внутри профиля пользователя (<c>%USERPROFILE%</c>,
+    /// <c>%APPDATA%</c>, <c>%LOCALAPPDATA%</c>), то есть уже персональный.
+    /// </summary>
+    internal static bool IsUserPrivateDirectory(string? directory)
+    {
+        var full = NormalizeDirectoryPath(directory);
+        if (full.Length == 0)
+            return false;
+
+        foreach (var root in GetUserPrivateRoots())
+        {
+            if (root.Length == 0)
+                continue;
+            if (full.Equals(root, StringComparison.OrdinalIgnoreCase)
+                || full.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// True — каталог относится к машинным (<c>Program Files</c>, <c>ProgramData</c>,
+    /// <c>%SystemRoot%</c>): в нём могут писать разные пользователи.
+    /// </summary>
+    internal static bool IsMachineWideDirectory(string? directory)
+    {
+        var full = NormalizeDirectoryPath(directory);
+        if (full.Length == 0)
+            return false;
+
+        var roots = new[]
+        {
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows)
+        };
+
+        foreach (var root in roots)
+        {
+            var normalized = NormalizeDirectoryPath(root);
+            if (normalized.Length == 0)
+                continue;
+            if (full.Equals(normalized, StringComparison.OrdinalIgnoreCase)
+                || full.StartsWith(normalized + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> GetUserPrivateRoots()
+    {
+        yield return NormalizeDirectoryPath(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile));
+        yield return NormalizeDirectoryPath(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+        yield return NormalizeDirectoryPath(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData));
+    }
+
+    /// <summary>Полный путь без хвостовых разделителей; пустая строка при пустом входе.</summary>
+    internal static string NormalizeDirectoryPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return string.Empty;
+        try
+        {
+            return Path.GetFullPath(path!)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch
+        {
+            return path!.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+    }
+
+    /// <summary>Сегмент текущего пользователя: безопасное имя + стабильный хэш профиля.</summary>
+    private static string BuildUserDataSegment()
+    {
+        var user = Environment.UserName;
+        if (string.IsNullOrWhiteSpace(user))
+            user = Environment.GetEnvironmentVariable("USERNAME") ?? "user";
+
+        var seed = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (string.IsNullOrWhiteSpace(seed))
+            seed = user;
+
+        return SanitizeUserSegment(user, seed);
+    }
+
+    /// <summary>
+    /// Безопасный сегмент каталога: недопустимые символы заменяются «_», длина
+    /// ограничена, в конец добавляется стабильный короткий хэш уникального профиля.
+    /// </summary>
+    internal static string SanitizeUserSegment(string? user, string? uniqueSeed)
+    {
+        var builder = new StringBuilder();
+        foreach (var ch in (user ?? string.Empty).Trim())
+            builder.Append(char.IsLetterOrDigit(ch) || ch == '-' || ch == '_' ? ch : '_');
+
+        var safe = builder.ToString().Trim('_');
+        if (safe.Length == 0)
+            safe = "user";
+        if (safe.Length > 32)
+            safe = safe[..32];
+
+        var hash = 2166136261u;
+        foreach (var ch in uniqueSeed ?? string.Empty)
+        {
+            hash ^= ch;
+            hash *= 16777619u;
+        }
+
+        return safe + "-" + hash.ToString("x8");
+    }
+
+    /// <summary>
+    /// Best-effort перенос данных из общего каталога в персональный (issue #136,
+    /// 1.0.1.81): файлы копируются без перезаписи, старый каталог не удаляется.
+    /// </summary>
+    private static void EnsureMigratedToPerUserDirectory(string legacyDirectory, string targetDirectory)
+    {
+        try
+        {
+            Directory.CreateDirectory(targetDirectory);
+            CopyDirectory(legacyDirectory, targetDirectory);
+        }
+        catch
+        {
+            // Перенос — вспомогательная операция; при сбое работаем с пустым каталогом.
         }
     }
 
@@ -331,6 +572,9 @@ public static class PlatformPaths
             _resolvedDataDirectory = null;
             _fallbackActive = false;
             _fallbackReason = null;
+            _sharedGuardActive = false;
+            _sharedGuardReason = null;
+            UserSegmentOverride = null;
         }
     }
 
@@ -342,17 +586,32 @@ public static class PlatformPaths
     /// </summary>
     internal static DataDirectoryResolution ResolveDataDirectoryForTests(
         string preferredDirectory,
-        IEnumerable<string> fallbackDirectories)
+        IEnumerable<string> fallbackDirectories,
+        bool applyPerUserGuard = false,
+        bool portableMode = false,
+        Func<string, bool>? isMachineWide = null,
+        string? userSegment = null)
     {
         var resolution = ResolveDataDirectory(preferredDirectory, fallbackDirectories);
+        var guarded = applyPerUserGuard
+            ? ApplyPerUserGuard(
+                resolution,
+                portableMode,
+                isMachineWide ?? IsMachineWideDirectory,
+                userSegment ?? UserDataSegment)
+            : resolution;
+
         lock (ResolutionLock)
         {
-            _resolvedDataDirectory = resolution.DirectoryPath;
-            _fallbackActive = resolution.IsFallback;
-            _fallbackReason = resolution.Reason;
+            _resolvedDataDirectory = guarded.DirectoryPath;
+            _fallbackActive = guarded.IsFallback;
+            _fallbackReason = guarded.Reason;
+            _sharedGuardActive = !string.Equals(
+                guarded.DirectoryPath, resolution.DirectoryPath, StringComparison.OrdinalIgnoreCase);
+            _sharedGuardReason = _sharedGuardActive ? guarded.Reason : null;
             _resolutionDone = true;
         }
-        return resolution;
+        return guarded;
     }
 
     /// <summary>

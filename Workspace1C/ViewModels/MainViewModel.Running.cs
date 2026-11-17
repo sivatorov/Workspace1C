@@ -75,9 +75,11 @@ public partial class MainViewModel
     {
         try
         {
+            // issue #134 (1.0.1.80): ключ базы, а не Id — у баз из кластера Id может
+            // отсутствовать, и они выпадали из сопоставления процессов.
             var before = new HashSet<string>(
-                Infobases.Where(i => i.IsRunning).Select(i => i.Id),
-                StringComparer.Ordinal);
+                Infobases.Where(i => i.IsRunning).Select(RunningInfobaseMatcher.GetBaseKey),
+                StringComparer.OrdinalIgnoreCase);
 
             // issue #131: настройки читаются на каждом опросе — включение галочки,
             // смена канала/порога применяются без перезапуска. Наблюдения собираются
@@ -93,7 +95,7 @@ public partial class MainViewModel
             foreach (var ib in Infobases)
             {
                 // База считается запущенной, если хотя бы один процесс 1С подключён к ней.
-                var matching = matchedByBase.TryGetValue(ib.Id, out var list)
+                var matching = matchedByBase.TryGetValue(RunningInfobaseMatcher.GetBaseKey(ib), out var list)
                     ? list
                     : (System.Collections.Generic.IReadOnlyList<RunningOneCProcess>)
                         System.Array.Empty<RunningOneCProcess>();

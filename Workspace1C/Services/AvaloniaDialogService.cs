@@ -77,8 +77,17 @@ namespace Workspace1C.Services
         /// <param name="skipButtonText">Локализованный текст кнопки пропуска.</param>
         /// <param name="title">Заголовок окна.</param>
         /// <returns>Кнопка, которой пользователь ответил (Esc/крестик — Cancelled).</returns>
+        /// <param name="okButtonText">
+        /// Текст основной кнопки (issue #116, 1.0.1.82): в диалоге обновления — «Обновить».
+        /// </param>
+        /// <param name="notesLinkText">
+        /// Текст ссылки «Что нового»; <c>null</c> — ссылка не показывается
+        /// (issue #116, 1.0.1.82).
+        /// </param>
+        /// <param name="showNotes">Действие по клику на ссылку «Что нового».</param>
         public UpdateDialogResult ConfirmUpdateWithSkip(
-            string summary, string? markdownBody, string skipButtonText, string title = "")
+            string summary, string? markdownBody, string skipButtonText, string title = "",
+            string? okButtonText = null, string? notesLinkText = null, Action? showNotes = null)
         {
             var resolvedTitle = DefaultTitle(title, "Common.Confirm");
             if (UiDialogs.SuppressModalDialogs)
@@ -88,7 +97,7 @@ namespace Workspace1C.Services
             }
             var win = new MaterialMessageWindowAvalonia(
                 summary, resolvedTitle, MaterialMessageKind.Question,
-                markdownBody, skipButtonText);
+                markdownBody, skipButtonText, okButtonText, notesLinkText, showNotes);
             ShowModalSync(win);
             return win.SkipClicked
                 ? UpdateDialogResult.Skipped

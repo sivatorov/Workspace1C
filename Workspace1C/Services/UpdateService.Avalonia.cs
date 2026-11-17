@@ -827,7 +827,15 @@ namespace Workspace1C.Services
                 + LocalizationManager.T("Update.DownloadPrompt");
             // Issue #116: в ручных режимах (Manual/NotifyOnly) описание релиза в диалог
             // не передаётся — пользователь сам запросил обновление и уже знает, что ищет.
-            var result = ConfirmUpdateWithResult(summary, ReleaseNotesForDialog(release));
+            var notes = ReleaseNotesForDialog(release);
+            if (notes is null)
+            {
+                // Issue #116 (1.0.1.82): без предварительной загрузки заголовок уточняет,
+                // что новая версия будет именно загружена.
+                summary = LocalizationManager.T("Update.NewVersionAvailableForDownload")
+                    + Environment.NewLine + Environment.NewLine + summary;
+            }
+            var result = ConfirmUpdateWithResult(summary, notes, release);
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
@@ -930,7 +938,7 @@ namespace Workspace1C.Services
 
             // Повышение прав запускаем только после явного согласия пользователя.
             // Issue #116: описание релиза передаётся только в автоматических режимах.
-            var result = ConfirmUpdateWithResult(prompt, ReleaseNotesForDialog(release));
+            var result = ConfirmUpdateWithResult(prompt, ReleaseNotesForDialog(release), release);
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
@@ -2201,15 +2209,44 @@ rmdir ""$WORK_DIR"" 2>/dev/null || true
         /// (issue #116). Для диалоговой службы без поддержки пропуска кнопка не
         /// добавляется — возвращается обычный результат «Да/Нет».
         /// </summary>
-        private UpdateDialogResult ConfirmUpdateWithResult(string summary, string? body)
+        private UpdateDialogResult ConfirmUpdateWithResult(
+            string summary, string? body, ReleaseInfo release)
         {
             var title = LocalizationManager.T("Update.NewVersionAvailable");
             var skipText = LocalizationManager.T("Update.SkipVersion");
+            // Issue #116 (1.0.1.82): основная кнопка — «Обновить»; в ручных режимах,
+            // где описание скрыто, под сообщением есть ссылка «Что нового».
+            var okText = LocalizationManager.T("Update.Update");
+            var notesLinkText = body is null ? LocalizationManager.T("Update.WhatsNewLink") : null;
             return _dialogs is AvaloniaDialogService avalonia
-                ? avalonia.ConfirmUpdateWithSkip(summary, body, skipText, title)
+                ? avalonia.ConfirmUpdateWithSkip(
+                    summary, body, skipText, title,
+                    okText,
+                    notesLinkText,
+                    notesLinkText is null ? null : () => ShowNewVersionNotes(release))
                 : _dialogs.Confirm(summary, title)
                     ? UpdateDialogResult.Confirmed
                     : UpdateDialogResult.Cancelled;
+        }
+
+        /// <summary>
+        /// Открывает стандартный диалог изменений новой версии (issue #116, 1.0.1.82)
+        /// из ссылки «Что нового» в диалоге обновления. Сбой показа не должен ломать
+        /// сам диалог обновления.
+        /// </summary>
+        private void ShowNewVersionNotes(ReleaseInfo release)
+        {
+            try
+            {
+                var settings = AppServices.GetRequiredService<IInfobaseRepository>().LoadSettings();
+                var dialog = new Workspace1C.WhatsNewWindow(
+                    settings, NormalizeTag(release.TagName), release.Body);
+                dialog.ShowDialogSync();
+            }
+            catch
+            {
+                // Ссылка вспомогательная — молча пропускаем сбой.
+            }
         }
 
         /// <summary>

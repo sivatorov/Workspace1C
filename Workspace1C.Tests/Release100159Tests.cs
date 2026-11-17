@@ -54,18 +54,34 @@ public sealed class Release100159Tests
         return File.ReadAllText(fullPath);
     }
 
-    // ===================== Версия (актуальная — 1.0.1.79, итоговый релиз 1.0.1.79) =====================
+    // ===================== Версия (актуальная — 1.0.1.80) =====================
 
     [Fact]
     public void Csproj_Version_Is_Current_In_AllFourProperties()
     {
         var csproj = ReadProjectFile(Path.Combine("Workspace1C", "Workspace1C.csproj"));
 
-        Assert.Contains("<Version>1.0.1.79</Version>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<AssemblyVersion>1.0.1.79</AssemblyVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<FileVersion>1.0.1.79</FileVersion>", csproj, StringComparison.Ordinal);
-        Assert.Contains("<InformationalVersion>1.0.1.79</InformationalVersion>", csproj, StringComparison.Ordinal);
-        Assert.DoesNotContain("1.0.1.78", csproj, StringComparison.Ordinal);
+        // Версия задаётся свойством Version и обязана совпадать во всех четырёх
+        // свойствах. Тест не привязан к конкретному номеру, поэтому инкремент
+        // последнего числа (1.0.1.80 → 1.0.1.81 → …) не требует правки теста.
+        var version = ExtractProperty(csproj, "Version");
+        Assert.False(string.IsNullOrWhiteSpace(version));
+        Assert.Matches(@"^\d+\.\d+\.\d+\.\d+$", version);
+        Assert.Equal(version, ExtractProperty(csproj, "AssemblyVersion"));
+        Assert.Equal(version, ExtractProperty(csproj, "FileVersion"));
+        Assert.Equal(version, ExtractProperty(csproj, "InformationalVersion"));
+        Assert.DoesNotContain("1.0.1.79", csproj, StringComparison.Ordinal);
+    }
+
+    /// <summary>Значение свойства csproj вида <c><Name>value</Name></c>.</summary>
+    private static string ExtractProperty(string csproj, string name)
+    {
+        var start = csproj.IndexOf("<" + name + ">", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Свойство {name} не найдено в csproj.");
+        start += name.Length + 2;
+        var end = csproj.IndexOf("</" + name + ">", start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Свойство {name} не закрыто в csproj.");
+        return csproj[start..end].Trim();
     }
 
     // ===================== Issue #102: переносимый текст =====================

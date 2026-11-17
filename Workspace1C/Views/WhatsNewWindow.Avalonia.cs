@@ -27,7 +27,17 @@ namespace Workspace1C
         private bool _githubFallbackLoaded;
 
         /// <param name="settings">Настройки профиля: читаются галкой, сохраняет вызывающий.</param>
-        public WhatsNewWindow(Models.AppSettings settings)
+        /// <param name="versionOverride">
+        /// Версия для показа; <c>null</c> — текущая (эффективная) версия приложения.
+        /// Issue #116 (1.0.1.82): диалог обновления передаёт версию нового релиза.
+        /// </param>
+        /// <param name="markdownBodyOverride">
+        /// Готовое тело релиза в markdown; <c>null</c> — обычный поиск сводки.
+        /// </param>
+        public WhatsNewWindow(
+            Models.AppSettings settings,
+            string? versionOverride = null,
+            string? markdownBodyOverride = null)
         {
             _settings = settings;
             Title = LocalizationManager.T("WhatsNew.Title");
@@ -42,7 +52,10 @@ namespace Workspace1C
 
             // Issue #129: при флаге «Считать версию прошлой» окно показывает
             // ЭФФЕКТИВНУЮ версию (предыдущий релиз), а не реальную сборку.
-            var version = WhatsNewService.EffectiveVersion;
+            // Issue #116 (1.0.1.82): из диалога обновления передаётся новая версия.
+            var version = string.IsNullOrWhiteSpace(versionOverride)
+                ? WhatsNewService.EffectiveVersion
+                : versionOverride.Trim();
 
             // Issue #124 (v1.0.1.56): корневая компоновка — DockPanel вместо Grid
             // (Auto/Star/Auto): нижняя панель с галкой «Показывать при запуске»
@@ -60,19 +73,28 @@ namespace Workspace1C
 
             // Сводка изменений релиза: пункты списком.
             var notesPanel = new StackPanel { Orientation = Orientation.Vertical };
-            var notes = WhatsNewService.GetReleaseNotes(version);
-            foreach (var note in notes ?? Array.Empty<string>())
+            if (!string.IsNullOrWhiteSpace(markdownBodyOverride))
             {
-                var item = AvaloniaUi.Text("• " + note, 13);
-                item.Margin = new Thickness(0, 0, 0, 8);
-                notesPanel.Children.Add(item);
+                // Issue #116 (1.0.1.82): изменения НОВОЙ версии из диалога обновления —
+                // тело релиза рендерим как markdown (заголовки, списки, жирный).
+                notesPanel.Children.Add(MarkdownRenderer.ToStackPanel(markdownBodyOverride));
             }
-
-            if (notes is null)
+            else
             {
-                // Issue #116 п.1: для версии без готовой сводки — fallback на body
-                // GitHub-релиза текущего тега (после показа окна, не в конструкторе).
-                Loaded += async (_, _) => await LoadGithubNotesAsync(notesPanel);
+                var notes = WhatsNewService.GetReleaseNotes(version);
+                foreach (var note in notes ?? Array.Empty<string>())
+                {
+                    var item = AvaloniaUi.Text("• " + note, 13);
+                    item.Margin = new Thickness(0, 0, 0, 8);
+                    notesPanel.Children.Add(item);
+                }
+
+                if (notes is null)
+                {
+                    // Issue #116 п.1: для версии без готовой сводки — fallback на body
+                    // GitHub-релиза текущего тега (после показа окна, не в конструкторе).
+                    Loaded += async (_, _) => await LoadGithubNotesAsync(notesPanel);
+                }
             }
             var card = new Border
             {

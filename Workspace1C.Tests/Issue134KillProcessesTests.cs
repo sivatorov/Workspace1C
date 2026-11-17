@@ -619,15 +619,59 @@ public sealed class Issue134KillProcessesTests
     }
 
     [Fact]
-    public void FormatKillAllSummary_WithoutBaseNames_KeepsCountersOnly()
+    public void FormatKillAllSummary_WithoutBaseNames_DerivesNamesFromCommandLine()
     {
-        // Обратная совместимость: карты «PID → имя базы» нет — прежний текст со счётчиками.
-        var processes = new[] { Process(pid: 1), Process(pid: 2) };
+        // issue #134 (1.0.1.80): карты «PID → имя базы» нет (WMI не отдал подробности),
+        // но командная строка содержит /F или /S — имя базы извлекается из неё,
+        // и отчёт больше не ограничивается счётчиками.
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 2, processName: "1cv8.exe", commandLine: "ENTERPRISE /S\"srv1\\beta\"")
+        };
 
         var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
             processes, new[] { 2 }, Translate);
 
-        Assert.Equal("Завершено: 1, ошибок: 1", summary);
+        Assert.Contains("Завершено: 1, ошибок: 1", summary, StringComparison.Ordinal);
+        Assert.Contains("Базы: Alpha, beta", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Не удалось определить базы", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_NoCommandLine_ReportsUndeterminedClientProcesses()
+    {
+        // Если базу определить нельзя, отчёт явно перечисляет PID клиентских процессов,
+        // а не показывает «только счётчики» без пояснения (issue #134, 1.0.1.80).
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: string.Empty),
+            Process(pid: 2, commandLine: "   ")
+        };
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, new[] { 2 }, Translate);
+
+        Assert.Contains("Завершено: 1, ошибок: 1", summary, StringComparison.Ordinal);
+        Assert.Contains("Не удалось определить базы для процессов: 1, 2", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FormatKillAllSummary_ServerProcesses_AreNotListedAsUndetermined()
+    {
+        // Серверные процессы (ragent/rmngr/rphost) к базам не относятся — их PID
+        // в строку «не удалось определить базы» не попадают.
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 2, processName: "rphost.exe", commandLine: string.Empty)
+        };
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            processes, Array.Empty<int>(), Translate);
+
+        Assert.Contains("Базы: Alpha", summary, StringComparison.Ordinal);
+        Assert.DoesNotContain("Не удалось определить базы", summary, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -771,15 +815,111 @@ public sealed class Issue134KillProcessesTests
     }
 
     [Fact]
-    public void FormatKillAllSummary_UtilityPath_WithoutMap_KeepsCountersOnly()
+    public void FormatKillAllSummary_UtilityPath_WithoutMap_UsesCommandLineFallback()
     {
-        // Снимка нет (WMI недоступен) — карты нет: прежний текст со счётчиками.
-        var processes = new[] { Process(pid: 1), Process(pid: 2) };
+        // Снимка нет (WMI недоступен) — карты нет, но имена извлекаются из командных
+        // строк процессов (issue #134, 1.0.1.80).
+        var processes = new[]
+        {
+            Process(pid: 1, commandLine: "ENTERPRISE /F\"C:\\Bases\\Alpha\""),
+            Process(pid: 2, processName: "1cv8.exe", commandLine: "ENTERPRISE /S\"srv1\\Beta\"")
+        };
 
         var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
             processes, new[] { 2 }, Translate, baseNamesByPid: null);
 
-        Assert.Equal("Завершено: 1, ошибок: 1", summary);
+        Assert.Contains("Завершено: 1, ошибок: 1", summary, StringComparison.Ordinal);
+        Assert.Contains("Базы: Alpha, Beta", summary, StringComparison.Ordinal);
+        Assert.Contains("Не удалось завершить процессы баз: Beta", summary, StringComparison.Ordinal);
+    }
+
+    // ===== issue #134 (1.0.1.80): базы без Id и имена из командной строки =====
+
+    [Fact]
+    public void BuildMenuPlan_BaseWithoutId_IsGroupedAndNamed()
+    {
+        // Импорт из кластера (RacInfobaseMapper) создаёт базу с Id = "" — раньше она
+        // выпадала из плана и из карты имён, и отчёт показывал только счётчики.
+        var clusterBase = new Infobase
+        {
+            Id = string.Empty,
+            Name = "bgu",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "srv1",
+                DatabaseName = "bgu"
+            }
+        };
+        var processes = new[]
+        {
+            Process(pid: 7, processName: "1cv8.exe", commandLine: "ENTERPRISE /S\"srv1\\bgu\"")
+        };
+
+        var plan = KillProcessesMenuPlanner.BuildMenuPlan(new[] { clusterBase }, processes, Translate);
+
+        Assert.False(plan.IsEmpty);
+        Assert.Single(plan.AllProcesses);
+        Assert.NotNull(plan.BaseNamesByPid);
+        Assert.Equal("bgu", plan.BaseNamesByPid![7]);
+
+        var summary = KillProcessesMenuPlanner.FormatKillAllSummary(
+            plan.AllProcesses, Array.Empty<int>(), Translate, plan.BaseNamesByPid);
+        Assert.Contains("Базы: bgu", summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildBaseNamesByPid_ServerBaseWithoutDatabaseName_MatchesByBaseName()
+    {
+        // Клиент-серверная база, добавленная только по адресу сервера: DatabaseName пуст,
+        // имя базы в кластере совпадает с названием карточки (issue #134, 1.0.1.80).
+        var baseByName = new Infobase
+        {
+            Id = "no-db-name",
+            Name = "bgu",
+            Connection = new ConnectionSettings
+            {
+                Type = ConnectionType.ClientServer,
+                Server = "srv1",
+                DatabaseName = string.Empty
+            }
+        };
+        var processes = new[]
+        {
+            Process(pid: 5, processName: "1cv8.exe", commandLine: "ENTERPRISE /S\"srv1\\bgu\"")
+        };
+
+        var map = KillProcessesMenuPlanner.BuildBaseNamesByPid(new[] { baseByName }, processes, Translate);
+
+        Assert.Equal("bgu", map[5]);
+    }
+
+    [Theory]
+    [InlineData("ENTERPRISE /F\"C:\\Bases\\BGU\"", "BGU")]
+    [InlineData("ENTERPRISE /F C:\\Bases\\BGU\\", "BGU")]
+    [InlineData("ENTERPRISE /S\"srv1\\bgu\"", "bgu")]
+    [InlineData("ENTERPRISE /IBName\"bgu\"", "bgu")]
+    [InlineData("ENTERPRISE /IBConnectionString\"Srvr=srv1;Ref=bgu;\"", "bgu")]
+    [InlineData("ENTERPRISE /IBConnectionString\"File=C:\\Bases\\BGU;\"", "BGU")]
+    [InlineData("ENTERPRISE", null)]
+    [InlineData("", null)]
+    public void DescribeBaseFromCommandLine_ExtractsBaseName(string commandLine, string? expected)
+    {
+        Assert.Equal(expected, KillProcessesMenuPlanner.DescribeBaseFromCommandLine(commandLine));
+    }
+
+    [Fact]
+    public void BothPlatforms_UtilityKillProcesses_LogReportDiagnostics()
+    {
+        // Диагностика причины «только счётчики» пишется в журнал в обоих путях.
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Tools.cs"));
+        var avalonia = ReadProjectFile(
+            Path.Combine("Workspace1C", "ViewModels", "MainViewModel.Avalonia.Tools.cs"));
+
+        Assert.Contains("LogKillReportDiagnostics(", wpf, StringComparison.Ordinal);
+        Assert.Contains("LogKillReportDiagnostics(", avalonia, StringComparison.Ordinal);
+        Assert.Contains("имён баз", wpf, StringComparison.Ordinal);
+        Assert.Contains("имён баз", avalonia, StringComparison.Ordinal);
     }
 
     // ===================== Локализация =====================
@@ -829,6 +969,8 @@ public sealed class Issue134KillProcessesTests
         // Сводка массового завершения перечисляет базы (доработка автора issue #134).
         Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllBasesFormatKey], StringComparison.Ordinal);
         Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllFailedBasesFormatKey], StringComparison.Ordinal);
+        // issue #134 (1.0.1.80): строка о процессах, для которых база не определена.
+        Assert.Contains("{0}", strings[KillProcessesMenuPlanner.KillAllUndeterminedFormatKey], StringComparison.Ordinal);
         Assert.Equal(", ", strings[KillProcessesMenuPlanner.BasesSeparatorKey]);
     }
 
@@ -855,6 +997,7 @@ public sealed class Issue134KillProcessesTests
         Assert.Contains(KillProcessesMenuPlanner.KillAllSummaryFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillAllBasesFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.KillAllFailedBasesFormatKey, ru);
+        Assert.Contains(KillProcessesMenuPlanner.KillAllUndeterminedFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.BasesSeparatorKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.GroupHeaderFormatKey, ru);
         Assert.Contains(KillProcessesMenuPlanner.UnknownBaseKey, ru);
@@ -1054,6 +1197,7 @@ public sealed class Issue134KillProcessesTests
         [KillProcessesMenuPlanner.KillAllSummaryFormatKey] = "Завершено: {0}, ошибок: {1}",
         [KillProcessesMenuPlanner.KillAllBasesFormatKey] = "Базы: {0}",
         [KillProcessesMenuPlanner.KillAllFailedBasesFormatKey] = "Не удалось завершить процессы баз: {0}",
+        [KillProcessesMenuPlanner.KillAllUndeterminedFormatKey] = "Не удалось определить базы для процессов: {0}",
         [KillProcessesMenuPlanner.BasesSeparatorKey] = ", ",
         [KillProcessesMenuPlanner.GroupHeaderFormatKey] = "{0} ({1})",
         [KillProcessesMenuPlanner.UnknownBaseKey] = "база без имени",

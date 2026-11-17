@@ -46,8 +46,14 @@ public partial class UpdateAvailableWindow : Window
         _release = release;
         _service = service;
 
-        Title = LocalizationManager.T("Update.NewVersionAvailable");
-        HeadingText.Text = LocalizationManager.T("Update.NewVersionAvailable");
+        // Issue #116 (1.0.1.82): когда файл ещё не скачан, заголовок уточняет,
+        // что версия будет именно загружена; для готового файла — прежний текст.
+        var readyToInstall = _service.IsReadyFor(release);
+        var headingKey = readyToInstall
+            ? "Update.NewVersionAvailable"
+            : "Update.NewVersionAvailableForDownload";
+        Title = LocalizationManager.T(headingKey);
+        HeadingText.Text = LocalizationManager.T(headingKey);
         // Issue #129: при включённом «Считать версию прошлой» подпись текущей версии
         // показывает реальную сборку и эффективную (понижённую) версию.
         CurrentVersionText.Text = string.Format(
@@ -58,6 +64,11 @@ public partial class UpdateAvailableWindow : Window
                 LocalizationManager.T("Common.VersionEffective")));
         NewVersionText.Text = string.Format(
             LocalizationManager.T("Update.NewVersion"), NormalizeTag(release.TagName));
+
+        // Issue #116 (1.0.1.82): ссылка «Что нового» открывает стандартный диалог
+        // изменений новой версии. Нужна в ручных режимах, где блок описания скрыт.
+        WhatsNewLinkText.Text = LocalizationManager.T("Update.WhatsNewLink");
+        WhatsNewLink.Visibility = showReleaseNotes ? Visibility.Collapsed : Visibility.Visible;
 
         if (showReleaseNotes)
         {
@@ -93,15 +104,20 @@ public partial class UpdateAvailableWindow : Window
         }
 
         // Issue #116 (v1.0.1.58): если файл обновления уже скачан в фоне (режим
-        // «Загружать с предложением установки»), вместо «Скачать» показывается
+        // «Загружать с предложением установки»), вместо «Обновить» показывается
         // «Установить» — она сразу применяет готовый файл по логике автообновления.
-        var readyToInstall = _service.IsReadyFor(release);
         InstallButton.Visibility = readyToInstall ? Visibility.Visible : Visibility.Collapsed;
         DownloadButton.Visibility = readyToInstall ? Visibility.Collapsed : Visibility.Visible;
         InstallButton.IsDefault = readyToInstall;
         DownloadButton.IsDefault = !readyToInstall;
 
-        Loaded += (_, _) => (readyToInstall ? InstallButton : DownloadButton).Focus();
+        // Issue #116 (1.0.1.82): окно подстраивается под содержимое по обеим осям;
+        // зафиксированные габариты пересчитываются после отрисовки каждого этапа.
+        Loaded += (_, _) =>
+        {
+            CaptureFixedSize();
+            (readyToInstall ? InstallButton : DownloadButton).Focus();
+        };
 
         // Закрытие окна по Esc (issue #371): единообразно с остальными окнами приложения
         // (ActualReleasesWindow и др.). Во время скачивания окно не закрывается — как и
@@ -237,6 +253,30 @@ public partial class UpdateAvailableWindow : Window
         });
     }
 
+    /// <summary>
+    /// Клик по ссылке «Что нового» (issue #116, 1.0.1.82): открывает стандартный
+    /// диалог изменений новой версии с телом её GitHub-релиза.
+    /// </summary>
+    private void OnWhatsNewLinkClick(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var settings = AppServices.GetRequiredService<IInfobaseRepository>().LoadSettings();
+            var dialog = new WhatsNewWindow(
+                settings,
+                NormalizeTag(_release.TagName),
+                _release.Body)
+            {
+                Owner = this
+            };
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            LogDiagnostic("Не удалось открыть «Что нового»: " + ex.Message);
+        }
+    }
+
     /// <summary>«Перезапустить сейчас»: применяем обновление с перезапуском и закрываем приложение.</summary>
     private void OnRestartNowClick(object sender, RoutedEventArgs e)
     {
@@ -362,12 +402,16 @@ public partial class UpdateAvailableWindow : Window
 
     /// <summary>
     /// Принудительно пересчитывает размер окна по содержимому текущего этапа
-    /// (issue #157). WPF не всегда пересобирает окно с <c>SizeToContent="Height"</c>
+    /// (issues #157, #116). WPF не всегда пересобирает окно с авто-подбором размера
     /// после изменения <c>Visibility</c> блоков (предложение → скачивание → применение →
     /// ошибка), поэтому сбрасываем авто-подбор в Manual, заново меряем содержимое и
     /// возвращаем обратно. Так окно каждый раз подстраивается именно под текущий этап:
-    /// высота не «застревает» от длинного описания изменений или от предыдущего диалога,
+    /// габариты не «застревают» от длинного описания изменений или предыдущего диалога,
     /// а прогресс-бар и кнопки не обрезаются и не остаётся пустоты снизу.
+    /// <para>
+    /// issue #116 (1.0.1.82): авто-подбор теперь по обеим осям — окно подгоняется
+    /// под содержимое, а не под фиксированную ширину 680 и минимальную высоту 320.
+    /// </para>
     /// </summary>
     private void RefreshWindowSize()
     {
@@ -378,14 +422,15 @@ public partial class UpdateAvailableWindow : Window
 
             // Сброс в Manual (авто-подбор выключен) и принудительный перерасчёт заставляют
             // окно заново измерить содержимое текущего этапа, после чего возвращаем
-            // авто-подбор высоты.
+            // авто-подбор по обеим осям и запоминаем фактический размер для WndProc.
             SizeToContent = SizeToContent.Manual;
             InvalidateMeasure();
             UpdateLayout();
 
-            SizeToContent = SizeToContent.Height;
+            SizeToContent = SizeToContent.WidthAndHeight;
             InvalidateMeasure();
             UpdateLayout();
+            CaptureFixedSize();
         }
         catch
         {
@@ -484,33 +529,55 @@ public partial class UpdateAvailableWindow : Window
         public int Bottom;
     }
 
+    // Зафиксированные габариты окна (issue #116, 1.0.1.82): пересчитываются после
+    // каждого этапа, чтобы WndProc не возвращал размеры предыдущего содержимого.
+    private double _lockedWidthDips;
+    private double _lockedHeightDips;
+
+    /// <summary>
+    /// Запоминает фактический размер окна после пересчёта содержимого: именно эти
+    /// габариты фиксирует WndProc (WM_GETMINMAXINFO / WM_SIZING).
+    /// </summary>
+    private void CaptureFixedSize()
+    {
+        if (ActualWidth > 0)
+            _lockedWidthDips = ActualWidth;
+        if (ActualHeight > 0)
+            _lockedHeightDips = ActualHeight;
+    }
+
     /// <summary>
     /// Возвращает фиксированную ширину окна в DIP (device-independent units), которую
-    /// нельзя изменить мышью. До первой реальной отрисовки берём значение из свойства
-    /// <see cref="Window.Width"/>, иначе — фактическую ширину окна.
+    /// нельзя изменить мышью: последний измеренный размер, иначе фактический,
+    /// иначе — разумный минимум (issue #116, 1.0.1.82).
     /// </summary>
     private double FixedWidthDips
     {
         get
         {
-            var w = ActualWidth;
-            return w > 0 ? w : Width;
+            if (_lockedWidthDips > 0)
+                return _lockedWidthDips;
+            if (ActualWidth > 0)
+                return ActualWidth;
+            return double.IsNaN(Width) || Width <= 0 ? 440 : Width;
         }
     }
 
     /// <summary>
     /// Возвращает фиксированную высоту окна в DIP (device-independent units),
     /// которую нельзя изменить мышью (issue #116 v1.0.1.54: окно подтверждения
-    /// перезапуска нельзя растягивать по вертикали — «растягивается странно»).
-    /// До первой реальной отрисовки берём значение из <see cref="Window.Height"/>,
-    /// иначе — фактическую высоту окна (подстроенную SizeToContent="Height").
+    /// перезапуска нельзя растягивать по вертикали). Значение берётся из последнего
+    /// измерения содержимого, поэтому окно не «застревает» на высоте другого этапа.
     /// </summary>
     private double FixedHeightDips
     {
         get
         {
-            var h = ActualHeight;
-            return h > 0 ? h : Height;
+            if (_lockedHeightDips > 0)
+                return _lockedHeightDips;
+            if (ActualHeight > 0)
+                return ActualHeight;
+            return double.IsNaN(Height) || Height <= 0 ? 200 : Height;
         }
     }
 

@@ -37,8 +37,48 @@ public static class RunningInfobaseMatcher
                     commandLine,
                     infobase.Connection.Server ?? "",
                     infobase.Connection.DatabaseName ?? "")
+                // issue #134 (1.0.1.80): у базы, добавленной только по адресу сервера,
+                // DatabaseName может быть пустым — тогда имя базы в кластере берём из
+                // названия карточки (сравнение по серверу сохраняется).
+                || (string.IsNullOrWhiteSpace(infobase.Connection.DatabaseName)
+                    && MatchesServerNameValue(
+                        commandLine,
+                        infobase.Connection.Server ?? "",
+                        infobase.Name))
                 || MatchesIbConnectionString(infobase, commandLine),
             _ => false
+        };
+    }
+
+    /// <summary>
+    /// Ключ базы для словарей сопоставления (issue #134, 1.0.1.80). Раньше матчер и план
+    /// подменю требовали непустой <see cref="Infobase.Id"/> и молча пропускали остальные
+    /// базы: у импортированных из кластера баз Id пуст, поэтому они не получали ни
+    /// индикатор запуска, ни пункты в подменю, ни имена в сводке завершения процессов.
+    /// Теперь ключ строится из Id, а при его отсутствии — из подписи подключения,
+    /// поэтому такие базы участвуют в сопоставлении на равных.
+    /// </summary>
+    public static string GetBaseKey(Infobase infobase)
+    {
+        if (infobase is null)
+            throw new ArgumentNullException(nameof(infobase));
+
+        var id = (infobase.Id ?? string.Empty).Trim();
+        if (id.Length > 0)
+            return id;
+
+        var connection = infobase.Connection;
+        if (connection is null)
+            return "name:" + NormalizeName(infobase.Name);
+
+        return connection.Type switch
+        {
+            ConnectionType.File => "file:" + NormalizePath(connection.FilePath ?? ""),
+            ConnectionType.ClientServer =>
+                "srv:" + NormalizeServerHost(connection.Server ?? "")
+                + "\\" + (connection.DatabaseName ?? string.Empty).Trim()
+                + "|" + NormalizeName(infobase.Name),
+            _ => connection.Type + ":" + (connection.ToConnectionString() ?? string.Empty)
         };
     }
 
@@ -262,9 +302,11 @@ public static class RunningInfobaseMatcher
     public static IReadOnlyDictionary<string, List<RunningOneCProcess>> MatchProcesses(
         IEnumerable<Infobase> infobases, IReadOnlyList<RunningOneCProcess> processes)
     {
-        var result = new Dictionary<string, List<RunningOneCProcess>>();
+        // issue #134 (1.0.1.80): Id больше не обязателен — ключ базы строит GetBaseKey,
+        // иначе базы из кластера (Id = "") выпадали из сопоставления целиком.
+        var result = new Dictionary<string, List<RunningOneCProcess>>(StringComparer.OrdinalIgnoreCase);
         var bases = (infobases ?? Enumerable.Empty<Infobase>())
-            .Where(ib => ib?.Connection is not null && !string.IsNullOrWhiteSpace(ib.Id))
+            .Where(ib => ib?.Connection is not null)
             .ToList();
         var processList = processes ?? (IReadOnlyList<RunningOneCProcess>)Array.Empty<RunningOneCProcess>();
         if (bases.Count == 0 || processList.Count == 0)
@@ -277,7 +319,7 @@ public static class RunningInfobaseMatcher
             RunningMatchDebug.Log($"MatchProcesses: bases={bases.Count}, processes={processList.Count}");
             foreach (var ib in bases)
                 RunningMatchDebug.Log(
-                    $"  base id={ib.Id} name=\"{ib.Name}\" db=\"{ib.Connection.DatabaseName}\" " +
+                    $"  base key={GetBaseKey(ib)} id=\"{ib.Id}\" name=\"{ib.Name}\" db=\"{ib.Connection.DatabaseName}\" " +
                     $"server=\"{ib.Connection.Server}\" file=\"{ib.Connection.FilePath}\" type={ib.Connection.Type}");
             foreach (var p in processList)
                 RunningMatchDebug.Log($"  process exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
@@ -296,7 +338,7 @@ public static class RunningInfobaseMatcher
             }
             else
             {
-                AddToResult(result, owner.Id, process);
+                AddToResult(result, GetBaseKey(owner), process);
                 if (RunningMatchDebug.IsEnabled)
                     RunningMatchDebug.Log($"  pass1: matched to base id={owner.Id} (direct keys)");
             }
@@ -335,7 +377,7 @@ public static class RunningInfobaseMatcher
             if (nameCandidates.TryGetValue(name, out var candidates) && candidates.Count == 1)
             {
                 var owner = candidates[0];
-                AddToResult(result, owner.Id, process);
+                AddToResult(result, GetBaseKey(owner), process);
                 if (RunningMatchDebug.IsEnabled)
                     RunningMatchDebug.Log($"  pass2: /IBName \"{name}\" matched to base id={owner.Id}");
             }
@@ -360,7 +402,10 @@ public static class RunningInfobaseMatcher
             return;
         if (!candidates.TryGetValue(name, out var list))
             candidates[name] = list = new List<Infobase>();
-        if (!list.Any(b => string.Equals(b.Id, infobase.Id, StringComparison.Ordinal)))
+        // Дубликат определяем по ключу базы (issue #134, 1.0.1.80): у баз без Id
+        // сравнение по пустой строке ошибочно склеивало разные базы в одну.
+        var key = GetBaseKey(infobase);
+        if (!list.Any(b => string.Equals(GetBaseKey(b), key, StringComparison.OrdinalIgnoreCase)))
             list.Add(infobase);
     }
 
@@ -422,6 +467,35 @@ public static class RunningInfobaseMatcher
             return false;
 
         return string.Equals(cmdDb, dbName, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(
+                NormalizeServerHost(cmdServer),
+                NormalizeServerHost(server),
+                StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Сопоставление клиент-серверной базы по ключу <c>/S</c>, когда имя базы в кластере
+    /// в карточке не заполнено (issue #134, 1.0.1.80): имя из командной строки
+    /// сравнивается с названием карточки, адрес сервера — как в
+    /// <see cref="MatchesServerValue"/>. Применяется только при пустом
+    /// <see cref="ConnectionSettings.DatabaseName"/>, чтобы не давать ложных совпадений.
+    /// </summary>
+    internal static bool MatchesServerNameValue(
+        string commandLine, string expectedServer, string expectedName)
+    {
+        var server = (expectedServer ?? "").Trim();
+        var name = (expectedName ?? "").Trim();
+        if (server.Length == 0 || name.Length == 0)
+            return false;
+
+        if (!TryExtractValue(commandLine, "S", out var raw))
+            return false;
+
+        var (cmdServer, cmdDb) = SplitServerValue(raw);
+        if (cmdDb.Length == 0)
+            return false;
+
+        return string.Equals(cmdDb, name, StringComparison.OrdinalIgnoreCase)
             && string.Equals(
                 NormalizeServerHost(cmdServer),
                 NormalizeServerHost(server),
