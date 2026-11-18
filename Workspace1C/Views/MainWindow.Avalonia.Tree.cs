@@ -108,7 +108,7 @@ namespace Workspace1C
             // уведомляет о смене темы (HeaderBrush), поэтому строка перекрашивается
             // сразу, без перезапуска. Насыщенная заливка не используется.
             void ApplyGroupBackground()
-                => header.Background = group.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush;
+                => header.Background = header.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush;
             ApplyGroupBackground();
             header.PointerEntered += (_, _) => ApplyGroupBackground();
             header.PointerExited += (_, _) => ApplyGroupBackground();

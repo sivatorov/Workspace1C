@@ -263,7 +263,7 @@ public sealed class GroupRowAppearanceTests
     public void Avalonia_GroupRow_BindsHoverAndStripe()
     {
         var tree = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
-        Assert.Contains("group.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush", tree, StringComparison.Ordinal);
+        Assert.Contains("header.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush", tree, StringComparison.Ordinal);
         Assert.Contains("stripe.Bind(Border.BackgroundProperty, new Binding(\"HeaderStripeBrush\")", tree, StringComparison.Ordinal);
         Assert.Contains("Width = 3", tree, StringComparison.Ordinal);
     }
