@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.83</Version>
-    <AssemblyVersion>1.0.1.83</AssemblyVersion>
-    <FileVersion>1.0.1.83</FileVersion>
-    <InformationalVersion>1.0.1.83</InformationalVersion>
+    <Version>1.0.1.84</Version>
+    <AssemblyVersion>1.0.1.84</AssemblyVersion>
+    <FileVersion>1.0.1.84</FileVersion>
+    <InformationalVersion>1.0.1.84</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -388,6 +388,10 @@
          достижимость); используется и Windows (WPF), и Linux (Avalonia) — подключается
          явно (имя не совпадает с глобом *.Avalonia.cs). -->
     <Compile Include="ViewModels\RevealPlanner.cs" />
+    <!-- Состав блока «Информация о подключении» (issue #138, 1.0.1.84): чистая логика
+         без WPF-зависимостей, используется и Windows, и Linux — подключается явно
+         (имя не совпадает с глобом *.Avalonia.cs). -->
+    <Compile Include="ViewModels\ConnectionInfoPresenter.cs" />
     <!-- MainViewModel.Avalonia.cs разбит на partial-файлы по ответственности
          (имена «MainViewModel.Avalonia.*.cs» не совпадают с глобом *.Avalonia.cs),
          поэтому каждый добавляется явно. -->

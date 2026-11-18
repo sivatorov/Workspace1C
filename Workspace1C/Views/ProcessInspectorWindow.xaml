@@ -13,6 +13,16 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
 
+        <!-- issue #140 (1.0.1.84): глобальный стиль DataGrid (LightTheme/DarkTheme)
+             задаёт AlternatingRowBackground. WPF применяет его к чётным строкам как
+             локальное значение Background, и оно перекрывает триггер IsSelected стиля
+             строки — выделение чётных строк становилось невидимым. Для инспектора
+             чередование отключается: «зебру» рисует триггер локального RowStyle ниже. -->
+        <Style x:Key="ProcessesGridStyle" TargetType="DataGrid"
+               BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AlternatingRowBackground" Value="{x:Null}"/>
+        </Style>
+
         <!-- Вертикальное выравнивание содержимого ячеек по центру (как в MaintenanceCenterWindow). -->
         <Style x:Key="CenteredCellText" TargetType="TextBlock">
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -42,6 +52,7 @@
 
         <!-- Таблица процессов 1С -->
         <DataGrid x:Name="ProcessesGrid" Grid.Row="2"
+                  Style="{StaticResource ProcessesGridStyle}"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                   SelectionMode="Extended" SelectionUnit="FullRow"
@@ -49,9 +60,30 @@
                   SelectionChanged="OnGrid_SelectionChanged"
                   GridLinesVisibility="Horizontal"
                   RowHeight="38"
-                  AlternatingRowBackground="{DynamicResource CardBackgroundBrush}"
+                  AlternationCount="2"
                   BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
                   MouseDoubleClick="OnGrid_MouseDoubleClick">
+            <!-- issue #140 (1.0.1.84): зебра задаётся триггером локального RowStyle, а не
+                 AlternatingRowBackground. Локальный фон чередования перекрывал триггер
+                 IsSelected стиля строки, из-за чего выделение не было видно. Триггер
+                 IsSelected стоит последним и всегда перекрывает зебру и hover. -->
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
+                    <Style.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                        </Trigger>
+                        <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                            <Setter Property="Background" Value="{DynamicResource ZebraRowBrush}"/>
+                        </Trigger>
+                        <!-- Последним: выделение всегда перекрывает зебру и hover. -->
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.CellStyle>
                 <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
                     <Setter Property="VerticalContentAlignment" Value="Center"/>

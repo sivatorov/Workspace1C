@@ -661,6 +661,18 @@
                                 <Path Width="18" Height="18" Stretch="Uniform"
                                       Data="{DynamicResource IconSonar}" Fill="{DynamicResource InfoBrush}"/>
                             </Button>
+                            <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ):
+                                 иконка набора инструментов сразу после «Проверить доступность
+                                 всех баз» и до разделителя — быстрый доступ вместо пункта
+                                 «Утилиты → Операции», где он был неюзабелен. -->
+                            <Button x:Name="ProcessInspectorButton"
+                                    Command="{Binding ProcessInspectorCommand}"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="8,7"
+                                    ToolTip="{loc:Loc Main.ProcessInspectorTooltip}">
+                                <Path Width="18" Height="18" Stretch="Uniform"
+                                      Data="{DynamicResource IconApplicationCog}"
+                                      Fill="{DynamicResource InfoBrush}"/>
+                            </Button>
                             <!-- Вертикальный разделитель: отделяет группу «Управление списком» от «Настройки» -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
@@ -688,16 +700,6 @@
                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
-                            </Button>
-                            <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ):
-                                 быстрый доступ рядом с «Утилитами». -->
-                            <Button x:Name="ProcessInspectorButton"
-                                    Command="{Binding ProcessInspectorCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="8,7"
-                                    ToolTip="{loc:Loc Main.ProcessInspectorTooltip}">
-                                <Path Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconApplicationCog}"
-                                      Fill="{DynamicResource InfoBrush}"/>
                             </Button>
                             <!-- «Настройки»: тема, компактный режим, настройки, справка -->
                             <Button x:Name="ThemeToggleButton" Click="OnToggleTheme_Click"
@@ -2938,57 +2940,61 @@
                             </WrapPanel>
 
                             <!-- Основное -->
-                            <TextBlock Text="{loc:Loc Main.SectionConnInfo}" FontWeight="SemiBold" FontSize="11"
-                                       Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
-                                       Typography.Capitals="AllSmallCaps"/>
+                            <!-- Issue #138 (1.0.1.84): заголовок и кнопка «Открыть каталог» рядом.
+                                 Кнопка видна только для файловой базы (ShowOpenFolderLink). -->
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{loc:Loc Main.SectionConnInfo}" FontWeight="SemiBold" FontSize="11"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Typography.Capitals="AllSmallCaps" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" Content="{loc:Loc Main.ConnectionInfo.OpenFolder}"
+                                        Command="{Binding OpenInfobaseFolderCommand}"
+                                        Visibility="{Binding ShowOpenFolderLink, Converter={StaticResource BoolToVis}}"
+                                        Style="{DynamicResource SecondaryButton}"
+                                        Padding="10,3" FontSize="11" Cursor="Hand"/>
+                            </Grid>
                             <!-- Шкала скруглений (аудит UI, п. 3.1): выброс 12 → 10. -->
                             <Border Background="{DynamicResource ContentBackgroundBrush}" CornerRadius="10"
                                     BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
                                     Padding="12,10" Margin="0,0,0,14">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="110"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:Loc Main.Type}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding SelectedInfobase.ConnectionTypeDisplay}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:Loc Main.ServerPath}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedInfobase.ConnectionPathDisplay}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Loc Column.ServerBase}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedInfobase.ServerDatabaseDisplay}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Loc Main.ConnectionString}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedInfobase.ConnectionStringDisplay}" FontSize="11" FontWeight="SemiBold"  TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Loc Main.Platform}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedInfobase.PlatformVersion}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="{loc:Loc Main.LaunchMode}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedInfobase.ParsedLaunchMode}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="{loc:Loc Main.Client}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedInfobase.ClientTypeDisplay}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="7" Grid.Column="0" Text="{loc:Loc Main.Bitness}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedInfobase.ArchitectureDisplay}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="8" Grid.Column="0" Text="{loc:Loc Main.Parameters}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding SelectedInfobase.LaunchParameters}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="9" Grid.Column="0" Text="{loc:Loc Main.LastLaunch}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding SelectedInfobase.LastLaunchDisplay}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="10" Grid.Column="0" Text="{loc:Loc Main.CacheSize}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding SelectedInfobase.CacheSizeDisplay}" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="11" Grid.Column="0" Text="{loc:Loc Column.Configuration}" FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"/>
-                                    <TextBlock Grid.Row="11" Grid.Column="1" Text="{Binding SelectedInfobase.ConfigurationDisplay}" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                </Grid>
+                                <!-- Issue #138 (1.0.1.84): строки строятся по виду базы
+                                     (ConnectionInfoPresenter), а не фиксированной сеткой:
+                                     у файловых и веб-баз нет дублирования пути. -->
+                                <ItemsControl ItemsSource="{Binding ConnectionInfoFields}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="110"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{Binding Label}" FontSize="12"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                <!-- Кликабельные значения копируются в буфер обмена
+                                                     (issue #138, 1.0.1.84). -->
+                                                <TextBlock Grid.Column="1" Text="{Binding Value}" Tag="{Binding Value}"
+                                                           FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                           MouseLeftButtonUp="OnConnectionInfoValueClick">
+                                                    <TextBlock.Style>
+                                                        <Style TargetType="TextBlock">
+                                                            <Setter Property="Cursor" Value="Arrow"/>
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Copyable}" Value="True">
+                                                                    <Setter Property="Cursor" Value="Hand"/>
+                                                                    <Setter Property="ToolTip"
+                                                                            Value="{loc:Loc Main.ConnectionInfo.CopyTooltip}"/>
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </TextBlock.Style>
+                                                </TextBlock>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </Border>
                             <TextBlock Text="{loc:Loc Main.Description}" FontWeight="SemiBold" FontSize="12"
                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,4"/>

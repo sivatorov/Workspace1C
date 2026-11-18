@@ -866,9 +866,10 @@ namespace Workspace1C.Services
             // Single-file в каталоге пользователя — применяем готовый файл напрямую.
             if (IsDirectoryWritable(Path.GetDirectoryName(target)))
             {
-                var restartNow = _dialogs.Confirm(
-                    LocalizationManager.T("Update.RestartNowPrompt"),
-                    LocalizationManager.T("Update.NewVersionAvailable"));
+                // Issue #139 (1.0.1.84): диалог перезапуска — по той же политике
+                // размеров, что и окно «Доступна новая версия…» (fitContent).
+                var restartNow = ConfirmRestartNow(
+                    LocalizationManager.T("Update.RestartNowPrompt"));
 
                 if (restartNow)
                 {
@@ -1002,9 +1003,9 @@ namespace Workspace1C.Services
             }
 
             // Спрашиваем, как применить обновление: перезапустить сейчас или после закрытия.
-            var restartNow = _dialogs.Confirm(
-                LocalizationManager.T("Update.RestartNowPrompt"),
-                LocalizationManager.T("Update.NewVersionAvailable"));
+            // Issue #139 (1.0.1.84): та же политика размеров, что у окна обновления.
+            var restartNow = ConfirmRestartNow(
+                LocalizationManager.T("Update.RestartNowPrompt"));
 
             if (restartNow)
             {
@@ -2336,6 +2337,20 @@ rmdir ""$WORK_DIR"" 2>/dev/null || true
             return _dialogs is AvaloniaDialogService avalonia
                 ? avalonia.ConfirmUpdate(summary, body, title)
                 : _dialogs.Confirm(summary, title);
+        }
+
+        /// <summary>
+        /// Issue #139 (1.0.1.84): подтверждение перезапуска после скачивания.
+        /// Для Avalonia-диалогов окно строится по содержимому (<c>fitContent</c>) —
+        /// те же правила, что у окна «Доступна новая версия…»: ограничение рабочей
+        /// областью и перенос кнопок. Для прочих реализаций — обычное подтверждение.
+        /// </summary>
+        private bool ConfirmRestartNow(string message)
+        {
+            var title = LocalizationManager.T("Update.NewVersionAvailable");
+            return _dialogs is AvaloniaDialogService avalonia
+                ? avalonia.ConfirmFitContent(message, title)
+                : _dialogs.Confirm(message, title);
         }
 
         /// <summary>

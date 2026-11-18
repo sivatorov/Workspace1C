@@ -65,8 +65,11 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             // Ширина и высота — по содержимому в разумных пределах; CanResize=false
             // запрещает менять размер мышью. Никакого ручного измерения после показа:
             // Avalonia считает размер до первого отображения, скачка нет.
+            // Issue #139 (1.0.1.84): MaxHeight ограничивает окно до первого кадра —
+            // длинное описание релиза не открывает окно выше экрана.
             MinWidth = 440;
             MaxWidth = 760;
+            MaxHeight = 640;
             SizeToContent = SizeToContent.WidthAndHeight;
         }
         else
@@ -79,6 +82,10 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         SystemDecorations = SystemDecorations.Full;
+
+        // Issue #139 (1.0.1.84): после открытия ограничиваем окно рабочей областью
+        // монитора — оконный менеджер Linux мог изменить ширину, и кнопки обрезались.
+        Opened += (_, _) => ClampToScreen();
 
         ThemeBrushes.Bind(this, TemplatedControl.BackgroundProperty, "ContentBackgroundColorBrush");
 
@@ -130,6 +137,7 @@ internal sealed class MaterialMessageWindowAvalonia : Window
                 VerticalAlignment = VerticalAlignment.Center
             },
             MinWidth = 100,
+            Margin = new Thickness(0, 0, 8, 0),
             IsDefault = true
         };
         okButton.Styled(ControlThemes.ModernButton);
@@ -144,12 +152,13 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         Opened += (_, _) => Dispatcher.UIThread.Post(() => _okButton.Focus());
 
         // Порядок кнопок согласован с WPF-версией: «Да» (подтверждение) слева,
-        // «Нет» (отмена) справа.
-        var buttonsPanel = new StackPanel
+        // «Нет» (отмена) справа. Issue #139 (1.0.1.84): WrapPanel вместо
+        // горизонтального StackPanel — при узкой ширине кнопки переносятся,
+        // а не обрезаются справа.
+        var buttonsPanel = new WrapPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Spacing = 8
+            HorizontalAlignment = HorizontalAlignment.Right
         };
         buttonsPanel.Children.Add(okButton);
 
@@ -162,7 +171,8 @@ internal sealed class MaterialMessageWindowAvalonia : Window
                 Button skipButton = new()
                 {
                     Content = skipButtonText,
-                    MinWidth = 120
+                    MinWidth = 120,
+                    Margin = new Thickness(0, 0, 8, 0)
                 };
                 skipButton.Styled(ControlThemes.SecondaryButton);
                 skipButton.Click += (_, _) =>
@@ -250,6 +260,46 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         content.Children.Add(buttonsPanel);
 
         Content = content;
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.84): ограничивает окно рабочей областью монитора.
+    /// Размер по содержимому (<see cref="SizeToContent.WidthAndHeight"/>) сохраняется,
+    /// но окно не должно оказаться шире/выше экрана — иначе кнопки и текст
+    /// обрезаются. <see cref="Screen.WorkingArea"/> задана в физических пикселях,
+    /// поэтому переводим её в DIP через масштаб окна. Для диалогов с фиксированной
+    /// шириной (обычные сообщения, диалог перезапуска) ограничиваем саму ширину.
+    /// </summary>
+    private void ClampToScreen()
+    {
+        var screen = Screens.ScreenFromWindow(this);
+        if (screen is null)
+            return;
+
+        var scaling = RenderScaling > 0 ? RenderScaling : screen.Scaling;
+        if (scaling <= 0)
+            scaling = 1.0;
+
+        var workArea = screen.WorkingArea;
+        var clamped = UpdateDialogSizePolicy.Clamp(
+            double.IsNaN(Width) ? MaxWidth : Width,
+            double.IsNaN(Height) ? MaxHeight : Height,
+            workArea.Width / scaling,
+            workArea.Height / scaling);
+
+        MaxWidth = clamped.Width;
+        if (SizeToContent == SizeToContent.WidthAndHeight)
+        {
+            MaxHeight = clamped.Height;
+            return;
+        }
+
+        // Issue #139 (1.0.1.84): фиксированная ширина/высота (fitContent=false)
+        // тоже не должна выходить за рабочую область.
+        if (!double.IsNaN(Width) && Width > clamped.Width)
+            Width = clamped.Width;
+        if (!double.IsNaN(Height) && Height > clamped.Height)
+            Height = clamped.Height;
     }
 
     /// <summary>

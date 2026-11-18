@@ -11,6 +11,66 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.84] — 2026-11-18
+
+### Исправлено
+
+- **Инспектор процессов: выделение строк и «Неизвестная база» (issue #140, RafaIS, ArtyoZ).**
+  - WPF: убран локальный `AlternatingRowBackground`, «зебра» перенесена в триггер
+    `ItemsControl.AlternationIndex` локального `DataGrid.RowStyle`, триггер `IsSelected` идёт
+    последним — выделение чётных строк видно
+    ([`ProcessInspectorWindow.xaml`](Workspace1C/Views/ProcessInspectorWindow.xaml)).
+  - Avalonia: фон `:selected` продублирован на самом `ListBoxItem` в `ModernListBoxItem`,
+    класс `zebra` вешается через `ContainerPrepared` — выделение не теряется при
+    `RebuildTable()` и автообновлении
+    ([`Controls.axaml`](Workspace1C/Themes/Controls.axaml),
+    [`ProcessInspectorWindow.Avalonia.cs`](Workspace1C/Views/ProcessInspectorWindow.Avalonia.cs)).
+  - инспектор использует полный
+    [`RunningInfobaseMatcher.FindOwner`](Workspace1C/Services/RunningInfobaseMatcher.cs):
+    `/F`, `/S`, `/IBConnectionString`, `/IBName` — только при уникальности, веб-базы `/WS` и
+    `WS=`;
+  - нормализация путей: переменные среды, короткие имена 8.3, UNC ↔ смонтированный диск,
+    fallback по уникальному последнему сегменту;
+  - веб-базы показываются именем базы и URL, «Строка подключения» — фактический адрес;
+    добавлена диагностика `RunningMatchDebug`;
+  - тесты — `Issue140ProcessInspectorTests`.
+
+- **Окно «Доступна новая версия» больше не обрезается (issue #139, ArtyoZ).**
+  - [`UpdateDialogSizePolicy`](Workspace1C/Services/UpdateDialogSizePolicy.cs): клампинг размера
+    рабочей областью монитора владельца, блокировка всех кодов границ `HTLEFT…HTBOTTOMRIGHT`
+    при `SizeToContent` + `NoResize`, расчёт минимальной ширины по кнопкам;
+  - WPF: первичный размер вычисляется до показа окна, кнопки в `WrapPanel` переносятся, а не
+    обрезаются
+    ([`UpdateAvailableWindow.xaml.cs`](Workspace1C/Services/UpdateAvailableWindow.xaml.cs));
+  - Avalonia: `fitContent` + `MaxHeight`, ограничение `WorkingArea`, диалоги перезапуска
+    используют ту же политику
+    ([`MaterialMessageWindow.Avalonia.cs`](Workspace1C/Services/MaterialMessageWindow.Avalonia.cs),
+    [`AvaloniaDialogService`](Workspace1C/Services/AvaloniaDialogService.cs));
+  - тесты — `Issue139UpdateDialogSizeTests`.
+
+- **Информация о подключении: заголовки по типу базы, копирование, открытие каталога
+  (issue #138, aleksandr-ermakov).**
+  - новый [`ConnectionInfoPresenter`](Workspace1C/ViewModels/ConnectionInfoPresenter.cs):
+    файловая база → «Каталог», веб-сервер → «Адрес», серверная → «Сервер» и «Имя базы»;
+    дублирующие строки пути и строки подключения убраны, пустые значения опускаются;
+  - клик по значению копирует его в буфер (WPF `Clipboard.SetText`, Avalonia
+    `Clipboard.SetTextAsync`), для файловых баз — кнопка «Открыть каталог»
+    (`OpenInfobaseFolderCommand`);
+  - ключи `Main.ConnectionInfo.*` в `ru.json`/`en.json`;
+  - тесты — `Issue138ConnectionInfoPanelTests`.
+
+- **Инспектор процессов: панель, меню «Утилиты», чекбоксы колонок, мультивыбор
+  (issue #134, 7OH, ArtyoZ).**
+  - иконка инспектора перенесена на панель после «Проверить доступность всех баз» и до
+    разделителя (WPF и Avalonia);
+  - пункт «Инспектор процессов 1С» удалён из меню «Утилиты» (каталог, компоновка по
+    умолчанию, enum и обработчики), старые пользовательские компоновки с этим пунктом
+    безопасно отбрасываются;
+  - меню «Колонки» в Avalonia — настоящий `MenuItemToggleType.CheckBox` с `IsChecked` вместо
+    текстового префикса «✓»;
+  - мультивыбор и восстановление выделения после автообновления;
+  - обновлены тесты `Issue134ProcessInspectorTests`, `UtilitiesMenuLayoutTests`.
+
 ## [1.0.1.83] — 2026-11-17
 
 ### Исправлено

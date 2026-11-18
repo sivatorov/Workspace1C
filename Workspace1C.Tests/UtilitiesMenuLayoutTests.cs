@@ -98,7 +98,8 @@ public sealed class UtilitiesMenuLayoutTests
             "ExportCsv", "ExportHtml", "ExportJson", "ImportJson", "ExportV8iFile", "ImportV8iFile",
             "ClusterImport", "ClusterMigration",
             null,
-            "ProcessInspector", "KillOneCProcesses",
+            // issue #134 (1.0.1.84): «Инспектор процессов 1С» убран из «Утилит».
+            "KillOneCProcesses",
             null,
             "ConnectionReplace", "UndoConnectionReplace", "RemoveMissingFileBases"
         };

@@ -1370,6 +1370,28 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Клик по кликабельному значению блока «Информация о подключении»
+        /// (issue #138, 1.0.1.84): копирует значение в буфер обмена. Копируются только
+        /// строки с <see cref="ConnectionInfoFieldInfo.Copyable"/> = true.
+        /// </summary>
+        private void OnConnectionInfoValueClick(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not FrameworkElement { DataContext: ConnectionInfoFieldInfo { Copyable: true } field })
+                return;
+            if (string.IsNullOrWhiteSpace(field.Value))
+                return;
+
+            try
+            {
+                Clipboard.SetText(field.Value);
+            }
+            catch
+            {
+                // Буфер обмена недоступен (занят другим процессом) — окно не роняем.
+            }
+        }
+
+        /// <summary>
         /// Перетаскивание окна за фон верхней панели (окно без системной рамки, WindowChrome
         /// с <c>CaptionHeight=0</c>). Двойной клик по пустой области переключает разворот.
         /// Нажатия на интерактивных элементах (кнопки, поля, вкладки) перехватываются ими

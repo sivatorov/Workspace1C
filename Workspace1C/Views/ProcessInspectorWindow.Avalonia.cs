@@ -10,6 +10,7 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -96,6 +97,14 @@ namespace Workspace1C
 
             // Таблица процессов: шапка с видимыми колонками и строки (issue #134).
             _grid.ItemsSource = _vm.Processes;
+            // issue #140 (1.0.1.84): явно назначаем тему контейнера строки, чтобы
+            // выделение (в том числе мультивыделение) не зависело от неявного стиля
+            // и было видно после автообновления/перестроения таблицы.
+            _grid.ItemContainerTheme = (ControlTheme?)Application.Current?.FindResource("ModernListBoxItem");
+            // «Зебра» чётных строк: класс zebra вешается на контейнер при его подготовке.
+            // Стиль ^.zebra объявлен в ModernListBoxItem до ^:selected, поэтому
+            // выделение всегда перекрывает зебру (как в WPF RowStyle инспектора).
+            _grid.ContainerPrepared += OnContainerPrepared;
             // Мультивыделение (issue #134): Ctrl/Shift выделяют несколько строк,
             // кнопка «Завершить процесс» действует на весь набор.
             _grid.SelectionMode = SelectionMode.Multiple;
@@ -216,6 +225,22 @@ namespace Workspace1C
             Themes.ThemeBrushes.Bind(button, Button.ForegroundProperty, "TextPrimaryBrush");
             button.Click += (_, _) => Close();
             return button;
+        }
+
+        /// <summary>
+        /// Issue #140 (1.0.1.84): при подготовке контейнера строки выставляет класс
+        /// <c>zebra</c> для чётных строк (индекс 1, 3, …). Класс пересчитывается при
+        /// каждом переиспользовании контейнера, поэтому зебра не «съезжает» после
+        /// автообновления и <see cref="RebuildTable"/>.
+        /// </summary>
+        private static void OnContainerPrepared(object? sender, ContainerPreparedEventArgs e)
+        {
+            if (e.Container is not ListBoxItem item)
+                return;
+
+            item.Classes.Remove("zebra");
+            if (e.Index % 2 == 1)
+                item.Classes.Add("zebra");
         }
 
         /// <summary>
@@ -378,7 +403,10 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Меню «Колонки» (issue #134): чек-лист всех колонок инспектора.
+        /// Меню «Колонки» (issue #134, доработка ArtyoZ в 1.0.1.84): чек-лист всех
+        /// колонок инспектора. Видимость обозначает настоящий чекбокс
+        /// <see cref="MenuItemToggleType.CheckBox"/> (индикатор галочки рисует шаблон
+        /// <see cref="ControlThemes.ModernMenuItem"/>), а не текстовый префикс галочки.
         /// </summary>
         private void ShowColumnsMenu(Button? anchor)
         {
@@ -388,13 +416,19 @@ namespace Workspace1C
             foreach (var info in ProcessInspectorViewModel.AllColumns)
             {
                 var column = info.Column;
-                var visible = _vm.IsColumnVisible(column);
+                // issue #134 (1.0.1.84): IsChecked отражает видимость колонки — у видимых
+                // галочка стоит, у скрытых её нет. Клик переключает состояние и сохраняет
+                // выбор в настройках.
                 var item = new MenuItem
                 {
-                    Header = (visible ? "✓ " : "   ") + LocalizationManager.T(info.TitleKey)
+                    Header = LocalizationManager.T(info.TitleKey),
+                    ToggleType = MenuItemToggleType.CheckBox,
+                    IsChecked = _vm.IsColumnVisible(column)
                 };
                 item.Styled(ControlThemes.ModernMenuItem);
-                item.Click += (_, _) => _vm.SetColumnVisible(column, !_vm.IsColumnVisible(column));
+                // Интеракция меню переключает IsChecked до события Click,
+                // поэтому передаём уже новое состояние флажка.
+                item.Click += (_, _) => _vm.SetColumnVisible(column, item.IsChecked);
                 menu.Items.Add(item);
             }
 

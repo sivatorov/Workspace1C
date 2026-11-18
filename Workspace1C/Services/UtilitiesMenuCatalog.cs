@@ -117,9 +117,6 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Миграция баз между кластерами серверов 1С (issue #41).</summary>
     MigrateClusterInfobases,
 
-    /// <summary>Инспектор процессов 1С.</summary>
-    ProcessInspector,
-
     /// <summary>Завершение процессов платформы 1С.</summary>
     KillOneCProcesses,
 
@@ -670,8 +667,8 @@ public static class UtilitiesMenuCatalog
             new("ClusterMigration", "ClusterMigration.MenuItem", GroupOperations,
                 "DatabaseExport", "IconDatabaseExport", "#16A34A", UtilitiesMenuCommandKind.MigrateClusterInfobases,
                 isNew: true, requiredFeature: Licensing.ProFeature.ClusterMigration),
-            new("ProcessInspector", "ProcessInspector.Title", GroupOperations,
-                "ApplicationCog", "IconApplicationCog", "#0EA5E9", UtilitiesMenuCommandKind.ProcessInspector),
+            // issue #134 (1.0.1.84): «Инспектор процессов 1С» убран из меню «Утилиты» —
+            // он доступен кнопкой на панели инструментов и горячей клавишей Ctrl+Alt+I.
             new("KillOneCProcesses", "Settings.Bases.KillProcesses", GroupOperations,
                 "CloseNetwork", "IconClose", "#F59E0B", UtilitiesMenuCommandKind.KillOneCProcesses),
             new("ConnectionReplace", "Main.UtilitiesConnectionReplace", GroupOperations,
@@ -777,7 +774,7 @@ public static class UtilitiesMenuLayouts
                 Item("ClusterImport"),
                 Item("ClusterMigration"),
                 Separator(),
-                Item("ProcessInspector"),
+                // issue #134 (1.0.1.84): пункта «Инспектор процессов 1С» здесь больше нет.
                 Item("KillOneCProcesses"),
                 Separator(),
                 Item("ConnectionReplace"),

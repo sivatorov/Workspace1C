@@ -406,11 +406,27 @@
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
+        <!-- issue #140 (1.0.1.84): «зебра» чётных строк задаётся на самом ListBoxItem
+             через класс zebra (его вешает окно инспектора при подготовке контейнера).
+             Стиль объявлен ДО :selected, поэтому выделение перекрывает зебру. -->
+        <Style Selector="^.zebra">
+            <Setter Property="Background" Value="{DynamicResource ZebraRowBrush}"/>
+        </Style>
         <Style Selector="^:selected /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
         <Style Selector="^:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}"/>
+        </Style>
+        <!-- issue #140 (1.0.1.84): фон выделения дублируется на самом ListBoxItem.
+             В мультивыделении и при пересоздании контейнеров (автообновление таблицы)
+             подсветка через ContentPresenter могла не отображаться — выделение
+             становилось невидимым. -->
+        <Style Selector="^:selected">
+            <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}"/>
+        </Style>
+        <Style Selector="^:selected:pointerover">
             <Setter Property="Background" Value="{DynamicResource ItemSelectedBrush}"/>
         </Style>
     </ControlTheme>
@@ -956,6 +972,15 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Margin" Value="2,1"/>
+
+        <!-- issue #134 (1.0.1.84): меню «Колонки» инспектора процессов использует
+             MenuItem.ToggleType = CheckBox. Индикатор галочки рисует базовый шаблон
+             Fluent (PART_ToggleIconPresenter по псевдоклассам :checked:toggle).
+             Резервируем место под индикатор и у снятого флажка, чтобы подписи
+             пунктов не «прыгали» при переключении видимости колонки. -->
+        <Style Selector="^:toggle /template/ ContentControl#PART_ToggleIconPresenter">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
 
         <!-- Цвет подписи штатная тема меняет не на контроле, а на части шаблона,
              поэтому и здесь красится часть: у автора подсветка меняет только фон

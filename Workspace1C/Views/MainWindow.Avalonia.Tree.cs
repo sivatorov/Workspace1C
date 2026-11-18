@@ -1492,23 +1492,38 @@ namespace Workspace1C
             tagsBlock.Children.Add(tagsHeader);
             tagsBlock.Children.Add(tagsList);
 
-            // Информация о подключении.
+            // Информация о подключении (issue #138, 1.0.1.84): строки строятся по виду
+            // базы (ConnectionInfoPresenter), поэтому у файловых и веб-баз нет
+            // дублирования пути, а заголовки соответствуют типу подключения.
             // Блок сведений подчинён переключателю подробностей правой панели,
             // как в WPF: там по нему прячется та же таблица.
             var connectionLabel = SectionLabel(LocalizationManager.T("Main.SectionConnInfo"));
-            var connectionCard = PlainCard(
-                DetailRow(LocalizationManager.T("Main.Type"), new Binding("SelectedInfobase.ConnectionTypeDisplay")),
-                DetailRow(LocalizationManager.T("Main.ServerPath"), new Binding("SelectedInfobase.ConnectionPathDisplay")),
-                DetailRow(LocalizationManager.T("Column.ServerBase"), new Binding("SelectedInfobase.ServerDatabaseDisplay")),
-                DetailRow(LocalizationManager.T("Main.ConnectionString"), new Binding("SelectedInfobase.ConnectionStringDisplay")),
-                DetailRow(LocalizationManager.T("Main.Platform"), new Binding("SelectedInfobase.PlatformVersion")),
-                DetailRow(LocalizationManager.T("Main.LaunchMode"), new Binding("SelectedInfobase.ParsedLaunchMode")),
-                DetailRow(LocalizationManager.T("Main.Client"), new Binding("SelectedInfobase.ClientTypeDisplay")),
-                DetailRow(LocalizationManager.T("Main.Bitness"), new Binding("SelectedInfobase.ArchitectureDisplay")),
-                DetailRow(LocalizationManager.T("Main.Parameters"), new Binding("SelectedInfobase.LaunchParameters")),
-                DetailRow(LocalizationManager.T("Main.LastLaunch"), new Binding("SelectedInfobase.LastLaunchDisplay")),
-                DetailRow(LocalizationManager.T("Main.CacheSize"), new Binding("SelectedInfobase.CacheSizeDisplay")),
-                DetailRow(LocalizationManager.T("Column.Configuration"), new Binding("SelectedInfobase.ConfigurationDisplay")));
+
+            // Кнопка «Открыть каталог» рядом с заголовком — только для файловой базы
+            // (issue #138, 1.0.1.84); видимостью управляет ShowOpenFolderLink.
+            var openFolderButton = new Button
+            {
+                Content = LocalizationManager.T("Main.ConnectionInfo.OpenFolder"),
+                Padding = new Thickness(10, 3),
+                FontSize = UiMetrics.ScaledFont(11)
+            };
+            openFolderButton.Styled(ControlThemes.SecondaryButton);
+            openFolderButton.Bind(Control.IsVisibleProperty, new Binding("ShowOpenFolderLink"));
+            openFolderButton.Bind(Button.CommandProperty, new Binding("OpenInfobaseFolderCommand"));
+
+            var connectionHeader = new Grid();
+            connectionHeader.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+            connectionHeader.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+            Grid.SetColumn(connectionLabel, 0);
+            Grid.SetColumn(openFolderButton, 1);
+            connectionHeader.Children.Add(connectionLabel);
+            connectionHeader.Children.Add(openFolderButton);
+
+            var connectionCard = PlainCard(new ItemsControl
+            {
+                ItemsSource = _vm?.ConnectionInfoFields,
+                ItemTemplate = new FuncDataTemplate<ConnectionInfoFieldInfo>((row, _) => BuildConnectionInfoRow(row))
+            });
             connectionCard.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
 
             // Блок «Текущая сессия»: значения действуют только на следующий запуск.
@@ -1534,13 +1549,13 @@ namespace Workspace1C
             // в WPF они лежат внутри сворачиваемого блока подробностей, а здесь висели
             // над кнопками запуска в узкой панели, где их принимали за артефакты.
             badges.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
-            connectionLabel.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
+            connectionHeader.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
             descriptionLabel.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
             desc.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
             tagsBlock.Bind(Control.IsVisibleProperty, new Binding("ShowConnectionInfo"));
 
             panel.Children.Add(badges);
-            panel.Children.Add(connectionLabel);
+            panel.Children.Add(connectionHeader);
             panel.Children.Add(connectionCard);
             panel.Children.Add(descriptionLabel);
             panel.Children.Add(desc);
@@ -2554,6 +2569,64 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Строка блока «Информация о подключении» (issue #138, 1.0.1.84): подпись и
+        /// значение; кликабельные значения копируются в буфер обмена по клику.
+        /// </summary>
+        private Control BuildConnectionInfoRow(ConnectionInfoFieldInfo row)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var labelBlock = new TextBlock
+            {
+                Text = row.Label,
+                FontSize = UiMetrics.ScaledFont(12),
+                LineHeight = UiMetrics.ScaledFont(16)
+            };
+            ThemeBrushes.Bind(labelBlock, TextBlock.ForegroundProperty, "TextSecondaryColorBrush");
+            grid.Children.Add(labelBlock);
+            Grid.SetColumn(labelBlock, 0);
+
+            var valueBlock = new TextBlock
+            {
+                Text = row.Value,
+                FontSize = UiMetrics.ScaledFont(12),
+                LineHeight = UiMetrics.ScaledFont(16),
+                FontWeight = FontWeight.SemiBold,
+                TextWrapping = TextWrapping.Wrap
+            };
+            if (row.Copyable)
+            {
+                valueBlock.Cursor = new Cursor(StandardCursorType.Hand);
+                ToolTip.SetTip(valueBlock, LocalizationManager.T("Main.ConnectionInfo.CopyTooltip"));
+                valueBlock.PointerPressed += async (_, _) => await CopyConnectionInfoValue(row.Value);
+            }
+            grid.Children.Add(valueBlock);
+            Grid.SetColumn(valueBlock, 1);
+            return grid;
+        }
+
+        /// <summary>
+        /// Копирует значение строки блока «Информация о подключении» в буфер обмена
+        /// (issue #138, 1.0.1.84). Если буфер недоступен — молча пропускаем.
+        /// </summary>
+        private async System.Threading.Tasks.Task CopyConnectionInfoValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return;
+            try
+            {
+                if (this.Clipboard is { } cb)
+                    await cb.SetTextAsync(value);
+            }
+            catch
+            {
+                // Буфер обмена может быть занят другим процессом — не роняем окно.
+            }
+        }
+
+        /// <summary>
         /// Подменю «Утилиты» общей панели (issue #262): глобальные команды, не привязанные
         /// к конкретной базе. Раньше они жили в контекстном меню строки базы; теперь собраны
         /// в общее подменю, куда в будущем можно добавлять новые общие команды.
@@ -2854,8 +2927,8 @@ namespace Workspace1C
                     item.Command = _vm!.ImportClusterInfobasesCommand; break;
                 case UtilitiesMenuCommandKind.MigrateClusterInfobases:
                     item.Command = _vm!.MigrateClusterInfobasesCommand; break;
-                case UtilitiesMenuCommandKind.ProcessInspector:
-                    item.Command = _vm!.ProcessInspectorCommand; break;
+                // issue #134 (1.0.1.84): пункт «Инспектор процессов 1С» из «Утилит» удалён —
+                // команда доступна кнопкой панели инструментов и Ctrl+Alt+I.
                 case UtilitiesMenuCommandKind.KillOneCProcesses:
                     // В Avalonia-версии MainViewModel это методы, а не команды.
                     item.Click += (_, _) => _vm!.KillOneCProcesses(); break;

@@ -3,6 +3,8 @@ using System;
 using System.IO;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -17,6 +19,9 @@ namespace Workspace1C.Services;
 /// </summary>
 public partial class UpdateAvailableWindow : Window
 {
+    // Issue #139 (1.0.1.84): WM_NCHITTEST — попадание мыши в неклиентскую область окна.
+    private const int WmNcHitTest = 0x0084;
+
     private readonly UpdateService _service;
     private readonly ReleaseInfo _release;
 
@@ -42,6 +47,17 @@ public partial class UpdateAvailableWindow : Window
         InitializeComponent();
         _release = release;
         _service = service;
+
+        // Issue #139 (1.0.1.84): первичный размер ограничиваем ДО показа окна —
+        // иначе первый кадр мог открыться шире рабочей области и обрезаться
+        // справа. На этом этапе HWND ещё нет, поэтому берётся рабочая область
+        // основного монитора; после создания HWND (SourceInitialized, до первого
+        // рендера) лимиты уточняются по монитору владельца.
+        ApplyWorkAreaLimits(IntPtr.Zero);
+
+        // Issue #139 (1.0.1.84): после создания HWND уточняем максимальные
+        // габариты рабочей областью и запрещаем изменение размера за границы.
+        SourceInitialized += OnSourceInitialized;
 
         // Issue #116 (1.0.1.82): когда файл ещё не скачан, заголовок уточняет,
         // что версия будет именно загружена; для готового файла — прежний текст.
@@ -139,6 +155,108 @@ public partial class UpdateAvailableWindow : Window
     /// <summary>Обрезает ведущий символ «v» у тега версии для отображения.</summary>
     private static string NormalizeTag(string tag) =>
         !string.IsNullOrEmpty(tag) && (tag[0] == 'v' || tag[0] == 'V') ? tag.Substring(1) : tag;
+
+    /// <summary>
+    /// Issue #139 (1.0.1.84): окно уже имеет HWND — ограничиваем максимальные габариты
+    /// рабочей областью монитора и подключаем хук оконных сообщений, запрещающий
+    /// изменение размера за границы.
+    /// </summary>
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var handle = new WindowInteropHelper(this).Handle;
+
+        // Issue #139 (1.0.1.84): лимиты выставляем до подключения хука и до
+        // первого рендера — HWND уже есть, можно взять монитор владельца.
+        ApplyWorkAreaLimits(handle);
+
+        if (handle != IntPtr.Zero && HwndSource.FromHwnd(handle) is { } source)
+            source.AddHook(OnWindowMessage);
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.84): окно подгоняется под содержимое (<c>SizeToContent</c>),
+    /// но не должно выходить за рабочую область с учётом масштаба и отступов.
+    /// Рабочая область берётся по монитору владельца (многомониторные конфигурации);
+    /// значения политики всегда исходные, поэтому повторный вызов не «залипает»
+    /// на уменьшенных лимитах.
+    /// </summary>
+    /// <param name="handle">HWND окна (0 до создания источника — тогда используется
+    /// монитор владельца или основная рабочая область).</param>
+    private void ApplyWorkAreaLimits(IntPtr handle)
+    {
+        var (workAreaWidth, workAreaHeight) = GetWorkAreaDip(handle);
+        var clamped = UpdateDialogSizePolicy.Clamp(
+            UpdateDialogSizePolicy.MaxWidth,
+            UpdateDialogSizePolicy.MaxHeight,
+            workAreaWidth,
+            workAreaHeight);
+        MaxWidth = clamped.Width;
+        MaxHeight = clamped.Height;
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.84): рабочая область монитора в DIP. Сначала пробуем
+    /// монитор владельца/окна (<see cref="System.Windows.Forms.Screen.FromHandle"/>,
+    /// учитывает многомониторные конфигурации), переводим физические пиксели в DIP
+    /// через масштаб окна. Если HWND/монитор недоступен — рабочая область основного
+    /// монитора (<see cref="SystemParameters.WorkArea"/>, уже в DIP).
+    /// </summary>
+    private (double Width, double Height) GetWorkAreaDip(IntPtr handle)
+    {
+        try
+        {
+            if (handle == IntPtr.Zero && Owner is { } owner)
+                handle = new WindowInteropHelper(owner).Handle;
+
+            if (handle != IntPtr.Zero)
+            {
+                var area = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+                if (area.Width > 0 && area.Height > 0)
+                {
+                    var dpi = VisualTreeHelper.GetDpi(this);
+                    var scaleX = dpi.DpiScaleX > 0 ? dpi.DpiScaleX : 1.0;
+                    var scaleY = dpi.DpiScaleY > 0 ? dpi.DpiScaleY : 1.0;
+                    return (area.Width / scaleX, area.Height / scaleY);
+                }
+            }
+        }
+        catch
+        {
+            // Сбой определения монитора не должен ломать показ диалога —
+            // ниже используем рабочую область основного монитора.
+        }
+
+        var workArea = SystemParameters.WorkArea;
+        return (workArea.Width, workArea.Height);
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.84): на <c>WM_NCHITTEST</c> попадание на границу окна
+    /// трактуем как клиентскую область. Иначе при <c>SizeToContent="WidthAndHeight"</c>
+    /// и <c>ResizeMode="NoResize"</c> перетаскивание границы уменьшало ширину, а
+    /// содержимое не пересчитывалось и обрезалось справа (оставалась только кнопка
+    /// «Перезапустить»). Заголовок (<c>HTCAPTION</c>) не блокируется — окно
+    /// по-прежнему можно перемещать.
+    /// </summary>
+    private IntPtr OnWindowMessage(
+        IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WmNcHitTest)
+            return IntPtr.Zero;
+
+        // Младшее слово lParam — код HT* (WinUser.h).
+        var hitTestCode = unchecked((short)(lParam.ToInt64() & 0xFFFF));
+        if (!UpdateDialogSizePolicy.ShouldBlockResize(
+                hitTestCode,
+                SizeToContent == SizeToContent.WidthAndHeight,
+                ResizeMode == ResizeMode.NoResize))
+        {
+            return IntPtr.Zero;
+        }
+
+        handled = true;
+        return new IntPtr(UpdateDialogSizePolicy.HtClient);
+    }
 
     /// <summary>
     /// «Обновить»: скрываем предложение, показываем прогресс и запускаем загрузку.

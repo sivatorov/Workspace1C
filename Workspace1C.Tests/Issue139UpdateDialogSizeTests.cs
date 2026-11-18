@@ -1,0 +1,450 @@
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using Workspace1C.Services;
+using Xunit;
+
+namespace Workspace1C.Tests;
+
+/// <summary>
+/// Issue #139 (1.0.1.84): окно «Доступна новая версия приложения для загрузки»
+/// обрезалось справа при клике по границе — оставалась видна только кнопка
+/// «Перезапустить». Проверяем чистую политику размеров, разметку WPF (перенос
+/// кнопок) и платформенные оболочки (запрет resize и ограничение рабочей областью).
+/// </summary>
+public sealed class Issue139UpdateDialogSizeTests
+{
+    // ===================== Чистая политика размеров =====================
+
+    [Fact]
+    public void Clamp_RespectsMaxWidthAndMaxHeight()
+    {
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 1920, 1080);
+
+        Assert.Equal(UpdateDialogSizePolicy.MaxWidth, size.Width);
+        Assert.Equal(UpdateDialogSizePolicy.MaxHeight, size.Height);
+    }
+
+    [Fact]
+    public void Clamp_RespectsSmallWorkArea()
+    {
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 700, 500);
+
+        var expectedWidth = 700 - 2 * UpdateDialogSizePolicy.WorkAreaMargin;
+        var expectedHeight = 500 - 2 * UpdateDialogSizePolicy.WorkAreaMargin;
+        Assert.Equal(expectedWidth, size.Width);
+        Assert.Equal(expectedHeight, size.Height);
+        // Окно целиком помещается в рабочую область с отступами по краям.
+        Assert.True(size.Width <= 700 - 2 * UpdateDialogSizePolicy.WorkAreaMargin);
+        Assert.True(size.Height <= 500 - 2 * UpdateDialogSizePolicy.WorkAreaMargin);
+    }
+
+    [Fact]
+    public void Clamp_NeverBelowMinWidth()
+    {
+        var size = UpdateDialogSizePolicy.Clamp(300, 200, 1920, 1080);
+
+        Assert.Equal(UpdateDialogSizePolicy.MinWidth, size.Width);
+    }
+
+    [Fact]
+    public void Clamp_UnknownWorkArea_UsesMaxLimits()
+    {
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 0, 0);
+
+        Assert.Equal(UpdateDialogSizePolicy.MaxWidth, size.Width);
+        Assert.Equal(UpdateDialogSizePolicy.MaxHeight, size.Height);
+    }
+
+    [Fact]
+    public void Clamp_NegativeWorkArea_TreatedAsUnknown()
+    {
+        // Отрицательные размеры рабочей области означают «неизвестно».
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, -1, -1);
+
+        Assert.Equal(UpdateDialogSizePolicy.MaxWidth, size.Width);
+        Assert.Equal(UpdateDialogSizePolicy.MaxHeight, size.Height);
+    }
+
+    [Fact]
+    public void Clamp_NaN_DesiredSize_UsesSafeDefaults()
+    {
+        // NaN появляется у SizeToContent, когда размер ещё не вычислен:
+        // ширина не должна стать меньше MinWidth, высота — больше MaxHeight.
+        var size = UpdateDialogSizePolicy.Clamp(double.NaN, double.NaN, 1920, 1080);
+
+        Assert.Equal(UpdateDialogSizePolicy.MinWidth, size.Width);
+        Assert.Equal(UpdateDialogSizePolicy.MaxHeight, size.Height);
+    }
+
+    [Fact]
+    public void Clamp_TinyWorkArea_KeepsMinWidthForContent()
+    {
+        // Экран меньше контента: ширина не опускается ниже MinWidth (иначе кнопки
+        // обрезаются), высота ограничена рабочей областью с отступами.
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 300, 200);
+
+        Assert.Equal(UpdateDialogSizePolicy.MinWidth, size.Width);
+        Assert.Equal(200 - 2 * UpdateDialogSizePolicy.WorkAreaMargin, size.Height);
+    }
+
+    [Theory]
+    [InlineData(10)] // HTLEFT
+    [InlineData(11)] // HTRIGHT — именно эта граница давала обрезание справа
+    [InlineData(12)] // HTTOP
+    [InlineData(13)] // HTTOPLEFT
+    [InlineData(14)] // HTTOPRIGHT
+    [InlineData(15)] // HTBOTTOM
+    [InlineData(16)] // HTBOTTOMLEFT
+    [InlineData(17)] // HTBOTTOMRIGHT
+    public void ShouldBlockResize_BlocksEachBorderCode(int code)
+    {
+        Assert.True(UpdateDialogSizePolicy.IsBorderHitTestCode(code));
+        Assert.True(UpdateDialogSizePolicy.ShouldBlockResize(code, true, true),
+            $"Код {code} должен блокироваться");
+    }
+
+    [Theory]
+    [InlineData(0)]  // HTNOWHERE
+    [InlineData(1)]  // HTCLIENT
+    [InlineData(2)]  // HTCAPTION
+    [InlineData(9)]  // HTVSCROLL — не граница окна
+    [InlineData(18)] // HTBORDER — системная рамка, не кнопки ресайза
+    public void ShouldBlockResize_DoesNotBlockNonBorderCodes(int code)
+    {
+        Assert.False(UpdateDialogSizePolicy.IsBorderHitTestCode(code));
+        Assert.False(UpdateDialogSizePolicy.ShouldBlockResize(code, true, true));
+    }
+
+    [Fact]
+    public void ShouldBlockResize_BlocksAllBorderCodes_WhenNoResizeAndSizeToContent()
+    {
+        // HTLEFT=10 … HTBOTTOMRIGHT=17 — все границы окна.
+        for (var code = UpdateDialogSizePolicy.HtLeft;
+             code <= UpdateDialogSizePolicy.HtBottomRight;
+             code++)
+        {
+            Assert.True(UpdateDialogSizePolicy.ShouldBlockResize(code, true, true),
+                $"Код {code} должен блокироваться");
+        }
+    }
+
+    [Fact]
+    public void ShouldBlockResize_DoesNotBlockWithoutBothFlags()
+    {
+        Assert.False(UpdateDialogSizePolicy.ShouldBlockResize(
+            UpdateDialogSizePolicy.HtRight, sizeToContent: false, noResize: true));
+        Assert.False(UpdateDialogSizePolicy.ShouldBlockResize(
+            UpdateDialogSizePolicy.HtRight, sizeToContent: true, noResize: false));
+    }
+
+    [Fact]
+    public void ShouldBlockResize_AllowsClientAndCaption()
+    {
+        Assert.False(UpdateDialogSizePolicy.ShouldBlockResize(
+            UpdateDialogSizePolicy.HtClient, true, true));
+        Assert.False(UpdateDialogSizePolicy.ShouldBlockResize(
+            UpdateDialogSizePolicy.HtCaption, true, true));
+    }
+
+    [Fact]
+    public void ContentMinWidth_ButtonRow()
+    {
+        // 150 + 150 + 170 + 100 + 3×10 (отступы) + 120 (иконка, поля, рамка).
+        var width = UpdateDialogSizePolicy.ContentMinWidth(
+            new double[] { 150, 150, 170, 100 }, spacing: 10, chrome: 120);
+
+        Assert.Equal(720, width);
+    }
+
+    [Fact]
+    public void ContentMinWidth_SingleButton()
+    {
+        // Одна кнопка: отступы между кнопками не добавляются.
+        var width = UpdateDialogSizePolicy.ContentMinWidth(
+            new double[] { 150 }, spacing: 10, chrome: 120);
+
+        Assert.Equal(270, width);
+    }
+
+    [Fact]
+    public void ContentMinWidth_Empty_ReturnsChrome()
+    {
+        var width = UpdateDialogSizePolicy.ContentMinWidth(
+            Array.Empty<double>(), spacing: 10, chrome: 120);
+
+        Assert.Equal(120, width);
+    }
+
+    [Fact]
+    public void ContentMinWidth_RestartRow()
+    {
+        // «Перезапустить сейчас» 230 + «Обновить после закрытия» 240 + отступ 10 + chrome.
+        var width = UpdateDialogSizePolicy.ContentMinWidth(
+            new double[] { 230, 240 }, spacing: 10, chrome: 120);
+
+        Assert.Equal(600, width);
+    }
+
+    [Fact]
+    public void ContentMinWidth_ThrowsOnNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            UpdateDialogSizePolicy.ContentMinWidth(null!, spacing: 10, chrome: 120));
+    }
+
+    // ===================== WPF: разметка =====================
+
+    [Fact]
+    public void Wpf_Xaml_ButtonRowsUseWrapPanel()
+    {
+        var xaml = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
+
+        // Issue #139: оба блока кнопок (предложение и перезапуск) — WrapPanel.
+        Assert.Equal(2, Regex.Matches(xaml, "<WrapPanel").Count);
+        Assert.DoesNotContain("<StackPanel Orientation=\"Horizontal\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DownloadButton\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"RestartNowButton\"", xaml, StringComparison.Ordinal);
+
+        // Литералы, на которые завязаны тесты Issue116, сохранены.
+        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"440\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"760\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Xaml_WrapPanelsHoldAllButtons()
+    {
+        var xaml = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
+
+        var panels = Regex.Matches(xaml, "<WrapPanel[^>]*>(.*?)</WrapPanel>",
+            RegexOptions.Singleline);
+        Assert.Equal(2, panels.Count);
+
+        // Блок предложения: «Обновить» (скачать/установить), пропуск, отмена.
+        Assert.Contains("x:Name=\"DownloadButton\"", panels[0].Groups[1].Value,
+            StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"InstallButton\"", panels[0].Groups[1].Value,
+            StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SkipVersionButton\"", panels[0].Groups[1].Value,
+            StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CancelButton\"", panels[0].Groups[1].Value,
+            StringComparison.Ordinal);
+
+        // Блок перезапуска: «Перезапустить сейчас» и «Обновить после закрытия».
+        Assert.Contains("x:Name=\"RestartNowButton\"", panels[1].Groups[1].Value,
+            StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"UpdateAfterCloseButton\"", panels[1].Groups[1].Value,
+            StringComparison.Ordinal);
+
+        // Кнопки не фиксируют ширину окна: у пропуска — MinWidth, перенос делает WrapPanel.
+        Assert.Contains("x:Name=\"SkipVersionButton\" MinWidth=\"170\"", xaml,
+            StringComparison.Ordinal);
+    }
+
+    // ===================== WPF: код-бихайнд =====================
+
+    [Fact]
+    public void Wpf_Code_BlocksBorderResizeWithoutForbiddenIdentifiers()
+    {
+        var source = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+
+        // Issue #139: хук WM_NCHITTEST и возврат HTCLIENT для границ.
+        Assert.Contains("AddHook", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ShouldBlockResize", source, StringComparison.Ordinal);
+        Assert.Contains("HtClient", source, StringComparison.Ordinal);
+        Assert.Contains("SourceInitialized", source, StringComparison.Ordinal);
+        Assert.Contains("SystemParameters.WorkArea", source, StringComparison.Ordinal);
+
+        // Запрещённые тестами Issue116 идентификаторы не используются.
+        Assert.DoesNotContain("WndProc", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WmGetMinMaxInfo", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent = SizeToContent.Manual", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("CaptureFixedSize", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Code_ComputesInitialSizeBeforeShow()
+    {
+        var source = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+
+        // Первичный клампинг — в конструкторе, ДО подписки на SourceInitialized:
+        // первый кадр уже ограничен рабочей областью (issue #139).
+        var initialClamp = source.IndexOf("ApplyWorkAreaLimits(IntPtr.Zero);",
+            StringComparison.Ordinal);
+        var subscribe = source.IndexOf("SourceInitialized += OnSourceInitialized;",
+            StringComparison.Ordinal);
+        Assert.True(initialClamp >= 0, "Первичный ApplyWorkAreaLimits не найден");
+        Assert.True(subscribe > initialClamp,
+            "Размер должен вычисляться до подписки на SourceInitialized");
+
+        // При создании HWND лимиты уточняются до подключения хука сообщений.
+        var initialized = ExtractMethod(source, "private void OnSourceInitialized(");
+        var handleClamp = initialized.IndexOf("ApplyWorkAreaLimits(handle);",
+            StringComparison.Ordinal);
+        var hook = initialized.IndexOf("AddHook(OnWindowMessage)", StringComparison.Ordinal);
+        Assert.True(handleClamp >= 0 && hook > handleClamp,
+            "Лимиты должны выставляться до AddHook");
+    }
+
+    [Fact]
+    public void Wpf_Code_UsesOwnerMonitorWorkArea()
+    {
+        var source = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+
+        // Многомониторные конфигурации: рабочая область монитора владельца в DIP,
+        // fallback — рабочая область основного монитора.
+        Assert.Contains("System.Windows.Forms.Screen.FromHandle", source, StringComparison.Ordinal);
+        Assert.Contains("WorkingArea", source, StringComparison.Ordinal);
+        Assert.Contains("DpiScaleX", source, StringComparison.Ordinal);
+        Assert.Contains("SystemParameters.WorkArea", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.Clamp", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Code_NoManualMeasurementOrFixedSize()
+    {
+        var source = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+
+        // Размер окна определяет SizeToContent, ручного измерения/фиксации нет
+        // (issue #116), при смене этапа — только безопасный UpdateLayout.
+        // Сравнение SizeToContent == ... в хуке и упоминания в doc-комментариях
+        // допустимы; запрещено именно присваивание (пробелы вокруг «=»).
+        Assert.DoesNotContain(".Measure(", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Arrange(", source, StringComparison.Ordinal);
+        Assert.DoesNotMatch(@"(?<![\w.])SizeToContent\s+=\s+(?!=)", source);
+        Assert.DoesNotMatch(@"(?<![\w.])Width\s+=\s+(?!=)", source);
+        Assert.DoesNotMatch(@"(?<![\w.])Height\s+=\s+(?!=)", source);
+        Assert.Contains("UpdateLayout();", source, StringComparison.Ordinal);
+    }
+
+    // ===================== Avalonia =====================
+
+    [Fact]
+    public void Avalonia_FitContent_ClampsToScreen()
+    {
+        var window = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs"));
+
+        Assert.Contains("ClampToScreen", window, StringComparison.Ordinal);
+        Assert.Contains("Screens.ScreenFromWindow", window, StringComparison.Ordinal);
+        Assert.Contains("WorkingArea", window, StringComparison.Ordinal);
+        Assert.Contains("RenderScaling", window, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.Clamp", window, StringComparison.Ordinal);
+        // Кнопки диалога — в WrapPanel, а не в горизонтальном StackPanel.
+        Assert.Contains("new WrapPanel", window, StringComparison.Ordinal);
+
+        // Литералы, на которые завязаны тесты Issue116, сохранены.
+        Assert.Contains("MinWidth = 440;", window, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
+        // Issue #139: высота ограничена до первого кадра, как в WPF-разметке.
+        Assert.Contains("MaxHeight = 640;", window, StringComparison.Ordinal);
+        Assert.Contains("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_ClampToScreen_CoversFixedWidthDialogs()
+    {
+        var window = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs"));
+
+        // Issue #139: политика применяется и к диалогам с фиксированной шириной
+        // (обычные сообщения, диалог перезапуска): ширина тоже клампится.
+        Assert.Contains("!double.IsNaN(Width)", window, StringComparison.Ordinal);
+        Assert.Contains("Width = clamped.Width", window, StringComparison.Ordinal);
+        Assert.Contains("Height = clamped.Height", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_FitContent_NoManualMeasurement()
+    {
+        var window = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs"));
+
+        // Размер по содержимому считает Avalonia; ручных Measure/Arrange нет.
+        Assert.DoesNotContain(".Measure(", window, StringComparison.Ordinal);
+        Assert.DoesNotContain(".Arrange(", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent.Manual", window, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_ConfirmUpdateWithSkip_PassesFitContent()
+    {
+        var service = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "AvaloniaDialogService.cs"));
+
+        var method = ExtractMethod(service, "public UpdateDialogResult ConfirmUpdateWithSkip(");
+        Assert.Contains("fitContent: true", method, StringComparison.Ordinal);
+
+        // Issue #139: диалог перезапуска использует тот же режим окна.
+        Assert.Contains("public bool ConfirmFitContent(", service, StringComparison.Ordinal);
+        var restart = ExtractMethod(service, "public bool ConfirmFitContent(");
+        Assert.Contains("fitContent: true", restart, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Avalonia_RestartDialog_UsesSameSizePolicy()
+    {
+        var update = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateService.Avalonia.cs"));
+
+        // Оба диалога перезапуска (готовый файл и после скачивания) идут через
+        // ConfirmRestartNow → ConfirmFitContent (определение + два вызова).
+        Assert.True(Regex.Matches(update, "ConfirmRestartNow\\(").Count >= 3);
+        var helper = ExtractMethod(update, "private bool ConfirmRestartNow(");
+        Assert.Contains("ConfirmFitContent", helper, StringComparison.Ordinal);
+        Assert.Contains("Update.RestartNowPrompt", update, StringComparison.Ordinal);
+    }
+
+    // ===================== Вспомогательное =====================
+
+    /// <summary>Вырезает тело метода по сигнатуре (до парной закрывающей скобки).</summary>
+    private static string ExtractMethod(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Метод не найден: {signature}");
+
+        var brace = source.IndexOf('{', start);
+        Assert.True(brace > start, $"Тело метода не найдено: {signature}");
+
+        var depth = 0;
+        for (var i = brace; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+                depth++;
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                    return source.Substring(start, i - start + 1);
+            }
+        }
+
+        Assert.Fail($"Не найдена закрывающая скобка метода: {signature}");
+        return string.Empty;
+    }
+
+    private static string ReadProjectFile(string relativePath)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var fullPath = Path.Combine(dir.FullName, relativePath);
+            if (File.Exists(fullPath))
+                return File.ReadAllText(fullPath);
+            dir = dir.Parent;
+        }
+
+        Assert.Fail($"Файл проекта не найден: {relativePath}");
+        return string.Empty;
+    }
+}

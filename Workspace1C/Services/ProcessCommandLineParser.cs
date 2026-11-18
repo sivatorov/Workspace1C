@@ -52,8 +52,11 @@ public static class ProcessCommandLineParser
 
     /// <summary>
     /// Краткая строка подключения из командной строки: для файловой базы — «/F <путь>»,
-    /// для клиент-серверной — «/S <сервер>\<база>». Версия ключа сохраняется как
-    /// в командной строке (со слешем). Возвращает null, если ключа подключения нет.
+    /// для клиент-серверной — «/S <сервер>\<база>», для веб-базы — «/WS <URL>»
+    /// (issue #140, 1.0.1.84). Если подключение передано только строкой
+    /// <c>/IBConnectionString</c>, показывается её фактическое значение (для веб-базы
+    /// из неё извлекается <c>WS=</c>). Версия ключа сохраняется как в командной
+    /// строке (со слешем). Возвращает null, если ключа подключения нет.
     /// </summary>
     public static string? ExtractConnectionString(string? commandLine)
     {
@@ -66,6 +69,23 @@ public static class ProcessCommandLineParser
         var serverBase = ExtractValue(line, "S");
         if (!string.IsNullOrWhiteSpace(serverBase))
             return "/S " + serverBase;
+
+        // issue #140 (1.0.1.84): веб-база запускается ключом /WS <адрес публикации>.
+        var webUrl = ExtractValue(line, "WS");
+        if (!string.IsNullOrWhiteSpace(webUrl))
+            return "/WS " + webUrl;
+
+        // Отладка из Конфигуратора передаёт полную строку соединения. Для веб-базы
+        // из неё берётся WS=, иначе показывается сама строка — это фактическое
+        // значение из командной строки (колонка «Строка подключения»).
+        var connectionString = ExtractValue(line, "IBConnectionString");
+        if (!string.IsNullOrWhiteSpace(connectionString))
+        {
+            var parts = RunningInfobaseMatcher.ParseConnectionString(connectionString);
+            if (parts.TryGetValue("WS", out var ws) && !string.IsNullOrWhiteSpace(ws))
+                return "/WS " + ws;
+            return connectionString;
+        }
 
         return null;
     }

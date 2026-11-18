@@ -1100,10 +1100,39 @@ public partial class MainViewModel : ViewModelBase
                     value.RefreshCacheSizeAsync();
                 }
 
+                // Состав блока «Информация о подключении» зависит от вида базы
+                // (issue #138, 1.0.1.84).
+                RebuildConnectionInfoFields();
+
                 CommandManager.InvalidateRequerySuggested();
                 OnPropertyChanged(nameof(StatusBarInfo));
             }
         }
+    }
+
+    /// <summary>
+    /// Строки блока «Информация о подключении» (issue #138, 1.0.1.84): заголовки и
+    /// состав зависят от вида информационной базы (файловая, веб-сервер, серверная).
+    /// </summary>
+    public ObservableCollection<ConnectionInfoFieldInfo> ConnectionInfoFields { get; } = new();
+
+    /// <summary>
+    /// Показывать кнопку «Открыть каталог» рядом с заголовком блока подключения
+    /// (issue #138, 1.0.1.84) — только для файловой базы с непустым путём.
+    /// </summary>
+    public bool ShowOpenFolderLink =>
+        SelectedInfobase is { } ib && ConnectionInfoPresenter.CanOpenFolder(ib);
+
+    /// <summary>
+    /// Пересобирает строки блока «Информация о подключении» (issue #138, 1.0.1.84)
+    /// и уведомляет об изменении видимости кнопки «Открыть каталог».
+    /// </summary>
+    private void RebuildConnectionInfoFields()
+    {
+        ConnectionInfoFields.Clear();
+        foreach (var field in ConnectionInfoPresenter.Build(SelectedInfobase))
+            ConnectionInfoFields.Add(field);
+        OnPropertyChanged(nameof(ShowOpenFolderLink));
     }
 
     private GroupNodeViewModel? _selectedGroupNode;

@@ -318,8 +318,8 @@ public partial class MainWindow
                 item.Command = _viewModel.ImportClusterInfobasesCommand; break;
             case UtilitiesMenuCommandKind.MigrateClusterInfobases:
                 item.Command = _viewModel.MigrateClusterInfobasesCommand; break;
-            case UtilitiesMenuCommandKind.ProcessInspector:
-                item.Command = _viewModel.ProcessInspectorCommand; break;
+            // issue #134 (1.0.1.84): пункт «Инспектор процессов 1С» из «Утилит» удалён —
+            // команда доступна кнопкой панели инструментов и Ctrl+Alt+I.
             case UtilitiesMenuCommandKind.KillOneCProcesses:
                 item.Command = _viewModel.KillOneCProcessesCommand; break;
             case UtilitiesMenuCommandKind.ConnectionReplace:

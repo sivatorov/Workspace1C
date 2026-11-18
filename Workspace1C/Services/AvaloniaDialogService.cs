@@ -47,6 +47,29 @@ namespace Workspace1C.Services
         }
 
         /// <summary>
+        /// Issue #139 (1.0.1.84): подтверждение с окном по содержимому
+        /// (<c>fitContent</c>). Используется диалогом перезапуска после скачивания
+        /// обновления, чтобы он подчинялся той же политике размеров, что и окно
+        /// «Доступна новая версия…»: ширина/высота по содержимому, ограничение
+        /// рабочей областью, перенос кнопок, без ручного ресайза.
+        /// </summary>
+        /// <param name="message">Текст вопроса.</param>
+        /// <param name="title">Заголовок окна.</param>
+        /// <returns>True, если пользователь подтвердил действие.</returns>
+        public bool ConfirmFitContent(string message, string title = "")
+        {
+            var resolvedTitle = DefaultTitle(title, "Common.Confirm");
+            if (UiDialogs.SuppressModalDialogs)
+            {
+                UiDialogs.TraceSuppressed(nameof(ConfirmFitContent), resolvedTitle);
+                return false;
+            }
+            var win = new MaterialMessageWindowAvalonia(
+                message, resolvedTitle, MaterialMessageKind.Question, fitContent: true);
+            return ShowModalSync(win);
+        }
+
+        /// <summary>
         /// Запрашивает подтверждение с показом описания релиза «Что нового» в формате
         /// markdown (заголовки, жирный, списки). Используется автообновлением на Linux.
         /// </summary>

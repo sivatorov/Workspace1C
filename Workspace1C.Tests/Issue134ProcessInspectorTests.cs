@@ -308,6 +308,243 @@ public sealed class Issue134ProcessInspectorTests
         Assert.Contains("IconApplicationCog", code, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// issue #134 (1.0.1.84): иконка инспектора стоит на панели сразу после
+    /// «Проверить доступность всех баз» и до вертикального разделителя.
+    /// </summary>
+    [Fact]
+    public void Wpf_ProcessInspectorButton_IsAfterCheckAvailability_BeforeSeparator()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
+
+        var checkAvailability = xaml.IndexOf("CheckAvailabilityCommand", StringComparison.Ordinal);
+        var inspector = xaml.IndexOf("x:Name=\"ProcessInspectorButton\"", StringComparison.Ordinal);
+        var separator = xaml.IndexOf(
+            "Вертикальный разделитель: отделяет группу «Управление списком»",
+            StringComparison.Ordinal);
+
+        Assert.True(checkAvailability >= 0, "Не найдена кнопка «Проверить доступность».");
+        Assert.True(inspector >= 0, "Не найдена кнопка инспектора процессов.");
+        Assert.True(separator >= 0, "Не найден разделитель после группы «Управление списком».");
+        Assert.True(checkAvailability < inspector,
+            "Инспектор должен идти после «Проверить доступность всех баз».");
+        Assert.True(inspector < separator, "Инспектор должен стоять до разделителя.");
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): в Avalonia кнопка инспектора добавляется после
+    /// <c>checkAvailBtn</c> и до следующего <c>CommandPanelSeparator()</c>.
+    /// </summary>
+    [Fact]
+    public void Avalonia_ProcessInspectorButton_IsAfterCheckAvailability_BeforeSeparator()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+
+        var checkAvailability = code.IndexOf(
+            "panel.Children.Add(checkAvailBtn);", StringComparison.Ordinal);
+        var inspector = code.IndexOf(
+            "panel.Children.Add(processInspectorBtn);", StringComparison.Ordinal);
+        Assert.True(checkAvailability >= 0, "Не найдено добавление кнопки «Проверить доступность».");
+        Assert.True(inspector >= 0, "Не найдено добавление кнопки инспектора процессов.");
+
+        var separator = code.IndexOf(
+            "panel.Children.Add(CommandPanelSeparator());", checkAvailability, StringComparison.Ordinal);
+        Assert.True(separator > checkAvailability, "После «Проверить доступность» нет разделителя.");
+
+        Assert.True(checkAvailability < inspector,
+            "Инспектор должен идти после «Проверить доступность всех баз».");
+        Assert.True(inspector < separator, "Инспектор должен стоять до разделителя.");
+    }
+
+    // ===================== Инспектор убран из меню «Утилиты» =====================
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): пункта «Инспектор процессов 1С» больше нет ни в каталоге,
+    /// ни в стандартной компоновке «Утилит», ни в обработчиках меню обеих оболочек.
+    /// </summary>
+    [Fact]
+    public void ProcessInspector_IsRemovedFromUtilitiesCatalogAndLayout()
+    {
+        Assert.Null(UtilitiesMenuCatalog.Find("ProcessInspector"));
+        Assert.DoesNotContain(
+            UtilitiesMenuCatalog.All,
+            item => string.Equals(item.Id, "ProcessInspector", StringComparison.Ordinal));
+
+        var layout = UtilitiesMenuLayouts.Default();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        UtilitiesMenuResolver.CollectItemIds(layout.Root, ids);
+        Assert.DoesNotContain("ProcessInspector", ids);
+        // Соседний пункт «Завершить процессы 1С» остаётся на месте.
+        Assert.Contains("KillOneCProcesses", ids);
+
+        // Значение перечисления удалено вместе с пунктом.
+        Assert.False(Enum.TryParse<UtilitiesMenuCommandKind>("ProcessInspector", out _));
+
+        var wpf = ReadProjectFile("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs");
+        var avalonia = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
+        Assert.DoesNotContain("UtilitiesMenuCommandKind.ProcessInspector", wpf, StringComparison.Ordinal);
+        Assert.DoesNotContain("UtilitiesMenuCommandKind.ProcessInspector", avalonia, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): старая пользовательская компоновка могла содержать
+    /// удалённый пункт <c>ProcessInspector</c>. <c>NormalizeNode</c> обязан молча
+    /// отбросить неизвестный <c>ItemId</c>, не роняя загрузку меню.
+    /// </summary>
+    [Fact]
+    public void OldCustomLayout_WithRemovedProcessInspectorItem_IsDroppedSafely()
+    {
+        var dir = Path.Combine(
+            Path.GetTempPath(), "ws1c-issue134-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            const string json = """
+                {
+                  "SchemaVersion": 1,
+                  "Root": [
+                    { "Kind": "item", "ItemId": "CommandPalette", "Visible": true },
+                    { "Kind": "item", "ItemId": "ProcessInspector", "Visible": true },
+                    { "Kind": "item", "ItemId": "KillOneCProcesses", "Visible": true }
+                  ]
+                }
+                """;
+            File.WriteAllText(Path.Combine(dir, UtilitiesMenuLayoutStore.FileName), json);
+
+            var store = new UtilitiesMenuLayoutStore(directoryOverride: dir);
+            var layout = store.Load();
+
+            Assert.NotNull(layout);
+            var ids = layout!.Root.Select(node => node.ItemId).ToList();
+            Assert.DoesNotContain("ProcessInspector", ids);
+            Assert.Contains("CommandPalette", ids);
+            Assert.Contains("KillOneCProcesses", ids);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    // ===================== Меню «Колонки»: настоящие чекбоксы =====================
+
+    /// <summary>issue #134 (1.0.1.84): WPF использует IsCheckable/IsChecked.</summary>
+    [Fact]
+    public void Wpf_ColumnsMenu_UsesIsCheckableIsChecked()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
+
+        Assert.Contains("IsCheckable = true", code, StringComparison.Ordinal);
+        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("\"✓ \"", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): Avalonia рисует настоящий чекбокс
+    /// <c>MenuItemToggleType.CheckBox</c>; текстового префикса «✓ » нет.
+    /// </summary>
+    [Fact]
+    public void Avalonia_ColumnsMenu_UsesMenuItemToggleTypeCheckBox()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
+
+        Assert.Contains("ToggleType = MenuItemToggleType.CheckBox", code, StringComparison.Ordinal);
+        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
+        // Текстовый префикс галочки полностью заменён индикатором MenuItem.
+        Assert.DoesNotContain("✓", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): шаблон <c>ModernMenuItem</c> наследует Fluent-шаблон,
+    /// который рисует индикатор <c>PART_ToggleIconPresenter</c>; тема резервирует
+    /// место под него, чтобы подписи пунктов не смещались.
+    /// </summary>
+    [Fact]
+    public void Avalonia_ModernMenuItem_ReservesToggleIndicator()
+    {
+        var axaml = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
+        var start = axaml.IndexOf("x:Key=\"ModernMenuItem\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "В Controls.axaml нет ControlTheme ModernMenuItem.");
+        var end = axaml.IndexOf("</ControlTheme>", start, StringComparison.Ordinal);
+        Assert.True(end > start, "ControlTheme ModernMenuItem не закрыт.");
+
+        var theme = axaml[start..end];
+        Assert.Contains("PART_ToggleIconPresenter", theme, StringComparison.Ordinal);
+        Assert.Contains(":toggle", theme, StringComparison.Ordinal);
+    }
+
+    // ===================== Мультивыбор, выделение и зебра =====================
+
+    /// <summary>
+    /// issue #134 (1.0.1.84) / #140: триггер IsSelected идёт после зебры и перекрывает её,
+    /// а локальный AlternatingRowBackground обнулён.
+    /// </summary>
+    [Fact]
+    public void Wpf_Inspector_SelectionTriggerOverridesZebra()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml");
+        var start = xaml.IndexOf("<DataGrid.RowStyle>", StringComparison.Ordinal);
+        var end = xaml.IndexOf("</DataGrid.RowStyle>", StringComparison.Ordinal);
+        Assert.True(start >= 0 && end > start, "В ProcessInspectorWindow.xaml нет DataGrid.RowStyle.");
+
+        var rowStyle = xaml[start..end];
+        var zebra = rowStyle.IndexOf("ItemsControl.AlternationIndex", StringComparison.Ordinal);
+        var selected = rowStyle.IndexOf("Property=\"IsSelected\"", StringComparison.Ordinal);
+        Assert.True(zebra >= 0, "В RowStyle нет триггера зебры.");
+        Assert.True(selected > zebra, "Триггер IsSelected должен идти после AlternationIndex.");
+
+        Assert.Contains(
+            "<Setter Property=\"AlternatingRowBackground\" Value=\"{x:Null}\"/>",
+            xaml,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84) / #140: в Avalonia стиль <c>^:selected</c> объявлен после
+    /// <c>^.zebra</c>, поэтому выделение видно и на чётных строках.
+    /// </summary>
+    [Fact]
+    public void Avalonia_Inspector_SelectedStyleOverridesZebra()
+    {
+        var axaml = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
+        var start = axaml.IndexOf("x:Key=\"ModernListBoxItem\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "В Controls.axaml нет ControlTheme ModernListBoxItem.");
+        var end = axaml.IndexOf("</ControlTheme>", start, StringComparison.Ordinal);
+        Assert.True(end > start, "ControlTheme ModernListBoxItem не закрыт.");
+
+        var theme = axaml[start..end];
+        var zebra = theme.IndexOf("Selector=\"^.zebra\"", StringComparison.Ordinal);
+        var selected = theme.IndexOf("Selector=\"^:selected\"", StringComparison.Ordinal);
+        Assert.True(zebra >= 0, "В ModernListBoxItem нет стиля ^.zebra.");
+        Assert.True(selected > zebra, "Стиль ^:selected должен идти после ^.zebra.");
+        Assert.Contains("ItemSelectedBrush", theme, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.84): после автообновления восстанавливаются ВСЕ выбранные
+    /// строки, включая чётные, — а не только первая.
+    /// </summary>
+    [Fact]
+    public void RestoreSelectedRows_RestoresAllSelectedRows()
+    {
+        var service = new FakeRunningService(
+            Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"), Proc(4, "Четвёртый"));
+        using var vm = CreateViewModel(service, out _, out _);
+
+        WaitFor(() => vm.Processes.Count == 4);
+        var original = vm.Processes.Where(row => row.Pid is 2 or 4).ToList();
+        vm.SetSelectedRows(original);
+
+        service.Set(
+            Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"), Proc(4, "Четвёртый"));
+        vm.Refresh();
+
+        WaitFor(() => vm.SelectedRows.Count == 2 && vm.SelectedRows.All(row => !original.Contains(row)));
+        Assert.Equal(new[] { 2, 4 }, vm.SelectedRows.Select(row => row.Pid).OrderBy(pid => pid));
+    }
+
     // ===================== Инспектор: мультивыбор и колонки в оболочках =====================
 
     [Fact]

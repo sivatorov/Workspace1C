@@ -95,6 +95,7 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
     public System.Collections.Generic.IReadOnlyList<RunningOneCProcessDetails> GetRunningDetails()
     {
         var result = new List<RunningOneCProcessDetails>();
+        var emptyCommandLineCount = 0;
         try
         {
             using var searcher = new ManagementObjectSearcher(
@@ -113,6 +114,18 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
                         pid = parsedPid;
 
                     var commandLine = o["CommandLine"]?.ToString() ?? "";
+                    // issue #140 (1.0.1.84): при отказе WMI/нехватке прав командная
+                    // строка пуста, и процесс гарантированно «неизвестен». Диагностика
+                    // (CM_DEBUG_RUNNING_MATCH=1) показывает, сколько таких процессов.
+                    if (string.IsNullOrWhiteSpace(commandLine))
+                    {
+                        emptyCommandLineCount++;
+                        if (RunningMatchDebug.IsEnabled)
+                        {
+                            RunningMatchDebug.Log(
+                                $"wmi: empty CommandLine pid={pid} name=\"{name}\" (нет прав/WMI)");
+                        }
+                    }
                     var startTime = ParseCreationDate(o["CreationDate"]?.ToString());
                     var userName = o is ManagementObject mo ? TryGetOwner(mo) : null;
                     result.Add(new RunningOneCProcessDetails(
@@ -125,6 +138,9 @@ public sealed class RunningInfobasesService : IRunningInfobasesService
         {
             // WMI недоступен (права/политика): инспектор показывает пустой список.
         }
+
+        if (emptyCommandLineCount > 0 && RunningMatchDebug.IsEnabled)
+            RunningMatchDebug.Log($"wmi: empty CommandLine total={emptyCommandLineCount}");
 
         return result;
     }

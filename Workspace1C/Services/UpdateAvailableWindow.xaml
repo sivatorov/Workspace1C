@@ -67,8 +67,11 @@
                          Единый контракт кнопок (issue #26): скачивание — ModernButton
                          (акцентная заливка AccentBrush + контрастный TextOnAccentBrush),
                          пропуск и отмена — SecondaryButton (карточка + контур + текст темы).
-                         Прежняя жёсткая зелёная кнопка #16A34A с белым текстом убрана. -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                         Прежняя жёсткая зелёная кнопка #16A34A с белым текстом убрана.
+                         Issue #139 (1.0.1.84): WrapPanel вместо горизонтального
+                         StackPanel — при узкой ширине кнопки переносятся, а не
+                         обрезаются справа. -->
+                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                         <!-- Issue #116 (v1.0.1.58): когда файл обновления уже скачан в фоне
                              (режим «Загружать с предложением установки»), вместо «Скачать»
                              показывается «Установить» — она применяет готовый файл по
@@ -107,7 +110,7 @@
                                 Click="OnCancelClick">
                             <TextBlock x:Name="CancelText" Text="{loc:Loc Update.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </Button>
-                    </StackPanel>
+                    </WrapPanel>
                 </StackPanel>
 
                 <!-- Этап 2: скачивание -->
@@ -124,8 +127,9 @@
                 <StackPanel x:Name="RestartPanel" Visibility="Collapsed">
                     <TextBlock x:Name="RestartHeadingText" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"/>
 
-                    <!-- «Перезапустить сейчас» (основная кнопка) и «Обновить после закрытия» -->
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                    <!-- «Перезапустить сейчас» (основная кнопка) и «Обновить после закрытия».
+                         Issue #139 (1.0.1.84): WrapPanel — кнопки переносятся при узкой ширине. -->
+                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                         <Button x:Name="RestartNowButton" Width="230" Height="34" Padding="0" IsDefault="True"
                                 Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
                                 Click="OnRestartNowClick">
@@ -138,7 +142,7 @@
                             <TextBlock x:Name="UpdateAfterCloseText" Text="{loc:Loc Update.UpdateAfterClose}"
                                        VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </Button>
-                    </StackPanel>
+                    </WrapPanel>
                 </StackPanel>
 
                 <!-- Этап 4: завершение (подтверждение применения) -->

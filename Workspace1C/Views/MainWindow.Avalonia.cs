@@ -1055,6 +1055,16 @@ namespace Workspace1C
             checkAvailBtn.Bind(Button.CommandProperty, new Binding("CheckAvailabilityCommand"));
             panel.Children.Add(checkAvailBtn);
 
+            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): иконка набора
+            // инструментов сразу после «Проверить доступность всех баз» и до разделителя.
+            // Пункт «Утилиты → Операции» убран — он был «закопан» и неюзабелен.
+            var processInspectorBtn = TopBarIconButton(
+                "IconApplicationCog",
+                LocalizationManager.T("Main.ProcessInspectorTooltip"),
+                "@InfoBrush");
+            processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
+            panel.Children.Add(processInspectorBtn);
+
             panel.Children.Add(CommandPanelSeparator());
 
             // «Утилиты»: общие команды, не привязанные к конкретной базе (issue #262).
@@ -1090,15 +1100,6 @@ namespace Workspace1C
             utilitiesBtn.Click += (_, _) => _utilitiesMenu?.Open(utilitiesBtn);
             _utilitiesButton = utilitiesBtn;
             panel.Children.Add(utilitiesBtn);
-
-            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): быстрый доступ
-            // рядом с «Утилитами» — та же команда, что пункт «Утилиты → Операции».
-            var processInspectorBtn = TopBarIconButton(
-                "IconApplicationCog",
-                LocalizationManager.T("Main.ProcessInspectorTooltip"),
-                "@InfoBrush");
-            processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
-            panel.Children.Add(processInspectorBtn);
 
             // «Актуальные релизы» перенесены в подменю «Утилиты» (issue #279), отдельная
             // кнопка на панели не нужна — в меню команда уже есть (пункт первый).

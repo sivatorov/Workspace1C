@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -14,7 +16,9 @@ namespace Workspace1C.Services;
 /// идти через пробел или без него в кавычках (<c>/F"C:\Bases\ib"</c>). Конфигуратор
 /// запускает клиент серверной базы в формате <c>/S"сервер/база"</c> — без пробела
 /// и с прямыми слешами (issue #103), такой формат тоже распознаётся.
-/// Веб-базы не сопоставляются (ключ /WS встречается и у прочих сценариев).
+/// Веб-базы не сопоставляются в <see cref="MatchesCommandLine"/> (ключ /WS встречается
+/// и у прочих сценариев), но инспектор процессов использует <see cref="FindOwner"/>
+/// и сопоставляет их по /WS/WS= (issue #140, 1.0.1.84).
 /// </summary>
 public static class RunningInfobaseMatcher
 {
@@ -48,6 +52,119 @@ public static class RunningInfobaseMatcher
                 || MatchesIbConnectionString(infobase, commandLine),
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Issue #140 (1.0.1.84): владелец командной строки для инспектора процессов.
+    /// Объединяет все проходы сопоставления:
+    /// <list type="number">
+    /// <item>прямые ключи <c>/F</c>, <c>/S</c>, <c>/IBConnectionString</c> и веб-ключ
+    /// <c>/WS</c>/<c>WS=</c>;</item>
+    /// <item><c>/IBName</c> — только если имя уникально в списке баз (Name или
+    /// DatabaseName);</item>
+    /// <item>файловый fallback по уникальному последнему сегменту пути (<c>/F</c> или
+    /// <c>File=</c>) — покрывает UNC ↔ смонтированный диск и короткие имена.</item>
+    /// </list>
+    /// Возвращает null, если база не определена. В отличие от
+    /// <see cref="MatchesCommandLine"/>, веб-базы сопоставляются — это нужно инспектору,
+    /// но не индикатору запуска (там поведение сохранено).
+    /// </summary>
+    public static Infobase? FindOwner(IEnumerable<Infobase> infobases, string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return null;
+
+        var bases = (infobases ?? Enumerable.Empty<Infobase>())
+            .Where(ib => ib?.Connection is not null)
+            .ToList();
+        if (bases.Count == 0)
+            return null;
+
+        // Проход 1: прямые ключи. Сначала обычные подключения, затем веб-базы.
+        var owner = bases.FirstOrDefault(ib => MatchesCommandLine(ib, commandLine));
+        if (owner is null)
+            owner = bases.FirstOrDefault(ib => MatchesWebBase(ib, commandLine));
+        if (owner is not null)
+        {
+            if (RunningMatchDebug.IsEnabled)
+                RunningMatchDebug.Log($"  find: direct match -> id={owner.Id} name=\"{owner.Name}\"");
+            return owner;
+        }
+
+        // Проход 2: /IBName — только при уникальном имени в списке баз.
+        if (TryExtractValue(commandLine, "IBName", out var rawName))
+        {
+            var name = NormalizeName(rawName);
+            if (name.Length > 0)
+            {
+                var nameCandidates = new Dictionary<string, List<Infobase>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var ib in bases)
+                {
+                    AddNameCandidate(nameCandidates, NormalizeName(ib.Name), ib);
+                    AddNameCandidate(nameCandidates, NormalizeName(ib.Connection.DatabaseName), ib);
+                }
+
+                if (nameCandidates.TryGetValue(name, out var candidates) && candidates.Count == 1)
+                {
+                    if (RunningMatchDebug.IsEnabled)
+                        RunningMatchDebug.Log($"  find: /IBName \"{name}\" -> id={candidates[0].Id}");
+                    return candidates[0];
+                }
+
+                if (RunningMatchDebug.IsEnabled)
+                {
+                    RunningMatchDebug.Log(
+                        $"  find: /IBName \"{name}\" skipped — " +
+                        (candidates is null
+                            ? "no candidate"
+                            : $"ambiguous ({candidates.Count} candidates)"));
+                }
+            }
+        }
+
+        // Проход 3: файловый fallback по уникальному последнему сегменту пути.
+        var commandPath = ExtractCommandFilePath(commandLine);
+        var leaf = GetPathLeaf(commandPath);
+        if (leaf.Length > 0)
+        {
+            var candidates = bases
+                .Where(ib => ib.Connection.Type == ConnectionType.File)
+                .Where(ib => PathLeafEquals(ib.Connection.FilePath, leaf))
+                .ToList();
+            if (candidates.Count == 1)
+            {
+                if (RunningMatchDebug.IsEnabled)
+                    RunningMatchDebug.Log($"  find: file leaf \"{leaf}\" -> id={candidates[0].Id}");
+                return candidates[0];
+            }
+            if (candidates.Count > 1 && RunningMatchDebug.IsEnabled)
+                RunningMatchDebug.Log($"  find: file leaf \"{leaf}\" ambiguous ({candidates.Count} candidates)");
+        }
+
+        // issue #140 (1.0.1.84): итоговая запись — на чужой машине по логу видно,
+        // что ни один проход не дал владельца (а не что диагностика не включена).
+        if (RunningMatchDebug.IsEnabled)
+            RunningMatchDebug.Log("  find: no match");
+        return null;
+    }
+
+    /// <summary>
+    /// Путь из командной строки для файлового fallback (issue #140): прямой ключ
+    /// <c>/F</c>, затем <c>File=</c> из <c>/IBConnectionString</c>.
+    /// </summary>
+    private static string ExtractCommandFilePath(string commandLine)
+    {
+        if (TryExtractValue(commandLine, "F", out var direct) && direct.Length > 0)
+            return direct;
+
+        if (TryExtractValue(commandLine, "IBConnectionString", out var connectionString))
+        {
+            var parts = ParseConnectionString(connectionString);
+            if (parts.TryGetValue("File", out var file) && !string.IsNullOrWhiteSpace(file))
+                return file;
+        }
+
+        return string.Empty;
     }
 
     /// <summary>
@@ -139,6 +256,75 @@ public static class RunningInfobaseMatcher
             ConnectionType.File => MatchesCsFile(parts, infobase.Connection.FilePath ?? ""),
             _ => false
         };
+    }
+
+    /// <summary>
+    /// Issue #140 (1.0.1.84): сопоставление веб-базы по ключу <c>/WS</c> или
+    /// <c>WS=</c> из <c>/IBConnectionString</c>. URL нормализуется (нижний регистр
+    /// схемы/хоста, без хвостового «/»); пустое ожидаемое значение не сопоставляется.
+    /// Если <see cref="ConnectionSettings.WebUrl"/> пуст, сравнивается
+    /// <see cref="ConnectionSettings.DatabaseName"/> (как в отображении базы).
+    /// </summary>
+    private static bool MatchesWebBase(Infobase infobase, string? commandLine)
+    {
+        var connection = infobase.Connection;
+        if (connection is null || connection.Type != ConnectionType.WebServer)
+            return false;
+
+        var expected = NormalizeWebUrl(
+            !string.IsNullOrWhiteSpace(connection.WebUrl) ? connection.WebUrl : connection.DatabaseName);
+        if (expected.Length == 0)
+            return false;
+
+        var line = commandLine ?? string.Empty;
+        if (TryExtractValue(line, "WS", out var ws) && WebUrlsEqual(ws, expected))
+            return true;
+
+        if (TryExtractValue(line, "IBConnectionString", out var connectionString))
+        {
+            var parts = ParseConnectionString(connectionString);
+            if (parts.TryGetValue("WS", out var csWs) && WebUrlsEqual(csWs, expected))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Сравнение URL веб-баз без учёта регистра; пустые значения не равны.</summary>
+    private static bool WebUrlsEqual(string? a, string? b)
+    {
+        var na = NormalizeWebUrl(a);
+        var nb = NormalizeWebUrl(b);
+        return na.Length > 0
+            && nb.Length > 0
+            && string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Нормализация URL веб-базы (issue #140): trim/кавычки, удаление схемы
+    /// (<c>http://</c>/<c>https://</c> — адрес публикации может быть сохранён в карточке
+    /// без схемы или с другой схемой), нижний регистр хоста и удаление хвостового «/».
+    /// Путь сохраняется как есть: сравнение в <see cref="WebUrlsEqual"/> идёт без учёта
+    /// регистра, поэтому различия в регистре пути публикации не мешают.
+    /// </summary>
+    internal static string NormalizeWebUrl(string? url)
+    {
+        var s = (url ?? string.Empty).Trim().Trim('"').Trim();
+        if (s.Length == 0)
+            return string.Empty;
+
+        // Схема не участвует в сравнении: /WS может содержать http, а карточка — https.
+        var schemeIndex = s.IndexOf("://", StringComparison.Ordinal);
+        if (schemeIndex > 0)
+            s = s[(schemeIndex + 3)..];
+
+        var slash = s.IndexOf('/');
+        if (slash < 0)
+            return s.ToLowerInvariant().TrimEnd('/');
+
+        var host = s[..slash].ToLowerInvariant();
+        var path = s[slash..];
+        return (host + path).TrimEnd('/');
     }
 
     /// <summary>
@@ -305,8 +491,11 @@ public static class RunningInfobaseMatcher
         // issue #134 (1.0.1.80): Id больше не обязателен — ключ базы строит GetBaseKey,
         // иначе базы из кластера (Id = "") выпадали из сопоставления целиком.
         var result = new Dictionary<string, List<RunningOneCProcess>>(StringComparer.OrdinalIgnoreCase);
+        // issue #140 (1.0.1.84): веб-базы намеренно не участвуют в индикаторе запуска
+        // (прежнее поведение: ключ /WS встречается и у прочих сценариев). Инспектор
+        // процессов вызывает FindOwner и сопоставляет их отдельно.
         var bases = (infobases ?? Enumerable.Empty<Infobase>())
-            .Where(ib => ib?.Connection is not null)
+            .Where(ib => ib?.Connection is not null && ib.Connection.Type != ConnectionType.WebServer)
             .ToList();
         var processList = processes ?? (IReadOnlyList<RunningOneCProcess>)Array.Empty<RunningOneCProcess>();
         if (bases.Count == 0 || processList.Count == 0)
@@ -325,67 +514,23 @@ public static class RunningInfobaseMatcher
                 RunningMatchDebug.Log($"  process exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
         }
 
-        // Первый проход: прямые ключи /F//S — самый надёжный признак.
-        var unmatched = new List<RunningOneCProcess>();
+        // issue #140 (1.0.1.84): единый проход через FindOwner — прямые ключи /F//S,
+        // /IBConnectionString, затем /IBName (только при уникальном имени) и файловый
+        // fallback по уникальному последнему сегменту пути. Поведение индикатора
+        // запуска сохранено; веб-базы сюда не передаются (см. фильтр выше).
         foreach (var process in processList)
         {
-            var owner = bases.FirstOrDefault(ib => MatchesCommandLine(ib, process.CommandLine));
+            var owner = FindOwner(bases, process.CommandLine);
             if (owner is null)
             {
-                unmatched.Add(process);
                 if (RunningMatchDebug.IsEnabled)
-                    RunningMatchDebug.Log($"  pass1: NO direct match for exe=\"{process.ProcessName}\"");
+                    RunningMatchDebug.Log($"  match: NO owner for exe=\"{process.ProcessName}\"");
             }
             else
             {
                 AddToResult(result, GetBaseKey(owner), process);
                 if (RunningMatchDebug.IsEnabled)
-                    RunningMatchDebug.Log($"  pass1: matched to base id={owner.Id} (direct keys)");
-            }
-        }
-
-        // Второй проход: /IBName — запуск отладки из Конфигуратора (issue #103).
-        // Г1 (issue #103): имя процесса может быть как отображаемым именем базы (Name),
-        // так и именем базы в кластере (Connection.DatabaseName), поэтому кандидаты
-        // собираются из ОБОИХ источников; сопоставление — только когда имя однозначно.
-        var nameCandidates = new Dictionary<string, List<Infobase>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var ib in bases)
-        {
-            AddNameCandidate(nameCandidates, NormalizeName(ib.Name), ib);
-            AddNameCandidate(nameCandidates, NormalizeName(ib.Connection.DatabaseName), ib);
-        }
-        if (RunningMatchDebug.IsEnabled)
-        {
-            foreach (var pair in nameCandidates)
-                RunningMatchDebug.Log(
-                    $"  pass2: name \"{pair.Key}\" -> {pair.Value.Count} candidate(s) " +
-                    $"[{string.Join(", ", pair.Value.Select(b => b.Id))}]");
-        }
-
-        foreach (var process in unmatched)
-        {
-            if (!TryExtractValue(process.CommandLine ?? "", "IBName", out var rawName))
-            {
-                if (RunningMatchDebug.IsEnabled)
-                    RunningMatchDebug.Log($"  pass2: no /IBName in exe=\"{process.ProcessName}\"");
-                continue;
-            }
-            var name = NormalizeName(rawName);
-            if (name.Length == 0)
-                continue;
-
-            if (nameCandidates.TryGetValue(name, out var candidates) && candidates.Count == 1)
-            {
-                var owner = candidates[0];
-                AddToResult(result, GetBaseKey(owner), process);
-                if (RunningMatchDebug.IsEnabled)
-                    RunningMatchDebug.Log($"  pass2: /IBName \"{name}\" matched to base id={owner.Id}");
-            }
-            else if (RunningMatchDebug.IsEnabled)
-            {
-                RunningMatchDebug.Log(
-                    $"  pass2: /IBName \"{name}\" skipped — " +
-                    (candidates is null ? "no candidate" : $"ambiguous ({candidates.Count} candidates)"));
+                    RunningMatchDebug.Log($"  match: base id={owner.Id} name=\"{owner.Name}\"");
             }
         }
 
@@ -648,20 +793,128 @@ public static class RunningInfobaseMatcher
 
         var na = NormalizePath(a);
         var nb = NormalizePath(b);
-        return string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
+        return na.Length > 0
+            && nb.Length > 0
+            && string.Equals(na, nb, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>Нормализация пути: полная форма, без хвостовых разделителей; при ошибке — trim.</summary>
+    /// <summary>
+    /// Issue #140 (1.0.1.84): сравнение последнего сегмента пути без учёта регистра.
+    /// Используется файловым fallback (UNC ↔ смонтированный диск, короткие имена).
+    /// </summary>
+    internal static bool PathLeafEquals(string? a, string? b)
+    {
+        var la = GetPathLeaf(a);
+        var lb = GetPathLeaf(b);
+        return la.Length > 0
+            && lb.Length > 0
+            && string.Equals(la, lb, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Последний сегмент пути (issue #140): учитывает и «\», и «/» на любой платформе,
+    /// поэтому работает и с UNC-путями Windows в Linux-сборке.
+    /// </summary>
+    internal static string GetPathLeaf(string? path)
+    {
+        var p = (path ?? string.Empty).Trim().Trim('"').Trim();
+        if (p.Length == 0)
+            return string.Empty;
+
+        p = p.TrimEnd('\\', '/');
+        var index = p.LastIndexOfAny(new[] { '\\', '/' });
+        return index >= 0 ? p[(index + 1)..].Trim() : p;
+    }
+
+    /// <summary>
+    /// Нормализация пути (issue #140, 1.0.1.84): trim/кавычки, раскрытие переменных
+    /// окружения, снятие префикса длинных путей Windows, замена «/» на разделитель
+    /// платформы, полная форма через <see cref="Path.GetFullPath(string)"/> (в try/catch),
+    /// раскрытие коротких имён 8.3 на Windows и обрезка хвостовых разделителей.
+    /// </summary>
     internal static string NormalizePath(string path)
     {
+        var p = (path ?? string.Empty).Trim().Trim('"').Trim();
+        if (p.Length == 0)
+            return string.Empty;
+
         try
         {
-            return Path.GetFullPath(path)
-                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // Карточка базы может хранить %USERPROFILE%/%APPDATA%, а командная
+            // строка — уже раскрытый абсолютный путь.
+            p = Environment.ExpandEnvironmentVariables(p);
         }
         catch
         {
-            return path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // Некорректная переменная — оставляем строку как есть.
+        }
+
+        // Длинные пути Windows: «\\?\C:\...» и «\\?\UNC\server\share».
+        if (p.StartsWith(@"\\?\UNC\", StringComparison.OrdinalIgnoreCase))
+            p = @"\\" + p[8..];
+        else if (p.StartsWith(@"\\?\", StringComparison.Ordinal))
+            p = p[4..];
+
+        // Прямые слеши в пути → разделитель текущей платформы.
+        p = p.Replace('/', Path.DirectorySeparatorChar);
+
+        try
+        {
+            p = Path.GetFullPath(p);
+        }
+        catch
+        {
+            // Некорректный путь — сравниваем в исходном виде (ниже только trim).
+        }
+
+        // Короткие имена 8.3 (C:\BASES~1\IB): на Windows раскрываем до длинного
+        // пути, если каталог существует. На других платформах и для несуществующих
+        // путей остаётся исходная форма — разницу покрывает fallback по листу.
+        p = ExpandShortPath(p);
+
+        return p.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    /// <summary>
+    /// Issue #140 (1.0.1.84): раскрытие коротких имён 8.3 в длинный путь Windows.
+    /// Вызывается только для путей с «~» (признак короткого имени): так не трогаем
+    /// обычные и UNC-пути и не провоцируем сетевые обращения к недоступному серверу.
+    /// Для несуществующих путей и на других платформах возвращает вход без изменений.
+    /// </summary>
+    private static string ExpandShortPath(string path)
+    {
+        if (string.IsNullOrEmpty(path)
+            || !OperatingSystem.IsWindows()
+            || path.IndexOf('~') < 0)
+        {
+            return path;
+        }
+
+        try
+        {
+            var buffer = new StringBuilder(1024);
+            var length = GetLongPathNameW(path, buffer, (uint)buffer.Capacity);
+            if (length == 0)
+                return path;
+            if (length > buffer.Capacity)
+            {
+                buffer = new StringBuilder((int)length);
+                length = GetLongPathNameW(path, buffer, (uint)buffer.Capacity);
+                if (length == 0)
+                    return path;
+            }
+
+            var expanded = buffer.ToString();
+            return string.IsNullOrEmpty(expanded) ? path : expanded;
+        }
+        catch
+        {
+            // Нет kernel32/путь некорректен — сравниваем в исходном виде.
+            return path;
         }
     }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern uint GetLongPathNameW(
+        string lpszShortPath, StringBuilder lpszLongPath, uint cchBuffer);
 }

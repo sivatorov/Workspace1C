@@ -36,6 +36,9 @@ public partial class MainViewModel : ViewModelBase
             Infobases.Add(infobase);
         }
         SelectedInfobase = null;
+        // Состав блока «Информация о подключении» пересобирается и при обновлении
+        // списка (issue #138, 1.0.1.84).
+        RebuildConnectionInfoFields();
         Save();
         RebuildGroupTree();
         RefreshFileMetadata();
@@ -319,6 +322,9 @@ public partial class MainViewModel : ViewModelBase
             // пересборки, была бы потеряна. Это нужно и для правки из кнопки «Действия» строки
             // (кнопка строку не выделяет), где SelectedInfobase иначе остался бы пустым.
             SelectedInfobase = target;
+            // Ссылка на базу та же, поэтому сеттер молчит — пересобираем строки блока
+            // «Информация о подключении» явно после редактирования (issue #138, 1.0.1.84).
+            RebuildConnectionInfoFields();
         }
         else
         {

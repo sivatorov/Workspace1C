@@ -430,23 +430,33 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
     private List<ProcessRowViewModel> BuildRows(IReadOnlyList<RunningOneCProcessDetails> processes)
     {
         var rows = new List<ProcessRowViewModel>(processes.Count);
+        var emptyCommandLine = 0;
         foreach (var p in processes)
         {
-            Infobase? matched = null;
-            if (!string.IsNullOrWhiteSpace(p.CommandLine))
+            // issue #140 (1.0.1.84): инспектор использует полный матчер — прямые ключи,
+            // /IBName (при уникальном имени), /IBConnectionString и веб-базы. Раньше
+            // здесь был только MatchesCommandLine, поэтому процессы, запущенные по
+            // /IBName (отладка из Конфигуратора) и веб-публикации, показывались как
+            // «Неизвестная база».
+            var matched = RunningInfobaseMatcher.FindOwner(_infobases, p.CommandLine);
+
+            if (RunningMatchDebug.IsEnabled)
             {
-                foreach (var ib in _infobases)
-                {
-                    if (RunningInfobaseMatcher.MatchesCommandLine(ib, p.CommandLine))
-                    {
-                        matched = ib;
-                        break;
-                    }
-                }
+                RunningMatchDebug.Log(
+                    $"inspector: pid={p.Pid} exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
+                RunningMatchDebug.Log($"inspector: matched={(matched is null ? "none" : matched.Name)}");
+                if (string.IsNullOrWhiteSpace(p.CommandLine))
+                    emptyCommandLine++;
             }
 
             rows.Add(new ProcessRowViewModel(p, matched));
         }
+
+        // issue #140 (1.0.1.84): на чужой машине пустая командная строка (нет прав WMI)
+        // — самая частая причина «Неизвестной базы». Пишем итог, чтобы это отличить
+        // от неудачного сопоставления путей/URL.
+        if (emptyCommandLine > 0 && RunningMatchDebug.IsEnabled)
+            RunningMatchDebug.Log($"inspector: processes without command line={emptyCommandLine}");
 
         return rows;
     }

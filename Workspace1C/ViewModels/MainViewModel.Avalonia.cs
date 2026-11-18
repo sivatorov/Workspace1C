@@ -685,14 +685,42 @@ public partial class MainViewModel : ViewModelBase
         {
             if (SetPropertyWithRelated(ref _selectedInfobase, value, nameof(SelectedInfobase), nameof(RightPanelTitle), nameof(RightPanelSubtitle),
                     nameof(IsInfobaseSelected), nameof(ShowConnectionInfo), nameof(ShowRightPanelHint),
-                    nameof(RightPanelIconKey), nameof(HasRightPanelIcon)))
+                    nameof(RightPanelIconKey), nameof(HasRightPanelIcon), nameof(ShowOpenFolderLink)))
             {
                 if (value is not null)
                     SelectedGroupNode = null;
+                // Состав блока «Информация о подключении» зависит от вида базы
+                // (issue #138, 1.0.1.84).
+                RebuildConnectionInfoFields();
                 RaiseCommandCanExecuteChanged();
                 UpdateStatus();
             }
         }
+    }
+
+    /// <summary>
+    /// Строки блока «Информация о подключении» (issue #138, 1.0.1.84): заголовки и
+    /// состав зависят от вида информационной базы (файловая, веб-сервер, серверная).
+    /// </summary>
+    public ObservableCollection<ConnectionInfoFieldInfo> ConnectionInfoFields { get; } = new();
+
+    /// <summary>
+    /// Показывать кнопку «Открыть каталог» рядом с заголовком блока подключения
+    /// (issue #138, 1.0.1.84) — только для файловой базы с непустым путём.
+    /// </summary>
+    public bool ShowOpenFolderLink =>
+        SelectedInfobase is { } ib && ConnectionInfoPresenter.CanOpenFolder(ib);
+
+    /// <summary>
+    /// Пересобирает строки блока «Информация о подключении» (issue #138, 1.0.1.84)
+    /// и уведомляет об изменении видимости кнопки «Открыть каталог».
+    /// </summary>
+    private void RebuildConnectionInfoFields()
+    {
+        ConnectionInfoFields.Clear();
+        foreach (var field in ConnectionInfoPresenter.Build(SelectedInfobase))
+            ConnectionInfoFields.Add(field);
+        OnPropertyChanged(nameof(ShowOpenFolderLink));
     }
 
     public GroupNodeViewModel? SelectedGroupNode
@@ -1765,6 +1793,9 @@ public partial class MainViewModel : ViewModelBase
         // Ссылка та же, поэтому сеттер молчит, а в строке состояния остаются
         // прежние порт, версия, пользователь и путь. Пересобираем явно.
         UpdateStatus();
+        // Строки блока «Информация о подключении» тоже пересобираем явно
+        // (issue #138, 1.0.1.84): сеттер не сработал из-за той же ссылки.
+        RebuildConnectionInfoFields();
     }
 
     private void AddInfobase()
