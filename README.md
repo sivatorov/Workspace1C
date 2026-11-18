@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.86-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.87-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.86**
-(поддерживается **7239 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.87**
+(поддерживается **7261 юнит-тест**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Шапка списка баз: заголовок последней колонки читается полностью
+  (1.0.1.87, Windows и Linux)** — колонка «Последняя копия» шириной 130 px
+  оставляла под текст 101 px при подписи ≈ 140 px, поэтому в шапке было
+  «Послед…». Каждая колонка получила `MinWidth` по своей подписи, заголовок
+  переносится на две строки при фиксированной высоте шапки 40 px, а минимум
+  применён одинаково к шапке, строке группы и строке базы (WPF) и к построителю
+  колонок (Avalonia) — шапка и значения выровнены. Горизонтальная прокрутка
+  остаётся только когда сумма видимых колонок действительно шире области списка.
+  Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Контраст вторичного текста и текста на акцентных кнопках приведён к WCAG AA
   (1.0.1.86, Windows и Linux)** — в светлой теме `TextSecondaryColor` затемнён с
   `#64748B` до `#475569` (6.9:1 / 6.4:1 / 6.2:1 на фоне контента, поле ввода и границе

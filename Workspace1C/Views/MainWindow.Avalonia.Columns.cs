@@ -259,10 +259,11 @@ namespace Workspace1C
                 // обязан совпадать с отступом строки, иначе заголовки разъедутся
                 // со значениями; в разметке он нулевой в обоих местах.
                 Padding = new Thickness(0, 2),
-                // Высоту шапке задавали кнопки блока групп; после их переноса
-                // в панель команд её держит минимум из разметки
-                // (MainWindow.xaml:639: MinHeight 36 и прозрачность 0.95).
-                MinHeight = 36,
+                // Аудит UI, P0-3: фиксированная высота шапки под две строки подписи.
+                // Заголовок переносится по словам, а не обрезается, поэтому высота
+                // должна вмещать две строки 12 px (раньше было MinHeight 36 под одну).
+                Height = ColumnHeaderMetrics.HeaderHeight,
+                MinHeight = ColumnHeaderMetrics.HeaderHeight,
                 Opacity = 0.95,
                 BorderThickness = new Thickness(0, 0, 0, 1),
                 Child = _columnHeaderRow
@@ -916,7 +917,13 @@ namespace Workspace1C
             if (sender is not Border grip || !ReferenceEquals(e.Pointer.Captured, grip))
                 return;
 
-            var minWidth = _resizeKey == "Actions" ? ActionsColumnMinWidth : MinColumnWidth;
+            // Аудит UI, P0-3: минимум по подписи заголовка — как у колонок сетки,
+            // иначе сохранённая ширина расходилась бы с фактической. У «Действий»
+            // дополнительно действует минимум под три кнопки-чипа (issue #121).
+            var headerMinWidth = ColumnHeaderMetrics.MinWidthFor(_resizeKey);
+            var minWidth = _resizeKey == "Actions"
+                ? Math.Max(ActionsColumnMinWidth, headerMinWidth)
+                : Math.Max(MinColumnWidth, headerMinWidth);
             var width = Math.Max(minWidth, _resizeStartWidth + e.GetPosition(this).X - _resizeStartX);
             ApplyColumnWidth(_resizeKey, width);
             _vm?.UpdateColumnWidth(_resizeKey, width, save: false);
@@ -1063,7 +1070,9 @@ namespace Workspace1C
         /// </summary>
         private static ListMinWidthCalculator.Column ColumnSpec(ColumnDefinition d)
             => new(
-                d.Width.IsAbsolute ? d.Width.Value : 0,
+                // Аудит UI, P0-3: MinWidth по подписи заголовка реально расширяет
+                // колонку — в сумме для полосы прокрутки берём фактическую ширину.
+                d.Width.IsAbsolute ? Math.Max(d.Width.Value, d.MinWidth) : 0,
                 d.Width.IsAbsolute && d.Width.Value > 0);
 
         /// <summary>
@@ -1254,30 +1263,40 @@ namespace Workspace1C
         /// </summary>
         private static Control ColumnHeader(string text, string iconKey)
         {
-            var panel = new StackPanel
+            // Аудит UI, P0-3: сетка «иконка + текст» вместо горизонтального StackPanel.
+            // StackPanel меряет детей без ограничения по ширине, поэтому перенос строк
+            // не работал и подпись обрезалась («Послед…»). В сетке текст получает
+            // ширину колонки, переносится на две строки и не обрезается, пока колонка
+            // не уже самого длинного слова (это держит MinWidth колонки).
+            var grid = new Grid
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 5,
                 VerticalAlignment = VerticalAlignment.Center,
                 // Отступы как в разметке WPF (Margin="6,0,6,4"): без них подпись
-                // встаёт вплотную к соседней, а горизонтальный StackPanel меряет
-                // детей без ограничения по ширине, поэтому сам текст не подрезается.
+                // встаёт вплотную к соседней.
                 Margin = new Thickness(6, 0, 6, 4),
                 ClipToBounds = true
             };
-            panel.Children.Add(IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(13), "TextSecondaryBrush"));
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(13), "TextSecondaryBrush");
+            Grid.SetColumn(icon, 0);
+            grid.Children.Add(icon);
 
             var block = new TextBlock
             {
                 Text = text,
                 FontSize = UiMetrics.ScaledFont(12),
                 FontWeight = FontWeight.SemiBold,
+                TextWrapping = TextWrapping.Wrap,
                 TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(5, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             ThemeBrushes.Bind(block, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            panel.Children.Add(block);
-            return panel;
+            Grid.SetColumn(block, 1);
+            grid.Children.Add(block);
+            return grid;
         }
 
         /// <summary>
@@ -1312,7 +1331,7 @@ namespace Workspace1C
             grid.ColumnDefinitions.Add(new ColumnDefinition
             {
                 Width = NameColumnLength(),
-                MinWidth = MinColumnWidth
+                MinWidth = ColumnHeaderMetrics.NameColumnMinWidth
             });
 
             var columns = ListColumns();
@@ -1327,15 +1346,29 @@ namespace Workspace1C
                 if (i == actionsOffset)
                 {
                     actionsIndex = grid.ColumnDefinitions.Count;
-                    grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(actionsWidth) });
+                    grid.ColumnDefinitions.Add(new ColumnDefinition
+                    {
+                        Width = new GridLength(actionsWidth),
+                        // Аудит UI, P0-3: скрытая колонка не держится минимумом.
+                        MinWidth = actionsWidth > 0 ? ColumnHeaderMetrics.MinWidthFor("Actions") : 0
+                    });
                 }
-                grid.ColumnDefinitions.Add(
-                    new ColumnDefinition { Width = new GridLength(columns[i].Width), MinWidth = MinColumnWidth });
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(columns[i].Width),
+                    // Аудит UI, P0-3: минимум по подписи заголовка (самое длинное слово
+                    // с иконкой и отступами) — заголовок переносится, но не обрезается.
+                    MinWidth = ColumnHeaderMetrics.MinWidthFor(columns[i].Key)
+                });
             }
             if (actionsOffset >= columns.Count)
             {
                 actionsIndex = grid.ColumnDefinitions.Count;
-                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(actionsWidth) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(actionsWidth),
+                    MinWidth = actionsWidth > 0 ? ColumnHeaderMetrics.MinWidthFor("Actions") : 0
+                });
             }
             return actionsIndex;
         }

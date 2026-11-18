@@ -59,6 +59,11 @@
         <conv:GroupTextColorConverter x:Key="GroupTextColorConverter"/>
         <conv:BooleanToGridLengthConverter x:Key="BoolToGridLen"/>
         <conv:ColumnVisibilityConverter x:Key="ColumnVis"/>
+        <!-- Аудит UI, пункт P0-3: минимум ширины колонки по её заголовку. Скрытая
+             колонка получает 0 и схлопывается, видимая — не уже самого длинного
+             слова подписи, поэтому заголовок не обрезается. Применяется и к шапке,
+             и к строкам (базы и группы), чтобы они оставались выровненными. -->
+        <conv:ColumnMinWidthConverter x:Key="ColumnMinWidth"/>
         <conv:NameColumnWidthConverter x:Key="NameColumnWidth"/>
         <conv:IconKeyToGeometryConverter x:Key="IconKeyToGeometryConverter"/>
         <conv:LevelToThicknessConverter x:Key="LevelToThickness"/>
@@ -767,7 +772,9 @@
                                      а при вертикальной прокрутке остаётся на месте. -->
                                 <Border x:Name="DbHeaderBorder" Grid.Row="0"
                                         BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,0,0,1"
-                                        Padding="0,2,0,2" MinHeight="36" Opacity="0.95">
+                                        Padding="0,2,0,2"
+                                        Height="{x:Static local:ColumnHeaderMetrics.HeaderHeight}"
+                                        MinHeight="36" Opacity="0.95">
                             <Grid x:Name="HeaderGrid" MinWidth="{Binding ActualWidth, ElementName=MainTree}">
                                 <!-- Единственная star-строка: растягивается на высоту Border (MinHeight=36),
                                      чтобы заголовки колонок (VerticalAlignment="Center") были отцентрированы
@@ -788,13 +795,15 @@
                                     <ColumnDefinition Width="{Binding DataContext.ShowPinnedButton, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToGridLen}, ConverterParameter=26}"/>
                                     <!-- Имя: растягивается на оставшееся место, пока не задана фиксированная
                                          ширина перетаскиванием разделителя (NameColumnWidth). -->
-                                    <ColumnDefinition x:Name="NameColumn">
+                                    <ColumnDefinition x:Name="NameColumn"
+                                                      MinWidth="{x:Static local:ColumnHeaderMetrics.NameColumnMinWidth}">
                                         <ColumnDefinition.Width>
                                             <Binding Path="DataContext.NameColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"
                                                      Converter="{StaticResource NameColumnWidth}"/>
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
-                                    <ColumnDefinition x:Name="VersionColumn">
+                                    <ColumnDefinition x:Name="VersionColumn"
+                                                      MinWidth="{Binding DataContext.ShowVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Version}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                 <Binding Path="DataContext.ShowVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -802,7 +811,8 @@
                                             </MultiBinding>
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
-                                    <ColumnDefinition x:Name="LaunchModeColumn">
+                                    <ColumnDefinition x:Name="LaunchModeColumn"
+                                                      MinWidth="{Binding DataContext.ShowLaunchModeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LaunchMode}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                 <Binding Path="DataContext.ShowLaunchModeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -813,11 +823,13 @@
                                     <!-- Колонка «Действия»: встаёт сразу после «Режим запуска»;
                                          видимость управляется переключателем ShowActionsColumn,
                                          ширина настраивается перетаскиванием разделителя.
-                                         MinWidth не задан намеренно — при скрытии колонка схлопывается в 0;
-                                         минимум (issue #121, v1.0.1.54) держит обработчик перетаскивания:
-                                         80 — под три круглые кнопки-чипа (MainViewModel.ActionsColumnMinWidth),
-                                         по умолчанию 120 вместо прежних 170 — колонку можно сузить. -->
-                                    <ColumnDefinition x:Name="ActionsColumn">
+                                         MinWidth (аудит UI, P0-3) — по подписи заголовка (≈ 94) и
+                                         только у видимой колонки: скрытая схлопывается в 0. Минимум
+                                         под три круглые кнопки-чипа (issue #121, v1.0.1.54) — 80
+                                         (AppSettings.ActionsColumnMinWidth), подпись требует чуть
+                                         больше; по умолчанию 120 вместо прежних 170. -->
+                                    <ColumnDefinition x:Name="ActionsColumn"
+                                                      MinWidth="{Binding DataContext.ShowActionsColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Actions}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                 <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -825,7 +837,8 @@
                                             </MultiBinding>
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
-                                    <ColumnDefinition x:Name="ServerColumn">
+                                    <ColumnDefinition x:Name="ServerColumn"
+                                                      MinWidth="{Binding DataContext.ShowServerColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ServerBase}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="200">
                                                 <Binding Path="DataContext.ShowServerColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -833,7 +846,8 @@
                                             </MultiBinding>
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
-                                    <ColumnDefinition x:Name="LastLaunchColumn">
+                                    <ColumnDefinition x:Name="LastLaunchColumn"
+                                                      MinWidth="{Binding DataContext.ShowLastLaunchColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastLaunch}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="140">
                                                 <Binding Path="DataContext.ShowLastLaunchColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -841,7 +855,8 @@
                                             </MultiBinding>
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
-                                    <ColumnDefinition x:Name="SizeColumn">
+                                    <ColumnDefinition x:Name="SizeColumn"
+                                                      MinWidth="{Binding DataContext.ShowSizeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Size}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="90">
                                                 <Binding Path="DataContext.ShowSizeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -850,7 +865,8 @@
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
                                     <!-- Колонка «Дата изменений» — сразу после «Размера» -->
-                                    <ColumnDefinition x:Name="ModifiedColumn">
+                                    <ColumnDefinition x:Name="ModifiedColumn"
+                                                      MinWidth="{Binding DataContext.ShowModifiedColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Modified}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                 <Binding Path="DataContext.ShowModifiedColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -859,7 +875,8 @@
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
                                     <!-- Колонка «Последняя копия» (0.3.9.86) — сразу после «Даты изменений» -->
-                                    <ColumnDefinition x:Name="LastBackupColumn">
+                                    <ColumnDefinition x:Name="LastBackupColumn"
+                                                      MinWidth="{Binding DataContext.ShowLastBackupColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastBackup}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                 <Binding Path="DataContext.ShowLastBackupColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -868,7 +885,8 @@
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
                                     <!-- Колонка «Конфигурация» (только название) — в самом конце списка колонок -->
-                                    <ColumnDefinition x:Name="ConfigurationColumn">
+                                    <ColumnDefinition x:Name="ConfigurationColumn"
+                                                      MinWidth="{Binding DataContext.ShowConfigurationColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Configuration}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="160">
                                                 <Binding Path="DataContext.ShowConfigurationColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -877,7 +895,8 @@
                                         </ColumnDefinition.Width>
                                     </ColumnDefinition>
                                     <!-- Колонка «№ релиза» (версия конфигурации) — сразу после «Конфигурации» -->
-                                    <ColumnDefinition x:Name="ConfigurationVersionColumn">
+                                    <ColumnDefinition x:Name="ConfigurationVersionColumn"
+                                                      MinWidth="{Binding DataContext.ShowConfigurationVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ConfigurationVersion}">
                                         <ColumnDefinition.Width>
                                             <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="100">
                                                 <Binding Path="DataContext.ShowConfigurationVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -897,173 +916,222 @@
                                      поэтому панель явно прижата к левому краю (HorizontalAlignment="Left"),
                                      а иконка и текст дополнительно зафиксированы слева, чтобы ни один
                                      неявный стиль/триггер не мог отцентрировать содержимое колонки. -->
-                                    <StackPanel Grid.Column="0" Grid.ColumnSpan="5" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Left" Margin="0,0,8,4"
-                                            Cursor="Hand" Tag="Name" ToolTip="{loc:Loc Main.ColumnNameSortTooltip}"
-                                            MouseLeftButtonUp="OnColumnHeader_Click">
-                                    <materialDesign:PackIcon Kind="FormatTitle" Width="13" Height="13"
+                                    <!-- Аудит UI, P0-3: заголовок — сетка «иконка + текст», а не
+                                         горизонтальный StackPanel. StackPanel меряет текст без
+                                         ограничения по ширине, поэтому перенос строк не работал и
+                                         подпись обрезалась. В сетке текст получает ширину колонки
+                                         и переносится на две строки. -->
+                                    <Grid Grid.Column="0" Grid.ColumnSpan="5" VerticalAlignment="Center"
+                                          HorizontalAlignment="Left" Margin="0,0,8,4"
+                                          Cursor="Hand" Tag="Name" ToolTip="{loc:Loc Main.ColumnNameSortTooltip}"
+                                          MouseLeftButtonUp="OnColumnHeader_Click">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="FormatTitle" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Name}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Name}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                HorizontalAlignment="Left" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                    </Grid>
+                                <Grid Grid.Column="5" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="Version" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Information" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Information" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Version}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Version}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="6" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="LaunchMode" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Play" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Play" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.LaunchMode}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.LaunchMode}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="7" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Left" Margin="6,0,6,4"
-                                            ToolTip="{loc:Loc Main.Actions}">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="7" VerticalAlignment="Center"
+                                      HorizontalAlignment="Left" Margin="6,0,6,4"
+                                      ToolTip="{loc:Loc Main.Actions}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="Actions" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Cog" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Cog" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Actions}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Actions}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="8" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="ServerBase" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Server" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Server" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.ServerBase}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.ServerBase}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="9" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4"
-                                            Cursor="Hand" Tag="LastLaunchDate" ToolTip="{loc:Loc Main.ColumnLastLaunchSortTooltip}"
-                                            MouseLeftButtonUp="OnColumnHeader_Click">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="9" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4"
+                                      Cursor="Hand" Tag="LastLaunchDate" ToolTip="{loc:Loc Main.ColumnLastLaunchSortTooltip}"
+                                      MouseLeftButtonUp="OnColumnHeader_Click">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="LastLaunch" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="ClockOutline" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="ClockOutline" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.LastLaunch}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.LastLaunch}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="10" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4"
-                                            ToolTip="{loc:Loc Main.ColumnSizeTooltip}">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="10" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4"
+                                      ToolTip="{loc:Loc Main.ColumnSizeTooltip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="Size" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Database" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Database" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Size}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Size}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="11" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="11" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="Modified" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="CalendarClock" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="CalendarClock" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Modified}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Modified}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="12" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="12" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="LastBackup" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="BackupRestore" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="BackupRestore" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.LastBackup}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.LastBackup}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="13" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4"
-                                            ToolTip="{loc:Loc Main.ColumnNameTooltip}">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="13" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4"
+                                      ToolTip="{loc:Loc Main.ColumnNameTooltip}">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="Configuration" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="CubeOutline" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="CubeOutline" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.Configuration}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.Configuration}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
-                                <StackPanel Grid.Column="14" Orientation="Horizontal" VerticalAlignment="Center"
-                                            HorizontalAlignment="Stretch" Margin="6,0,6,4">
-                                    <StackPanel.ContextMenu>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
+                                <Grid Grid.Column="14" VerticalAlignment="Center"
+                                      HorizontalAlignment="Stretch" Margin="6,0,6,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.ContextMenu>
                                         <ContextMenu Style="{DynamicResource ModernContextMenu}">
                                             <MenuItem Header="{loc:Loc Column.HideColumn}" Tag="ConfigurationVersion" Click="OnColumnHeaderContextMenu_Hide" Style="{DynamicResource ModernMenuItem}"/>
                                             <MenuItem Header="{loc:Loc Settings.Columns.OpenSettings}" Click="OnColumnHeaderContextMenu_OpenSettings" Style="{DynamicResource ModernMenuItem}"/>
                                         </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                    <materialDesign:PackIcon Kind="Counter" Width="13" Height="13"
+                                    </Grid.ContextMenu>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="Counter" Width="13" Height="13"
                                                              Foreground="{DynamicResource TextSecondaryBrush}"
                                                              VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Column.ConfigurationVersion}" FontWeight="SemiBold" FontSize="12"
+                                    <TextBlock Grid.Column="1" Text="{loc:Loc Column.ConfigurationVersion}" FontWeight="SemiBold" FontSize="12"
                                                Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
-                                               TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
-                                </StackPanel>
+                                               TextWrapping="Wrap" TextTrimming="CharacterEllipsis" Margin="4,0,0,0"/>
+                                </Grid>
 
                                 <!-- Современные разделители колонок: тонкая линия + широкая зона захвата -->
                                 <Border x:Name="NameSplitter" Grid.Column="4"
@@ -1425,13 +1493,13 @@
                                                  в панель команд, колонка пустая. Структура синхронизирована с шапкой. -->
                                             <ColumnDefinition Width="{Binding DataContext.ShowFavoritesButton, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToGridLen}, ConverterParameter=28}"/>
                                             <ColumnDefinition Width="{Binding DataContext.ShowPinnedButton, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToGridLen}, ConverterParameter=26}"/>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{x:Static local:ColumnHeaderMetrics.NameColumnMinWidth}">
                                                 <ColumnDefinition.Width>
                                                     <Binding Path="DataContext.NameColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"
                                                              Converter="{StaticResource NameColumnWidth}"/>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Version}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1439,7 +1507,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLaunchModeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LaunchMode}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowLaunchModeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1449,9 +1517,10 @@
                                             </ColumnDefinition>
                                             <!-- Колонка «Действия»: команды группы на уровне кнопок строк баз.
                                                  Видимость управляется переключателем ShowActionsColumn.
-                                                 MinWidth не задан намеренно — минимум (issue #121, v1.0.1.54) 80
-                                                 держит обработчик перетаскивания, пока колонка видима. -->
-                                            <ColumnDefinition>
+                                                 MinWidth — по подписи заголовка (аудит UI, P0-3) и только
+                                                 у видимой колонки: минимум под три кнопки-чипа
+                                                 (issue #121, v1.0.1.54, 80) меньше ширины подписи. -->
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowActionsColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Actions}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1459,7 +1528,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowServerColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ServerBase}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="200">
                                                         <Binding Path="DataContext.ShowServerColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1467,7 +1536,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLastLaunchColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastLaunch}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="140">
                                                         <Binding Path="DataContext.ShowLastLaunchColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1475,7 +1544,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowSizeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Size}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="90">
                                                         <Binding Path="DataContext.ShowSizeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1483,7 +1552,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowModifiedColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Modified}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                         <Binding Path="DataContext.ShowModifiedColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1492,7 +1561,7 @@
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
                                             <!-- Колонка «Последняя копия» (0.3.9.86) — сразу после «Даты изменений» -->
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLastBackupColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastBackup}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                         <Binding Path="DataContext.ShowLastBackupColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1500,7 +1569,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowConfigurationColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Configuration}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="160">
                                                         <Binding Path="DataContext.ShowConfigurationColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1508,7 +1577,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowConfigurationVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ConfigurationVersion}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="100">
                                                         <Binding Path="DataContext.ShowConfigurationVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1752,13 +1821,13 @@
                                                  в панель команд, колонка пустая. Структура синхронизирована с шапкой. -->
                                             <ColumnDefinition Width="{Binding DataContext.ShowFavoritesButton, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToGridLen}, ConverterParameter=28}"/>
                                             <ColumnDefinition Width="{Binding DataContext.ShowPinnedButton, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToGridLen}, ConverterParameter=26}"/>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{x:Static local:ColumnHeaderMetrics.NameColumnMinWidth}">
                                                 <ColumnDefinition.Width>
                                                     <Binding Path="DataContext.NameColumnWidth" RelativeSource="{RelativeSource AncestorType=Window}"
                                                              Converter="{StaticResource NameColumnWidth}"/>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Version}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1766,7 +1835,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLaunchModeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LaunchMode}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowLaunchModeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1776,9 +1845,10 @@
                                             </ColumnDefinition>
                                             <!-- Колонка «Действия»: встаёт сразу после «Режим запуска», совпадает с заголовком.
                                                  Видимость управляется переключателем ShowActionsColumn.
-                                                 MinWidth не задан намеренно — минимум (issue #121, v1.0.1.54) 80
-                                                 держит обработчик перетаскивания, пока колонка видима. -->
-                                            <ColumnDefinition>
+                                                 MinWidth — по подписи заголовка (аудит UI, P0-3) и только
+                                                 у видимой колонки: минимум под три кнопки-чипа
+                                                 (issue #121, v1.0.1.54, 80) меньше ширины подписи. -->
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowActionsColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Actions}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="120">
                                                         <Binding Path="DataContext.ShowActionsColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1786,7 +1856,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowServerColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ServerBase}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="200">
                                                         <Binding Path="DataContext.ShowServerColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1794,7 +1864,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLastLaunchColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastLaunch}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="140">
                                                         <Binding Path="DataContext.ShowLastLaunchColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1802,7 +1872,7 @@
                                                     </MultiBinding>
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowSizeColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Size}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="90">
                                                         <Binding Path="DataContext.ShowSizeColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1811,7 +1881,7 @@
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
                                             <!-- Колонка «Дата изменений» — сразу после «Размера» -->
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowModifiedColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Modified}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                         <Binding Path="DataContext.ShowModifiedColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1820,7 +1890,7 @@
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
                                             <!-- Колонка «Последняя копия» (0.3.9.86) — сразу после «Даты изменений» -->
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowLastBackupColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=LastBackup}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="130">
                                                         <Binding Path="DataContext.ShowLastBackupColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1829,7 +1899,7 @@
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
                                             <!-- Колонка «Конфигурация» (только название) — в самом конце списка колонок -->
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowConfigurationColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=Configuration}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="160">
                                                         <Binding Path="DataContext.ShowConfigurationColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>
@@ -1838,7 +1908,7 @@
                                                 </ColumnDefinition.Width>
                                             </ColumnDefinition>
                                             <!-- Колонка «№ релиза» (версия конфигурации) — сразу после «Конфигурации» -->
-                                            <ColumnDefinition>
+                                            <ColumnDefinition MinWidth="{Binding DataContext.ShowConfigurationVersionColumn, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource ColumnMinWidth}, ConverterParameter=ConfigurationVersion}">
                                                 <ColumnDefinition.Width>
                                                     <MultiBinding Converter="{StaticResource ColumnVis}" ConverterParameter="100">
                                                         <Binding Path="DataContext.ShowConfigurationVersionColumn" RelativeSource="{RelativeSource AncestorType=Window}"/>

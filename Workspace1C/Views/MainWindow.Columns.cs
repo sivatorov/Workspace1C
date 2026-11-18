@@ -1298,7 +1298,12 @@ namespace Workspace1C
                 leading.Add(HeaderColumnSpec(defs[i]));
 
             var nameDef = defs[nameIndex];
-            var nameWidth = nameDef.Width.IsAbsolute ? nameDef.Width.Value : 0;
+            // Аудит UI, P0-3: фактическая ширина колонки не может быть меньше её
+            // MinWidth — учитываем минимум в сумме, иначе полоса прокрутки не
+            // дотягивала бы до последней колонки после сужения «Названия».
+            var nameWidth = nameDef.Width.IsAbsolute
+                ? Math.Max(nameDef.Width.Value, nameDef.MinWidth)
+                : 0;
 
             var values = new List<ListMinWidthCalculator.Column>(defs.Count - HeaderFirstDataColumn);
             for (var i = HeaderFirstDataColumn; i < defs.Count; i++)
@@ -1636,12 +1641,51 @@ namespace Workspace1C
             UpdateTreeMinWidth();
         }
 
-        /// <summary>Спецификация колонки заголовка для расчёта минимальной ширины.</summary>
+        /// <summary>
+        /// Спецификация колонки заголовка для расчёта минимальной ширины.
+        /// Аудит UI, P0-3: берём максимум из заданной ширины и <c>MinWidth</c> — минимум
+        /// по подписи заголовка (<see cref="ColumnHeaderMetrics"/>) реально расширяет
+        /// колонку, и сумма для полосы прокрутки должна совпадать с фактической.
+        /// </summary>
         private static ListMinWidthCalculator.Column HeaderColumnSpec(ColumnDefinition d)
             => new(
-                d.Width.IsAbsolute ? d.Width.Value : d.MinWidth,
+                d.Width.IsAbsolute ? Math.Max(d.Width.Value, d.MinWidth) : d.MinWidth,
                 d.Width.IsAbsolute && d.Width.Value > 0);
 
+
+        /// <summary>
+        /// Минимум ширины колонки по её подписи заголовка (аудит UI, P0-3):
+        /// <see cref="ColumnHeaderMetrics.MinWidthFor"/>. Для «Названия» — 220,
+        /// для остальных — самое длинное слово подписи плюс иконка и отступы.
+        /// </summary>
+        private double MinWidthForColumn(ColumnDefinition? column)
+        {
+            if (column is null)
+                return ColumnHeaderMetrics.MinWidthFloor;
+            if (ReferenceEquals(column, NameColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Name");
+            if (ReferenceEquals(column, VersionColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Version");
+            if (ReferenceEquals(column, ConfigurationColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Configuration");
+            if (ReferenceEquals(column, ConfigurationVersionColumn))
+                return ColumnHeaderMetrics.MinWidthFor("ConfigurationVersion");
+            if (ReferenceEquals(column, LaunchModeColumn))
+                return ColumnHeaderMetrics.MinWidthFor("LaunchMode");
+            if (ReferenceEquals(column, ActionsColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Actions");
+            if (ReferenceEquals(column, ServerColumn))
+                return ColumnHeaderMetrics.MinWidthFor("ServerBase");
+            if (ReferenceEquals(column, LastLaunchColumn))
+                return ColumnHeaderMetrics.MinWidthFor("LastLaunch");
+            if (ReferenceEquals(column, SizeColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Size");
+            if (ReferenceEquals(column, ModifiedColumn))
+                return ColumnHeaderMetrics.MinWidthFor("Modified");
+            if (ReferenceEquals(column, LastBackupColumn))
+                return ColumnHeaderMetrics.MinWidthFor("LastBackup");
+            return ColumnHeaderMetrics.MinWidthFloor;
+        }
 
         /// <summary>
         /// Определяет колонку, ширину которой меняет данный разделитель.
@@ -1717,10 +1761,15 @@ namespace Workspace1C
             var delta = current.X - _resizeStartMouse.X;
 
             var newWidth = _resizeStartWidth + delta;
-            if (ReferenceEquals(_resizeColumn, ActionsColumn) && newWidth < ActionsColumnMinWidth)
-                newWidth = ActionsColumnMinWidth;
-            else if (newWidth < 40)
-                newWidth = 40;
+            // Аудит UI, P0-3: ниже минимума по подписи заголовка колонку не сужаем —
+            // иначе заголовок пришлось бы обрезать. У «Действий» дополнительно
+            // действует минимум под три кнопки-чипа (issue #121).
+            var headerMinWidth = MinWidthForColumn(_resizeColumn);
+            var minWidth = ReferenceEquals(_resizeColumn, ActionsColumn)
+                ? Math.Max(ActionsColumnMinWidth, headerMinWidth)
+                : Math.Max(40, headerMinWidth);
+            if (newWidth < minWidth)
+                newWidth = minWidth;
 
             if (ReferenceEquals(_resizeColumn, SizeColumn))
             {
