@@ -422,6 +422,7 @@
     "Main.Parameters": "Параметры",
     "Main.Tags": "Теги",
     "Main.NoSelectionHint": "Выберите информационную базу в списке, чтобы увидеть параметры подключения, запуск и теги.",
+    "Main.SelectInfobaseHint": "Выберите информационную базу",
     "Main.Actions": "Действия",
     "LongOperation.Settings.GroupTitle": "Уведомления о длительных операциях",
     "LongOperation.Settings.Enabled": "Уведомлять",

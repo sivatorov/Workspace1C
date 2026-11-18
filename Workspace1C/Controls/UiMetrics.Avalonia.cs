@@ -129,6 +129,12 @@ namespace Workspace1C.Controls
         public static double ActionButtonPadH => Compact ? 6 : 8;
         /// <summary>Минимальная высота кнопки действия в правой панели.</summary>
         public static double ActionButtonMinHeight => Compact ? 26 : 32;
+        /// <summary>
+        /// Единая высота кнопок действий правой панели (аудит UI, P1-3, 1.0.1.90):
+        /// «1С:Предприятие», «Конфигуратор», «Перейти по ссылке» и «Выход» должны
+        /// быть одной высоты, как в WPF-разметке (Height="34").
+        /// </summary>
+        public static double ActionPanelButtonHeight => Scaled(34);
         /// <summary>Размер иконки на кнопке действия правой панели.</summary>
         public static double ActionIconSize => Compact ? 13 : 14;
         /// <summary>Размер шрифта подписи кнопки действия правой панели.</summary>

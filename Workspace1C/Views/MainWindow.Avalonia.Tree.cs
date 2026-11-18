@@ -1461,10 +1461,12 @@ namespace Workspace1C
             // где его можно переименовать, скрыть или удалить.
 
             // Переход по ссылке идёт после карточки сессии, как в разметке.
-            var byLinkBlock = BuildActionList(
-                CompactActionButtonBound("IconLink", "OpenByLinkCaption", "OpenInfobaseByLinkCommand", LocalizationManager.T("Main.OpenLinkTooltip"), "@InfoBrush", "IconArrowRight", colorTextToo: false,
-                    iconSize: UiMetrics.Scaled(16), widePadding: new Thickness(14, 11), narrowPadding: new Thickness(6, 8))
-            );
+            // Аудит UI, P1-3 (1.0.1.90): действие доступно только при выбранной базе.
+            var byLinkButton = CompactActionButtonBound("IconLink", "OpenByLinkCaption", "OpenInfobaseByLinkCommand",
+                LocalizationManager.T("Main.OpenLinkTooltip"), "@InfoBrush", "IconArrowRight", colorTextToo: false,
+                iconSize: UiMetrics.Scaled(16), widePadding: new Thickness(14, 0), narrowPadding: new Thickness(6, 0));
+            BindActionAvailability(byLinkButton, LocalizationManager.T("Main.OpenLinkTooltip"));
+            var byLinkBlock = BuildActionList(byLinkButton);
 
             // Бейджи «Избранное» и «Закреплено», как в разметке WPF: цвета там
             // заданы явно и одинаковы в обеих темах, поэтому берутся числом.
@@ -1646,10 +1648,11 @@ namespace Workspace1C
             panel.Children.Add(exitSeparator);
 
             // Выход — компактная кнопка внизу, без лишней «карточки».
-            // «Выход» у автора красный, #DC2626 в обеих темах.
+            // Аудит UI, P1-3 (1.0.1.90): «Выход» нейтральный — красный в продукте
+            // означает удаление/ошибку, поэтому цвет берётся из темы, без #DC2626.
             var exitBtn = CompactActionButton("IconExitToApp", LocalizationManager.T("Main.Exit"), "ExitCommand",
-                LocalizationManager.T("Main.ExitTooltip"), "#DC2626", "IconClose",
-                iconSize: UiMetrics.Scaled(16), widePadding: new Thickness(14, 11), narrowPadding: new Thickness(6, 8));
+                LocalizationManager.T("Main.ExitTooltip"), colorHex: null, trailingIconKey: "IconClose",
+                iconSize: UiMetrics.Scaled(16), widePadding: new Thickness(14, 0), narrowPadding: new Thickness(6, 0));
             // Нижний отступ обязателен: без него последний элемент не попадает
             // в прокручиваемую высоту целиком и снизу остаётся видна только рамка.
             exitBtn.Margin = new Thickness(0, UiMetrics.ActionGridGap, 0, UiMetrics.ActionGridGap);
@@ -1859,7 +1862,10 @@ namespace Workspace1C
                 Content = content,
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinHeight = UiMetrics.ActionButtonMinHeight,
+                // Карточка «1С:Стартер»/«Мои программы» выровнена с кнопками панели
+                // и остаётся нейтральной: фон карточки + контур (аудит UI, P1-3).
+                Height = UiMetrics.ActionPanelButtonHeight,
+                MinHeight = UiMetrics.ActionPanelButtonHeight,
                 Padding = new Thickness(UiMetrics.ActionButtonPadH, UiMetrics.ActionButtonPadV),
                 Margin = new Thickness(0, 0, 0, UiMetrics.ActionGridGap)
             };
@@ -1913,8 +1919,9 @@ namespace Workspace1C
                 };
             }
             // Нет иконки (галочка снята и извлечь не удалось, файл нечитаем) —
-            // стандартная иконка группы; панель не падает.
-            return IconHelper.MakeIcon("IconApplication", size, "WarningBrush");
+            // стандартная иконка группы; панель не падает. Жёлтый WarningBrush
+            // оставлен только семантическим предупреждениям (аудит UI, P1-3).
+            return IconHelper.MakeIcon("IconApplication", size, "TextSecondaryBrush");
         }
 
         /// <summary>Привязывает кнопку программы к команде запуска (issue #91).</summary>
@@ -1981,7 +1988,8 @@ namespace Workspace1C
                 Content = CompactIconAndText(iconKey, text, "TextPrimaryColorBrush", colorHex: colorHex, trailingIconKey: trailingIconKey, colorTextToo: colorTextToo, iconSize: iconSize),
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinHeight = UiMetrics.ActionButtonMinHeight,
+                Height = UiMetrics.ActionPanelButtonHeight,
+                MinHeight = UiMetrics.ActionPanelButtonHeight,
                 Padding = new Thickness(UiMetrics.ActionButtonPadH, UiMetrics.ActionButtonPadV),
                 Margin = new Thickness(0)
             };
@@ -2007,6 +2015,22 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Аудит UI, P1-3 (1.0.1.90): кнопки запуска доступны только при выбранной базе.
+        /// При отсутствии выбора — disabled и подсказка «Выберите информационную базу»;
+        /// подсказка показывается и у недоступной кнопки.
+        /// </summary>
+        private static void BindActionAvailability(Control control, string enabledTooltip)
+        {
+            control.Bind(InputElement.IsEnabledProperty, new Binding("IsInfobaseSelected"));
+            control.Bind(ToolTip.TipProperty, new Binding("IsInfobaseSelected")
+            {
+                Converter = new Avalonia.Data.Converters.FuncValueConverter<bool, string>(
+                    selected => selected ? enabledTooltip : LocalizationManager.T("Main.SelectInfobaseHint"))
+            });
+            ToolTip.SetShowOnDisabled(control, true);
+        }
+
+        /// <summary>
         /// Вариант кнопки действия с подписью из привязки: нужен там, где текст
         /// меняется по состоянию, как короткая подпись открытия по ссылке.
         /// </summary>
@@ -2026,7 +2050,8 @@ namespace Workspace1C
                 Content = CompactIconAndText(iconKey, "", "TextPrimaryColorBrush", textPath, colorHex, trailingIconKey, colorTextToo, iconSize),
                 HorizontalContentAlignment = HorizontalAlignment.Stretch,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinHeight = UiMetrics.ActionButtonMinHeight,
+                Height = UiMetrics.ActionPanelButtonHeight,
+                MinHeight = UiMetrics.ActionPanelButtonHeight,
                 Padding = new Thickness(UiMetrics.ActionButtonPadH, UiMetrics.ActionButtonPadV),
                 Margin = new Thickness(0)
             };
@@ -2468,11 +2493,16 @@ namespace Workspace1C
             main.Content = ThemedIconAndText(iconKey, text, contentBrush, UiMetrics.Scaled(16), centered: false);
             main.HorizontalContentAlignment = HorizontalAlignment.Left;
             main.HorizontalAlignment = HorizontalAlignment.Stretch;
-            main.MinHeight = UiMetrics.Scaled(34);
-            main.Padding = new Thickness(UiMetrics.Scaled(8), UiMetrics.Scaled(8), UiMetrics.Scaled(4), UiMetrics.Scaled(8));
+            // Аудит UI, P1-3 (1.0.1.90): единая высота кнопок панели — 34, как в WPF.
+            main.Height = UiMetrics.ActionPanelButtonHeight;
+            main.MinHeight = UiMetrics.ActionPanelButtonHeight;
+            main.Padding = new Thickness(UiMetrics.Scaled(8), 0, UiMetrics.Scaled(4), 0);
             main.Margin = new Thickness(0);
             ToolTip.SetTip(main, tooltip);
             main.Bind(Button.CommandProperty, new Binding(commandPath));
+            // Без выбранной базы запуск недоступен: disabled-вид даёт PanelButton,
+            // подсказка меняется на «Выберите информационную базу».
+            BindActionAvailability(main, tooltip);
 
             var menu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
             foreach (var (header, command, itemIcon, itemColor, gesture) in menuItems)
@@ -2511,12 +2541,14 @@ namespace Workspace1C
                 : new PanelButton("", "ItemHoverBrush",
                     "SecondaryButtonPressedBrush", "BorderColorBrush", arrowCorner);
             arrow.Width = UiMetrics.Scaled(28);
-            arrow.MinHeight = main.MinHeight;
+            arrow.Height = UiMetrics.ActionPanelButtonHeight;
+            arrow.MinHeight = UiMetrics.ActionPanelButtonHeight;
             arrow.Padding = new Thickness(0);
             arrow.Margin = new Thickness(0);
             // Стрелка в разметке это контур ChevronDown 16, а не текстовый знак.
             arrow.Content = IconHelper.MakeIcon("IconChevronDown", UiMetrics.Scaled(16), contentBrush);
             ToolTip.SetTip(arrow, LocalizationManager.T("Main.MoreLaunchOptions"));
+            BindActionAvailability(arrow, LocalizationManager.T("Main.MoreLaunchOptions"));
             arrow.ContextMenu = menu;
             arrow.Click += (_, _) => menu.Open(arrow);
 

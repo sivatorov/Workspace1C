@@ -1104,6 +1104,10 @@ public partial class MainViewModel : ViewModelBase
                 // (issue #138, 1.0.1.84).
                 RebuildConnectionInfoFields();
 
+                // Аудит UI, P1-3 (1.0.1.90): от выбора базы зависит disabled-состояние
+                // кнопок запуска в правой панели (WPF-разметка привязывает IsEnabled).
+                OnPropertyChanged(nameof(IsInfobaseSelected));
+
                 CommandManager.InvalidateRequerySuggested();
                 OnPropertyChanged(nameof(StatusBarInfo));
             }
@@ -1160,6 +1164,9 @@ public partial class MainViewModel : ViewModelBase
                     previous.IsSelected = false;
                 if (_selectedGroupNode is not null)
                     _selectedGroupNode.IsSelected = true;
+
+                // Выбор группы тоже снимает доступность запуска (аудит UI, P1-3).
+                OnPropertyChanged(nameof(IsInfobaseSelected));
 
                 CommandManager.InvalidateRequerySuggested();
             }

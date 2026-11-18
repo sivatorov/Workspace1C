@@ -183,14 +183,18 @@ namespace Workspace1C
             {
                 if (!IsEnabled)
                 {
-                    Opacity = 0.4;
+                    // Аудит UI, P1-3 (1.0.1.90): явное disabled-состояние —
+                    // приглушённая кнопка и обычный курсор, без hover-эффекта.
+                    Opacity = 0.5;
                     Background = _baseBg;
                     BorderBrush = _border;
                     BorderThickness = new Thickness(1);
+                    Cursor = Cursor.Default;
                     return;
                 }
 
                 Opacity = 1.0;
+                Cursor = new Cursor(StandardCursorType.Hand);
                 Background = _pressed ? _pressedBg : (_hovered ? _hoverBg : _baseBg);
                 if (_focused)
                 {

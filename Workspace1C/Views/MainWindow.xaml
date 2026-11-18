@@ -3177,8 +3177,13 @@
                                    Margin="0,0,0,10"
                                    Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
 
-                        <!-- Split-кнопки запуска: единый блок «действие | ▼» -->
+                        <!-- Split-кнопки запуска: единый блок «действие | ▼».
+                             Аудит UI, P1-3 (1.0.1.90): акцентная заливка — только у
+                             главного действия «1С:Предприятие» (один акцент на экран).
+                             При отсутствии выбранной базы блок получает disabled-вид:
+                             opacity 0.5 и подсказка «Выберите информационную базу». -->
                         <Border Margin="4,0,4,4" CornerRadius="10"
+                                IsEnabled="{Binding IsInfobaseSelected}"
                                 Background="{DynamicResource AccentBrush}">
                             <Border.Style>
                                 <Style TargetType="Border">
@@ -3186,6 +3191,11 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowRightPanelDetails}" Value="False">
                                             <Setter Property="Margin" Value="0,0,0,4"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsInfobaseSelected}" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                            <Setter Property="ToolTip" Value="{loc:Loc Main.SelectInfobaseHint}"/>
+                                            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -3198,7 +3208,7 @@
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" Command="{Binding LaunchEnterpriseCommand}"
                                         Cursor="Hand" HorizontalContentAlignment="Left" HorizontalAlignment="Stretch"
-                                        Background="Transparent" BorderThickness="0" Padding="8,8,4,8" MinHeight="34">
+                                        Background="Transparent" BorderThickness="0" Padding="8,0,4,0" Height="34" MinHeight="34">
                                     <Button.ToolTip>
                                         <MultiBinding Converter="{StaticResource MultiFormat}" ConverterParameter="{}{0} ({1})">
                                             <Binding Source="{x:Static loc:LocalizationManager.Instance}" Path="Source"
@@ -3283,7 +3293,10 @@
                             </Grid>
                         </Border>
 
+                        <!-- Конфигуратор — вторичная кнопка без акцентной заливки;
+                             высота выровнена с главным действием (аудит UI, P1-3). -->
                         <Border Margin="4,0,4,4" CornerRadius="10"
+                                IsEnabled="{Binding IsInfobaseSelected}"
                                 Background="{DynamicResource CardBackgroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
                             <Border.Style>
@@ -3292,6 +3305,11 @@
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowRightPanelDetails}" Value="False">
                                             <Setter Property="Margin" Value="0,0,0,4"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsInfobaseSelected}" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                            <Setter Property="ToolTip" Value="{loc:Loc Main.SelectInfobaseHint}"/>
+                                            <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
                                         </DataTrigger>
                                     </Style.Triggers>
                                 </Style>
@@ -3304,7 +3322,7 @@
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0" Command="{Binding LaunchConfiguratorCommand}"
                                         Cursor="Hand" HorizontalContentAlignment="Left" HorizontalAlignment="Stretch"
-                                        Background="Transparent" BorderThickness="0" Padding="8,8,4,8" MinHeight="34">
+                                        Background="Transparent" BorderThickness="0" Padding="8,0,4,0" Height="34" MinHeight="34">
                                     <Button.ToolTip>
                                         <MultiBinding Converter="{StaticResource MultiFormat}" ConverterParameter="{}{0} ({1})">
                                             <Binding Source="{x:Static loc:LocalizationManager.Instance}" Path="Source"
@@ -3454,8 +3472,10 @@
                                                             </MultiBinding>
                                                         </Image.Visibility>
                                                     </Image>
+                                                    <!-- Нейтральная иконка программы (аудит UI, P1-3): жёлтый
+                                                         WarningBrush — только для семантических предупреждений. -->
                                                     <materialDesign:PackIcon Kind="Application" Width="15" Height="15"
-                                                                             Foreground="{DynamicResource WarningBrush}">
+                                                                             Foreground="{DynamicResource TextSecondaryBrush}">
                                                         <materialDesign:PackIcon.Visibility>
                                                             <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
                                                                           ConverterParameter="Invert">
@@ -3515,8 +3535,9 @@
                                                         </MultiBinding>
                                                     </Image.Visibility>
                                                 </Image>
+                                                <!-- Нейтральная иконка программы (аудит UI, P1-3): без жёлтой заливки. -->
                                                 <materialDesign:PackIcon Kind="Application" Width="22" Height="22"
-                                                                         Foreground="{DynamicResource WarningBrush}">
+                                                                         Foreground="{DynamicResource TextSecondaryBrush}">
                                                     <materialDesign:PackIcon.Visibility>
                                                         <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
                                                                       ConverterParameter="Invert">
@@ -3640,16 +3661,27 @@
                         </Border>
 
                         <Button Command="{Binding OpenInfobaseByLinkCommand}"
-                                ToolTip="{loc:Loc Main.OpenLinkTooltip}">
+                                IsEnabled="{Binding IsInfobaseSelected}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource ActionPanelSecondaryButton}">
-                                    <Setter Property="Padding" Value="14,11"/>
+                                    <!-- Высота выровнена с кнопками запуска (аудит UI, P1-3). -->
+                                    <Setter Property="Height" Value="34"/>
+                                    <Setter Property="Padding" Value="14,0"/>
                                     <Setter Property="Margin" Value="8,0,8,0"/>
+                                    <Setter Property="ToolTip" Value="{loc:Loc Main.OpenLinkTooltip}"/>
+                                    <Setter Property="ToolTipService.ShowOnDisabled" Value="True"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowRightPanelDetails}" Value="False">
-                                            <Setter Property="Padding" Value="6,8"/>
+                                            <Setter Property="Padding" Value="6,0"/>
                                             <Setter Property="Margin" Value="0,0,0,0"/>
                                         </DataTrigger>
+                                        <!-- Без выбранной базы действие недоступно: явный disabled-вид
+                                             и подсказка вместо обычной (аудит UI, P1-3). -->
+                                        <Trigger Property="IsEnabled" Value="False">
+                                            <Setter Property="Opacity" Value="0.5"/>
+                                            <Setter Property="Cursor" Value="Arrow"/>
+                                            <Setter Property="ToolTip" Value="{loc:Loc Main.SelectInfobaseHint}"/>
+                                        </Trigger>
                                     </Style.Triggers>
                                 </Style>
                             </Button.Style>
@@ -3702,11 +3734,15 @@
                                 ToolTip="{loc:Loc Main.ExitTooltip}">
                             <Button.Style>
                                 <Style TargetType="Button" BasedOn="{StaticResource ActionPanelSecondaryButton}">
-                                    <Setter Property="Padding" Value="14,11"/>
+                                    <!-- «Выход» — нейтральное действие (аудит UI, P1-3):
+                                         не красный (красный в продукте = удаление/ошибка),
+                                         высота выровнена с остальными кнопками панели. -->
+                                    <Setter Property="Height" Value="34"/>
+                                    <Setter Property="Padding" Value="14,0"/>
                                     <Setter Property="Margin" Value="8,0,8,0"/>
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding ShowRightPanelDetails}" Value="False">
-                                            <Setter Property="Padding" Value="6,8"/>
+                                            <Setter Property="Padding" Value="6,0"/>
                                             <Setter Property="Margin" Value="0,0,0,0"/>
                                         </DataTrigger>
                                     </Style.Triggers>
@@ -3718,12 +3754,12 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
-                                    <materialDesign:PackIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Main.Exit}" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}" FontSize="12" FontWeight="SemiBold"/>
+                                    <materialDesign:PackIcon Kind="ExitToApp" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Main.Exit}" VerticalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}" FontSize="12" FontWeight="SemiBold"/>
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="✕"
                                            VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"
-                                           Foreground="{DynamicResource ErrorBrush}" Opacity="0.85" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Opacity="0.75" Margin="8,0,0,0"
                                            Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
                             </Grid>
                         </Button>

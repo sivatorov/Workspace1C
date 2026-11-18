@@ -422,6 +422,7 @@
     "Main.Parameters": "Parameters",
     "Main.Tags": "Tags",
     "Main.NoSelectionHint": "Select an infobase in the list to see connection parameters, launch and tags.",
+    "Main.SelectInfobaseHint": "Select an infobase",
     "Main.Actions": "Actions",
     "LongOperation.Settings.GroupTitle": "Long-running operation notifications",
     "LongOperation.Settings.Enabled": "Notify",

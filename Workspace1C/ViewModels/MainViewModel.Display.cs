@@ -425,6 +425,14 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Выбрана база, а не группа и не пустота (аудит UI, P1-3, 1.0.1.90).
+    /// Кнопки запуска правой панели доступны только при выбранной базе;
+    /// при <c>false</c> они получают явное disabled-состояние (opacity 0.5,
+    /// обычный курсор, подсказка «Выберите информационную базу»).
+    /// </summary>
+    public bool IsInfobaseSelected => SelectedInfobase is not null;
+
     /// <summary>Показывать подробности в правой панели (иначе — только кнопки).</summary>
     public bool ShowRightPanelDetails
     {
