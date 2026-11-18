@@ -472,8 +472,9 @@ namespace Workspace1C
 
             var closeButton = BuildCloseButton();
 
+            // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
             _runButton.Content = IconHelper.IconAndText("IconImport",
-                LocalizationManager.T("BatchOps.Execute"), 16, "ButtonTextBrush");
+                LocalizationManager.T("BatchOps.Execute"), 16, "TextOnAccentBrush");
             _runButton.Styled(ControlThemes.ModernButton);
             _runButton.Width = 200;
             _runButton.IsDefault = true;

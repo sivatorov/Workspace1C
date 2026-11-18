@@ -14,7 +14,9 @@
     <Color x:Key="InputBackgroundColor">#E8EDF3</Color>
     <Color x:Key="BorderColor">#E2E8F0</Color>
     <Color x:Key="TextPrimaryColor">#000000</Color>
-    <Color x:Key="TextSecondaryColor">#64748B</Color>
+    <!-- Вторичный текст (аудит UI P0-1): #475569 даёт ≥ 6.2:1 на ContentBackground,
+         InputBackground и BorderColor — WCAG AA 4.5:1 для 11–12 px. -->
+    <Color x:Key="TextSecondaryColor">#475569</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
     <Color x:Key="ButtonTextColor">#000000</Color>
     <Color x:Key="FavoriteColor">#F59E0B</Color>
@@ -22,7 +24,8 @@
     <Color x:Key="ItemHoverColor">#FFF3CD</Color>
     <Color x:Key="ItemSelectedColor">#FFE69C</Color>
     <Color x:Key="AvatarBackgroundColor">#FFF3CD</Color>
-    <Color x:Key="AvatarTextColor">#8A6D00</Color>
+    <!-- Текст аватара (аудит UI P0-1): #6B5410 на #FFF3CD — ≈ 6.5:1 (WCAG AA). -->
+    <Color x:Key="AvatarTextColor">#6B5410</Color>
     <Color x:Key="SecondaryButtonBackgroundColor">#FFF3CD</Color>
     <Color x:Key="SecondaryButtonHoverColor">#FFE69C</Color>
     <Color x:Key="SecondaryButtonPressedColor">#FFD54D</Color>

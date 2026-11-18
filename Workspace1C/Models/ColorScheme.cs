@@ -378,7 +378,9 @@ public class ColorScheme
         ["InputBackgroundColor"] = "#E8EDF3",
         ["BorderColor"] = "#E2E8F0",
         ["TextPrimaryColor"] = "#000000",
-        ["TextSecondaryColor"] = "#64748B",
+        // Вторичный текст (аудит UI P0-1): #475569 — ≥ 6.2:1 на ContentBackground,
+        // CardBackground, InputBackground и BorderColor (WCAG AA для 11–12 px).
+        ["TextSecondaryColor"] = "#475569",
         ["TextOnAccentColor"] = "#FFFFFF",
         ["ButtonTextColor"] = "#000000",
         // Подпись поля формы (issue #61): равна первичному тексту темы — ключ в палитре
@@ -408,7 +410,8 @@ public class ColorScheme
         ["ItemHoverColor"] = "#FFF3CD",
         ["ItemSelectedColor"] = "#FFE69C",
         ["AvatarBackgroundColor"] = "#FFF3CD",
-        ["AvatarTextColor"] = "#8A6D00",
+        // Текст аватара (аудит UI P0-1): #6B5410 на #FFF3CD — ≈ 6.5:1 (WCAG AA).
+        ["AvatarTextColor"] = "#6B5410",
         ["SecondaryButtonBackgroundColor"] = "#FFF3CD",
         ["SecondaryButtonHoverColor"] = "#FFE69C",
         ["SecondaryButtonPressedColor"] = "#FFD54D",

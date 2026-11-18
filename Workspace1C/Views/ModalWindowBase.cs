@@ -1113,7 +1113,9 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        IconHelper.MakeIcon(okIconKey, 14, "ButtonTextBrush"),
+                        // Кнопка подтверждения акцентная: значок — TextOnAccentBrush
+                        // (аудит UI P0-1; ButtonTextBrush на синем акценте давал 4.05:1).
+                        IconHelper.MakeIcon(okIconKey, 14, "TextOnAccentBrush"),
                         caption
                     }
                 },

@@ -17,7 +17,10 @@
     <Color x:Key="InputBackgroundColor">#E8EDF3</Color>
     <Color x:Key="BorderColor">#E2E8F0</Color>
     <Color x:Key="TextPrimaryColor">#000000</Color>
-    <Color x:Key="TextSecondaryColor">#64748B</Color>
+    <!-- Вторичный текст (аудит UI P0-1): #475569 даёт ≥ 6.2:1 на ContentBackground
+         (#F1F5F9), InputBackground (#E8EDF3) и BorderColor (#E2E8F0) — WCAG AA 4.5:1
+         для текста 11–12 px. Прежний #64748B давал лишь 3.86–4.34:1. -->
+    <Color x:Key="TextSecondaryColor">#475569</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
     <Color x:Key="ButtonTextColor">#000000</Color>
     <Color x:Key="FavoriteColor">#F59E0B</Color>
@@ -29,7 +32,9 @@
     <Color x:Key="ItemHoverColor">#FFF3CD</Color>
     <Color x:Key="ItemSelectedColor">#FFE69C</Color>
     <Color x:Key="AvatarBackgroundColor">#FFF3CD</Color>
-    <Color x:Key="AvatarTextColor">#8A6D00</Color>
+    <!-- Текст аватара (аудит UI P0-1): #6B5410 на #FFF3CD даёт ≈ 6.5:1 (WCAG AA);
+         прежний #8A6D00 — только 4.44:1, на границе допустимого. -->
+    <Color x:Key="AvatarTextColor">#6B5410</Color>
     <Color x:Key="SecondaryButtonBackgroundColor">#FFF3CD</Color>
     <Color x:Key="SecondaryButtonHoverColor">#FFE69C</Color>
     <Color x:Key="SecondaryButtonPressedColor">#FFD54D</Color>
@@ -1153,7 +1158,9 @@
                                             <Setter TargetName="ToggleSymbol" Property="Background" Value="{DynamicResource AccentBrush}"/>
                                             <Setter TargetName="ToggleSymbol" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                             <Setter TargetName="ToggleSymbolText" Property="Text" Value="-"/>
-                                            <Setter TargetName="ToggleSymbolText" Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                                            <!-- Символ «−» на акцентной заливке — контрастный акценту
+                                                 (аудит UI P0-1; ButtonTextBrush на синем давал 4.05:1). -->
+                                            <Setter TargetName="ToggleSymbolText" Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -1453,11 +1460,12 @@
         </Setter>
     </Style>
 
-    <!-- Основная кнопка панели действий: акцент + тёмный текст -->
+    <!-- Основная кнопка панели действий: акцентная заливка + контрастный акценту
+         текст (TextOnAccentBrush, аудит UI P0-1 — ButtonTextBrush на синем давал 4.05:1). -->
     <Style x:Key="ActionPanelButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">

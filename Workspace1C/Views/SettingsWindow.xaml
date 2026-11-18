@@ -1213,7 +1213,7 @@
                                         Click="OnFontApply_Click"
                                         ToolTip="{loc:Loc Settings.Font.ApplyTooltip}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FormatFont" Width="16" Height="16" Foreground="{DynamicResource ButtonTextBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FormatFont" Width="16" Height="16" Foreground="{DynamicResource TextOnAccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Common.Apply}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
@@ -1334,7 +1334,7 @@
                                         <Button Style="{DynamicResource ModernButton}" Padding="12,5" Margin="0,0,8,0">
                                             <StackPanel Orientation="Horizontal">
                                                 <materialDesign:PackIcon Kind="Check" Width="14" Height="14"
-                                                                         Foreground="{DynamicResource ButtonTextBrush}"
+                                                                         Foreground="{DynamicResource TextOnAccentBrush}"
                                                                          Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Common.Apply}" VerticalAlignment="Center"/>
                                             </StackPanel>

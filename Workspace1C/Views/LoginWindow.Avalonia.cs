@@ -233,7 +233,8 @@ namespace Workspace1C
                 {
                     Orientation = Orientation.Horizontal,
                     Spacing = 6,
-                    Children = { IconHelper.MakeIcon("IconOk", 14, "ButtonTextBrush"), loginCaption }
+                    // Акцентная кнопка входа: значок — TextOnAccentBrush (аудит UI P0-1).
+                    Children = { IconHelper.MakeIcon("IconOk", 14, "TextOnAccentBrush"), loginCaption }
                 },
                 Width = 130,
                 IsDefault = true

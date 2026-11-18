@@ -1971,13 +1971,16 @@ namespace Workspace1C
             displayFont.Children.Add(fontPreviewCard);
 
             var fontApplyContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            fontApplyContent.Children.Add(IconHelper.MakeIcon("IconFormatFont", UiMetrics.Scaled(16), "ButtonTextBrush"));
+            // Кнопка «Применить» — акцентная (ModernButton): текст и значок берут
+            // TextOnAccentBrush, который ThemeManager пересчитывает по WCAG для акцента
+            // темы (аудит UI P0-1; ButtonTextBrush на синем #2563EB давал лишь 4.05:1).
+            fontApplyContent.Children.Add(IconHelper.MakeIcon("IconFormatFont", UiMetrics.Scaled(16), "TextOnAccentBrush"));
             var fontApplyLabel = new TextBlock
             {
                 Text = LocalizationManager.T("Common.Apply"),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            Themes.ThemeBrushes.Bind(fontApplyLabel, TextBlock.ForegroundProperty, "ButtonTextBrush");
+            Themes.ThemeBrushes.Bind(fontApplyLabel, TextBlock.ForegroundProperty, "TextOnAccentBrush");
             fontApplyContent.Children.Add(fontApplyLabel);
             var fontApply = new Button
             {

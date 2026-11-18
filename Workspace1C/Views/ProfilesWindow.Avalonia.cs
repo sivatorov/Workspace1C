@@ -255,7 +255,8 @@ namespace Workspace1C
         {
             var button = new Button
             {
-                Content = IconHelper.IconAndText(iconKey, LocalizationManager.T(textKey), 14, "ButtonTextBrush"),
+                // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
+                Content = IconHelper.IconAndText(iconKey, LocalizationManager.T(textKey), 14, "TextOnAccentBrush"),
                 Width = width
             };
             button.Styled(Themes.ControlThemes.ModernButton);

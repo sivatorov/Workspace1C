@@ -94,8 +94,9 @@ namespace Workspace1C
 
             // «Обновить выбранные» + «Закрыть».
             var closeButton = BuildCloseButton();
+            // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
             _updateButton.Content = IconHelper.IconAndText("IconCloudDownload",
-                LocalizationManager.T("RepoUpdate.UpdateSelected"), 16, "ButtonTextBrush");
+                LocalizationManager.T("RepoUpdate.UpdateSelected"), 16, "TextOnAccentBrush");
             _updateButton.Styled(ControlThemes.ModernButton);
             _updateButton.Width = 200;
             _updateButton.IsDefault = true;

@@ -11,6 +11,31 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.86] — 2026-11-18
+
+### Исправлено
+
+- **Контраст вторичного текста и текста на акцентных кнопках приведён к WCAG AA
+  (аудит UI, пункт P0-1).**
+  - светлая тема: `TextSecondaryColor` `#64748B` → `#475569` синхронно в
+    [`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml),
+    [`LightTheme.axaml`](Workspace1C/Themes/LightTheme.axaml) и палитре
+    [`ColorScheme.CreateLight()`](Workspace1C/Models/ColorScheme.cs): контраст вырос
+    с 4.34:1 / 4.04:1 / 3.86:1 до 6.9:1 / 6.4:1 / 6.2:1 на `ContentBackground`,
+    `InputBackground` и `BorderColor` — вторичные подписи 11–12 px читаются по AA;
+  - `AvatarTextColor` в светлой теме `#8A6D00` → `#6B5410` (было 4.44:1 — на границе,
+    стало ≈ 6.5:1 к `#FFF3CD`);
+  - текст и значки на акцентной заливке переведены с `ButtonTextBrush` на
+    `TextOnAccentBrush` (ThemeManager пересчитывает его по WCAG): кнопки «Применить»
+    в разделах «Шрифт» и «Цветовое оформление», выполнение пакетных операций и
+    обновления репозитория, вход, подтверждение в диалогах, профили, шапка таблицы
+    произвольных полей, `ActionPanelButton` и символ раскрытия Expander — на синем
+    акценте `#2563EB` контраст вырос с 4.05:1 до AA;
+  - тёмная тема не менялась: `#CBD5E1` на `#0F172A` = 12.1:1;
+  - новый тест `ContrastAuditP01Tests` читает значения из палитры и словарей обеих
+    тем (WPF и Avalonia) и проверяет ≥ 4.5:1 для `TextSecondary` на `ContentBackground`,
+    `CardBackground`, `InputBackground` и `AvatarText` на `AvatarBackground`.
+
 ## [1.0.1.85] — 2026-11-18
 
 ### Изменено

@@ -25,14 +25,15 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
 
-        <!-- Раскраска шапки таблицы «Произвольные поля» (issue #6): акцентный фон и тёмный
-             жирный текст (как у акцентных кнопок). Штатный заголовок в теме окрашен
-             CardBackgroundBrush — тем же цветом, что и строки, поэтому визуально сливается.
-             Шаблон заменяем целиком, чтобы hover не перекрашивал шапку в ItemHoverBrush
-             (иначе тёмный текст стал бы нечитаемым в обеих темах). -->
+        <!-- Раскраска шапки таблицы «Произвольные поля» (issue #6): акцентный фон и
+             контрастный акценту жирный текст (TextOnAccentBrush, как у акцентных кнопок;
+             аудит UI P0-1 — ButtonTextBrush на синем акценте давал лишь 4.05:1).
+             Штатный заголовок в теме окрашен CardBackgroundBrush — тем же цветом, что
+             и строки, поэтому визуально сливается. Шаблон заменяем целиком, чтобы hover
+             не перекрашивал шапку в ItemHoverBrush (иначе текст стал бы нечитаемым). -->
         <Style x:Key="AdditionalFieldsColumnHeader" TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>

@@ -1403,9 +1403,10 @@ namespace Workspace1C
             var additionalHint = Hint("Connection.AdditionalFieldsDescription", margin: new Thickness(0, 0, 0, 8), fontSize: 11);
 
             // Шапка таблицы «№ | Значение поля» (issue #6): у ListBox штатной шапки нет,
-            // поэтому рисуем свою строку над списком — контрастный акцентный фон и тёмный
-            // жирный текст (как у акцентных кнопок). Ширины колонок совпадают с шаблоном
-            // строк списка (48 и *), чтобы шапка выравнивалась с данными.
+            // поэтому рисуем свою строку над списком — акцентный фон и контрастный
+            // акценту жирный текст (TextOnAccentBrush, как у акцентных кнопок; аудит UI
+            // P0-1 — ButtonTextBrush на синем акценте давал лишь 4.05:1). Ширины колонок
+            // совпадают с шаблоном строк списка (48 и *), чтобы шапка выравнивалась.
             var additionalHeader = new Grid
             {
                 ColumnDefinitions =
@@ -1422,7 +1423,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 3, 0, 3)
             };
-            Themes.ThemeBrushes.Bind(headerNumber, TextBlock.ForegroundProperty, "ButtonTextBrush");
+            Themes.ThemeBrushes.Bind(headerNumber, TextBlock.ForegroundProperty, "TextOnAccentBrush");
             Grid.SetColumn(headerNumber, 0);
             additionalHeader.Children.Add(headerNumber);
             var headerValue = new TextBlock
@@ -1433,7 +1434,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(8, 3, 0, 3)
             };
-            Themes.ThemeBrushes.Bind(headerValue, TextBlock.ForegroundProperty, "ButtonTextBrush");
+            Themes.ThemeBrushes.Bind(headerValue, TextBlock.ForegroundProperty, "TextOnAccentBrush");
             Grid.SetColumn(headerValue, 1);
             additionalHeader.Children.Add(headerValue);
             var additionalHeaderBorder = new Border

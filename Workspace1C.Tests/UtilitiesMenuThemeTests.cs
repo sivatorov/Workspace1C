@@ -52,8 +52,15 @@ public sealed class UtilitiesMenuThemeTests
     [Fact]
     public void ResolveIconColor_TextSecondary_FollowsSchemeVariant()
     {
-        Assert.Equal("#64748B", UtilitiesMenuCatalog.ResolveIconColor("#64748B", ColorScheme.CreateLight(), dark: false));
-        Assert.Equal("#CBD5E1", UtilitiesMenuCatalog.ResolveIconColor("#64748B", ColorScheme.CreateDark(), dark: true));
+        // Ожидаемый цвет читаем из палитры схемы, а не литералом: аудит UI P0-1
+        // затемнил TextSecondary в светлой теме до #475569, и тест не должен
+        // требовать обновления при каждой правке контраста.
+        var light = ColorScheme.CreateLight();
+        var dark = ColorScheme.CreateDark();
+        Assert.Equal(light.PaletteValue(false, "TextSecondaryColor"),
+            UtilitiesMenuCatalog.ResolveIconColor("#64748B", light, dark: false));
+        Assert.Equal(dark.PaletteValue(true, "TextSecondaryColor"),
+            UtilitiesMenuCatalog.ResolveIconColor("#64748B", dark, dark: true));
     }
 
     [Fact]
