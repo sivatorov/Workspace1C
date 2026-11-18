@@ -361,14 +361,15 @@ namespace Workspace1C
 
             // Цветной чип со значком группы: размер задаётся отступом, как
             // в разметке (GroupPickerWindow.xaml:271), а не фиксированной
-            // шириной с высотой.
+            // шириной с высотой. Аудит UI P1-2: чип остаётся исходным цветом
+            // группы (HeaderStripeBrush), а не пастелью строки дерева.
             var chip = new Border
             {
                 Padding = new Thickness(6, 3),
                 Margin = new Thickness(0, 0, 8, 0),
                 CornerRadius = new CornerRadius(6),
                 VerticalAlignment = VerticalAlignment.Center,
-                Background = node.HeaderBrush,
+                Background = node.HeaderStripeBrush,
                 Child = new Avalonia.Controls.Shapes.Path
                 {
                     Width = 18,

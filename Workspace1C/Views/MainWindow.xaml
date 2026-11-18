@@ -1468,7 +1468,10 @@
                                             </Border.Margin>
                                             <Border.Style>
                                                 <Style TargetType="Border">
-                                                    <!-- Готовая кисть с узла — без поиска группы и GetFullPath при каждой отрисовке -->
+                                                    <!-- Аудит UI P1-2: фон строки группы — пастель (цвет группы,
+                                                         смешанный с ContentBackground темы на 14 %), а не сплошная
+                                                         насыщенная заливка. Кисть считает ThemeManager из цвета группы
+                                                         и темы, поэтому смена темы перекрашивает строку сразу. -->
                                                     <Setter Property="Background" Value="{Binding HeaderBrush}"/>
                                                     <Setter Property="BorderBrush" Value="Transparent"/>
                                                     <Setter Property="BorderThickness" Value="2"/>
@@ -1476,9 +1479,27 @@
                                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                         </DataTrigger>
+                                                        <!-- Hover: та же пастель с долей 24 % — заметнее, но без
+                                                             сплошной заливки; выделение остаётся акцентной рамкой. -->
+                                                        <DataTrigger Binding="{Binding IsMouseOver, ElementName=GroupRowBorder}" Value="True">
+                                                            <Setter Property="Background" Value="{Binding HeaderHoverBrush}"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </Border.Style>
+                                        </Border>
+                                        <!-- Аудит UI P1-2: вертикальная полоса 3 px исходным цветом группы —
+                                             сохраняет идентичность цвета, пока фон строки остаётся пастельным.
+                                             Сдвиг тот же, что у фона (+2 px внутрь рамки толщиной 2). -->
+                                        <Border Width="3" HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                                CornerRadius="1.5" IsHitTestVisible="False"
+                                                Background="{Binding HeaderStripeBrush}">
+                                            <Border.Margin>
+                                                <MultiBinding Converter="{StaticResource LevelToThickness}" ConverterParameter="group-stripe">
+                                                    <Binding Path="(controls:LeveledTreeView.Level)"
+                                                             RelativeSource="{RelativeSource AncestorType=TreeViewItem}"/>
+                                                </MultiBinding>
+                                            </Border.Margin>
                                         </Border>
                                         <Grid x:Name="GroupRowGrid" Loaded="OnGroupRowGrid_Loaded"
                                               Unloaded="OnGroupRowGrid_Unloaded">

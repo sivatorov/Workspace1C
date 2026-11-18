@@ -102,10 +102,19 @@ namespace Workspace1C
                 };
             }
 
-            header.Bind(Border.BackgroundProperty, new Binding("HeaderBrush") { Source = group });
+            // Аудит UI P1-2: фон строки группы — пастель (цвет группы, смешанный
+            // с ContentBackground темы на 14 %), при наведении — та же пастель с
+            // долей 24 %. Кисти считает ThemeManager из цвета группы и темы; узел
+            // уведомляет о смене темы (HeaderBrush), поэтому строка перекрашивается
+            // сразу, без перезапуска. Насыщенная заливка не используется.
+            void ApplyGroupBackground()
+                => header.Background = group.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush;
+            ApplyGroupBackground();
+            header.PointerEntered += (_, _) => ApplyGroupBackground();
+            header.PointerExited += (_, _) => ApplyGroupBackground();
 
             // Кисть берётся наблюдателем темы, а подписка на узел живёт ровно
-            // столько, сколько строка находится в дереве: строки пересобираются
+            // столько времени, сколько строка находится в дереве: строки пересобираются
             // часто, а узел группы переживает их все.
             IBrush accent = Brushes.Transparent;
             void ApplyGroupSelection()
@@ -116,8 +125,10 @@ namespace Workspace1C
             {
                 if (e.PropertyName == nameof(GroupNodeViewModel.IsSelected))
                     ApplyGroupSelection();
+                else if (e.PropertyName == nameof(GroupNodeViewModel.HeaderBrush))
+                    ApplyGroupBackground();
             }
-            header.AttachedToVisualTree += (_, _) => { group.PropertyChanged += OnGroupChanged; ApplyGroupSelection(); };
+            header.AttachedToVisualTree += (_, _) => { group.PropertyChanged += OnGroupChanged; ApplyGroupSelection(); ApplyGroupBackground(); };
             header.DetachedFromVisualTree += (_, _) => group.PropertyChanged -= OnGroupChanged;
             ApplyGroupSelection();
 
@@ -215,7 +226,26 @@ namespace Workspace1C
             Grid.SetColumnSpan(caption, actionsIndex);
             row.Children.Add(caption);
 
-            header.Child = row;
+            // Аудит UI P1-2: вертикальная полоса 3 px исходным цветом группы —
+            // сохраняет идентичность цвета, пока фон строки остаётся пастельным.
+            // Привязка к HeaderStripeBrush обновляет её при смене темы.
+            var stripe = new Border
+            {
+                Width = 3,
+                CornerRadius = new CornerRadius(1.5),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Stretch,
+                IsHitTestVisible = false,
+                // Внутри рамки толщиной 2 (акцентной у выбранной группы).
+                Margin = new Thickness(2, 0, 0, 0)
+            };
+            stripe.Bind(Border.BackgroundProperty, new Binding("HeaderStripeBrush") { Source = group });
+
+            var rowRoot = new Grid();
+            rowRoot.Children.Add(row);
+            rowRoot.Children.Add(stripe);
+
+            header.Child = rowRoot;
 
             // Issue #130: горизонтальная линия строки группы — та же толщина/цвет,
             // что у строк баз; вертикальные линии ведёт единый оверлей. Отрицательный

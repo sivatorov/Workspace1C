@@ -226,9 +226,12 @@
                         <HierarchicalDataTemplate DataType="{x:Type vm:GroupNodeViewModel}"
                                                   ItemsSource="{Binding Children}">
                             <StackPanel Orientation="Horizontal" Margin="0,1">
+                                <!-- Аудит UI P1-2: в списке выбора группы чип остаётся исходным
+                                     цветом группы (HeaderStripeBrush), а не пастелью строки дерева —
+                                     иначе белая иконка теряла бы контраст, а выбор цвета — наглядность. -->
                                 <Border Padding="6,3" CornerRadius="6" Margin="0,0,8,0"
                                         VerticalAlignment="Center"
-                                        Background="{Binding HeaderBrush}">
+                                        Background="{Binding HeaderStripeBrush}">
                                     <Path Width="18" Height="18" Stretch="Uniform"
                                           Fill="{Binding IconBrush}">
                                         <Path.Data>

@@ -728,6 +728,107 @@ public class ColorScheme
         double accentWeight = NavSelectedAccentWeight)
         => ContrastTextHex(NavSelectedBackgroundHex(accentHex, backgroundHex, accentWeight));
 
+    // ---- Строка группы (аудит UI P1-2): пастельный фон вместо сплошной заливки ----
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки группы (аудит UI P1-2): 14 % — в
+    /// рекомендованном диапазоне 12–16 %. Насыщенный цвет группы (синий, зелёный,
+    /// красный), смешанный с фоном темы в такой пропорции, даёт спокойную пастель:
+    /// цвет группы остаётся узнаваемым, но не конкурирует с семантическими цветами
+    /// (ошибка/опасность) и не требует белого текста на насыщенной плашке.
+    /// </summary>
+    public const double GroupRowTintWeight = 0.14;
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки при наведении: чуть выше покоя, чтобы hover
+    /// был заметен, но строка не превращалась в сплошную заливку.
+    /// </summary>
+    public const double GroupRowHoverTintWeight = 0.24;
+
+    /// <summary>
+    /// Нормализует HEX-цвет к виду #RRGGBB: поддерживает #RGB, #RRGGBB и #AARRGGBB
+    /// (альфа отбрасывается — пастель считается по непрозрачному оттенку, как в
+    /// схемах Glass с полупрозрачными фонами). Некорректное значение заменяется
+    /// <paramref name="fallbackHex"/>.
+    /// </summary>
+    public static string NormalizeRgbHex(string? hex, string fallbackHex = "#2D6CDF")
+    {
+        if (TryNormalizeRgbHex(hex, out var normalized))
+            return normalized;
+        if (TryNormalizeRgbHex(fallbackHex, out var fallback))
+            return fallback;
+        return "#2D6CDF";
+    }
+
+    /// <summary>Разбирает HEX-цвет (см. <see cref="NormalizeRgbHex"/>) без рекурсии.</summary>
+    private static bool TryNormalizeRgbHex(string? hex, out string normalized)
+    {
+        normalized = string.Empty;
+        var raw = (hex ?? string.Empty).Trim().TrimStart('#');
+        if (raw.Length == 3)
+            raw = string.Concat(raw[0], raw[0], raw[1], raw[1], raw[2], raw[2]);
+        else if (raw.Length == 8)
+            raw = raw.Substring(2); // #AARRGGBB → #RRGGBB
+        if (raw.Length != 6)
+            return false;
+        for (var i = 0; i < raw.Length; i++)
+        {
+            if (!Uri.IsHexDigit(raw[i]))
+                return false;
+        }
+        normalized = "#" + raw.ToUpperInvariant();
+        return true;
+    }
+
+    /// <summary>
+    /// Фон строки группы (аудит UI P1-2): цвет группы, подмешанный к фону темы
+    /// (<paramref name="surfaceHex"/> — ContentBackground/CardBackground) в пропорции
+    /// <paramref name="weight"/>. Чистая функция без UI-зависимостей: одинаковый
+    /// результат в WPF и Avalonia, покрыта юнит-тестами.
+    /// </summary>
+    public static string GroupRowBackgroundHex(string groupHex, string surfaceHex,
+        double weight = GroupRowTintWeight)
+        => BlendHex(
+            NormalizeRgbHex(groupHex),
+            NormalizeRgbHex(surfaceHex, "#F1F5F9"),
+            weight);
+
+    /// <summary>
+    /// Фон строки группы при наведении: тот же цвет группы, но с большей долей
+    /// (<see cref="GroupRowHoverTintWeight"/>), чтобы hover был заметен без
+    /// превращения строки в сплошную заливку.
+    /// </summary>
+    public static string GroupRowHoverBackgroundHex(string groupHex, string surfaceHex)
+        => GroupRowBackgroundHex(groupHex, surfaceHex, GroupRowHoverTintWeight);
+
+    /// <summary>
+    /// Цвет текста строки группы (аудит UI P1-2): сначала берётся TextPrimary темы —
+    /// он читаем на пастельном фоне. Если контраст к фактическому фону строки ниже
+    /// <paramref name="minContrast"/> (пользовательская схема с необычным TextPrimary
+    /// или очень светлый/тёмный оттенок группы), возвращается чёрный/белый с
+    /// максимальным контрастом — это гарантирует ≥ 4.5:1 (фактически ≥ 4.58:1).
+    /// </summary>
+    public static string GroupRowTextHex(string groupHex, string surfaceHex, string? textPrimaryHex,
+        double weight = GroupRowTintWeight, double minContrast = 4.5)
+    {
+        var background = GroupRowBackgroundHex(groupHex, surfaceHex, weight);
+        if (!string.IsNullOrWhiteSpace(textPrimaryHex))
+        {
+            var text = NormalizeRgbHex(textPrimaryHex, "#000000");
+            if (ContrastRatio(text, background) >= minContrast)
+                return text;
+        }
+        return ContrastTextHex(background);
+    }
+
+    /// <summary>
+    /// Цвет вертикальной полосы-идентификатора строки группы: исходный цвет группы
+    /// без смешения (полоса 3 px сохраняет узнаваемость выбранного пользователем
+    /// цвета — аудит UI P1-2).
+    /// </summary>
+    public static string GroupRowStripeHex(string groupHex)
+        => NormalizeRgbHex(groupHex);
+
     // ---- Точный RGB-HSV (единый источник для пикеров обеих платформ) ----
     // Раньше WPF и Avalonia конвертировали цвет собственными преобразованиями,
     // а каналы «усекались» при приведении к байту: из-за потери точности при

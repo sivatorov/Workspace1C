@@ -1,5 +1,6 @@
 #if LINUX
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -76,6 +77,9 @@ namespace Workspace1C.Themes
             if (CurrentFullTheme is not null)
                 CurrentFullTheme.Scheme = scheme;
             ApplyColors(app, scheme, CurrentTheme == DarkThemeName);
+            // Аудит UI P1-2: пастельные кисти строк групп зависят от фона и текста
+            // схемы — после смены темы их нельзя отдавать из старого кэша.
+            InvalidateGroupRowBrushCache();
         }
 
         /// <summary>
@@ -652,6 +656,91 @@ namespace Workspace1C.Themes
         {
             foreach (var key in keys)
                 app.Resources[key] = brush;
+        }
+
+        // ---- Строка группы (аудит UI P1-2): пастельные кисти из цвета группы ----
+
+        /// <summary>Кэш кистей строк групп: ключ включает вид кисти, вариант темы,
+        /// фон/текст схемы и цвет группы — смена темы даёт новые ключи.</summary>
+        private static readonly ConcurrentDictionary<string, SolidColorBrush> GroupRowBrushCache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Сбрасывает кэш кистей строк групп (после смены темы/схемы).</summary>
+        internal static void InvalidateGroupRowBrushCache() => GroupRowBrushCache.Clear();
+
+        /// <summary>
+        /// Фон строки группы (аудит UI P1-2): цвет группы, подмешанный к фону
+        /// содержимого темы (ContentBackground, при отсутствии — CardBackground)
+        /// в пропорции <see cref="ColorScheme.GroupRowTintWeight"/> (14 %). Сплошная
+        /// насыщенная заливка больше не используется — красная строка группы не
+        /// конкурирует с семантическим «ошибка/опасность».
+        /// </summary>
+        public static SolidColorBrush GetGroupRowBackgroundBrush(string groupHex)
+            => GetGroupRowBrush("bg", groupHex, ColorScheme.GroupRowTintWeight);
+
+        /// <summary>
+        /// Фон строки группы при наведении: та же смесь с большей долей цвета группы
+        /// (<see cref="ColorScheme.GroupRowHoverTintWeight"/>). Hover остаётся мягким
+        /// и не превращается в сплошную заливку.
+        /// </summary>
+        public static SolidColorBrush GetGroupRowHoverBrush(string groupHex)
+            => GetGroupRowBrush("hover", groupHex, ColorScheme.GroupRowHoverTintWeight);
+
+        /// <summary>
+        /// Текст строки группы: TextPrimary темы, если он даёт ≥ 4.5:1 к фактическому
+        /// фону строки; иначе — чёрный/белый с максимальным контрастом (WCAG).
+        /// </summary>
+        public static SolidColorBrush GetGroupRowTextBrush(string groupHex)
+        {
+            var (surface, textPrimary) = GroupRowThemeColors();
+            var hex = ColorScheme.GroupRowTextHex(groupHex, surface, textPrimary);
+            return GroupRowBrushCache.GetOrAdd(
+                $"text|{CurrentTheme}|{surface}|{textPrimary}|{groupHex}",
+                _ => CreateFrozenBrush(hex));
+        }
+
+        /// <summary>
+        /// Кисть вертикальной полосы-идентификатора (3 px) строки группы: исходный
+        /// цвет группы без смешения — сохраняет узнаваемость пользовательского цвета.
+        /// </summary>
+        public static SolidColorBrush GetGroupRowStripeBrush(string groupHex)
+        {
+            var hex = ColorScheme.GroupRowStripeHex(groupHex);
+            return GroupRowBrushCache.GetOrAdd(
+                $"stripe|{CurrentTheme}|{hex}",
+                _ => CreateFrozenBrush(hex));
+        }
+
+        /// <summary>Фон содержимого и первичный текст активной схемы (фолбэк — светлая тема).</summary>
+        private static (string Surface, string TextPrimary) GroupRowThemeColors()
+        {
+            var dark = CurrentTheme == DarkThemeName;
+            var surface = CurrentScheme.PaletteValue(dark, "ContentBackgroundColor");
+            if (string.IsNullOrWhiteSpace(surface))
+                surface = CurrentScheme.PaletteValue(dark, "CardBackgroundColor");
+            if (string.IsNullOrWhiteSpace(surface))
+                surface = dark ? "#0F172A" : "#F1F5F9";
+            var textPrimary = CurrentScheme.PaletteValue(dark, "TextPrimaryColor");
+            if (string.IsNullOrWhiteSpace(textPrimary))
+                textPrimary = dark ? "#F1F5F9" : "#000000";
+            return (surface, textPrimary);
+        }
+
+        private static SolidColorBrush GetGroupRowBrush(string kind, string groupHex, double weight)
+        {
+            var (surface, _) = GroupRowThemeColors();
+            var key = $"{kind}|{CurrentTheme}|{surface}|{weight}|{groupHex}";
+            return GroupRowBrushCache.GetOrAdd(key, _ =>
+            {
+                var hex = ColorScheme.GroupRowBackgroundHex(groupHex, surface, weight);
+                return CreateFrozenBrush(hex);
+            });
+        }
+
+        private static SolidColorBrush CreateFrozenBrush(string hex)
+        {
+            var color = TryParseColor(hex, out var parsed) ? parsed : Colors.Transparent;
+            return new SolidColorBrush(color);
         }
 
         /// <summary>

@@ -55,6 +55,13 @@ public class LevelToThicknessConverter : IMultiValueConverter
             // (оформление 0.3.5.1) и не заходила под кнопку и левее неё.
             offset = level * IndentStep + ExpanderWidth - HighlightGap;
         }
+        else if (string.Equals(param, "group-stripe", StringComparison.OrdinalIgnoreCase))
+        {
+            // Аудит UI P1-2: вертикальная полоса 3 px исходным цветом группы. Тот же
+            // сдвиг, что у фона строки ("group-hl"), плюс 2 px — полоса рисуется
+            // внутри рамки толщиной 2 (акцентной у выбранной группы).
+            offset = level * IndentStep + ExpanderWidth - HighlightGap + 2;
+        }
         else if (string.Equals(param, "group", StringComparison.OrdinalIgnoreCase))
         {
             // Заголовок группы: сдвиг названия по уровню + ширина расширителя,

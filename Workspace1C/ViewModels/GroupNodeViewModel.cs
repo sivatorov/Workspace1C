@@ -115,11 +115,14 @@ public class GroupNodeViewModel : ViewModelBase
             ? (!string.IsNullOrWhiteSpace(group.IconColor) ? group.IconColor : "#FFFFFF")
             : (defaultIconColor ?? "#FFFFFF");
         _icon = group?.Icon ?? defaultIcon ?? string.Empty;
-        // Issue #107: плашка фона адаптируется под тёмную тему (светлая заливка
-        // группы становится полупрозрачной, тёмной); цвет иконки — не адаптируется.
-        HeaderBrush = GroupColorConverter.GetBrush(_color, adaptForDark: true);
-        HeaderTextBrush = GroupTextColorConverter.GetBrush(_color);
+        // Аудит UI P1-2: строка группы больше не заливается насыщенным цветом —
+        // фон/текст/полоса вычисляются в ThemeManager из цвета группы и темы
+        // (пастель 14 %, полоса исходным цветом, текст по WCAG ≥ 4.5:1).
+        // Цвет иконки не адаптируется и остаётся исходным.
         IconBrush = GroupColorConverter.GetBrush(_iconColor);
+        // Смена темы перекрашивает уже построенные строки сразу, без перезапуска:
+        // узел уведомляет привязки о новых кистях (отписка — в Detach).
+        Themes.ThemeManager.ThemeChanged += OnThemeChangedBrushes;
         // Обработчики вынесены в поля-делегаты — Detach() (эксперимент A, 1.0.0.34)
         // должен иметь возможность отписаться при удалении узла из дерева.
         _onInfobasesChanged = (_, _) =>
@@ -150,6 +153,9 @@ public class GroupNodeViewModel : ViewModelBase
             return;
         _detached = true;
         Interlocked.Increment(ref s_totalDetachCount);
+        // Аудит UI P1-2: узел больше не нужен дереву — снимаем подписку на смену
+        // темы, иначе статические узлы удерживали бы отрисованные строки.
+        Themes.ThemeManager.ThemeChanged -= OnThemeChangedBrushes;
         // Поддерево узла не переиспользуется (дерево строгое, без общих поддеревьев) —
         // отписываем и дочерние узлы, чтобы коллекции не удерживали ни одного
         // обработчика узлов, ставших мусором после удаления корня.
@@ -202,11 +208,34 @@ public class GroupNodeViewModel : ViewModelBase
         return scheme.PaletteValue(dark, "FolderColor");
     }
 
-    /// <summary>Кэшированная кисть фона заголовка группы (Freeze).</summary>
-    public Brush HeaderBrush { get; }
+    /// <summary>
+    /// Пастельный фон строки группы (аудит UI P1-2): цвет группы, смешанный с
+    /// ContentBackground темы в пропорции 14 %. Сплошная насыщенная заливка не
+    /// используется — красная строка группы не конкурирует с семантическим
+    /// «ошибка/опасность», зелёная — с акцентом темы.
+    /// </summary>
+    public Brush HeaderBrush => Themes.ThemeManager.GetGroupRowBackgroundBrush(_color);
 
-    /// <summary>Кэшированная кисть текста заголовка (контраст к фону).</summary>
-    public Brush HeaderTextBrush { get; }
+    /// <summary>Фон строки группы при наведении: та же пастель с долей 24 % —
+    /// hover заметен, но не превращается в сплошную заливку.</summary>
+    public Brush HeaderHoverBrush => Themes.ThemeManager.GetGroupRowHoverBrush(_color);
+
+    /// <summary>Текст строки группы: TextPrimary темы или WCAG-контраст ≥ 4.5:1
+    /// к фактическому пастельному фону.</summary>
+    public Brush HeaderTextBrush => Themes.ThemeManager.GetGroupRowTextBrush(_color);
+
+    /// <summary>Кисть вертикальной полосы-идентификатора (3 px): исходный цвет
+    /// группы без смешения — сохраняет узнаваемость выбранного цвета.</summary>
+    public Brush HeaderStripeBrush => Themes.ThemeManager.GetGroupRowStripeBrush(_color);
+
+    /// <summary>Уведомляет привязки о пересчёте кистей строки при смене темы.</summary>
+    private void OnThemeChangedBrushes(object? sender, System.EventArgs e)
+    {
+        OnPropertyChanged(nameof(HeaderBrush));
+        OnPropertyChanged(nameof(HeaderHoverBrush));
+        OnPropertyChanged(nameof(HeaderTextBrush));
+        OnPropertyChanged(nameof(HeaderStripeBrush));
+    }
 
     /// <summary>Кэшированная кисть иконки группы (может отличаться от цвета фона).</summary>
     public Brush IconBrush { get; }
