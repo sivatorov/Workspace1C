@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.84-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.85-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.84**
-(поддерживается **7229 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.85**
+(поддерживается **7234 юнит-теста**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,10 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Внутренние номера задач убраны из подсказок и справки (1.0.1.85, Windows и Linux)** —
+  в 17 пользовательских строках `ru.json` и `en.json` ссылки вида «issue #NNN» (и
+  сокращённые «#NNN») заменены обычным текстом; смысл подсказок и все плейсхолдеры
+  сохранены, паритет ключей — 4748/4748. Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Инспектор процессов: выделение строк и «Неизвестная база» (1.0.1.84, Windows и Linux)** —
   выделение чётных строк больше не пропадает ни в WPF, ни в Avalonia; инспектор использует
   полный сопоставитель запущенных баз (`/F`, `/S`, `/IBConnectionString`, `/IBName`, веб-базы
