@@ -48,6 +48,9 @@ namespace Workspace1C.Themes
         /// <summary>Вертикальная вкладка окна настроек: та же, что в окне подключения, шириной 235.</summary>
         public const string SettingsTabItem = "SettingsTabItem";
 
+        /// <summary>Заголовок группы «Настройки»: нейтральная подпись без плашки выбранного пункта (аудит UI P1-1).</summary>
+        public const string SettingsGroupTabItem = "SettingsGroupTabItem";
+
         /// <summary>Переключатель настроек: дорожка 40 на 22 с кружком 16.</summary>
         public const string SettingsToggle = "SettingsToggle";
 

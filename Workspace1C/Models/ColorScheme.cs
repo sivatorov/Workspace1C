@@ -689,6 +689,45 @@ public class ColorScheme
         return ContrastTextHex(accentHex);
     }
 
+    /// <summary>
+    /// Доля акцента темы в фоне выбранного пункта навигации (аудит UI P1-1):
+    /// 14 % — в рекомендованном диапазоне 12–16 %, поэтому подложка остаётся
+    /// мягкой, но однозначно связанной с акцентом.
+    /// </summary>
+    public const double NavSelectedAccentWeight = 0.14;
+
+    /// <summary>
+    /// Смешивает два цвета #RRGGBB: <paramref name="foregroundWeight"/> — доля
+    /// <paramref name="foregroundHex"/> (0..1), остальное берётся из
+    /// <paramref name="backgroundHex"/>. Чистая функция без UI-зависимостей.
+    /// </summary>
+    public static string BlendHex(string foregroundHex, string backgroundHex, double foregroundWeight)
+    {
+        var weight = Math.Clamp(foregroundWeight, 0.0, 1.0);
+        var (fr, fg, fb) = ParseRgb(foregroundHex);
+        var (br, bg, bb) = ParseRgb(backgroundHex);
+        byte Mix(byte f, byte b) => (byte)Math.Round(f * weight + b * (1.0 - weight));
+        return $"#{Mix(fr, br):X2}{Mix(fg, bg):X2}{Mix(fb, bb):X2}";
+    }
+
+    /// <summary>
+    /// Фон выбранного пункта навигации (аудит UI P1-1): акцент темы, подмешанный
+    /// к фону содержимого. Никаких фиксированных янтарных значений — цвет следует
+    /// за акцентом любой встроенной или пользовательской схемы.
+    /// </summary>
+    public static string NavSelectedBackgroundHex(string accentHex, string backgroundHex,
+        double accentWeight = NavSelectedAccentWeight)
+        => BlendHex(accentHex, backgroundHex, accentWeight);
+
+    /// <summary>
+    /// Контрастный текст на фоне выбранного пункта навигации (WCAG): чёрный или
+    /// белый — что даёт больший контраст. Для любого фона это не ниже ≈ 4.58:1,
+    /// поэтому требование ≥ 4.5:1 выполняется и для пользовательских акцентов.
+    /// </summary>
+    public static string NavSelectedTextHex(string accentHex, string backgroundHex,
+        double accentWeight = NavSelectedAccentWeight)
+        => ContrastTextHex(NavSelectedBackgroundHex(accentHex, backgroundHex, accentWeight));
+
     // ---- Точный RGB-HSV (единый источник для пикеров обеих платформ) ----
     // Раньше WPF и Avalonia конвертировали цвет собственными преобразованиями,
     // а каналы «усекались» при приведении к байту: из-за потери точности при

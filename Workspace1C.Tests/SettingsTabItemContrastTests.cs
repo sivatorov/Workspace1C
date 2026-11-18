@@ -53,20 +53,25 @@ public sealed class SettingsTabItemContrastTests
     // ===================== WPF: стиль SettingsTabItem =====================
 
     [Fact]
-    public void WpfSettingsTabItem_IsSelected_AppliesTreeSelectedTextBrush()
+    public void WpfSettingsTabItem_IsSelected_AppliesNavSelectedBrushes()
     {
-        // Issue #26: у выбранного пункта левой панели фон TreeSelectedBrush (тёмный
-        // в тёмной теме) и контрастная подпись TreeSelectedTextBrush, а не чёрная.
+        // Аудит UI P1-1: у выбранного пункта левой панели фон из акцента темы
+        // (NavSelectedBrush) и контрастная подпись NavSelectedTextBrush.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml"));
         var style = ExtractBetween(xaml, "x:Key=\"SettingsTabItem\"", "x:Key=\"SettingsSubTabControl\"");
 
         Assert.Contains("Trigger Property=\"IsSelected\" Value=\"True\"", style);
         Assert.Contains(
-            "<Setter Property=\"Foreground\" Value=\"{DynamicResource TreeSelectedTextBrush}\"/>",
+            "<Setter Property=\"Foreground\" Value=\"{DynamicResource NavSelectedTextBrush}\"/>",
             style);
-        // Дополнительная проверка по имени кисти — сеттер не может «потеряться»
-        // при переносах строк.
-        Assert.Contains("TreeSelectedTextBrush", style);
+        Assert.Contains(
+            "<Setter TargetName=\"Bd\" Property=\"Background\" Value=\"{DynamicResource NavSelectedBrush}\"/>",
+            style);
+        // Фиксированная янтарная подложка больше не участвует в выделении навигации.
+        Assert.DoesNotContain("TreeSelectedBrush", style);
+        Assert.DoesNotContain("TreeSelectedTextBrush", style);
+        Assert.DoesNotContain("#B45309", style);
+        Assert.DoesNotContain("#FFD54D", style);
     }
 
     [Fact]
@@ -128,21 +133,22 @@ public sealed class SettingsTabItemContrastTests
     // ===================== Avalonia: тема и построители вкладок =====================
 
     [Fact]
-    public void AvaloniaConnTabItem_Selected_ForegroundIsTreeSelectedTextBrush()
+    public void AvaloniaConnTabItem_Selected_UsesNavSelectedBrushes()
     {
-        // База темы SettingsTabItem: выбранная вкладка красит подпись контрастной
-        // кистью (в тёмной теме — светлой), а не нейтральным цветом текста.
+        // Аудит UI P1-1: выбранная вкладка красит подпись контрастной кистью
+        // NavSelectedTextBrush, а фон берёт из акцента темы (NavSelectedBrush).
         var axaml = ReadProjectFile(Path.Combine("Workspace1C", "Themes", "Controls.axaml"));
         var theme = ExtractBetween(axaml, "x:Key=\"ConnTabItem\"", "x:Key=\"OptionCard\"");
 
         Assert.Contains("^:selected", theme);
-        Assert.Contains("TreeSelectedTextBrush", theme);
+        Assert.Contains("NavSelectedTextBrush", theme);
         Assert.Contains(
-            "<Setter Property=\"Foreground\" Value=\"{DynamicResource TreeSelectedTextBrush}\"/>",
+            "<Setter Property=\"Foreground\" Value=\"{DynamicResource NavSelectedTextBrush}\"/>",
             theme);
-
-        // Фон выбранного пункта — та же тёмная подложка, что в WPF-стиле SettingsTabItem.
-        Assert.Contains("TreeSelectedBrush", theme);
+        Assert.Contains("NavSelectedBrush", theme);
+        // Фиксированная янтарная подложка в навигации не используется.
+        Assert.DoesNotContain("TreeSelectedBrush", theme);
+        Assert.DoesNotContain("TreeSelectedTextBrush", theme);
     }
 
     [Fact]
@@ -164,13 +170,15 @@ public sealed class SettingsTabItemContrastTests
         // Все вкладки левой панели строятся одним методом MainTab: тема
         // SettingsTabItem применяется, а подпись не перетирает Foreground —
         // контрастная кисть при :selected наследуется подписи из темы.
+        // Аудит UI P1-1: для заголовка группы «Настройки» — нейтральная тема.
         var source = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.Avalonia.cs"));
         var mainTab = ExtractBetween(
             source,
             "private static TabItem MainTab",
             "private static ToggleButton SettingsSwitch");
 
-        Assert.Contains("tab.Styled(ControlThemes.SettingsTabItem)", mainTab);
+        Assert.Contains("ControlThemes.SettingsTabItem", mainTab);
+        Assert.Contains("ControlThemes.SettingsGroupTabItem", mainTab);
         // Подпись без жёсткого цвета — берёт цвет из темы вкладки.
         Assert.Contains("new TextBlock { Text = LocalizationManager.T(titleKey)", mainTab);
         Assert.DoesNotContain(".Foreground =", mainTab);

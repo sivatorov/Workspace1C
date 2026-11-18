@@ -227,7 +227,7 @@
                 <Border Name="PART_Surface"
                         Background="Transparent"
                         BorderBrush="Transparent"
-                        BorderThickness="0,0,3,0"
+                        BorderThickness="3,0,0,0"
                         CornerRadius="8"
                         Padding="{TemplateBinding Padding}">
                     <ContentPresenter Name="PART_ContentPresenter"
@@ -244,13 +244,15 @@
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
         <Style Selector="^:selected /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="{DynamicResource TreeSelectedBrush}"/>
+            <!-- Аудит UI P1-1: фон выбранной вкладки — акцент темы (14 % акцента
+                 к фону содержимого) и полоса 3 px слева; фиксированного янтаря нет. -->
+            <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- Текст выбранной вкладки контрастен её фону TreeSelectedBrush (issue #26):
-             в тёмной теме фон тёмный, поэтому подпись светлая, а не чёрная. -->
+        <!-- Текст выбранной вкладки контрастен её фону NavSelectedBrush:
+             ThemeManager пересчитывает кисть по WCAG (≥ 4.5:1). -->
         <Style Selector="^:selected">
-            <Setter Property="Foreground" Value="{DynamicResource TreeSelectedTextBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource NavSelectedTextBrush}"/>
         </Style>
         <Style Selector="^:disabled">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
@@ -710,6 +712,37 @@
 
     <ControlTheme x:Key="SettingsTabItem" TargetType="TabItem" BasedOn="{StaticResource ConnTabItem}">
         <Setter Property="Width" Value="235"/>
+    </ControlTheme>
+
+    <!-- Заголовок раздела «Настройки» (аудит UI P1-1): это группа, а не выбранный
+         пункт. Плашки и полосы нет — только SemiBold-подпись; имя части шаблона
+         отличается от PART_Surface, поэтому стили :selected базовой темы не
+         срабатывают и на экране остаётся ровно один выбранный пункт (подвкладка). -->
+    <ControlTheme x:Key="SettingsGroupTabItem" TargetType="TabItem" BasedOn="{StaticResource ConnTabItem}">
+        <Setter Property="Width" Value="235"/>
+        <Setter Property="Template">
+            <ControlTemplate TargetType="TabItem">
+                <Border Name="PART_GroupSurface"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="8"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Name="PART_ContentPresenter"
+                                      Content="{TemplateBinding Header}"
+                                      ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                      Foreground="{TemplateBinding Foreground}"
+                                      HorizontalAlignment="Left"
+                                      VerticalAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover:not(:selected) /template/ Border#PART_GroupSurface">
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+        </Style>
+        <Style Selector="^:disabled">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
     </ControlTheme>
 
     <!-- ===================== Переключатель настроек =====================

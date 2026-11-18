@@ -1162,7 +1162,10 @@ namespace Workspace1C
             generalTabs.Items.Add(SubTab("Settings.General.Subtab.ComConnector", "Settings.General.Subtab.ComConnectorTooltip", "IconLink", settingsCom));
             generalTabs.Items.Add(SubTab("Settings.General.Subtab.CommonAuth", "Settings.General.Subtab.CommonAuthTooltip", "IconAccountKey", settingsCommonAuth));
 
-            var tabGeneral = MainTab("IconApplicationCog", "Settings.TabGeneral", generalTabs);
+            // Аудит UI P1-1: «Настройки» — заголовок группы, а не выбранный пункт,
+            // поэтому он не получает акцентную плашку (SettingsGroupTabItem).
+            var tabGeneral = MainTab("IconApplicationCog", "Settings.TabGeneral", generalTabs,
+                groupHeader: true);
 
             // ===== Платформы =====
             // Раздел собран гридом из пяти строк, как в разметке
@@ -4861,10 +4864,14 @@ namespace Workspace1C
         /// Вкладка окна: значок 18 и подпись, содержимое как есть.
         /// Значок красится подписью, как в разметке (SettingsWindow.xaml:296).
         /// </summary>
-        private static TabItem MainTab(string iconKey, string titleKey, Control content)
+        private static TabItem MainTab(string iconKey, string titleKey, Control content,
+            bool groupHeader = false)
         {
             var tab = new TabItem { Content = content };
-            tab.Styled(ControlThemes.SettingsTabItem);
+            // Аудит UI P1-1: заголовок группы «Настройки» — нейтральный, без плашки.
+            tab.Styled(groupHeader
+                ? ControlThemes.SettingsGroupTabItem
+                : ControlThemes.SettingsTabItem);
             // Ширина, кегль и значок вкладки уменьшаются в компактном режиме.
             tab.Width = UiMetrics.Scaled(235);
             tab.FontSize = UiMetrics.ScaledFont(13);

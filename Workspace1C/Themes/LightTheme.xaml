@@ -74,6 +74,11 @@
     <Color x:Key="ZebraRowColor">#F1F5F9</Color>
     <Color x:Key="TreeHoverColor">#FFF9E6</Color>
     <Color x:Key="TreeSelectedColor">#FFD54D</Color>
+    <!-- Выбранный пункт навигации (аудит UI P1-1): акцент темы, подмешанный
+         к фону содержимого (14 %). Не фиксированный янтарь — ThemeManager
+         пересчитывает кисти под акцент активной схемы. -->
+    <Color x:Key="NavSelectedColor">#F3EDD6</Color>
+    <Color x:Key="NavSelectedTextColor">#000000</Color>
 
     <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
     <!-- Поля Material Design (текстовые без стиля ModernTextBox, напр. в ConnectionSettingsWindow)
@@ -117,6 +122,11 @@
     <SolidColorBrush x:Key="ZebraRowBrush" Color="{DynamicResource ZebraRowColor}"/>
     <SolidColorBrush x:Key="TreeHoverBrush" Color="{DynamicResource TreeHoverColor}"/>
     <SolidColorBrush x:Key="TreeSelectedBrush" Color="{DynamicResource TreeSelectedColor}"/>
+    <!-- Выбранный пункт навигации/вкладка (аудит UI P1-1): фон из акцента темы
+         и контрастный ему текст. Значения пересчитывает ThemeManager для каждой
+         схемы, поэтому фиксированного янтаря здесь нет. -->
+    <SolidColorBrush x:Key="NavSelectedBrush" Color="{DynamicResource NavSelectedColor}"/>
+    <SolidColorBrush x:Key="NavSelectedTextBrush" Color="{DynamicResource NavSelectedTextColor}"/>
     <!-- Семантические статусы (аудит UI, п. 2.1). -->
     <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>

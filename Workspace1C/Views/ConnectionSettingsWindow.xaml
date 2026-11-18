@@ -238,7 +238,7 @@
                         <Border x:Name="Bd"
                                 Background="Transparent"
                                 BorderBrush="Transparent"
-                                BorderThickness="0,0,3,0"
+                                BorderThickness="3,0,0,0"
                                 CornerRadius="8"
                                 Width="{TemplateBinding Width}"
                                 MinHeight="40"
@@ -260,9 +260,12 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
                             </MultiTrigger>
                             <Trigger Property="IsSelected" Value="True">
+                                <!-- Аудит UI P1-1: выбранная вертикальная вкладка — фон из
+                                     акцента темы (14 % акцента к фону содержимого), полоса
+                                     3 px слева и WCAG-контрастный текст (≥ 4.5:1). -->
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TreeSelectedBrush}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource ButtonTextBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource NavSelectedTextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>

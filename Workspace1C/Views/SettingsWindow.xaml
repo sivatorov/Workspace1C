@@ -180,7 +180,7 @@
                         <Border x:Name="Bd"
                                 Background="Transparent"
                                 BorderBrush="Transparent"
-                                BorderThickness="0,0,3,0"
+                                BorderThickness="3,0,0,0"
                                 CornerRadius="8"
                                 Width="{TemplateBinding Width}"
                                 MinHeight="40"
@@ -202,12 +202,54 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
                             </MultiTrigger>
                             <Trigger Property="IsSelected" Value="True">
+                                <!-- Аудит UI P1-1: выбранный пункт навигации — фон из акцента
+                                     темы (14 % акцента к фону содержимого) и полоса 3 px слева;
+                                     текст — WCAG-контраст к этому фону (≥ 4.5:1). Никакого
+                                     фиксированного янтаря TreeSelectedBrush. -->
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource TreeSelectedBrush}"/>
-                                <!-- Текст выбранного раздела контрастен его фону (issue #26):
-                                     тёмная подложка TreeSelectedBrush требует светлый текст. -->
-                                <Setter Property="Foreground" Value="{DynamicResource TreeSelectedTextBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource NavSelectedTextBrush}"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Заголовок раздела «Настройки» (аудит UI P1-1): это группа, а не
+             выбранный пункт. Плашки и полосы нет — только SemiBold-подпись,
+             поэтому на экране ровно один визуально выбранный пункт (подвкладка). -->
+        <Style x:Key="SettingsGroupTabItem" TargetType="TabItem" BasedOn="{StaticResource SettingsTabItem}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="Bd"
+                                Background="Transparent"
+                                BorderBrush="Transparent"
+                                BorderThickness="0"
+                                CornerRadius="8"
+                                Width="{TemplateBinding Width}"
+                                MinHeight="40"
+                                SnapsToDevicePixels="True"
+                                ClipToBounds="False"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header"
+                                              HorizontalAlignment="Left"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                            </MultiTrigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                             </Trigger>
@@ -315,8 +357,9 @@
             <!-- ============ Вкладка «Настройки» (issue #95): первая вкладка окна,
                  содержимое разложено на четыре горизонтальные под-вкладки:
                  «Поведение и язык», «Функциональность», «COM-Коннектор»,
-                 «Общая авторизация». ============ -->
-            <TabItem Style="{StaticResource SettingsTabItem}">
+                 «Общая авторизация». Аудит UI P1-1: это заголовок группы, поэтому
+                 он не получает плашку выбранного пункта (SettingsGroupTabItem). ============ -->
+            <TabItem Style="{StaticResource SettingsGroupTabItem}">
                 <TabItem.Header>
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="ApplicationCog" Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center"

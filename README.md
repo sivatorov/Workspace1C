@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.87-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.88-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.87**
-(поддерживается **7261 юнит-тест**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.88**
+(поддерживается **7286 юнит-тестов**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,14 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Выделение в навигации, вкладках и переключателях следует акценту темы
+  (1.0.1.88, Windows и Linux)** — выбранный пункт левого меню «Настройки» и
+  вертикальные вкладки окна подключения больше не красятся фиксированным
+  янтарным `TreeSelectedBrush`: фон — акцент темы (14 % к фону содержимого)
+  плюс полоса 3 px слева, текст — WCAG-контраст ≥ 4.5:1 для любой схемы.
+  Заголовок раздела «Настройки» стал нейтральной SemiBold-подписью без плашки,
+  поэтому на экране ровно один выбранный пункт; включённые тумблеры используют
+  акцент темы вместо зелёного. Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Шапка списка баз: заголовок последней колонки читается полностью
   (1.0.1.87, Windows и Linux)** — колонка «Последняя копия» шириной 130 px
   оставляла под текст 101 px при подписи ≈ 140 px, поэтому в шапке было

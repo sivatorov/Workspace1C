@@ -565,6 +565,9 @@ namespace Workspace1C.Themes
             // настроек теряют читаемость в тёмной теме.
             SetContrastBrush(app, scheme, dark, "AccentTextBrush", "AccentColor");
             SetContrastBrush(app, scheme, dark, "TreeSelectedTextBrush", "TreeSelectedColor");
+            // Выбранный пункт навигации/вкладки (аудит UI P1-1): фон — акцент
+            // темы, подмешанный к фону содержимого, текст — WCAG-контраст к нему.
+            SetNavSelectedBrushes(app, scheme, dark);
 
             // Текст на плашке избранного (issue #61): контраст по WCAG к фактическому
             // FavoriteColor — номера Alt+N и подписи бейджей читаемы в обеих темах
@@ -649,6 +652,28 @@ namespace Workspace1C.Themes
         {
             foreach (var key in keys)
                 app.Resources[key] = brush;
+        }
+
+        /// <summary>
+        /// Кисти выбранного пункта навигации (аудит UI P1-1): фон получается
+        /// подмешиванием 14 % акцента схемы к фону содержимого, текст —
+        /// WCAG-контраст к этому фону (≥ 4.5:1 для любой схемы). Фиксированные
+        /// янтарные литералы не используются — цвет следует за акцентом темы.
+        /// </summary>
+        private static void SetNavSelectedBrushes(Application app, ColorScheme scheme, bool dark)
+        {
+            var accentHex = scheme.PaletteValue(dark, "AccentColor");
+            var backgroundHex = scheme.PaletteValue(dark, "ContentBackgroundColor");
+            if (string.IsNullOrWhiteSpace(accentHex) || !TryParseColor(accentHex, out _))
+                return;
+            if (string.IsNullOrWhiteSpace(backgroundHex) || !TryParseColor(backgroundHex, out _))
+                return;
+
+            var navHex = ColorScheme.NavSelectedBackgroundHex(accentHex, backgroundHex);
+            if (TryParseColor(navHex, out var navColor))
+                app.Resources["NavSelectedBrush"] = new SolidColorBrush(navColor);
+            if (TryParseColor(ColorScheme.ContrastTextHex(navHex), out var textColor))
+                app.Resources["NavSelectedTextBrush"] = new SolidColorBrush(textColor);
         }
 
         /// <summary>Выставляет кисть, контрастную заданному цвету палитры (WCAG 4.5:1).</summary>

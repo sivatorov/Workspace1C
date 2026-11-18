@@ -58,6 +58,11 @@
     <Color x:Key="ZebraRowColor">#334155</Color>
     <Color x:Key="TreeHoverColor">#334155</Color>
     <Color x:Key="TreeSelectedColor">#B45309</Color>
+    <!-- Выбранный пункт навигации (аудит UI P1-1): акцент темы, подмешанный
+         к фону содержимого (14 %). Не фиксированный янтарь — ThemeManager
+         пересчитывает кисти под акцент активной схемы. -->
+    <Color x:Key="NavSelectedColor">#312D24</Color>
+    <Color x:Key="NavSelectedTextColor">#FFFFFF</Color>
     <Color x:Key="ScrollTrackBrush">#16202E</Color>
     <Color x:Key="ScrollThumbBrush">#3B4A5F</Color>
     <Color x:Key="ScrollThumbHoverBrush">#4A5B73</Color>
@@ -98,6 +103,11 @@
     <SolidColorBrush x:Key="ZebraRowBrush" Color="{DynamicResource ZebraRowColor}"/>
     <SolidColorBrush x:Key="TreeHoverBrush" Color="{DynamicResource TreeHoverColor}"/>
     <SolidColorBrush x:Key="TreeSelectedBrush" Color="{DynamicResource TreeSelectedColor}"/>
+    <!-- Выбранный пункт навигации/вкладка (аудит UI P1-1): фон из акцента темы
+         и контрастный ему текст. Значения пересчитывает ThemeManager для каждой
+         схемы, поэтому фиксированного янтаря здесь нет. -->
+    <SolidColorBrush x:Key="NavSelectedBrush" Color="{DynamicResource NavSelectedColor}"/>
+    <SolidColorBrush x:Key="NavSelectedTextBrush" Color="{DynamicResource NavSelectedTextColor}"/>
     <!-- Семантические статусы (аудит UI, п. 2.1). -->
     <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}"/>
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}"/>
