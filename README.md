@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.90-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.91-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.90**
-(поддерживается **7395 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.91**
+(поддерживается **7399 юнит-тестов**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,13 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Единый стиль опасных действий во всех окнах (1.0.1.91, Windows и Linux)** —
+  кнопка «Удалить» в окнах сценариев резервного копирования, пользовательских
+  действий и программ, параметров запуска, заданий по расписанию, сценариев
+  скриптов и настроек оформлена `DangerButton`: красная заливка и белый текст
+  задаются стилем, а не локальной иконкой. Убрана красная иконка внутри
+  вторичной кнопки в «Параметрах запуска», значок приведён к 16 px. Изменения
+  симметричны в WPF и Avalonia. Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Иерархия действий в правой панели и честное disabled-состояние
   (1.0.1.90, Windows и Linux)** — акцентная заливка осталась только у главного
   действия «1С:Предприятие», «Конфигуратор» и «Перейти по ссылке» стали

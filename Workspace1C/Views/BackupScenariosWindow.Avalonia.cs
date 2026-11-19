@@ -77,11 +77,15 @@ public sealed class BackupScenariosWindow : ModalWindowBase
 
         // Темизация кнопок окна (issue #291): стили берутся из Controls.axaml/тем
         // Light-Dark, как у остальных окон приложения, а не штатный вид Fluent.
-        foreach (var b in new Control[] { _runButton, add, edit, del, close })
+        foreach (var b in new Control[] { _runButton, add, edit, close })
         {
             b.Styled(ControlThemes.ModernButton);
             b.Width = 100;
         }
+
+        // Удаление сценария — опасное действие: DangerButton (P2-1).
+        del.Styled(ControlThemes.DangerButton);
+        del.Width = 100;
 
         bottom.Children.Add(_runButton);
         bottom.Children.Add(add);

@@ -11,6 +11,53 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.91] — 2026-11-19
+
+### Исправлено
+
+- **Единый стиль опасных действий во всех окнах (аудит UI, пункт P2-1).**
+  - удаление переведено на `DangerButton` (WPF) и `ControlThemes.DangerButton`
+    (Avalonia) в окнах [`BackupScenarioEditWindow`](Workspace1C/Views/BackupScenarioEditWindow.xaml),
+    [`BackupScenariosWindow`](Workspace1C/Views/BackupScenariosWindow.xaml),
+    [`CustomActionsWindow`](Workspace1C/Views/CustomActionsWindow.xaml),
+    [`CustomProgramsWindow`](Workspace1C/Views/CustomProgramsWindow.xaml),
+    [`LaunchParametersWindow`](Workspace1C/Views/LaunchParametersWindow.xaml),
+    [`ScheduledTasksWindow`](Workspace1C/Views/ScheduledTasksWindow.xaml),
+    [`ScriptScenariosWindow`](Workspace1C/Views/ScriptScenariosWindow.xaml) и
+    [`SettingsWindow`](Workspace1C/Views/SettingsWindow.xaml);
+  - в `LaunchParametersWindow` убрана «псевдо-опасная» кнопка: красная иконка
+    больше не вставляется внутрь `SecondaryButton` — кнопка «Удалить» стала
+    `DangerButton`, цвет задаёт сам стиль, значок приведён к 16 px (было 15);
+  - в `SettingsWindow` на `DangerButton` также переведены «Удалить отсутствующие
+    базы» и «Очистить список баз» — необратимые действия с подтверждением;
+  - «Очистить историю» (`ClearHistoryWindow`) уже была `DangerButton` — не
+    менялась; «Остановить» в окнах поиска/диагностики оставлена красной:
+    остановка процесса необратима;
+  - изменения симметричны в WPF и Avalonia (`*.Avalonia.cs`);
+  - строки групп, навигация, правая панель, отступы, размеры иконок в других
+    местах и остальные стили кнопок не затрагивались.
+
+### Известные ограничения
+
+- Удаление без отдельного диалога подтверждения (в этой задаче новый диалог не
+  добавлялся): `BackupScenarioEditWindow` (удаление каталога из сценария),
+  `LaunchParametersWindow` (удаление пользовательского параметра),
+  `CustomProgramsWindow` (удаление программы), `SettingsWindow` (удаление пути
+  платформы и каталога шаблонов). Подтверждение есть в `BackupScenariosWindow`,
+  `CustomActionsWindow`, `ScheduledTasksWindow`, `ScriptScenariosWindow`,
+  `SettingsWindow` (удаление темы, «Удалить отсутствующие», «Очистить список баз»).
+
+### Тесты
+
+- Новый `AuditP21DangerButtonTests`: в 8 XAML-окнах кнопка удаления использует
+  `DangerButton`; в 8 `*.Avalonia.cs` — `ControlThemes.DangerButton`; ни в одном
+  из файлов нет `Foreground="{DynamicResource ErrorBrush}"` внутри
+  `SecondaryButton` для удаления; значок удаления в `LaunchParametersWindow` —
+  16 px.
+- `ButtonThemeBindingTests.LaunchParametersWindow_AddAndRemoveButtons_AreThemed`
+  обновлён: «Удалить» — `DangerButton`, «Добавить» — `SecondaryButton`.
+- Всего тестов: **7399**, все зелёные.
+
 ## [1.0.1.90] — 2026-11-18
 
 ### Исправлено

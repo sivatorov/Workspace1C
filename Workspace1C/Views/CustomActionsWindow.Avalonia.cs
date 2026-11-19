@@ -63,11 +63,15 @@ public sealed class CustomActionsWindow : ModalWindowBase
 
         // Темизация кнопок окна (issue #291): стили берутся из Controls.axaml/тем
         // Light-Dark, как у остальных окон приложения.
-        foreach (var b in new Control[] { add, _editButton, _deleteButton, close })
+        foreach (var b in new Control[] { add, _editButton, close })
         {
             b.Styled(ControlThemes.ModernButton);
             b.Width = 96;
         }
+
+        // Удаление действия — опасное действие: DangerButton (P2-1).
+        _deleteButton.Styled(ControlThemes.DangerButton);
+        _deleteButton.Width = 96;
 
         bottom.Children.Add(add);
         bottom.Children.Add(_editButton);

@@ -1468,11 +1468,12 @@
                                                 <TextBlock Text="{loc:Loc Settings.Rename}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
-                                        <Button x:Name="DeleteSchemeButton" Style="{DynamicResource SecondaryButton}" Padding="10,6" Margin="0,0,8,4"
+                                        <!-- Удаление темы — опасное действие: DangerButton (P2-1). -->
+                                        <Button x:Name="DeleteSchemeButton" Style="{DynamicResource DangerButton}" Padding="10,6" Margin="0,0,8,4"
                                                 Click="OnDeleteScheme_Click"
                                                 ToolTip="{loc:Loc Settings.DeleteThemeTooltip}">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Delete" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <materialDesign:PackIcon Kind="Delete" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -2404,12 +2405,13 @@
                                         <TextBlock Text="{loc:Loc Common.Edit}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
+                                <!-- Удаление пути платформы — опасное действие: DangerButton (P2-1). -->
                                 <Button Padding="10,6"
-                                        Style="{DynamicResource SecondaryButton}"
+                                        Style="{DynamicResource DangerButton}"
                                         Click="OnRemovePlatformPath_Click"
                                         ToolTip="{loc:Loc Settings.AdditionalPaths.RemoveTooltip}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
@@ -2852,11 +2854,12 @@
                                                         <TextBlock Text="{loc:Loc Settings.Bases.EditTemplate}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
-                                                <Button Style="{DynamicResource SecondaryButton}" Padding="10,6" Margin="0,0,8,4"
+                                                <!-- Удаление каталога шаблонов — опасное действие: DangerButton (P2-1). -->
+                                                <Button Style="{DynamicResource DangerButton}" Padding="10,6" Margin="0,0,8,4"
                                                         Click="OnRemoveTemplatePath_Click"
                                                         ToolTip="{loc:Loc Settings.Bases.RemoveTemplateTooltip}">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                        <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                                         <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
                                                     </StackPanel>
                                                 </Button>
@@ -2893,12 +2896,13 @@
                                             <TextBlock Text="{loc:Loc Settings.Bases.MaintenanceHint}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
                                                        TextWrapping="Wrap"/>
-                                            <Button Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Padding="10,8"
+                                            <!-- Удаление отсутствующих баз — опасное действие: DangerButton (P2-1). -->
+                                            <Button Style="{DynamicResource DangerButton}" Margin="0,0,0,8" Padding="10,8"
                                                     HorizontalAlignment="Stretch"
                                                     Click="OnRemoveMissingFileBases_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.RemoveMissingTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="FolderRemove" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.RemoveMissing}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
@@ -2998,12 +3002,13 @@
                                             <TextBlock Text="{loc:Loc Settings.Bases.DangerousHint}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,8"
                                                        TextWrapping="Wrap"/>
-                                            <Button Style="{DynamicResource SecondaryButton}" Padding="10,8"
+                                            <!-- Очистка списка баз — необратимое действие: DangerButton (P2-1). -->
+                                            <Button Style="{DynamicResource DangerButton}" Padding="10,8"
                                                     HorizontalAlignment="Stretch"
                                                     Click="OnClearAllInfobases_Click"
                                                     ToolTip="{loc:Loc Settings.Bases.ClearAllTooltip}">
                                                 <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="DeleteForever" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                    <materialDesign:PackIcon Kind="DeleteForever" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ClearAll}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>

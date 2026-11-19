@@ -59,11 +59,15 @@ public sealed class ScriptScenariosWindow : ModalWindowBase
 
         // Темизация кнопок окна (issue #291): стили берутся из Controls.axaml/тем
         // Light-Dark, как у остальных окон приложения.
-        foreach (var b in new Control[] { add, edit, del, close })
+        foreach (var b in new Control[] { add, edit, close })
         {
             b.Styled(ControlThemes.ModernButton);
             b.Width = 96;
         }
+
+        // Удаление сценария — опасное действие: DangerButton (P2-1).
+        del.Styled(ControlThemes.DangerButton);
+        del.Width = 96;
 
         bottom.Children.Add(add);
         bottom.Children.Add(edit);

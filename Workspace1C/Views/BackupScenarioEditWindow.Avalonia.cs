@@ -125,7 +125,8 @@ public sealed class BackupScenarioEditWindow : ModalWindowBase
         var dirButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var addDir = new Button { Content = T("Common.Browse"), Width = 110 }.Styled(ControlThemes.SecondaryButton);
         addDir.Click += (_, _) => AddDirectory();
-        var removeDir = new Button { Content = T("Common.Delete"), Width = 96 }.Styled(ControlThemes.SecondaryButton);
+        // Удаление каталога из сценария — опасное действие: DangerButton (P2-1).
+        var removeDir = new Button { Content = T("Common.Delete"), Width = 96 }.Styled(ControlThemes.DangerButton);
         removeDir.Click += (_, _) => RemoveDirectory();
         dirButtons.Children.Add(addDir);
         dirButtons.Children.Add(removeDir);

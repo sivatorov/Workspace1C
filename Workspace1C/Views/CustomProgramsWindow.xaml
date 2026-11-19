@@ -80,8 +80,9 @@
                             Padding="8,5" Margin="0,0,6,0">
                         <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
                     </Button>
+                    <!-- Удаление программы — опасное действие: DangerButton (P2-1). -->
                     <Button Command="{Binding DeleteCommand}" ToolTip="{loc:Loc Common.Delete}"
-                            Padding="8,5" Margin="0,0,6,0">
+                            Style="{DynamicResource DangerButton}" Padding="8,5" Margin="0,0,6,0">
                         <materialDesign:PackIcon Kind="Delete" Width="16" Height="16"/>
                     </Button>
                     <Button Command="{Binding MoveUpCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveUp}"

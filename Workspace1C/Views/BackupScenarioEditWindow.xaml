@@ -84,7 +84,9 @@
                 <TextBlock x:Name="DirsLabel" Text="{loc:Loc Backup.TargetDirectories}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <Button x:Name="AddDirButton" Content="{loc:Loc Common.Browse}" MinWidth="96" Padding="12,5" Click="AddDir_Click"/>
-                    <Button x:Name="RemoveDirButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Margin="8,0,0,0" Padding="12,5" Click="RemoveDir_Click"/>
+                    <!-- Удаление каталога из сценария — опасное действие: DangerButton (P2-1). -->
+                    <Button x:Name="RemoveDirButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Margin="8,0,0,0" Padding="12,5"
+                            Style="{DynamicResource DangerButton}" Click="RemoveDir_Click"/>
                 </StackPanel>
                 <ListBox x:Name="DirList" ItemsSource="{Binding TargetDirectories}" Height="110" Margin="0,0,0,10"/>
 

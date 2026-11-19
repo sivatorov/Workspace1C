@@ -1355,12 +1355,14 @@ namespace Workspace1C
                 RefreshVersions();
             };
 
+            // Удаление пути платформы — опасное действие: DangerButton (P2-1).
+            // Цвет задаёт стиль, поэтому значок белый (DangerTextBrush).
             var removePath = new Button
             {
-                Content = IconTextContent("IconFolderRemove", "@ErrorBrush", "Common.Delete"),
+                Content = IconTextContent("IconFolderRemove", "@DangerTextBrush", "Common.Delete"),
                 Padding = new Thickness(10, 6)
             };
-            removePath.Styled(ControlThemes.SecondaryButton);
+            removePath.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(removePath, LocalizationManager.T("Settings.AdditionalPaths.RemoveTooltip"));
             removePath.Click += (_, _) =>
             {
@@ -2270,17 +2272,18 @@ namespace Workspace1C
 
             var schemeButtons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
 
-            Button SchemeButton(string textKey, string tooltipKey, Action action)
+            Button SchemeButton(string textKey, string tooltipKey, Action action, bool danger = false)
             {
                 // Числа из разметки (SettingsWindow.xaml:843): отступ 10 на 6,
-                // поля справа 8 и снизу 4, вторичная тема.
+                // поля справа 8 и снизу 4, вторичная тема. Удаление темы —
+                // опасное действие: DangerButton (P2-1).
                 var button = new Button
                 {
                     Content = LocalizationManager.T(textKey),
                     Padding = new Thickness(10, 6),
                     Margin = new Thickness(0, 0, 8, 4)
                 };
-                button.Styled(ControlThemes.SecondaryButton);
+                button.Styled(danger ? ControlThemes.DangerButton : ControlThemes.SecondaryButton);
                 ToolTip.SetTip(button, LocalizationManager.T(tooltipKey));
                 button.Click += (_, _) => action();
                 schemeButtons.Children.Add(button);
@@ -2399,7 +2402,7 @@ namespace Workspace1C
                     editedScheme = ColorScheme.CreateLight();
                 ReloadSchemes(editedScheme.Name);
                 RefreshColors();
-            });
+            }, danger: true);
 
             SchemeButton("Settings.ResetColors", "Settings.ResetColorsTooltip", () =>
             {
@@ -2620,7 +2623,9 @@ namespace Workspace1C
                 templateList.SelectedItem = folder;
             };
 
+            // Удаление каталога шаблонов — опасное действие: DangerButton (P2-1).
             var removeTemplate = new Button { Content = LocalizationManager.T("Common.Delete") };
+            removeTemplate.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(removeTemplate, LocalizationManager.T("Settings.Bases.RemoveTemplateTooltip"));
             removeTemplate.Click += (_, _) =>
             {
@@ -2968,7 +2973,9 @@ namespace Workspace1C
 
             var maintenanceButtons = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8, Margin = new Thickness(0, 0, 0, 8) };
 
+            // Удаление отсутствующих баз — опасное действие: DangerButton (P2-1).
             var removeMissing = new Button { Content = LocalizationManager.T("Settings.Bases.RemoveMissing") };
+            removeMissing.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(removeMissing, LocalizationManager.T("Settings.Bases.RemoveMissingTooltip"));
             removeMissing.Click += (_, _) => _viewModel.RemoveMissingFileBases();
 
@@ -3130,12 +3137,14 @@ namespace Workspace1C
             basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.DangerousOps")));
             basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.Bases.DangerousHint")));
 
+            // Очистка списка баз — необратимое действие: DangerButton (P2-1).
             var clearAll = new Button
             {
                 Content = LocalizationManager.T("Settings.Bases.ClearAll"),
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 0, 0, 8)
             };
+            clearAll.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(clearAll, LocalizationManager.T("Settings.Bases.ClearAllTooltip"));
             clearAll.Click += (_, _) => _viewModel.ClearAllInfobases();
             basesMaintenancePanel.Children.Add(clearAll);

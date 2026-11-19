@@ -53,7 +53,9 @@
             <Button x:Name="AddButton" Content="{loc:Loc Common.Add}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" Click="Add_Click"/>
             <Button x:Name="EditButton" Content="{loc:Loc Common.Edit}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Edit_Click"/>
             <Button x:Name="CopyButton" Content="{loc:Loc Common.Copy}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Copy_Click"/>
-            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Padding="12,5" IsEnabled="False" Click="Delete_Click"/>
+            <!-- Удаление задания — опасное действие: DangerButton (P2-1). -->
+            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Padding="12,5"
+                    Style="{DynamicResource DangerButton}" IsEnabled="False" Click="Delete_Click"/>
         </StackPanel>
 
         <ListBox x:Name="TasksList" SelectionChanged="TasksList_SelectionChanged"

@@ -104,15 +104,22 @@ public sealed class ButtonThemeBindingTests
     public void LaunchParametersWindow_AddAndRemoveButtons_AreThemed()
     {
         // Issue #50 «Цвета кнопок 2»: в окне «Запустить с выбором параметров»
-        // кнопки «Добавить» и «Удалить» используют вторичный стиль темы.
+        // кнопки используют стили темы. Аудит UI P2-1 (v1.0.1.91): удаление —
+        // опасное действие, поэтому «Удалить» переведена на DangerButton,
+        // «Добавить» остаётся вторичной.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "LaunchParametersWindow.xaml"));
-        foreach (var name in new[] { "BtnAddParam", "BtnRemoveParam" })
+        var expected = new[]
+        {
+            ("BtnAddParam", "DynamicResource SecondaryButton"),
+            ("BtnRemoveParam", "DynamicResource DangerButton")
+        };
+        foreach (var (name, style) in expected)
         {
             var index = xaml.IndexOf("x:Name=\"" + name + "\"", System.StringComparison.Ordinal);
             Assert.True(index > 0, $"Кнопка {name} не найдена");
             var start = xaml.LastIndexOf("<Button", index, System.StringComparison.Ordinal);
             var tag = xaml.Substring(start, index - start + 200);
-            Assert.Contains("DynamicResource SecondaryButton", tag);
+            Assert.Contains(style, tag);
         }
     }
 }

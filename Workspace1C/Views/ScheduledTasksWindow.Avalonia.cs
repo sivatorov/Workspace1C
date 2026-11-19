@@ -130,11 +130,15 @@ public sealed class ScheduledTasksWindow : ModalWindowBase
 
         // Темизация кнопок окна (issue #291): стили берутся из Controls.axaml/тем
         // Light-Dark, как у остальных окон приложения, а не штатный вид Fluent.
-        foreach (var b in new Control[] { run, add, edit, copy, del })
+        foreach (var b in new Control[] { run, add, edit, copy })
         {
             b.Styled(ControlThemes.ModernButton);
             b.MinWidth = b.Width;
         }
+
+        // Удаление задания — опасное действие: DangerButton (P2-1).
+        del.Styled(ControlThemes.DangerButton);
+        del.MinWidth = del.Width;
 
         bottom.Children.Add(run);
         bottom.Children.Add(add);

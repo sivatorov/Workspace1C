@@ -137,11 +137,13 @@
                             ToolTip="{loc:Loc LaunchParams.MoveDown}">
                         <materialDesign:PackIcon Kind="ArrowDown" Width="16" Height="16" VerticalAlignment="Center"/>
                     </Button>
-                    <Button Style="{DynamicResource SecondaryButton}" x:Name="BtnRemoveParam" Grid.Column="6" Width="104" Height="32" MinHeight="32" Padding="10,4"
+                    <!-- Удаление параметра — опасное действие: DangerButton (P2-1).
+                         Красный цвет задаёт сам стиль, значок 16 px без локального Foreground. -->
+                    <Button Style="{DynamicResource DangerButton}" x:Name="BtnRemoveParam" Grid.Column="6" Width="104" Height="32" MinHeight="32" Padding="10,4"
                             Margin="6,0,0,0" Click="OnRemoveParam_Click" Cursor="Hand" IsEnabled="False"
                             ToolTip="{loc:Loc LaunchParams.CustomRemove}">
                         <StackPanel Orientation="Horizontal">
-                            <materialDesign:PackIcon Kind="Delete" Width="15" Height="15" Foreground="{DynamicResource ErrorBrush}"
+                            <materialDesign:PackIcon Kind="Delete" Width="16" Height="16"
                                                      Margin="0,0,5,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc Common.Delete}" VerticalAlignment="Center"/>
                         </StackPanel>

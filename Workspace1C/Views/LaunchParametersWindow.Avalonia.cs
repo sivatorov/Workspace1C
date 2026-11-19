@@ -101,7 +101,8 @@ namespace Workspace1C
             _btnEdit = BuildToolButton("LaunchParams.CustomEdit", "IconEdit", OnEditParam_Click);
             _btnMoveUp = BuildToolButton("LaunchParams.MoveUp", "IconArrowUp", () => MoveSelectedCustomParameter(-1));
             _btnMoveDown = BuildToolButton("LaunchParams.MoveDown", "IconArrowDown", () => MoveSelectedCustomParameter(1));
-            _btnRemove = BuildToolButton("Common.Delete", "IconDelete", RemoveSelectedCustomParameter);
+            // Удаление параметра — опасное действие: DangerButton (P2-1).
+            _btnRemove = BuildToolButton("Common.Delete", "IconDelete", RemoveSelectedCustomParameter, danger: true);
 
             _txtNewParam = new TextBox
             {
@@ -146,21 +147,29 @@ namespace Workspace1C
         /// <summary>Обновлённый список пользовательских параметров справочника (issue #141).</summary>
         public IReadOnlyList<string> CustomParameters => _customParams;
 
-        private Button BuildToolButton(string labelKey, string iconKey, Action onClick)
+        private Button BuildToolButton(string labelKey, string iconKey, Action onClick, bool danger = false)
         {
+            // У опасной кнопки цвет задаёт стиль: значок 16 px и белая кисть
+            // DangerTextBrush, без локального красного Foreground (P2-1).
             var button = new Button
             {
                 Content = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
                     Spacing = 4,
-                    Children = { IconHelper.MakeIcon(iconKey, 15), new TextBlock { Text = T(labelKey) } }
+                    Children =
+                    {
+                        danger
+                            ? IconHelper.MakeIcon(iconKey, 16, "DangerTextBrush")
+                            : IconHelper.MakeIcon(iconKey, 15),
+                        new TextBlock { Text = T(labelKey) }
+                    }
                 },
                 MinHeight = 32,
                 Padding = new Thickness(10, 4),
                 VerticalContentAlignment = VerticalAlignment.Center
             };
-            button.Styled(ControlThemes.SecondaryButton);
+            button.Styled(danger ? ControlThemes.DangerButton : ControlThemes.SecondaryButton);
             button.Click += (_, _) => onClick();
             return button;
         }

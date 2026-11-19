@@ -146,7 +146,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             Margin = new Thickness(0, 8, 0, 0)
         };
         ops.Children.Add(IconButton("IconPlus", "Common.Add", () => _vm.AddProgram()));
-        ops.Children.Add(IconButton("IconDelete", "Common.Delete", () => _vm.DeleteSelected()));
+        // Удаление программы — опасное действие: DangerButton (P2-1).
+        ops.Children.Add(IconButton("IconDelete", "Common.Delete", () => _vm.DeleteSelected(),
+            ControlThemes.DangerButton, "DangerTextBrush"));
         ops.Children.Add(IconButton("IconArrowUp", "Launch.CustomPrograms.MoveUp", () => _vm.MoveSelected(-1)));
         ops.Children.Add(IconButton("IconArrowDown", "Launch.CustomPrograms.MoveDown", () => _vm.MoveSelected(1)));
         DockPanel.SetDock(ops, Dock.Bottom);
@@ -356,14 +358,15 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         return dock;
     }
 
-    private Button IconButton(string iconKey, string tooltipKey, Action action)
+    private Button IconButton(string iconKey, string tooltipKey, Action action,
+        string style = ControlThemes.ModernButton, string iconBrush = "TextPrimaryBrush")
     {
         var button = new Button
         {
-            Content = IconHelper.MakeIcon(iconKey, 16, "TextPrimaryBrush"),
+            Content = IconHelper.MakeIcon(iconKey, 16, iconBrush),
             Padding = new Thickness(8, 5)
         };
-        button.Styled(ControlThemes.ModernButton);
+        button.Styled(style);
         ToolTip.SetTip(button, T(tooltipKey));
         button.Click += (_, _) => action();
         return button;
