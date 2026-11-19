@@ -18,15 +18,7 @@
         </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
     </Window.Resources>
 
     <Grid x:Name="RootPanel" Margin="16">
@@ -108,21 +100,21 @@
                     </DataGrid>
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,0">
-                        <Button x:Name="AddEditionButton" Height="30" Style="{StaticResource OutlineButtonStyle}"
+                        <Button x:Name="AddEditionButton" Height="30" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                 Margin="0,0,8,0" Click="OnAddEditionClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
                                 <TextBlock Text="{loc:Loc Updates.AddEdition}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="EditEditionButton" Height="30" Style="{StaticResource OutlineButtonStyle}"
+                        <Button x:Name="EditEditionButton" Height="30" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                 Margin="0,0,8,0" Click="OnEditEditionClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="PencilOutline" Width="16" Height="16"/>
                                 <TextBlock Text="{loc:Loc Updates.EditEdition}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="SetDefaultEditionButton" Height="30" Style="{StaticResource OutlineButtonStyle}"
+                        <Button x:Name="SetDefaultEditionButton" Height="30" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                 Margin="0,0,8,0" Click="OnSetDefaultEditionClick"
                                 ToolTip="{loc:Loc Updates.SetDefaultEditionHint}">
                             <StackPanel Orientation="Horizontal">
@@ -130,7 +122,7 @@
                                 <TextBlock Text="{loc:Loc Updates.SetDefaultEdition}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button x:Name="RemoveEditionButton" Height="30" Style="{StaticResource OutlineButtonStyle}"
+                        <Button x:Name="RemoveEditionButton" Height="30" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                 Click="OnRemoveEditionClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="Minus" Width="16" Height="16" Foreground="{DynamicResource ErrorBrush}"/>
@@ -144,13 +136,13 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="SaveButton" Width="140" Height="34" Margin="0,0,10,0" IsDefault="True"
-                    Style="{StaticResource PrimaryButtonStyle}" Click="OnSaveClick">
+                    Style="{StaticResource PrimaryButton}" Click="OnSaveClick">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Check" Width="16" Height="16"/>
                     <TextBlock Text="{loc:Loc Updates.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource OutlineButtonStyle}"
+            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnCancelClick">
                 <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
             </Button>

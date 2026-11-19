@@ -13,15 +13,7 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
     </Window.Resources>
 
     <StackPanel Margin="16">
@@ -33,14 +25,14 @@
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="CancelAndRestartButton" MinWidth="150" Height="34" Margin="0,0,8,0"
-                        Style="{StaticResource PrimaryButtonStyle}" Click="OnCancelAndRestartClick">
+                        Style="{StaticResource PrimaryButton}" Click="OnCancelAndRestartClick">
                     <TextBlock Text="{loc:Loc Updates.FileAlreadyDownloadingCancel}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                 </Button>
                 <Button MinWidth="110" Height="34" Margin="0,0,8,0"
-                        Style="{StaticResource OutlineButtonStyle}" Click="OnWaitClick">
+                        Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnWaitClick">
                     <TextBlock Text="{loc:Loc Updates.FileAlreadyDownloadingWait}" VerticalAlignment="Center"/>
                 </Button>
-                <Button MinWidth="110" Height="34" Style="{StaticResource OutlineButtonStyle}"
+                <Button MinWidth="110" Height="34" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Click="OnCancelClick" IsCancel="True">
                     <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
                 </Button>

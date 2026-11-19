@@ -19,16 +19,7 @@
         </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
     </Window.Resources>
 
     <Grid Margin="16">
@@ -198,7 +189,7 @@
             <StackPanel Orientation="Horizontal">
                 <!-- Первая строка: главная команда + действия при проблемах авторизации
                      (issue #323/#330/#334): справочник учётных данных ИТС, login.1c.ru. -->
-                <Button Height="36" Style="{StaticResource PrimaryButtonStyle}"
+                <Button Height="36" Style="{StaticResource PrimaryButton}"
                         Command="{Binding CheckCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16"/>
@@ -207,12 +198,12 @@
                     </StackPanel>
                 </Button>
 
-                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Click="OnItsAccountsClick">
                     <TextBlock Text="{loc:Loc Updates.OpenItsAccounts}" VerticalAlignment="Center"/>
                 </Button>
 
-                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Click="OnOpenLoginClick">
                     <TextBlock Text="{loc:Loc Updates.OpenLoginPage}" VerticalAlignment="Center"/>
                 </Button>
@@ -220,7 +211,7 @@
 
             <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                 <!-- Вторая строка: операции с версиями. -->
-                <Button Height="36" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Command="{Binding DownloadAndInstallCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DownloadOutline" Width="16" Height="16"
@@ -230,12 +221,12 @@
                     </StackPanel>
                 </Button>
 
-                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Command="{Binding DownloadOnlyCommand}">
                     <TextBlock Text="{loc:Loc PlatformUpdate.DownloadOnly}" VerticalAlignment="Center"/>
                 </Button>
 
-                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Command="{Binding RemoveOldVersionsCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DeleteOutline" Width="16" Height="16"

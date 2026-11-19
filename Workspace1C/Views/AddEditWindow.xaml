@@ -26,40 +26,6 @@
              (issue #107 п.1) выбранный вариант снова заливается акцентом — текст и
              значок следуют Foreground (TextOnAccentBrush, контраст гарантируется
              ThemeManager: пользовательский цвет при контрасте ≥ 3:1, иначе WCAG). -->
-        <Style x:Key="OptionRadioButton" TargetType="RadioButton">
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="RadioButton">
-                        <Border x:Name="OptionBorder"
-                                Background="{DynamicResource CardBackgroundBrush}"
-                                BorderBrush="{DynamicResource BorderBrushColor}"
-                                BorderThickness="1"
-                                CornerRadius="6"
-                                Padding="12,10"
-                                Margin="0,0,0,10"
-                                Cursor="Hand">
-                            <ContentPresenter/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            </Trigger>
-                            <!-- Issue #107 п.1 (v1.0.1.49): выбранный вариант — акцентная заливка
-                                 + рамка 2px, текст/значок — TextOnAccentBrush (читаемость обеспечивает
-                                 ThemeManager, issue #26 + п.2 #107). Заливка AccentHoverBrush
-                                 по-прежнему запрещена (светлый текст нечитаем). -->
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="OptionBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                                <Setter TargetName="OptionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                <Setter TargetName="OptionBorder" Property="BorderThickness" Value="2"/>
-                                <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">

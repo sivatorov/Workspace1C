@@ -82,12 +82,21 @@ public sealed class SettingsWindowXamlResourcesTests
     }
 
     [Fact]
-    public void SettingsWindow_OutlineButtonStyle_IsDefined()
+    public void SettingsWindow_ButtonStyles_AreDefinedInTheme()
     {
-        // Регрессия issue #337: именно этот ключ отсутствовал с 0.3.9.247 по 0.3.9.253.
+        // Регрессия issue #337 + аудит UI P2-2: локальный OutlineButtonStyle удалён,
+        // окно ссылается на канонический SecondaryButton из словарей темы.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml"));
         var localKeys = CollectDefinedKeys(xaml);
-        Assert.Contains("OutlineButtonStyle", localKeys);
+        Assert.DoesNotContain("OutlineButtonStyle", localKeys);
+        Assert.Contains("SecondaryButton", xaml);
+
+        foreach (var theme in new[] { "LightTheme.xaml", "DarkTheme.xaml" })
+        {
+            var themeKeys = CollectDefinedKeys(ReadProjectFile(Path.Combine("Workspace1C", "Themes", theme)));
+            Assert.Contains("SecondaryButton", themeKeys);
+            Assert.Contains("PrimaryButton", themeKeys);
+        }
     }
 
     [Fact]

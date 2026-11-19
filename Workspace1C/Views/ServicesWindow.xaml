@@ -22,19 +22,9 @@
         </Style>
 
         <!-- Кнопка-иконка строки действий (issue #11): без текста, узкая, с подсказкой. -->
-        <Style x:Key="IconOnlyButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-            <Setter Property="FontSize" Value="13"/>
-        </Style>
         <!-- Кнопка команды службы: только цветная иконка, без подписи (замечание 7OH
              18.10: «выключить надписи у кнопок управления состоянием на панели»),
              по ширине чуть больше кнопки «Добавить группу». -->
-        <Style x:Key="CommandButton" TargetType="Button" BasedOn="{StaticResource IconOnlyButton}">
-            <Setter Property="Padding" Value="13,5"/>
-            <Setter Property="MinWidth" Value="44"/>
-        </Style>
         <Style x:Key="ToolbarSeparator" TargetType="Border">
             <Setter Property="Width" Value="1"/>
             <Setter Property="Height" Value="20"/>
@@ -92,13 +82,13 @@
             <!-- «Свернуть все»/«Развернуть все» (issue #11; замечание 7OH: глифы ⏷/⏶ не
                  совпадали с главным окном): те же PackIcon ExpandAll/CollapseAll, что в
                  главном окне (MainWindow.xaml:567 и 574), с разделителем после них. -->
-            <Button x:Name="ExpandAllButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="ExpandAllButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.ExpandAll}" IsEnabled="{Binding CanExpandAllGroups}"
                     Click="OnExpandAll_Click">
                 <materialDesign:PackIcon Kind="ExpandAll" Width="18" Height="18"
                                          Foreground="{DynamicResource TextSecondaryBrush}"/>
             </Button>
-            <Button x:Name="CollapseAllButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="CollapseAllButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.CollapseAll}" IsEnabled="{Binding CanExpandAllGroups}"
                     Click="OnCollapseAll_Click">
                 <materialDesign:PackIcon Kind="CollapseAll" Width="18" Height="18"
@@ -108,12 +98,12 @@
             <!-- Порядок задаёт пользователь (issue #11, 7OH 17.10): «Переместить выше / ниже»
                  для корневых строк списка (службы вне групп и папки-группы); порядок служб
                  внутри группы задаётся в редакторе группы. -->
-            <Button x:Name="MoveUpButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="MoveUpButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveUp}" IsEnabled="{Binding CanMoveUp}"
                     Click="OnMoveUp_Click">
                 <TextBlock Text="▲" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
-            <Button x:Name="MoveDownButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="MoveDownButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveDown}" IsEnabled="{Binding CanMoveDown}"
                     Click="OnMoveDown_Click">
                 <TextBlock Text="▼" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
@@ -122,29 +112,29 @@
             <!-- Группы служб (issue #11, итерация 2 — релиз 1.0.0.12): «Добавить/Изменить/
                  Удалить группу». Кнопки неактивны, пока окно не установит GroupEditorProvider
                  (окно редактирования группы — Задача 3). -->
-            <Button x:Name="AddGroupButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupAddHint}" IsEnabled="{Binding CanAddGroup}"
                     Click="OnAddGroup_Click">
                 <TextBlock Text="📦" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
             </Button>
-            <Button x:Name="EditGroupButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="EditGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupEditHint}" IsEnabled="{Binding CanEditGroup}"
                     Click="OnEditGroup_Click">
                 <TextBlock Text="✎" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
             </Button>
             <!-- «Перенести в группу» (issue #11, 1.0.0.14): рядом с кнопкой правки. -->
-            <Button x:Name="MoveToGroupButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="MoveToGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveToGroupHint}" IsEnabled="{Binding CanMoveToGroup}"
                     Click="OnMoveToGroup_Click">
                 <TextBlock Text="⇄" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
-            <Button x:Name="DeleteGroupButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="DeleteGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupDeleteHint}" IsEnabled="{Binding CanDeleteGroup}"
                     Click="OnDeleteGroup_Click">
                 <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
-            <Button x:Name="RefreshButton" Style="{StaticResource IconOnlyButton}"
+            <Button x:Name="RefreshButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Refresh}" Click="OnRefresh_Click">
                 <TextBlock Text="⟳" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
@@ -153,29 +143,29 @@
                  «выключить надписи у кнопок управления состоянием на панели»);
                  подписи — подсказками, в контекстном меню подписи остаются.
                  «Восстановить» — треугольник с палочкой справа (ServiceCommandGlyphs). -->
-            <Button x:Name="StartButton" Style="{StaticResource CommandButton}"
+            <Button x:Name="StartButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Start}"
                     IsEnabled="{Binding CanStart}" Click="OnStart_Click">
                 <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StartGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource SuccessBrush}"/>
             </Button>
-            <Button x:Name="StopButton" Style="{StaticResource CommandButton}"
+            <Button x:Name="StopButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Stop}"
                     IsEnabled="{Binding CanStop}" Click="OnStop_Click">
                 <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.StopGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
-            <Button x:Name="PauseButton" Style="{StaticResource CommandButton}"
+            <Button x:Name="PauseButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Pause}"
                     IsEnabled="{Binding CanPause}" Click="OnPause_Click">
                 <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.PauseGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}"/>
             </Button>
-            <Button x:Name="ContinueButton" Style="{StaticResource CommandButton}"
+            <Button x:Name="ContinueButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Continue}"
                     IsEnabled="{Binding CanContinue}" Click="OnContinue_Click">
                 <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.ContinueGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
-            <Button x:Name="RestartButton" Style="{StaticResource CommandButton}"
+            <Button x:Name="RestartButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Restart}"
                     IsEnabled="{Binding CanRestart}" Click="OnRestart_Click">
                 <TextBlock Text="{x:Static vm:ServiceCommandGlyphs.RestartGlyph}" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>

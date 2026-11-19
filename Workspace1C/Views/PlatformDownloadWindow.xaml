@@ -24,33 +24,7 @@
         </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8" Padding="10,4">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
     </Window.Resources>
 
     <Grid Margin="16">
@@ -117,13 +91,13 @@
                              компактные иконки (как в главном окне), за которыми не теряется
                              поле поиска. Назначение поясняют подсказки (тултипы). -->
                         <Button Grid.Column="1" Margin="6,0,0,0" VerticalAlignment="Center"
-                                Command="{Binding ExpandAllCommand}" Style="{StaticResource OutlineButtonStyle}"
+                                Command="{Binding ExpandAllCommand}" Style="{StaticResource SecondaryButton}"
                                 Padding="6,4" ToolTip="{loc:Loc PlatformDownload.ExpandAll}">
                             <Path Data="{DynamicResource IconExpandAll}" Width="16" Height="16"
                                   Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}"/>
                         </Button>
                         <Button Grid.Column="2" Margin="6,0,0,0" VerticalAlignment="Center"
-                                Command="{Binding CollapseAllCommand}" Style="{StaticResource OutlineButtonStyle}"
+                                Command="{Binding CollapseAllCommand}" Style="{StaticResource SecondaryButton}"
                                 Padding="6,4" ToolTip="{loc:Loc PlatformDownload.CollapseAll}">
                             <Path Data="{DynamicResource IconCollapseAll}" Width="16" Height="16"
                                   Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}"/>
@@ -253,7 +227,7 @@
                                  MinHeight="30" VerticalContentAlignment="Center" IsReadOnly="False"/>
                         <Button Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
                                 Content="{loc:Loc PlatformDownload.ChooseDirectory}"
-                                Command="{Binding ChooseDirectoryCommand}" Style="{StaticResource OutlineButtonStyle}"/>
+                                Command="{Binding ChooseDirectoryCommand}" Style="{StaticResource SecondaryButton}"/>
                     </Grid>
 
                     <!-- Действия после скачивания: только «Открыть папку» — дистрибутив
@@ -261,7 +235,7 @@
                          (issue #330, комментарий 7OH от 2026-10-08). -->
                     <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
                         <Button Content="{loc:Loc PlatformDownload.OpenFolder}"
-                                Command="{Binding OpenFolderCommand}" Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding OpenFolderCommand}" Style="{StaticResource PrimaryButton}"
                                 MinWidth="130"/>
                     </StackPanel>
 
@@ -307,7 +281,7 @@
                                VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Content="{loc:Loc PlatformDownload.Download}"
-                                Command="{Binding DownloadCommand}" Style="{StaticResource PrimaryButtonStyle}"
+                                Command="{Binding DownloadCommand}" Style="{StaticResource PrimaryButton}"
                                 MinWidth="130"/>
                     </StackPanel>
                 </Grid>
@@ -327,14 +301,14 @@
                          login.1c.ru в браузере, справочник учётных данных ИТС. -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                         <Button Content="{loc:Loc Updates.OpenLoginPage}"
-                                Click="OnOpenLoginClick" Style="{StaticResource OutlineButtonStyle}"
+                                Click="OnOpenLoginClick" Style="{StaticResource SecondaryButton}"
                                 Padding="12,6"/>
                         <Button Content="{loc:Loc Updates.OpenItsAccounts}"
-                                Click="OnItsAccountsClick" Style="{StaticResource OutlineButtonStyle}"
+                                Click="OnItsAccountsClick" Style="{StaticResource SecondaryButton}"
                                 Margin="8,0,0,0" Padding="12,6"/>
                     </StackPanel>
                     <Button Grid.Column="1" Content="{loc:Loc PlatformDownload.RefreshCatalog}"
-                            Command="{Binding LoadCatalogCommand}" Style="{StaticResource OutlineButtonStyle}"/>
+                            Command="{Binding LoadCatalogCommand}" Style="{StaticResource SecondaryButton}"/>
                 </Grid>
             </StackPanel>
         </Border>

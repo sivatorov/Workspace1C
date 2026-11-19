@@ -18,17 +18,9 @@
 
         <!-- Основная зелёная кнопка -->
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
 
         <!-- Серая кнопка-контур -->
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -58,13 +50,13 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="OkButton" Width="140" Height="34" Margin="0,0,10,0" IsDefault="True"
-                    Style="{StaticResource PrimaryButtonStyle}" Click="OnOkClick">
+                    Style="{StaticResource PrimaryButton}" Click="OnOkClick">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="🔌" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Ports.Check}" Margin="0,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource OutlineButtonStyle}"
+            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnCancelClick">
                 <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
             </Button>

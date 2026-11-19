@@ -19,33 +19,6 @@
         </Style>
 
         <!-- Кнопки «Отметить все / Снять все / Инвертировать»: без рамки, с подсветкой при наведении -->
-        <Style x:Key="SelectAllButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.7"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -71,7 +44,7 @@
                 <Border DockPanel.Dock="Top" BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,0,0,1"
                         Padding="8,4" Background="Transparent">
                     <StackPanel Orientation="Horizontal">
-                        <Button x:Name="CheckAllButton" Style="{StaticResource SelectAllButtonStyle}"
+                        <Button x:Name="CheckAllButton" Style="{StaticResource SelectAllButton}"
                                 ToolTip="{loc:Loc ClearHistory.Button.CheckAllTooltip}"
                                 Click="OnCheckAllClick">
                             <StackPanel Orientation="Horizontal">
@@ -81,7 +54,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="UncheckAllButton"
-                                Style="{StaticResource SelectAllButtonStyle}"
+                                Style="{StaticResource SelectAllButton}"
                                 Margin="16,0,0,0" ToolTip="{loc:Loc ClearHistory.Button.UncheckAllTooltip}"
                                 Click="OnUncheckAllClick">
                             <StackPanel Orientation="Horizontal">
@@ -91,7 +64,7 @@
                             </StackPanel>
                         </Button>
                         <Button x:Name="InvertButton"
-                                Style="{StaticResource SelectAllButtonStyle}"
+                                Style="{StaticResource SelectAllButton}"
                                 Margin="16,0,0,0" ToolTip="{loc:Loc ClearHistory.Button.InvertTooltip}"
                                 Click="OnInvertClick">
                             <StackPanel Orientation="Horizontal">

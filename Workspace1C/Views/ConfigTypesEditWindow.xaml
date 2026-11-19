@@ -19,44 +19,9 @@
         </Style>
 
         <!-- Кнопка-ссылка без рамки с подсветкой при наведении -->
-        <Style x:Key="SelectAllButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.7"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
 
         <!-- Заголовок колонки со стрелкой сортировки ▲/▼ (issue #12; шаблон как в окне
              «Серверы 1С», issue #3): тема DataGrid не показывает штатную индикацию, поэтому
@@ -137,7 +102,7 @@
                      BorderThickness="1.5"
                      TextChanged="OnSearchTextChanged"
                      materialDesign:HintAssist.Hint="{loc:Loc Updates.SearchPlaceholder}"/>
-            <Button Grid.Column="1" Margin="8,0,0,0" Height="32" Style="{StaticResource OutlineButtonStyle}"
+            <Button Grid.Column="1" Margin="8,0,0,0" Height="32" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnClearSearchClick" ToolTip="{loc:Loc Updates.ClearSearch}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Close" Width="14" Height="14"/>
@@ -276,7 +241,7 @@
                                 <!-- Правка доступна и для предопределённых (issue #321): изменение
                                      встроенной строки создаёт пользовательскую копию-переопределение,
                                      а «Восстановить типовые» возвращает предопределённый набор. -->
-                                <Button x:Name="EditButton" Style="{StaticResource SelectAllButtonStyle}"
+                                <Button x:Name="EditButton" Style="{StaticResource SelectAllButton}"
                                         Command="{Binding EditCommand}"
                                         ToolTip="{loc:Loc Updates.Edit}">
                                     <materialDesign:PackIcon Kind="PencilOutline" Width="16" Height="16"
@@ -289,7 +254,7 @@
                     <DataGridTemplateColumn Width="44" CanUserSort="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button x:Name="DeleteButton" Style="{StaticResource SelectAllButtonStyle}"
+                                <Button x:Name="DeleteButton" Style="{StaticResource SelectAllButton}"
                                         Command="{Binding DeleteCommand}"
                                         ToolTip="{loc:Loc Updates.Delete}">
                                     <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16"
@@ -319,7 +284,7 @@
             </Grid.ColumnDefinitions>
 
             <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
-                <Button Height="36" Style="{StaticResource PrimaryButtonStyle}" Click="OnAddConfigClick">
+                <Button Height="36" Style="{StaticResource PrimaryButton}" Click="OnAddConfigClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
                         <TextBlock Text="{loc:Loc Updates.AddConfig}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -327,7 +292,7 @@
                 </Button>
                 <!-- Восстановление предопределённого набора (issue #321): убирает пользовательские
                      копии встроенных конфигураций, обычные пользовательские записи не трогает. -->
-                <Button Height="36" Margin="10,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                <Button Height="36" Margin="10,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Click="OnRestoreDefaultsClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Restore" Width="16" Height="16"/>
@@ -337,7 +302,7 @@
             </StackPanel>
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Width="120" Height="36" Style="{StaticResource OutlineButtonStyle}" Click="OnClose_Click">
+                <Button Width="120" Height="36" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnClose_Click">
                     <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>

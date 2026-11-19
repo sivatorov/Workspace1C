@@ -216,7 +216,9 @@ public sealed class NavSelectionAccentTests
     public void WpfColumnVisibilitySwitch_CheckedUsesAccent_NotGreen()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "SettingsWindow.xaml"));
-        var style = ExtractBetween(xaml, "x:Key=\"ColumnVisibilitySwitch\"", "x:Key=\"OutlineButtonStyle\"");
+        // P2-2: OutlineButtonStyle больше не объявляется локально, поэтому границу
+        // блока задаёт первый закрывающий тег Style после ColumnVisibilitySwitch.
+        var style = ExtractBetween(xaml, "x:Key=\"ColumnVisibilitySwitch\"", "</Style>");
 
         Assert.Contains("Property=\"IsChecked\" Value=\"True\"", style);
         Assert.Contains("{DynamicResource AccentBrush}", style);

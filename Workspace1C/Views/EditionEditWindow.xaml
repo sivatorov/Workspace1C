@@ -25,16 +25,8 @@
         <!-- Основная зелёная кнопка -->
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton. Имя
              PrimaryButtonStyle сохранено. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
 
         <!-- Серая кнопка-контур -->
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -70,13 +62,13 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="SaveButton" Width="140" Height="34" Margin="0,0,10,0" IsDefault="True"
-                    Style="{StaticResource PrimaryButtonStyle}" Click="OnSaveClick">
+                    Style="{StaticResource PrimaryButton}" Click="OnSaveClick">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Check" Width="16" Height="16"/>
                     <TextBlock Text="{loc:Loc Updates.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource OutlineButtonStyle}"
+            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnCancelClick">
                 <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
             </Button>

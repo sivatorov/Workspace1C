@@ -42,10 +42,11 @@ public sealed class Issue107AddWindowTests
     {
         // WPF: триггер IsChecked стиля OptionRadioButton — акцентная заливка +
         // рамка 2px + TextOnAccentBrush, без заливки AccentHoverBrush.
-        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "AddEditWindow.xaml"));
+        // P2-2 (1.0.1.92): стиль перенесён из AddEditWindow в словарь темы.
+        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Themes", "LightTheme.xaml"));
 
         var styleStart = xaml.IndexOf("x:Key=\"OptionRadioButton\"", StringComparison.Ordinal);
-        Assert.True(styleStart > 0, "Стиль OptionRadioButton не найден в AddEditWindow.xaml");
+        Assert.True(styleStart > 0, "Стиль OptionRadioButton не найден в LightTheme.xaml");
         var styleEnd = xaml.IndexOf("</Style>", styleStart, StringComparison.Ordinal);
         Assert.True(styleEnd > styleStart, "Не найден конец стиля OptionRadioButton");
         var style = xaml[styleStart..styleEnd];

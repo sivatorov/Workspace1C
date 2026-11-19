@@ -14,7 +14,7 @@
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"/>
         <Style TargetType="ListBoxItem" BasedOn="{StaticResource ModernListBoxItem}"/>
         <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}"/>
         <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
@@ -49,12 +49,13 @@
         <!-- Кнопка «Закрыть» внизу убрана (issue #372, п. 3): закрытие — системное / Esc. -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <!-- Футер диалога (аудит UI, пп. 3.3 и 5.4): единые MinWidth/Padding и ключи локализации. -->
-            <Button x:Name="RunButton" Content="{loc:Loc Schedule.RunNow}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" Click="Run_Click"/>
-            <Button x:Name="AddButton" Content="{loc:Loc Common.Add}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" Click="Add_Click"/>
-            <Button x:Name="EditButton" Content="{loc:Loc Common.Edit}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Edit_Click"/>
-            <Button x:Name="CopyButton" Content="{loc:Loc Common.Copy}" MinWidth="96" Margin="0,0,8,0" Padding="12,5" IsEnabled="False" Click="Copy_Click"/>
+            <Button x:Name="RunButton" Content="{loc:Loc Schedule.RunNow}" MinWidth="96" Margin="0,0,8,0"
+                    Style="{StaticResource PrimaryButton}" Click="Run_Click"/>
+            <Button x:Name="AddButton" Content="{loc:Loc Common.Add}" MinWidth="96" Margin="0,0,8,0" Click="Add_Click"/>
+            <Button x:Name="EditButton" Content="{loc:Loc Common.Edit}" MinWidth="96" Margin="0,0,8,0" IsEnabled="False" Click="Edit_Click"/>
+            <Button x:Name="CopyButton" Content="{loc:Loc Common.Copy}" MinWidth="96" Margin="0,0,8,0" IsEnabled="False" Click="Copy_Click"/>
             <!-- Удаление задания — опасное действие: DangerButton (P2-1). -->
-            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96" Padding="12,5"
+            <Button x:Name="DeleteButton" Content="{loc:Loc Common.Delete}" MinWidth="96"
                     Style="{DynamicResource DangerButton}" IsEnabled="False" Click="Delete_Click"/>
         </StackPanel>
 

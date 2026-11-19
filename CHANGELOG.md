@@ -11,6 +11,63 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.92] — 2026-11-19
+
+### Изменено
+
+- **Единый набор стилей кнопок (аудит UI, пункт P2-2).**
+  - в словари тем добавлены канонические ключи `PrimaryButton`, `SecondaryButton`,
+    `DangerButton`, `IconButton` (32×32), `SelectAllButton`, `RowActionButton`;
+    `ModernButton` сохранён алиасом для существующих 150 ссылок;
+  - удалены все локальные `<Style x:Key="…Button…">` из `Workspace1C/Views/*.xaml`:
+    15 копий `PrimaryButtonStyle`, 4 варианта `OutlineButtonStyle`, 3 варианта
+    `IconOnlyButton`, 2 варианта `SelectAllButtonStyle`, а также `ActionButton`,
+    `CommandButton`, `DialogButton`, `RowActionButton`, `RowIconButton`,
+    `RowActionChipButton`, `OutlinedButton`, `PaletteColorButton`, `IconPickButton`
+    и `OptionRadioButton`;
+  - hover вторичных кнопок — только рамка (контракт issue #107); у
+    [`PlatformDownloadWindow`](Workspace1C/Views/PlatformDownloadWindow.xaml) и
+    [`UpdateCheckWindow`](Workspace1C/Views/UpdateCheckWindow.xaml) убрана заливка
+    при наведении;
+  - иконочные кнопки — 32×32, прозрачный фон, hover `ItemHoverBrush`;
+  - padding текстовых кнопок — 14,8 при `MinHeight 36`, иконочных — 8, радиус 6;
+  - «голые» кнопки в [`ScheduledTasksWindow`](Workspace1C/Views/ScheduledTasksWindow.xaml),
+    [`CustomProgramsWindow`](Workspace1C/Views/CustomProgramsWindow.xaml),
+    [`ServerJobsWindow`](Workspace1C/Views/ServerJobsWindow.xaml),
+    [`WhatsNewWindow`](Workspace1C/Views/WhatsNewWindow.xaml) и
+    [`GroupPickerWindow`](Workspace1C/Views/GroupPickerWindow.xaml) переведены на
+    `PrimaryButton`/`SecondaryButton`/`IconButton`;
+  - изменения симметричны в WPF ([`LightTheme.xaml`](Workspace1C/Themes/LightTheme.xaml),
+    [`DarkTheme.xaml`](Workspace1C/Themes/DarkTheme.xaml)) и Avalonia
+    ([`Controls.axaml`](Workspace1C/Themes/Controls.axaml),
+    [`ControlThemes.Avalonia.cs`](Workspace1C/Themes/ControlThemes.Avalonia.cs)).
+
+### Не менялось
+
+- Строки групп, навигация, правая панель действий, размеры иконок, сетка отступов
+  и типографика — это отдельные пункты плана.
+- Семантика опасных кнопок (P2-1, 1.0.1.91) сохранена: удаление остаётся
+  `DangerButton`.
+
+### Тесты
+
+- Новый `ButtonStyleUnificationP22Tests`: в `Views/*.xaml` нет локальных стилей
+  кнопок; все ключи, на которые ссылаются окна, существуют в словарях WPF и
+  Avalonia; hover `SecondaryButton` не меняет фон (обе платформы); `IconButton`
+  имеет размер 32×32 и `ItemHoverBrush`; `PrimaryButton`/`ModernButton` —
+  padding 14,8.
+- `Issue107AddWindowTests` и `SettingsWindowXamlResourcesTests` обновлены под
+  перенос стилей в тему.
+- Всего тестов: **7413**, все зелёные.
+
+### Известные ограничения
+
+- Визуальная проверка в среде сборки недоступна: перечисленные окна проверены
+  source-тестами и сравнением определений стилей.
+- Посторонний сбой CI: job `Linux` в workflow «Сборка» падает ~107 тестами
+  (Windows-санитизация путей и др.); к этому выпуску отношения не имеет и не
+  исправлялся.
+
 ## [1.0.1.91] — 2026-11-19
 
 ### Исправлено

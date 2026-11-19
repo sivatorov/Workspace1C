@@ -16,7 +16,7 @@
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style TargetType="Button" BasedOn="{StaticResource ModernButton}"/>
+        <Style TargetType="Button" BasedOn="{StaticResource SecondaryButton}"/>
         <Style TargetType="TextBox" BasedOn="{StaticResource ModernTextBox}"/>
         <!-- Список программ — ListBox с ItemTemplate (не GridView): контейнер
              ListBoxItem, поэтому стиль ModernListBoxItem (issue #91). -->
@@ -37,16 +37,15 @@
         <!-- Нижняя панель: «Готово» слева, «Отмена» справа (как в остальных окнах). -->
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,12,0,0">
-            <Button x:Name="OkButton" MinWidth="130" IsDefault="True" Padding="12,5" Click="OnOk_Click">
+            <Button x:Name="OkButton" MinWidth="130" IsDefault="True"
+                    Style="{StaticResource PrimaryButton}" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0"
                                VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button MinWidth="110" Margin="8,0,0,0" Padding="12,5"
-                    Background="{DynamicResource ItemHoverBrush}"
-                    Foreground="{DynamicResource TextPrimaryBrush}"
+            <Button MinWidth="110" Margin="8,0,0,0"
                     Content="{loc:Loc Common.Cancel}" IsCancel="True" Click="OnCancel_Click"/>
         </StackPanel>
 
@@ -77,20 +76,20 @@
             <DockPanel Grid.Column="0">
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
                     <Button Command="{Binding AddCommand}" ToolTip="{loc:Loc Common.Add}"
-                            Padding="8,5" Margin="0,0,6,0">
+                            Style="{StaticResource IconButton}" Margin="0,0,6,0">
                         <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
                     </Button>
                     <!-- Удаление программы — опасное действие: DangerButton (P2-1). -->
                     <Button Command="{Binding DeleteCommand}" ToolTip="{loc:Loc Common.Delete}"
-                            Style="{DynamicResource DangerButton}" Padding="8,5" Margin="0,0,6,0">
+                            Style="{DynamicResource DangerButton}" Width="32" Height="32" MinHeight="0" Padding="8" Margin="0,0,6,0">
                         <materialDesign:PackIcon Kind="Delete" Width="16" Height="16"/>
                     </Button>
                     <Button Command="{Binding MoveUpCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveUp}"
-                            Padding="8,5" Margin="0,0,6,0">
+                            Style="{StaticResource IconButton}" Margin="0,0,6,0">
                         <materialDesign:PackIcon Kind="ArrowUp" Width="16" Height="16"/>
                     </Button>
                     <Button Command="{Binding MoveDownCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveDown}"
-                            Padding="8,5">
+                            Style="{StaticResource IconButton}">
                         <materialDesign:PackIcon Kind="ArrowDown" Width="16" Height="16"/>
                     </Button>
                 </StackPanel>

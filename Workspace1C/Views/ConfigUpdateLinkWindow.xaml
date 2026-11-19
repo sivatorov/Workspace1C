@@ -26,15 +26,6 @@
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton. Имя
              PrimaryButtonStyle сохранено. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -106,7 +97,7 @@
                 <StackPanel Margin="0,12,0,0">
                     <StackPanel Orientation="Horizontal">
                         <Button x:Name="ConfigTypesButton" Height="36" HorizontalAlignment="Left"
-                                Style="{StaticResource OutlineButtonStyle}" Click="OnOpenConfigTypesClick">
+                                Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnOpenConfigTypesClick">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="FormatListBulleted" Width="16" Height="16"/>
                                 <TextBlock Text="{loc:Loc Updates.ManageList}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -114,7 +105,7 @@
                         </Button>
 
                         <Button x:Name="DefineVersionButton" Height="36" Margin="10,0,0,0"
-                                HorizontalAlignment="Left" Style="{StaticResource OutlineButtonStyle}"
+                                HorizontalAlignment="Left" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                 ToolTip="{loc:Loc Updates.DefineVersionHint}"
                                 Click="OnDefineVersionClick">
                             <StackPanel Orientation="Horizontal">
@@ -147,13 +138,13 @@
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="SaveButton" Width="150" Height="36" Margin="0,0,10,0"
-                        Style="{StaticResource PrimaryButtonStyle}" IsDefault="True" Click="OnSaveClick">
+                        Style="{StaticResource PrimaryButton}" IsDefault="True" Click="OnSaveClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Check" Width="16" Height="16"/>
                         <TextBlock Text="{loc:Loc Updates.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button Width="120" Height="36" Style="{StaticResource OutlineButtonStyle}" IsCancel="True"
+                <Button Width="120" Height="36" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" IsCancel="True"
                         Click="OnCancelClick">
                     <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
                 </Button>

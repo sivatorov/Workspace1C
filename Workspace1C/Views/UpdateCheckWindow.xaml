@@ -25,33 +25,7 @@
         </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8" Padding="14,8">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
 
         <!-- Ячейка таблицы вариантов цепочки обновлений (issue #352). -->
         <Style x:Key="ChainCellText" TargetType="TextBlock">
@@ -158,11 +132,11 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                             <Button x:Name="OpenLoginButton" MinWidth="150" Height="32" Margin="0,0,8,0"
-                                    Style="{StaticResource OutlineButtonStyle}" Click="OnOpenLoginClick">
+                                    Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnOpenLoginClick">
                                 <TextBlock Text="{loc:Loc Updates.OpenLoginPage}" VerticalAlignment="Center"/>
                             </Button>
                             <Button x:Name="ItsAccountsButton" MinWidth="150" Height="32"
-                                    Style="{StaticResource OutlineButtonStyle}" Click="OnItsAccountsClick">
+                                    Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnItsAccountsClick">
                                 <TextBlock Text="{loc:Loc Updates.OpenItsAccounts}" VerticalAlignment="Center"/>
                             </Button>
                         </StackPanel>
@@ -223,13 +197,13 @@
                                      под контент (MinHeight), контент центрируется. -->
                                 <Button x:Name="ChainChooseFolderButton" MinWidth="96" MinHeight="30"
                                         VerticalContentAlignment="Center" Padding="12,5"
-                                        Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                                        Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                         Click="OnChooseChainFolderClick">
                                     <TextBlock Text="{loc:Loc Updates.Chain.ChooseFolderButton}" VerticalAlignment="Center"/>
                                 </Button>
                                 <Button x:Name="ChainOpenFolderButton" MinWidth="96" MinHeight="30"
                                         VerticalContentAlignment="Center" Padding="12,5"
-                                        Margin="8,0,0,0" Style="{StaticResource OutlineButtonStyle}"
+                                        Margin="8,0,0,0" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                                         Click="OnOpenChainFolderClick">
                                     <TextBlock Text="{loc:Loc Updates.Chain.OpenFolder}" VerticalAlignment="Center"/>
                                 </Button>
@@ -277,7 +251,7 @@
             <!-- issue #371: кнопка «Список конфигураций» — открыть список типовых
                  конфигураций, чтобы проверить ссылки каталогов релизов сразу. -->
             <Button Grid.Column="0" MinWidth="180" Height="40" HorizontalAlignment="Left"
-                    Style="{StaticResource OutlineButtonStyle}" Click="OnOpenConfigListClick">
+                    Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnOpenConfigListClick">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="DatabaseSettings" Width="16" Height="16"/>
                     <TextBlock Text="{loc:Loc Updates.OpenConfigList}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -288,14 +262,14 @@
                 <!-- Ширины кнопок не фиксированы (только минимальные): при любом шрифте и масштабе
                      DPI кнопка растягивается под текст и не обрезается (issue #323). -->
                 <Button x:Name="CheckButton" MinWidth="180" Height="40" Margin="0,0,10,0"
-                        Style="{StaticResource OutlineButtonStyle}" Click="OnCheckClick">
+                        Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnCheckClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Refresh" Width="16" Height="16"/>
                         <TextBlock Text="{loc:Loc Updates.StartCheck}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="DownloadChainButton" MinWidth="180" Height="40" Margin="0,0,10,0"
-                        Style="{StaticResource PrimaryButtonStyle}" Visibility="Collapsed"
+                        Style="{StaticResource PrimaryButton}" Visibility="Collapsed"
                         Click="OnDownloadChainClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DownloadMultiple" Width="16" Height="16"/>
@@ -304,14 +278,14 @@
                     </StackPanel>
                 </Button>
                 <Button x:Name="DownloadButton" MinWidth="160" Height="40" Margin="0,0,10,0"
-                        Style="{StaticResource PrimaryButtonStyle}"
+                        Style="{StaticResource PrimaryButton}"
                         Command="{Binding DownloadCommand}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="DownloadOutline" Width="16" Height="16"/>
                         <TextBlock Text="{loc:Loc Updates.Download}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button MinWidth="130" Height="40" Style="{StaticResource OutlineButtonStyle}" Click="OnClose_Click">
+                <Button MinWidth="130" Height="40" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnClose_Click">
                     <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>

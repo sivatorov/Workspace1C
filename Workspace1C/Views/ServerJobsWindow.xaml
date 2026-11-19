@@ -27,11 +27,6 @@
 
         <!-- Кнопка действия диалога: стиль и заливка — как у кнопок монитора серверов
              (без хардкод-цветов, темы/ресурсы). -->
-        <Style x:Key="ActionButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-            <Setter Property="Padding" Value="12,5"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -58,7 +53,7 @@
                 </ComboBox.ItemTemplate>
             </ComboBox>
 
-            <Button Style="{StaticResource ActionButton}" Margin="16,0,6,0"
+            <Button Style="{StaticResource SecondaryButton}" Margin="16,0,6,0"
                     Command="{Binding RefreshCommand}"
                     ToolTip="{loc:Loc ServerMonitor.Refresh}">
                 <StackPanel Orientation="Horizontal">
@@ -66,23 +61,23 @@
                     <TextBlock Text="{loc:Loc ServerMonitor.Refresh}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Style="{StaticResource ActionButton}"
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
                     IsEnabled="{Binding CanRunNow}" Command="{Binding RunNowCommand}">
                 <TextBlock Text="{loc:Loc ServerMonitor.Jobs.RunNow}" VerticalAlignment="Center"/>
             </Button>
-            <Button Style="{StaticResource ActionButton}"
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
                     IsEnabled="{Binding CanRestart}" Command="{Binding RestartCommand}">
                 <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Restart}" VerticalAlignment="Center"/>
             </Button>
-            <Button Style="{StaticResource ActionButton}"
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
                     IsEnabled="{Binding CanPause}" Command="{Binding PauseCommand}">
                 <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Pause}" VerticalAlignment="Center"/>
             </Button>
-            <Button Style="{StaticResource ActionButton}"
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
                     IsEnabled="{Binding CanResume}" Command="{Binding ResumeCommand}">
                 <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Resume}" VerticalAlignment="Center"/>
             </Button>
-            <Button Style="{StaticResource ActionButton}"
+            <Button Style="{StaticResource SecondaryButton}" Margin="0,0,6,0"
                     Command="{Binding DetailsCommand}">
                 <TextBlock Text="{loc:Loc ServerMonitor.Jobs.Details}" VerticalAlignment="Center"/>
             </Button>

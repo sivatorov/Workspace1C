@@ -50,15 +50,7 @@
         </Style>
 
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="12,6"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
     </Window.Resources>
 
     <Grid Margin="16">
@@ -93,7 +85,7 @@
                 </Grid>
                 <TextBlock Style="{StaticResource HintText}" Text="{loc:Loc Notifications.TelegramHint}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <Button x:Name="TelegramTestButton" Style="{StaticResource OutlineButtonStyle}" Click="OnTelegramTestClick" MinWidth="120">
+                    <Button x:Name="TelegramTestButton" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnTelegramTestClick" MinWidth="120">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="PlayCircleOutline" Width="15" Height="15" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc Notifications.Test}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -143,7 +135,7 @@
                 </Grid>
                 <TextBlock Style="{StaticResource HintText}" Text="{loc:Loc Notifications.EmailHint}"/>
                 <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                    <Button x:Name="EmailTestButton" Style="{StaticResource OutlineButtonStyle}" Click="OnEmailTestClick" MinWidth="120">
+                    <Button x:Name="EmailTestButton" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnEmailTestClick" MinWidth="120">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="PlayCircleOutline" Width="15" Height="15" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc Notifications.Test}" Margin="6,0,0,0" VerticalAlignment="Center"/>
@@ -212,13 +204,13 @@
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Width="140" Height="34" Margin="0,0,10,0" IsDefault="True"
-                    Style="{StaticResource PrimaryButtonStyle}" Click="OnSaveClick">
+                    Style="{StaticResource PrimaryButton}" Click="OnSaveClick">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Check" Width="16" Height="16"/>
                     <TextBlock Text="{loc:Loc Common.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource OutlineButtonStyle}" Click="OnCancelClick">
+            <Button Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnCancelClick">
                 <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
             </Button>
         </StackPanel>

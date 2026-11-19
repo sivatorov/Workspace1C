@@ -15,6 +15,9 @@ namespace Workspace1C.Themes
         /// <summary>Основная кнопка: акцентная заливка, скругление 6, высота от 36.</summary>
         public const string ModernButton = "ModernButton";
 
+        /// <summary>Каноническая основная кнопка (P2-2): ModernButton + полужирный текст + padding 14,8.</summary>
+        public const string PrimaryButton = "PrimaryButton";
+
         /// <summary>Вторичная кнопка: фон карточки, контур и текст темы (единый контракт, issue #26).</summary>
         public const string SecondaryButton = "SecondaryButton";
 
@@ -60,8 +63,17 @@ namespace Workspace1C.Themes
         /// <summary>Пункт меню: отступ 12 на 6, скругление 4, подсветка выделенного.</summary>
         public const string ModernMenuItem = "ModernMenuItem";
 
-        /// <summary>Значковая кнопка: прозрачный фон, скругление 8, подсветка при наведении.</summary>
+        /// <summary>Значковая кнопка: 32×32, прозрачный фон, скругление 6, подсветка ItemHoverBrush.</summary>
         public const string IconButton = "IconButton";
+
+        /// <summary>Кнопка-иконка колонки «Действия»: прозрачная, контент-размера (P2-2).</summary>
+        public const string RowActionButton = "RowActionButton";
+
+        /// <summary>Кнопка-иконка действия в чипе-кружке колонки «Действия» (P2-2).</summary>
+        public const string RowActionChipButton = "RowActionChipButton";
+
+        /// <summary>Плитка палитры редактора группы: 28×28, скругление 4 (P2-2).</summary>
+        public const string PaletteColorButton = "PaletteColorButton";
 
         /// <summary>Значковая кнопка заголовка: скругление 6, своё нажатие и гашение.</summary>
         public const string HeaderIconButton = "HeaderIconButton";

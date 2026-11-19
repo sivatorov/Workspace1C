@@ -20,11 +20,6 @@
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <Style x:Key="DialogButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-            <Setter Property="Padding" Value="14,6"/>
-            <Setter Property="Margin" Value="8,0,0,0"/>
-        </Style>
     </Window.Resources>
 
     <DockPanel Margin="20" LastChildFill="True">
@@ -49,13 +44,13 @@
             <CheckBox x:Name="ShowOnStartCheck" Grid.Column="0" VerticalAlignment="Center"
                       Content="{loc:Loc WhatsNew.ShowOnStart}"/>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button Style="{StaticResource DialogButton}" Click="OnOpenChangelog_Click">
+                <Button Style="{StaticResource SecondaryButton}" Click="OnOpenChangelog_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="🌐" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc WhatsNew.OpenChangelog}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource DialogButton}" IsCancel="True" Click="OnClose_Click">
+                <Button Style="{StaticResource SecondaryButton}" IsCancel="True" Click="OnClose_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>

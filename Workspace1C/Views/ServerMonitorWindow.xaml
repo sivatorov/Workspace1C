@@ -161,13 +161,6 @@
              Кнопки шире (комментарий 7OH 20.10): раза в полтора — отступы 9,7 и шрифт 14.
              MinWidth (комментарий 7OH 20.10): «Вверх»/«Вниз» (глифы ↑/↓ уже соседних)
              получают ту же ширину, что и остальные кнопки-иконки. -->
-        <Style x:Key="IconOnlyButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Padding" Value="9,7"/>
-            <Setter Property="MinWidth" Value="40"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-            <Setter Property="FontSize" Value="14"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -198,30 +191,30 @@
             <!-- Кнопки управления серверами — иконками без надписей (issue #3, комментарий
                  7OH 20.10): Добавить, Изменить | Вверх, Вниз | Удалить (как у списка баз). -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                <Button x:Name="AddServerButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="AddServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.Add}"
                         Click="OnAddServer_Click">
                     <TextBlock Text="＋" VerticalAlignment="Center"/>
                 </Button>
-                <Button x:Name="EditServerButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="EditServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.Edit}"
                         Click="OnEditServer_Click">
                     <TextBlock Text="✎" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
-                <Button x:Name="MoveUpServerButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="MoveUpServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.MoveUp}"
                         IsEnabled="{Binding CanMoveServerUp}" Click="OnMoveServerUp_Click">
                     <TextBlock Text="↑" VerticalAlignment="Center"/>
                 </Button>
-                <Button x:Name="MoveDownServerButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="MoveDownServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.MoveDown}"
                         IsEnabled="{Binding CanMoveServerDown}" Click="OnMoveServerDown_Click">
                     <TextBlock Text="↓" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Кнопке «Удалить» — красная иконка (issue #3, комментарий 7OH). -->
-                <Button x:Name="DeleteServerButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="DeleteServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.Delete}"
                         Click="OnDeleteServer_Click">
                     <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
@@ -307,12 +300,12 @@
                        Text="{Binding InfobasesHeaderText}"/>
             <!-- Три кнопки управления базами в одну строку (иконки + подсказки). -->
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                <Button x:Name="AddInfobaseButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="AddInfobaseButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.Add}"
                         Click="OnAddInfobase_Click">
                     <TextBlock Text="＋" VerticalAlignment="Center"/>
                 </Button>
-                <Button x:Name="EditInfobaseButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="EditInfobaseButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.Edit}"
                         IsEnabled="{Binding CanDropInfobase}"
                         Click="OnEditInfobase_Click">
@@ -322,19 +315,19 @@
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Языконезависимые глифы сортировки (аудит UI, п. 4.4): «А↓/Я↓»
                      сменились на нейтральные «A↓/Z↓». -->
-                <Button x:Name="SortInfobasesAscButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="SortInfobasesAscButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortAsc}"
                         Click="OnSortInfobasesAsc_Click">
                     <TextBlock Text="A↓" VerticalAlignment="Center"/>
                 </Button>
-                <Button x:Name="SortInfobasesDescButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="SortInfobasesDescButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortDesc}"
                         Click="OnSortInfobasesDesc_Click">
                     <TextBlock Text="Z↓" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Кнопке удаления — красная иконка (issue #3). -->
-                <Button x:Name="DeleteInfobaseButton" Style="{StaticResource IconOnlyButton}"
+                <Button x:Name="DeleteInfobaseButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.Delete}"
                         IsEnabled="{Binding CanDropInfobase}" Click="OnDeleteInfobase_Click">
                     <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>

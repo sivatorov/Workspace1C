@@ -65,10 +65,6 @@
              SecondaryButton — фон карточки, контур и текст темы; полужирный текст
              и отступы сохранены. До 0.3.9.254 стиль не был объявлен в ресурсах
              окна — StaticResource падал в InitializeComponent (issue #337). -->
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
 
         <!-- Implicit-стили для корректного отображения в тёмной теме -->
         <Style TargetType="TextBlock">
@@ -571,7 +567,7 @@
                                                       DisplayMemberPath="Name"
                                                       ToolTip="{loc:Loc ItsAccounts.SettingsHint}"/>
                                             <Button x:Name="ItsAccountsManageButton" Grid.Column="2" Height="30"
-                                                    Style="{StaticResource OutlineButtonStyle}" Click="OnItsAccountsManageClick">
+                                                    Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnItsAccountsManageClick">
                                                 <StackPanel Orientation="Horizontal">
                                                     <materialDesign:PackIcon Kind="AccountKey" Width="16" Height="16"
                                                                              Foreground="{DynamicResource AccentBrush}"/>

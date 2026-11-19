@@ -23,15 +23,6 @@
              Базируется на ModernButton через BasedOn (не через Setter Property="Style":
              в WPF стиль нельзя назначать Setter'ом — XamlParseException «Объект Style
              не может изменять свойство Style объекта»; замечание 7OH 18.10). -->
-        <Style x:Key="IconOnlyButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Width" Value="34"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Margin" Value="0,3"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-        </Style>
     </Window.Resources>
 
     <DockPanel Margin="16" LastChildFill="True">
@@ -80,11 +71,11 @@
 
             <!-- Над «Управляемым списком» кнопки ▲ и ▼ (порядок членов, 7OH 13:25). -->
             <StackPanel Grid.Row="0" Grid.Column="0" Orientation="Horizontal" Margin="0,0,0,6">
-                <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveUpCommand}"
+                <Button Style="{StaticResource IconButton}" Command="{Binding MoveUpCommand}"
                         ToolTip="{loc:Loc Services.MoveUp}">
                     <TextBlock Text="▲" Foreground="{DynamicResource InfoBrush}" FontSize="12"/>
                 </Button>
-                <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveDownCommand}"
+                <Button Style="{StaticResource IconButton}" Command="{Binding MoveDownCommand}"
                         ToolTip="{loc:Loc Services.MoveDown}" Margin="6,3,0,3">
                     <TextBlock Text="▼" Foreground="{DynamicResource InfoBrush}" FontSize="12"/>
                 </Button>
@@ -113,11 +104,11 @@
             <!-- Кнопки-стрелки между списками: «Влево» — в члены, «Вправо» — обратно. -->
             <StackPanel Grid.Row="1" Grid.Column="1" VerticalAlignment="Center"
                         HorizontalAlignment="Center" Margin="10,0">
-                <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveLeftCommand}"
+                <Button Style="{StaticResource IconButton}" Command="{Binding MoveLeftCommand}"
                         ToolTip="{loc:Loc Services.MoveLeft}">
                     <TextBlock Text="◀" Foreground="{DynamicResource SuccessBrush}" FontSize="13"/>
                 </Button>
-                <Button Style="{StaticResource IconOnlyButton}" Command="{Binding MoveRightCommand}"
+                <Button Style="{StaticResource IconButton}" Command="{Binding MoveRightCommand}"
                         ToolTip="{loc:Loc Services.MoveRight}">
                     <TextBlock Text="▶" Foreground="{DynamicResource ErrorBrush}" FontSize="13"/>
                 </Button>

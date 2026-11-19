@@ -20,46 +20,11 @@
 
         <!-- Основная зелёная кнопка -->
         <!-- Кнопки — единый контракт (issue #26): акцентная ModernButton и вторичная
-             SecondaryButton. Имена PrimaryButtonStyle/OutlineButtonStyle сохранены. -->
-        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
+             SecondaryButton. Имена PrimaryButtonStyle/SecondaryButton сохранены. -->
 
         <!-- Серая кнопка-контур -->
-        <Style x:Key="OutlineButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="14,8"/>
-        </Style>
 
         <!-- Кнопка-ссылка без рамки с подсветкой при наведении -->
-        <Style x:Key="SelectAllButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.7"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -135,7 +100,7 @@
                     <DataGridTemplateColumn Width="44">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button x:Name="EditButton" Style="{StaticResource SelectAllButtonStyle}"
+                                <Button x:Name="EditButton" Style="{StaticResource SelectAllButton}"
                                         Command="{Binding EditCommand}"
                                         ToolTip="{loc:Loc ItsAccounts.Edit}">
                                     <materialDesign:PackIcon Kind="PencilOutline" Width="16" Height="16"
@@ -148,7 +113,7 @@
                     <DataGridTemplateColumn Width="44">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <Button x:Name="DeleteButton" Style="{StaticResource SelectAllButtonStyle}"
+                                <Button x:Name="DeleteButton" Style="{StaticResource SelectAllButton}"
                                         Command="{Binding DeleteCommand}"
                                         ToolTip="{loc:Loc ItsAccounts.Delete}">
                                     <materialDesign:PackIcon Kind="TrashCanOutline" Width="16" Height="16"
@@ -168,7 +133,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
             <StackPanel Grid.Column="0" Orientation="Horizontal">
-                <Button x:Name="AddButton" Height="34" Margin="0,0,10,0" Style="{StaticResource PrimaryButtonStyle}"
+                <Button x:Name="AddButton" Height="34" Margin="0,0,10,0" Style="{StaticResource PrimaryButton}"
                         Click="OnAddClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
@@ -178,7 +143,7 @@
                 <!-- Кнопка «Задать основным» на нижней панели (issue #333): доступна при выборе
                      неосновной записи; у основной и без выделения — недоступна. -->
                 <Button x:Name="PrimaryButton" Height="34" IsEnabled="False"
-                        Style="{StaticResource OutlineButtonStyle}" Click="OnSetPrimaryClick"
+                        Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnSetPrimaryClick"
                         ToolTip="{loc:Loc ItsAccounts.PrimaryTooltip}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Star" Width="16" Height="16"
@@ -187,7 +152,7 @@
                     </StackPanel>
                 </Button>
             </StackPanel>
-            <Button Grid.Column="1" Width="120" Height="34" IsCancel="True" Style="{StaticResource OutlineButtonStyle}"
+            <Button Grid.Column="1" Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnClose_Click">
                 <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
             </Button>

@@ -113,19 +113,9 @@
             </Setter>
         </Style>
         <!-- Единый контракт кнопок (issue #26): «Отмена» — вторичная SecondaryButton,
-             основная кнопка — акцентная ModernButton. Локальные OutlinedButton
+             основная кнопка — акцентная ModernButton. Локальные SecondaryButton
              (янтарный контур) и PrimaryButton (акцент) больше не дублируют темы,
              а наследуют единые стили; сохранены размеры окна. -->
-        <Style x:Key="OutlinedButton" TargetType="Button" BasedOn="{StaticResource SecondaryButton}">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="MinWidth" Value="116"/>
-            <Setter Property="Padding" Value="14,6"/>
-        </Style>
-        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Height" Value="38"/>
-            <Setter Property="MinWidth" Value="116"/>
-            <Setter Property="Padding" Value="14,6"/>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="20,18,20,16">
@@ -271,6 +261,7 @@
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button x:Name="SelectButton" Style="{StaticResource PrimaryButton}" IsDefault="True"
+                        Height="38" MinWidth="116"
                         IsEnabled="False" Click="OnSelect_Click" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
@@ -280,7 +271,8 @@
                                    FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource OutlinedButton}" IsCancel="True" Click="OnCancel_Click">
+                <Button Style="{StaticResource SecondaryButton}" Height="38" MinWidth="116"
+                        IsCancel="True" Click="OnCancel_Click">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Close" Width="15" Height="15"
                                                  Margin="0,0,6,0"

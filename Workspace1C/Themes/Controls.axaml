@@ -67,7 +67,7 @@
         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Padding" Value="14,9"/>
+        <Setter Property="Padding" Value="14,8"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="MinHeight" Value="36"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -139,6 +139,14 @@
             <Setter Property="Opacity" Value="0.5"/>
         </Style>
     </ControlTheme>
+
+    <!-- ===================== Основная кнопка: канонический ключ (аудит UI P2-2) =====================
+         Симметрично WPF: PrimaryButton = ModernButton + полужирный текст + padding 14,8. -->
+    <ControlTheme x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Padding" Value="14,8"/>
+    </ControlTheme>
+
     <!-- ===================== Кнопки нижней панели диалогов =====================
          Единый контракт (issue #26): подтверждение — акцентная ModernButton
          (заливка акцентом темы, текст TextOnAccentBrush), отмена — вторичная
@@ -876,6 +884,8 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Padding" Value="8"/>
+        <Setter Property="Width" Value="32"/>
+        <Setter Property="Height" Value="32"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -884,7 +894,7 @@
                 <Border Name="PART_Surface"
                         Background="{TemplateBinding Background}"
                         BorderThickness="0"
-                        CornerRadius="8"
+                        CornerRadius="6"
                         Padding="{TemplateBinding Padding}">
                     <ContentPresenter Name="PART_ContentPresenter"
                                       Content="{TemplateBinding Content}"
@@ -897,7 +907,7 @@
         </Setter>
 
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="{DynamicResource IconButtonHoverBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
         <!-- Недоступную кнопку приглушаем сразу, как в контекстном меню, а не
              только по наведению (issue #197). Та же величина, что у HeaderIconButton. -->
@@ -1310,7 +1320,7 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Padding" Value="8,5"/>
+        <Setter Property="Padding" Value="8"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Template">
@@ -1331,6 +1341,60 @@
             <Setter Property="Opacity" Value="0.7"/>
         </Style>
     </ControlTheme>
+
+    <!-- ===================== Кнопка-иконка колонки «Действия» (P2-2) =====================
+         Симметрично WPF: прозрачная, контент-размера, мягкая подложка при наведении. -->
+    <ControlTheme x:Key="RowActionButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Border Name="PART_Surface"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="4"
+                        Padding="{TemplateBinding Padding}">
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      ContentTemplate="{TemplateBinding ContentTemplate}"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+        <Style Selector="^:pointerover /template/ Border#PART_Surface">
+            <Setter Property="Background" Value="#22F1F5F9"/>
+        </Style>
+    </ControlTheme>
+
+    <ControlTheme x:Key="RowActionChipButton" TargetType="Button" BasedOn="{StaticResource RowActionButton}">
+        <Setter Property="Margin" Value="2,0"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+    </ControlTheme>
+
+    <!-- ===================== Плитка палитры редактора группы (P2-2) ===================== -->
+    <ControlTheme x:Key="PaletteColorButton" TargetType="Button">
+        <Setter Property="Width" Value="28"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Margin" Value="2"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
+        <Setter Property="Template">
+            <ControlTemplate TargetType="Button">
+                <Border Name="PART_Surface"
+                        Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="4">
+                    <ContentPresenter Content="{TemplateBinding Content}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </ControlTemplate>
+        </Setter>
+    </ControlTheme>
+
     <!-- Карточка варианта окна добавления (AddEditWindow.xaml:26): рамка без
          маркера радиокнопки. С v1.0.1.49 (issue #107 п.1) выбранный вариант снова
          заливается акцентом: текст и значок следуют Foreground — TextOnAccentBrush,

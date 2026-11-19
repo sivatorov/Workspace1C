@@ -19,33 +19,6 @@
         </Style>
 
         <!-- Кнопки «Отметить все / Снять все»: без рамки, с подсветкой при наведении -->
-        <Style x:Key="SelectAllButtonStyle" TargetType="Button">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="8,5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.7"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
     </Window.Resources>
 
     <Grid Margin="16">
@@ -74,7 +47,7 @@
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <Button Style="{StaticResource SelectAllButtonStyle}"
+                        <Button Style="{StaticResource SelectAllButton}"
                                 ToolTip="{loc:Loc FindLostBases.Drive.AllTooltip}" Click="OnDriveCheckAll">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
@@ -82,7 +55,7 @@
                                 <TextBlock Text="{loc:Loc FindLostBases.Drive.All}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
-                        <Button Grid.Column="1" Style="{StaticResource SelectAllButtonStyle}"
+                        <Button Grid.Column="1" Style="{StaticResource SelectAllButton}"
                                 Margin="16,0,0,0" ToolTip="{loc:Loc FindLostBases.Drive.NoneTooltip}" Click="OnDriveCheckNone">
                             <StackPanel Orientation="Horizontal">
                                 <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"
@@ -155,7 +128,7 @@
             <DockPanel>
                 <!-- «Отметить все / Снять все» для найденных баз -->
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="8,6,8,2">
-                    <Button Style="{StaticResource SelectAllButtonStyle}"
+                    <Button Style="{StaticResource SelectAllButton}"
                             ToolTip="{loc:Loc FindLostBases.FoundAllTooltip}" Click="OnFoundCheckAll">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="CheckboxMultipleMarked" Width="16" Height="16"
@@ -163,7 +136,7 @@
                             <TextBlock Text="{loc:Loc FindLostBases.FoundAll}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button Style="{StaticResource SelectAllButtonStyle}"
+                    <Button Style="{StaticResource SelectAllButton}"
                             Margin="16,0,0,0" ToolTip="{loc:Loc FindLostBases.FoundNoneTooltip}" Click="OnFoundCheckNone">
                         <StackPanel Orientation="Horizontal">
                             <materialDesign:PackIcon Kind="CheckboxMultipleBlankOutline" Width="16" Height="16"

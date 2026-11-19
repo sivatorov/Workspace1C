@@ -1346,42 +1346,9 @@
                                  прозрачный шаблон без неявного стиля MaterialDesign, который
                                  раздувает кнопку до ~32px и держит высоту главной линии строки.
                                  Кнопка становится контент-размера (иконка 14 / компакт 12). -->
-                            <Style x:Key="RowActionButton" TargetType="Button">
-                                <Setter Property="Background" Value="Transparent"/>
-                                <Setter Property="BorderThickness" Value="0"/>
-                                <Setter Property="Padding" Value="0"/>
-                                <Setter Property="MinWidth" Value="0"/>
-                                <Setter Property="MinHeight" Value="0"/>
-                                <Setter Property="Cursor" Value="Hand"/>
-                                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
-                                <Setter Property="Template">
-                                    <Setter.Value>
-                                        <ControlTemplate TargetType="Button">
-                                            <Border Background="{TemplateBinding Background}"
-                                                    CornerRadius="4"
-                                                    Padding="{TemplateBinding Padding}">
-                                                <ContentPresenter VerticalAlignment="Center"/>
-                                            </Border>
-                                        </ControlTemplate>
-                                    </Setter.Value>
-                                </Setter>
-                                <Style.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter Property="Background" Value="#22F1F5F9"/>
-                                    </Trigger>
-                                </Style.Triggers>
-                            </Style>
                             <!-- Кнопки действий строки базы и команд группы (issue #296):
                                  как IconButton, но в компактном режиме отступы 8 → 3 —
                                  иначе кнопка держит высоту строки, а строка группы сжимается. -->
-                            <Style x:Key="RowIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
-                                <Setter Property="Padding" Value="8"/>
-                                <Style.Triggers>
-                                    <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Padding" Value="3"/>
-                                    </DataTrigger>
-                                </Style.Triggers>
-                            </Style>
                             <!-- Issue #121 (v1.0.1.54): круглая подложка-кружок кнопок колонки
                                  «Действия» — единый стиль с индикаторами запуска (issue #101/#103):
                                  фон карточки с тонкой обводкой; выделенная строка подсвечивает
@@ -1409,10 +1376,6 @@
                             <!-- Кнопка действия в колонке «Действия» (issue #121): прозрачная,
                                  контент-размера (весь визуал — чип-кружок внутри), выровнена
                                  по левому краю колонки. -->
-                            <Style x:Key="RowActionChipButton" TargetType="Button" BasedOn="{StaticResource RowActionButton}">
-                                <Setter Property="Margin" Value="2,0"/>
-                                <Setter Property="HorizontalAlignment" Value="Left"/>
-                            </Style>
                             <!-- Узел группы: заголовок + вложенные подгруппы и базы -->
                             <HierarchicalDataTemplate DataType="{x:Type vm:GroupNodeViewModel}"
                                                       ItemsSource="{Binding Items}">
