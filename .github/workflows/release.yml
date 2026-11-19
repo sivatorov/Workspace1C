@@ -234,8 +234,9 @@ jobs:
           files: |
             dist/release/Workspace1C.exe
             dist/release/Workspace1C-linux-x64
-          # Перезаписываем одноимённые asset'ы при повторном прогоне.
-          overwrite: true
+          # Перезаписываем одноимённые asset'ы при повторном прогоне
+          # (в action-gh-release@v2 параметр называется overwrite_files).
+          overwrite_files: true
           # Тестовый workflow_dispatch (prerelease=true) — prerelease и не latest:
           # обычные пользователи автообновления его не видят (issue #89, запрос 7OH).
           prerelease: ${{ env.IS_PRERELEASE }}
@@ -246,27 +247,41 @@ jobs:
 
       # Новость о релизе в Telegram-канал проекта. Шаг выполняется, только если в
       # репозитории задан секрет TELEGRAM_BOT_TOKEN (бот — администратор канала).
-      # Канал по умолчанию -1004425443528, переопределяется секретом TELEGRAM_CHAT_ID.
-      # Текст — из _telegram_msg_v1000NN.txt (1.0.0.NN), иначе первые строки заметок.
+      # Канал фиксирован: -1004425443528 (секрет TELEGRAM_CHAT_ID больше не читается,
+      # чтобы неверное значение не приводило к HTTP 404 и «тихой» потере новости).
+      # Текст — из docs/_telegram_msg_v<версия>.txt (или _telegram_msg_<версия>.txt),
+      # иначе первые строки заметок релиза.
       # Тестовые prerelease-сборки в Telegram не анонсируются.
       - name: Новость в Telegram
         if: github.event_name != 'release' && env.IS_PRERELEASE != 'true'
         env:
           TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TG_CHAT: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TG_CHAT: '-1004425443528'
         run: |
           if [ -z "$TG_TOKEN" ]; then
             echo "Секрет TELEGRAM_BOT_TOKEN не задан — новость в Telegram не отправляется."
             exit 0
           fi
-          chat="${TG_CHAT:--1004425443528}"
+          chat="$TG_CHAT"
           ver="${{ steps.notes.outputs.version }}"
-          head3="${ver%.*}"
-          msg="_telegram_msg_v${head3//./}0${ver##*.}.txt"
           url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${RELEASE_TAG}"
-          if [ -f "$msg" ]; then
-            cp "$msg" dist/tg.txt
+          # Файлы _telegram_*.txt в корне перечислены в .gitignore и в CI отсутствуют,
+          # поэтому ищем текст новости в docs/ (и как запасной вариант — в корне).
+          found=""
+          for cand in \
+            "docs/_telegram_msg_v${ver}.txt" \
+            "docs/_telegram_msg_${ver}.txt" \
+            "docs/_telegram_msg_v${ver}.md" \
+            "docs/_telegram_msg_${ver}.md" \
+            "_telegram_msg_v${ver}.txt" \
+            "_telegram_msg_${ver}.txt"; do
+            if [ -f "$cand" ]; then found="$cand"; break; fi
+          done
+          if [ -n "$found" ]; then
+            echo "Текст новости: $found"
+            cp "$found" dist/tg.txt
           else
+            echo "Файл новости не найден — берём первые строки заметок релиза."
             { echo "🚀 Workspace 1C ${ver}"; echo; head -c 3000 dist/notes.md; echo; echo; echo "$url"; } > dist/tg.txt
           fi
           grep -q "$url" dist/tg.txt || { echo; echo "$url"; } >> dist/tg.txt

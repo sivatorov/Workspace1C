@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.93-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.94-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.93**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.94**
 (поддерживается **7455 юнит-тестов**).
 
 ## 📣 Telegram-канал
@@ -205,6 +205,20 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Надёжная публикация релизов и Telegram-анонсов (1.0.1.94,
+  Windows и Linux)** — релизный workflow больше не читает секрет
+  `TELEGRAM_CHAT_ID`: новость всегда уходит в канал проекта
+  `-1004425443528`, поэтому неверное значение секрета не приводит к HTTP 404
+  и «тихой» потере анонса. Текст новости ищется в `docs/_telegram_msg_v<версия>.txt`
+  (ранее файл искался в корне, который перечислен в `.gitignore` и в CI
+  отсутствовал). Перезапись asset'ов при повторном прогоне включена корректным
+  параметром `overwrite_files` вместо несуществующего `overwrite`.
+  Подробности — в [CHANGELOG.md](CHANGELOG.md).
+- **Прогресс многопоточной загрузки не откатывается назад (1.0.1.94,
+  Windows и Linux)** — в агрегаторе прогресса процент вычислялся до взятия
+  блокировки, и поток с устаревшим значением мог опубликовать 50 % после 100 %:
+  индикатор загрузки замирал на половине. Расчёт и проверка монотонности
+  перенесены под блокировку. Подробности — в [CHANGELOG.md](CHANGELOG.md).
 - **Единый UI-аудит: иконки, контраст, типографика и доступность
   (1.0.1.93, Windows и Linux)** — эмодзи и текстовые глифы заменены
   векторными иконками; введена шкала размеров 12/16/20/24/32/48; белые

@@ -170,10 +170,15 @@ internal static class ParallelDownloader
             if (_report is null || _totalBytes <= 0)
                 return;
 
-            var percent = (int)Math.Min(100, Downloaded * 100.0 / _totalBytes);
+            int percent;
             lock (_gate)
             {
-                if (percent == _lastPercent)
+                // Процент считается ПОД блокировкой: иначе поток, вычисливший 50 % до
+                // увеличения счётчика, мог опубликовать своё устаревшее значение уже
+                // после 100 % (гонка «последним приходит 0.5»). Публикуем только
+                // возрастающие проценты — это и есть контракт агрегатора.
+                percent = (int)Math.Min(100, Downloaded * 100.0 / _totalBytes);
+                if (percent <= _lastPercent)
                     return;
                 _lastPercent = percent;
             }

@@ -142,7 +142,7 @@ public sealed class BatchOperationsTests
             new[] { "Альфа.dt", "Бета.dt" },
             calls.Select(c => Path.GetFileName(c.Path)).ToArray());
         Assert.All(vm.Items, i => Assert.Equal(BatchOperationsStatus.Success, i.Status));
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
         // Итоговая строка сформирована (в тестовом окружении локаль может не
         // подгружаться — проверяем только непустоту).
         Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
@@ -188,7 +188,7 @@ public sealed class BatchOperationsTests
                 "Ожидались две строки «[время] «Имя» → путь»");
             Assert.Equal(2, log.Count(line => line.Contains("→", StringComparison.Ordinal)));
             Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
-            Assert.False(vm.IsRunning);
+            Assert.True(await WaitRunFinishedAsync(vm));
         }
         finally
         {
@@ -211,7 +211,7 @@ public sealed class BatchOperationsTests
         await vm.RunAsync();
 
         Assert.False(called);
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
         var log = AsyncLogAssert.WaitForNonEmpty(
             vm.LogLines, "Журнал «ничего не выбрано» должен содержать строку");
         Assert.Contains(log, l => !string.IsNullOrWhiteSpace(l));
@@ -231,7 +231,7 @@ public sealed class BatchOperationsTests
         await vm.RunAsync();
 
         Assert.False(called);
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
         Assert.All(vm.Items, i => Assert.Equal(BatchOperationsStatus.Pending, i.Status));
     }
 
@@ -296,7 +296,7 @@ public sealed class BatchOperationsTests
         Assert.NotEqual(BatchOperationsStatus.Success, vm.Items[1].Status);
         // Issue #92 (v1.0.1.21): IsRunning сбрасывается даже при отмене — окно
         // массовых операций больше не «повисает» с заблокированными кнопками.
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
     }
 
     // ===================== Issue #92 (v1.0.1.21): continue вместо return =====================
@@ -334,7 +334,7 @@ public sealed class BatchOperationsTests
         Assert.Equal(BatchOperationsStatus.Success, vm.Items[1].Status);
         // Вторая база реально обработана (ранее `return` не доходил до неё совсем).
         Assert.Equal(new[] { "Файловая" }, executed);
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
         Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
     }
 
@@ -358,8 +358,23 @@ public sealed class BatchOperationsTests
 
         await vm.RunAsync();
 
-        Assert.False(vm.IsRunning);
+        Assert.True(await WaitRunFinishedAsync(vm));
         Assert.Equal(BatchOperationsStatus.Failed, vm.Items[1].Status);
         Assert.False(string.IsNullOrWhiteSpace(vm.Summary));
+    }
+
+    /// <summary>
+    /// Ждёт сброса <see cref="BatchOperationsViewModel.IsRunning"/>. В полном прогоне
+    /// xUnit задаёт <see cref="SynchronizationContext"/>, и ViewModel публикует сброс
+    /// флага через <c>Post</c> (чтобы PropertyChanged шёл в UI-поток). Проверка сразу
+    /// после <c>await RunAsync()</c> ловила гонку «IsRunning ещё true» — тест падал
+    /// только при параллельном прогоне набора, но не в одиночку.
+    /// </summary>
+    private static async Task<bool> WaitRunFinishedAsync(BatchOperationsViewModel vm)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (vm.IsRunning && DateTime.UtcNow < deadline)
+            await Task.Delay(10).ConfigureAwait(true);
+        return !vm.IsRunning;
     }
 }
