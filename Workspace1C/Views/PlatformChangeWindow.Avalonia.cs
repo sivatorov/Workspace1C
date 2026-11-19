@@ -117,7 +117,7 @@ namespace Workspace1C
                 },
                 Padding = new Thickness(16, 6)
             };
-            applyButton.Styled(ControlThemes.ModernButton);
+            applyButton.Styled(ControlThemes.DialogConfirmButton);
             applyButton.Bind(Button.IsEnabledProperty, new Binding("CanApply"));
             applyButton.Click += (_, _) => OnApplyClick();
 

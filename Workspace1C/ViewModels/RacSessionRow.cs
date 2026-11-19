@@ -64,7 +64,10 @@ public sealed class RacSessionRow
     /// <summary>Заблокирован взаимоблокировкой.</summary>
     public bool BlockedByDeadlock => _info.BlockedByDeadlock;
 
-    /// <summary>Признак блокировки: «●» при любой блокировке, иначе пусто.</summary>
+    /// <summary>Признак любой блокировки — для векторного индикатора в UI (P1b).</summary>
+    public bool IsBlocked => _info.BlockedByLs || _info.BlockedByDeadlock;
+
+    /// <summary>Признак блокировки: «●» при любой блокировке, иначе пусто (данные экспорта).</summary>
     public string BlockedSymbol => _info.BlockedByLs || _info.BlockedByDeadlock ? "●" : string.Empty;
 
     /// <summary>Состояние сеанса из rac (например «active», «sleep», «dead»).</summary>

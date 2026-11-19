@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,6 +11,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -36,8 +37,8 @@ namespace Workspace1C
         private readonly IDialogService _dialogs =
             AppServices.GetRequiredService<IDialogService>();
         private readonly Dictionary<FoundBaseRowViewModel, CheckBox> _checks = new();
-        private readonly Dictionary<FoundBaseRowViewModel, TextBlock> _inAppTexts = new();
-        private readonly Dictionary<FoundBaseRowViewModel, TextBlock> _inV8iTexts = new();
+        private readonly Dictionary<FoundBaseRowViewModel, Avalonia.Controls.Shapes.Path> _inAppTexts = new();
+        private readonly Dictionary<FoundBaseRowViewModel, Avalonia.Controls.Shapes.Path> _inV8iTexts = new();
         private readonly Services.IAppLogger _logger =
             AppServices.GetRequiredService<Services.IAppLogger>();
 
@@ -529,7 +530,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(drivesBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(drivesBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -611,7 +612,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -837,36 +838,36 @@ namespace Workspace1C
             Grid.SetColumn(modified, 4);
             grid.Children.Add(modified);
 
-            var inApp = MakeFlagDot();
-            ApplyFlagStyle(inApp, row.InApp, "@SuccessBrush", "@TextSecondaryBrush");
+            var inApp = MakeFlagDot(out var inAppPath);
+            ApplyFlagStyle(inAppPath, row.InApp, "@SuccessBrush", "@TextSecondaryBrush");
             ToolTip.SetTip(inApp, LocalizationManager.T("FindLostBases.AlreadyInAppHint"));
             Grid.SetColumn(inApp, 5);
             grid.Children.Add(inApp);
 
-            var inV8i = MakeFlagDot();
-            ApplyFlagStyle(inV8i, row.InIbasesV8i, "@PurpleAccentBrush", "@TextSecondaryBrush");
+            var inV8i = MakeFlagDot(out var inV8iPath);
+            ApplyFlagStyle(inV8iPath, row.InIbasesV8i, "@PurpleAccentBrush", "@TextSecondaryBrush");
             ToolTip.SetTip(inV8i, LocalizationManager.T("FindLostBases.InV8iHint"));
             Grid.SetColumn(inV8i, 6);
             grid.Children.Add(inV8i);
 
             _checks[row] = check;
-            _inAppTexts[row] = inApp;
-            _inV8iTexts[row] = inV8i;
+            _inAppTexts[row] = inAppPath;
+            _inV8iTexts[row] = inV8iPath;
             _rowsPanel.Children.Add(grid);
         }
 
-        private static TextBlock MakeFlagDot()
-            => new()
-            {
-                Text = "●",
-                FontSize = 15,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0, 4, 0)
-            };
+        private static Control MakeFlagDot(out Avalonia.Controls.Shapes.Path path)
+        {
+            // P1b: флаг — векторный кружок, не текстовый «●».
+            var icon = IconHelper.MakeIcon("IconBullet", UiMetrics.IconControl, out path);
+            icon.HorizontalAlignment = HorizontalAlignment.Center;
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            icon.Margin = new Thickness(4, 0, 4, 0);
+            return icon;
+        }
 
-        private static void ApplyFlagStyle(TextBlock block, bool on, string onColor, string offColor)
-            => block.Foreground = Themes.ThemeBrushes.FromSpec(on ? onColor : offColor);
+        private static void ApplyFlagStyle(Avalonia.Controls.Shapes.Path path, bool on, string onColor, string offColor)
+            => path.Fill = Themes.ThemeBrushes.FromSpec(on ? onColor : offColor);
 
         private static void AddText(Grid grid, int column, string text, bool allowEllipsis)
         {

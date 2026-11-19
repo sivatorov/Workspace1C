@@ -44,9 +44,13 @@ public sealed class ConfigTypesSorter
         Descending = false;
     }
 
-    /// <summary>Индикатор направления для заголовка колонки: «▲», «▼» или пусто.</summary>
+    /// <summary>
+    /// Ключ векторной иконки направления для заголовка колонки (P1b):
+    /// <c>IconArrowDown</c>, <c>IconArrowUp</c> или пустая строка. Текстовые «▲/▼»
+    /// в UI больше не используются — заголовок рисует стрелку из набора темы.
+    /// </summary>
     public string IndicatorFor(ConfigTypesSortColumn column) =>
-        column != Column ? string.Empty : (Descending ? "▼" : "▲");
+        column != Column ? string.Empty : (Descending ? "IconArrowDown" : "IconArrowUp");
 
     /// <summary>Возвращает строки в порядке текущей сортировки (исходный список не меняется).</summary>
     public IReadOnlyList<ConfigTypeItemViewModel> Apply(IEnumerable<ConfigTypeItemViewModel> rows) =>

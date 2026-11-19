@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using Avalonia;
@@ -91,7 +91,7 @@ namespace Workspace1C
             // ---- Шапка конфигурации ----
             var configTitle = new TextBlock
             {
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 12, 0, 4)
             };
@@ -514,7 +514,7 @@ namespace Workspace1C
                 Margin = new Thickness(12, 0, 0, 0),
                 Padding = new Thickness(12),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Child = new ScrollViewer
                 {
                     Content = content,

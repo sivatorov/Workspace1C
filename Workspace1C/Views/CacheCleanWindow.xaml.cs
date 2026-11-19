@@ -55,7 +55,8 @@ public partial class CacheCleanWindow : Window
     private readonly Dictionary<Infobase, long> _programBytes = new();
     private readonly Dictionary<Infobase, long> _userBytes = new();
     // Заголовки колонок, чтобы обновлять на них стрелку-индикатор направления сортировки.
-    private readonly List<TextBlock> _headerTexts = new();
+    // P1b: индикатор — векторная стрелка, а не текстовые «▲/▼».
+    private readonly List<(TextBlock Label, System.Windows.Shapes.Path Arrow)> _headerTexts = new();
 
     // Диагностика и показ ошибок (issues #195, #202): расчёт размера кеша выполняется
     // в фоновых потоках и может завершиться сбоем доступа к файловой системе или иным
@@ -374,16 +375,32 @@ public partial class CacheCleanWindow : Window
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             Foreground = brush,
-            HorizontalAlignment = align,
-            Margin = new Thickness(8, 0, 8, 0),
             VerticalAlignment = VerticalAlignment.Center,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            Cursor = Cursors.Hand
+            TextTrimming = TextTrimming.CharacterEllipsis
         };
-        block.MouseLeftButtonDown += (_, _) => OnHeaderClick(column);
-        Grid.SetColumn(block, column);
-        grid.Children.Add(block);
-        _headerTexts.Add(block);
+        var arrow = new System.Windows.Shapes.Path
+        {
+            Width = 12,
+            Height = 12,
+            Stretch = Stretch.Uniform,
+            Fill = brush,
+            Margin = new Thickness(4, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Visibility = Visibility.Collapsed
+        };
+        var panel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = align,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 8, 0),
+            Cursor = Cursors.Hand,
+            Children = { block, arrow }
+        };
+        panel.MouseLeftButtonDown += (_, _) => OnHeaderClick(column);
+        Grid.SetColumn(panel, column);
+        grid.Children.Add(panel);
+        _headerTexts.Add((block, arrow));
     }
 
     /// <summary>Обрабатывает клик по заголовку колонки: задаёт сортировку и направление (issue #215).</summary>
@@ -464,8 +481,14 @@ public partial class CacheCleanWindow : Window
         };
         for (var i = 0; i < _headerTexts.Count && i < labels.Length; i++)
         {
-            var suffix = i == _sortColumn ? (_sortDescending ? " ▼" : " ▲") : string.Empty;
-            _headerTexts[i].Text = labels[i] + suffix;
+            var (label, arrow) = _headerTexts[i];
+            label.Text = labels[i];
+            var active = i == _sortColumn;
+            arrow.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            arrow.Data = active
+                ? Converters.IconKeyToGeometryConverter.ResolveGeometry(
+                    _sortDescending ? "IconArrowDown" : "IconArrowUp")
+                : null;
         }
     }
 

@@ -83,7 +83,7 @@
                     Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
                     Click="OnRefresh_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.Refresh}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -93,7 +93,7 @@
                     Command="{Binding CompareWithBaseCommand}"
                     Background="{DynamicResource ItemHoverBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⇄" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconSwap}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.CompareWithBase}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -101,7 +101,7 @@
                     Command="{Binding CompareVersionsCommand}"
                     Background="{DynamicResource ItemHoverBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⇅" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconSwapVertical}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.CompareVersions}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -119,8 +119,8 @@
                     Foreground="{DynamicResource TextPrimaryBrush}"
                     Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{loc:Loc RepositoryBrowser.Close}" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
         </StackPanel>
@@ -140,14 +140,14 @@
             <Button Style="{StaticResource ModernButton}" Padding="12,5" Margin="0,0,8,0"
                     Command="{Binding LockAllCommand}" Background="{DynamicResource ItemHoverBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🔒" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconLock}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.LockAll}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Style="{StaticResource ModernButton}" Padding="12,5" Margin="0,0,8,0"
                     Command="{Binding UnlockAllCommand}" Background="{DynamicResource ItemHoverBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🔓" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconUnlock}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepositoryBrowser.UnlockAll}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -197,8 +197,21 @@
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
                                     <StackPanel Orientation="Horizontal" Margin="4,2">
-                                        <TextBlock Text="{Binding CurrentMark}" Foreground="{DynamicResource SuccessBrush}"
-                                                   FontSize="12" VerticalAlignment="Top" Margin="0,2,6,0"/>
+                                        <!-- P1b: пометка актуальной версии — векторный кружок. -->
+                                        <Path Data="{DynamicResource IconBullet}" Width="12" Height="12"
+                                              Stretch="Uniform" Fill="{DynamicResource SuccessBrush}"
+                                              VerticalAlignment="Top" Margin="0,2,6,0">
+                                            <Path.Style>
+                                                <Style TargetType="Path">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </Path.Style>
+                                        </Path>
                                         <TextBlock Text="{Binding Comment}" TextWrapping="Wrap"
                                                    TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
                                     </StackPanel>

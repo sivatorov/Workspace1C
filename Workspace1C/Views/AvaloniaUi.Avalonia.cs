@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections;
 using Avalonia;
@@ -77,7 +77,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 0, 8, 0),
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
-            button.Styled(accent ? ControlThemes.ModernButton : ControlThemes.SecondaryButton);
+            button.Styled(accent ? ControlThemes.PrimaryButton : ControlThemes.SecondaryButton);
             button.Click += onClick;
             return button;
         }
@@ -220,8 +220,8 @@ namespace Workspace1C
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 AcceptsReturn = true,
-                FontFamily = new FontFamily("monospace"),
-                FontSize = 12
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = ThemeManager.FontSizeSecondary
             };
             box.Bind(TextBox.TextProperty, new Binding(path) { Mode = BindingMode.OneWay });
             return box;
@@ -241,7 +241,7 @@ namespace Workspace1C
             var border = new Border
             {
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(10),
                 Margin = new Thickness(0, 0, 0, 10),
                 Child = child

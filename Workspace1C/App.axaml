@@ -38,6 +38,9 @@
             <!-- «Блик» поверх иконок (0.3.12.60): у набора Windows XP ThemeManager.ApplyIconSet
                  подменяет кисть объёмным градиентом, у остальных наборов она прозрачна. -->
             <SolidColorBrush x:Key="IconGlossBrush" Color="Transparent"/>
+            <!-- Единый моноширинный стек (аудит UI P2a): журналы, код, технические
+                 значения. Совпадает с ThemeManager.DefaultMonospaceFontFamily. -->
+            <FontFamily x:Key="UiMonospaceFontFamily">Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace</FontFamily>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

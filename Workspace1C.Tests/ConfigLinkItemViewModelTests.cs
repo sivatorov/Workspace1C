@@ -48,15 +48,17 @@ public sealed class ConfigLinkItemViewModelTests
     }
 
     [Fact]
-    public void OverrideCopy_HasPencilStarBadge()
+    public void OverrideCopy_HasDistinctBadgeWithoutTextGlyph()
     {
         // Пользовательская копия предопределённой (правка встроенной, issue #321):
-        // метка должна отличаться и от типовой, и от обычной пользовательской.
+        // метка отличается от типовой и обычной пользовательской, но не содержит
+        // текстового глифа «✎» (P1b: иконки рисуются векторно в таблицах).
         var item = Create(code: "ZUP", name: "ЗУП (копия)", overrides: true);
 
         Assert.False(item.IsBuiltIn);
         Assert.True(item.IsOverride);
-        Assert.Contains("✎", item.OriginBadge);
+        Assert.NotEmpty(item.OriginBadge);
+        Assert.DoesNotContain("✎", item.OriginBadge);
     }
 
     [Fact]

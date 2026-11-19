@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -192,6 +192,8 @@ namespace Workspace1C
             {
                 Width = 12,
                 Height = 12,
+                // Исключение шкалы радиусов: индикатор-кружок 12×12, радиус 6 = круг
+                // (радиус 8 на 12 px даёт «скруглённый квадрат»).
                 CornerRadius = new CornerRadius(6),
                 Background = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"),
                 VerticalAlignment = VerticalAlignment.Center
@@ -204,10 +206,11 @@ namespace Workspace1C
             titleGrid.Children.Add(statusDot);
             p.TitleBar = new Border { Height = 34, Padding = new Thickness(10, 0), Child = titleGrid };
 
-            // Боковое меню.
-            p.NavSelectedText = new TextBlock { Text = "Базы", FontSize = 11 };
-            p.NavItem1Text = new TextBlock { Text = "Избранное", FontSize = 11 };
-            p.NavItem2Text = new TextBlock { Text = "История", FontSize = 11 };
+            // Боковое меню. Аудит UI P2b: подписи превью — нейтральные плейсхолдеры
+            // без привязки к языку, чтобы образец темы не выглядел «русским текстом».
+            p.NavSelectedText = new TextBlock { Text = "Nav", FontSize = 11 };
+            p.NavItem1Text = new TextBlock { Text = "Item A", FontSize = 11 };
+            p.NavItem2Text = new TextBlock { Text = "Item B", FontSize = 11 };
             p.NavSelected = NewNavItem(p.NavSelectedText);
             p.NavItem1 = NewNavItem(p.NavItem1Text);
             p.NavItem2 = NewNavItem(p.NavItem2Text);
@@ -218,21 +221,21 @@ namespace Workspace1C
             };
 
             // Контент.
-            p.ContentTitle = new TextBlock { Text = "Документы", FontWeight = FontWeight.SemiBold, FontSize = 13 };
-            p.ContentSubtitle = new TextBlock { Text = "Последние изменения", FontSize = 11, Margin = new Thickness(0, 2, 0, 8) };
-            p.CardTitle = new TextBlock { Text = "Карточка базы", FontWeight = FontWeight.SemiBold, FontSize = 11 };
-            p.CardText = new TextBlock { Text = "Краткое описание объекта", FontSize = 10, Margin = new Thickness(0, 2, 0, 0) };
+            p.ContentTitle = new TextBlock { Text = "Content", FontWeight = FontWeight.SemiBold, FontSize = 13 };
+            p.ContentSubtitle = new TextBlock { Text = "Subtitle", FontSize = 11, Margin = new Thickness(0, 2, 0, 8) };
+            p.CardTitle = new TextBlock { Text = "Card title", FontWeight = FontWeight.SemiBold, FontSize = 11 };
+            p.CardText = new TextBlock { Text = "Short description", FontSize = ThemeManager.FontSizeCaption, Margin = new Thickness(0, 2, 0, 0) };
             p.Card = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(8),
                 Margin = new Thickness(0, 0, 0, 8),
                 Child = new StackPanel { Children = { p.CardTitle, p.CardText } }
             };
             p.TextField = new TextBox { Height = 26, FontSize = 11, Padding = new Thickness(6, 2), BorderThickness = new Thickness(1) };
-            p.PrimaryButtonText = new TextBlock { Text = "Готово", FontSize = 11, FontWeight = FontWeight.SemiBold };
-            p.SecondaryButtonText = new TextBlock { Text = "Отмена", FontSize = 11 };
+            p.PrimaryButtonText = new TextBlock { Text = "OK", FontSize = 11, FontWeight = FontWeight.SemiBold };
+            p.SecondaryButtonText = new TextBlock { Text = "Cancel", FontSize = 11 };
             p.PrimaryButton = new Border { CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 5), Margin = new Thickness(0, 0, 6, 0), Child = p.PrimaryButtonText };
             p.SecondaryButton = new Border { CornerRadius = new CornerRadius(4), Padding = new Thickness(12, 5), Child = p.SecondaryButtonText };
             var buttons = new StackPanel
@@ -241,15 +244,15 @@ namespace Workspace1C
                 Margin = new Thickness(0, 8, 0, 0),
                 Children = { p.PrimaryButton, p.SecondaryButton }
             };
-            p.ListSelectedText = new TextBlock { Text = "Бухгалтерия предприятия", FontSize = 11 };
-            p.ListItem1Text = new TextBlock { Text = "Зарплата и кадры", FontSize = 11 };
-            p.ListItem2Text = new TextBlock { Text = "Управление торговлей", FontSize = 11 };
+            p.ListSelectedText = new TextBlock { Text = "List item A", FontSize = 11 };
+            p.ListItem1Text = new TextBlock { Text = "List item B", FontSize = 11 };
+            p.ListItem2Text = new TextBlock { Text = "List item C", FontSize = 11 };
             p.ListSelected = new Border { Padding = new Thickness(8, 5), Child = p.ListSelectedText };
             p.ListItem1 = new Border { Padding = new Thickness(8, 5), BorderThickness = new Thickness(0, 1, 0, 0), Child = p.ListItem1Text };
             p.ListItem2 = new Border { Padding = new Thickness(8, 5), BorderThickness = new Thickness(0, 1, 0, 0), Child = p.ListItem2Text };
             p.ListBox = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
                 BorderThickness = new Thickness(1),
                 Margin = new Thickness(0, 10, 0, 0),
                 Child = new StackPanel { Children = { p.ListSelected, p.ListItem1, p.ListItem2 } }

@@ -9,6 +9,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -160,8 +161,8 @@ namespace Workspace1C
                     Children =
                     {
                         danger
-                            ? IconHelper.MakeIcon(iconKey, 16, "DangerTextBrush")
-                            : IconHelper.MakeIcon(iconKey, 15),
+                            ? IconHelper.MakeIcon(iconKey, UiMetrics.IconControl, "DangerTextBrush")
+                            : IconHelper.MakeIcon(iconKey, UiMetrics.IconControl),
                         new TextBlock { Text = T(labelKey) }
                     }
                 },

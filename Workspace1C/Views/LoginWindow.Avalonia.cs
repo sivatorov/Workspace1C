@@ -128,7 +128,9 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 0, 0, 12),
                 ItemsSource = profileService.Profiles,
-                DisplayMemberBinding = new Avalonia.Data.Binding("Name")
+                DisplayMemberBinding = new Avalonia.Data.Binding("Name"),
+                // Аудит UI P3a: порядок табуляции совпадает с визуальным.
+                TabIndex = 0
             };
             _profilesList.SelectionChanged += (_, _) => OnSelectionChanged();
             Grid.SetRow(_profilesList, 1);
@@ -142,7 +144,7 @@ namespace Workspace1C
             var passwordLabel = new TextBlock { Text = LocalizationManager.T("Auth.Password") };
             ThemeBrushes.Bind(passwordLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
             _passwordPanel.Children.Add(passwordLabel);
-            _passwordInput = new PasswordBox();
+            _passwordInput = new PasswordBox { TabIndex = 1 };
             _passwordInput.Styled(ControlThemes.ModernPasswordBox);
             // Отступ из разметки (LoginWindow.xaml), общая тема даёт 10,6.
             _passwordInput.Padding = new Thickness(8, 6);
@@ -234,12 +236,14 @@ namespace Workspace1C
                     Orientation = Orientation.Horizontal,
                     Spacing = 6,
                     // Акцентная кнопка входа: значок — TextOnAccentBrush (аудит UI P0-1).
-                    Children = { IconHelper.MakeIcon("IconOk", 14, "TextOnAccentBrush"), loginCaption }
+                    Children = { IconHelper.MakeIcon("IconOk", UiMetrics.IconControl, "TextOnAccentBrush"), loginCaption }
                 },
                 Width = 130,
-                IsDefault = true
+                IsDefault = true,
+                // Аудит UI P3a: кнопки идут после полей формы.
+                TabIndex = 900
             };
-            login.Styled(ControlThemes.ModernButton);
+            login.Styled(ControlThemes.DialogConfirmButton);
             RegisterConfirmCaption(loginCaption, "Auth.Login");
             login.Click += (_, _) => TryLogin();
             panel.Children.Add(login);

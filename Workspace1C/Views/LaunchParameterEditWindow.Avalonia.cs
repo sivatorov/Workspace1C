@@ -91,7 +91,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 16, 0, 0),
                 Children =
                 {
-                    BuildConfirmActionButton("Updates.Save", "IconCheck", 130, OnSaveClick),
+                    BuildConfirmActionButton("Common.Save", "IconCheck", 130, OnSaveClick),
                     BuildCancelActionButton(120)
                 }
             };

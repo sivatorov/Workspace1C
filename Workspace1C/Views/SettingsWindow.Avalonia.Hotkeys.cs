@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -129,7 +129,7 @@ namespace Workspace1C
             {
                 Child = new TextBlock { Text = key, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
                 Padding = new Thickness(10, 4),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 BorderThickness = new Thickness(1),
                 HorizontalAlignment = HorizontalAlignment.Right
             };

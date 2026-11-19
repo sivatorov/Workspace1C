@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -545,7 +545,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -585,8 +585,8 @@ namespace Workspace1C
             _logBox = new TextBox
             {
                 Height = 120,
-                FontFamily = new FontFamily("Consolas, Courier New, monospace"),
-                FontSize = 11,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = ThemeManager.FontSizeCaption,
                 IsReadOnly = true,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap

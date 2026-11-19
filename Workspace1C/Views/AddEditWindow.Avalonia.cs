@@ -51,7 +51,9 @@ namespace Workspace1C
             {
                 HelpText = LocalizationManager.T("AddEdit.HelpText"),
                 Margin = new Thickness(8, 0, 0, 0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Аудит UI P3a: справка — первый элемент порядка табуляции.
+                TabIndex = 0
             });
             Grid.SetRow(header, 0);
             grid.Children.Add(header);
@@ -59,13 +61,13 @@ namespace Workspace1C
             var options = new StackPanel();
 
             options.Children.Add(BuildOption("IconList", LocalizationManager.T("AddEdit.ExistingBase"),
-                LocalizationManager.T("AddEdit.ExistingBaseDescription"), "Infobase", true));
+                LocalizationManager.T("AddEdit.ExistingBaseDescription"), "Infobase", true, tabIndex: 1));
             options.Children.Add(BuildOption("IconSave", LocalizationManager.T("AddEdit.CreateEmpty"),
-                LocalizationManager.T("AddEdit.CreateEmptyDescription"), "CreateEmpty"));
+                LocalizationManager.T("AddEdit.CreateEmptyDescription"), "CreateEmpty", tabIndex: 2));
             options.Children.Add(BuildOption("IconPackage", LocalizationManager.T("AddEdit.CreateFromTemplate"),
-                LocalizationManager.T("AddEdit.CreateFromTemplateDescription"), "CreateFromTemplate"));
+                LocalizationManager.T("AddEdit.CreateFromTemplateDescription"), "CreateFromTemplate", tabIndex: 3));
             options.Children.Add(BuildOption("IconFolder", LocalizationManager.T("AddEdit.Group"),
-                LocalizationManager.T("AddEdit.GroupDescription"), "Group"));
+                LocalizationManager.T("AddEdit.GroupDescription"), "Group", tabIndex: 4));
 
             Grid.SetRow(options, 1);
             grid.Children.Add(options);
@@ -91,16 +93,20 @@ namespace Workspace1C
             return grid;
         }
 
-        private RadioButton BuildOption(string iconKey, string title, string description, string tag, bool isChecked = false)
+        private RadioButton BuildOption(string iconKey, string title, string description, string tag,
+            bool isChecked = false, int tabIndex = 0)
         {
             var radio = new RadioButton
             {
                 Tag = tag,
                 GroupName = "AddType",
-                IsChecked = isChecked
+                IsChecked = isChecked,
+                // Аудит UI P3a: порядок табуляции совпадает с визуальным.
+                TabIndex = tabIndex
             };
-            // Карточка без маркера, с акцентной рамкой у выбранного варианта
-            // (AddEditWindow.xaml:26). Отступы и поля задаёт сама тема.
+            // Аудит UI P1c: AddOptionCard — псевдоним общей OptionCard, поэтому
+            // у карточки есть маркер-точка, тонированный фон и акцентная рамка
+            // у выбранного варианта (AddEditWindow.xaml:26). Отступы задаёт тема.
             radio.Styled(Themes.ControlThemes.AddOptionCard);
 
             var content = new Grid { Margin = new Thickness(0) };
@@ -116,7 +122,7 @@ namespace Workspace1C
             content.Children.Add(iconBlock);
 
             var textPanel = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
-            textPanel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = 14 });
+            textPanel.Children.Add(new TextBlock { Text = title, FontWeight = FontWeight.SemiBold, FontSize = ThemeManager.FontSizeSubtitle });
             var descriptionBlock = new TextBlock
             {
                 Text = description,

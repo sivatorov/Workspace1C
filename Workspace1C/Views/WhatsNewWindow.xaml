@@ -24,7 +24,7 @@
 
     <DockPanel Margin="20" LastChildFill="True">
         <!-- Заголовок: «Что нового в Workspace 1C <версия>» (docked Top). -->
-        <TextBlock x:Name="TitleText" DockPanel.Dock="Top" FontSize="16" FontWeight="SemiBold"
+        <TextBlock x:Name="TitleText" DockPanel.Dock="Top" FontSize="18" FontWeight="SemiBold"
                    Margin="0,0,0,12" TextWrapping="Wrap"/>
 
         <!-- Сводка изменений релиза: пункты списком, читаемо в обеих темах.
@@ -46,13 +46,15 @@
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Style="{StaticResource SecondaryButton}" Click="OnOpenChangelog_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🌐" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconWeb}" Stretch="Uniform" Width="14" Height="14"
+                              Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc WhatsNew.OpenChangelog}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource SecondaryButton}" IsCancel="True" Click="OnClose_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Width="12" Height="12"
+                              Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

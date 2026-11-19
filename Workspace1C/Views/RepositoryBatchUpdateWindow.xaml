@@ -77,7 +77,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <TextBlock Text="{Binding}" TextWrapping="Wrap" FontSize="12"
-                               FontFamily="Consolas"
+                               FontFamily="{DynamicResource UiMonospaceFontFamily}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                Margin="2,1"/>
                 </DataTemplate>
@@ -89,9 +89,9 @@
 
         <StackPanel Grid.Row="6" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Margin="0,0,8,0" x:Name="UpdateButton" Width="180" IsDefault="True"
-                    Style="{StaticResource ModernButton}" Click="OnUpdateSelected_Click">
+                    Style="{StaticResource PrimaryButton}" Click="OnUpdateSelected_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⇅" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconSwapVertical}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc RepoUpdate.UpdateSelected}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -101,7 +101,7 @@
                     Foreground="{DynamicResource TextPrimaryBrush}"
                     Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

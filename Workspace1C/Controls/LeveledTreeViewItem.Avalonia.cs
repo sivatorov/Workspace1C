@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using Avalonia;
 using Avalonia.Controls;
@@ -195,7 +195,7 @@ namespace Workspace1C.Controls
                             Name = "РамкаРазворота",
                             Width = 22,
                             Height = 22,
-                            CornerRadius = new CornerRadius(5),
+                            CornerRadius = new CornerRadius(4),
                             BorderThickness = new Thickness(1.5),
                             Child = glyphs
                         };

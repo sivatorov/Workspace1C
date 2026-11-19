@@ -42,7 +42,7 @@ public sealed class DownloadConflictGuard
     public const string WaitKey = "Updates.FileAlreadyDownloadingWait";
 
     /// <summary>Ключ кнопки «Отмена».</summary>
-    public const string CancelKey = "Updates.Cancel";
+    public const string CancelKey = "Common.Cancel";
 
     private readonly BackgroundDownloadManager _manager;
 

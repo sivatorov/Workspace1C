@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -418,7 +418,7 @@ namespace Workspace1C
                         }
                     }
                 },
-                Padding = new Thickness(10, 4),
+                Padding = new Thickness(12, 4),
                 VerticalAlignment = VerticalAlignment.Center
             };
             button.Styled(ControlThemes.SecondaryButton);
@@ -606,10 +606,10 @@ namespace Workspace1C
             {
                 Width = 40,
                 Height = 40,
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(12),
                 Margin = new Thickness(0, 0, 12, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Child = IconHelper.MakeIcon("IconDatabase", 22, Brushes.White)
+                Child = IconHelper.MakeIcon("IconDatabase", UiMetrics.IconHeader, Brushes.White)
             };
             Themes.ThemeBrushes.Bind(iconBox, Border.BackgroundProperty, "AccentBrush");
 
@@ -827,7 +827,7 @@ namespace Workspace1C
             var addBtn = new Button
             {
                 Content = LocalizationManager.T("Connection.AddTag"),
-                Padding = new Thickness(10, 4),
+                Padding = new Thickness(12, 4),
                 Margin = new Thickness(6, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -859,7 +859,7 @@ namespace Workspace1C
                 remove.Click += (_, _) => _viewModel.RemoveTag(chipTag);
                 _tagChipsPanel.Children.Add(new Border
                 {
-                    CornerRadius = new CornerRadius(10),
+                    CornerRadius = new CornerRadius(12),
                     Padding = new Thickness(8, 3),
                     Margin = new Thickness(0, 0, 6, 4),
                     Child = new StackPanel
@@ -916,7 +916,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        IconHelper.MakeIcon("IconCopy", 15, "SecondaryButtonTextBrush"),
+                        IconHelper.MakeIcon("IconCopy", UiMetrics.IconControl, "SecondaryButtonTextBrush"),
                         new TextBlock
                         {
                             Text = LocalizationManager.T("Connection.PasteString"),
@@ -1347,9 +1347,9 @@ namespace Workspace1C
             url.Bind(TextBlock.TextProperty, new Binding("LinkUrl"));
 
             var bind = SecondaryButton("IconLink", "Conn.LinkBind", OnBindConfigLink_Click);
-            bind.Padding = new Thickness(10, 5);
+            bind.Padding = new Thickness(12, 4);
             var clear = SecondaryButton("IconDelete", "Conn.LinkClear", OnClearConfigLink_Click);
-            clear.Padding = new Thickness(10, 5);
+            clear.Padding = new Thickness(12, 4);
             clear.Bind(Button.IsEnabledProperty, new Binding("HasLink"));
 
             var actions = new StackPanel
@@ -1386,10 +1386,10 @@ namespace Workspace1C
             var generate = SecondaryButton("IconRefresh", "Connection.GenerateId",
                 () => _viewModel.Id = Guid.NewGuid().ToString("D"), "Connection.GenerateIdTooltip",
                 iconBrush: Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
-            generate.Padding = new Thickness(10, 5);
+            generate.Padding = new Thickness(12, 4);
             generate.Margin = new Thickness(0, 0, 8, 0);
             var copy = SecondaryButton("IconCopy", "Connection.CopyId", OnCopyId_Click, "Connection.CopyIdTooltip");
-            copy.Padding = new Thickness(10, 5);
+            copy.Padding = new Thickness(12, 4);
 
             // Произвольные поля базы (issue #6): таблица «№ | Значение поля» с кнопками
             // Добавить/Изменить/Удалить и открытием списка сценариев.
@@ -1501,19 +1501,19 @@ namespace Workspace1C
 
             var add = SecondaryButton("IconPlus", "Connection.AdditionalFieldsAdd", OnAddAdditionalField_Click,
                 "Connection.AdditionalFieldsAddTooltip", iconBrush: Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A"));
-            add.Padding = new Thickness(10, 5);
+            add.Padding = new Thickness(12, 4);
             add.Margin = new Thickness(0, 0, 8, 0);
             var edit = SecondaryButton("IconEdit", "Connection.AdditionalFieldsEdit", OnEditAdditionalField_Click,
                 "Connection.AdditionalFieldsEditTooltip");
-            edit.Padding = new Thickness(10, 5);
+            edit.Padding = new Thickness(12, 4);
             edit.Margin = new Thickness(0, 0, 8, 0);
             var remove = SecondaryButton("IconDelete", "Connection.AdditionalFieldsDelete", OnRemoveAdditionalField_Click,
                 "Connection.AdditionalFieldsDeleteTooltip", iconBrush: Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626"));
-            remove.Padding = new Thickness(10, 5);
+            remove.Padding = new Thickness(12, 4);
             remove.Margin = new Thickness(0, 0, 8, 0);
             var scenarios = SecondaryButton("IconScript", "Connection.AdditionalFieldsScenarios", OnOpenScenarios_Click,
                 "Connection.AdditionalFieldsScenariosTooltip");
-            scenarios.Padding = new Thickness(10, 5);
+            scenarios.Padding = new Thickness(12, 4);
 
             return new StackPanel
             {

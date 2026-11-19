@@ -70,7 +70,7 @@
             <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button x:Name="OkButton" Width="150" Height="38" Margin="0,0,10,0"
                         IsDefault="True" Click="OnOk_Click"
-                        Style="{DynamicResource ModernButton}">
+                        Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
                                                  Margin="0,0,6,0" VerticalAlignment="Center"/>

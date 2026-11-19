@@ -97,7 +97,7 @@ namespace Workspace1C
             // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
             _updateButton.Content = IconHelper.IconAndText("IconCloudDownload",
                 LocalizationManager.T("RepoUpdate.UpdateSelected"), 16, "TextOnAccentBrush");
-            _updateButton.Styled(ControlThemes.ModernButton);
+            _updateButton.Styled(ControlThemes.DialogConfirmButton);
             _updateButton.Width = 200;
             _updateButton.IsDefault = true;
             _updateButton.Click += async (_, _) => await RunAsyncSafe();

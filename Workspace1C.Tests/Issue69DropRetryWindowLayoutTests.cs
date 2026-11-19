@@ -114,7 +114,7 @@ public sealed class Issue69DropRetryWindowLayoutTests
         Assert.Contains("администратора", strings.GetProperty("ServerMonitor.Infobase.Drop.RetryPrompt").GetString());
         Assert.Equal("Повторить попытку", strings.GetProperty("ServerMonitor.Infobase.Drop.RetryButton").GetString());
         Assert.Equal("Отмена", strings.GetProperty("ServerMonitor.Infobase.Drop.CancelButton").GetString());
-        Assert.Equal("Логин", strings.GetProperty("ServerMonitor.Infobase.Drop.RetryLogin").GetString());
+        Assert.Equal("Пользователь", strings.GetProperty("ServerMonitor.Infobase.Drop.RetryLogin").GetString());
         Assert.Equal("Пароль", strings.GetProperty("ServerMonitor.Infobase.Drop.RetryPassword").GetString());
     }
 

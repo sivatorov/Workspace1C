@@ -12,6 +12,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -149,9 +150,9 @@ namespace Workspace1C
             columnsButton = BuildActionButton(
                 LocalizationManager.T("ProcessInspector.Columns"),
                 () => ShowColumnsMenu(columnsButton),
-                "▦");
-            var refreshButton = BuildActionButton(LocalizationManager.T("ProcessInspector.Refresh"), () => _vm.Refresh(), "⟳");
-            var killButton = BuildActionButton(LocalizationManager.T("ProcessInspector.KillProcess"), _vm.KillSelectedMany, "✕");
+                "IconViewColumn");
+            var refreshButton = BuildActionButton(LocalizationManager.T("ProcessInspector.Refresh"), () => _vm.Refresh(), "IconRefresh");
+            var killButton = BuildActionButton(LocalizationManager.T("ProcessInspector.KillProcess"), _vm.KillSelectedMany, "IconClose");
             killButton.Width = 170;
             var closeButton = BuildCloseButton();
 
@@ -200,7 +201,10 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        // P1b аудита UI: ключ Icon* — векторная иконка активного набора.
+                        icon.StartsWith("Icon", StringComparison.Ordinal)
+                            ? IconHelper.MakeIcon(icon, UiMetrics.IconControl, "TextPrimaryBrush")
+                            : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -373,15 +377,11 @@ namespace Workspace1C
                     return connection;
 
                 case ProcessInspectorColumn.Known:
-                    // Значок-флаг: зелёный «●» — известная база, серый «○» — неизвестная.
-                    return new TextBlock
-                    {
-                        Text = row.IsKnown ? "●" : "○",
-                        FontSize = 14,
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        VerticalAlignment = VerticalAlignment.Center,
-                        Foreground = Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush")
-                    };
+                    // P1b: значок-флаг — векторная иконка (известная/неизвестная база).
+                    return IconHelper.MakeIcon(
+                        row.IsKnown ? "IconBullet" : "IconUnknown",
+                        UiMetrics.IconControl,
+                        Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush"));
 
                 default:
                     return CellText(string.Empty);

@@ -53,7 +53,7 @@ namespace Workspace1C
                 PlatformNodeKind.LeafX32 => ("IconCube", "@PurpleAccentBrush"),
                 _ => ("IconApplication", "@InfoBrush")
             };
-            var icon = IconHelper.MakeIcon(iconKey, 14, Themes.ThemeBrushes.FromSpec(iconColor));
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.IconControl, Themes.ThemeBrushes.FromSpec(iconColor));
             icon.Margin = new Thickness(0, 2, 8, 0);
             icon.VerticalAlignment = VerticalAlignment.Top;
 

@@ -106,7 +106,7 @@
                             <TextBlock FontWeight="SemiBold" Margin="0,0,0,4"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Text="{loc:Loc Updates.Status}"/>
-                            <TextBlock x:Name="StatusText" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                            <TextBlock x:Name="StatusText" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Grid>
 
@@ -286,7 +286,7 @@
                     </StackPanel>
                 </Button>
                 <Button MinWidth="130" Height="40" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnClose_Click">
-                    <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </Grid>

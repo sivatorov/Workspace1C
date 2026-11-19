@@ -145,12 +145,12 @@
                 <Button x:Name="SaveButton" Style="{StaticResource ModernButton}"
                         Background="{DynamicResource ItemHoverBrush}" Padding="16,6" Margin="0,0,8,0"
                         IsDefault="True" Click="OnSaveClick">
-                    <TextBlock Text="{loc:Loc Updates.Save}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center"/>
                 </Button>
                 <Button x:Name="CancelButton" Style="{StaticResource ModernButton}"
                         Background="{DynamicResource ItemHoverBrush}" Padding="16,6"
                         IsCancel="True" Click="OnCancelClick">
-                    <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </StackPanel>

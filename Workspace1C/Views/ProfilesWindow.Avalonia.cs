@@ -209,12 +209,12 @@ namespace Workspace1C
 
         private Control BuildButtons()
         {
-            // Раскладка по разметке (ProfilesWindow.xaml:161): отмена прижата
-            // влево, остальные кнопки вправо. Удаление, как и отмена, идёт мягкой
-            // заливкой, три остальные акцентом.
+            // Аудит UI P1c: единый порядок кнопок — действия слева, «Отмена»
+            // последней справа (как в остальных диалогах). Деструктивное «Удалить»
+            // оформлено DangerButton, а не мягкой кремовой заливкой.
             var panel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Spacing = 8 };
 
-            var delete = SoftButton("Profiles.Delete", "IconDelete", 120);
+            var delete = DangerButton("Profiles.Delete", "IconDelete", 120);
             delete.Click += (_, _) => OnDelete();
             panel.Children.Add(delete);
 
@@ -222,58 +222,48 @@ namespace Workspace1C
             // (ProfilesWindow.xaml:183). Без неё сменить активный профиль
             // из интерфейса было нельзя вовсе: команда живёт в ProfilesViewModel,
             // а тот в Linux-сборку не входит.
-            var activate = AccentButton("Profiles.Activate", "IconStar", 150);
+            var activate = AccentButton("Profiles.Activate", "IconStar", 140);
             activate.Click += (_, _) => OnActivate();
             panel.Children.Add(activate);
 
-            var save = AccentButton("Profiles.Save", "IconOk", 130);
+            var save = AccentButton("Profiles.Save", "IconOk", 120);
             save.Click += (_, _) => OnSave();
             panel.Children.Add(save);
 
-            var create = AccentButton("Profiles.Create", "IconAdd", 130);
+            var create = AccentButton("Profiles.Create", "IconAdd", 120);
             create.Click += (_, _) => OnCreate();
             panel.Children.Add(create);
 
-            var row = new Grid();
-            row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-            row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+            var cancel = BuildCancelButton(120, secondary: true);
+            panel.Children.Add(cancel);
 
-            var cancel = BuildCancelButton(110);
-            // Отступ кнопки отмены из разметки (ProfilesWindow.xaml:162),
-            // общая тема кнопки даёт 14,9.
-            cancel.Padding = new Thickness(12, 6);
-            Grid.SetColumn(cancel, 0);
-            row.Children.Add(cancel);
-
-            Grid.SetColumn(panel, 1);
-            row.Children.Add(panel);
-            return row;
+            return panel;
         }
 
         /// <summary>Кнопка акцентной заливки со значком и подписью.</summary>
-        private static Button AccentButton(string textKey, string iconKey, double width)
+        private static Button AccentButton(string textKey, string iconKey, double minWidth)
         {
             var button = new Button
             {
                 // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
                 Content = IconHelper.IconAndText(iconKey, LocalizationManager.T(textKey), 14, "TextOnAccentBrush"),
-                Width = width
+                // Аудит UI P1c: минимальная ширина вместо фиксированной — английская
+                // подпись не обрезается, кнопка растёт под текст.
+                MinWidth = minWidth
             };
             button.Styled(Themes.ControlThemes.ModernButton);
             return button;
         }
 
-        /// <summary>Кнопка мягкой заливки: в разметке ей задан фон ItemHoverBrush.</summary>
-        private static Button SoftButton(string textKey, string iconKey, double width)
+        /// <summary>Деструктивная кнопка: DangerButton с контрастным значком.</summary>
+        private static Button DangerButton(string textKey, string iconKey, double minWidth)
         {
             var button = new Button
             {
-                Content = IconHelper.IconAndText(iconKey, LocalizationManager.T(textKey), 14, "TextPrimaryBrush"),
-                Width = width
+                Content = IconHelper.IconAndText(iconKey, LocalizationManager.T(textKey), 14, "DangerTextBrush"),
+                MinWidth = minWidth
             };
-            button.Styled(Themes.ControlThemes.ModernButton);
-            Themes.ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
-            Themes.ThemeBrushes.Bind(button, Button.ForegroundProperty, "TextPrimaryBrush");
+            button.Styled(Themes.ControlThemes.DangerButton);
             return button;
         }
 

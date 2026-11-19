@@ -50,7 +50,7 @@
                     HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="OkButton" Width="150" Height="38" Margin="0,0,10,0"
                     IsDefault="True" Click="OnOk_Click"
-                    Style="{DynamicResource ModernButton}">
+                    Style="{DynamicResource PrimaryButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ArrowRightBoldCircle" Width="16" Height="16"
                                              Margin="0,0,6,0" VerticalAlignment="Center"/>

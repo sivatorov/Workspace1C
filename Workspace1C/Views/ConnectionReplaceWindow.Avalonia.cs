@@ -66,7 +66,7 @@ namespace Workspace1C
             };
             ignoreCaseCheck.IsCheckedChanged += (_, _) => _vm.IgnoreCase = ignoreCaseCheck.IsChecked == true;
 
-            var findButton = BuildActionButton(LocalizationManager.T("ConnectionReplace.FindButton"), "🔍",
+            var findButton = BuildActionButton(LocalizationManager.T("ConnectionReplace.FindButton"), "IconSearch",
                 () => _vm.RefreshPreviewCommand.Execute(null));
 
             // Панель параметров — ДВЕ СТРОКИ (issue #357): на первой только «Найти» и
@@ -267,7 +267,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        BuildIconOrGlyph(icon, 14, "TextPrimaryBrush"),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -278,6 +278,15 @@ namespace Workspace1C
             button.Click += (_, _) => onClick();
             return button;
         }
+
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка набора темы (P1a),
+        /// иначе — текстовый глиф для обратной совместимости с остальными кнопками окна.
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, string brushKey)
+            => icon.StartsWith("Icon", StringComparison.Ordinal)
+                ? IconHelper.MakeIcon(icon, size, brushKey)
+                : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center };
 
         private Button BuildCloseButton()
         {

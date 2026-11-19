@@ -30,8 +30,8 @@ namespace Workspace1C
             // Текст деталей: «ключ: значение» построчно, моноширинный шрифт.
             var text = new TextBlock
             {
-                FontFamily = new FontFamily("Consolas, monospace"),
-                FontSize = 12,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = ThemeManager.FontSizeSecondary,
                 Margin = new Thickness(10),
                 TextWrapping = TextWrapping.Wrap,
                 Text = detailsText ?? string.Empty

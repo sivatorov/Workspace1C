@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -56,7 +56,7 @@ namespace Workspace1C.Controls
             var header = new Border
             {
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(8, 4),
                 Child = headerContent
             };

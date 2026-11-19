@@ -607,7 +607,9 @@ namespace Workspace1C
                         Header = ServiceTrayMenuBuilder.EscapeMenuText(item.Text),
                         Command = new ViewModels.RelayCommand(_ => ShowServicesSettings()),
                         Style = TryFindResource("ModernMenuItem") as Style,
-                        Icon = MenuIconText("⚙", "#6B7280"),
+                        // Аудит UI P0-5: цвет из темы, не жёсткий #6B7280.
+                        // P1a: шестерёнка — векторная иконка активного набора, не текстовый глиф.
+                        Icon = CreateMenuIcon("IconSettings", "@TextSecondaryBrush"),
                     };
 
                 case ServiceMenuItemKind.ServiceSubmenu:
@@ -629,12 +631,12 @@ namespace Workspace1C
                         Style = TryFindResource("ModernMenuItem") as Style,
                     };
                     // Иконки (замечание 7OH 19.10): служба — кружок статуса; группа —
-                    // папка с кружком статуса справа-снизу (как в трее); «Все сервисы» — ☰.
+                    // папка с кружком статуса справа-снизу (как в трее); «Все сервисы» — меню.
                     node.Icon = item.Kind switch
                     {
                         ServiceMenuItemKind.ServiceSubmenu => MenuStatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuIconText("☰", "@PurpleAccentBrush")
+                        _ => CreateMenuIcon("IconMenu", "@PurpleAccentBrush")
                     };
                     if (item.Kind == ServiceMenuItemKind.ServiceSubmenu
                         && !string.IsNullOrEmpty(item.StatusText))
@@ -693,20 +695,15 @@ namespace Workspace1C
         };
 
         /// <summary>
-        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка 📦 +
+        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка +
         /// кружок статуса группы справа-снизу (цвет StatusColorHex), как в трее.
         /// </summary>
-        private static FrameworkElement MenuGroupIcon(string statusColorHex)
+        private FrameworkElement MenuGroupIcon(string statusColorHex)
         {
             var grid = new Grid { Width = 16, Height = 16 };
-            grid.Children.Add(new TextBlock
-            {
-                Text = "📦",
-                FontSize = 13,
-                Foreground = Themes.WpfBrushes.Get("PurpleAccentBrush") ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")), // fallback
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            });
+            var packageIcon = CreateMenuIcon("IconPackage", "@PurpleAccentBrush");
+            if (packageIcon is not null)
+                grid.Children.Add(packageIcon);
             if (!string.IsNullOrWhiteSpace(statusColorHex))
             {
                 grid.Children.Add(new Border

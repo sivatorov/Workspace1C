@@ -980,6 +980,7 @@ namespace Workspace1C
                 Content = path,
                 ToolTip = LocalizationManager.T("Window.Maximize")
             };
+            UiAutomation.SetNameFromTip(button);
             // «Светофор» macOS: зелёный круг «развернуть» задаётся кистью HoverBrush
             // кнопки (шаблон рисует круг всегда видимым, цвет — из этой кисти).
             // Ссылка на ресурс, а не снимок: кисть обновляется при смене темы.
@@ -991,6 +992,7 @@ namespace Workspace1C
             {
                 bool maximized = window.WindowState == WindowState.Maximized;
                 button.ToolTip = LocalizationManager.T(maximized ? "Window.Restore" : "Window.Maximize");
+                UiAutomation.SetNameFromTip(button);
                 path.SetResourceReference(Path.DataProperty,
                     maximized ? "GlyphWindowRestore" : "GlyphWindowMaximize");
             };
@@ -1032,6 +1034,7 @@ namespace Workspace1C
                 Content = path,
                 ToolTip = LocalizationManager.T("Common.Close")
             };
+            UiAutomation.SetNameFromTip(button);
             // Значок следует за цветом Foreground кнопки (тема + состояние hover/pressed).
             path.SetBinding(Shape.StrokeProperty, new Binding(nameof(Button.Foreground)) { Source = button });
             button.Click += (_, _) => window.Close();

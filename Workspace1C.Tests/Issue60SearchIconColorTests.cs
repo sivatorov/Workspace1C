@@ -94,7 +94,7 @@ public sealed class Issue60SearchIconColorTests
 
         // Иконка поиска и крестик очистки построены с одной кистью TextSecondaryBrush
         // (в Avalonia код уже синхронен, правка не требовалась).
-        Assert.Contains("IconHelper.MakeIcon(\"IconSearch\", 16, \"TextSecondaryBrush\")", source, StringComparison.Ordinal);
-        Assert.Contains("IconHelper.MakeIcon(\"IconClose\", 12, \"TextSecondaryBrush\")", source, StringComparison.Ordinal);
+        Assert.Contains("IconHelper.MakeIcon(\"IconSearch\", UiMetrics.IconControl, \"TextSecondaryBrush\")", source, StringComparison.Ordinal);
+        Assert.Contains("IconHelper.MakeIcon(\"IconClose\", UiMetrics.IconInline, \"TextSecondaryBrush\")", source, StringComparison.Ordinal);
     }
 }

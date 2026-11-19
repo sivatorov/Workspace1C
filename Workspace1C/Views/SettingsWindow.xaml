@@ -1301,7 +1301,7 @@
                                             Style="{StaticResource ModernButton}" Margin="0,0,8,0"
                                             IsEnabled="False" Click="OnApplyThemePreview_Click">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{loc:Loc Settings.ThemePreview.Apply}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
@@ -1309,7 +1309,7 @@
                                             Style="{StaticResource SecondaryButton}"
                                             IsEnabled="False" Click="OnCancelThemePreview_Click">
                                         <StackPanel Orientation="Horizontal">
-                                            <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                            <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                             <TextBlock Text="{loc:Loc Settings.ThemePreview.Cancel}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </Button>
@@ -3256,13 +3256,15 @@
             </Button>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Width="140" Height="36" Margin="0,0,10,0" IsDefault="True" Click="OnSave_Click"
-                        Style="{DynamicResource ModernButton}">
+                        KeyboardNavigation.TabIndex="900"
+                        Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="ContentSave" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button Width="140" Height="36" IsCancel="True" Click="OnCancel_Click"
+                        KeyboardNavigation.TabIndex="1000"
                         Style="{DynamicResource SecondaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>

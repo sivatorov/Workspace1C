@@ -324,11 +324,44 @@ namespace Workspace1C.Themes
         public static ColorScheme? GetBuiltInScheme(string themeName)
             => themeName == DarkThemeName ? ColorScheme.CreateDark() : ColorScheme.CreateLight();
 
-        /// <summary>Шрифт интерфейса по умолчанию.</summary>
-        public const string DefaultFontFamily = "Segoe UI";
+        /// <summary>
+        /// Шрифт интерфейса по умолчанию для Avalonia-сборки. Linux получает
+        /// системный стек Inter/Noto/DejaVu, macOS — SF Pro Text/Helvetica Neue.
+        /// Windows-сборка использует WPF-версию ThemeManager с «Segoe UI».
+        /// </summary>
+        public static readonly string DefaultFontFamily = ResolveDefaultFontFamily();
+
+        private static string ResolveDefaultFontFamily()
+        {
+            if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                    System.Runtime.InteropServices.OSPlatform.OSX))
+                return "SF Pro Text, Helvetica Neue";
+            return "Inter, Noto Sans, DejaVu Sans, sans-serif";
+        }
+
         public const double DefaultFontSize = 13;
         public const string DefaultFontWeight = "Normal";
         public const string DefaultFontStyle = "Normal";
+
+        /// <summary>
+        /// Единый моноширинный стек (аудит UI P2a): журналы, код, технические значения.
+        /// </summary>
+        public const string DefaultMonospaceFontFamily =
+            "Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace";
+
+        // ---- Токены размеров шрифта (аудит UI P2a) ----
+        /// <summary>Мелкие подписи, бейджи, сноски.</summary>
+        public const double FontSizeCaption = 11;
+        /// <summary>Вторичный текст: подсказки, пояснения, статусы.</summary>
+        public const double FontSizeSecondary = 12;
+        /// <summary>Основной текст интерфейса.</summary>
+        public const double FontSizeBody = 13;
+        /// <summary>Заголовок секции/подзаголовок окна.</summary>
+        public const double FontSizeSubtitle = 15;
+        /// <summary>Заголовок окна.</summary>
+        public const double FontSizeTitle = 18;
+        /// <summary>Крупный заголовок страницы/пустого состояния.</summary>
+        public const double FontSizePage = 24;
 
         /// <summary>
         /// Применяет настройки шрифта к элементу управления. Свойства шрифта в Avalonia

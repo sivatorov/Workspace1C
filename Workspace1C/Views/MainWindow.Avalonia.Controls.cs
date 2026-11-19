@@ -630,8 +630,8 @@ namespace Workspace1C
                 // черта толще квадратов, крест чуть толще, концы скруглены.
                 _glyph = new Avalonia.Controls.Shapes.Path
                 {
-                    Width = UiMetrics.Scaled(14),
-                    Height = UiMetrics.Scaled(14),
+                    Width = UiMetrics.Scaled(UiMetrics.IconControl),
+                    Height = UiMetrics.Scaled(UiMetrics.IconControl),
                     Stretch = Stretch.Uniform,
                     StrokeThickness = _kind switch
                     {

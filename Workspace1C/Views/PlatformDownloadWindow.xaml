@@ -288,7 +288,7 @@
 
                 <TextBox x:Name="LogBox" Margin="0,10,0,0" IsReadOnly="True" Height="96"
                          Text="{Binding LogText, Mode=OneWay}" TextWrapping="Wrap" AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto" FontFamily="Consolas" FontSize="12"
+                         VerticalScrollBarVisibility="Auto" FontFamily="{DynamicResource UiMonospaceFontFamily}" FontSize="12"
                          Background="{DynamicResource ContentBackgroundBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"/>
 

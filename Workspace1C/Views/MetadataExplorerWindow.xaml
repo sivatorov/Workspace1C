@@ -141,7 +141,7 @@
         </StackPanel>
 
         <!-- Шапка конфигурации -->
-        <TextBlock Grid.Row="2" x:Name="ConfigurationTitleText" FontSize="14" FontWeight="SemiBold"
+        <TextBlock Grid.Row="2" x:Name="ConfigurationTitleText" FontSize="15" FontWeight="SemiBold"
                    Margin="0,12,0,4" Text="{Binding ConfigurationTitle}"/>
 
         <!-- Поиск по имени (debounce в VM) и фильтр по типу (этап 3) -->

@@ -140,6 +140,17 @@ public sealed class IconSetCoverageTests
     [Theory]
     [InlineData("xaml")]
     [InlineData("axaml")]
+    public void BaseDictionary_HasLockAndUnlockIcons(string ext)
+    {
+        // P1a аудита UI: эмодзи 🔒/🔓 заменены ключами IconLock/IconUnlock.
+        var dict = Geometries($"Icons.{ext}");
+        Assert.Contains("IconLock", dict.Keys);
+        Assert.Contains("IconUnlock", dict.Keys);
+    }
+
+    [Theory]
+    [InlineData("xaml")]
+    [InlineData("axaml")]
     public void BaseDictionary_HasWindowAndTemplateGlyphs(string ext)
     {
         // 0.3.12.61: глифы кнопок окна и шаблонов — отдельные ключи базового словаря.

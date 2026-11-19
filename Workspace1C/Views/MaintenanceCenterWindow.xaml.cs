@@ -120,7 +120,7 @@ namespace Workspace1C
                 HistoryChartCanvas.Children.Add(gridLine);
                 var yLabel = new TextBlock
                 {
-                    Text = label, FontSize = 10, Foreground = textBrush,
+                    Text = label, FontSize = Themes.ThemeManager.FontSizeCaption, Foreground = textBrush,
                     TextAlignment = TextAlignment.Right
                 };
                 Canvas.SetLeft(yLabel, 0);
@@ -134,7 +134,7 @@ namespace Workspace1C
             HistoryChartCanvas.Children.Add(axis);
             foreach (var (f, label) in new[] { (0.0, chart.XMinLabel), (1.0, chart.XMaxLabel) })
             {
-                var xLabel = new TextBlock { Text = label, FontSize = 10, Foreground = textBrush };
+                var xLabel = new TextBlock { Text = label, FontSize = Themes.ThemeManager.FontSizeCaption, Foreground = textBrush };
                 Canvas.SetLeft(xLabel, f == 0 ? left - 2 : left + plotW - 64);
                 Canvas.SetTop(xLabel, top + plotH + 4);
                 HistoryChartCanvas.Children.Add(xLabel);

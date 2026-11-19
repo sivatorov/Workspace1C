@@ -78,7 +78,7 @@ namespace Workspace1C
             // (MainWindow.xaml:872-882). Рамки у нас не было вовсе.
             var header = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
                 Padding = new Thickness(UiMetrics.Compact ? 6 : 8, UiMetrics.GroupHeaderPadV),
                 Margin = new Thickness(0, UiMetrics.GroupHeaderMarginV, 0, UiMetrics.GroupHeaderMarginV),
                 BorderThickness = new Thickness(2),
@@ -212,7 +212,7 @@ namespace Workspace1C
                 // наведению — на самой кнопке: привязка IsVisible кнопки перекрыла
                 // бы локальное значение, если бы оба правила жили на одном элементе.
                 var deleteBtn = GroupRowActionButton(group, "IconDelete", "DeleteGroupCommand",
-                    LocalizationManager.T("Main.DeleteGroupTooltip"), colorHex: "#DC2626");
+                    LocalizationManager.T("Main.DeleteGroupTooltip"), colorHex: "@ErrorBrush");
                 BindGroupActionsHoverVisibility(deleteBtn, header);
                 var deleteSlot = FixedLaunchSlot(deleteBtn);
                 deleteSlot.IsVisible = group.Marker != GroupNodeViewModel.PinnedMarker
@@ -936,7 +936,7 @@ namespace Workspace1C
             var host = new Border
             {
                 Child = text,
-                CornerRadius = new CornerRadius(3),
+                CornerRadius = new CornerRadius(UiMetrics.RadiusSm),
                 Padding = new Thickness(3, 0, 3, 1),
                 Margin = new Thickness(2, 0, 0, 0),
                 MinWidth = UiMetrics.Scaled(13),
@@ -976,7 +976,7 @@ namespace Workspace1C
             string activeBrushKey, string stateProperty, Func<bool> isActive,
             string tooltip, string commandPath, Control? trailing = null)
         {
-            var iconHost = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(14), out var icon);
+            var iconHost = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconControl), out var icon);
             Control content = iconHost;
             if (trailing is not null)
             {
@@ -1032,6 +1032,7 @@ namespace Workspace1C
                 CommandParameter = infobase
             };
             ToolTip.SetTip(button, tooltip);
+            UiAutomation.SetNameFromTip(button);
             // Команда живёт во вьюмодели, а контекстом строки служит сама база,
             // поэтому источник привязки указывается явно.
             button.Bind(Button.CommandProperty, new Binding(commandPath) { Source = _vm });
@@ -1258,6 +1259,7 @@ namespace Workspace1C
             };
             button.Styled(Themes.ControlThemes.IconButton);
             ToolTip.SetTip(button, tooltip);
+            UiAutomation.SetNameFromTip(button);
             // Команда живёт во вьюмодели, а контекстом строки служит сама база.
             button.Bind(Button.CommandProperty, new Binding(commandPath) { Source = _vm });
             return button;
@@ -1381,7 +1383,7 @@ namespace Workspace1C
             // Значок 28 акцентной кистью и правым полем 10, как в разметке
             // (MainWindow.xaml:1709). Контур привязывается к самому Path внутри
             // холста: у Viewbox такого свойства нет, и привязка молча не работала.
-            var headerIcon = IconHelper.MakeIcon("IconDatabase", UiMetrics.Scaled(28), out var headerIconPath);
+            var headerIcon = IconHelper.MakeIcon("IconDatabase", UiMetrics.Scaled(UiMetrics.IconHeader), out var headerIconPath);
             // Контур задан привязкой — авто-обновление IconHelper отключается, а смену набора
             // иконок привязка ловит сама через IconSetState.Current (0.3.12.60).
             IconHelper.Untrack(headerIconPath);
@@ -1472,10 +1474,11 @@ namespace Workspace1C
             // заданы явно и одинаковы в обеих темах, поэтому берутся числом.
             var badges = new WrapPanel { Margin = new Thickness(0, 0, 0, 12) };
 
-            // Issue #61: текст бейджа «Избранное» — кисть FavoriteTextBrush, а не
-            // FavoriteBrush: плашка #FEF3C7 постоянная, а FavoriteBrush в тёмной теме
-            // жёлтый (#FBBF24) — «жёлтое на жёлтом» было нечитаемо.
-            var favoriteBadge = Badge("#FEF3C7");
+            // Аудит UI P2b: фон и текст бейджа «Избранное» — theme-кисти
+            // FavoriteBadgeBrush/FavoriteBadgeTextBrush с вариантами Light/Dark,
+            // а не жёсткий #FEF3C7, который «светился» в тёмной теме.
+            var favoriteBadge = Badge(null);
+            ThemeBrushes.Bind(favoriteBadge, Border.BackgroundProperty, "FavoriteBadgeBrush");
             favoriteBadge.Child = BadgeContent("IconStar", "@WarningBrush", textBinding:
                 new MultiBinding
                 {
@@ -1485,7 +1488,7 @@ namespace Workspace1C
                         new Binding { Source = LocalizationManager.T("Main.Favorites") },
                         new Binding("SelectedInfobase.FavoriteHotkeyDisplay")
                     }
-                }, themeBrushKey: "FavoriteTextBrush");
+                }, themeBrushKey: "FavoriteBadgeTextBrush");
             favoriteBadge.Bind(Control.IsVisibleProperty, new Binding("SelectedInfobase.IsFavorite"));
             badges.Children.Add(favoriteBadge);
 
@@ -1672,16 +1675,17 @@ namespace Workspace1C
         {
             // Две копии одной геометрии: цвет зависит от состояния, а кисть каждой
             // копии остаётся привязкой к ресурсу темы и меняется вместе со схемой.
-            var bellOn = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(18), "AccentBrush");
-            var bellOff = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(18), "SidebarTextBrush");
+            var bellOn = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(UiMetrics.IconToolbar), "AccentBrush");
+            var bellOff = IconHelper.MakeIcon("Pack.BellOutline", UiMetrics.Scaled(UiMetrics.IconToolbar), "SidebarTextBrush");
             var cross = new Avalonia.Controls.Shapes.Line
             {
                 StartPoint = new Point(2, 16),
                 EndPoint = new Point(16, 2),
-                Stroke = new SolidColorBrush(Color.Parse("#DC2626")),
                 StrokeThickness = 1.6,
                 StrokeLineCap = PenLineCap.Round
             };
+            // Аудит UI P0-5: цвет перечёркивания — ErrorBrush темы, не жёсткий #DC2626.
+            ThemeBrushes.Bind(cross, Avalonia.Controls.Shapes.Shape.StrokeProperty, "ErrorBrush");
 
             var content = new Grid
             {
@@ -1721,7 +1725,7 @@ namespace Workspace1C
                         {
                             Background = Brushes.Transparent,
                             BorderThickness = new Thickness(0),
-                            CornerRadius = new CornerRadius(6),
+                            CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
                             Padding = new Thickness(4)
                         };
                         var presenter = new ContentPresenter
@@ -1788,7 +1792,7 @@ namespace Workspace1C
 
             var gear = new Button
             {
-                Content = IconHelper.MakeIcon("IconCog", 14, "TextSecondaryBrush"),
+                Content = IconHelper.MakeIcon("IconCog", UiMetrics.IconControl, "TextSecondaryBrush"),
                 Width = 24,
                 MinWidth = 24,
                 Padding = new Thickness(0),
@@ -2279,14 +2283,19 @@ namespace Workspace1C
                 return string.IsNullOrEmpty(key) ? null : IconHelper.Geometry(key);
             });
 
-        /// <summary>Рамка бейджа правой панели с явным фоном, как в разметке WPF.</summary>
-        private static Border Badge(string backHex) =>
+        /// <summary>
+        /// Рамка бейджа правой панели. Фон можно задать явно (как в разметке WPF)
+        /// либо оставить <c>null</c> и привязать theme-кисть снаружи (аудит UI P2b).
+        /// </summary>
+        private static Border Badge(string? backHex) =>
             new()
             {
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(8, 3),
                 Margin = new Thickness(0, 0, 6, 4),
-                Background = new SolidColorBrush(Color.Parse(backHex))
+                Background = backHex is null
+                    ? Brushes.Transparent
+                    : new SolidColorBrush(Color.Parse(backHex))
             };
 
         /// <summary>Содержимое бейджа: значок и подпись из привязки.</summary>
@@ -2435,30 +2444,6 @@ namespace Workspace1C
             return btn;
         }
 
-        /// <summary>Secondary-кнопка с приглушённым фоном и hover/pressed из ресурсов темы.</summary>
-        private static Control SecondaryActionButton(string iconKey, string text, string commandPath, string tooltip)
-        {
-            var btn = new PanelButton(
-                "SecondaryButtonBackgroundBrush",
-                "SecondaryButtonHoverBrush",
-                "SecondaryButtonPressedBrush",
-                "BorderColorBrush",
-                new CornerRadius(UiMetrics.RadiusMd))
-            {
-                // Текст вторичной кнопки — основной цвет темы (TextPrimaryColorBrush),
-                // а не чёрный ButtonTextBrush (issue #26).
-                Content = ThemedIconAndText(iconKey, text, "TextPrimaryColorBrush", UiMetrics.ActionIconSize, centered: false),
-                HorizontalContentAlignment = HorizontalAlignment.Left,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinHeight = UiMetrics.ActionButtonMinHeight,
-                Padding = new Thickness(UiMetrics.ActionButtonPadH, UiMetrics.ActionButtonPadV),
-                Margin = new Thickness(0, 0, 0, UiMetrics.ActionGridGap / 2)
-            };
-            ToolTip.SetTip(btn, tooltip);
-            btn.Bind(Button.CommandProperty, new Binding(commandPath));
-            return btn;
-        }
-
         /// <summary>
         /// Кнопка запуска со стрелкой и меню дополнительных вариантов, как
         /// в WPF-версии. Пункт «от имени администратора» не переносится:
@@ -2521,7 +2506,7 @@ namespace Workspace1C
                 if (itemIcon is not null)
                     // Фолбэк значка без явного цвета — тематизированная нейтральная кисть,
                     // как в Hotkeys/ServerMonitor (аудит UI v100114, вместо Brushes.Gray).
-                    item.Icon = IconHelper.MakeIcon(itemIcon, 18,
+                    item.Icon = IconHelper.MakeIcon(itemIcon, UiMetrics.IconToolbar,
                         itemColor is not null
                             ? Themes.ThemeBrushes.FromSpec(itemColor)
                             : Themes.ThemeBrushes.Get("TextSecondaryBrush", "#64748B"));

@@ -9,6 +9,7 @@ using Avalonia.Media;
 using Avalonia.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Services.Licensing;
+using Workspace1C.Themes;
 using Workspace1C.ViewModels;
 
 namespace Workspace1C
@@ -35,7 +36,7 @@ namespace Workspace1C
 
             var head = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
             if (!string.IsNullOrEmpty(_vm.RequestedText))
-                head.Children.Add(AvaloniaUi.Text(_vm.RequestedText, 14, bold: true));
+                head.Children.Add(AvaloniaUi.Text(_vm.RequestedText, ThemeManager.FontSizeSubtitle, bold: true));
             head.Children.Add(AvaloniaUi.BoundText(nameof(LicenseViewModel.EditionText), 13, secondary: false));
             head.Children.Add(AvaloniaUi.BoundText(nameof(LicenseViewModel.OwnerText)));
             if (!string.IsNullOrEmpty(_vm.CommunityBuildText))
@@ -48,8 +49,8 @@ namespace Workspace1C
             {
                 Text = _vm.MachineCodeText,
                 IsReadOnly = true,
-                FontSize = 18,
-                FontFamily = new FontFamily("monospace"),
+                FontSize = ThemeManager.FontSizeTitle,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
                 Width = 260
             };
             var copy = AvaloniaUi.Button("Pro.CopyCode", async (_, _) =>
@@ -100,7 +101,7 @@ namespace Workspace1C
                 IsReadOnly = true,
                 TextWrapping = TextWrapping.Wrap,
                 AcceptsReturn = true,
-                FontFamily = new FontFamily("monospace")
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily)
             };
             features.Bind(TextBox.TextProperty, new Binding(nameof(LicenseViewModel.FeaturesText)) { Mode = BindingMode.OneWay });
             AvaloniaUi.Place(featuresPanel, features, 1);

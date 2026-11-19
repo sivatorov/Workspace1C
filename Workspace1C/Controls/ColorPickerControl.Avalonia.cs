@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using Avalonia;
 using Avalonia.Controls;
@@ -123,7 +123,7 @@ namespace Workspace1C.Controls
             _colorPreview = new Border
             {
                 Height = 40,
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Margin = new Thickness(0, 0, 0, 8),
                 BorderThickness = new Thickness(1)
             };

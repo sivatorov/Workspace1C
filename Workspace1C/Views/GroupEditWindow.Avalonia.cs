@@ -411,7 +411,10 @@ namespace Workspace1C
 
                 if (string.IsNullOrEmpty(key))
                 {
-                    btn.Content = IconHelper.MakeIcon("IconClose", 16, "TextOnAccentColorBrush");
+                    // Аудит UI P0-1: ключ кисти — TextOnAccentBrush. Прежний ключ
+                    // с суффиксом ColorBrush в ресурсах не существует, и значок
+                    // молча оставался невидимым.
+                    btn.Content = IconHelper.MakeIcon("IconClose", 16, "TextOnAccentBrush");
                 }
                 else
                 {

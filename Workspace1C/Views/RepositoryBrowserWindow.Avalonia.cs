@@ -10,6 +10,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -122,14 +123,14 @@ namespace Workspace1C
             PlaceColumn(connectPanel, _passwordBox, 5);
 
             // ---- Кнопки: Подключить / Обновить / действия этапа 3 / Закрыть ----
-            var connectButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.Connect"), OnConnectClick, "🔗");
-            var refreshButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.Refresh"), OnRefreshClick, "⟳");
+            var connectButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.Connect"), OnConnectClick, "IconLink");
+            var refreshButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.Refresh"), OnRefreshClick, "IconRefresh");
             _compareWithBaseButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.CompareWithBase"),
-                () => _vm.CompareWithBaseCommand.Execute(null), "⇄");
+                () => _vm.CompareWithBaseCommand.Execute(null), "IconSwap");
             _compareVersionsButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.CompareVersions"),
-                () => _vm.CompareVersionsCommand.Execute(null), "⇅");
+                () => _vm.CompareVersionsCommand.Execute(null), "IconSwapVertical");
             _dumpCfButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.DumpToCf"),
-                () => _vm.DumpVersionToCfCommand.Execute(null), "⇩");
+                () => _vm.DumpVersionToCfCommand.Execute(null), "IconUpload");
             var closeButton = BuildCloseButton();
             RefreshActionButtons();
 
@@ -145,9 +146,9 @@ namespace Workspace1C
             ToolTip.SetTip(commentBox, LocalizationManager.T("RepositoryBrowser.LockCommentHint"));
 
             _lockAllButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.LockAll"),
-                () => _vm.LockAllCommand.Execute(null), "🔒");
+                () => _vm.LockAllCommand.Execute(null), "IconLock");
             _unlockAllButton = BuildActionButton(LocalizationManager.T("RepositoryBrowser.UnlockAll"),
-                () => _vm.UnlockAllCommand.Execute(null), "🔓");
+                () => _vm.UnlockAllCommand.Execute(null), "IconUnlock");
 
             var lockPanel = new StackPanel
             {
@@ -370,14 +371,10 @@ namespace Workspace1C
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
             comment.Bind(TextBlock.TextProperty, new Binding("Comment"));
-            var currentMark = new TextBlock
-            {
-                Text = "●",
-                FontSize = 12,
-                Foreground = new SolidColorBrush(Color.Parse("#16A34A")),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0)
-            };
+            // P1b: пометка актуальной версии — векторный кружок, не текстовый «●».
+            var currentMark = IconHelper.MakeIcon("IconBullet", UiMetrics.IconInline,
+                new SolidColorBrush(Color.Parse("#16A34A")));
+            currentMark.Margin = new Thickness(8, 0, 0, 0);
             currentMark.Bind(IsVisibleProperty, new Binding("IsCurrent"));
             var commentCell = new StackPanel
             {
@@ -519,7 +516,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        BuildIconOrGlyph(icon, UiMetrics.IconControl, "TextPrimaryBrush"),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -531,11 +528,20 @@ namespace Workspace1C
             return button;
         }
 
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка набора темы (P1a),
+        /// иначе — текстовый глиф для обратной совместимости с остальными кнопками окна.
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, string brushKey)
+            => icon.StartsWith("Icon", StringComparison.Ordinal)
+                ? IconHelper.MakeIcon(icon, size, brushKey)
+                : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center };
+
         private Button BuildCloseButton()
         {
             var button = new Button
             {
-                Content = IconHelper.IconAndText("IconClose", LocalizationManager.T("Common.Close"), 14, "TextPrimaryBrush"),
+                Content = IconHelper.IconAndText("IconClose", LocalizationManager.T("Common.Close"), UiMetrics.IconControl, "TextPrimaryBrush"),
                 Width = 110,
                 Margin = new Thickness(16, 0, 0, 0),
                 IsCancel = true

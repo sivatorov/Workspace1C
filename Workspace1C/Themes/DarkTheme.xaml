@@ -19,7 +19,8 @@
     <Color x:Key="TextPrimaryColor">#F1F5F9</Color>
     <Color x:Key="TextSecondaryColor">#CBD5E1</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
-    <Color x:Key="ButtonTextColor">#000000</Color>
+    <!-- Аудит UI P2b: текст на вторичных кнопках — основной светлый текст темы. -->
+    <Color x:Key="ButtonTextColor">#F1F5F9</Color>
     <Color x:Key="FavoriteColor">#FBBF24</Color>
     <Color x:Key="FavoriteTextColor">#1C1917</Color>
 
@@ -28,10 +29,11 @@
     <Color x:Key="ItemSelectedColor">#1E3A5F</Color>
     <Color x:Key="AvatarBackgroundColor">#1E3A5F</Color>
     <Color x:Key="AvatarTextColor">#FFB300</Color>
-    <!-- Светлый фон вторичных кнопок: тёмный текст всегда читаем -->
-    <Color x:Key="SecondaryButtonBackgroundColor">#FFF3CD</Color>
-    <Color x:Key="SecondaryButtonHoverColor">#FFE69C</Color>
-    <Color x:Key="SecondaryButtonPressedColor">#FFD54D</Color>
+    <!-- Аудит UI P2b: вторичная кнопка в тёмной теме — из палитры темы
+         (CardBackground/ItemHover), а не светло-жёлтая. -->
+    <Color x:Key="SecondaryButtonBackgroundColor">#1E293B</Color>
+    <Color x:Key="SecondaryButtonHoverColor">#334155</Color>
+    <Color x:Key="SecondaryButtonPressedColor">#475569</Color>
     <!-- Опасная кнопка (удаление, остановка): единый красный для обеих тем (issue #26);
          текст на ней всегда белый — контраст с #DC2626 по WCAG ≈ 4.97:1 (≥ 4.5). -->
     <Color x:Key="DangerColor">#DC2626</Color>
@@ -56,6 +58,11 @@
     <!-- Пикер иконок (аудит UI, п. 2.6): тёмные плитки, как раньше, но из темы. -->
     <Color x:Key="IconPickerBaseColor">#374151</Color>
     <Color x:Key="IconPickerHoverColor">#4B5563</Color>
+    <!-- Бейдж «Избранное» и фон блока кода (аудит UI P2b): theme-варианты
+         вместо жёстких #FEF3C7 и полупрозрачного чёрного #22000000. -->
+    <Color x:Key="FavoriteBadgeColor">#78350F</Color>
+    <Color x:Key="FavoriteBadgeTextColor">#FDE68A</Color>
+    <Color x:Key="CodeBlockBackgroundColor">#0B1220</Color>
     <Color x:Key="DangerPressedColor">#991B1B</Color>
     <Color x:Key="DangerTextColor">#FFFFFF</Color>
     <!-- Дорожка переключателя настроек в выключенном положении (issue #26):
@@ -138,6 +145,10 @@
     <!-- Пикер иконок (аудит UI, п. 2.6). -->
     <SolidColorBrush x:Key="IconPickerBaseBrush" Color="{DynamicResource IconPickerBaseColor}"/>
     <SolidColorBrush x:Key="IconPickerHoverBrush" Color="{DynamicResource IconPickerHoverColor}"/>
+    <!-- Бейдж «Избранное» и фон блока кода (аудит UI P2b). -->
+    <SolidColorBrush x:Key="FavoriteBadgeBrush" Color="{DynamicResource FavoriteBadgeColor}"/>
+    <SolidColorBrush x:Key="FavoriteBadgeTextBrush" Color="{DynamicResource FavoriteBadgeTextColor}"/>
+    <SolidColorBrush x:Key="CodeBlockBackgroundBrush" Color="{DynamicResource CodeBlockBackgroundColor}"/>
 
     <SolidColorBrush x:Key="ScrollTrackBrush" Color="#16202E"/>
     <SolidColorBrush x:Key="ScrollThumbBrush" Color="#3B4A5F"/>
@@ -298,6 +309,9 @@
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <!-- Аудит UI P3a: доступное имя и справка из той же строки ToolTip. -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -311,7 +325,8 @@
         </Setter>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="#22F1F5F9"/>
+                <!-- Аудит UI P0-5: подсветка из темы вместо жёсткого #22F1F5F9. -->
+                <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -348,6 +363,9 @@
         <Setter Property="Height" Value="40"/>
         <Setter Property="Margin" Value="3"/>
         <Setter Property="Cursor" Value="Hand"/>
+        <!-- Аудит UI P3a: доступное имя и справка из той же строки ToolTip. -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         <Setter Property="Background" Value="{DynamicResource IconPickerBaseBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="{DynamicResource IconPickerHoverBrush}"/>
@@ -760,14 +778,16 @@
                                     BorderThickness="2"
                                     SnapsToDevicePixels="True">
                                 <Grid>
+                                    <!-- Аудит UI P0-2: индикатор на акцентной заливке
+                                         контрастен акценту (TextOnAccentBrush). -->
                                     <Path x:Name="Check" Data="{DynamicResource GlyphCheckMark}"
-                                          Stroke="White" StrokeThickness="2.2"
+                                          Stroke="{DynamicResource TextOnAccentBrush}" StrokeThickness="2.2"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                           StrokeLineJoin="Round"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Stretch="None" Visibility="Collapsed"/>
                                     <Path x:Name="Dash" Data="{DynamicResource GlyphCheckDash}"
-                                          Stroke="White" StrokeThickness="2.2"
+                                          Stroke="{DynamicResource TextOnAccentBrush}" StrokeThickness="2.2"
                                           StrokeStartLineCap="Round" StrokeEndLineCap="Round"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                           Stretch="None" Visibility="Collapsed"/>
@@ -1320,7 +1340,7 @@
                              стрелка WPF не рисуется, а «стрелки для кого нарисованы» —
                              в тёмной теме их не видно. Рисуем ▲/▼ сами, цвет — вторичной
                              кистью темы (контрастен и в тёмной, и в светлой). -->
-                        <TextBlock x:Name="SortGlyph" Grid.Column="1" Text="▲" FontSize="10"
+                        <TextBlock x:Name="SortGlyph" Grid.Column="1" Text="▲" FontSize="11"
                                    Margin="4,0,6,0" VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Visibility="Collapsed"/>
@@ -1540,6 +1560,9 @@
         <Setter Property="Height" Value="32"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        <!-- Аудит UI P3a: доступное имя и справка берутся из той же строки ToolTip. -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -1571,6 +1594,9 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>
+        <!-- Аудит UI P3a: доступное имя и справка берутся из той же строки ToolTip. -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -1600,6 +1626,9 @@
         <Setter Property="Padding" Value="6,4"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        <!-- Аудит UI P3a: доступное имя и справка берутся из той же строки ToolTip. -->
+        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+        <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -1713,7 +1742,7 @@
                                 CornerRadius="11" Background="{DynamicResource SettingsToggleTrackBrush}"
                                 Margin="12,0,0,0" VerticalAlignment="Center">
                             <Ellipse x:Name="Thumb" Width="16" Height="16"
-                                     Fill="White" HorizontalAlignment="Left" Margin="3,0,0,0"
+                                     Fill="{DynamicResource TextPrimaryBrush}" HorizontalAlignment="Left" Margin="3,0,0,0"
                                      VerticalAlignment="Center"/>
                         </Border>
                     </Grid>
@@ -1722,6 +1751,8 @@
                             <Setter TargetName="Track" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
                             <Setter TargetName="Thumb" Property="Margin" Value="0,0,3,0"/>
+                            <!-- Аудит UI P0-2: на акцентной дорожке — контрастный индикатор. -->
+                            <Setter TargetName="Thumb" Property="Fill" Value="{DynamicResource TextOnAccentBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.5"/>

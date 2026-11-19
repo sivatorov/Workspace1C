@@ -364,6 +364,30 @@ namespace Workspace1C.Themes
         public const string DefaultFontStyle = "Normal";
 
         /// <summary>
+        /// Единый моноширинный стек (аудит UI P2a): журналы, код, технические значения.
+        /// Одинаков на обеих платформах, чтобы вид не «прыгал» при переносе окна.
+        /// </summary>
+        public const string DefaultMonospaceFontFamily =
+            "Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace";
+
+        // ---- Токены размеров шрифта (аудит UI P2a) ----
+        // Единая шкала вместо разрозненных 10/12.5/14/16/20/24:
+        // подпись 11, вторичный текст 12, основной 13, подзаголовок 15,
+        // заголовок 18, заголовок страницы 24.
+        /// <summary>Мелкие подписи, бейджи, сноски.</summary>
+        public const double FontSizeCaption = 11;
+        /// <summary>Вторичный текст: подсказки, пояснения, статусы.</summary>
+        public const double FontSizeSecondary = 12;
+        /// <summary>Основной текст интерфейса.</summary>
+        public const double FontSizeBody = 13;
+        /// <summary>Заголовок секции/подзаголовок окна.</summary>
+        public const double FontSizeSubtitle = 15;
+        /// <summary>Заголовок окна.</summary>
+        public const double FontSizeTitle = 18;
+        /// <summary>Крупный заголовок страницы/пустого состояния.</summary>
+        public const double FontSizePage = 24;
+
+        /// <summary>
         /// Применяет настройки шрифта интерфейса к указанному элементу (окну).
         /// Семейство, размер, начертание и стиль шрифта задаются через наследуемые
         /// свойства <see cref="TextElement"/>, поэтому распространяются на все дочерние

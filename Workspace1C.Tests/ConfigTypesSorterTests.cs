@@ -102,11 +102,11 @@ public sealed class ConfigTypesSorterTests
     {
         var sorter = new ConfigTypesSorter();
 
-        Assert.Equal("▲", sorter.IndicatorFor(ConfigTypesSortColumn.Name));
+        Assert.Equal("IconArrowUp", sorter.IndicatorFor(ConfigTypesSortColumn.Name));
         Assert.Equal(string.Empty, sorter.IndicatorFor(ConfigTypesSortColumn.Nick));
 
         sorter.Toggle(ConfigTypesSortColumn.Name);
-        Assert.Equal("▼", sorter.IndicatorFor(ConfigTypesSortColumn.Name));
+        Assert.Equal("IconArrowDown", sorter.IndicatorFor(ConfigTypesSortColumn.Name));
     }
 
     [Fact]

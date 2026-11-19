@@ -46,7 +46,7 @@ namespace Workspace1C
             RootPanel.Children.Add(new TextBlock
             {
                 Text = name,
-                FontSize = 20,
+                FontSize = Themes.ThemeManager.FontSizeTitle,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = text,
                 Margin = new Thickness(0, 0, 0, 16)

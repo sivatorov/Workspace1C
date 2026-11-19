@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +9,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 using Workspace1C.Models;
@@ -38,7 +39,7 @@ namespace Workspace1C
         private readonly CheckBox _programCacheCheck = new();
         private readonly CheckBox _userCacheCheck = new();
         private readonly CheckBox _orphanCacheCheck = new();
-        private readonly TextBox _searchBox = new() { Padding = new Thickness(10, 7), Watermark = LocalizationManager.T("CacheClean.SearchBase") };
+        private readonly TextBox _searchBox = new() { Padding = new Thickness(12, 8), Watermark = LocalizationManager.T("CacheClean.SearchBase") };
         // Отступ панели строк как в разметке (CacheCleanWindow.xaml:183).
         private readonly StackPanel _basesPanel = new() { Margin = new Thickness(4, 2) };
         private readonly TextBlock _basesCountText = new();
@@ -68,7 +69,8 @@ namespace Workspace1C
         private readonly Dictionary<Infobase, long> _programBytes = new();
         private readonly Dictionary<Infobase, long> _userBytes = new();
         // Заголовки колонок, чтобы обновлять на них стрелку-индикатор направления сортировки.
-        private readonly List<TextBlock> _headerTexts = new();
+        // P1b: индикатор — векторная стрелка, а не текстовые «▲/▼».
+        private readonly List<(TextBlock Label, Avalonia.Controls.Shapes.Path Arrow)> _headerTexts = new();
 
         // Прокрутка списка и строка базы, отмеченной по умолчанию (issue #198): если окно
         // открыто для конкретной базы, список прокручивается к ней, чтобы она была видна
@@ -254,7 +256,7 @@ namespace Workspace1C
             var caption = new TextBlock
             {
                 Text = text,
-                Margin = new Thickness(6, 0, 0, 0),
+                Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             return new StackPanel
@@ -543,7 +545,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             // Фон и рамка карточки: в разметке это CardBackgroundBrush
             // и BorderBrushColor (CacheCleanWindow.xaml:136-137). Без привязки
@@ -659,6 +661,8 @@ namespace Workspace1C
             _cleanButton.Classes.Add("dimmed");
             _cleanButton.Width = 180;
             _cleanButton.Height = 36;
+            // Аудит UI P3a: кнопки нижней панели идут после списка.
+            _cleanButton.TabIndex = 900;
             var cleanCaption = new TextBlock
             {
                 Text = LocalizationManager.T("CacheClean.Clean"),
@@ -878,26 +882,42 @@ namespace Workspace1C
         /// Формирует кликабельный заголовок колонки списка баз. Клик по нему сортирует список
         /// по этой колонке, повторный клик меняет направление (issue #215).
         /// </summary>
-        private TextBlock BuildHeaderText(string text, HorizontalAlignment align, int column)
+        private Control BuildHeaderText(string text, HorizontalAlignment align, int column)
         {
             var block = new TextBlock
             {
                 Text = text,
                 FontSize = 12,
                 FontWeight = FontWeight.SemiBold,
-                HorizontalAlignment = align,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 8, 0),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Cursor = new Cursor(StandardCursorType.Hand)
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
             // Цвет из темы, а не постоянный серый: в тёмной схеме вторичный
             // текст светлее фона (CacheCleanWindow.xaml.cs:134).
             Themes.ThemeBrushes.Bind(block, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            block.PointerPressed += (_, _) => OnHeaderClick(column);
-            Grid.SetColumn(block, column);
-            _headerTexts.Add(block);
-            return block;
+            var arrow = new Avalonia.Controls.Shapes.Path
+            {
+                Width = UiMetrics.IconInline,
+                Height = UiMetrics.IconInline,
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                IsVisible = false
+            };
+            Themes.ThemeBrushes.Bind(arrow, Avalonia.Controls.Shapes.Shape.FillProperty, "TextSecondaryBrush");
+            var panel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = align,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(8, 0, 8, 0),
+                Cursor = new Cursor(StandardCursorType.Hand),
+                Children = { block, arrow }
+            };
+            panel.PointerPressed += (_, _) => OnHeaderClick(column);
+            Grid.SetColumn(panel, column);
+            _headerTexts.Add((block, arrow));
+            return panel;
         }
 
         /// <summary>Обрабатывает клик по заголовку колонки: задаёт сортировку и направление (issue #215).</summary>
@@ -978,8 +998,13 @@ namespace Workspace1C
             };
             for (var i = 0; i < _headerTexts.Count && i < labels.Length; i++)
             {
-                var suffix = i == _sortColumn ? (_sortDescending ? " ▼" : " ▲") : string.Empty;
-                _headerTexts[i].Text = labels[i] + suffix;
+                var (label, arrow) = _headerTexts[i];
+                label.Text = labels[i];
+                var active = i == _sortColumn;
+                arrow.IsVisible = active;
+                arrow.Data = active
+                    ? IconHelper.Geometry(_sortDescending ? "IconArrowDown" : "IconArrowUp")
+                    : null;
             }
         }
 

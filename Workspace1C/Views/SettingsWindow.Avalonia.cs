@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -1265,7 +1265,7 @@ namespace Workspace1C
             var refreshButton = new Button
             {
                 Content = IconTextContent("IconRefresh", "@InfoBrush", "Settings.Platforms.Refresh"),
-                Padding = new Thickness(10, 6),
+                Padding = new Thickness(12, 8),
                 Margin = new Thickness(6, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Top
             };
@@ -1288,7 +1288,7 @@ namespace Workspace1C
             var addPath = new Button
             {
                 Content = IconTextContent("IconFolderPlus", "@SuccessBrush", "Settings.AdditionalPaths.Add"),
-                Padding = new Thickness(10, 6),
+                Padding = new Thickness(12, 8),
                 Margin = new Thickness(0, 0, 8, 0)
             };
             addPath.Styled(ControlThemes.SecondaryButton);
@@ -1317,7 +1317,7 @@ namespace Workspace1C
             var editPath = new Button
             {
                 Content = IconTextContent("IconFolderEdit", "@WarningBrush", "Common.Edit"),
-                Padding = new Thickness(10, 6),
+                Padding = new Thickness(12, 8),
                 Margin = new Thickness(0, 0, 8, 0)
             };
             editPath.Styled(ControlThemes.SecondaryButton);
@@ -1360,7 +1360,7 @@ namespace Workspace1C
             var removePath = new Button
             {
                 Content = IconTextContent("IconFolderRemove", "@DangerTextBrush", "Common.Delete"),
-                Padding = new Thickness(10, 6)
+                Padding = new Thickness(12, 8)
             };
             removePath.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(removePath, LocalizationManager.T("Settings.AdditionalPaths.RemoveTooltip"));
@@ -1463,7 +1463,7 @@ namespace Workspace1C
             // Заголовок порядка колонок и его пояснение по числам разметки
             // (SettingsWindow.xaml:544-548).
             var orderTitle = GroupTitle(LocalizationManager.T("Settings.Columns.OrderTitle"));
-            orderTitle.FontSize = 14;
+            orderTitle.FontSize = ThemeManager.FontSizeSubtitle;
             orderTitle.Margin = new Thickness(0, 12, 0, 4);
             displayColumns.Children.Add(orderTitle);
             displayColumns.Children.Add(Hint(LocalizationManager.T("Settings.Columns.OrderHint"), bottom: 10));
@@ -1965,7 +1965,7 @@ namespace Workspace1C
             Themes.ThemeBrushes.Bind(fontPreview, TextBlock.ForegroundProperty, "TextPrimaryBrush");
             var fontPreviewCard = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(12, 10),
                 Margin = new Thickness(0, 0, 0, 10),
@@ -1993,9 +1993,9 @@ namespace Workspace1C
                 Padding = new Thickness(12, 6),
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            // Тема кнопки целиком, а не только цвета: у автора здесь ModernButton
-            // с его минимальной высотой и скруглением (SettingsWindow.xaml:800).
-            fontApply.Styled(ControlThemes.ModernButton);
+            // Тема кнопки целиком, а не только цвета: у автора здесь акцентная
+            // кнопка с минимальной высотой и скруглением (SettingsWindow.xaml:800).
+            fontApply.Styled(ControlThemes.PrimaryButton);
             ToolTip.SetTip(fontApply, LocalizationManager.T("Settings.Font.ApplyTooltip"));
             displayFont.Children.Add(fontApply);
 
@@ -2280,7 +2280,7 @@ namespace Workspace1C
                 var button = new Button
                 {
                     Content = LocalizationManager.T(textKey),
-                    Padding = new Thickness(10, 6),
+                    Padding = new Thickness(12, 8),
                     Margin = new Thickness(0, 0, 8, 4)
                 };
                 button.Styled(danger ? ControlThemes.DangerButton : ControlThemes.SecondaryButton);
@@ -3393,7 +3393,7 @@ namespace Workspace1C
             var profileBrowse = new Button
             {
                 Content = LocalizationManager.T("Settings.Profile.Browse"),
-                Padding = new Thickness(10, 4),
+                Padding = new Thickness(12, 4),
                 Margin = new Thickness(8, 0, 0, 0)
             };
             // Вторичный стиль темы (issue #46): кнопки резервного копирования профиля
@@ -3649,8 +3649,8 @@ namespace Workspace1C
             };
             var slotUp = new Button
             {
-                Content = IconHelper.MakeIcon("IconArrowUp", 18),
-                Padding = new Thickness(10, 6)
+                Content = IconHelper.MakeIcon("IconArrowUp", UiMetrics.IconToolbar),
+                Padding = new Thickness(12, 8)
             };
             slotUp.Styled(ControlThemes.SecondaryButton);
             ToolTip.SetTip(slotUp, LocalizationManager.T("Settings.Hotkeys.MoveUpTooltip"));
@@ -3665,8 +3665,8 @@ namespace Workspace1C
             };
             var slotDown = new Button
             {
-                Content = IconHelper.MakeIcon("IconArrowDown", 18),
-                Padding = new Thickness(10, 6)
+                Content = IconHelper.MakeIcon("IconArrowDown", UiMetrics.IconToolbar),
+                Padding = new Thickness(12, 8)
             };
             slotDown.Styled(ControlThemes.SecondaryButton);
             ToolTip.SetTip(slotDown, LocalizationManager.T("Settings.Hotkeys.MoveDownTooltip"));
@@ -3802,7 +3802,9 @@ namespace Workspace1C
                 // и высота жёсткие, а не минимум по содержимому.
                 Width = 140,
                 Height = 36,
-                IsDefault = true
+                IsDefault = true,
+                // Аудит UI P3a: кнопки подвала идут после содержимого вкладок.
+                TabIndex = 900
             };
             ok.Styled(ControlThemes.DialogConfirmButton);
             ok.Click += (_, _) =>
@@ -4140,7 +4142,9 @@ namespace Workspace1C
                 Content = cancelContent,
                 Width = 140,
                 Height = 36,
-                IsCancel = true
+                IsCancel = true,
+                // Аудит UI P3a: «Отмена» — последняя в порядке табуляции.
+                TabIndex = 1000
             };
             cancel.Styled(ControlThemes.DialogCancelButton);
             // Отмена закрывает окно так же, как крестик: DialogResult остаётся
@@ -4172,7 +4176,7 @@ namespace Workspace1C
 
         private static Border NewNavItem(TextBlock text) => new()
         {
-            CornerRadius = new CornerRadius(5),
+            CornerRadius = new CornerRadius(4),
             Padding = new Thickness(6, 4),
             Margin = new Thickness(0, 0, 0, 4),
             Child = text
@@ -4259,7 +4263,7 @@ namespace Workspace1C
             // невозможен. Местное значение старше темы, поэтому ставится здесь.
             tab.FontSize = UiMetrics.ScaledFont(12);
 
-            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(14), out var path);
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconControl), out var path);
             path.Bind(Avalonia.Controls.Shapes.Shape.FillProperty,
                 new Avalonia.Data.Binding(nameof(TabItem.Foreground)) { Source = tab });
 
@@ -4297,7 +4301,7 @@ namespace Workspace1C
                 Child = title,
                 Padding = new Thickness(8, 4),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             ThemeBrushes.Bind(headerBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(headerBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -4885,7 +4889,7 @@ namespace Workspace1C
             tab.Width = UiMetrics.Scaled(235);
             tab.FontSize = UiMetrics.ScaledFont(13);
 
-            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18), out var path);
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar), out var path);
             path.Bind(Avalonia.Controls.Shapes.Shape.FillProperty,
                 new Avalonia.Data.Binding(nameof(TabItem.Foreground)) { Source = tab });
             icon.Margin = new Thickness(0, 0, 8, 0);
@@ -5276,7 +5280,7 @@ namespace Workspace1C
             versionRow.Children.Add(new TextBlock
             {
                 Text = string.Format(LocalizationManager.T("Settings.About.Version"), infoVersion),
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeBody,
                 VerticalAlignment = VerticalAlignment.Center
             });
             var checkCaption = new TextBlock
@@ -5285,7 +5289,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 FontSize = 12
             };
-            var checkIcon = IconHelper.MakeIcon("IconRefresh", 14,
+            var checkIcon = IconHelper.MakeIcon("IconRefresh", UiMetrics.IconControl,
                 Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9"));
             checkIcon.VerticalAlignment = VerticalAlignment.Center;
             checkIcon.Margin = new Thickness(0, 0, 5, 0);
@@ -5319,7 +5323,7 @@ namespace Workspace1C
             var authorBlock = new TextBlock
             {
                 Text = LocalizationManager.T("Settings.About.Author"),
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeBody,
                 Margin = new Thickness(0, 0, 0, 16)
             };
             ThemeBrushes.Bind(authorBlock, TextBlock.ForegroundProperty, "TextPrimaryBrush");
@@ -5427,7 +5431,7 @@ namespace Workspace1C
                 Content = copyContent,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 24, 0, 0),
-                Padding = new Thickness(14, 8)
+                Padding = new Thickness(16, 8)
             };
             copyButton.Styled(ControlThemes.SecondaryButton);
             copyButton.Click += async (_, _) =>
@@ -5474,7 +5478,7 @@ namespace Workspace1C
                 Content = diagContent,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 Margin = new Thickness(0, 8, 0, 0),
-                Padding = new Thickness(14, 8)
+                Padding = new Thickness(16, 8)
             };
             diagButton.Styled(ControlThemes.SecondaryButton);
             diagButton.Click += async (_, _) =>
@@ -5513,7 +5517,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 16, 0, 0),
                 Padding = new Thickness(12, 10),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 BorderThickness = new Thickness(1)
             };
             ThemeBrushes.Bind(card, Border.BackgroundProperty, "CardBackgroundBrush");
@@ -5535,7 +5539,7 @@ namespace Workspace1C
             var headerText = new TextBlock
             {
                 Text = LocalizationManager.T("Settings.About.LicenseHeader"),
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -5607,7 +5611,7 @@ namespace Workspace1C
             };
             var licenseButton = new Button
             {
-                Padding = new Thickness(14, 6),
+                Padding = new Thickness(16, 8),
                 Margin = new Thickness(0, 0, 8, 0),
                 Content = AboutLicenseButtonContent("Pro.MenuItem", "IconAccountKey", "InfoBrush")
             };
@@ -5629,7 +5633,7 @@ namespace Workspace1C
 
             var buyProButton = new Button
             {
-                Padding = new Thickness(14, 6),
+                Padding = new Thickness(16, 8),
                 Content = AboutLicenseButtonContent("Settings.About.BuyPro", "IconTag", "SuccessBrush")
             };
             buyProButton.Styled(ControlThemes.SecondaryButton);
@@ -5682,7 +5686,7 @@ namespace Workspace1C
         /// <summary>Содержимое кнопки блока лицензии: значок и подпись из локализации.</summary>
         private static Control AboutLicenseButtonContent(string labelKey, string iconKey, string brushKey)
         {
-            var icon = IconHelper.MakeIcon(iconKey, 14, brushKey);
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.IconControl, brushKey);
             icon.VerticalAlignment = VerticalAlignment.Center;
             icon.Margin = new Thickness(0, 0, 5, 0);
             return new StackPanel

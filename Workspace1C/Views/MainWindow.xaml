@@ -2951,7 +2951,7 @@
                                                          Foreground="{DynamicResource AccentBrush}"
                                                          Margin="0,0,10,0" VerticalAlignment="Center"/>
                                 <StackPanel>
-                                    <TextBlock Text="{Binding SelectedInfobase.Name}" FontSize="16" FontWeight="SemiBold"
+                                    <TextBlock Text="{Binding SelectedInfobase.Name}" FontSize="15" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
                                     <TextBlock FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0">
                                         <TextBlock.Text>
@@ -2966,14 +2966,14 @@
                             </StackPanel>
 
                             <WrapPanel Margin="0,0,0,12">
-                                <Border Background="#FEF3C7" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
+                                <!-- Аудит UI P2b: плашка и текст «Избранное» — theme-кисти
+                                     FavoriteBadgeBrush/FavoriteBadgeTextBrush (Light/Dark),
+                                     а не жёсткий #FEF3C7, который светился в тёмной теме. -->
+                                <Border Background="{DynamicResource FavoriteBadgeBrush}" CornerRadius="8" Padding="8,3" Margin="0,0,6,4"
                                         Visibility="{Binding SelectedInfobase.IsFavorite, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
                                         <materialDesign:PackIcon Kind="Star" Width="12" Height="12" Foreground="{DynamicResource FavoriteBrush}" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                        <!-- Issue #61: подпись «Избранное» на постоянной светло-кремовой плашке #FEF3C7.
-                                             Раньше текст был кистью FavoriteBrush (в тёмной теме жёлтый #FBBF24) —
-                                             «жёлтое на жёлтом», нечитаемо. Теперь тёмный текст FavoriteTextBrush. -->
-                                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FavoriteTextBrush}">
+                                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource FavoriteBadgeTextBrush}">
                                             <TextBlock.Text>
                                                 <MultiBinding StringFormat="{}{0} {1}">
                                                     <Binding Source="{x:Static loc:LocalizationManager.Instance}" Path="Source"
@@ -3110,7 +3110,7 @@
                                     </Path.Data>
                                 </Path>
                                 <StackPanel>
-                                    <TextBlock FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"
+                                    <TextBlock FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"
                                                Foreground="{DynamicResource TextPrimaryBrush}">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -3200,9 +3200,11 @@
                                         </ControlTemplate>
                                     </Button.Template>
                                     <StackPanel Orientation="Horizontal">
+                                        <!-- Аудит UI P0-2: на акцентной кнопке — контрастный TextOnAccentBrush. -->
                                         <materialDesign:PackIcon Kind="Play" Width="16" Height="16" Margin="0,0,6,0"
-                                                                 Foreground="White" VerticalAlignment="Center"/>
-                                        <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold" Foreground="White"
+                                                                 Foreground="{DynamicResource TextOnAccentBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock VerticalAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextOnAccentBrush}"
                                                    Text="{loc:Loc Main.Enterprise}" TextTrimming="None"
                                                    LineHeight="20" LineStackingStrategy="BlockLineHeight"
                                                    Padding="0,1,0,2"/>
@@ -3218,7 +3220,8 @@
                                                  подсветка не выступала за скруглённый контур карточки. -->
                                             <Border x:Name="bd" Background="Transparent" CornerRadius="0,9,9,0">
                                                 <materialDesign:PackIcon Kind="ChevronDown" Width="16" Height="16"
-                                                                         Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                                         Foreground="{DynamicResource TextOnAccentBrush}"
+                                                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
@@ -3670,11 +3673,12 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                 </StackPanel>
-                                <TextBlock Grid.Column="1" Text="➜"
-                                           VerticalAlignment="Center" FontWeight="SemiBold" FontSize="11"
-                                           Foreground="{DynamicResource TextPrimaryBrush}" Opacity="0.75"
-                                           Margin="8,0,0,0"
-                                           Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
+                                <Path Grid.Column="1" Data="{DynamicResource IconArrowRight}"
+                                      Stretch="Uniform" Width="12" Height="12"
+                                      VerticalAlignment="Center"
+                                      Fill="{DynamicResource TextPrimaryBrush}" Opacity="0.75"
+                                      Margin="8,0,0,0"
+                                      Visibility="{Binding ShowRightPanelDetails, Converter={StaticResource BoolToVis}}"/>
                             </Grid>
                         </Button>
 
@@ -3937,7 +3941,7 @@
                     MinWidth="320" MaxWidth="520">
                 <StackPanel>
                     <TextBlock Text="{Binding LoadingMessage}"
-                               FontSize="14" FontWeight="SemiBold"
+                               FontSize="15" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                Margin="0,0,0,16" TextWrapping="Wrap"
                                HorizontalAlignment="Center"/>
@@ -3978,7 +3982,8 @@
                             Style="{StaticResource ModernButton}"
                             Click="OnAppLockOverlay_ButtonClick">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="🔓" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <Path Data="{DynamicResource IconUnlock}" Stretch="Uniform" Width="14" Height="14"
+                                  Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc AppLock.Unlock}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>

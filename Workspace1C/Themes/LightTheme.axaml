@@ -55,6 +55,11 @@
          фиксированных тёмно-серых #374151/#4B5563. -->
     <Color x:Key="IconPickerBaseColor">#FFFFFF</Color>
     <Color x:Key="IconPickerHoverColor">#E2E8F0</Color>
+    <!-- Бейдж «Избранное» (аудит UI P2b): theme-варианты вместо жёсткого #FEF3C7. -->
+    <Color x:Key="FavoriteBadgeColor">#FEF3C7</Color>
+    <Color x:Key="FavoriteBadgeTextColor">#92400E</Color>
+    <!-- Фон блока кода markdown (аудит UI P2b): вместо #22000000. -->
+    <Color x:Key="CodeBlockBackgroundColor">#F1F5F9</Color>
     <Color x:Key="DangerPressedColor">#991B1B</Color>
     <Color x:Key="DangerTextColor">#FFFFFF</Color>
     <!-- Дорожка переключателя в выключенном положении (issue #26): в светлой теме
@@ -131,4 +136,8 @@
     <!-- Пикер иконок (аудит UI, п. 2.6). -->
     <SolidColorBrush x:Key="IconPickerBaseBrush" Color="{DynamicResource IconPickerBaseColor}"/>
     <SolidColorBrush x:Key="IconPickerHoverBrush" Color="{DynamicResource IconPickerHoverColor}"/>
+    <!-- Бейдж «Избранное» и фон блока кода (аудит UI P2b). -->
+    <SolidColorBrush x:Key="FavoriteBadgeBrush" Color="{DynamicResource FavoriteBadgeColor}"/>
+    <SolidColorBrush x:Key="FavoriteBadgeTextBrush" Color="{DynamicResource FavoriteBadgeTextColor}"/>
+    <SolidColorBrush x:Key="CodeBlockBackgroundBrush" Color="{DynamicResource CodeBlockBackgroundColor}"/>
 </ResourceDictionary>

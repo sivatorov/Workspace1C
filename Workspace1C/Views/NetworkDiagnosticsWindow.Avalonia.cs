@@ -7,6 +7,7 @@ using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 using Workspace1C.ViewModels;
@@ -66,16 +67,16 @@ namespace Workspace1C
             portBox.Styled(ControlThemes.ModernTextBox);
             portBox.Bind(TextBox.TextProperty, new Binding("PortText", BindingMode.TwoWay));
 
-            var runButton = BuildActionButton(LocalizationManager.T("Diagnostics.Run"), "🔎",
+            var runButton = BuildActionButton(LocalizationManager.T("Diagnostics.Run"), "IconSearch",
                 () => _ = _vm.RunAsync());
-            var checkPortsButton = BuildActionButton(LocalizationManager.T("Diagnostics.CheckPorts"), "🔌",
+            var checkPortsButton = BuildActionButton(LocalizationManager.T("Diagnostics.CheckPorts"), "IconLink",
                 () => _ = _vm.CheckPortsAsync());
             var checkRepositoryButton = BuildActionButton(
-                LocalizationManager.T("Diagnostics.CheckRepository"), "🗄️",
+                LocalizationManager.T("Diagnostics.CheckRepository"), "IconDatabase",
                 () => _ = _vm.CheckRepositoryAsync());
             ToolTip.SetTip(checkRepositoryButton,
                 LocalizationManager.T("Diagnostics.CheckRepositoryTooltip"));
-            var retryButton = BuildActionButton(LocalizationManager.T("Diagnostics.Retry"), "⟳",
+            var retryButton = BuildActionButton(LocalizationManager.T("Diagnostics.Retry"), "IconRefresh",
                 () => _ = _vm.RetryAsync());
             var closeButton = BuildCloseButton();
 
@@ -287,7 +288,10 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        // P1b аудита UI: ключ Icon* — векторная иконка активного набора.
+                        icon.StartsWith("Icon", StringComparison.Ordinal)
+                            ? IconHelper.MakeIcon(icon, UiMetrics.IconControl, "TextPrimaryBrush")
+                            : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -303,7 +307,7 @@ namespace Workspace1C
         {
             var button = new Button
             {
-                Content = IconHelper.IconAndText("IconClose", LocalizationManager.T("Common.Close"), 14, "TextPrimaryBrush"),
+                Content = IconHelper.IconAndText("IconClose", LocalizationManager.T("Common.Close"), UiMetrics.IconControl, "TextPrimaryBrush"),
                 IsCancel = true
             };
             button.Styled(ControlThemes.ModernButton);

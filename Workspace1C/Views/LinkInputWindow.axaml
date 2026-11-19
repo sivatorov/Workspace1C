@@ -31,25 +31,26 @@
 
         <TextBox Grid.Row="2" x:Name="LinkBox" Theme="{DynamicResource ModernTextBox}"/>
 
-        <!-- Порядок, размеры и цвета по разметке WPF (LinkInputWindow.xaml:50):
-             зелёный переход слева, красная отмена справа, зазор 10. -->
+        <!-- Порядок и цвета по разметке WPF (LinkInputWindow.xaml:50): переход
+             слева, отмена справа, зазор 10. Аудит UI P1c: высота нижней панели
+             диалога — 36, ширина минимальная, недоступность гасится приглушением
+             (класс greyed удалён). -->
         <StackPanel Grid.Row="3" Orientation="Horizontal"
                     HorizontalAlignment="Right" Spacing="10" Margin="0,16,0,0">
-            <Button x:Name="OkButton" Width="150" Height="38" IsDefault="True"
-                    Classes="greyed"
+            <Button x:Name="OkButton" MinWidth="140" Height="36" IsDefault="True"
                     Theme="{DynamicResource DialogConfirmButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <!-- Контур кладётся в холст 24 на 24 и масштабируется целиком,
                          как это делает IconHelper.MakeIcon и PackIcon в WPF. -->
                     <Viewbox Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center">
                         <Canvas Width="24" Height="24">
-                            <Path Data="{DynamicResource IconArrowRight}" Fill="White"/>
+                            <Path Data="{DynamicResource IconArrowRight}" Fill="{DynamicResource TextOnAccentBrush}"/>
                         </Canvas>
                     </Viewbox>
                     <TextBlock Text="{loc:Loc LinkInput.Go}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="CancelButton" Width="140" Height="38" IsCancel="True"
+            <Button x:Name="CancelButton" MinWidth="140" Height="36" IsCancel="True"
                     Theme="{DynamicResource DialogCancelButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Viewbox Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center">

@@ -154,7 +154,7 @@
             </StackPanel>
             <Button Grid.Column="1" Width="120" Height="34" IsCancel="True" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnClose_Click">
-                <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
             </Button>
         </Grid>
     </Grid>

@@ -69,7 +69,7 @@
                         Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
                         Command="{Binding CheckPortsCommand}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="🔌" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconLink}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Diagnostics.CheckPorts}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -86,7 +86,7 @@
                         Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,8,0"
                         Command="{Binding RetryCommand}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Diagnostics.Retry}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -95,7 +95,7 @@
                         Foreground="{DynamicResource TextPrimaryBrush}"
                         Click="OnClose_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -35,7 +36,7 @@ public sealed class BaseNotesWindow : ModalWindowBase
         AcceptsReturn = true,
         AcceptsTab = true,
         Height = 190,
-        FontFamily = new FontFamily("Consolas,DejaVu Sans Mono,monospace"),
+        FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
         VerticalContentAlignment = VerticalAlignment.Top
     }.Styled(ControlThemes.ModernTextBox);
 
@@ -154,7 +155,9 @@ public sealed class BaseNotesWindow : ModalWindowBase
         var secretsLabel = new TextBlock { Text = T("Notes.SecretsHeader"), FontWeight = FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         ThemeBrushes.Bind(secretsLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
         secretsHeader.Children.Add(secretsLabel);
-        var addButton = new Button { Content = T("Notes.AddSecret"), Height = 30 };
+        // Аудит UI P1c: компактная кнопка действия — 32 px (шкала 36/32/40),
+        // а не 30; ширина по содержимому.
+        var addButton = new Button { Content = T("Notes.AddSecret"), Height = 32 };
         addButton.Styled(ControlThemes.DialogConfirmButton);
         addButton.Click += (_, _) => AddSecretRow(string.Empty, null);
         secretsHeader.Children.Add(addButton);
@@ -169,7 +172,9 @@ public sealed class BaseNotesWindow : ModalWindowBase
             Spacing = 10,
             Margin = new Thickness(0, 12, 0, 0)
         };
-        var save = new Button { Content = T("Common.Save"), Width = 130, Height = 36, IsDefault = true };
+        // Аудит UI P1c: минимальная ширина вместо фиксированной — английская
+        // подпись не обрезается.
+        var save = new Button { Content = T("Common.Save"), MinWidth = 120, Height = 36, IsDefault = true };
         save.Styled(ControlThemes.DialogConfirmButton);
         save.Click += (_, _) => OnSaveClick();
         var cancel = BuildCancelActionButton(120);
@@ -203,7 +208,7 @@ public sealed class BaseNotesWindow : ModalWindowBase
         row.RevealButton.Content = IconHelper.MakeIcon("IconEye", 16);
         row.RevealButton.Styled(ControlThemes.IconButton);
         ToolTip.SetTip(row.RevealButton, T("Connection.ShowPasswordTooltip"));
-        row.RemoveButton.Content = IconHelper.MakeIcon("IconClose", 13);
+        row.RemoveButton.Content = IconHelper.MakeIcon("IconClose", UiMetrics.IconInline);
         row.RemoveButton.Styled(ControlThemes.IconButton);
         ToolTip.SetTip(row.RemoveButton, T("Notes.DeleteSecret"));
         ThemeBrushes.Bind(row.StatusText, TextBlock.ForegroundProperty, "TextSecondaryBrush");

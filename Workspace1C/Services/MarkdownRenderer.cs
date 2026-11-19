@@ -387,8 +387,14 @@ namespace Workspace1C.Services
     /// </summary>
     internal static class MarkdownWpfRenderer
     {
-        private static readonly FontFamily MonospaceFont = new("Cascadia Mono, Consolas, monospace");
-        private static readonly SolidColorBrush CodeBrush = new(Color.FromArgb(35, 0, 0, 0));
+        private static readonly FontFamily MonospaceFont =
+            new(Themes.ThemeManager.DefaultMonospaceFontFamily);
+        // Аудит UI P2b: фон блока кода — theme-кисть CodeBlockBackgroundBrush
+        // (Light/Dark), а не полупрозрачный чёрный #22000000, который в тёмной
+        // теме сливался с фоном окна. Запасной вариант — прежний полупрозрачный чёрный.
+        private static Brush CodeBrush =>
+            System.Windows.Application.Current?.TryFindResource("CodeBlockBackgroundBrush") as Brush
+            ?? new SolidColorBrush(Color.FromArgb(35, 0, 0, 0));
         private static readonly SolidColorBrush RuleBrush = new(Color.FromArgb(60, 0, 0, 0));
 
         public static FlowDocument Render(string markdown)
@@ -398,7 +404,7 @@ namespace Workspace1C.Services
                 PagePadding = new Thickness(0),
                 FontSize = 12,
                 LineHeight = 18,
-                FontFamily = new FontFamily("Segoe UI")
+                FontFamily = new FontFamily(Themes.ThemeManager.DefaultFontFamily)
             };
             // Issue #107 п.1 (v1.0.1.50): текст «Что нового» обязан следовать теме.
             // Без явной кисти FlowDocument наследовал дефолт контрола (чёрный), и в
@@ -578,8 +584,11 @@ namespace Workspace1C.Services
     /// </summary>
     internal static class MarkdownAvaloniaRenderer
     {
-        private static readonly FontFamily MonospaceFont = new("Consolas, monospace");
-        private static readonly IBrush CodeBrush = new SolidColorBrush(Color.Parse("#22000000"));
+        private static readonly FontFamily MonospaceFont =
+            new(ThemeManager.DefaultMonospaceFontFamily);
+        // Аудит UI P2b: фон блока кода — theme-кисть CodeBlockBackgroundBrush
+        // (Light/Dark) вместо #22000000, чтобы в тёмной теме блок не сливался.
+        private static IBrush CodeBrush => ThemeBrushes.Get("CodeBlockBackgroundBrush", "#22000000");
         private static readonly IBrush RuleBrush = new SolidColorBrush(Color.Parse("#40000000"));
 
         public static StackPanel Render(string markdown)

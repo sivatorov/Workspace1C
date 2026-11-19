@@ -16,19 +16,55 @@ namespace Workspace1C.Controls
     /// </summary>
     public static class UiMetrics
     {
-        // ---- Скругления ----
-        /// <summary>Крупные карточки-секции (правый экран, empty-state).</summary>
+        // ---- Скругления (аудит UI P1c: единая шкала 4 / 8 / 12) ----
+        // 4 — чипы и мелкие элементы, 8 — кнопки/поля/карточки, 12 — диалоги и
+        // крупные карточки. Пилюли (круглые кнопки, дорожки тумблеров) задаются
+        // явным 999 по месту: это не радиус, а признак «капсулы».
+        /// <summary>Крупные карточки-секции и диалоги.</summary>
         public const double RadiusXl = 12;
-        /// <summary>Управляющие элементы (кнопки, поле поиска, сегмент-контейнер).</summary>
-        public const double RadiusLg = 10;
-        /// <summary>Карточки строк и иконки-«аватары».</summary>
+        /// <summary>Управляющие элементы (кнопки, поля, карточки, поле поиска).</summary>
+        public const double RadiusLg = 8;
+        /// <summary>Карточки строк и иконки-«аватары» (тот же шаг шкалы, что и RadiusLg).</summary>
         public const double RadiusMd = 8;
-        /// <summary>Мелкие элементы (заголовки групп, сегменты).</summary>
-        public const double RadiusSm = 6;
+        /// <summary>Чипы и мелкие элементы (заголовки групп, сегменты, пункты меню).</summary>
+        public const double RadiusSm = 4;
 
-        // ---- Отступы ----
+        // ---- Размеры шрифтов (аудит UI P2a) ----
+        // Единая шкала: подпись 11, вторичный текст 12, основной 13,
+        // подзаголовок 15, заголовок 18, заголовок страницы 24.
+        // Значения — из общего менеджера темы, чтобы обе платформы жили по одной шкале.
+        /// <summary>Мелкие подписи, бейджи, сноски.</summary>
+        public const double FontSizeCaption = Themes.ThemeManager.FontSizeCaption;
+        /// <summary>Вторичный текст: подсказки, пояснения, статусы.</summary>
+        public const double FontSizeSecondary = Themes.ThemeManager.FontSizeSecondary;
+        /// <summary>Основной текст интерфейса.</summary>
+        public const double FontSizeBody = Themes.ThemeManager.FontSizeBody;
+        /// <summary>Заголовок секции/подзаголовок окна.</summary>
+        public const double FontSizeSubtitle = Themes.ThemeManager.FontSizeSubtitle;
+        /// <summary>Заголовок окна.</summary>
+        public const double FontSizeTitle = Themes.ThemeManager.FontSizeTitle;
+        /// <summary>Крупный заголовок страницы/пустого состояния.</summary>
+        public const double FontSizePage = Themes.ThemeManager.FontSizePage;
+
+        // ---- Размеры иконок (аудит UI, P1b) ----
+        // Единая шкала вместо разрозненных 13/14/15/18/22/28/34/44:
+        // 13→12, 14/15→16, 18→20, 22→24, 28→24/32, 34→32, 44→48.
+        /// <summary>Иконка внутри строки текста, чипа или мелкой метки.</summary>
+        public const double IconInline = 12;
+        /// <summary>Иконка управляющего элемента: кнопки, поля, пункты меню.</summary>
+        public const double IconControl = 16;
+        /// <summary>Иконка панели инструментов и компактных кнопок-иконок.</summary>
+        public const double IconToolbar = 20;
+        /// <summary>Иконка заголовка окна/секции.</summary>
+        public const double IconHeader = 24;
+        /// <summary>Иконка пустого состояния.</summary>
+        public const double IconEmpty = 32;
+        /// <summary>Крупная иконка пустого состояния/оверлея.</summary>
+        public const double IconEmptyLarge = 48;
+
+        // ---- Отступы (аудит UI P2b: единая шкала 4 / 8 / 12 / 16 / 24 / 32) ----
         /// <summary>Внутренний отступ секций-карточек правой панели (обычный режим).</summary>
-        public const double PaddingSection = 10;
+        public const double PaddingSection = 12;
         /// <summary>Внутренний отступ управляющих элементов (обычный режим).</summary>
         public const double PaddingControl = 8;
 
@@ -108,7 +144,7 @@ namespace Workspace1C.Controls
         public static double TopBarH => Compact ? 8 : 12;
 
         /// <summary>Внутренний отступ секций-карточек правой панели.</summary>
-        public static double SectionPad => Compact ? 6 : PaddingSection;
+        public static double SectionPad => Compact ? 8 : PaddingSection;
         /// <summary>Нижний отступ между секциями-карточками.</summary>
         public static double SectionMarginBottom => Compact ? 4 : 8;
 
@@ -116,15 +152,15 @@ namespace Workspace1C.Controls
         public static double ControlPad => Compact ? 6 : PaddingControl;
 
         /// <summary>Стандартный вертикальный промежуток между строками внутри секции.</summary>
-        public static double Gap => Compact ? 4 : 6;
+        public static double Gap => Compact ? 4 : 8;
 
         /// <summary>Вертикальный padding кнопок (primary/secondary).</summary>
-        public static double ButtonPadV => Compact ? 4 : 7;
+        public static double ButtonPadV => Compact ? 4 : 8;
         /// <summary>Горизонтальный padding кнопок (primary/secondary).</summary>
-        public static double ButtonPadH => Compact ? 6 : 10;
+        public static double ButtonPadH => Compact ? 8 : 12;
 
         /// <summary>Вертикальный padding компактных кнопок действий правой панели.</summary>
-        public static double ActionButtonPadV => Compact ? 3 : 6;
+        public static double ActionButtonPadV => Compact ? 4 : 8;
         /// <summary>Горизонтальный padding компактных кнопок действий правой панели.</summary>
         public static double ActionButtonPadH => Compact ? 6 : 8;
         /// <summary>Минимальная высота кнопки действия в правой панели.</summary>
@@ -136,27 +172,29 @@ namespace Workspace1C.Controls
         /// </summary>
         public static double ActionPanelButtonHeight => Scaled(34);
         /// <summary>Размер иконки на кнопке действия правой панели.</summary>
-        public static double ActionIconSize => Compact ? 13 : 14;
+        public static double ActionIconSize => Compact ? IconInline : IconControl;
         /// <summary>Размер шрифта подписи кнопки действия правой панели.</summary>
         public static double ActionFontSize => Compact ? 11 : 12;
         /// <summary>Промежуток между ячейками сетки действий правой панели.</summary>
-        public static double ActionGridGap => Compact ? 4 : 6;
+        public static double ActionGridGap => Compact ? 4 : 8;
 
         /// <summary>Размер квадратной подложки под иконку статуса базы в списке.</summary>
         public static double RowIconBox => Compact ? 28 : 38;
         /// <summary>Размер самой иконки статуса внутри подложки.</summary>
-        public static double RowIcon => 14;
+        public static double RowIcon => IconControl;
         /// <summary>Размер шрифта имени базы в строке списка.</summary>
-        public static double RowNameFont => (Compact ? 12.5 : 13) * _userRowScale;
+        public static double RowNameFont =>
+            (Compact ? FontSizeSecondary : FontSizeBody) * _userRowScale;
         /// <summary>Размер шрифта вторичной информации в строке списка.</summary>
-        public static double RowSecondaryFont => (Compact ? 11 : 12) * _userRowScale;
+        public static double RowSecondaryFont =>
+            (Compact ? FontSizeCaption : FontSizeSecondary) * _userRowScale;
 
         /// <summary>
         /// Размер шрифта имени группы в списке. В обычном режиме имя группы наследует
         /// применяемый к интерфейсу шрифт (без жёсткого размера), поэтому значение имеет
         /// смысл только в компактном режиме, где имя группы задаётся явно и уменьшается.
         /// </summary>
-        public static double GroupNameFont => 12.5 * _userRowScale;
+        public static double GroupNameFont => FontSizeBody * _userRowScale;
 
         /// <summary>Вертикальный внутренний отступ заголовка группы (высота оформления группы).</summary>
         public static double GroupHeaderPadV => Compact ? 1 : 3;

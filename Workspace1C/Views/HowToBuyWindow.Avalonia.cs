@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Workspace1C.Localization;
 using Workspace1C.Services.Licensing;
+using Workspace1C.Themes;
 using Workspace1C.ViewModels;
 
 namespace Workspace1C
@@ -63,8 +64,8 @@ namespace Workspace1C
             {
                 Text = _vm.MachineCodeText,
                 IsReadOnly = true,
-                FontSize = 18,
-                FontFamily = new FontFamily("monospace"),
+                FontSize = ThemeManager.FontSizeTitle,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
                 Width = 260
             };
             var copy = AvaloniaUi.Button("Pro.HowToBuy.CopyMachineCode", async (_, _) =>

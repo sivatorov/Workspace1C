@@ -40,7 +40,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="LockIcon" Text="🔒" Margin="0,0,8,0" VerticalAlignment="Center" Opacity="0.0"/>
+                        <Path Data="{DynamicResource IconLock}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,8,0" VerticalAlignment="Center" x:Name="LockIcon" Opacity="0.0"/>
                         <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </DataTemplate>
@@ -62,21 +62,21 @@
              слева, «Отмена» — справа (последней), как во всех остальных окнах. -->
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="LoginButton" Width="130" Margin="0,0,8,0"
-                    IsDefault="True"
-                    Style="{StaticResource ModernButton}"
+                    IsDefault="True" KeyboardNavigation.TabIndex="900"
+                    Style="{StaticResource PrimaryButton}"
                     Click="OnLogin_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Auth.Login}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Width="110"
-                    IsCancel="True"
+                    IsCancel="True" KeyboardNavigation.TabIndex="1000"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"
                     Foreground="{DynamicResource TextPrimaryBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

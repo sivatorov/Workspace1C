@@ -171,7 +171,8 @@ namespace Workspace1C
             _cfPathBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("CfFilePath") { Mode = Avalonia.Data.BindingMode.TwoWay });
             ThemeBrushes.Bind(_cfPathBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
             ThemeBrushes.Bind(_cfPathBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
-            _browseCfButton.Content = "…";
+            // P1b: кнопка «Обзор» — векторная иконка папки, не текстовое «…».
+            _browseCfButton.Content = IconHelper.MakeIcon("IconFolderOpen", UiMetrics.IconControl, "TextPrimaryBrush");
             _browseCfButton.MinWidth = 34;
             _browseCfButton.Styled(ControlThemes.ModernButton);
             _browseCfButton.Click += async (_, _) => await BrowseCfAsync();
@@ -213,7 +214,8 @@ namespace Workspace1C
             _dumpDirBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("DumpDirectory") { Mode = Avalonia.Data.BindingMode.TwoWay });
             ThemeBrushes.Bind(_dumpDirBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
             ThemeBrushes.Bind(_dumpDirBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
-            _browseDirButton.Content = "…";
+            // P1b: кнопка «Обзор» — векторная иконка папки, не текстовое «…».
+            _browseDirButton.Content = IconHelper.MakeIcon("IconFolderOpen", UiMetrics.IconControl, "TextPrimaryBrush");
             _browseDirButton.MinWidth = 34;
             _browseDirButton.Styled(ControlThemes.ModernButton);
             _browseDirButton.Click += async (_, _) => await BrowseDumpDirAsync();
@@ -408,7 +410,7 @@ namespace Workspace1C
             // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
             _runButton.Content = IconHelper.IconAndText("IconImport",
                 LocalizationManager.T("BatchOps.Execute"), 16, "TextOnAccentBrush");
-            _runButton.Styled(ControlThemes.ModernButton);
+            _runButton.Styled(ControlThemes.DialogConfirmButton);
             _runButton.Width = 200;
             _runButton.IsDefault = true;
             _runButton.Click += async (_, _) => await RunAsyncSafe();

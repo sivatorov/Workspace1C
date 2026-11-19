@@ -78,10 +78,7 @@
                                     </Grid.ColumnDefinitions>
                                     <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
                                                       Margin="{TemplateBinding Padding}"/>
-                                    <TextBlock Grid.Column="1" x:Name="SortArrow" Text="▲" FontSize="9"
-                                               Margin="4,0,6,0" VerticalAlignment="Center"
-                                               Foreground="{DynamicResource TextPrimaryBrush}"
-                                               Visibility="Collapsed"/>
+                                    <Path Grid.Column="1" x:Name="SortArrow" Data="{DynamicResource IconArrowUp}" Width="10" Height="10" Stretch="Uniform" Margin="4,0,6,0" VerticalAlignment="Center" Fill="{DynamicResource TextPrimaryBrush}" Visibility="Collapsed"/>
                                 </Grid>
                             </Border>
                             <Thumb x:Name="PART_LeftHeaderGripper" HorizontalAlignment="Left"
@@ -92,12 +89,12 @@
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding SortDirection, RelativeSource={RelativeSource Self}}"
                                          Value="Ascending">
-                                <Setter TargetName="SortArrow" Property="Text" Value="▲"/>
+                                <Setter TargetName="SortArrow" Property="Data" Value="{DynamicResource IconArrowUp}"/>
                                 <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding SortDirection, RelativeSource={RelativeSource Self}}"
                                          Value="Descending">
-                                <Setter TargetName="SortArrow" Property="Text" Value="▼"/>
+                                <Setter TargetName="SortArrow" Property="Data" Value="{DynamicResource IconArrowDown}"/>
                                 <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
                             </DataTrigger>
                         </ControlTemplate.Triggers>
@@ -199,25 +196,25 @@
                 <Button x:Name="EditServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.Edit}"
                         Click="OnEditServer_Click">
-                    <TextBlock Text="✎" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconEdit}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <Button x:Name="MoveUpServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.MoveUp}"
                         IsEnabled="{Binding CanMoveServerUp}" Click="OnMoveServerUp_Click">
-                    <TextBlock Text="↑" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconArrowUp}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <Button x:Name="MoveDownServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.MoveDown}"
                         IsEnabled="{Binding CanMoveServerDown}" Click="OnMoveServerDown_Click">
-                    <TextBlock Text="↓" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconArrowDown}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Кнопке «Удалить» — красная иконка (issue #3, комментарий 7OH). -->
                 <Button x:Name="DeleteServerButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Servers.Delete}"
                         Click="OnDeleteServer_Click">
-                    <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
+                    <Path Data="{DynamicResource IconDelete}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
             <!-- Подсказка при пустом списке (issue #3): добавьте сервер и выберите его. -->
@@ -309,28 +306,29 @@
                         ToolTip="{loc:Loc ServerMonitor.Infobase.Edit}"
                         IsEnabled="{Binding CanDropInfobase}"
                         Click="OnEditInfobase_Click">
-                    <TextBlock Text="✎" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconEdit}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <!-- Сортировка списка баз (issue #3, 7OH 17.10): Добавить, Правка | А→Я, Я→А | Удалить. -->
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
-                <!-- Языконезависимые глифы сортировки (аудит UI, п. 4.4): «А↓/Я↓»
-                     сменились на нейтральные «A↓/Z↓». -->
+                <!-- Аудит UI P1b: сортировка — векторные иконки набора, не текстовые «A↓/Z↓». -->
                 <Button x:Name="SortInfobasesAscButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortAsc}"
                         Click="OnSortInfobasesAsc_Click">
-                    <TextBlock Text="A↓" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconSortAscending}" Width="16" Height="16"
+                          Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <Button x:Name="SortInfobasesDescButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.SortDesc}"
                         Click="OnSortInfobasesDesc_Click">
-                    <TextBlock Text="Z↓" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconSortDescending}" Width="16" Height="16"
+                          Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </Button>
                 <Border Width="1" Margin="0,4,6,4" Background="{DynamicResource BorderBrushColor}"/>
                 <!-- Кнопке удаления — красная иконка (issue #3). -->
                 <Button x:Name="DeleteInfobaseButton" Style="{StaticResource IconButton}"
                         ToolTip="{loc:Loc ServerMonitor.Infobase.Delete}"
                         IsEnabled="{Binding CanDropInfobase}" Click="OnDeleteInfobase_Click">
-                    <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
+                    <Path Data="{DynamicResource IconDelete}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
             <!-- Подсказка при пустом списке баз. -->
@@ -417,7 +415,7 @@
                     Background="{DynamicResource ItemHoverBrush}" Padding="14,6" Margin="0,0,6,0"
                     Click="OnRefresh_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc ServerMonitor.Refresh}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -571,8 +569,27 @@
                                 </Style>
                             </DataGridTextColumn.ElementStyle>
                         </DataGridTextColumn>
-                        <DataGridTextColumn Width="100" MinWidth="93" Header="{loc:Loc ServerMonitor.Columns.Session.Blocked}"
-                                            Binding="{Binding BlockedSymbol}" ElementStyle="{StaticResource CenteredCellText}"/>
+                        <DataGridTemplateColumn Width="100" MinWidth="93" Header="{loc:Loc ServerMonitor.Columns.Session.Blocked}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <!-- P1b: блокировка — векторный кружок, не текстовый «●». -->
+                                    <Path Data="{DynamicResource IconBullet}" Width="16" Height="16"
+                                          Stretch="Uniform" Fill="{DynamicResource WarningBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBlocked}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Width="110" MinWidth="85" Header="{loc:Loc ServerMonitor.Columns.Session.Memory}"
                                             Binding="{Binding MemoryText}" ElementStyle="{StaticResource CenteredCellText}"/>
                         <DataGridTextColumn Width="130" MinWidth="130" Header="{loc:Loc ServerMonitor.Columns.Session.Duration}"
@@ -680,22 +697,48 @@
                         <!-- issue #75: MinWidth колонок — по заголовку (см. SessionsGrid). -->
                         <DataGridTextColumn Width="2*" MinWidth="85" Header="{loc:Loc ServerMonitor.Columns.Lock.Object}"
                                             Binding="{Binding Object}" ElementStyle="{StaticResource CellTextAccent}"/>
-                        <DataGridTextColumn Width="110" MinWidth="93" Header="{loc:Loc ServerMonitor.Columns.Lock.Waiting}"
-                                            Binding="{Binding WaitingSymbol}">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
-                                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}"/>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
-                        <DataGridTextColumn Width="110" MinWidth="108" Header="{loc:Loc ServerMonitor.Columns.Lock.Blocking}"
-                                            Binding="{Binding BlockingSymbol}">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock" BasedOn="{StaticResource CenteredCellText}">
-                                    <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
+                        <DataGridTemplateColumn Width="110" MinWidth="93" Header="{loc:Loc ServerMonitor.Columns.Lock.Waiting}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <!-- P1b: ожидание блокировки — векторный кружок. -->
+                                    <Path Data="{DynamicResource IconBullet}" Width="16" Height="16"
+                                          Stretch="Uniform" Fill="{DynamicResource WarningBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Waiting}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Width="110" MinWidth="108" Header="{loc:Loc ServerMonitor.Columns.Lock.Blocking}">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <!-- P1b: активная блокировка — векторный кружок. -->
+                                    <Path Data="{DynamicResource IconBullet}" Width="16" Height="16"
+                                          Stretch="Uniform" Fill="{DynamicResource ErrorBrush}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Blocking}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Width="1.1*" MinWidth="93" Header="{loc:Loc ServerMonitor.Columns.Lock.Session}"
                                             Binding="{Binding SessionId}" ElementStyle="{StaticResource CenteredCellText}"/>
                         <DataGridTextColumn Width="1.1*" MinWidth="115" Header="{loc:Loc ServerMonitor.Columns.Lock.Connection}"
@@ -922,7 +965,7 @@
                             Margin="0,0,0,8" HorizontalAlignment="Left"
                             Click="OnSaveClusterInfo_Click">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="💾" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <Path Data="{DynamicResource IconSave}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                             <TextBlock Text="{loc:Loc ServerMonitor.Cluster.Save}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>

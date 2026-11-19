@@ -281,7 +281,7 @@ public sealed class Issue116UpdateModesAuditTests
 
         // Avalonia: те же цвета через спецификации темы.
         var avalonia = ReadProjectFile("Workspace1C/Views/MainWindow.Avalonia.cs");
-        Assert.Contains("IconHelper.MakeIcon(\"IconSync\", UiMetrics.Scaled(15), \"@AccentBrush\")", avalonia);
+        Assert.Contains("IconHelper.MakeIcon(\"IconSync\", UiMetrics.Scaled(UiMetrics.IconControl), \"@AccentBrush\")", avalonia);
         Assert.Contains("IconHelper.MakeIcon(\"IconWarning\", UiMetrics.Scaled(16), \"@AccentBrush\")", avalonia);
         Assert.Contains("IconHelper.MakeIcon(\"IconCheck\", UiMetrics.Scaled(16), \"@SuccessBrush\")", avalonia);
     }

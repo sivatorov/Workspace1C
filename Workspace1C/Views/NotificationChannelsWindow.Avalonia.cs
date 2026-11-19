@@ -92,7 +92,7 @@ public sealed class NotificationChannelsWindow : ModalWindowBase
         var header = new TextBlock
         {
             Text = text,
-            FontSize = 14,
+            FontSize = ThemeManager.FontSizeSubtitle,
             FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Margin = new Thickness(0, 12, 0, 2)
         };

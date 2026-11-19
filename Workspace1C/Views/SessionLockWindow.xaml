@@ -94,14 +94,14 @@
             <Button x:Name="UnlockButton" Width="180" Margin="0,0,8,0"
                     Click="OnUnlock_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="UnlockTextBlock" Text="{loc:Loc SessionLock.Unlock}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button x:Name="LockButton" Width="180" IsDefault="True"
                     Click="OnLock_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🔒" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconLock}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock x:Name="LockTextBlock" Text="{loc:Loc SessionLock.Lock}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

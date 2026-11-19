@@ -169,13 +169,27 @@ namespace Workspace1C
             Header = LocalizationManager.T(textKey),
             Command = command,
             Style = TryFindResource("ModernMenuItem") as Style,
-            Icon = new TextBlock
-            {
-                Text = icon,
-                Foreground = Themes.WpfBrushes.FromSpec(colorHex),
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            }
+            Icon = icon.StartsWith("Icon", StringComparison.Ordinal)
+                ? MenuIconGlyph(icon, colorHex)
+                : new TextBlock
+                {
+                    Text = icon,
+                    Foreground = Themes.WpfBrushes.FromSpec(colorHex),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                }
+        };
+
+        /// <summary>Векторная иконка пункта меню по ключу <c>Icon*</c> (P1b).</summary>
+        private static FrameworkElement MenuIconGlyph(string iconKey, string colorHex) => new System.Windows.Shapes.Path
+        {
+            Data = Converters.IconKeyToGeometryConverter.ResolveGeometry(iconKey),
+            Fill = Themes.WpfBrushes.FromSpec(colorHex),
+            Width = 16,
+            Height = 16,
+            Stretch = Stretch.Uniform,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
         };
 
         private void OnStart_Click(object sender, RoutedEventArgs e) => _vm.StartCommand.Execute(null);
@@ -316,11 +330,11 @@ namespace Workspace1C
                 menu.Items.Add(new Separator());
                 menu.Items.Add(CommandItem("Services.Restart", "⟲", "@InfoBrush", _vm.RestartGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.EditGroup", "✎", "@PurpleAccentBrush", _vm.EditGroupCommand));
-                menu.Items.Add(CommandItem("Services.DeleteGroup", "🗑", "@ErrorBrush", _vm.DeleteGroupCommand));
+                menu.Items.Add(CommandItem("Services.EditGroup", "IconEdit", "@PurpleAccentBrush", _vm.EditGroupCommand));
+                menu.Items.Add(CommandItem("Services.DeleteGroup", "IconDelete", "@ErrorBrush", _vm.DeleteGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "@InfoBrush", _vm.MoveUpCommand));
-                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "@InfoBrush", _vm.MoveDownCommand));
+                menu.Items.Add(CommandItem("Services.MoveUp", "IconArrowUp", "@InfoBrush", _vm.MoveUpCommand));
+                menu.Items.Add(CommandItem("Services.MoveDown", "IconArrowDown", "@InfoBrush", _vm.MoveDownCommand));
             }
             else
             {
@@ -333,10 +347,10 @@ namespace Workspace1C
                 menu.Items.Add(CommandItem("Services.Restart", "⟲", "@InfoBrush", _vm.RestartCommand));
                 menu.Items.Add(new Separator());
                 // «Перенести в группу» (issue #11, 1.0.0.14): только для службы.
-                menu.Items.Add(CommandItem("Services.MoveToGroup", "⇄", "@InfoBrush", _vm.MoveToGroupCommand));
+                menu.Items.Add(CommandItem("Services.MoveToGroup", "IconSwap", "@InfoBrush", _vm.MoveToGroupCommand));
                 menu.Items.Add(new Separator());
-                menu.Items.Add(CommandItem("Services.MoveUp", "▲", "@InfoBrush", _vm.MoveUpCommand));
-                menu.Items.Add(CommandItem("Services.MoveDown", "▼", "@InfoBrush", _vm.MoveDownCommand));
+                menu.Items.Add(CommandItem("Services.MoveUp", "IconArrowUp", "@InfoBrush", _vm.MoveUpCommand));
+                menu.Items.Add(CommandItem("Services.MoveDown", "IconArrowDown", "@InfoBrush", _vm.MoveDownCommand));
             }
             return menu;
         }

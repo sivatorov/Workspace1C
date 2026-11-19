@@ -54,11 +54,11 @@ namespace Workspace1C
 
             // ---- Первая строка: «Сохранить» / «Отмена» (7OH 13:25). ----
             var saveButton = BuildActionButton(
-                "✔ " + LocalizationManager.T("Services.Save"), () => _vm.SaveCommand.Execute(null));
+                LocalizationManager.T("Common.Save"), () => _vm.SaveCommand.Execute(null), "IconCheck");
             saveButton.MinWidth = 110;
             saveButton.Bind(Button.CommandProperty, new Binding("SaveCommand"));
             var cancelButton = BuildActionButton(
-                "✖ " + LocalizationManager.T("Services.Cancel"), () => _vm.CancelCommand.Execute(null));
+                LocalizationManager.T("Common.Cancel"), () => _vm.CancelCommand.Execute(null), "IconClose");
             cancelButton.MinWidth = 110;
             cancelButton.Bind(Button.CommandProperty, new Binding("CancelCommand"));
 
@@ -86,18 +86,18 @@ namespace Workspace1C
                 Children = { nameLabel, nameBox }
             };
 
-            // ---- Кнопки-иконки ▲/▼ над «Управляемым списком» и стрелки между списками. ----
-            var moveUpButton = BuildIconButton("▲", LocalizationManager.T("Services.MoveUp"),
+            // ---- Кнопки-иконки «вверх/вниз» над «Управляемым списком» и стрелки между списками. ----
+            var moveUpButton = BuildIconButton("IconArrowUp", LocalizationManager.T("Services.MoveUp"),
                 () => _vm.MoveUpCommand.Execute(null), "@InfoBrush");
             moveUpButton.Bind(Button.CommandProperty, new Binding("MoveUpCommand"));
-            var moveDownButton = BuildIconButton("▼", LocalizationManager.T("Services.MoveDown"),
+            var moveDownButton = BuildIconButton("IconArrowDown", LocalizationManager.T("Services.MoveDown"),
                 () => _vm.MoveDownCommand.Execute(null), "@InfoBrush");
             moveDownButton.Bind(Button.CommandProperty, new Binding("MoveDownCommand"));
 
-            var moveLeftButton = BuildIconButton("◀", LocalizationManager.T("Services.MoveLeft"),
+            var moveLeftButton = BuildIconButton("IconArrowLeft", LocalizationManager.T("Services.MoveLeft"),
                 () => _vm.MoveLeftCommand.Execute(null), "@SuccessBrush");
             moveLeftButton.Bind(Button.CommandProperty, new Binding("MoveLeftCommand"));
-            var moveRightButton = BuildIconButton("▶", LocalizationManager.T("Services.MoveRight"),
+            var moveRightButton = BuildIconButton("IconArrowRight", LocalizationManager.T("Services.MoveRight"),
                 () => _vm.MoveRightCommand.Execute(null), "@ErrorBrush");
             moveRightButton.Bind(Button.CommandProperty, new Binding("MoveRightCommand"));
 
@@ -204,11 +204,15 @@ namespace Workspace1C
         // ===================== Построители =====================
 
         /// <summary>Кнопка с текстом и стандартным оформлением.</summary>
-        private static Button BuildActionButton(string text, Action onClick)
+        private static Button BuildActionButton(string text, Action onClick, string? iconKey = null)
         {
             var button = new Button
             {
-                Content = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center },
+                // P1a аудита UI: значок кнопки — векторная иконка активного набора,
+                // а не текстовый глиф «✔»/«✖».
+                Content = iconKey is null
+                    ? new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
+                    : IconHelper.IconAndText(iconKey, text, UiMetrics.IconControl, "TextPrimaryBrush"),
                 Padding = new Thickness(14, 5)
             };
             button.Styled(ControlThemes.ModernButton);
@@ -217,19 +221,25 @@ namespace Workspace1C
             return button;
         }
 
-        /// <summary>Узкая кнопка-иконка с подсказкой (стрелки переноса/порядка, 7OH 13:25).</summary>
+        /// <summary>
+        /// Узкая кнопка-иконка с подсказкой (стрелки переноса/порядка, 7OH 13:25).
+        /// Ключ <c>Icon*</c> — векторная иконка активного набора (P1b), иначе глиф.
+        /// </summary>
         private static Button BuildIconButton(string icon, string tooltip, Action onClick, string iconColorHex)
         {
             var button = new Button
             {
-                Content = new TextBlock
-                {
-                    Text = icon,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    FontSize = 13,
-                    Foreground = Themes.ThemeBrushes.FromSpec(iconColorHex)
-                },
+                Content = icon.StartsWith("Icon", StringComparison.Ordinal)
+                    ? IconHelper.MakeIcon(icon, UiMetrics.IconControl,
+                        Themes.ThemeBrushes.FromSpec(iconColorHex))
+                    : new TextBlock
+                    {
+                        Text = icon,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        FontSize = UiMetrics.IconControl,
+                        Foreground = Themes.ThemeBrushes.FromSpec(iconColorHex)
+                    },
                 Width = 34,
                 Height = 30,
                 Padding = new Thickness(0)

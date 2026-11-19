@@ -21,6 +21,14 @@
             <SolidColorBrush x:Key="SecondaryButtonPressedSurfaceBrush" Color="{DynamicResource SidebarHoverColor}"/>
             <Thickness x:Key="SecondaryButtonOutlineThickness">1</Thickness>
             <SolidColorBrush x:Key="SettingsToggleTrackBrush">#CBD5E1</SolidColorBrush>
+            <!-- Ползунок выключенного тумблера: контрастен светлой дорожке.
+                 Во включённом состоянии перекрывается TextOnAccentBrush. -->
+            <SolidColorBrush x:Key="SettingsToggleThumbBrush" Color="{DynamicResource TextPrimaryColor}"/>
+            <!-- Действия верхней панели: нейтральный цвет темы. Панель команд лежит
+                 на CardBackgroundBrush, поэтому TextOnAccentBrush здесь не подходит
+                 (в тёмной теме он чёрный и сливается с карточкой). Семантические
+                 кисти остаются только у статусов. -->
+            <SolidColorBrush x:Key="TopBarActionBrush" Color="{DynamicResource TextPrimaryColor}"/>
             <SolidColorBrush x:Key="IconButtonHoverBrush">#F1F5F9</SolidColorBrush>
             <SolidColorBrush x:Key="StatusBarIconPressedBrush">#0F172A</SolidColorBrush>
             <x:Double x:Key="StatusBarIconPressedOpacity">1</x:Double>
@@ -35,6 +43,10 @@
             <SolidColorBrush x:Key="SecondaryButtonPressedSurfaceBrush" Color="{DynamicResource SidebarHoverColor}"/>
             <Thickness x:Key="SecondaryButtonOutlineThickness">1</Thickness>
             <SolidColorBrush x:Key="SettingsToggleTrackBrush">#475569</SolidColorBrush>
+            <!-- Ползунок выключенного тумблера: светлый на тёмной дорожке.
+                 Во включённом состоянии перекрывается TextOnAccentBrush. -->
+            <SolidColorBrush x:Key="SettingsToggleThumbBrush" Color="{DynamicResource TextPrimaryColor}"/>
+            <SolidColorBrush x:Key="TopBarActionBrush" Color="{DynamicResource TextPrimaryColor}"/>
             <SolidColorBrush x:Key="IconButtonHoverBrush" Color="{DynamicResource ItemHoverColor}"/>
             <SolidColorBrush x:Key="StatusBarIconPressedBrush" Color="{DynamicResource SidebarHoverColor}"/>
             <x:Double x:Key="StatusBarIconPressedOpacity">0.85</x:Double>
@@ -75,17 +87,26 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
@@ -94,6 +115,9 @@
         </Style>
         <Style Selector="^:pressed /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
         </Style>
         <Style Selector="^:disabled /template/ Border#PART_Surface">
             <Setter Property="Opacity" Value="0.5"/>
@@ -108,19 +132,28 @@
         <Setter Property="BorderThickness" Value="{DynamicResource SecondaryButtonOutlineThickness}"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
@@ -131,6 +164,9 @@
         </Style>
         <Style Selector="^:pressed /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource SecondaryButtonPressedSurfaceBrush}"/>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
         </Style>
         <!-- Гашение задано и здесь, хотя оно есть у основной кнопки: вторичная
              переопределяет шаблон целиком, и вложенный стиль основной ссылается
@@ -153,15 +189,16 @@
          SecondaryButton (карточка + контур + текст темы). Раньше здесь были
          жёсткие зелёная (#16A34A) и красная (#EF4444) кнопки, отличавшие вид
          диалогов от остальных окон; имена тем контролов сохранены, чтобы десятки
-         ссылок из кода не менялись. Гашение при недоступности — двумя классами:
-         greyed (серая заливка) и dimmed (полупрозрачность), окно выбирает нужный. -->
+         ссылок из кода не менялись.
+
+         Аудит UI P1c: недоступность кнопки диалога обозначается ОДНИМ способом —
+         приглушением (opacity 0.5), как у остальных недоступных контролов. Класс
+         dimmed оставлен явным для читаемости разметки/кода, серый класс greyed
+         удалён: он дублировал семантику и давал другую геометрию состояния. -->
     <ControlTheme x:Key="DialogConfirmButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
         <Setter Property="Padding" Value="12,8"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Height" Value="36"/>
-        <Style Selector="^.greyed:disabled /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="#9CA3AF"/>
-        </Style>
         <Style Selector="^.dimmed:disabled /template/ Border#PART_Surface">
             <Setter Property="Opacity" Value="0.5"/>
         </Style>
@@ -268,10 +305,13 @@
     </ControlTheme>
 
     <!-- ===================== Карточка варианта выбора =====================
-         В разметке это Border со своим DataTrigger вокруг обычного RadioButton
-         (ConnectionSettingsWindow.xaml:263 и ещё четырнадцать таких же).
-         Здесь это тема самого переключателя: рамка и кружок нарисованы шаблоном,
-         поэтому состояние выбора красит их без привязок и без кода. -->
+         Единый паттерн радиокарточки (аудит UI P1c): тонированный фон при выборе,
+         акцентная рамка и маркер-точка. В разметке WPF это Border со своим
+         DataTrigger вокруг обычного RadioButton (ConnectionSettingsWindow.xaml:263
+         и ещё четырнадцать таких же); здесь это тема самого переключателя, поэтому
+         состояние выбора красит рамку и маркер без привязок и без кода.
+         AddOptionCard (окно добавления) наследует эту тему — отдельного вида
+         «сплошная акцентная заливка без маркера» больше нет. -->
     <ControlTheme x:Key="OptionCard" TargetType="RadioButton">
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Margin" Value="0,0,0,4"/>
@@ -280,30 +320,45 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="RadioButton">
-                <Border Name="PART_Surface"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrushColor}"
-                        BorderThickness="1.5"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <Grid ColumnDefinitions="Auto,*">
-                        <Panel Grid.Column="0" Width="16" Height="16" Margin="0,1,8,0" VerticalAlignment="Top">
-                            <Ellipse Name="PART_Bullet" Width="16" Height="16"
-                                     StrokeThickness="1.5"
-                                     Stroke="{DynamicResource BorderBrushColor}"/>
-                            <Ellipse Name="PART_Dot" Width="8" Height="8" IsVisible="False"
-                                     Fill="{DynamicResource AccentBrush}"/>
-                        </Panel>
-                        <ContentPresenter Grid.Column="1"
-                                          Name="PART_ContentPresenter"
-                                          Content="{TemplateBinding Content}"
-                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                          Foreground="{TemplateBinding Foreground}"/>
-                    </Grid>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{DynamicResource CardBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrushColor}"
+                            BorderThickness="1.5"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <Grid ColumnDefinitions="Auto,*">
+                            <Panel Grid.Column="0" Width="16" Height="16" Margin="0,1,8,0" VerticalAlignment="Top">
+                                <Ellipse Name="PART_Bullet" Width="16" Height="16"
+                                         StrokeThickness="1.5"
+                                         Stroke="{DynamicResource BorderBrushColor}"/>
+                                <Ellipse Name="PART_Dot" Width="8" Height="8" IsVisible="False"
+                                         Fill="{DynamicResource AccentBrush}"/>
+                            </Panel>
+                            <ContentPresenter Grid.Column="1"
+                                              Name="PART_ContentPresenter"
+                                              Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              Foreground="{TemplateBinding Foreground}"/>
+                        </Grid>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом (клавиатура). -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
+        <Style Selector="^:pointerover /template/ Border#PART_Surface">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+        </Style>
         <Style Selector="^:checked /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
@@ -314,10 +369,9 @@
         <Style Selector="^:checked /template/ Ellipse#PART_Dot">
             <Setter Property="IsVisible" Value="True"/>
         </Style>
-        <!-- Гашение 0.45, как у недоступных карточек в разметке
-             (ConnectionSettingsWindow.xaml:744 и :862). -->
+        <!-- Аудит UI P0-4: единая прозрачность недоступных элементов — 0.5. -->
         <Style Selector="^:disabled /template/ Border#PART_Surface">
-            <Setter Property="Opacity" Value="0.45"/>
+            <Setter Property="Opacity" Value="0.5"/>
         </Style>
     </ControlTheme>
     <!-- ===================== Поля ввода и списки =====================
@@ -353,7 +407,8 @@
         <Style Selector="^:focus /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
+            <!-- Аудит UI P0-4: фокус заметнее — рамка 2 px, а не 1. -->
+            <Setter Property="BorderThickness" Value="2"/>
         </Style>
         <!-- Штатная тема на наведении, фокусе и в недоступном состоянии красит
              и текст, и фон своими системными кистями; в разметке WPF у поля
@@ -364,12 +419,11 @@
         <Style Selector="^:focus">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
-        <!-- Гашения у поля нет: в разметке WPF у ModernTextBox нет ни триггера
-             недоступности, ни прозрачности, и заблокированное поле там выглядит
-             как обычное (подтверждено Windows-стороной на окне «Без группы»).
-             Здесь только снимается перекраска штатной темой. -->
+        <!-- Аудит UI P0-4: недоступное поле приглушается, а не выглядит обычным.
+             Прозрачность та же, что у остальных недоступных контролов (0.5). -->
         <Style Selector="^:disabled">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Setter Property="Opacity" Value="0.5"/>
         </Style>
         <Style Selector="^:disabled /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
@@ -380,9 +434,14 @@
     <ControlTheme x:Key="ModernComboBoxItem" TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Padding" Value="10,8"/>
-        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
 
+        <!-- Аудит UI P3a: фокус клавиатуры виден как акцентная подсветка строки. -->
+        <Style Selector="^:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -412,6 +471,14 @@
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
 
+        <!-- Аудит UI P3a: фокус клавиатуры виден как акцентная подсветка строки. -->
+        <Style Selector="^:focus /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
+        <Style Selector="^:focus">
+            <Setter Property="Background" Value="{DynamicResource NavSelectedBrush}"/>
+        </Style>
         <Style Selector="^:pointerover /template/ ContentPresenter#PART_ContentPresenter">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -510,22 +577,24 @@
                 <Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,*">
                     <Border Name="PART_Box"
                             Width="18" Height="18"
-                            CornerRadius="3"
+                            CornerRadius="4"
                             BorderThickness="2"
                             VerticalAlignment="Center"
                             Background="{DynamicResource CardBackgroundBrush}"
                             BorderBrush="{DynamicResource BorderBrushColor}">
                         <Panel>
+                            <!-- Индикатор на акцентной заливке — контрастный
+                                 TextOnAccentBrush (аудит UI P0-2), не жёсткий белый. -->
                             <Path Name="PART_Check"
                                   Data="{DynamicResource GlyphCheckMark}"
-                                  Stroke="White" StrokeThickness="2.2"
+                                  Stroke="{DynamicResource TextOnAccentBrush}" StrokeThickness="2.2"
                                   StrokeLineCap="Round" StrokeJoin="Round"
                                   Stretch="None"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
                                   IsVisible="False"/>
                             <Path Name="PART_Dash"
                                   Data="{DynamicResource GlyphCheckDash}"
-                                  Stroke="White" StrokeThickness="2.2"
+                                  Stroke="{DynamicResource TextOnAccentBrush}" StrokeThickness="2.2"
                                   StrokeLineCap="Round"
                                   Stretch="None"
                                   HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -539,10 +608,22 @@
                                       Content="{TemplateBinding Content}"
                                       ContentTemplate="{TemplateBinding ContentTemplate}"
                                       Foreground="{TemplateBinding Foreground}"/>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            Grid.ColumnSpan="2"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="4"
+                            Margin="-3"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
                 </Grid>
             </ControlTemplate>
         </Setter>
 
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#PART_Box">
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
@@ -755,9 +836,10 @@
 
     <!-- ===================== Переключатель настроек =====================
          Стиль SettingsToggle (LightTheme.xaml:1223, DarkTheme.xaml:1256).
-         Дорожка 40 на 22 со скруглением 11, кружок 16 белый; во включённом
-         положении дорожка акцентная, кружок уезжает вправо. Тёмная тема
-         отличается только цветом дорожки в выключенном положении. -->
+         Дорожка 40 на 22 со скруглением 11, кружок 16 цвета текста темы;
+         во включённом положении дорожка акцентная, кружок контрастен акценту
+         (TextOnAccentBrush) и уезжает вправо. Тёмная тема отличается только
+         цветом дорожки в выключенном положении. -->
     <ControlTheme x:Key="SettingsToggle" TargetType="ToggleButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
@@ -775,30 +857,42 @@
                                       ContentTemplate="{TemplateBinding ContentTemplate}"
                                       Foreground="{TemplateBinding Foreground}"
                                       VerticalAlignment="Center"/>
-                    <Border Grid.Column="1"
-                            Name="PART_Track"
-                            Width="40" Height="22"
-                            CornerRadius="11"
-                            Margin="12,0,0,0"
-                            VerticalAlignment="Center"
-                            Background="{DynamicResource SettingsToggleTrackBrush}">
-                        <Ellipse Name="PART_Thumb"
-                                 Width="16" Height="16"
-                                 Fill="White"
-                                 HorizontalAlignment="Left"
-                                 VerticalAlignment="Center"
-                                 Margin="3,0,0,0"/>
-                    </Border>
+                    <Panel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <Border Name="PART_Track"
+                                Width="40" Height="22"
+                                CornerRadius="999"
+                                Background="{DynamicResource SettingsToggleTrackBrush}">
+                            <Ellipse Name="PART_Thumb"
+                                     Width="16" Height="16"
+                                     Fill="{DynamicResource SettingsToggleThumbBrush}"
+                                     HorizontalAlignment="Left"
+                                     VerticalAlignment="Center"
+                                     Margin="3,0,0,0"/>
+                        </Border>
+                        <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                        <Border Name="PART_FocusRing"
+                                BorderBrush="{DynamicResource AccentBrush}"
+                                BorderThickness="2"
+                                CornerRadius="999"
+                                Margin="-3"
+                                IsHitTestVisible="False"
+                                IsVisible="False"/>
+                    </Panel>
                 </Grid>
             </ControlTemplate>
         </Setter>
 
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:checked /template/ Border#PART_Track">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="^:checked /template/ Ellipse#PART_Thumb">
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="Margin" Value="0,0,3,0"/>
+            <!-- Аудит UI P0-2: на акцентной дорожке — контрастный TextOnAccentBrush. -->
+            <Setter Property="Fill" Value="{DynamicResource TextOnAccentBrush}"/>
         </Style>
         <Style Selector="^:disabled">
             <Setter Property="Opacity" Value="0.5"/>
@@ -815,62 +909,89 @@
         <Setter Property="HorizontalAlignment" Value="Right"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="ToggleButton">
-                <Border Name="PART_Track"
-                        CornerRadius="11"
-                        Background="{DynamicResource SettingsToggleTrackBrush}">
-                    <Ellipse Name="PART_Thumb"
-                             Width="16" Height="16"
-                             Fill="White"
-                             HorizontalAlignment="Left"
-                             VerticalAlignment="Center"
-                             Margin="3,0,0,0"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Track"
+                            CornerRadius="999"
+                            Background="{DynamicResource SettingsToggleTrackBrush}">
+                        <Ellipse Name="PART_Thumb"
+                                 Width="16" Height="16"
+                                 Fill="{DynamicResource SettingsToggleThumbBrush}"
+                                 HorizontalAlignment="Left"
+                                 VerticalAlignment="Center"
+                                 Margin="3,0,0,0"/>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="999"
+                            Margin="-3"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:checked /template/ Border#PART_Track">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="^:checked /template/ Ellipse#PART_Thumb">
             <Setter Property="HorizontalAlignment" Value="Right"/>
             <Setter Property="Margin" Value="0,0,3,0"/>
+            <!-- Аудит UI P0-2: на акцентной дорожке — контрастный TextOnAccentBrush. -->
+            <Setter Property="Fill" Value="{DynamicResource TextOnAccentBrush}"/>
         </Style>
         <Style Selector="^:disabled">
             <Setter Property="Opacity" Value="0.5"/>
         </Style>
     </ControlTheme>
     <!-- ===================== Плитка выбора значка группы =====================
-         Стиль IconPickButton (GroupEditWindow.xaml:45). Цвета зашиты числом
-         намеренно: у автора в комментарии сказано, что на тёмной подложке
-         белые и цветные значки читаются всегда, поэтому плитка остаётся
-         тёмной и в светлой теме. -->
+         Стиль IconPickButton (GroupEditWindow.xaml:45). Аудит UI P2b: фон плитки
+         и наведение берутся из theme-кистей IconPickerBaseBrush/IconPickerHoverBrush
+         (Light/Dark), а не из жёстких #374151/#4B5563. В светлой теме плитка
+         белая с корректным светлым hover, в тёмной — тёмная. -->
     <ControlTheme x:Key="IconPickButton" TargetType="Button">
         <Setter Property="Width" Value="40"/>
         <Setter Property="Height" Value="40"/>
         <Setter Property="Margin" Value="3"/>
         <Setter Property="Cursor" Value="Hand"/>
-        <Setter Property="Background" Value="#374151"/>
+        <Setter Property="Background" Value="{DynamicResource IconPickerBaseBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="BorderBrush" Value="#4B5563"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource IconPickerHoverBrush}"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        CornerRadius="8">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="8">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="#4B5563"/>
-            <Setter Property="BorderBrush" Value="#9CA3AF"/>
+            <Setter Property="Background" Value="{DynamicResource IconPickerHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
     </ControlTheme>
     <!-- ===================== Значковые кнопки =====================
@@ -891,28 +1012,40 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        BorderThickness="0"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <!-- Недоступную кнопку приглушаем сразу, как в контекстном меню, а не
-             только по наведению (issue #197). Та же величина, что у HeaderIconButton. -->
+             только по наведению (issue #197). Аудит UI P0-4: единая прозрачность 0.5. -->
         <Style Selector="^:disabled">
-            <Setter Property="Opacity" Value="0.4"/>
+            <Setter Property="Opacity" Value="0.5"/>
         </Style>
     </ControlTheme>
 
@@ -920,18 +1053,27 @@
         <Setter Property="Padding" Value="5"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        BorderThickness="0"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
@@ -941,8 +1083,11 @@
         <Style Selector="^:pressed /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource SecondaryButtonHoverBrush}"/>
         </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:disabled">
-            <Setter Property="Opacity" Value="0.4"/>
+            <Setter Property="Opacity" Value="0.5"/>
         </Style>
     </ControlTheme>
 
@@ -950,23 +1095,35 @@
         <Setter Property="Padding" Value="6,4"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        BorderThickness="0"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            BorderThickness="0"
+                            CornerRadius="8"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Name="PART_ContentPresenter"
+                                          Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P0-4: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
 
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
             <Setter Property="Background" Value="{DynamicResource SidebarHoverBrush}"/>
+        </Style>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
         </Style>
         <!-- Нажатие у автора различается темами: в светлой это заливка числом,
              в тёмной прозрачность 0.85 (LightTheme.xaml:634, DarkTheme.xaml:1178). -->
@@ -1001,7 +1158,7 @@
         <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
         <Setter Property="BorderBrush" Value="{DynamicResource BorderBrushColor}"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="Padding" Value="4"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <!-- Аналог HasDropShadow разметки: подсказка оконному менеджеру. -->
@@ -1048,8 +1205,10 @@
         </Style>
     </ControlTheme>
     <!-- Элемент дерева окна выбора группы: шаблон автора
-         (GroupPickerWindow.xaml:29). Раскрыватель это «+»/«-» в колонке 24,
-         подсвечивается только сама выбранная строка, вложенные сдвинуты на 16. -->
+         (GroupPickerWindow.xaml:29). Раскрыватель — векторный шеврон 16 px
+         в колонке 24 (P1a аудита UI: вместо текстовых «+»/«−»), при раскрытии
+         иконка поворачивается на 90°. Подсвечивается только сама выбранная
+         строка, вложенные сдвинуты на 16. -->
     <ControlTheme x:Key="GroupPickerTreeItem" TargetType="TreeViewItem">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="IsExpanded" Value="True"/>
@@ -1057,8 +1216,9 @@
         <Setter Property="Template">
             <ControlTemplate>
                 <StackPanel>
-                    <Border x:Name="PART_Header" Background="Transparent" CornerRadius="6"
-                            Padding="4,3" Margin="0,1">
+                    <Border x:Name="PART_Header" Background="Transparent" CornerRadius="8"
+                            BorderBrush="Transparent" BorderThickness="2"
+                            Padding="2,1" Margin="0,1">
                         <Grid ColumnDefinitions="24,*">
                             <ToggleButton x:Name="PART_ExpandCollapseChevron" Grid.Column="0"
                                           IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=TreeViewItem}, Mode=TwoWay}"
@@ -1067,15 +1227,23 @@
                                           Cursor="Hand" VerticalAlignment="Center">
                                 <ToggleButton.Template>
                                     <ControlTemplate>
-                                        <TextBlock x:Name="ExpanderSymbol" Text="+"
-                                                   FontSize="16" FontWeight="Bold"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <Path x:Name="ExpanderGlyph"
+                                              Data="{DynamicResource IconChevronRight}"
+                                              Width="16" Height="16" Stretch="Uniform"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Fill="{DynamicResource TextSecondaryBrush}"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <RotateTransform Angle="0"/>
+                                            </Path.RenderTransform>
+                                        </Path>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>
-                                    <Style Selector="ToggleButton:checked /template/ TextBlock#ExpanderSymbol">
-                                        <Setter Property="Text" Value="-"/>
+                                    <Style Selector="ToggleButton:checked /template/ Path#ExpanderGlyph">
+                                        <Setter Property="RenderTransform">
+                                            <RotateTransform Angle="90"/>
+                                        </Setter>
                                     </Style>
                                 </ToggleButton.Styles>
                             </ToggleButton>
@@ -1097,6 +1265,11 @@
         <Style Selector="^:selected /template/ Border#PART_Header">
             <Setter Property="Background" Value="{DynamicResource TreeSelectedBrush}"/>
         </Style>
+        <!-- Аудит UI P3a: клавиатурный фокус виден и рамкой 2 px, и подсветкой строки. -->
+        <Style Selector="^:focus-visible /template/ Border#PART_Header">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource TreeHoverBrush}"/>
+        </Style>
     </ControlTheme>
     <!-- Переключатель разрядности окна выбора версии платформы
          (PlatformVersionPickerWindow.xaml:30). Материальный кружок: внешний
@@ -1116,7 +1289,7 @@
                         <Ellipse Name="HoverRing" Width="32" Height="32" Opacity="0"
                                  Fill="{DynamicResource ItemHoverBrush}"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        <Border Name="Outer" Width="20" Height="20" CornerRadius="10"
+                        <Border Name="Outer" Width="20" Height="20" CornerRadius="999"
                                 BorderThickness="2"
                                 Background="{DynamicResource CardBackgroundBrush}"
                                 BorderBrush="{DynamicResource BorderBrushColor}"/>
@@ -1144,7 +1317,8 @@
         </Style>
         <Style Selector="^:checked /template/ Ellipse#Dot">
             <Setter Property="IsVisible" Value="True"/>
-            <Setter Property="Fill" Value="White"/>
+            <!-- Аудит UI P0-2: точка на акцентной заливке контрастна акценту. -->
+            <Setter Property="Fill" Value="{DynamicResource TextOnAccentBrush}"/>
         </Style>
         <Style Selector="^:checked:pointerover /template/ Ellipse#HoverRing">
             <Setter Property="Opacity" Value="0.6"/>
@@ -1156,7 +1330,7 @@
 
     <!-- Кнопка сортировки окна выбора версии платформы
          (PlatformVersionPickerWindow.xaml:105): 32 на 28, скругление 4,
-         выбранная заливается акцентом, значок белеет. -->
+         выбранная заливается акцентом, значок — контрастный TextOnAccentBrush. -->
     <ControlTheme x:Key="VersionSortToggle" TargetType="ToggleButton">
         <Setter Property="Width" Value="32"/>
         <Setter Property="Height" Value="28"/>
@@ -1169,63 +1343,85 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="ToggleButton">
-                <Border Name="PART_Border"
-                        Background="{TemplateBinding Background}"
-                        BorderBrush="{TemplateBinding BorderBrush}"
-                        BorderThickness="{TemplateBinding BorderThickness}"
-                        Padding="{TemplateBinding Padding}"
-                        CornerRadius="4">
-                    <ContentPresenter Content="{TemplateBinding Content}"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="4">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="4"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#PART_Border">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
         <Style Selector="^:checked /template/ Border#PART_Border">
             <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
         </Style>
-        <!-- У автора триггер наведения объявлен после триггера выбора и побеждает:
-             нажатая кнопка под курсором тоже заливается кистью наведения
-             (PlatformVersionPickerWindow.xaml:126). -->
+        <!-- Аудит UI P0-2: выбранная кнопка под курсором сохраняет акцентную
+             заливку (AccentHoverBrush), а не становится кремовой; Foreground —
+             контрастный акценту TextOnAccentBrush. -->
         <Style Selector="^:checked:pointerover /template/ Border#PART_Border">
-            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
         </Style>
         <Style Selector="^:checked">
-            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
         </Style>
     </ControlTheme>
     <!-- Общий элемент дерева окон (Themes/LightTheme.xaml:670, ModernTreeViewItem):
-         раскрыватель «+»/«-» в колонке 26, подсветка наведения и выбора,
-         вложенные со сдвигом 16. -->
+         раскрыватель — векторный шеврон 16 px в колонке 24 (P1a аудита UI:
+         вместо текстовых «+»/«−»), при раскрытии иконка поворачивается на 90°;
+         подсветка наведения и выбора, вложенные со сдвигом 16. -->
     <ControlTheme x:Key="ModernTreeItem" TargetType="TreeViewItem">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Padding" Value="2,1"/>
         <Setter Property="Template">
             <ControlTemplate>
                 <StackPanel>
-                    <Border x:Name="PART_Header" Background="Transparent" CornerRadius="6"
-                            Padding="4,3" Margin="0,1">
-                        <Grid ColumnDefinitions="26,*">
+                    <Border x:Name="PART_Header" Background="Transparent" CornerRadius="8"
+                            BorderBrush="Transparent" BorderThickness="2"
+                            Padding="2,1" Margin="0,1">
+                        <Grid ColumnDefinitions="24,*">
                             <ToggleButton x:Name="PART_ExpandCollapseChevron" Grid.Column="0"
                                           IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=TreeViewItem}, Mode=TwoWay}"
-                                          ClickMode="Press" Width="22" Height="22"
+                                          ClickMode="Press" Width="20" Height="22"
                                           Background="Transparent" BorderThickness="0" Padding="0"
                                           Cursor="Hand" VerticalAlignment="Center">
                                 <ToggleButton.Template>
                                     <ControlTemplate>
-                                        <TextBlock x:Name="ExpanderSymbol" Text="+"
-                                                   FontSize="18" FontWeight="Bold"
-                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <Path x:Name="ExpanderGlyph"
+                                              Data="{DynamicResource IconChevronRight}"
+                                              Width="16" Height="16" Stretch="Uniform"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"
+                                              Fill="{DynamicResource TextSecondaryBrush}"
+                                              RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform>
+                                                <RotateTransform Angle="0"/>
+                                            </Path.RenderTransform>
+                                        </Path>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>
-                                    <Style Selector="ToggleButton:checked /template/ TextBlock#ExpanderSymbol">
-                                        <Setter Property="Text" Value="-"/>
+                                    <Style Selector="ToggleButton:checked /template/ Path#ExpanderGlyph">
+                                        <Setter Property="RenderTransform">
+                                            <RotateTransform Angle="90"/>
+                                        </Setter>
                                     </Style>
-                                    <Style Selector="ToggleButton:pointerover /template/ TextBlock#ExpanderSymbol">
+                                    <Style Selector="ToggleButton:pointerover /template/ Path#ExpanderGlyph">
                                         <Setter Property="Opacity" Value="0.6"/>
                                     </Style>
                                 </ToggleButton.Styles>
@@ -1251,10 +1447,15 @@
         <Style Selector="^:selected /template/ Border#PART_Header">
             <Setter Property="Background" Value="{DynamicResource TreeSelectedBrush}"/>
         </Style>
+        <!-- Аудит UI P3a: клавиатурный фокус виден и рамкой 2 px, и подсветкой строки. -->
+        <Style Selector="^:focus-visible /template/ Border#PART_Header">
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource TreeHoverBrush}"/>
+        </Style>
     </ControlTheme>
     <!-- Флажок окна очистки кеша (CacheCleanWindow.xaml:23): у автора это
-         местный вариант общего флажка, крупнее и с зелёной заливкой выбранного,
-         поэтому он отдельной темой, а не правкой ModernMaterialCheckBox. -->
+         местный вариант общего флажка, крупнее. Аудит UI P0-5: заливка выбранного —
+         AccentBrush (как у общего флажка), индикатор — TextOnAccentBrush. -->
     <ControlTheme x:Key="CacheCleanCheckBox" TargetType="CheckBox">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Cursor" Value="Hand"/>
@@ -1272,13 +1473,13 @@
                             <Viewbox Name="PART_Check" Width="13" Height="13" IsVisible="False"
                                      HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Canvas Width="24" Height="24">
-                                    <Path Fill="White" Data="{DynamicResource IconCheck}"/>
+                                    <Path Fill="{DynamicResource TextOnAccentBrush}" Data="{DynamicResource IconCheck}"/>
                                 </Canvas>
                             </Viewbox>
                             <Viewbox Name="PART_Dash" Width="13" Height="13" IsVisible="False"
                                      HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Canvas Width="24" Height="24">
-                                    <Path Fill="White" Data="{DynamicResource IconMinus}"/>
+                                    <Path Fill="{DynamicResource TextOnAccentBrush}" Data="{DynamicResource IconMinus}"/>
                                 </Canvas>
                             </Viewbox>
                         </Panel>
@@ -1295,15 +1496,15 @@
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="^:checked /template/ Border#PART_Box">
-            <Setter Property="Background" Value="#16A34A"/>
-            <Setter Property="BorderBrush" Value="#16A34A"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="^:checked /template/ Viewbox#PART_Check">
             <Setter Property="IsVisible" Value="True"/>
         </Style>
         <Style Selector="^:indeterminate /template/ Border#PART_Box">
-            <Setter Property="Background" Value="#16A34A"/>
-            <Setter Property="BorderBrush" Value="#16A34A"/>
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Style>
         <Style Selector="^:indeterminate /template/ Viewbox#PART_Dash">
             <Setter Property="IsVisible" Value="True"/>
@@ -1325,15 +1526,27 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Border"
-                        Background="{TemplateBinding Background}"
-                        Padding="{TemplateBinding Padding}"
-                        CornerRadius="6">
-                    <ContentPresenter Content="{TemplateBinding Content}"
-                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            Padding="{TemplateBinding Padding}"
+                            CornerRadius="8">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="8"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#PART_Border">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
@@ -1353,19 +1566,32 @@
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="Button">
-                <Border Name="PART_Surface"
-                        Background="{TemplateBinding Background}"
-                        CornerRadius="4"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      HorizontalAlignment="Center"
-                                      VerticalAlignment="Center"/>
-                </Border>
+                <Panel>
+                    <Border Name="PART_Surface"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="4"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter Content="{TemplateBinding Content}"
+                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <!-- Аудит UI P3a: видимый focus-ring 2 px акцентом. -->
+                    <Border Name="PART_FocusRing"
+                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderThickness="2"
+                            CornerRadius="4"
+                            IsHitTestVisible="False"
+                            IsVisible="False"/>
+                </Panel>
             </ControlTemplate>
         </Setter>
+        <Style Selector="^:focus-visible /template/ Border#PART_FocusRing">
+            <Setter Property="IsVisible" Value="True"/>
+        </Style>
         <Style Selector="^:pointerover /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="#22F1F5F9"/>
+            <!-- Аудит UI P0-5: подсветка из темы вместо жёсткого #22F1F5F9. -->
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
     </ControlTheme>
 
@@ -1395,43 +1621,12 @@
         </Setter>
     </ControlTheme>
 
-    <!-- Карточка варианта окна добавления (AddEditWindow.xaml:26): рамка без
-         маркера радиокнопки. С v1.0.1.49 (issue #107 п.1) выбранный вариант снова
-         заливается акцентом: текст и значок следуют Foreground — TextOnAccentBrush,
-         читаемость обеспечивает ThemeManager (issue #26 + п.2 #107). Заливка
-         AccentHoverBrush по-прежнему запрещена. Это местный стиль автора, он
-         отличается от общей карточки OptionCard, где маркер есть. -->
-    <ControlTheme x:Key="AddOptionCard" TargetType="RadioButton">
-        <Setter Property="Cursor" Value="Hand"/>
+    <!-- Карточка варианта окна добавления (AddEditWindow.xaml:26).
+         Аудит UI P1c: отдельного вида больше нет — это псевдоним OptionCard
+         с увеличенными отступами. Маркер-точка, тонированный фон и акцентная
+         рамка у выбранного варианта те же, что во всех радиокарточках. -->
+    <ControlTheme x:Key="AddOptionCard" TargetType="RadioButton" BasedOn="{StaticResource OptionCard}">
         <Setter Property="Margin" Value="0,0,0,10"/>
         <Setter Property="Padding" Value="12,10"/>
-        <Setter Property="HorizontalAlignment" Value="Stretch"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
-        <Setter Property="Template">
-            <ControlTemplate TargetType="RadioButton">
-                <Border Name="PART_Surface"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrushColor}"
-                        BorderThickness="1"
-                        CornerRadius="6"
-                        Padding="{TemplateBinding Padding}">
-                    <ContentPresenter Name="PART_ContentPresenter"
-                                      Content="{TemplateBinding Content}"
-                                      ContentTemplate="{TemplateBinding ContentTemplate}"
-                                      Foreground="{TemplateBinding Foreground}"/>
-                </Border>
-            </ControlTemplate>
-        </Setter>
-        <Style Selector="^:pointerover /template/ Border#PART_Surface">
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-        </Style>
-        <Style Selector="^:checked /template/ Border#PART_Surface">
-            <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderThickness" Value="2"/>
-        </Style>
-        <Style Selector="^:checked">
-            <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
-        </Style>
     </ControlTheme>
 </ResourceDictionary>

@@ -60,7 +60,7 @@
 
         <StackPanel>
             <!-- Подпись: «Не удалось удалить информационную базу. <детали ошибки rac>». -->
-            <TextBlock x:Name="ErrorText" FontSize="14" FontWeight="SemiBold"
+            <TextBlock x:Name="ErrorText" FontSize="15" FontWeight="SemiBold"
                        TextWrapping="Wrap" Margin="0,0,0,6"/>
 
             <!-- Пояснение: что ввести и зачем (issue #69). -->

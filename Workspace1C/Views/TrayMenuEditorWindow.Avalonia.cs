@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using Avalonia;
 using Avalonia.Controls;
@@ -85,7 +85,7 @@ namespace Workspace1C
                 Background = TryBrush("CardBackgroundBrush"),
                 BorderBrush = TryBrush("BorderColorBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(4),
                 Margin = new Thickness(0, 0, 12, 0)
             };
@@ -225,7 +225,7 @@ namespace Workspace1C
                 Background = TryBrush("CardBackgroundBrush"),
                 BorderBrush = TryBrush("BorderColorBrush"),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(10),
                 Margin = new Thickness(0, 14, 0, 0)
             };

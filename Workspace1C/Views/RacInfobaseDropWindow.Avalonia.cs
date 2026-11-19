@@ -52,7 +52,7 @@ namespace Workspace1C
             var drop = new Button { Content = LocalizationManager.T("ServerMonitor.Infobase.Drop.Confirm"), Width = 140, Height = 36, IsDefault = true };
             drop.Styled(ControlThemes.DangerButton);
             drop.Click += (_, _) => OnDrop();
-            var cancel = new Button { Content = LocalizationManager.T("Updates.Cancel"), Width = 120, Height = 36 };
+            var cancel = new Button { Content = LocalizationManager.T("Common.Cancel"), Width = 120, Height = 36 };
             cancel.Styled(ControlThemes.SecondaryButton);
             cancel.Click += (_, _) =>
             {
@@ -73,7 +73,7 @@ namespace Workspace1C
             // Вопрос.
             var question = new TextBlock
             {
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold,
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 4),
@@ -111,7 +111,7 @@ namespace Workspace1C
             var group = new Border
             {
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(12, 10),
                 Margin = new Thickness(0, 8, 0, 0),
                 Child = options

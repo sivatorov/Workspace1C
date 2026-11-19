@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.IO;
 using System.Linq;
@@ -1419,7 +1419,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 12, 0, 0),
                 Padding = new Thickness(14, 12),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(card, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(card, Border.BorderBrushProperty, "BorderColorBrush");
@@ -1431,11 +1431,11 @@ namespace Workspace1C
             summary.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(0.8, GridUnitType.Star)));
             summary.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(0.8, GridUnitType.Star)));
             summary.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1.6, GridUnitType.Star)));
-            _currentVersionText.FontSize = 14;
+            _currentVersionText.FontSize = ThemeManager.FontSizeSubtitle;
             _currentVersionText.FontWeight = FontWeight.SemiBold;
-            _latestVersionText.FontSize = 14;
+            _latestVersionText.FontSize = ThemeManager.FontSizeSubtitle;
             _latestVersionText.FontWeight = FontWeight.SemiBold;
-            _statusText.FontSize = 14;
+            _statusText.FontSize = ThemeManager.FontSizeSubtitle;
             _statusText.FontWeight = FontWeight.SemiBold;
             // issue #371: статус переносится по словам — длинные сообщения («каталог доступен,
             // но версия не распарсена») не обрезаются и не раздвигают колонки версий.
@@ -1459,7 +1459,7 @@ namespace Workspace1C
             fields.Children.Add(noBumpRow);
 
             _baseNameText.FontWeight = FontWeight.SemiBold;
-            _baseNameText.FontSize = 14;
+            _baseNameText.FontSize = ThemeManager.FontSizeSubtitle;
             fields.Children.Add(MakeFieldRow(T("Updates.Name"), _baseNameText));
 
             fields.Children.Add(MakeFieldRow(T("Updates.Url"), _urlText));
@@ -1624,7 +1624,8 @@ namespace Workspace1C
             {
                 Content = T("Updates.OpenConfigList"),
                 MinWidth = 160,
-                Height = 40,
+                // Аудит UI P1c: нижняя панель диалога — 36 px.
+                Height = 36,
                 HorizontalAlignment = HorizontalAlignment.Left
             };
             configListButton.Styled(ControlThemes.SecondaryButton);
@@ -1640,7 +1641,7 @@ namespace Workspace1C
             };
             // Ширины кнопок не фиксированы (только минимальные): при любом шрифте и масштабе
             // кнопка растягивается под текст и не обрезается (issue #323).
-            _checkButton = new Button { Content = T("Updates.Check"), MinWidth = 160, Height = 40 };
+            _checkButton = new Button { Content = T("Updates.Check"), MinWidth = 160, Height = 36 };
             _checkButton.Styled(ControlThemes.SecondaryButton);
             _checkButton.Click += (_, _) => OnCheckClick();
 
@@ -1648,18 +1649,18 @@ namespace Workspace1C
             {
                 Content = T("Updates.Chain.Download"),
                 MinWidth = 170,
-                Height = 40,
+                Height = 36,
                 IsVisible = false,
                 IsEnabled = false,
             };
             _downloadChainButton.Styled(ControlThemes.DialogConfirmButton);
             _downloadChainButton.Click += (_, _) => OnDownloadChainClick();
 
-            _downloadButton = new Button { Content = T("Updates.Download"), MinWidth = 150, Height = 40, IsEnabled = false };
+            _downloadButton = new Button { Content = T("Updates.Download"), MinWidth = 150, Height = 36, IsEnabled = false };
             _downloadButton.Styled(ControlThemes.DialogConfirmButton);
             _downloadButton.Click += (_, _) => OnDownloadRow(_row);
 
-            var close = BuildCancelActionButton(150, 40);
+            var close = BuildCancelActionButton(150, 36);
             close.Click += (_, _) => Close();
 
             buttons.Children.Add(_checkButton);

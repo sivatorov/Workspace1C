@@ -105,7 +105,7 @@
                 <ItemsControl ItemsSource="{Binding DayOfWeekBars}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock FontFamily="Consolas" FontSize="12" Margin="0,1"
+                            <TextBlock FontFamily="{DynamicResource UiMonospaceFontFamily}" FontSize="12" Margin="0,1"
                                        Text="{Binding}"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

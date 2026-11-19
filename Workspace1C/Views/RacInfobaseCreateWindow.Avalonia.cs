@@ -161,7 +161,7 @@ namespace Workspace1C
             panel.Children.Add(_createDbBox);
             panel.Children.Add(_scheduledJobsDenyBox);
 
-            var save = new Button { Content = T("Updates.Save"), Width = 130, Height = 36, IsDefault = true };
+            var save = new Button { Content = T("Common.Save"), Width = 130, Height = 36, IsDefault = true };
             save.Styled(ControlThemes.DialogConfirmButton);
             save.Click += (_, _) => OnSaveClick();
             var cancel = BuildCancelActionButton(120);

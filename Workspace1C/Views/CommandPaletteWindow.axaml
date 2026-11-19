@@ -10,7 +10,7 @@
                        SystemDecorations="None">
     <Grid Margin="10" RowDefinitions="Auto,Auto,Auto">
         <TextBox Grid.Row="0" x:Name="SearchBox" Theme="{DynamicResource ModernTextBox}"
-                 Padding="10,8" FontSize="14"/>
+                 Padding="10,8" FontSize="15"/>
         <ListBox Grid.Row="1" x:Name="ItemList" MaxHeight="380" Margin="0,8,0,0"
                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <ListBox.ItemTemplate>

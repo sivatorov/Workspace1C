@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="{loc:Loc NameInput.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="200" Width="440"
+        MinHeight="200" MinWidth="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontSize="13"
@@ -43,21 +43,21 @@
         <StackPanel Grid.Row="2" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="OkButton" Width="130" Margin="0,0,8,0"
-                    IsDefault="True"
-                    Style="{StaticResource ModernButton}"
+                    IsDefault="True" KeyboardNavigation.TabIndex="900"
+                    Style="{StaticResource PrimaryButton}"
                     Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock x:Name="OkIcon" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center" x:Name="OkIcon"/>
                     <TextBlock x:Name="OkTextBlock" Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button Width="110"
-                    IsCancel="True"
+                    IsCancel="True" KeyboardNavigation.TabIndex="1000"
                     Style="{StaticResource ModernButton}"
                     Background="{DynamicResource ItemHoverBrush}"
                     Foreground="{DynamicResource TextPrimaryBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

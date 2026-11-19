@@ -149,21 +149,20 @@
                         <DataGridTemplateColumn Width="40" Header="{loc:Loc DetectConfigs.Column.Credentials}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="●" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                               ToolTip="{loc:Loc DetectConfigs.CredentialsMissingTooltip}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="{DynamicResource ErrorBrush}"/>
+                                    <Path Data="{DynamicResource IconBullet}" Width="16" Height="16" Stretch="Uniform" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="{loc:Loc DetectConfigs.CredentialsMissingTooltip}">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding HasCredentials}" Value="True">
-                                                        <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}"/>
+                                                        <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
                                                         <Setter Property="ToolTip"
                                                                 Value="{loc:Loc DetectConfigs.CredentialsFilledTooltip}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </Path.Style>
+                                    </Path>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
@@ -218,7 +217,7 @@
                 </Button>
                 <Button x:Name="DetectButton" Width="180" Height="36" Margin="0,0,10,0" IsDefault="True"
                         Click="OnDetect_Click"
-                        Style="{DynamicResource ModernButton}">
+                        Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="MagnifyScan" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc DetectConfigs.Button.Detect}" VerticalAlignment="Center" FontWeight="SemiBold"/>

@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -1008,7 +1008,10 @@ namespace Workspace1C
             panel.Children.Add(CommandPanelSeparator());
 
             // «Правка»: добавить, изменить и удалить выбранную базу.
-            var addBtn = TopBarIconButton("IconAdd", LocalizationManager.T("Main.AddBase"), "@SuccessBrush");
+            // Аудит UI P0-3: действия верхней панели — нейтральная кисть темы
+            // (TopBarActionBrush), семантические цвета остаются только статусам.
+            var addBtn = TopBarIconButton("IconAdd", LocalizationManager.T("Main.AddBase"),
+                themeBrushKey: "TopBarActionBrush");
             addBtn.Bind(Button.CommandProperty, new Binding("AddInfobaseCommand"));
             panel.Children.Add(addBtn);
 
@@ -1017,7 +1020,8 @@ namespace Workspace1C
             editBtn.Bind(Button.CommandProperty, new Binding("EditInfobaseCommand"));
             panel.Children.Add(editBtn);
 
-            var deleteBtn = TopBarIconButton("IconDelete", LocalizationManager.T("Main.DeleteTooltip"), "@ErrorBrush");
+            var deleteBtn = TopBarIconButton("IconDelete", LocalizationManager.T("Main.DeleteTooltip"),
+                themeBrushKey: "TopBarActionBrush");
             deleteBtn.Bind(Button.CommandProperty, new Binding("DeleteInfobaseCommand"));
             panel.Children.Add(deleteBtn);
 
@@ -1025,19 +1029,22 @@ namespace Workspace1C
 
             // «Управление списком»: очистка кеша, индикатор выгрузки, синхронизация
             // с ibases.v8i и проверка доступности баз.
-            var clearCacheBtn = TopBarIconButton("IconBroom", LocalizationManager.T("Main.ClearCacheTooltip"), "@WarningBrush");
+            var clearCacheBtn = TopBarIconButton("IconBroom", LocalizationManager.T("Main.ClearCacheTooltip"),
+                themeBrushKey: "TopBarActionBrush");
             clearCacheBtn.Bind(Button.CommandProperty, new Binding("ClearCacheCommand"));
             panel.Children.Add(clearCacheBtn);
 
             // Индикатор выгрузки .dt и .cf: виден только во время пакетной
             // операции, подсказка сводкой (MainWindow.xaml:563).
+            // Индикатор выгрузки — статус, а не действие: семантический WarningBrush сохранён.
             var exportBtn = TopBarIconButton("IconUpload", string.Empty, "@WarningBrush");
             exportBtn.Bind(ToolTip.TipProperty, new Binding("ExportIndicatorTooltip"));
             exportBtn.Bind(Control.IsVisibleProperty, new Binding("IsExporting"));
             exportBtn.Focusable = false;
             panel.Children.Add(exportBtn);
 
-            var syncBtn = TopBarIconButton("IconSync", LocalizationManager.T("Main.SyncDetailedTooltip"), "@InfoBrush");
+            var syncBtn = TopBarIconButton("IconSync", LocalizationManager.T("Main.SyncDetailedTooltip"),
+                themeBrushKey: "TopBarActionBrush");
             syncBtn.Bind(Button.CommandProperty, new Binding("SynchronizeWithIbasesCommand"));
             panel.Children.Add(syncBtn);
 
@@ -1045,13 +1052,14 @@ namespace Workspace1C
             // Иконка — зелёный гидролокатор (сонар), как экран на подводных лодках.
             var checkAvailBtn = new Button
             {
-                Content = IconHelper.MakeIcon("IconSonar", UiMetrics.Scaled(18),
-                    Themes.ThemeBrushes.Get("InfoBrush", "#0EA5E9")),
+                // Аудит UI P0-3: действие верхней панели — нейтральная кисть темы.
+                Content = IconHelper.MakeIcon("IconSonar", UiMetrics.Scaled(UiMetrics.IconToolbar), "TopBarActionBrush"),
                 Padding = new Thickness(UiMetrics.Scaled(8)),
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
             checkAvailBtn.Styled(Themes.ControlThemes.IconButton);
             ToolTip.SetTip(checkAvailBtn, LocalizationManager.T("Main.CheckAvailabilityTooltip"));
+            UiAutomation.SetNameFromTip(checkAvailBtn);
             checkAvailBtn.Bind(Button.CommandProperty, new Binding("CheckAvailabilityCommand"));
             panel.Children.Add(checkAvailBtn);
 
@@ -1061,7 +1069,7 @@ namespace Workspace1C
             var processInspectorBtn = TopBarIconButton(
                 "IconApplicationCog",
                 LocalizationManager.T("Main.ProcessInspectorTooltip"),
-                "@InfoBrush");
+                themeBrushKey: "TopBarActionBrush");
             processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
             panel.Children.Add(processInspectorBtn);
 
@@ -1084,6 +1092,7 @@ namespace Workspace1C
             };
             utilitiesBtn.Styled(Themes.ControlThemes.IconButton);
             ToolTip.SetTip(utilitiesBtn, LocalizationManager.T("Main.UtilitiesTooltip"));
+            UiAutomation.SetNameFromTip(utilitiesBtn);
             // ПКМ по заголовку «Утилиты» (issue #374): сразу открывает редактор структуры
             // меню, минуя окно настроек и контекстное меню с единственной командой.
             utilitiesBtn.PointerPressed += (_, e) =>
@@ -1109,7 +1118,8 @@ namespace Workspace1C
             // Значок темы меняется вместе со схемой, как в версии для Windows
             // (MainWindow.Language.cs:41): в тёмной солнце, в светлой луна.
             var themeIconKey = ThemeManager.CurrentTheme == ThemeManager.DarkThemeName ? "IconSun" : "IconMoon";
-            var themeBtn = TopBarIconButton(themeIconKey, LocalizationManager.T("Main.Theme"), "@PurpleAccentBrush");
+            var themeBtn = TopBarIconButton(themeIconKey, LocalizationManager.T("Main.Theme"),
+                themeBrushKey: "TopBarActionBrush");
             themeBtn.Bind(Button.CommandProperty, new Binding("ToggleThemeCommand"));
             panel.Children.Add(themeBtn);
 
@@ -1286,12 +1296,14 @@ namespace Workspace1C
 
             var minimize = new WindowControlButton(this, WindowControlKind.Minimize);
             ToolTip.SetTip(minimize, LocalizationManager.T("Window.Minimize"));
+            UiAutomation.SetNameFromTip(minimize);
             minimize.Click += (_, _) => WindowState = WindowState.Minimized;
             panel.Children.Add(minimize);
             _windowControlButtons.Add(minimize);
 
             var maximize = new WindowControlButton(this, WindowControlKind.Maximize);
             ToolTip.SetTip(maximize, LocalizationManager.T("Window.Maximize"));
+            UiAutomation.SetNameFromTip(maximize);
             maximize.Click += (_, _) =>
             {
                 WindowState = WindowState == WindowState.Maximized
@@ -1305,6 +1317,7 @@ namespace Workspace1C
             // прятать ли окно в трей (CloseToTray) или завершать приложение.
             var close = new WindowControlButton(this, WindowControlKind.Close);
             ToolTip.SetTip(close, LocalizationManager.T("Common.Close"));
+            UiAutomation.SetNameFromTip(close);
             close.Click += (_, _) => Close();
             panel.Children.Add(close);
             _windowControlButtons.Add(close);
@@ -1511,7 +1524,7 @@ namespace Workspace1C
             var panel = new StackPanel { Orientation = Orientation.Horizontal };
 
             var allSeg = new SegmentButton("IconDatabase", LocalizationManager.T("Main.AllBases"), "ItemHoverBrush", "ItemSelectedBrush",
-                iconSize: UiMetrics.Scaled(14), cornerRadius: 8)
+                iconSize: UiMetrics.Scaled(UiMetrics.IconControl), cornerRadius: 8)
             {
                 Padding = new Thickness(12, 5),
                 Margin = new Thickness(0, 0, 4, 0),
@@ -1522,7 +1535,7 @@ namespace Workspace1C
             panel.Children.Add(allSeg);
 
             var favSeg = new SegmentButton("IconStar", LocalizationManager.T("Main.Favorites"), "ItemHoverBrush", "ItemSelectedBrush",
-                iconSize: UiMetrics.Scaled(14), cornerRadius: 8)
+                iconSize: UiMetrics.Scaled(UiMetrics.IconControl), cornerRadius: 8)
             {
                 Padding = new Thickness(12, 5),
                 Margin = new Thickness(0, 0, 4, 0),
@@ -1533,7 +1546,7 @@ namespace Workspace1C
             panel.Children.Add(favSeg);
 
             var recSeg = new SegmentButton("IconHistory", LocalizationManager.T("Main.Recent"), "ItemHoverBrush", "ItemSelectedBrush",
-                iconSize: UiMetrics.Scaled(14), cornerRadius: 8)
+                iconSize: UiMetrics.Scaled(UiMetrics.IconControl), cornerRadius: 8)
             {
                 Padding = new Thickness(12, 5),
                 Margin = new Thickness(0),
@@ -1564,7 +1577,7 @@ namespace Workspace1C
         {
             var border = new Border
             {
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(8, 4),
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 12, 0),
@@ -1576,7 +1589,7 @@ namespace Workspace1C
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            var searchIcon = IconHelper.MakeIcon("IconSearch", 16, "TextSecondaryBrush");
+            var searchIcon = IconHelper.MakeIcon("IconSearch", UiMetrics.IconControl, "TextSecondaryBrush");
             searchIcon.Margin = new Thickness(2, 0, 6, 0);
             grid.Children.Add(searchIcon);
             Grid.SetColumn(searchIcon, 0);
@@ -1598,13 +1611,14 @@ namespace Workspace1C
             var clearBtn = new Button
             {
                 // Крестик очистки поиска в разметке 12 (MainWindow.xaml:220).
-                Content = IconHelper.MakeIcon("IconClose", 12, "TextSecondaryBrush"),
+                Content = IconHelper.MakeIcon("IconClose", UiMetrics.IconInline, "TextSecondaryBrush"),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(6, 0),
                 Cursor = new Cursor(StandardCursorType.Hand)
             };
             ToolTip.SetTip(clearBtn, LocalizationManager.T("Main.ClearSearch"));
+            UiAutomation.SetNameFromTip(clearBtn);
             clearBtn.Bind(Button.CommandProperty, new Binding("ClearSearchCommand"));
             grid.Children.Add(clearBtn);
             Grid.SetColumn(clearBtn, 2);
@@ -1634,6 +1648,7 @@ namespace Workspace1C
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
             ToolTip.SetTip(button, tooltip);
+            UiAutomation.SetNameFromTip(button);
             return button;
         }
 
@@ -1648,11 +1663,11 @@ namespace Workspace1C
             Control icon;
             if (colorHex is null)
             {
-                icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18), themeBrushKey);
+                icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar), themeBrushKey);
             }
             else
             {
-                icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18),
+                icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar),
                     Themes.ThemeBrushes.FromSpec(colorHex));
             }
 
@@ -1670,6 +1685,7 @@ namespace Workspace1C
             };
             button.Styled(Themes.ControlThemes.IconButton);
             ToolTip.SetTip(button, tooltip);
+            UiAutomation.SetNameFromTip(button);
             return button;
         }
 
@@ -2195,7 +2211,7 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Center
             };
 
-            _emptyIconHost = IconHelper.MakeIcon("IconDatabase", 44, out _emptyIcon);
+            _emptyIconHost = IconHelper.MakeIcon("IconDatabase", UiMetrics.IconEmptyLarge, out _emptyIcon);
             ThemeBrushes.Bind(_emptyIcon, Avalonia.Controls.Shapes.Path.FillProperty, "TextSecondaryBrush");
             _emptyIconHost.HorizontalAlignment = HorizontalAlignment.Center;
             _emptyIconHost.Margin = new Thickness(0, 0, 0, 6);
@@ -2309,7 +2325,7 @@ namespace Workspace1C
                 _vm?.ShowAppUnlockDialog();
             };
 
-            var icon = IconHelper.MakeIcon("IconExitToApp", 34, out _);
+            var icon = IconHelper.MakeIcon("IconExitToApp", UiMetrics.IconEmpty, out _);
             icon.HorizontalAlignment = HorizontalAlignment.Center;
 
             var title = new TextBlock
@@ -2376,7 +2392,7 @@ namespace Workspace1C
         {
             var message = new TextBlock
             {
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold,
                 Margin = new Thickness(0, 0, 0, 16),
                 TextWrapping = TextWrapping.Wrap,
@@ -2406,7 +2422,7 @@ namespace Workspace1C
 
             var card = new Border
             {
-                CornerRadius = new CornerRadius(10),
+                CornerRadius = new CornerRadius(12),
                 Padding = new Thickness(32, 26),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -2528,7 +2544,7 @@ namespace Workspace1C
                 Cursor = new Cursor(StandardCursorType.Hand),
                 IsVisible = false
             };
-            _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(15), "@AccentBrush");
+            _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(UiMetrics.IconControl), "@AccentBrush");
             _footerUpdateWarningIcon = IconHelper.MakeIcon("IconWarning", UiMetrics.Scaled(16), "@AccentBrush");
             _footerUpdateWarningIcon.IsVisible = false;
             // Состояние «готов к установке» (issue #116 v1.0.1.58): зелёная галочка —
@@ -2575,6 +2591,7 @@ namespace Workspace1C
 
             var sessionToggleBtn = StatusBarIconButton("IconRecent");
             ToolTip.SetTip(sessionToggleBtn, LocalizationManager.T("Main.CurrentSession"));
+            UiAutomation.SetNameFromTip(sessionToggleBtn);
             sessionToggleBtn.Bind(Button.CommandProperty, new Binding("ToggleSessionLaunchPanelCommand"));
             sessionPanel.Children.Add(sessionToggleBtn);
 
@@ -2642,6 +2659,7 @@ namespace Workspace1C
 
             var cancelDownloadsBtn = StatusBarIconButton("IconClose");
             ToolTip.SetTip(cancelDownloadsBtn, LocalizationManager.T("Main.Downloads.Cancel"));
+            UiAutomation.SetNameFromTip(cancelDownloadsBtn);
             cancelDownloadsBtn.Bind(Button.CommandProperty, new Binding("CancelDownloadsCommand"));
             downloadsPanel.Children.Add(cancelDownloadsBtn);
 
@@ -2978,7 +2996,7 @@ namespace Workspace1C
         {
             var button = new Button
             {
-                Content = IconHelper.MakeIcon(iconKey, 18, "SidebarTextBrush"),
+                Content = IconHelper.MakeIcon(iconKey, UiMetrics.IconToolbar, "SidebarTextBrush"),
                 Margin = new Thickness(4, 0, 0, 0),
                 MinWidth = 0,
                 MinHeight = 0,

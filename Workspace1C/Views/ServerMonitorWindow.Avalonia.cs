@@ -203,7 +203,7 @@ namespace Workspace1C
                     var text = new TextBlock
                     {
                         Text = server.Description,
-                        FontSize = 14,
+                        FontSize = ThemeManager.FontSizeBody,
                         TextTrimming = TextTrimming.CharacterEllipsis,
                         VerticalAlignment = VerticalAlignment.Center
                     };
@@ -242,16 +242,16 @@ namespace Workspace1C
             // Кнопки управления серверами — иконками без надписей (issue #3, комментарий
             // 7OH 20.10): Добавить, Изменить | Вверх, Вниз | Удалить (как у списка баз).
             var addServerButton = BuildIconButton(
-                "＋", LocalizationManager.T("ServerMonitor.Servers.Add"), OnAddServer);
+                "IconAdd", LocalizationManager.T("ServerMonitor.Servers.Add"), OnAddServer);
             var editServerButton = BuildIconButton(
-                "✎", LocalizationManager.T("ServerMonitor.Servers.Edit"), OnEditServer);
+                "IconEdit", LocalizationManager.T("ServerMonitor.Servers.Edit"), OnEditServer);
             var moveUpServerButton = BuildIconButton(
-                "↑", LocalizationManager.T("ServerMonitor.Servers.MoveUp"), _vm.MoveServerUp);
+                "IconArrowUp", LocalizationManager.T("ServerMonitor.Servers.MoveUp"), _vm.MoveServerUp);
             var moveDownServerButton = BuildIconButton(
-                "↓", LocalizationManager.T("ServerMonitor.Servers.MoveDown"), _vm.MoveServerDown);
+                "IconArrowDown", LocalizationManager.T("ServerMonitor.Servers.MoveDown"), _vm.MoveServerDown);
             // Кнопке «Удалить» — красная иконка (issue #3, комментарий 7OH).
             var deleteServerButton = BuildIconButton(
-                "🗑", LocalizationManager.T("ServerMonitor.Servers.Delete"), OnDeleteServer,
+                "IconDelete", LocalizationManager.T("ServerMonitor.Servers.Delete"), OnDeleteServer,
                 red: true);
 
             // Доступность «Вверх»/«Вниз» зависит от позиции выбранной строки (issue #3).
@@ -324,14 +324,14 @@ namespace Workspace1C
             var infobasesPanel = BuildInfobasesPanel();
 
             // ---- Первая строка панели (issue #3): «Подключиться», «Обновить», «Диагностика». ----
-            var connectButton = BuildActionButton(LocalizationManager.T("ServerMonitor.Connect"), "🔗",
+            var connectButton = BuildActionButton(LocalizationManager.T("ServerMonitor.Connect"), "IconLink",
                 () => _vm.ConnectCommand.Execute(null));
-            var refreshButton = BuildActionButton(LocalizationManager.T("ServerMonitor.Refresh"), "⟳", _vm.Refresh);
+            var refreshButton = BuildActionButton(LocalizationManager.T("ServerMonitor.Refresh"), "IconRefresh", _vm.Refresh);
 
             // «Диагностика сети…» (0.3.9.232, функция 12): DNS/ICMP/TCP-проверка
             // адреса:порт монитора и стандартных портов 1С. Работает до подключения rac.
             var diagnosticsButton = BuildActionButton(
-                LocalizationManager.T("ServerMonitor.NetworkDiagnostics"), "🛜", OpenNetworkDiagnostics);
+                LocalizationManager.T("ServerMonitor.NetworkDiagnostics"), "IconNetwork", OpenNetworkDiagnostics);
 
             var actionPanel = new StackPanel
             {
@@ -412,7 +412,7 @@ namespace Workspace1C
             // ListBox в режиме SelectionMode.Multiple, набор выбранных строк синхронизируется
             // в ViewModel, кнопка «Завершить сеансы» действует на весь список.
             var terminateButton = BuildActionButton(
-                LocalizationManager.T("ServerMonitor.TerminateSession"), "✕",
+                LocalizationManager.T("ServerMonitor.TerminateSession"), "IconClose",
                 () => _vm.TerminateSessionCommand.Execute(null));
             terminateButton.Bind(Button.IsEnabledProperty, new Binding("CanTerminateSessions"));
             var sessionsTab = CreateTab(_vm.SessionsTabText,
@@ -426,7 +426,7 @@ namespace Workspace1C
 
             // issue #72: то же для соединений («Разорвать соединения» — по всем выбранным).
             var disconnectButton = BuildActionButton(
-                LocalizationManager.T("ServerMonitor.DisconnectConnection"), "⛓",
+                LocalizationManager.T("ServerMonitor.DisconnectConnection"), "IconClose",
                 () => _vm.DisconnectConnectionCommand.Execute(null));
             disconnectButton.Bind(Button.IsEnabledProperty, new Binding("CanDisconnectConnections"));
             var connectionsTab = CreateTab(_vm.ConnectionsTabText,
@@ -471,7 +471,7 @@ namespace Workspace1C
                 [!TextBlock.TextProperty] = new Binding("InfobaseFilterText")
             };
             var clearFilterButton = BuildActionButton(
-                LocalizationManager.T("ServerMonitor.Infobase.FilterReset"), "✕", _vm.ClearInfobaseFilter);
+                LocalizationManager.T("ServerMonitor.Infobase.FilterReset"), "IconClose", _vm.ClearInfobaseFilter);
             var filterPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -525,7 +525,7 @@ namespace Workspace1C
         {
             Header = header,
             Padding = new Thickness(14, 6),
-            FontSize = 12.5,
+            FontSize = ThemeManager.FontSizeBody,
             Content = content
         }.Styled(ControlThemes.ServerMonitorTabItem);
 
@@ -665,7 +665,7 @@ namespace Workspace1C
             {
                 ItemsSource = items,
                 Margin = new Thickness(0, 0, 0, 4),
-                FontSize = 12.5
+                FontSize = ThemeManager.FontSizeBody
             };
             // Разная высота двух таблиц задаётся вызывающим кодом (по умолчанию — авто).
             if (fixedHeight > 0)
@@ -1017,7 +1017,7 @@ namespace Workspace1C
                 // issue #75: MinWidth колонки — заголовок и стрелка сортировки не обрезаются.
                 headerGrid.ColumnDefinitions.Add(new ColumnDefinition(widths[i]) { MinWidth = columns[i].MinWidth });
             }
-            var arrows = new Dictionary<TableColumn, TextBlock>();
+            var arrows = new Dictionary<TableColumn, Avalonia.Controls.Shapes.Path>();
 
             for (var i = 0; i < columns.Count; i++)
             {
@@ -1025,15 +1025,16 @@ namespace Workspace1C
                 // Стрелка сортировки (issue #3): акцентный цвет, не переносится и не
                 // «съедается» длинным заголовком — заголовок усекается (TextTrimming),
                 // а стрелка всегда видна справа в отдельной авто-колонке.
-                var arrow = new TextBlock
+                // P1b: стрелка сортировки — векторная иконка, не текстовые «▲/▼».
+                var arrow = new Avalonia.Controls.Shapes.Path
                 {
-                    Text = string.Empty,
-                    FontSize = 10,
+                    Width = UiMetrics.IconInline,
+                    Height = UiMetrics.IconInline,
+                    Stretch = Stretch.Uniform,
                     Margin = new Thickness(4, 0, 0, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    TextWrapping = TextWrapping.NoWrap
+                    VerticalAlignment = VerticalAlignment.Center
                 };
-                ThemeBrushes.Bind(arrow, TextBlock.ForegroundProperty, "AccentBrush");
+                ThemeBrushes.Bind(arrow, Avalonia.Controls.Shapes.Shape.FillProperty, "AccentBrush");
                 arrows[col] = arrow;
                 var headerText = new TextBlock
                 {
@@ -1074,9 +1075,9 @@ namespace Workspace1C
                         sortDescending = false;
                     }
                     foreach (var pair in arrows)
-                        pair.Value.Text = pair.Key == col
-                            ? (sortDescending ? "▼" : "▲")
-                            : string.Empty;
+                        pair.Value.Data = pair.Key == col
+                            ? IconHelper.Geometry(sortDescending ? "IconArrowDown" : "IconArrowUp")
+                            : null;
                     Rebuild();
                 };
                 Grid.SetColumn(button, i);
@@ -1346,7 +1347,7 @@ namespace Workspace1C
         }
 
         /// <summary>Кнопка действия: значок + подпись; <paramref name="red"/> — красные текст/иконка
-        /// (кнопки «Удалить», issue #3).</summary>
+        /// (кнопки «Удалить», issue #3). Ключ <c>Icon*</c> даёт векторную иконку набора (P1b).</summary>
         private static Button BuildActionButton(
             string text, string icon, System.Action onClick, bool red = false)
         {
@@ -1359,12 +1360,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock
-                        {
-                            Text = icon,
-                            VerticalAlignment = VerticalAlignment.Center,
-                            Foreground = red ? redBrush : null
-                        },
+                        BuildIconOrGlyph(icon, UiMetrics.IconControl, red ? redBrush : null),
                         new TextBlock
                         {
                             Text = text,
@@ -1395,21 +1391,15 @@ namespace Workspace1C
         }
 
         /// <summary>Узкая кнопка-иконка (для строки управления базами, issue #3): только
-        /// значок, подсказка; красная — для «Удалить». MinWidth (комментарий 7OH 20.10):
-        /// «Вверх»/«Вниз» (глифы ↑/↓ уже соседних) получают ту же ширину, что и остальные.</summary>
+        /// значок, подсказка; красная — для «Удалить». Ключ <c>Icon*</c> — векторная
+        /// иконка набора (P1b), иначе текстовый глиф. MinWidth (комментарий 7OH 20.10):
+        /// «Вверх»/«Вниз» получают ту же ширину, что и остальные.</summary>
         private static Button BuildIconButton(string icon, string tooltip, System.Action onClick, bool red = false)
         {
             var redBrush = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
             var button = new Button
             {
-                Content = new TextBlock
-                {
-                    Text = icon,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = red ? redBrush : null,
-                    // Кнопки-иконки шире (issue #3, комментарий 7OH 20.10): раза в полтора.
-                    FontSize = 14
-                },
+                Content = BuildIconOrGlyph(icon, UiMetrics.IconControl, red ? redBrush : null),
                 Padding = new Thickness(9, 7),
                 MinWidth = 40
             };
@@ -1418,6 +1408,25 @@ namespace Workspace1C
             ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
             button.Click += (_, _) => onClick();
             return button;
+        }
+
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка активного набора,
+        /// иначе — текстовый глиф (команды служб пока остаются глифами).
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, IBrush? brush)
+        {
+            if (icon.StartsWith("Icon", StringComparison.Ordinal))
+                return brush is null
+                    ? IconHelper.MakeIcon(icon, size, "TextPrimaryBrush")
+                    : IconHelper.MakeIcon(icon, size, brush);
+            return new TextBlock
+            {
+                Text = icon,
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = size,
+                Foreground = brush
+            };
         }
 
         // ===================== Колонки вкладок =====================
@@ -1443,7 +1452,8 @@ namespace Workspace1C
             new TableColumn(LocalizationManager.T("ServerMonitor.Columns.Process.Cpu"), "CpuText", "CpuText", Px(100), 63),
             new TableColumn(LocalizationManager.T("ServerMonitor.Columns.Process.Running"), "RunningText", "Running", Px(100), 93),
             new TableColumn(LocalizationManager.T("ServerMonitor.Columns.Process.Infobases"), "Infobases", "Infobases", Px(80), 63),
-            new TableColumn("●", string.Empty, null, Px(30))
+            // P1b: колонка-индикатор без текстового «●» в заголовке (значок — в ячейке).
+            new TableColumn(string.Empty, string.Empty, null, Px(30))
         };
 
         /// <summary>
@@ -1505,7 +1515,7 @@ namespace Workspace1C
         private Control BuildInfoPane()
         {
             var saveButton = BuildActionButton(
-                LocalizationManager.T("ServerMonitor.Cluster.Save"), "💾",
+                LocalizationManager.T("ServerMonitor.Cluster.Save"), "IconSave",
                 () => _vm.SaveClusterPropertiesCommand.Execute(null));
 
             var panel = new StackPanel { Spacing = 2 };
@@ -1612,11 +1622,11 @@ namespace Workspace1C
         private Control BuildInfobasesPanel()
         {
             var addButton = BuildIconButton(
-                "＋", LocalizationManager.T("ServerMonitor.Infobase.Add"), OnAddInfobase);
+                "IconAdd", LocalizationManager.T("ServerMonitor.Infobase.Add"), OnAddInfobase);
             var editButton = BuildIconButton(
-                "✎", LocalizationManager.T("ServerMonitor.Infobase.Edit"), OnEditInfobase);
+                "IconEdit", LocalizationManager.T("ServerMonitor.Infobase.Edit"), OnEditInfobase);
             var deleteButton = BuildIconButton(
-                "🗑", LocalizationManager.T("ServerMonitor.Infobase.Delete"),
+                "IconDelete", LocalizationManager.T("ServerMonitor.Infobase.Delete"),
                 OnDeleteInfobase, red: true);
             // Кнопки «Изменить»/«Удалить» активны только при выбранной базе и подключении
             // (issue #3: раньше кнопка «Удалить» оставалась неактивной — CanDropInfobase
@@ -1649,9 +1659,9 @@ namespace Workspace1C
             // Сортировка списка баз (issue #3, 7OH 17.10): по алфавиту и обратная — иконки.
             // Языконезависимые глифы сортировки (аудит UI, п. 4.4): «А↓/Я↓» → «A↓/Z↓».
             var sortAscButton = BuildIconButton(
-                "A↓", LocalizationManager.T("ServerMonitor.Infobase.SortAsc"), () => _vm.SortInfobases(false));
+                "IconSortAscending", LocalizationManager.T("ServerMonitor.Infobase.SortAsc"), () => _vm.SortInfobases(false));
             var sortDescButton = BuildIconButton(
-                "Z↓", LocalizationManager.T("ServerMonitor.Infobase.SortDesc"), () => _vm.SortInfobases(true));
+                "IconSortDescending", LocalizationManager.T("ServerMonitor.Infobase.SortDesc"), () => _vm.SortInfobases(true));
 
             // Порядок кнопок (issue #3): Добавить, Правка | А→Я, Я→А | Удалить.
             var toolbar = new StackPanel
@@ -1945,7 +1955,10 @@ namespace Workspace1C
                 case ServiceMenuItemKind.Settings:
                 {
                     var settings = new MenuItem { Header = item.Text }.Styled(Themes.ControlThemes.ModernMenuItem);
-                    settings.Icon = MenuIcon("⚙", "#6B7280");
+                    // Аудит UI P0-5: цвет из темы, не жёсткий #6B7280.
+                    // P1a: шестерёнка — векторная иконка активного набора, не текстовый глиф.
+                    settings.Icon = IconHelper.MakeIcon(
+                        "IconSettings", 16, Themes.ThemeBrushes.FromSpec("@TextSecondaryBrush"));
                     settings.Click += (_, _) => ShowServicesSettings();
                     return settings;
                 }
@@ -1962,7 +1975,7 @@ namespace Workspace1C
                     {
                         ServiceMenuItemKind.ServiceSubmenu => StatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuIcon("☰", "@PurpleAccentBrush")
+                        _ => MenuIcon("IconMenu", "@PurpleAccentBrush")
                     };
                     foreach (var child in item.Children)
                         submenu.Items.Add(ToAvaloniaMenuItem(child));
@@ -1992,15 +2005,25 @@ namespace Workspace1C
             }
         }
 
-        /// <summary>Цветной глиф-иконка пункта меню (Avalonia).</summary>
-        private static Control MenuIcon(string text, string colorHex) => new TextBlock
+        /// <summary>
+        /// Иконка пункта меню (Avalonia): ключ <c>Icon*</c> — векторная иконка
+        /// активного набора (P1b), иначе — цветной текстовый глиф команды службы.
+        /// </summary>
+        private static Control MenuIcon(string textOrKey, string colorHex)
         {
-            Text = text,
-            VerticalAlignment = VerticalAlignment.Center,
-            HorizontalAlignment = HorizontalAlignment.Center,
-            FontSize = 13,
-            Foreground = new SolidColorBrush(Color.Parse(colorHex))
-        };
+            // Аудит UI P0-5: поддерживаются и HEX, и «@»-ключи кистей темы.
+            var brush = Themes.ThemeBrushes.FromSpec(colorHex);
+            if (textOrKey.StartsWith("Icon", StringComparison.Ordinal))
+                return IconHelper.MakeIcon(textOrKey, UiMetrics.IconControl, brush);
+            return new TextBlock
+            {
+                Text = textOrKey,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                FontSize = UiMetrics.IconControl,
+                Foreground = brush
+            };
+        }
 
         /// <summary>Кружок статуса службы в пункте меню (цвет StatusColorHex).</summary>
         private static Control StatusCircle(string colorHex)
@@ -2026,7 +2049,7 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка 📦 +
+        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка +
         /// кружок статуса группы справа-снизу (цвет StatusColorHex — зелёный/жёлтый/серый),
         /// как в трее и в меню главного окна. При отсутствии статуса (кэш пуст, локальная
         /// машина) — обычная папка без кружка.
@@ -2034,14 +2057,8 @@ namespace Workspace1C
         private static Control MenuGroupIcon(string statusColorHex)
         {
             var grid = new Grid { Width = 16, Height = 16 };
-            grid.Children.Add(new TextBlock
-            {
-                Text = "📦",
-                FontSize = 13,
-                Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"), // fallback
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            });
+            grid.Children.Add(IconHelper.MakeIcon("IconPackage", UiMetrics.IconControl,
+                Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED")));
             if (!string.IsNullOrWhiteSpace(statusColorHex))
             {
                 try
@@ -2164,17 +2181,27 @@ namespace Workspace1C
             return text;
         }
 
+        /// <summary>Ячейка-индикатор: векторный кружок виден только при активности (P1b).</summary>
+        private static Control StatusDotCell(bool active, string colorHex)
+        {
+            var icon = IconHelper.MakeIcon("IconBullet", UiMetrics.IconControl,
+                Themes.ThemeBrushes.FromSpec(colorHex));
+            icon.HorizontalAlignment = HorizontalAlignment.Center;
+            icon.VerticalAlignment = VerticalAlignment.Center;
+            icon.IsVisible = active;
+            return icon;
+        }
+
         private static Control BuildProcessRow(object item)
         {
             var row = (RacProcessRow)item;
-            var runningDot = new TextBlock
-            {
-                Text = row.Running ? "●" : "○",
-                FontSize = 13,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = new SolidColorBrush(Color.Parse(row.StateColorHex))
-            };
+            // P1b: индикатор состояния — векторная иконка, не текстовые «●/○».
+            var runningDot = IconHelper.MakeIcon(
+                row.Running ? "IconBullet" : "IconUnknown",
+                UiMetrics.IconControl,
+                new SolidColorBrush(Color.Parse(row.StateColorHex)));
+            runningDot.HorizontalAlignment = HorizontalAlignment.Center;
+            runningDot.VerticalAlignment = VerticalAlignment.Center;
 
             var grid = new Grid
             {
@@ -2210,14 +2237,12 @@ namespace Workspace1C
         private static Control BuildSessionRow(object item)
         {
             var row = (RacSessionRow)item;
-            var blockedDot = new TextBlock
-            {
-                Text = row.BlockedSymbol,
-                FontSize = 13,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = Themes.ThemeBrushes.Get("WarningBrush", "#D97706")
-            };
+            // P1b: признак блокировки — векторный кружок, не текстовый «●».
+            var blockedDot = IconHelper.MakeIcon("IconBullet", UiMetrics.IconControl,
+                Themes.ThemeBrushes.Get("WarningBrush", "#D97706"));
+            blockedDot.HorizontalAlignment = HorizontalAlignment.Center;
+            blockedDot.VerticalAlignment = VerticalAlignment.Center;
+            blockedDot.IsVisible = !string.IsNullOrEmpty(row.BlockedSymbol);
 
             var grid = new Grid
             {
@@ -2298,8 +2323,8 @@ namespace Workspace1C
                 }
             };
             AddCell(grid, CellText("Object", bold: true), 0);
-            AddCell(grid, CellText("WaitingSymbol", colorHex: "#D97706"), 1);
-            AddCell(grid, CellText("BlockingSymbol", colorHex: "#DC2626"), 2);
+            AddCell(grid, StatusDotCell(!string.IsNullOrEmpty(row.WaitingSymbol), "#D97706"), 1);
+            AddCell(grid, StatusDotCell(!string.IsNullOrEmpty(row.BlockingSymbol), "#DC2626"), 2);
             AddCell(grid, CellText("SessionId"), 3);
             AddCell(grid, CellText("ConnectionId"), 4);
             AddCell(grid, CellText("TransactionId"), 5);

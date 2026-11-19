@@ -109,7 +109,13 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 [!TextBlock.TextProperty] = new Binding(nameof(RacInfobasePropertiesViewModel.Name))
             };
-            var refresh = new Button { Content = "⟳ " + T("ServerMonitor.Refresh"), Height = 32, HorizontalAlignment = HorizontalAlignment.Right };
+            var refresh = new Button
+            {
+                Content = IconHelper.IconAndText("IconRefresh", T("ServerMonitor.Refresh"),
+                    UiMetrics.IconControl, "TextPrimaryBrush"),
+                Height = 32,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
             refresh.Styled(ControlThemes.ModernButton);
             ToolTip.SetTip(refresh, T("ServerMonitor.Infobase.Props.RefreshHint"));
             refresh.Click += async (_, _) => await _vm.RefreshAsync();
@@ -118,7 +124,7 @@ namespace Workspace1C
             root.Children.Add(header);
 
             // Кнопки внизу.
-            var save = new Button { Content = T("Updates.Save"), Width = 130, Height = 36, IsDefault = true };
+            var save = new Button { Content = T("Common.Save"), Width = 130, Height = 36, IsDefault = true };
             save.Styled(ControlThemes.DialogConfirmButton);
             save.Click += (_, _) => OnSave();
             var cancel = BuildCancelActionButton(120);
@@ -285,7 +291,7 @@ namespace Workspace1C
             {
                 Header = T("ServerMonitor.Infobase.Props.Tab.Settings"),
                 Padding = new Thickness(14, 6),
-                FontSize = 12.5,
+                FontSize = ThemeManager.FontSizeBody,
                 Content = new ScrollViewer
                 {
                     Content = settingsPanel,
@@ -299,7 +305,7 @@ namespace Workspace1C
             {
                 Header = T("ServerMonitor.Infobase.Props.Tab.Basic"),
                 Padding = new Thickness(14, 6),
-                FontSize = 12.5,
+                FontSize = ThemeManager.FontSizeBody,
                 Content = new ScrollViewer
                 {
                     Content = basicPanel,
@@ -408,7 +414,7 @@ namespace Workspace1C
             var border = new Border
             {
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(10, 2, 10, 8),
                 Child = content
             };

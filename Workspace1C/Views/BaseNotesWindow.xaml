@@ -59,7 +59,7 @@
                 <TextBox x:Name="MarkdownBox" Style="{StaticResource ModernTextBox}"
                          AcceptsReturn="True" AcceptsTab="True"
                          Padding="6,4" VerticalScrollBarVisibility="Auto"
-                         HorizontalScrollBarVisibility="Auto" FontFamily="Consolas"/>
+                         HorizontalScrollBarVisibility="Auto" FontFamily="{DynamicResource UiMonospaceFontFamily}"/>
                 <FlowDocumentScrollViewer x:Name="PreviewViewer" Visibility="Collapsed"
                                           BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1" Padding="8"/>
             </Grid>

@@ -42,20 +42,17 @@
                             </Grid.ColumnDefinitions>
                             <ContentPresenter Grid.Column="0" VerticalAlignment="Center"
                                               Margin="{TemplateBinding Padding}"/>
-                            <TextBlock Grid.Column="1" x:Name="SortArrow" Text="▲" FontSize="9"
-                                       Margin="4,0,6,0" VerticalAlignment="Center"
-                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                       Visibility="Collapsed"/>
+                            <Path Grid.Column="1" x:Name="SortArrow" Data="{DynamicResource IconArrowUp}" Width="10" Height="10" Stretch="Uniform" Margin="4,0,6,0" VerticalAlignment="Center" Fill="{DynamicResource TextPrimaryBrush}" Visibility="Collapsed"/>
                         </Grid>
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding SortDirection, RelativeSource={RelativeSource Self}}"
                                          Value="Ascending">
-                                <Setter TargetName="SortArrow" Property="Text" Value="▲"/>
+                                <Setter TargetName="SortArrow" Property="Data" Value="{DynamicResource IconArrowUp}"/>
                                 <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding SortDirection, RelativeSource={RelativeSource Self}}"
                                          Value="Descending">
-                                <Setter TargetName="SortArrow" Property="Text" Value="▼"/>
+                                <Setter TargetName="SortArrow" Property="Data" Value="{DynamicResource IconArrowDown}"/>
                                 <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
                             </DataTrigger>
                         </ControlTemplate.Triggers>
@@ -209,28 +206,52 @@
                                         ElementStyle="{StaticResource AccountCellText}"/>
 
                     <!-- Признак предопределённой; пользовательская копия предопределённой
-                         (правка встроенной строки, issue #321) помечается значком ✎★. -->
+                         (правка встроенной строки, issue #321) помечается иконками «правка + звезда». -->
                     <DataGridTemplateColumn Width="44" CanUserSort="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="★" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           ToolTip="{loc:Loc Updates.Tracked}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <StackPanel.Style>
+                                        <Style TargetType="StackPanel">
+                                            <Setter Property="ToolTip" Value="{loc:Loc Updates.Tracked}"/>
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
-                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-                                                </DataTrigger>
                                                 <DataTrigger Binding="{Binding IsOverride}" Value="True">
-                                                    <Setter Property="Text" Value="✎★"/>
-                                                    <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
                                                     <Setter Property="ToolTip" Value="{loc:Loc Updates.OverrideHint}"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
+                                    </StackPanel.Style>
+                                    <Path Data="{DynamicResource IconEdit}" Width="12" Height="12" Stretch="Uniform"
+                                          Margin="0,0,2,0" VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsOverride}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                    <Path Data="{DynamicResource IconStar}" Width="12" Height="12" Stretch="Uniform"
+                                          VerticalAlignment="Center">
+                                        <Path.Style>
+                                            <Style TargetType="Path">
+                                                <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsBuiltIn}" Value="True">
+                                                        <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding IsOverride}" Value="True">
+                                                        <Setter Property="Fill" Value="{DynamicResource AccentBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Path.Style>
+                                    </Path>
+                                </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
@@ -303,7 +324,7 @@
 
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Width="120" Height="36" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" Click="OnClose_Click">
-                    <TextBlock Text="{loc:Loc Updates.Close}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </Grid>

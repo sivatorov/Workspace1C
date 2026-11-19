@@ -34,7 +34,7 @@
                 </Button>
                 <Button MinWidth="110" Height="34" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                         Click="OnCancelClick" IsCancel="True">
-                    <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </Grid>

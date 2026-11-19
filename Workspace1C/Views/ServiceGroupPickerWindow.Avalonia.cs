@@ -34,7 +34,9 @@ namespace Workspace1C
             _initialGroup = currentGroup;
             _selectedName = string.IsNullOrEmpty(currentGroup) ? string.Empty : currentGroup;
             Title = LocalizationManager.T("Services.GroupPicker.Title");
-            Width = 400;
+            // Аудит UI P3a: минимальная ширина вместо фиксированной — длинные
+            // английские подписи не обрезаются при 125/150 %.
+            MinWidth = 400;
             MinHeight = 220;
             MaxHeight = 560;
             CanResize = false;
@@ -91,10 +93,12 @@ namespace Workspace1C
                 Content = host
             };
 
-            var ok = new Button { Content = LocalizationManager.T("Common.Ok"), Width = 92, Height = 34, IsDefault = true };
+            // Аудит UI P1c: высота нижней панели диалога — 36, ширина минимальная
+            // (120), чтобы английские подписи не обрезались.
+            var ok = new Button { Content = LocalizationManager.T("Common.Ok"), MinWidth = 120, Height = 36, IsDefault = true };
             ok.Styled(ControlThemes.DialogConfirmButton);
             ok.Click += (_, _) => OnOk();
-            var cancel = new Button { Content = LocalizationManager.T("Common.Cancel"), Width = 92, Height = 34, IsCancel = true };
+            var cancel = new Button { Content = LocalizationManager.T("Common.Cancel"), MinWidth = 120, Height = 36, IsCancel = true };
             cancel.Styled(ControlThemes.DialogCancelButton);
             cancel.Click += (_, _) =>
             {

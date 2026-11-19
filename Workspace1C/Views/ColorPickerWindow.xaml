@@ -26,15 +26,15 @@
 
         <!-- ============ Кнопки ============ -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button MinWidth="90" Style="{DynamicResource ModernButton}" Margin="0,0,8,0" IsDefault="True" Click="OnOk_Click">
+            <Button MinWidth="90" Style="{DynamicResource PrimaryButton}" Margin="0,0,8,0" IsDefault="True" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
             <Button MinWidth="110" Style="{DynamicResource SecondaryButton}" IsCancel="True">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

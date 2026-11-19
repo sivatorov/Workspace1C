@@ -97,7 +97,7 @@ namespace Workspace1C
                 Spacing = 10,
                 Margin = new Thickness(0, 12, 0, 0)
             };
-            var save = new Button { Content = T("Updates.Save"), Width = 130, Height = 36, IsDefault = true };
+            var save = new Button { Content = T("Common.Save"), Width = 130, Height = 36, IsDefault = true };
             save.Styled(ControlThemes.DialogConfirmButton);
             save.Click += (_, _) => OnSaveClick();
             var cancel = BuildCancelActionButton(120);

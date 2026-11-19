@@ -751,6 +751,7 @@ namespace Workspace1C
                         ? LocalizationManager.T("Window.Restore")
                         : LocalizationManager.T("Window.Maximize"));
                 UpdateMaximizeTooltip();
+                UiAutomation.SetNameFromTip(maximize);
                 this.GetObservable(WindowStateProperty)
                     .Subscribe(new WindowStateObserver(UpdateMaximizeTooltip));
                 maximize.Click += (_, _) => WindowState = WindowState == WindowState.Maximized
@@ -761,11 +762,13 @@ namespace Workspace1C
 
             var minimize = new DialogWindowControlButton(DialogWindowControlKind.Minimize);
             ToolTip.SetTip(minimize, LocalizationManager.T("Window.Minimize"));
+            UiAutomation.SetNameFromTip(minimize);
             minimize.Click += (_, _) => WindowState = WindowState.Minimized;
             buttons.Children.Add(minimize);
 
             var close = new DialogWindowControlButton(DialogWindowControlKind.Close);
             ToolTip.SetTip(close, LocalizationManager.T("Common.Close"));
+            UiAutomation.SetNameFromTip(close);
             close.Click += (_, _) =>
             {
                 ModalCloseTrace.Log($"Кнопка окна «Закрыть».Click: окно {GetType().Name} — Close()");
@@ -1055,11 +1058,13 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        IconHelper.MakeIcon("IconClose", 14, secondary ? "SecondaryButtonTextBrush" : "TextPrimaryBrush"),
+                        IconHelper.MakeIcon("IconClose", UiMetrics.IconControl, secondary ? "SecondaryButtonTextBrush" : "TextPrimaryBrush"),
                         caption
                     }
                 },
-                IsCancel = true
+                IsCancel = true,
+                // Аудит UI P3a: «Отмена» — последняя в порядке табуляции.
+                TabIndex = 1000
             };
 
             button.Styled(secondary ? ControlThemes.SecondaryButton : ControlThemes.ModernButton);
@@ -1115,14 +1120,16 @@ namespace Workspace1C
                     {
                         // Кнопка подтверждения акцентная: значок — TextOnAccentBrush
                         // (аудит UI P0-1; ButtonTextBrush на синем акценте давал 4.05:1).
-                        IconHelper.MakeIcon(okIconKey, 14, "TextOnAccentBrush"),
+                        IconHelper.MakeIcon(okIconKey, UiMetrics.IconControl, "TextOnAccentBrush"),
                         caption
                     }
                 },
-                IsDefault = true
+                IsDefault = true,
+                // Аудит UI P3a: кнопки диалога идут после полей формы.
+                TabIndex = 900
             };
 
-            button.Styled(ControlThemes.ModernButton);
+            button.Styled(ControlThemes.DialogConfirmButton);
             SetButtonWidth(button, width, minimumWidth);
             button.Click += (_, _) =>
             {
@@ -1176,9 +1183,13 @@ namespace Workspace1C
                         caption
                     }
                 },
-                Width = width,
+                // Аудит UI P1c: минимальная ширина вместо фиксированной (120..140),
+                // чтобы длинные английские подписи не обрезались.
+                MinWidth = Math.Max(width, 120),
                 Height = height,
-                IsDefault = true
+                IsDefault = true,
+                // Аудит UI P3a: кнопки диалога идут после полей формы в порядке табуляции.
+                TabIndex = 900
             };
 
             button.Styled(ControlThemes.DialogConfirmButton);
@@ -1231,9 +1242,12 @@ namespace Workspace1C
                         caption
                     }
                 },
-                Width = width,
+                // Аудит UI P1c: минимальная ширина вместо фиксированной.
+                MinWidth = Math.Max(width, 120),
                 Height = height,
-                IsCancel = true
+                IsCancel = true,
+                // Аудит UI P3a: «Отмена» — последняя в порядке табуляции.
+                TabIndex = 1000
             };
 
             button.Styled(ControlThemes.DialogCancelButton);
@@ -1288,10 +1302,12 @@ namespace Workspace1C
 
         private static void SetButtonWidth(Button button, double width, bool minimumWidth)
         {
-            if (minimumWidth)
-                button.MinWidth = width;
-            else
-                button.Width = width;
+            // Аудит UI P1c: у кнопок с текстом фиксированная ширина заменена
+            // минимальной — английские подписи не обрезаются, а кнопка растёт
+            // под содержимое. Параметр minimumWidth сохранён ради совместимости
+            // вызовов: теперь ширина ВСЕГДА минимальная.
+            _ = minimumWidth;
+            button.MinWidth = Math.Max(width, 120);
         }
 
         /// <summary>
@@ -1513,8 +1529,8 @@ namespace Workspace1C
 
                 _glyph = new Avalonia.Controls.Shapes.Path
                 {
-                    Width = UiMetrics.Scaled(14),
-                    Height = UiMetrics.Scaled(14),
+                    Width = UiMetrics.Scaled(UiMetrics.IconControl),
+                    Height = UiMetrics.Scaled(UiMetrics.IconControl),
                     Stretch = Stretch.Uniform,
                     StrokeThickness = _kind is DialogWindowControlKind.Close or DialogWindowControlKind.Maximize ? 1.7 : 2.0,
                     StrokeLineCap = PenLineCap.Round,

@@ -87,13 +87,13 @@ namespace Workspace1C
 
             // ---- Первая строка: «Настроить» и «Системный диалог» (скрыт на Linux). ----
             var configureButton = BuildActionButton(
-                LocalizationManager.T("Services.Configure"), "⚙", () => _vm.ConfigureCommand.Execute(null), "@TextSecondaryBrush");
+                LocalizationManager.T("Services.Configure"), "IconSettings", () => _vm.ConfigureCommand.Execute(null), "@TextSecondaryBrush");
             var systemDialogButton = BuildActionButton(
                 LocalizationManager.T("Services.SystemDialog"), "🗔", () => _vm.OpenSystemDialogCommand.Execute(null), "@InfoBrush");
             systemDialogButton.IsVisible = _vm.CanOpenSystemDialog;
             // «Выдать права» (issue #11): на Linux выдача прав не поддерживается — скрыта.
             var grantRightsButton = BuildActionButton(
-                LocalizationManager.T("Services.GrantRights"), "🛡", () => _vm.GrantRightsCommand.Execute(null), "@PurpleAccentBrush");
+                LocalizationManager.T("Services.GrantRights"), "IconShield", () => _vm.GrantRightsCommand.Execute(null), "@PurpleAccentBrush");
             grantRightsButton.IsVisible = _vm.CanGrantRights;
 
             var topButtons = new StackPanel
@@ -128,28 +128,28 @@ namespace Workspace1C
                 () => _vm.CollapseAllCommand.Execute(null));
             collapseAllButton.Bind(Button.IsEnabledProperty, new Binding("CanExpandAllGroups"));
 
-            var moveUpButton = BuildIconButton("▲", LocalizationManager.T("Services.MoveUp"),
+            var moveUpButton = BuildIconButton("IconArrowUp", LocalizationManager.T("Services.MoveUp"),
                 () => _vm.MoveUpCommand.Execute(null), "@InfoBrush");
             moveUpButton.Bind(Button.IsEnabledProperty, new Binding("CanMoveUp"));
-            var moveDownButton = BuildIconButton("▼", LocalizationManager.T("Services.MoveDown"),
+            var moveDownButton = BuildIconButton("IconArrowDown", LocalizationManager.T("Services.MoveDown"),
                 () => _vm.MoveDownCommand.Execute(null), "@InfoBrush");
             moveDownButton.Bind(Button.IsEnabledProperty, new Binding("CanMoveDown"));
             // Группы служб: «Добавить/Изменить/Удалить группу». Кнопки неактивны, пока окно
             // не установит GroupEditorProvider (окно редактирования группы — Задача 3).
-            var addGroupButton = BuildIconButton("📦", LocalizationManager.T("Services.GroupAddHint"),
+            var addGroupButton = BuildIconButton("IconPackage", LocalizationManager.T("Services.GroupAddHint"),
                 () => _vm.AddGroupCommand.Execute(null), "@PurpleAccentBrush");
             addGroupButton.Bind(Button.IsEnabledProperty, new Binding("CanAddGroup"));
-            var editGroupButton = BuildIconButton("✎", LocalizationManager.T("Services.GroupEditHint"),
+            var editGroupButton = BuildIconButton("IconEdit", LocalizationManager.T("Services.GroupEditHint"),
                 () => _vm.EditGroupCommand.Execute(null), "@PurpleAccentBrush");
             editGroupButton.Bind(Button.IsEnabledProperty, new Binding("CanEditGroup"));
             // «Перенести в группу» (issue #11, 1.0.0.14): рядом с кнопкой правки.
-            var moveToGroupButton = BuildIconButton("⇄", LocalizationManager.T("Services.MoveToGroupHint"),
+            var moveToGroupButton = BuildIconButton("IconSwap", LocalizationManager.T("Services.MoveToGroupHint"),
                 () => _vm.MoveToGroupCommand.Execute(null), "@InfoBrush");
             moveToGroupButton.Bind(Button.IsEnabledProperty, new Binding("CanMoveToGroup"));
-            var deleteGroupButton = BuildIconButton("🗑", LocalizationManager.T("Services.GroupDeleteHint"),
+            var deleteGroupButton = BuildIconButton("IconDelete", LocalizationManager.T("Services.GroupDeleteHint"),
                 () => _vm.DeleteGroupCommand.Execute(null), "@ErrorBrush");
             deleteGroupButton.Bind(Button.IsEnabledProperty, new Binding("CanDeleteGroup"));
-            var refreshButton = BuildIconButton("⟳", LocalizationManager.T("Services.Refresh"),
+            var refreshButton = BuildIconButton("IconRefresh", LocalizationManager.T("Services.Refresh"),
                 () => _vm.RefreshCommand.Execute(null), "@InfoBrush");
             // Команды — только цветные иконки, без подписей (замечание 7OH 18.10);
             // подписи — подсказками, в контекстном меню подписи остаются.
@@ -180,7 +180,7 @@ namespace Workspace1C
             // скина и цветными иконками — как контекстное меню основного окна (issue #11).
             Button? allServicesButton = null;
             allServicesButton = BuildActionButton(LocalizationManager.T("Services.AllServices"),
-                "▾",
+                "IconChevronDown",
                 () =>
                 {
                     var menu = new ContextMenu().Styled(ControlThemes.ModernContextMenu);
@@ -336,12 +336,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock
-                        {
-                            Text = icon,
-                            VerticalAlignment = VerticalAlignment.Center,
-                            Foreground = iconColorHex is null ? null : Themes.ThemeBrushes.FromSpec(iconColorHex)
-                        },
+                        BuildIconOrGlyph(icon, UiMetrics.IconControl, iconColorHex),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -353,18 +348,33 @@ namespace Workspace1C
             return button;
         }
 
-        /// <summary>Узкая кнопка-иконка с подсказкой.</summary>
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка набора темы (P1a),
+        /// иначе — текстовый глиф для обратной совместимости с остальными кнопками окна.
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, string? colorHex)
+        {
+            if (icon.StartsWith("Icon", StringComparison.Ordinal))
+                return colorHex is null
+                    ? IconHelper.MakeIcon(icon, size, "TextPrimaryBrush")
+                    : IconHelper.MakeIcon(icon, size, Themes.ThemeBrushes.FromSpec(colorHex));
+            return new TextBlock
+            {
+                Text = icon,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = colorHex is null ? null : Themes.ThemeBrushes.FromSpec(colorHex)
+            };
+        }
+
+        /// <summary>
+        /// Узкая кнопка-иконка с подсказкой. Ключ <c>Icon*</c> даёт векторную иконку
+        /// активного набора, иначе — текстовый глиф (обратная совместимость).
+        /// </summary>
         private static Button BuildIconButton(string icon, string tooltip, Action onClick, string? iconColorHex = null)
         {
             var button = new Button
             {
-                Content = new TextBlock
-                {
-                    Text = icon,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FontSize = 13,
-                    Foreground = iconColorHex is null ? null : Themes.ThemeBrushes.FromSpec(iconColorHex)
-                },
+                Content = BuildIconOrGlyph(icon, UiMetrics.IconControl, iconColorHex),
                 Padding = new Thickness(8, 5)
             };
             ToolTip.SetTip(button, tooltip);
@@ -412,7 +422,7 @@ namespace Workspace1C
         {
             var button = new Button
             {
-                Content = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18), "TextSecondaryBrush"),
+                Content = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar), "TextSecondaryBrush"),
                 Padding = new Thickness(8, 5)
             };
             ToolTip.SetTip(button, tooltip);
@@ -469,14 +479,10 @@ namespace Workspace1C
             }
 
             // Иконка-индикатор группы (видна только для строк-групп).
-            var groupIcon = new TextBlock
-            {
-                Text = "📦",
-                Margin = new Thickness(0, 0, 6, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"), // fallback
-                IsVisible = row.IsGroup
-            };
+            var groupIcon = IconHelper.MakeIcon("IconPackage", UiMetrics.IconControl,
+                Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"));
+            groupIcon.Margin = new Thickness(0, 0, 6, 0);
+            groupIcon.IsVisible = row.IsGroup;
 
             var name = new TextBlock
             {
@@ -557,11 +563,11 @@ namespace Workspace1C
                 menu.Items.Add(new Separator());
                 AddRowMenuCommand(menu, "Services.Restart", _vm.RestartGroupCommand, "⟲", "@InfoBrush");
                 menu.Items.Add(new Separator());
-                AddRowMenuCommand(menu, "Services.EditGroup", _vm.EditGroupCommand, "✎", "@PurpleAccentBrush");
-                AddRowMenuCommand(menu, "Services.DeleteGroup", _vm.DeleteGroupCommand, "🗑", "@ErrorBrush");
+                AddRowMenuCommand(menu, "Services.EditGroup", _vm.EditGroupCommand, "IconEdit", "@PurpleAccentBrush");
+                AddRowMenuCommand(menu, "Services.DeleteGroup", _vm.DeleteGroupCommand, "IconDelete", "@ErrorBrush");
                 menu.Items.Add(new Separator());
-                AddRowMenuCommand(menu, "Services.MoveUp", _vm.MoveUpCommand, "▲", "@InfoBrush");
-                AddRowMenuCommand(menu, "Services.MoveDown", _vm.MoveDownCommand, "▼", "@InfoBrush");
+                AddRowMenuCommand(menu, "Services.MoveUp", _vm.MoveUpCommand, "IconArrowUp", "@InfoBrush");
+                AddRowMenuCommand(menu, "Services.MoveDown", _vm.MoveDownCommand, "IconArrowDown", "@InfoBrush");
             }
             else
             {
@@ -574,10 +580,10 @@ namespace Workspace1C
                 AddRowMenuCommand(menu, "Services.Restart", _vm.RestartCommand, "⟲", "@InfoBrush");
                 menu.Items.Add(new Separator());
                 // «Перенести в группу» (issue #11, 1.0.0.14): только для службы.
-                AddRowMenuCommand(menu, "Services.MoveToGroup", _vm.MoveToGroupCommand, "⇄", "@InfoBrush");
+                AddRowMenuCommand(menu, "Services.MoveToGroup", _vm.MoveToGroupCommand, "IconSwap", "@InfoBrush");
                 menu.Items.Add(new Separator());
-                AddRowMenuCommand(menu, "Services.MoveUp", _vm.MoveUpCommand, "▲", "@InfoBrush");
-                AddRowMenuCommand(menu, "Services.MoveDown", _vm.MoveDownCommand, "▼", "@InfoBrush");
+                AddRowMenuCommand(menu, "Services.MoveUp", _vm.MoveUpCommand, "IconArrowUp", "@InfoBrush");
+                AddRowMenuCommand(menu, "Services.MoveDown", _vm.MoveDownCommand, "IconArrowDown", "@InfoBrush");
             }
             grid.ContextMenu = menu;
 
@@ -596,13 +602,9 @@ namespace Workspace1C
                 .Styled(ControlThemes.ModernMenuItem);
             if (icon is not null)
             {
-                item.Icon = new TextBlock
-                {
-                    Text = icon,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Foreground = colorHex is null ? null : Themes.ThemeBrushes.FromSpec(colorHex)
-                };
+                // P1b аудита UI: ключ Icon* — векторная иконка активного набора,
+                // иначе — цветной глиф (команды служб пока остаются глифами).
+                item.Icon = BuildIconOrGlyph(icon, UiMetrics.IconControl, colorHex);
             }
             menu.Items.Add(item);
         }

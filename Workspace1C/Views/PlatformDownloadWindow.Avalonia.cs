@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -214,7 +214,7 @@ namespace Workspace1C
             var listBorder = new Border
             {
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -447,7 +447,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             ThemeBrushes.Bind(bottom, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(bottom, Border.BorderBrushProperty, "BorderColorBrush");
@@ -471,8 +471,8 @@ namespace Workspace1C
             _logBox = new TextBox
             {
                 Height = 100,
-                FontFamily = new FontFamily("Consolas, Courier New, monospace"),
-                FontSize = 11,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = ThemeManager.FontSizeCaption,
                 IsReadOnly = true,
                 AcceptsReturn = true,
                 TextWrapping = TextWrapping.Wrap
@@ -552,7 +552,7 @@ namespace Workspace1C
             {
                 Text = text,
                 VerticalAlignment = VerticalAlignment.Center,
-                FontSize = 12.5
+                FontSize = ThemeManager.FontSizeBody
             };
             // Issue #61: подписи полей формы — единая кисть FormLabelBrush; вторичные
             // пояснения остаются на вторичной кисти (намеренно приглушённый текст).

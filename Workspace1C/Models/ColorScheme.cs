@@ -405,6 +405,11 @@ public class ColorScheme
         // Текст на плашке избранного: тёмный (плашка всегда яркая). Реальный контраст
         // к палитре схемы добирает ThemeManager (SetContrastBrush FavoriteTextBrush).
         ["FavoriteTextColor"] = "#1C1917",
+        // Бейдж «Избранное» и фон блока кода markdown (аудит UI P2b): theme-варианты
+        // вместо жёстких #FEF3C7 и полупрозрачного #22000000.
+        ["FavoriteBadgeColor"] = "#FEF3C7",
+        ["FavoriteBadgeTextColor"] = "#92400E",
+        ["CodeBlockBackgroundColor"] = "#F1F5F9",
         ["FolderColor"] = "#2D6CDF",
         ["FavoriteFolderColor"] = "#8B5CF6",
         ["ItemHoverColor"] = "#FFF3CD",
@@ -443,7 +448,9 @@ public class ColorScheme
         ["TextPrimaryColor"] = "#F1F5F9",
         ["TextSecondaryColor"] = "#CBD5E1",
         ["TextOnAccentColor"] = "#FFFFFF",
-        ["ButtonTextColor"] = "#000000",
+        // Аудит UI P2b: текст на вторичных кнопках — основной светлый текст темы,
+        // а не чёрный (на тёмной заливке чёрный нечитаем).
+        ["ButtonTextColor"] = "#F1F5F9",
         // Подпись поля формы (issue #61): равна первичному тексту тёмной темы.
         ["FormLabelBrush"] = "#F1F5F9",
         // Семантические статусы (аудит UI 1.0.1.10, п. 2.1): осветлённые варианты
@@ -462,15 +469,21 @@ public class ColorScheme
         ["PinnedBadgeTextBrush"] = "#DDD6FE",
         ["FavoriteColor"] = "#FBBF24",
         ["FavoriteTextColor"] = "#1C1917",
+        // Бейдж «Избранное» и фон блока кода markdown (аудит UI P2b).
+        ["FavoriteBadgeColor"] = "#78350F",
+        ["FavoriteBadgeTextColor"] = "#FDE68A",
+        ["CodeBlockBackgroundColor"] = "#0B1220",
         ["FolderColor"] = "#3B82F6",
         ["FavoriteFolderColor"] = "#8B5CF6",
         ["ItemHoverColor"] = "#334155",
         ["ItemSelectedColor"] = "#1E3A5F",
         ["AvatarBackgroundColor"] = "#1E3A5F",
         ["AvatarTextColor"] = "#FFB300",
-        ["SecondaryButtonBackgroundColor"] = "#FFF3CD",
-        ["SecondaryButtonHoverColor"] = "#FFE69C",
-        ["SecondaryButtonPressedColor"] = "#FFD54D",
+        // Аудит UI P2b: вторичная кнопка в тёмной теме — из палитры темы
+        // (CardBackground/ItemHover), а не светло-жёлтая (#FFF3CD/#FFE69C).
+        ["SecondaryButtonBackgroundColor"] = "#1E293B",
+        ["SecondaryButtonHoverColor"] = "#334155",
+        ["SecondaryButtonPressedColor"] = "#475569",
         ["TreeHoverColor"] = "#334155",
         ["TreeSelectedColor"] = "#B45309",
         // Дорожка переключателя в выключенном положении (issue #26): тёмная #475569.

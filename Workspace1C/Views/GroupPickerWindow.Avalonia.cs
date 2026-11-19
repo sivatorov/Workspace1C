@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -264,7 +264,7 @@ namespace Workspace1C
 
             _clearSearch = new Button
             {
-                Content = IconHelper.MakeIcon("IconClose", 13, "TextSecondaryBrush"),
+                Content = IconHelper.MakeIcon("IconClose", UiMetrics.IconInline, "TextSecondaryBrush"),
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(4, 0),
@@ -367,7 +367,7 @@ namespace Workspace1C
             {
                 Padding = new Thickness(6, 3),
                 Margin = new Thickness(0, 0, 8, 0),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 VerticalAlignment = VerticalAlignment.Center,
                 Background = node.HeaderStripeBrush,
                 Child = new Avalonia.Controls.Shapes.Path
@@ -404,7 +404,7 @@ namespace Workspace1C
                 Spacing = 6,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            pathPanel.Children.Add(IconHelper.MakeIcon("IconChevronRight", 15, "TextSecondaryBrush"));
+            pathPanel.Children.Add(IconHelper.MakeIcon("IconChevronRight", UiMetrics.IconControl, "TextSecondaryBrush"));
             _pathLabel = ThemedText(string.Empty, 12.5, secondary: true, FontWeight.Normal);
             _pathLabel.VerticalAlignment = VerticalAlignment.Center;
             _pathLabel.TextTrimming = TextTrimming.CharacterEllipsis;

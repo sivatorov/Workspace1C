@@ -170,11 +170,11 @@ namespace Workspace1C
 
             // ---- Кнопки (паттерн BaseSelectionWindow: строятся в коде, хост — в разметке). ----
             // Пароль приходит из выбранной записи справочника (issue #27) — PasswordBox нет.
-            _connectButton = BuildActionButton(LocalizationManager.T("ClusterImport.Connect"), "🔌",
+            _connectButton = BuildActionButton(LocalizationManager.T("ClusterImport.Connect"), "IconLink",
                 () => _ = SafeConnectAndSaveAsync());
             this.FindControl<ContentControl>("ConnectHost")!.Content = _connectButton;
 
-            _loadBasesButton = BuildActionButton(LocalizationManager.T("ClusterImport.LoadBases"), "⟳",
+            _loadBasesButton = BuildActionButton(LocalizationManager.T("ClusterImport.LoadBases"), "IconRefresh",
                 () => _vm.LoadBases());
             this.FindControl<ContentControl>("LoadHost")!.Content = _loadBasesButton;
 
@@ -348,7 +348,9 @@ namespace Workspace1C
         private Button BuildImportButton()
         {
             // Жёсткая циановая заливка и белый текст убраны: акцент темы (issue #26).
-            var button = BuildActionButton(LocalizationManager.T("ClusterImport.ImportButton"), "⇩", OnImportClick);
+            // Импорт — основное действие окна, поэтому акцентная кнопка SemiBold.
+            var button = BuildActionButton(LocalizationManager.T("ClusterImport.ImportButton"),
+                "IconUpload", OnImportClick, "TextOnAccentBrush", primary: true);
             return button;
         }
 
@@ -356,14 +358,15 @@ namespace Workspace1C
         /// красный шрифт и иконка — по образцу Windows-версии.</summary>
         private Button BuildCloseButton()
         {
-            var button = BuildActionButton(LocalizationManager.T("Common.Close"), "✖", () => Close());
+            var button = BuildActionButton(LocalizationManager.T("Common.Close"), "IconClose", () => Close(), "ErrorBrush");
             ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
             // Красный шрифт — на семантической кисти темы (аудит UI, п. 2.9).
             ThemeBrushes.Bind(button, Button.ForegroundProperty, "ErrorBrush");
             return button;
         }
 
-        private Button BuildActionButton(string text, string icon, Action onClick)
+        private Button BuildActionButton(string text, string icon, Action onClick,
+            string iconBrushKey = "TextPrimaryBrush", bool primary = false)
         {
             var button = new Button
             {
@@ -373,17 +376,33 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        BuildIconOrGlyph(icon, UiMetrics.IconControl, iconBrushKey),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
                 Padding = new Thickness(12, 5)
             };
-            button.Styled(ControlThemes.ModernButton);
-            ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
+            if (primary)
+            {
+                button.Styled(ControlThemes.DialogConfirmButton);
+            }
+            else
+            {
+                button.Styled(ControlThemes.ModernButton);
+                ThemeBrushes.Bind(button, Button.BackgroundProperty, "ItemHoverBrush");
+            }
             button.Click += (_, _) => onClick();
             return button;
         }
+
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка набора темы (P1a),
+        /// иначе — текстовый глиф для обратной совместимости с остальными кнопками окна.
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, string brushKey)
+            => icon.StartsWith("Icon", StringComparison.Ordinal)
+                ? IconHelper.MakeIcon(icon, size, brushKey)
+                : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center };
 
         private Button BuildSecondaryButton(string text, Action onClick)
         {

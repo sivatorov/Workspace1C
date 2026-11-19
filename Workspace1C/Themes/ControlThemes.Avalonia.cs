@@ -12,7 +12,7 @@ namespace Workspace1C.Themes
     /// </summary>
     public static class ControlThemes
     {
-        /// <summary>Основная кнопка: акцентная заливка, скругление 6, высота от 36.</summary>
+        /// <summary>Основная кнопка: акцентная заливка, скругление 8, высота от 36.</summary>
         public const string ModernButton = "ModernButton";
 
         /// <summary>Каноническая основная кнопка (P2-2): ModernButton + полужирный текст + padding 14,8.</summary>
@@ -39,10 +39,10 @@ namespace Workspace1C.Themes
         /// <summary>Карточка варианта выбора: рамка вокруг переключателя с подписью и пояснением.</summary>
         public const string OptionCard = "OptionCard";
 
-        /// <summary>Поле ввода: карточный фон, скругление 6, акцентный контур при наведении и фокусе.</summary>
+        /// <summary>Поле ввода: карточный фон, скругление 8, акцентный контур при наведении и фокусе.</summary>
         public const string ModernTextBox = "ModernTextBox";
 
-        /// <summary>Выпадающий список: карточный фон, скругление 6, акцентный контур при наведении и фокусе.</summary>
+        /// <summary>Выпадающий список: карточный фон, скругление 8, акцентный контур при наведении и фокусе.</summary>
         public const string ModernComboBox = "ModernComboBox";
 
         /// <summary>Колонка вертикальных вкладок окна настроек.</summary>
@@ -63,7 +63,7 @@ namespace Workspace1C.Themes
         /// <summary>Пункт меню: отступ 12 на 6, скругление 4, подсветка выделенного.</summary>
         public const string ModernMenuItem = "ModernMenuItem";
 
-        /// <summary>Значковая кнопка: 32×32, прозрачный фон, скругление 6, подсветка ItemHoverBrush.</summary>
+        /// <summary>Значковая кнопка: 32×32, прозрачный фон, скругление 8, подсветка ItemHoverBrush.</summary>
         public const string IconButton = "IconButton";
 
         /// <summary>Кнопка-иконка колонки «Действия»: прозрачная, контент-размера (P2-2).</summary>
@@ -75,7 +75,7 @@ namespace Workspace1C.Themes
         /// <summary>Плитка палитры редактора группы: 28×28, скругление 4 (P2-2).</summary>
         public const string PaletteColorButton = "PaletteColorButton";
 
-        /// <summary>Значковая кнопка заголовка: скругление 6, своё нажатие и гашение.</summary>
+        /// <summary>Значковая кнопка заголовка: скругление 8, своё нажатие и гашение.</summary>
         public const string HeaderIconButton = "HeaderIconButton";
 
         /// <summary>Значковая кнопка строки состояния: отступ 6 на 4, подсветка боковой панели.</summary>
@@ -98,7 +98,7 @@ namespace Workspace1C.Themes
         /// <summary>Кнопки «Выбрать все» и «Снять все» окна очистки кеша.</summary>
         public const string SelectAllButton = "SelectAllButton";
 
-        /// <summary>Карточка варианта окна добавления: рамка без маркера радиокнопки.</summary>
+        /// <summary>Карточка варианта окна добавления: псевдоним OptionCard (маркер + акцентная рамка).</summary>
         public const string AddOptionCard = "AddOptionCard";
 
         /// <summary>Плитка выбора значка группы: тёмная в обеих темах, как у автора.</summary>

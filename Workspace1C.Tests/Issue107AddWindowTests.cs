@@ -64,28 +64,35 @@ public sealed class Issue107AddWindowTests
     }
 
     [Fact]
-    public void Avalonia_AddOptionCard_Checked_AccentFillWithTextOnAccentBrush()
+    public void Avalonia_OptionCards_UseUnifiedMarkerPattern()
     {
-        // Avalonia: селекторы ^:checked темы AddOptionCard — акцентная заливка +
-        // рамка 2px + TextOnAccentBrush, без заливки AccentHoverBrush.
+        // Аудит UI P1c: все радиокарточки используют единый паттерн OptionCard —
+        // тонированный фон, акцентная рамка и маркер-точка. AddOptionCard больше
+        // не отдельный вид со сплошной акцентной заливкой, а псевдоним OptionCard.
         var axaml = ReadProjectFile(Path.Combine("Workspace1C", "Themes", "Controls.axaml"));
 
-        var themeStart = axaml.IndexOf("x:Key=\"AddOptionCard\"", StringComparison.Ordinal);
-        Assert.True(themeStart > 0, "ControlTheme AddOptionCard не найден в Controls.axaml");
-        var themeEnd = axaml.IndexOf("</ControlTheme>", themeStart, StringComparison.Ordinal);
-        Assert.True(themeEnd > themeStart, "Не найден конец ControlTheme AddOptionCard");
-        var theme = axaml[themeStart..themeEnd];
+        var optionStart = axaml.IndexOf("x:Key=\"OptionCard\"", StringComparison.Ordinal);
+        Assert.True(optionStart > 0, "ControlTheme OptionCard не найден в Controls.axaml");
+        var optionEnd = axaml.IndexOf("</ControlTheme>", optionStart, StringComparison.Ordinal);
+        Assert.True(optionEnd > optionStart, "Не найден конец ControlTheme OptionCard");
+        var option = axaml[optionStart..optionEnd];
 
-        var checkedSelector = theme.IndexOf("^:checked", StringComparison.Ordinal);
-        Assert.True(checkedSelector > 0, "Селектор ^:checked не найден в AddOptionCard");
-        var selectorBlock = theme[checkedSelector..];
+        // Маркер и акцентная рамка выбранного варианта.
+        Assert.Contains("Name=\"PART_Dot\"", option);
+        Assert.Contains("^:checked", option);
+        Assert.Contains("Property=\"BorderBrush\" Value=\"{DynamicResource AccentBrush}\"", option);
+        Assert.DoesNotContain("AccentHoverBrush", option);
 
-        Assert.DoesNotContain("AccentHoverBrush", selectorBlock);
-        // Акцентная заливка выбранной карточки и контрастный текст (issue #107 п.1).
-        Assert.Contains("Property=\"Background\" Value=\"{DynamicResource AccentBrush}\"", selectorBlock);
-        Assert.Contains("Property=\"Foreground\" Value=\"{DynamicResource TextOnAccentBrush}\"", selectorBlock);
-        // Рамка выбранной карточки сохранена.
-        Assert.Contains("BorderThickness", selectorBlock);
+        // Псевдоним окна добавления не переопределяет шаблон и наследует паттерн.
+        var addStart = axaml.IndexOf("x:Key=\"AddOptionCard\"", StringComparison.Ordinal);
+        Assert.True(addStart > 0, "ControlTheme AddOptionCard не найден в Controls.axaml");
+        var addEnd = axaml.IndexOf("</ControlTheme>", addStart, StringComparison.Ordinal);
+        Assert.True(addEnd > addStart, "Не найден конец ControlTheme AddOptionCard");
+        var add = axaml[addStart..addEnd];
+
+        Assert.Contains("BasedOn=\"{StaticResource OptionCard}\"", add);
+        Assert.DoesNotContain("<ControlTemplate", add);
+        Assert.DoesNotContain("Property=\"Background\" Value=\"{DynamicResource AccentBrush}\"", add);
     }
 
     [Fact]

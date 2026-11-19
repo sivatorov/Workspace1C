@@ -45,7 +45,7 @@ public sealed class LicenseDetailsWindow : ModalWindowBase
         {
             Text = RingLicenseParser.BuildReadableDetails(license),
             TextWrapping = TextWrapping.Wrap,
-            FontFamily = new FontFamily("Consolas, DejaVu Sans Mono, monospace")
+            FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily)
         };
         ThemeBrushes.Bind(details, TextBlock.ForegroundProperty, "TextPrimaryBrush");
         scroll.Content = details;

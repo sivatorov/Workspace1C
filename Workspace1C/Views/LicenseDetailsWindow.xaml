@@ -32,7 +32,7 @@
         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto">
             <TextBlock x:Name="DetailsText" TextWrapping="Wrap"
                        Foreground="{DynamicResource TextPrimaryBrush}"
-                       FontFamily="Consolas"/>
+                       FontFamily="{DynamicResource UiMonospaceFontFamily}"/>
         </ScrollViewer>
 
         <!-- ============ Кнопки ============ -->

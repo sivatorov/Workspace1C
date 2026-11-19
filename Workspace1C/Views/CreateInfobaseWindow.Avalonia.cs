@@ -533,7 +533,9 @@ namespace Workspace1C
                 },
                 Width = 140,
                 Height = 36,
-                IsDefault = true
+                IsDefault = true,
+                // Аудит UI P3a: кнопки нижней панели идут после полей формы.
+                TabIndex = 900
             };
             create.Styled(ControlThemes.DialogConfirmButton);
             RegisterConfirmCaption(createCaption, "CreateInfobase.Create");

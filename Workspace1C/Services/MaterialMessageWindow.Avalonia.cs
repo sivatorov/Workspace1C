@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 
@@ -97,7 +98,7 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             MaterialMessageKind.Question => "IconUnknown",
             _ => "IconInfo"
         };
-        var messageIcon = Workspace1C.IconHelper.MakeIcon(iconKey, 28);
+        var messageIcon = Workspace1C.IconHelper.MakeIcon(iconKey, UiMetrics.IconHeader);
         messageIcon.Margin = new Thickness(0, 0, 12, 0);
         messageIcon.VerticalAlignment = VerticalAlignment.Top;
 
@@ -141,6 +142,7 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             IsDefault = true
         };
         okButton.Styled(ControlThemes.ModernButton);
+        okButton.FontWeight = FontWeight.SemiBold;
         okButton.Click += (_, _) => { _answered = true; Confirmed = true; Close(); };
         _okButton = okButton;
 

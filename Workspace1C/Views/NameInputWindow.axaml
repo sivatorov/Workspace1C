@@ -6,14 +6,15 @@
                        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                        xmlns:local="clr-namespace:Workspace1C"
                        x:Class="Workspace1C.NameInputWindow"
-                       Width="440"
-                       Height="200"
+                       MinWidth="440"
+                       MinHeight="200"
+                       SizeToContent="Height"
                        FontSize="13"
                        CanResize="False"
                        SystemDecorations="None">
     <Grid Margin="16" RowDefinitions="Auto,Auto,Auto">
         <TextBlock Grid.Row="0" x:Name="Prompt" Margin="0,0,0,8"/>
-        <TextBox Grid.Row="1" x:Name="NameBox" Theme="{DynamicResource ModernTextBox}"/>
+        <TextBox Grid.Row="1" x:Name="NameBox" TabIndex="0" Theme="{DynamicResource ModernTextBox}"/>
         <!-- Отступ панели кнопок сверху взят из разметки WPF. -->
         <ContentControl Grid.Row="2" x:Name="ButtonsHost" Margin="0,16,0,0"/>
     </Grid>

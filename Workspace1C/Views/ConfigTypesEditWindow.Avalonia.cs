@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +7,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -43,7 +44,7 @@ namespace Workspace1C
         // Сортировка списка (issue #12): по умолчанию — по наименованию по возрастанию;
         // заголовки колонок кликабельные, текущая колонка помечается ▲/▼.
         private readonly ConfigTypesSorter _sorter = new();
-        private readonly List<(TextBlock Block, string Title, ConfigTypesSortColumn Column)> _sortHeaders = new();
+        private readonly List<(TextBlock Block, Avalonia.Controls.Shapes.Path Arrow, string Title, ConfigTypesSortColumn Column)> _sortHeaders = new();
 
         // Панель строк списка (пересобирается после каждого изменения).
         private readonly StackPanel _rowsPanel = new();
@@ -124,10 +125,11 @@ namespace Workspace1C
         /// <summary>Подписи заголовков с индикатором направления у текущей колонки (issue #12).</summary>
         private void UpdateSortHeaders()
         {
-            foreach (var (block, title, column) in _sortHeaders)
+            foreach (var (block, arrow, title, column) in _sortHeaders)
             {
+                block.Text = title;
                 var indicator = _sorter.IndicatorFor(column);
-                block.Text = indicator.Length == 0 ? title : $"{title} {indicator}";
+                arrow.Data = indicator.Length == 0 ? null : IconHelper.Geometry(indicator);
             }
         }
 
@@ -191,18 +193,23 @@ namespace Workspace1C
             };
             namePanel.Children.Add(name);
             // Пользовательская копия предопределённой (правка встроенной строки, issue #321):
-            // значок ✎★ + серая подпись «заменена пользовательской» и пояснение (часть 2).
+            // векторные значки «правка» + «звезда» + серая подпись «заменена пользовательской».
             if (row.IsOverride)
             {
-                var mark = new TextBlock
+                // P1b: вместо текстового «✎★» — иконки активного набора.
+                var mark = new StackPanel
                 {
-                    Text = "✎★",
-                    FontSize = 12,
+                    Orientation = Orientation.Horizontal,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(8, 0, 0, 0)
+                    Margin = new Thickness(8, 0, 0, 0),
+                    Spacing = 2,
+                    Children =
+                    {
+                        IconHelper.MakeIcon("IconEdit", UiMetrics.IconInline, "AccentBrush"),
+                        IconHelper.MakeIcon("IconStar", UiMetrics.IconInline, "AccentBrush")
+                    }
                 };
                 ToolTip.SetTip(mark, T("Updates.OverrideHint"));
-                Themes.ThemeBrushes.Bind(mark, TextBlock.ForegroundProperty, "AccentBrush");
                 namePanel.Children.Add(mark);
 
                 var note = new TextBlock
@@ -525,7 +532,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -672,9 +679,25 @@ namespace Workspace1C
         {
             var block = MakeHeaderText(title, 0);
             block.Margin = new Thickness(0);
+            // P1b: индикатор направления — векторная стрелка, а не текстовые «▲/▼».
+            var arrow = new Avalonia.Controls.Shapes.Path
+            {
+                Width = UiMetrics.IconInline,
+                Height = UiMetrics.IconInline,
+                Stretch = Stretch.Uniform,
+                Margin = new Thickness(4, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Themes.ThemeBrushes.Bind(arrow, Avalonia.Controls.Shapes.Shape.FillProperty, "TextSecondaryBrush");
+            var headerPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Children = { block, arrow }
+            };
             var button = new Button
             {
-                Content = block,
+                Content = headerPanel,
                 Background = Brushes.Transparent,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(8, 4),
@@ -685,7 +708,7 @@ namespace Workspace1C
             ToolTip.SetTip(button, T("Updates.SortByColumn"));
             button.Click += (_, _) => OnSortHeaderClick(column);
             Grid.SetColumn(button, gridColumn);
-            _sortHeaders.Add((block, title, column));
+            _sortHeaders.Add((block, arrow, title, column));
             return button;
         }
 

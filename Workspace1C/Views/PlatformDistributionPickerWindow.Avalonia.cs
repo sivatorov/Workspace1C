@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,7 +39,7 @@ namespace Workspace1C
             var title = new TextBlock
             {
                 Text = LocalizationManager.T("PlatformUpdate.DistributionPicker.Title"),
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold
             };
             var description = new TextBlock
@@ -101,7 +101,7 @@ namespace Workspace1C
 
             var listBorder = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Child = _optionsList
             };
             ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");

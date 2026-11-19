@@ -133,11 +133,11 @@ namespace Workspace1C
             row.Children.Add(name);
             row.Children.Add(remove);
 
-            // Рамки у чипа в строке нет, подложка ItemHover и скругление 3:
+            // Рамки у чипа в строке нет, подложка ItemHover и скругление 4 (шкала):
             // рамка была нашей отсебятиной (MainWindow.xaml:1335-1338).
             var chip = new Border
             {
-                CornerRadius = new CornerRadius(3),
+                CornerRadius = new CornerRadius(UiMetrics.RadiusSm),
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(4, 0),
                 Margin = new Thickness(0, 0, 3, 2),

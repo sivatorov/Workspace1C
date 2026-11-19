@@ -56,15 +56,15 @@
         <!-- Единый контракт кнопок (issue #26): «Сохранить» — акцентная ModernButton,
              «Отмена» — вторичная SecondaryButton. -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
-            <Button x:Name="SaveButton" Style="{StaticResource ModernButton}"
+            <Button x:Name="SaveButton" Style="{StaticResource PrimaryButton}"
                     Padding="16,6" Margin="0,0,8,0"
                     IsDefault="True" Click="OnSave_Click">
-                <TextBlock Text="{loc:Loc Updates.Save}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center"/>
             </Button>
             <Button x:Name="CancelButton" Style="{StaticResource SecondaryButton}"
                     Padding="16,6"
                     IsCancel="True" Click="OnCancel_Click">
-                <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
             </Button>
         </StackPanel>
     </StackPanel>

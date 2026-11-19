@@ -160,8 +160,6 @@ public sealed class LocalizationCoverageServicesTests
     [InlineData("Services.GroupEditHint")]
     [InlineData("Services.GroupDeleteHint")]
     [InlineData("Services.GroupName")]
-    [InlineData("Services.Save")]
-    [InlineData("Services.Cancel")]
     [InlineData("Services.MoveLeft")]
     [InlineData("Services.MoveRight")]
     [InlineData("Services.ManagedList")]

@@ -333,6 +333,12 @@
     <StreamGeometry x:Key="IconPlus">M11,6H13V11H18V13H13V18H11V13H6V11H11V6Z</StreamGeometry>
     <StreamGeometry x:Key="IconMinus">M6,11H18V13H6V11Z</StreamGeometry>
 
+    <!-- Замок / Lock (P1a аудита UI: замена эмодзи 🔒) -->
+    <StreamGeometry x:Key="IconLock">M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z</StreamGeometry>
+
+    <!-- Открытый замок / Unlock (P1a аудита UI: замена эмодзи 🔓) -->
+    <StreamGeometry x:Key="IconUnlock">M10,13C8.9,13 8,13.9 8,15C8,16.1 8.9,17 10,17C11.1,17 12,16.1 12,15C12,13.9 11.1,13 10,13M18,8C19.1,8 20,8.9 20,10V20C20,21.1 19.1,22 18,22H6C4.9,22 4,21.1 4,20V10C4,8.9 4.9,8 6,8H12V6C12,3.79 13.79,2 16,2C18.21,2 20,3.79 20,6H18C18,4.9 17.1,4 16,4C14.9,4 14,4.9 14,6V8H18Z</StreamGeometry>
+
     <StreamGeometry x:Key="IconAccountKey">M11 10V12H9V14H7V12H5.8C5.4 13.2 4.3 14 3 14C1.3 14 0 12.7 0 11S1.3 8 3 8C4.3 8 5.4 8.8 5.8 10H11M3 10C2.4 10 2 10.4 2 11S2.4 12 3 12 4 11.6 4 11 3.6 10 3 10M16 14C18.7 14 24 15.3 24 18V20H8V18C8 15.3 13.3 14 16 14M16 12C13.8 12 12 10.2 12 8S13.8 4 16 4 20 5.8 20 8 18.2 12 16 12Z</StreamGeometry>
     <StreamGeometry x:Key="IconTune">M3,17V19H9V17H3M3,5V7H13V5H3M13,21V19H21V17H13V15H11V21H13M7,9V11H3V13H7V15H9V9H7M21,13V11H11V13H21M15,9H17V7H21V5H17V3H15V9Z</StreamGeometry>
 
@@ -393,4 +399,10 @@
     <StreamGeometry x:Key="GlyphCheckMark">M 3.2,8.2 L 6.8,11.8 L 14.6,4.2</StreamGeometry>
     <StreamGeometry x:Key="GlyphCheckDash">M 4.2,9 L 13.8,9</StreamGeometry>
 
+    <!-- Аудит UI P1b: глифы 🔌/⇄/⇅/☰/↑/↓ заменены векторными иконками -->
+    <StreamGeometry x:Key="IconShield">M12,2L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,2Z</StreamGeometry>
+    <StreamGeometry x:Key="IconSwap">M21,9L17,5V8H10V10H17V13M7,11L3,15L7,19V16H14V14H7V11Z</StreamGeometry>
+    <StreamGeometry x:Key="IconSwapVertical">M9,3L5,7H8V14H10V7H13M16,17V10H14V17H11L15,21L19,17H16Z</StreamGeometry>
+    <StreamGeometry x:Key="IconMenu">M3,6H21V8H3V6M3,11H21V13H3V11M3,16H21V18H3V16Z</StreamGeometry>
+    <StreamGeometry x:Key="IconArrowLeft">M20,11V13H8L13.5,18.5L12.08,19.92L4.16,12L12.08,4.08L13.5,5.5L8,11H20Z</StreamGeometry>
 </ResourceDictionary>

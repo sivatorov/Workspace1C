@@ -947,8 +947,12 @@ public class AppSettings
     /// </summary>
     public string DefaultDbmsKind { get; set; } = string.Empty;
 
-    /// <summary>Семейство шрифта интерфейса (например «Segoe UI»).</summary>
-    public string FontFamily { get; set; } = "Segoe UI";
+    /// <summary>
+    /// Семейство шрифта интерфейса. По умолчанию — платформенный шрифт
+    /// (Windows: Segoe UI, Linux: Inter/Noto/DejaVu, macOS: SF Pro Text).
+    /// Пустое значение при загрузке заменяется платформенным, а не «Segoe UI».
+    /// </summary>
+    public string FontFamily { get; set; } = Workspace1C.Themes.ThemeManager.DefaultFontFamily;
 
     /// <summary>Размер шрифта интерфейса (в логических единицах WPF, по умолчанию 13).</summary>
     public double FontSize { get; set; } = 13;
@@ -1361,6 +1365,15 @@ public class AppSettings
         // issue #75: ширины колонок вкладок окна «Серверы 1С» — легаси-файл без поля
         // инициализируется пустым словарём (обращение по ключу вкладки безопасно).
         ServerMonitorColumnWidths ??= new Dictionary<string, double[]>();
+
+        // Шрифт интерфейса (аудит UI P2a): пустое/пробельное значение — это
+        // «не задано», а не сигнал сбросить пользовательский выбор. Подставляем
+        // платформенный шрифт по умолчанию, сохранённый выбор не трогаем.
+        FontFamily = string.IsNullOrWhiteSpace(FontFamily)
+            ? Workspace1C.Themes.ThemeManager.DefaultFontFamily
+            : FontFamily;
+        foreach (var elementFont in ElementFonts.Values)
+            elementFont.NormalizeForLoad();
 
         // Нормализуем строковые поля, чтобы избежать null-значений у потребителей.
         NoGroupIcon ??= string.Empty;

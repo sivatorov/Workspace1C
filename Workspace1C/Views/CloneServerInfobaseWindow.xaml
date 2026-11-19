@@ -93,7 +93,7 @@
              «Отмена» — вторичная SecondaryButton. -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button Width="150" Height="36" Margin="0,0,10,0" IsDefault="True" Click="OnClone_Click"
-                    Style="{DynamicResource ModernButton}">
+                    Style="{DynamicResource PrimaryButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16" Margin="0,0,8,0"
                                              VerticalAlignment="Center"/>

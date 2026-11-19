@@ -6,6 +6,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 
@@ -32,7 +33,7 @@ internal sealed class ManualUpdateWindowAvalonia : Window
         ThemeBrushes.Bind(this, TemplatedControl.BackgroundProperty, "ContentBackgroundColorBrush");
 
         // Иконка информации, как у обычного сообщения.
-        var messageIcon = Workspace1C.IconHelper.MakeIcon("IconInfo", 28);
+        var messageIcon = Workspace1C.IconHelper.MakeIcon("IconInfo", UiMetrics.IconHeader);
         messageIcon.Margin = new Thickness(0, 0, 12, 0);
         messageIcon.VerticalAlignment = VerticalAlignment.Top;
 
@@ -114,6 +115,7 @@ internal sealed class ManualUpdateWindowAvalonia : Window
             IsDefault = true
         };
         okButton.Styled(ControlThemes.ModernButton);
+        okButton.FontWeight = FontWeight.SemiBold;
         okButton.Click += (_, _) => Close();
 
         var buttonsPanel = new StackPanel

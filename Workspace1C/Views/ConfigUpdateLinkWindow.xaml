@@ -141,12 +141,12 @@
                         Style="{StaticResource PrimaryButton}" IsDefault="True" Click="OnSaveClick">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Check" Width="16" Height="16"/>
-                        <TextBlock Text="{loc:Loc Updates.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc Common.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button Width="120" Height="36" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold" IsCancel="True"
                         Click="OnCancelClick">
-                    <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </Grid>

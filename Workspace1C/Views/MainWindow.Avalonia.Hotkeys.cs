@@ -649,7 +649,9 @@ namespace Workspace1C
                     {
                         Header = item.Text,
                         Command = new ViewModels.RelayCommand(_ => _vm?.ShowServicesCommand.Execute(null)),
-                        Icon = MenuGlyph("⚙", "#6B7280")
+                        // Аудит UI P0-5: цвет из темы, не жёсткий #6B7280.
+                        // P1a: шестерёнка — векторная иконка активного набора, не текстовый глиф.
+                        Icon = MenuIcon("IconSettings", "@TextSecondaryBrush")
                     }.Styled(Themes.ControlThemes.ModernMenuItem);
 
                 case ServiceMenuItemKind.ServiceSubmenu:
@@ -668,12 +670,12 @@ namespace Workspace1C
                         IsEnabled = item.IsEnabled
                     }.Styled(Themes.ControlThemes.ModernMenuItem);
                     // Иконки (замечание 7OH 19.10): служба — кружок статуса; группа —
-                    // папка с кружком статуса справа-снизу (как в трее); «Все сервисы» — ☰.
+                    // папка с кружком статуса справа-снизу (как в трее); «Все сервисы» — меню.
                     node.Icon = item.Kind switch
                     {
                         ServiceMenuItemKind.ServiceSubmenu => StatusCircle(item.StatusColorHex),
                         ServiceMenuItemKind.GroupSubmenu => MenuGroupIcon(item.StatusColorHex),
-                        _ => MenuGlyph("☰", "@PurpleAccentBrush")
+                        _ => MenuIconGlyph("IconMenu", "@PurpleAccentBrush")
                     };
                     if (item.Kind == ServiceMenuItemKind.ServiceSubmenu
                         && !string.IsNullOrEmpty(item.StatusText))
@@ -718,9 +720,13 @@ namespace Workspace1C
             Text = text,
             VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-            FontSize = 16,
+            FontSize = UiMetrics.IconControl,
             Foreground = Themes.ThemeBrushes.FromSpec(colorHex)
         };
+
+        /// <summary>Векторная иконка пункта меню по ключу <c>Icon*</c> (P1b).</summary>
+        private static Control MenuIconGlyph(string iconKey, string colorHex)
+            => IconHelper.MakeIcon(iconKey, UiMetrics.IconControl, Themes.ThemeBrushes.FromSpec(colorHex));
 
         /// <summary>Кружок статуса службы в пункте меню (цвет StatusColorHex).</summary>
         private static Control StatusCircle(string colorHex)
@@ -746,20 +752,14 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка 📦 +
+        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка +
         /// кружок статуса группы справа-снизу (цвет StatusColorHex), как в трее.
         /// </summary>
         private static Control MenuGroupIcon(string statusColorHex)
         {
             var grid = new Grid { Width = 20, Height = 20 };
-            grid.Children.Add(new TextBlock
-            {
-                Text = "📦",
-                FontSize = 16,
-                Foreground = Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED"), // fallback
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center
-            });
+            grid.Children.Add(IconHelper.MakeIcon("IconPackage", UiMetrics.IconControl,
+                Themes.ThemeBrushes.Get("PurpleAccentBrush", "#7C3AED")));
             if (!string.IsNullOrWhiteSpace(statusColorHex))
             {
                 grid.Children.Add(new Border

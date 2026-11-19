@@ -817,7 +817,7 @@ namespace Workspace1C
             {
                 // Значок 18, как у этих же кнопок в панели команд разметки
                 // (MainWindow.xaml:499, 506, 513, 520).
-                Content = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(18), "TextSecondaryBrush"),
+                Content = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar), "TextSecondaryBrush"),
                 Padding = new Thickness(UiMetrics.Scaled(8)),
                 MinWidth = 0,
                 MinHeight = 0,
@@ -825,6 +825,7 @@ namespace Workspace1C
             };
             button.Styled(Themes.ControlThemes.IconButton);
             ToolTip.SetTip(button, tooltip);
+            UiAutomation.SetNameFromTip(button);
             button.Bind(Button.CommandProperty, new Binding(commandPath));
             return button;
         }
@@ -1279,7 +1280,7 @@ namespace Workspace1C
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(13), "TextSecondaryBrush");
+            var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconInline), "TextSecondaryBrush");
             Grid.SetColumn(icon, 0);
             grid.Children.Add(icon);
 

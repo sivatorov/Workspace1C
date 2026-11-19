@@ -577,7 +577,8 @@ namespace Workspace1C
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 10
             };
-            var save = new Button { Content = T("Updates.Save"), Width = 150, Height = 36, IsDefault = true };
+            // Аудит UI P1c: минимальная ширина вместо фиксированной.
+            var save = new Button { Content = T("Common.Save"), MinWidth = 140, Height = 36, IsDefault = true };
             save.Styled(ControlThemes.DialogConfirmButton);
             save.Click += (_, _) => OnSaveClick();
 

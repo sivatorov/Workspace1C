@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using Avalonia;
 using Avalonia.Controls;
@@ -86,7 +86,7 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         // Переключатель режима отображения группы.
         var modePanel = new Border
         {
-            CornerRadius = new CornerRadius(6),
+            CornerRadius = new CornerRadius(8),
             Padding = new Thickness(10, 8),
             BorderThickness = new Thickness(1),
             Margin = new Thickness(0, 10, 0, 0),
@@ -243,7 +243,7 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             }
         });
 
-        var fallback = IconHelper.MakeIcon("IconApplication", 18, "WarningBrush");
+        var fallback = IconHelper.MakeIcon("IconApplication", UiMetrics.IconToolbar, "WarningBrush");
         fallback.Bind(Control.IsVisibleProperty, new MultiBinding
         {
             Converter = ProgramIconVisibility,

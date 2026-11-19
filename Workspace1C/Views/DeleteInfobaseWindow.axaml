@@ -9,8 +9,7 @@
                        xmlns:controls="clr-namespace:Workspace1C.Controls"
                        x:Class="Workspace1C.DeleteInfobaseWindow"
                        Title="{loc:Loc DeleteInfobase.Title}"
-                       Width="520"
-                       MinWidth="460"
+                       MinWidth="520"
                        SizeToContent="Height"
                        FontSize="13"
                        CanResize="False"
@@ -20,9 +19,9 @@
         <!-- Заголовок со значком предупреждения 28 и отступом 12
              (DeleteInfobaseWindow.xaml:37-41). -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,14">
-            <Path Data="{DynamicResource IconAlertCircleOutline}" Width="28" Height="28"
+            <Path Data="{DynamicResource IconAlertCircleOutline}" Width="24" Height="24"
                   Stretch="Uniform" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"
-                  Margin="0,0,12,0"/>
+                  IsTabStop="False" Margin="0,0,12,0"/>
             <TextBlock Text="{loc:Loc DeleteInfobase.Title}"
                        FontSize="15" FontWeight="SemiBold"
                        VerticalAlignment="Center"/>
@@ -86,9 +85,10 @@
             <StackPanel>
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <CheckBox x:Name="CacheCheck" IsChecked="True" FontWeight="SemiBold"
-                              VerticalAlignment="Center"/>
+                              VerticalAlignment="Center" TabIndex="0"/>
                     <!-- Тот же контрол справки, что и в остальных окнах. -->
                     <controls:HelpLink x:Name="CacheHelp" VerticalAlignment="Center"
+                                       TabIndex="1"
                                        HelpText="{loc:Loc DeleteInfobase.CacheHelp}"/>
                 </StackPanel>
                 <TextBlock x:Name="CacheHint" Margin="24,6,0,0" FontSize="12"
@@ -106,10 +106,11 @@
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <CheckBox x:Name="PhysicalCheck"
                               Content="{loc:Loc DeleteInfobase.PhysicalDelete}"
-                              FontWeight="SemiBold" VerticalAlignment="Center"/>
+                              FontWeight="SemiBold" VerticalAlignment="Center" TabIndex="2"/>
                     <!-- Тот же контрол справки, что и в остальных окнах:
                          в разметке это controls:HelpLink (DeleteInfobaseWindow.xaml:97). -->
                     <controls:HelpLink x:Name="PhysicalHelp" VerticalAlignment="Center"
+                                       TabIndex="3"
                                        HelpText="{loc:Loc DeleteInfobase.PhysicalHelp}"/>
                 </StackPanel>
                 <TextBlock x:Name="PhysicalHint" Margin="24,6,0,0" FontSize="12"
@@ -118,29 +119,32 @@
             </StackPanel>
         </Border>
 
-        <!-- Порядок кнопок как в разметке WPF: удаление слева, отмена справа. -->
+        <!-- Порядок кнопок как в разметке WPF: удаление слева, отмена справа.
+             Аудит UI P1c: локальные CornerRadius/BorderThickness/Foreground убраны —
+             кнопки используют общие темы DangerButton и DialogCancelButton, поэтому
+             радиус 8, рамка, текст и hover совпадают с остальными диалогами. -->
         <StackPanel Grid.Row="5" Orientation="Horizontal"
                     HorizontalAlignment="Right" Spacing="10">
-            <Button x:Name="DeleteButton" Width="140" Height="36" IsDefault="True"
-                    CornerRadius="8" HorizontalContentAlignment="Center"
-                    Background="{DynamicResource ErrorBrush}" BorderThickness="0" Foreground="White">
+            <Button x:Name="DeleteButton" MinWidth="140" Height="36" IsDefault="True"
+                    TabIndex="900"
+                    Theme="{DynamicResource DangerButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Path Data="{DynamicResource IconDelete}" Width="16" Height="16"
-                          Stretch="Uniform" Fill="White" VerticalAlignment="Center"/>
+                          Stretch="Uniform" Fill="{DynamicResource DangerTextBrush}"
+                          IsTabStop="False" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc DeleteInfobase.Delete}" FontWeight="SemiBold"
-                               Foreground="White" VerticalAlignment="Center"/>
+                               VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
-            <Button x:Name="CancelButton" Width="140" Height="36" IsCancel="True"
-                    CornerRadius="8" HorizontalContentAlignment="Center"
-                    Background="Transparent" BorderThickness="1.5"
-                    BorderBrush="{DynamicResource BorderColorBrush}"
-                    Foreground="{DynamicResource TextPrimaryBrush}">
+            <Button x:Name="CancelButton" MinWidth="140" Height="36" IsCancel="True"
+                    TabIndex="1000"
+                    Theme="{DynamicResource DialogCancelButton}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Path Data="{DynamicResource IconClose}" Width="16" Height="16"
                           Stretch="Uniform" VerticalAlignment="Center"
-                          Fill="{DynamicResource TextSecondaryBrush}"/>
-                    <TextBlock Text="{loc:Loc DeleteInfobase.Cancel}" FontWeight="SemiBold"
+                          IsTabStop="False"
+                          Fill="{DynamicResource SecondaryButtonTextBrush}"/>
+                    <TextBlock Text="{loc:Loc Common.Cancel}" FontWeight="SemiBold"
                                VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

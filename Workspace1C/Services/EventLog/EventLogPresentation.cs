@@ -75,13 +75,17 @@ public static class EventLogPresentation
         _ => LocalizationManager.T("EventLog.Severity.Info"),
     };
 
-    /// <summary>Однобуквенный значок уровня для компактной колонки.</summary>
+    /// <summary>
+    /// Ключ векторной иконки уровня для компактной колонки (P1a аудита UI): вместо
+    /// текстовых значков возвращается ключ набора иконок, который отрисовывается
+    /// через Path/IconHelper. Так индикатор следует активной теме и не зависит от шрифта.
+    /// </summary>
     public static string SeverityGlyph(EventLogSeverity severity) => severity switch
     {
-        EventLogSeverity.Warning => "▲",
-        EventLogSeverity.Error => "✖",
-        EventLogSeverity.Note => "✎",
-        _ => "ℹ",
+        EventLogSeverity.Warning => "IconWarning",
+        EventLogSeverity.Error => "IconError",
+        EventLogSeverity.Note => "IconNote",
+        _ => "IconInfo",
     };
 
     /// <summary>Цвет уровня (#RRGGBB) — одинаковый в обеих темах.</summary>

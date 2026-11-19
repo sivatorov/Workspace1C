@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -62,7 +62,7 @@ namespace Workspace1C
             panel.Children.Add(new TextBlock
             {
                 Text = name,
-                FontSize = 20,
+                FontSize = ThemeManager.FontSizeTitle,
                 FontWeight = FontWeight.SemiBold,
                 Foreground = text,
                 Margin = new Thickness(0, 0, 0, 10)
@@ -115,7 +115,7 @@ namespace Workspace1C
                 {
                     Width = 56,
                     Height = 36,
-                    CornerRadius = new CornerRadius(6),
+                    CornerRadius = new CornerRadius(8),
                     Background = SettingsWindow.HexBrush(hex),
                     BorderBrush = SettingsWindow.HexBrush(colors.Border),
                     BorderThickness = new Thickness(1)

@@ -33,11 +33,12 @@
                                         BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1.5"
                                         SnapsToDevicePixels="True">
                                     <Grid>
+                                        <!-- Аудит UI P0-2/P0-5: индикатор контрастен акцентной заливке. -->
                                         <materialDesign:PackIcon x:Name="CheckIcon" Kind="Check" Width="13" Height="13"
-                                                                 Foreground="White" HorizontalAlignment="Center"
+                                                                 Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center"
                                                                  VerticalAlignment="Center" Visibility="Collapsed"/>
                                         <materialDesign:PackIcon x:Name="DashIcon" Kind="Minus" Width="13" Height="13"
-                                                                 Foreground="White" HorizontalAlignment="Center"
+                                                                 Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center"
                                                                  VerticalAlignment="Center" Visibility="Collapsed"/>
                                     </Grid>
                                 </Border>
@@ -49,13 +50,14 @@
                                 <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource SuccessBrush}"/>
-                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                                <!-- Аудит UI P0-5: единый стиль флажка — акцент темы. -->
+                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="CheckIcon" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsChecked" Value="{x:Null}">
-                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource SuccessBrush}"/>
-                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                                <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                 <Setter TargetName="DashIcon" Property="Visibility" Value="Visible"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -184,14 +186,16 @@
                  «Отмена» — вторичная SecondaryButton. -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
             <Button x:Name="CleanButton" Width="180" Height="36" Margin="0,0,10,0" IsDefault="True"
+                    KeyboardNavigation.TabIndex="900"
                     Click="OnClean_Click" IsEnabled="False"
-                    Style="{DynamicResource ModernButton}">
+                    Style="{DynamicResource PrimaryButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Broom" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc CacheClean.Clean}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
             <Button Width="140" Height="36" IsCancel="True"
+                    KeyboardNavigation.TabIndex="1000"
                     Style="{DynamicResource SecondaryButton}">
                 <StackPanel Orientation="Horizontal">
                     <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>

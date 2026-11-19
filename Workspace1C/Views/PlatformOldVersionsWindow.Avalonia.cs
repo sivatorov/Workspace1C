@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -97,7 +97,7 @@ namespace Workspace1C
             header.Children.Add(new TextBlock
             {
                 Text = LocalizationManager.T("PlatformUpdate.OldVersions.Title"),
-                FontSize = 14,
+                FontSize = ThemeManager.FontSizeSubtitle,
                 FontWeight = FontWeight.SemiBold
             });
             var description = new TextBlock
@@ -112,7 +112,7 @@ namespace Workspace1C
 
             var listBorder = new Border
             {
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(8, 4)
             };
             ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");

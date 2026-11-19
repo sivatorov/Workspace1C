@@ -93,9 +93,11 @@ namespace Workspace1C
                 Margin = new Thickness(0, 0, 8, 0),
                 Cursor = System.Windows.Input.Cursors.Hand
             };
-            var styleKey = accent ? "ModernButton" : "SecondaryButton";
+            var styleKey = accent ? "PrimaryButton" : "SecondaryButton";
             if (Application.Current?.TryFindResource(styleKey) is Style style)
                 button.Style = style;
+            // Аудит UI P3a: доступное имя совпадает с видимой подписью кнопки.
+            UiAutomation.SetName(button, button.Content as string);
             button.Click += onClick;
             return button;
         }
@@ -368,8 +370,8 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap,
                 AcceptsReturn = true,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                FontFamily = new FontFamily("Consolas"),
-                FontSize = 12,
+                FontFamily = new FontFamily(Themes.ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = Themes.ThemeManager.FontSizeSecondary,
                 Padding = new Thickness(6)
             };
             box.SetResourceReference(Control.BackgroundProperty, "CardBackgroundBrush");

@@ -44,7 +44,7 @@ public sealed class UpdateFileChoiceWindow : ModalWindowBase
         var headingText = new TextBlock
         {
             Text = heading,
-            FontSize = 14,
+            FontSize = ThemeManager.FontSizeSubtitle,
             FontWeight = FontWeight.SemiBold,
             TextWrapping = TextWrapping.Wrap,
         };

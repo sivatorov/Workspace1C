@@ -108,18 +108,18 @@ namespace Workspace1C
             servicesList.Bind(ItemsControl.ItemsSourceProperty, new Binding("FilteredServices"));
 
             // ---- Кнопки OK / Отмена. ----
-            var okButton = BuildActionButton("✔ " + LocalizationManager.T("Common.Ok"), () =>
+            var okButton = BuildActionButton(LocalizationManager.T("Common.Ok"), () =>
             {
                 _vm.OkCommand.Execute(null);
                 DialogResult = true;
                 Close();
-            });
+            }, "IconCheck");
             okButton.MinWidth = 90;
-            var cancelButton = BuildActionButton("✖ " + LocalizationManager.T("Common.Cancel"), () =>
+            var cancelButton = BuildActionButton(LocalizationManager.T("Common.Cancel"), () =>
             {
                 DialogResult = false;
                 Close();
-            });
+            }, "IconClose");
             cancelButton.MinWidth = 90;
 
             var buttonsRow = new StackPanel
@@ -151,11 +151,15 @@ namespace Workspace1C
         public IReadOnlyList<string>? SelectedServices => _vm.OkPressed ? _vm.SelectedNames : null;
 
         /// <summary>Кнопка с текстом и стандартным оформлением.</summary>
-        private static Button BuildActionButton(string text, System.Action onClick)
+        private static Button BuildActionButton(string text, System.Action onClick, string? iconKey = null)
         {
             var button = new Button
             {
-                Content = new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center },
+                // P1a аудита UI: значок кнопки — векторная иконка активного набора,
+                // а не текстовый глиф «✔»/«✖».
+                Content = iconKey is null
+                    ? new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
+                    : IconHelper.IconAndText(iconKey, text, UiMetrics.IconControl, "TextPrimaryBrush"),
                 Padding = new Thickness(14, 5)
             };
             button.Styled(ControlThemes.ModernButton);

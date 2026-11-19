@@ -171,7 +171,7 @@
                 <!-- Моноширинный лог — единый размер 12pt (аудит UI, п. 1.8): как в
                      PlatformDownload/BatchOperations/RepositoryBatchUpdate/JobDetails. -->
                 <TextBox x:Name="LogBox" Grid.Row="1" Margin="0,8,0,0"
-                         Height="120" FontFamily="Consolas" FontSize="12"
+                         Height="120" FontFamily="{DynamicResource UiMonospaceFontFamily}" FontSize="12"
                          IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
                          VerticalScrollBarVisibility="Auto"
                          Text="{Binding LogText, Mode=OneWay}"

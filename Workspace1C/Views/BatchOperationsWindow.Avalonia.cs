@@ -183,7 +183,8 @@ namespace Workspace1C
             };
             _pathLabel = pathLabel;
             _pathBox.Bind(TextBox.TextProperty, new Avalonia.Data.Binding("PathText") { Mode = Avalonia.Data.BindingMode.TwoWay });
-            _browseButton.Content = "…";
+            // P1b: кнопка «Обзор» — векторная иконка папки, не текстовое «…».
+            _browseButton.Content = IconHelper.MakeIcon("IconFolderOpen", UiMetrics.IconControl, "TextPrimaryBrush");
             _browseButton.MinWidth = 34;
             _browseButton.Styled(ControlThemes.ModernButton);
             _browseButton.Click += async (_, _) => await BrowseAsync();
@@ -475,7 +476,7 @@ namespace Workspace1C
             // Акцентная кнопка: текст и значок — TextOnAccentBrush (аудит UI P0-1).
             _runButton.Content = IconHelper.IconAndText("IconImport",
                 LocalizationManager.T("BatchOps.Execute"), 16, "TextOnAccentBrush");
-            _runButton.Styled(ControlThemes.ModernButton);
+            _runButton.Styled(ControlThemes.DialogConfirmButton);
             _runButton.Width = 200;
             _runButton.IsDefault = true;
             _runButton.Click += async (_, _) => await RunAsyncSafe();

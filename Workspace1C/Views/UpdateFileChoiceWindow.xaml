@@ -22,7 +22,7 @@
     </Window.Resources>
 
     <StackPanel Margin="16">
-        <TextBlock x:Name="HeadingText" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap"/>
+        <TextBlock x:Name="HeadingText" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap"/>
         <ListBox x:Name="ChoicesList" Margin="0,12,0,0" SelectionMode="Single"
                  ItemContainerStyle="{StaticResource ChoiceItemStyle}"
                  MouseDoubleClick="OnChoicesListDoubleClick"

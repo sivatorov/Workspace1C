@@ -73,8 +73,9 @@ public sealed class SettingsSyncWindow : ModalWindowBase
         saveButton.Click += (_, _) => { _vm.Save(); Close(); };
         var closeButton = new Button { Content = T("Common.Close"), Width = 100 };
         closeButton.Click += (_, _) => { _vm.Save(); Close(); };
-        foreach (var b in new Control[] { _syncNowButton, saveButton, closeButton })
-            b.Styled(ControlThemes.ModernButton);
+        _syncNowButton.Styled(ControlThemes.PrimaryButton);
+        saveButton.Styled(ControlThemes.PrimaryButton);
+        closeButton.Styled(ControlThemes.SecondaryButton);
         bottom.Children.Add(_syncNowButton);
         bottom.Children.Add(saveButton);
         bottom.Children.Add(closeButton);

@@ -63,7 +63,7 @@
             <Button x:Name="OkButton" Width="130" Margin="0,0,8,0" IsDefault="True"
                     Style="{StaticResource ModernButton}" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource SuccessBrush}" Text="✔" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -72,7 +72,7 @@
                     Background="{DynamicResource ItemHoverBrush}"
                     Foreground="{DynamicResource TextPrimaryBrush}">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

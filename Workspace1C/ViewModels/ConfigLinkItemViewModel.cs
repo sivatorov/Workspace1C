@@ -37,14 +37,16 @@ public sealed class ConfigLinkItemViewModel
 
     /// <summary>
     /// Короткая пометка происхождения для строки выпадающего списка: ★ — типовая,
-    /// ✎★ — пользовательская копия (перекрывает типовую), без звёздочки — пользовательская.
+    /// «заменена пользовательской» — пользовательская копия (перекрывает типовую),
+    /// без звёздочки — пользовательская. Текстовый глиф «✎» не используется (P1b):
+    /// пометка остаётся читаемой строкой, а иконки рисуются в таблицах.
     /// </summary>
     public string OriginBadge
     {
         get
         {
             if (Model.OverridesBuiltIn)
-                return "✎★ " + LocalizationManager.T("Updates.OriginOverride");
+                return LocalizationManager.T("Updates.OriginOverride");
             if (Model.IsBuiltIn)
                 return "★ " + LocalizationManager.T("Updates.OriginBuiltIn");
             return LocalizationManager.T("Updates.OriginCustom");

@@ -15,16 +15,21 @@
     <Color x:Key="TextPrimaryColor">#F1F5F9</Color>
     <Color x:Key="TextSecondaryColor">#CBD5E1</Color>
     <Color x:Key="TextOnAccentColor">#FFFFFF</Color>
-    <Color x:Key="ButtonTextColor">#000000</Color>
+    <!-- Аудит UI P2b: текст на вторичных кнопках — основной светлый текст темы,
+         а не чёрный (на тёмной заливке чёрный нечитаем). -->
+    <Color x:Key="ButtonTextColor">#F1F5F9</Color>
     <Color x:Key="FavoriteColor">#FBBF24</Color>
     <Color x:Key="FavoriteTextColor">#1C1917</Color>
     <Color x:Key="ItemHoverColor">#334155</Color>
     <Color x:Key="ItemSelectedColor">#1E3A5F</Color>
     <Color x:Key="AvatarBackgroundColor">#1E3A5F</Color>
     <Color x:Key="AvatarTextColor">#FFB300</Color>
-    <Color x:Key="SecondaryButtonBackgroundColor">#FFF3CD</Color>
-    <Color x:Key="SecondaryButtonHoverColor">#FFE69C</Color>
-    <Color x:Key="SecondaryButtonPressedColor">#FFD54D</Color>
+    <!-- Аудит UI P2b: вторичная кнопка в тёмной теме — из палитры темы
+         (CardBackground/ItemHover), а не светло-жёлтая (#FFF3CD/#FFE69C),
+         оставшаяся от светлой схемы. -->
+    <Color x:Key="SecondaryButtonBackgroundColor">#1E293B</Color>
+    <Color x:Key="SecondaryButtonHoverColor">#334155</Color>
+    <Color x:Key="SecondaryButtonPressedColor">#475569</Color>
     <!-- Опасная кнопка (issue #26): единый красный и белый текст (WCAG ≥ 4.5). -->
     <Color x:Key="DangerColor">#DC2626</Color>
     <Color x:Key="DangerHoverColor">#B91C1C</Color>
@@ -48,6 +53,12 @@
     <!-- Пикер иконок (аудит UI, п. 2.6): тёмные плитки, как раньше, но из темы. -->
     <Color x:Key="IconPickerBaseColor">#374151</Color>
     <Color x:Key="IconPickerHoverColor">#4B5563</Color>
+    <!-- Бейдж «Избранное» (аудит UI P2b): theme-варианты вместо жёсткого #FEF3C7. -->
+    <Color x:Key="FavoriteBadgeColor">#78350F</Color>
+    <Color x:Key="FavoriteBadgeTextColor">#FDE68A</Color>
+    <!-- Фон блока кода markdown (аудит UI P2b): вместо #22000000, чтобы блок
+         кода не сливался с тёмным фоном окна. -->
+    <Color x:Key="CodeBlockBackgroundColor">#0B1220</Color>
     <Color x:Key="DangerPressedColor">#991B1B</Color>
     <Color x:Key="DangerTextColor">#FFFFFF</Color>
     <!-- Дорожка переключателя в выключенном положении (issue #26): тёмная #475569
@@ -124,4 +135,8 @@
     <!-- Пикер иконок (аудит UI, п. 2.6). -->
     <SolidColorBrush x:Key="IconPickerBaseBrush" Color="{DynamicResource IconPickerBaseColor}"/>
     <SolidColorBrush x:Key="IconPickerHoverBrush" Color="{DynamicResource IconPickerHoverColor}"/>
+    <!-- Бейдж «Избранное» и фон блока кода (аудит UI P2b). -->
+    <SolidColorBrush x:Key="FavoriteBadgeBrush" Color="{DynamicResource FavoriteBadgeColor}"/>
+    <SolidColorBrush x:Key="FavoriteBadgeTextBrush" Color="{DynamicResource FavoriteBadgeTextColor}"/>
+    <SolidColorBrush x:Key="CodeBlockBackgroundBrush" Color="{DynamicResource CodeBlockBackgroundColor}"/>
 </ResourceDictionary>

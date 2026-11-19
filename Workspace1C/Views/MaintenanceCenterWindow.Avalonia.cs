@@ -475,7 +475,7 @@ namespace Workspace1C
                 var yLabel = new TextBlock
                 {
                     Text = label,
-                    FontSize = 10,
+                    FontSize = ThemeManager.FontSizeCaption,
                     Width = left - 4
                 };
                 Canvas.SetLeft(yLabel, 0);
@@ -492,7 +492,7 @@ namespace Workspace1C
             });
             foreach (var (f, label) in new[] { (0.0, chart.XMinLabel), (1.0, chart.XMaxLabel) })
             {
-                var xLabel = new TextBlock { Text = label, FontSize = 10 };
+                var xLabel = new TextBlock { Text = label, FontSize = ThemeManager.FontSizeCaption };
                 Canvas.SetLeft(xLabel, f == 0 ? left - 2 : left + plotW - 64);
                 Canvas.SetTop(xLabel, top + plotH + 4);
                 _historyChartCanvas.Children.Add(xLabel);

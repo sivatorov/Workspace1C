@@ -87,7 +87,7 @@
                                 Background="{DynamicResource ItemHoverBrush}" Padding="10,5" Margin="10,0,0,0"
                                 Click="OnSourceConnect_Click">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔌" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Path Data="{DynamicResource IconLink}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc ClusterMigration.Connect}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -114,7 +114,7 @@
                                 Background="{DynamicResource ItemHoverBrush}" Padding="10,5" Margin="10,0,0,0"
                                 Click="OnSourceLoadBases_Click">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc ClusterMigration.LoadBases}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -159,7 +159,7 @@
                                 Background="{DynamicResource ItemHoverBrush}" Padding="10,5" Margin="10,0,0,0"
                                 Click="OnTargetConnect_Click">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="🔌" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Path Data="{DynamicResource IconLink}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc ClusterMigration.Connect}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -186,7 +186,7 @@
                                 Background="{DynamicResource ItemHoverBrush}" Padding="10,5" Margin="10,0,0,0"
                                 Click="OnTargetGetStatuses_Click">
                             <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="⟳" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{loc:Loc ClusterMigration.GetStatuses}" VerticalAlignment="Center"/>
                             </StackPanel>
                         </Button>
@@ -363,11 +363,11 @@
                  (без жёсткой зелёной заливки и белого текста), «Отмена» — вторичная
                  SecondaryButton. -->
             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                <Button x:Name="MigrateButton" Style="{StaticResource ModernButton}"
+                <Button x:Name="MigrateButton" Style="{StaticResource PrimaryButton}"
                         Padding="16,5" Margin="0,0,8,0"
                         Click="OnMigrate_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="➜" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconArrowRight}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc ClusterMigration.MigrateButton}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
@@ -375,7 +375,7 @@
                         Padding="14,5" Margin="18,0,0,0"
                         Click="OnCancel_Click">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Foreground="{DynamicResource TextSecondaryBrush}" Text="✖" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

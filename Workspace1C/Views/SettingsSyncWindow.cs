@@ -41,8 +41,8 @@ public partial class SettingsSyncWindow : Window
         MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ShowInTaskbar = false;
-        FontFamily = new System.Windows.Media.FontFamily("Segoe UI");
-        FontSize = 13;
+        FontFamily = new System.Windows.Media.FontFamily(Themes.ThemeManager.DefaultFontFamily);
+        FontSize = Themes.ThemeManager.FontSizeBody;
         SetResourceReference(BackgroundProperty, "ContentBackgroundBrush");
 
         var grid = new Grid { Margin = new Thickness(16) };

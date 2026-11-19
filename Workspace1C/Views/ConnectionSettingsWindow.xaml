@@ -1509,14 +1509,16 @@
                      ModernButton, «Отмена» — вторичная SecondaryButton. -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right">
                 <Button Width="140" Height="36" Margin="0,0,10,0" IsDefault="True" Click="OnSave_Click"
+                        KeyboardNavigation.TabIndex="900"
                         IsEnabled="{Binding HasChanges}"
-                        Style="{DynamicResource ModernButton}">
+                        Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="ContentSave" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button Width="140" Height="36" IsCancel="True" Click="OnCancel_Click"
+                        KeyboardNavigation.TabIndex="1000"
                         Style="{DynamicResource SecondaryButton}">
                     <StackPanel Orientation="Horizontal">
                         <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>

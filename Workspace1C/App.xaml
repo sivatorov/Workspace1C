@@ -25,6 +25,9 @@
                 <ResourceDictionary Source="Themes/IconsWindowsXp.xaml"/>
                 <ResourceDictionary Source="Themes/IconsGlass.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+            <!-- Единый моноширинный стек (аудит UI P2a): журналы, код, технические
+                 значения. Совпадает с ThemeManager.DefaultMonospaceFontFamily. -->
+            <FontFamily x:Key="UiMonospaceFontFamily">Cascadia Mono, Consolas, DejaVu Sans Mono, Liberation Mono, monospace</FontFamily>
             <conv:GroupTextColorConverter x:Key="GroupTextColorConverter"/>
             <conv:IconKeyToGeometryConverter x:Key="IconKeyToGeometryConverter"/>
             <!-- Цвет точки «база запущена» (issue #310): зелёный/оранжевый/красный. -->
@@ -153,6 +156,9 @@
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                 <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>
+                <!-- Аудит UI P3a: доступное имя и справка берутся из той же строки ToolTip. -->
+                <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
+                <Setter Property="AutomationProperties.HelpText" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
                 <!-- Подложка наведения — из темы. Активный заголовок (WindowControlButtonOnAccent)
                      переопределяет её полупрозрачным белым, чтобы оставаться читаемой; обычный
                      стиль (неактивное главное окно, шапка карточки) использует приглушённую

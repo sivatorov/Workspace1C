@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.92-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.93-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.92**
-(поддерживается **7413 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.93**
+(поддерживается **7455 юнит-тестов**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,15 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Единый UI-аудит: иконки, контраст, типографика и доступность
+  (1.0.1.93, Windows и Linux)** — эмодзи и текстовые глифы заменены
+  векторными иконками; введена шкала размеров 12/16/20/24/32/48; белые
+  индикаторы на жёлтом акценте заменены на контрастный `TextOnAccentBrush`;
+  добавлены focus-ring, `AutomationProperties.Name` и порядок табуляции в
+  ключевых диалогах; унифицированы кнопки, радиусы 4/8/12, отступы 4/8/12/16/24/32,
+  шкала шрифтов 11/12/13/15/18/24 и платформенный шрифт по умолчанию;
+  терминология приведена к «1С:Предприятие»/«Конфигуратор». Подробности — в
+  [CHANGELOG.md](CHANGELOG.md).
 - **Единый набор стилей кнопок (1.0.1.92, Windows и Linux)** — все локальные
   копии `PrimaryButtonStyle`, `OutlineButtonStyle`, `IconOnlyButton` и
   `SelectAllButtonStyle` удалены из окон: осталось шесть канонических ключей

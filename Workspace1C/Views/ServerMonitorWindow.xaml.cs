@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -1104,7 +1105,9 @@ namespace Workspace1C
                         Header = ServiceTrayMenuBuilder.EscapeMenuText(item.Text),
                         Style = TryFindResource("ModernMenuItem") as Style,
                     };
-                    settings.Icon = MenuIconText("⚙", "#6B7280");
+                    // Аудит UI P0-5: цвет из темы, не жёсткий #6B7280.
+                    // P1a: шестерёнка — векторная иконка активного набора, не текстовый глиф.
+                    settings.Icon = MenuIconGlyph("IconSettings", "@TextSecondaryBrush");
                     settings.Click += (_, _) => ShowServicesSettings();
                     return settings;
                 }
@@ -1134,10 +1137,10 @@ namespace Workspace1C
                         Style = TryFindResource("ModernMenuItem") as Style,
                     };
                     // Группа — «микс» папка + кружок статуса (замечание 7OH 19.10),
-                    // как в трее и в контекстном меню служб главного окна; «Все сервисы» — ☰.
+                    // как в трее и в контекстном меню служб главного окна; «Все сервисы» — меню.
                     submenu.Icon = item.Kind == ServiceMenuItemKind.GroupSubmenu
                         ? MenuGroupIcon(item.StatusColorHex)
-                        : MenuIconText("☰", "@PurpleAccentBrush");
+                        : MenuIconGlyph("IconMenu", "@PurpleAccentBrush");
                     foreach (var child in item.Children)
                         submenu.Items.Add(ToWpfServiceMenuItem(child));
                     return submenu;
@@ -1176,7 +1179,23 @@ namespace Workspace1C
         private static TextBlock MenuIconText(string text, string colorHex) => new()
         {
             Text = text,
-            Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex)),
+            // Аудит UI P0-5: поддерживаются и HEX, и «@»-ключи кистей темы.
+            Foreground = Themes.WpfBrushes.FromSpec(colorHex),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        /// <summary>
+        /// Векторная иконка пункта меню по ключу <c>Icon*</c> (P1a): геометрия активного
+        /// набора иконок, цвет — HEX или «@»-ключ кисти темы.
+        /// </summary>
+        private static FrameworkElement MenuIconGlyph(string iconKey, string colorHex) => new Path
+        {
+            Data = Converters.IconKeyToGeometryConverter.ResolveGeometry(iconKey),
+            Fill = Themes.WpfBrushes.FromSpec(colorHex),
+            Width = 16,
+            Height = 16,
+            Stretch = Stretch.Uniform,
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
@@ -1192,7 +1211,7 @@ namespace Workspace1C
         };
 
         /// <summary>
-        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка 📦 +
+        /// Иконка группы служб в пункте меню — «микс» (замечание 7OH 19.10): папка +
         /// кружок статуса группы справа-снизу (цвет StatusColorHex — зелёный/жёлтый/серый),
         /// как в трее и в контекстном меню служб главного окна. При отсутствии статуса
         /// (кэш пуст, локальная машина) — обычная папка без кружка.
@@ -1200,14 +1219,7 @@ namespace Workspace1C
         private static FrameworkElement MenuGroupIcon(string statusColorHex)
         {
             var grid = new Grid { Width = 16, Height = 16 };
-            grid.Children.Add(new TextBlock
-            {
-                Text = "📦",
-                FontSize = 13,
-                Foreground = Themes.WpfBrushes.Get("PurpleAccentBrush") ?? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#7C3AED")), // fallback
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
-            });
+            grid.Children.Add(MenuIconGlyph("IconPackage", "@PurpleAccentBrush"));
             if (!string.IsNullOrWhiteSpace(statusColorHex))
             {
                 grid.Children.Add(new Border

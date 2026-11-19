@@ -35,13 +35,13 @@
             <Button Style="{StaticResource SecondaryButton}"
                     Padding="16,6"
                     IsCancel="True" Click="OnCancel_Click">
-                <TextBlock Text="{loc:Loc Updates.Cancel}" VerticalAlignment="Center"/>
+                <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
             </Button>
         </StackPanel>
 
         <StackPanel>
             <!-- Вопрос: имя базы. -->
-            <TextBlock x:Name="QuestionText" FontSize="14" FontWeight="SemiBold"
+            <TextBlock x:Name="QuestionText" FontSize="15" FontWeight="SemiBold"
                        TextWrapping="Wrap" Margin="0,0,0,4"/>
 
             <!-- Диагностика (issue #3, часть 1): распознанный тип СУБД и сервер СУБД.

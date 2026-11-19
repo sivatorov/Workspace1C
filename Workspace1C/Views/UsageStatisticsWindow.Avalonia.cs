@@ -110,8 +110,8 @@ namespace Workspace1C
             barsHost.ItemTemplate = new FuncDataTemplate<string>((text, _) => new TextBlock
             {
                 Text = text,
-                FontFamily = new FontFamily("Consolas"),
-                FontSize = 12,
+                FontFamily = new FontFamily(ThemeManager.DefaultMonospaceFontFamily),
+                FontSize = ThemeManager.FontSizeSecondary,
                 Margin = new Thickness(0, 1)
             });
             var barsPanel = new StackPanel { Children = { barsTitle, barsHost } };

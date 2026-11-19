@@ -6,6 +6,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
 using Workspace1C.Services;
@@ -98,9 +99,10 @@ namespace Workspace1C
                 {
                     Orientation = Orientation.Horizontal,
                     Spacing = 6,
-                    Children = { IconHelper.MakeIcon("IconCopy", 15, "SecondaryButtonTextBrush"), pasteCaption }
+                    Children = { IconHelper.MakeIcon("IconCopy", UiMetrics.IconControl, "SecondaryButtonTextBrush"), pasteCaption }
                 },
-                Height = 38,
+                // Аудит UI P1c: высота нижней панели диалога — 36.
+                Height = 36,
                 // Отступ справа из разметки (ConnectionStringInputWindow.xaml:58).
                 Margin = new Thickness(0, 0, 10, 0),
                 Padding = new Thickness(12, 0)
@@ -111,15 +113,16 @@ namespace Workspace1C
             Grid.SetColumn(pasteButton, 0);
             bottom.Children.Add(pasteButton);
 
-            _okButton = BuildConfirmActionButton("Common.Apply", "IconCheck", 150, OnOk_Click, height: 38);
-            _okButton.Classes.Add("greyed");
+            // Аудит UI P1c: единое гашение недоступной кнопки — приглушение
+            // (opacity 0.5) в теме DialogConfirmButton; серый класс greyed удалён.
+            _okButton = BuildConfirmActionButton("Common.Apply", "IconCheck", 150, OnOk_Click);
 
             var buttons = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 Spacing = 10,
-                Children = { _okButton, BuildCancelActionButton(140, height: 38) }
+                Children = { _okButton, BuildCancelActionButton(140) }
             };
             Grid.SetColumn(buttons, 2);
             bottom.Children.Add(buttons);

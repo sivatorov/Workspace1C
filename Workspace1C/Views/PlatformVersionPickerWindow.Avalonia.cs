@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -189,7 +189,7 @@ namespace Workspace1C
                 Padding = new Thickness(8, 6),
                 Margin = new Thickness(0, 0, 0, 8),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
+                CornerRadius = new CornerRadius(8),
                 Child = topGrid
             };
             ThemeBrushes.Bind(top, Border.BackgroundProperty, "CardBackgroundColorBrush");
@@ -263,7 +263,7 @@ namespace Workspace1C
                     Padding = new Thickness(4)
                 },
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             // Фон и рамка карточки дерева из ресурсов темы
             // (PlatformVersionPickerWindow.xaml:183): без привязки рамка была

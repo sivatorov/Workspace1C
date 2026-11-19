@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -123,7 +123,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 10, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");

@@ -155,6 +155,6 @@ public sealed class AuditP21DangerButtonTests
         Assert.DoesNotContain("Width=\"15\"", block);
 
         var avalonia = ReadView("LaunchParametersWindow.Avalonia.cs");
-        Assert.Contains("IconHelper.MakeIcon(iconKey, 16, \"DangerTextBrush\")", avalonia);
+        Assert.Contains("IconHelper.MakeIcon(iconKey, UiMetrics.IconControl, \"DangerTextBrush\")", avalonia);
     }
 }

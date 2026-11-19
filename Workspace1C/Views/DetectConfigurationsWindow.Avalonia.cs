@@ -1,4 +1,4 @@
-#if LINUX
+﻿#if LINUX
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,6 +10,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -34,7 +35,7 @@ namespace Workspace1C
         private readonly Dictionary<DetectConfigRowViewModel, TextBlock> _platformTexts = new();
         private readonly Dictionary<DetectConfigRowViewModel, TextBlock> _configTexts = new();
         private readonly Dictionary<DetectConfigRowViewModel, TextBlock> _versionTexts = new();
-        private readonly Dictionary<DetectConfigRowViewModel, TextBlock> _credTexts = new();
+        private readonly Dictionary<DetectConfigRowViewModel, Avalonia.Controls.Shapes.Path> _credTexts = new();
         private readonly Action<Infobase>? _editBase;
 
         private readonly StackPanel _rowsPanel = new() { Margin = new Thickness(4, 2) };
@@ -371,7 +372,7 @@ namespace Workspace1C
             {
                 Margin = new Thickness(0, 12, 0, 0),
                 BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6)
+                CornerRadius = new CornerRadius(8)
             };
             Themes.ThemeBrushes.Bind(listBorder, Border.BackgroundProperty, "CardBackgroundColorBrush");
             Themes.ThemeBrushes.Bind(listBorder, Border.BorderBrushProperty, "BorderColorBrush");
@@ -625,22 +626,19 @@ namespace Workspace1C
             Grid.SetColumn(version, 4);
             grid.Children.Add(version);
 
-            var cred = new TextBlock
-            {
-                Text = "●",
-                FontSize = 16,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 0, 4, 0)
-            };
-            ApplyCredentialStyle(cred, row.HasCredentials);
+            // P1b: индикатор логина/пароля — векторный кружок, не текстовый «●».
+            var cred = IconHelper.MakeIcon("IconBullet", UiMetrics.IconControl, out var credPath);
+            cred.HorizontalAlignment = HorizontalAlignment.Center;
+            cred.VerticalAlignment = VerticalAlignment.Center;
+            cred.Margin = new Thickness(4, 0, 4, 0);
+            ApplyCredentialStyle(credPath, row.HasCredentials);
             Grid.SetColumn(cred, 5);
             grid.Children.Add(cred);
 
             var props = new Button
             {
-                Content = "⚙",
-                FontSize = 14,
+                // P1a аудита UI: шестерёнка — векторная иконка активного набора, не текстовый глиф.
+                Content = IconHelper.MakeIcon("IconSettings", UiMetrics.IconControl, "TextPrimaryBrush"),
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 Margin = new Thickness(4, 0, 4, 0),
@@ -656,22 +654,22 @@ namespace Workspace1C
             _platformTexts[row] = platform;
             _configTexts[row] = config;
             _versionTexts[row] = version;
-            _credTexts[row] = cred;
+            _credTexts[row] = credPath;
             _rowsPanel.Children.Add(grid);
         }
 
         /// <summary>Окрашивает индикатор логина/пароля: зелёный — заполнены, красный — нет.</summary>
-        private static void ApplyCredentialStyle(TextBlock block, bool filled)
+        private static void ApplyCredentialStyle(Avalonia.Controls.Shapes.Path icon, bool filled)
         {
             if (filled)
             {
-                block.Foreground = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A");
-                ToolTip.SetTip(block, LocalizationManager.T("DetectConfigs.CredentialsFilledTooltip"));
+                icon.Fill = Themes.ThemeBrushes.Get("SuccessBrush", "#16A34A");
+                ToolTip.SetTip(icon, LocalizationManager.T("DetectConfigs.CredentialsFilledTooltip"));
             }
             else
             {
-                block.Foreground = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
-                ToolTip.SetTip(block, LocalizationManager.T("DetectConfigs.CredentialsMissingTooltip"));
+                icon.Fill = Themes.ThemeBrushes.Get("ErrorBrush", "#DC2626");
+                ToolTip.SetTip(icon, LocalizationManager.T("DetectConfigs.CredentialsMissingTooltip"));
             }
         }
 

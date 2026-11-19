@@ -114,6 +114,57 @@ public sealed class ContrastAuditP01Tests
             $"{avatarBackground} даёт {ratio:F2}:1 — требуется ≥ {WcagAaMinimum}:1 (WCAG AA).");
     }
 
+    /// <summary>
+    /// Аудит UI P3a: действия верхней панели (TopBarActionBrush) лежат на
+    /// CardBackgroundBrush. Кисть — это TextPrimaryColor темы, поэтому проверяем
+    /// её контраст к карточке и синхронность привязки в Controls.axaml обеих тем.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TopBarAction_MeetsWcagAa_OnCardBackground(string wpfTheme, string avaloniaTheme, bool dark)
+    {
+        var scheme = dark ? ColorScheme.CreateDark() : ColorScheme.CreateLight();
+        var topBarAction = ReadSynchronizedColor(scheme, dark, "TextPrimaryColor", wpfTheme, avaloniaTheme);
+        var card = ReadSynchronizedColor(scheme, dark, "CardBackgroundColor", wpfTheme, avaloniaTheme);
+
+        var ratio = ColorScheme.ContrastRatio(topBarAction, card);
+        Assert.True(ratio >= WcagAaMinimum,
+            $"{wpfTheme}/{avaloniaTheme}: TopBarAction {topBarAction} на CardBackground " +
+            $"{card} даёт {ratio:F2}:1 — требуется ≥ {WcagAaMinimum}:1 (WCAG AA).");
+
+        // Оба словаря Controls.axaml (Light/Dark) обязаны брать кисть из TextPrimaryColor.
+        var controls = ReadProjectFile(Path.Combine("Workspace1C", "Themes", "Controls.axaml"));
+        var bindings = Regex.Matches(
+            controls,
+            "<SolidColorBrush x:Key=\"TopBarActionBrush\"\\s+Color=\"\\{DynamicResource TextPrimaryColor\\}\"");
+        Assert.Equal(2, bindings.Count);
+    }
+
+    /// <summary>
+    /// Аудит UI P3a: индикаторы (точки, галочки, ползунки) на акцентной заливке —
+    /// нетекстовые элементы, для них достаточно 3:1 (WCAG 1.4.11). ThemeManager
+    /// считает TextOnAccentBrush через <see cref="ColorScheme.ContrastTextHex"/>,
+    /// поэтому проверяем все встроенные варианты акцента обеих схем.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TextOnAccent_Indicator_MeetsNonTextContrast(string wpfTheme, string avaloniaTheme, bool dark)
+    {
+        const double NonTextMinimum = 3.0;
+        var scheme = dark ? ColorScheme.CreateDark() : ColorScheme.CreateLight();
+
+        foreach (var accentKey in new[] { "AccentColor", "AccentHoverColor", "AccentPressedColor" })
+        {
+            var accent = ReadSynchronizedColor(scheme, dark, accentKey, wpfTheme, avaloniaTheme);
+            var indicator = ColorScheme.ContrastTextHex(accent);
+            var ratio = ColorScheme.ContrastRatio(indicator, accent);
+
+            Assert.True(ratio >= NonTextMinimum,
+                $"{wpfTheme}/{avaloniaTheme}: индикатор {indicator} на {accentKey} " +
+                $"{accent} даёт {ratio:F2}:1 — требуется ≥ {NonTextMinimum}:1 (WCAG 1.4.11).");
+        }
+    }
+
     [Fact]
     public void LightTheme_PreviousSecondaryAndAvatarColors_WouldFailWcag()
     {

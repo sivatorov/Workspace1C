@@ -80,7 +80,7 @@
                                Margin="0,0,0,6"/>
                     <TextBlock Text="{Binding HelpText, ElementName=Root}"
                                TextWrapping="Wrap"
-                               FontSize="12.5" LineHeight="19"
+                               FontSize="12" LineHeight="19"
                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                 </StackPanel>
             </Border>

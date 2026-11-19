@@ -43,7 +43,7 @@
                     Background="{DynamicResource ItemHoverBrush}" Padding="12,5" Margin="0,0,6,0"
                     Click="OnConfigure_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="⚙" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <Path Data="{DynamicResource IconSettings}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Services.Configure}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -65,7 +65,7 @@
                     IsEnabled="{Binding HasRows}"
                     Click="OnGrantRights_Click">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="🛡" Margin="0,0,6,0" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
+                    <Path Data="{DynamicResource IconShield}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource PurpleAccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Services.GrantRights}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -101,12 +101,12 @@
             <Button x:Name="MoveUpButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveUp}" IsEnabled="{Binding CanMoveUp}"
                     Click="OnMoveUp_Click">
-                <TextBlock Text="▲" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
+                <Path Data="{DynamicResource IconArrowUp}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource InfoBrush}" VerticalAlignment="Center"/>
             </Button>
             <Button x:Name="MoveDownButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveDown}" IsEnabled="{Binding CanMoveDown}"
                     Click="OnMoveDown_Click">
-                <TextBlock Text="▼" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
+                <Path Data="{DynamicResource IconArrowDown}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource InfoBrush}" VerticalAlignment="Center"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <!-- Группы служб (issue #11, итерация 2 — релиз 1.0.0.12): «Добавить/Изменить/
@@ -115,28 +115,28 @@
             <Button x:Name="AddGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupAddHint}" IsEnabled="{Binding CanAddGroup}"
                     Click="OnAddGroup_Click">
-                <TextBlock Text="📦" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
+                <Path Data="{DynamicResource IconPackage}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource PurpleAccentBrush}" VerticalAlignment="Center"/>
             </Button>
             <Button x:Name="EditGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupEditHint}" IsEnabled="{Binding CanEditGroup}"
                     Click="OnEditGroup_Click">
-                <TextBlock Text="✎" VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
+                <Path Data="{DynamicResource IconEdit}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource PurpleAccentBrush}" VerticalAlignment="Center"/>
             </Button>
             <!-- «Перенести в группу» (issue #11, 1.0.0.14): рядом с кнопкой правки. -->
             <Button x:Name="MoveToGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.MoveToGroupHint}" IsEnabled="{Binding CanMoveToGroup}"
                     Click="OnMoveToGroup_Click">
-                <TextBlock Text="⇄" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
+                <Path Data="{DynamicResource IconSwap}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource InfoBrush}" VerticalAlignment="Center"/>
             </Button>
             <Button x:Name="DeleteGroupButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.GroupDeleteHint}" IsEnabled="{Binding CanDeleteGroup}"
                     Click="OnDeleteGroup_Click">
-                <TextBlock Text="🗑" VerticalAlignment="Center" Foreground="{DynamicResource ErrorBrush}"/>
+                <Path Data="{DynamicResource IconDelete}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource ErrorBrush}" VerticalAlignment="Center"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <Button x:Name="RefreshButton" Style="{StaticResource IconButton}"
                     ToolTip="{loc:Loc Services.Refresh}" Click="OnRefresh_Click">
-                <TextBlock Text="⟳" VerticalAlignment="Center" Foreground="{DynamicResource InfoBrush}"/>
+                <Path Data="{DynamicResource IconRefresh}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource InfoBrush}" VerticalAlignment="Center"/>
             </Button>
             <Border Style="{StaticResource ToolbarSeparator}"/>
             <!-- Команды — только цветные иконки, без подписей (замечание 7OH 18.10:
@@ -238,8 +238,7 @@
                         <Ellipse Grid.Column="0" Width="9" Height="9" Margin="0,0,8,0"
                                  VerticalAlignment="Center"
                                  Fill="{Binding StatusColorHex, Converter={StaticResource BrushFromHex}}"/>
-                        <TextBlock Grid.Column="1" Text="📦" Margin="0,0,6,0"
-                                   VerticalAlignment="Center" Foreground="{DynamicResource PurpleAccentBrush}"/>
+                        <Path Data="{DynamicResource IconPackage}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource PurpleAccentBrush}" Margin="0,0,6,0" VerticalAlignment="Center" Grid.Column="1"/>
                         <TextBlock Grid.Column="2" Text="{Binding DisplayName}"
                                    VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                         <TextBlock Grid.Column="3" Text="{Binding StatusText}"

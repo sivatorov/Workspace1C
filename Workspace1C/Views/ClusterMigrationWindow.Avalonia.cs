@@ -251,19 +251,19 @@ namespace Workspace1C
             localeBox.Bind(ComboBox.SelectedItemProperty, new Binding("Locale", BindingMode.TwoWay));
 
             // ---- Кнопки (паттерн BaseSelectionWindow: строятся в коде, хост — в панели). ----
-            _sourceConnectButton = BuildActionButton(LocalizationManager.T("ClusterMigration.Connect"), "🔌",
+            _sourceConnectButton = BuildActionButton(LocalizationManager.T("ClusterMigration.Connect"), "IconLink",
                 () => _vm.ConnectSourceCommand.Execute(null));
             _sourceConnectHost.Content = _sourceConnectButton;
 
-            _sourceLoadBasesButton = BuildActionButton(LocalizationManager.T("ClusterMigration.LoadBases"), "⟳",
+            _sourceLoadBasesButton = BuildActionButton(LocalizationManager.T("ClusterMigration.LoadBases"), "IconRefresh",
                 () => _vm.LoadSourceBasesCommand.Execute(null));
             _sourceLoadHost.Content = _sourceLoadBasesButton;
 
-            _targetConnectButton = BuildActionButton(LocalizationManager.T("ClusterMigration.Connect"), "🔌",
+            _targetConnectButton = BuildActionButton(LocalizationManager.T("ClusterMigration.Connect"), "IconLink",
                 () => _vm.ConnectTargetCommand.Execute(null));
             _targetConnectHost.Content = _targetConnectButton;
 
-            _targetGetStatusesButton = BuildActionButton(LocalizationManager.T("ClusterMigration.GetStatuses"), "⟳",
+            _targetGetStatusesButton = BuildActionButton(LocalizationManager.T("ClusterMigration.GetStatuses"), "IconRefresh",
                 () => _vm.GetTargetStatusesCommand.Execute(null));
             _targetStatusesHost.Content = _targetGetStatusesButton;
 
@@ -289,7 +289,7 @@ namespace Workspace1C
             bulk.Children.Add(_selectNoneButton);
             this.FindControl<ContentControl>("BulkHost")!.Content = bulk;
 
-            _migrateButton = BuildPrimaryButton(LocalizationManager.T("ClusterMigration.MigrateButton"), "➜",
+            _migrateButton = BuildPrimaryButton(LocalizationManager.T("ClusterMigration.MigrateButton"), "IconArrowRight",
                 OnMigrateClick);
             this.FindControl<ContentControl>("MigrateHost")!.Content = _migrateButton;
 
@@ -416,13 +416,13 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        BuildIconOrGlyph(icon, 14, "TextOnAccentBrush"),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
                 Padding = new Thickness(16, 5)
             };
-            button.Styled(ControlThemes.ModernButton);
+            button.Styled(ControlThemes.DialogConfirmButton);
             button.Click += (_, _) => onClick();
             return button;
         }
@@ -437,7 +437,7 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center },
+                        BuildIconOrGlyph(icon, UiMetrics.IconControl, "TextPrimaryBrush"),
                         new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
                     }
                 },
@@ -448,6 +448,15 @@ namespace Workspace1C
             button.Click += (_, _) => onClick();
             return button;
         }
+
+        /// <summary>
+        /// Содержимое кнопки: ключ <c>Icon*</c> — векторная иконка набора темы (P1a),
+        /// иначе — текстовый глиф для обратной совместимости с остальными кнопками окна.
+        /// </summary>
+        private static Control BuildIconOrGlyph(string icon, double size, string brushKey)
+            => icon.StartsWith("Icon", StringComparison.Ordinal)
+                ? IconHelper.MakeIcon(icon, size, brushKey)
+                : new TextBlock { Text = icon, VerticalAlignment = VerticalAlignment.Center };
 
         private Button BuildSecondaryButton(string text, Action onClick)
         {
