@@ -23,11 +23,29 @@ public static class UpdateDialogSizePolicy
     /// <summary>Максимальная ширина диалога по содержимому.</summary>
     public const double MaxWidth = 760;
 
+    /// <summary>
+    /// Минимальная высота диалога, DIP. Ниже опускаться нельзя: окно с заголовком,
+    /// иконкой и строкой кнопок становится нечитаемым. Совпадает с MinHeight в
+    /// разметке WPF/Avalonia.
+    /// </summary>
+    public const double MinHeight = 140;
+
     /// <summary>Максимальная высота диалога по содержимому.</summary>
     public const double MaxHeight = 640;
 
     /// <summary>Отступ от краёв рабочей области монитора, DIP.</summary>
     public const double WorkAreaMargin = 24;
+
+    /// <summary>
+    /// Высота строки кнопок диалога, DIP (совпадает с Height=34 у кнопок в разметке).
+    /// </summary>
+    public const double ButtonHeight = 34;
+
+    /// <summary>
+    /// Межстрочный зазор, который добавляет <c>WrapPanel</c> при переносе кнопок
+    /// на новую строку (задаётся отступом панели, DIP).
+    /// </summary>
+    public const double ButtonRowGap = 8;
 
     // Коды HT* из WM_NCHITTEST (WinUser.h): границы окна.
     public const int HtClient = 1;
@@ -42,7 +60,7 @@ public static class UpdateDialogSizePolicy
     public const int HtBottomRight = 17;
 
     /// <summary>
-    /// Начальный размер: по содержимому, но не меньше <see cref="MinWidth"/>
+    /// Начальный размер: по содержимому, но не меньше <see cref="MinWidth"/>/<see cref="MinHeight"/>
     /// и не больше <see cref="MaxWidth"/>/<see cref="MaxHeight"/> и рабочей
     /// области минус 2×<see cref="WorkAreaMargin"/>.
     /// </summary>
@@ -62,25 +80,105 @@ public static class UpdateDialogSizePolicy
         if (maxWidth < MinWidth)
             maxWidth = MinWidth;
 
+        var width = double.IsNaN(desiredWidth) ? MinWidth : desiredWidth;
+
+        return new UpdateDialogSize(
+            Math.Clamp(width, MinWidth, maxWidth),
+            ClampWindowHeight(desiredHeight, workAreaHeight));
+    }
+
+    /// <summary>
+    /// Итоговая высота окна: не меньше <see cref="MinHeight"/>, не больше
+    /// <see cref="MaxHeight"/> и рабочей области минус 2×<see cref="WorkAreaMargin"/>.
+    /// Если рабочая область настолько мала, что меньше <see cref="MinHeight"/>,
+    /// приоритет у рабочей области — окно должно поместиться на экране, а длинное
+    /// содержимое прокручивается внутри (issue #139, 1.0.1.95).
+    /// Расчёт высоты переиспользует <see cref="WindowSizeMath.ClampHeight"/>, чтобы
+    /// не дублировать клампинг в WPF и Avalonia.
+    /// </summary>
+    /// <param name="desiredHeight">Желаемая (по содержимому) высота окна, DIP.</param>
+    /// <param name="workAreaHeight">Высота рабочей области монитора, DIP; 0/отрицательное —
+    /// ограничение по рабочей области неизвестно и не применяется.</param>
+    public static double ClampWindowHeight(double desiredHeight, double workAreaHeight)
+    {
         var maxHeight = MaxHeight;
         if (workAreaHeight > 0)
             maxHeight = Math.Min(maxHeight, workAreaHeight - 2 * WorkAreaMargin);
         if (maxHeight < 0)
             maxHeight = 0;
 
-        var width = double.IsNaN(desiredWidth) ? MinWidth : desiredWidth;
+        var minHeight = Math.Min(MinHeight, maxHeight);
         var height = double.IsNaN(desiredHeight) ? maxHeight : desiredHeight;
+        return WindowSizeMath.ClampHeight(height, minHeight, maxHeight);
+    }
 
-        return new UpdateDialogSize(
-            Math.Clamp(width, MinWidth, maxWidth),
-            Math.Clamp(height, 0, maxHeight));
+    /// <summary>
+    /// Высота панели кнопок с учётом переноса <c>WrapPanel</c> по доступной ширине
+    /// (issue #139, 1.0.1.95). Именно перенос вызывал обрезание низа: при
+    /// <c>SizeToContent="WidthAndHeight"</c> контейнер измерялся с бесконечной
+    /// шириной (одна строка), затем ширина клампилась, кнопки переносились, а
+    /// высота окна уже была посчитана.
+    /// </summary>
+    /// <param name="buttonWidths">Ширины кнопок в одной панели, DIP.</param>
+    /// <param name="availableWidth">Доступная ширина панели (ширина окна минус
+    /// отступы и оформление), DIP; <c><= 0</c> — ширина неизвестна, переноса нет.</param>
+    /// <param name="spacing">Горизонтальный отступ между соседними кнопками, DIP.</param>
+    /// <param name="rowHeight">Высота одной строки кнопок, DIP.</param>
+    /// <param name="rowGap">Вертикальный зазор между строками, DIP.</param>
+    /// <returns>Высота панели: <c>rows × rowHeight + (rows − 1) × rowGap</c>;
+    /// 0, если кнопок нет.</returns>
+    public static double ButtonPanelHeight(
+        IEnumerable<double> buttonWidths,
+        double availableWidth,
+        double spacing,
+        double rowHeight,
+        double rowGap = ButtonRowGap)
+    {
+        ArgumentNullException.ThrowIfNull(buttonWidths);
+
+        var rows = 0;
+        var rowWidth = 0.0;
+        var hasButtons = false;
+
+        foreach (var buttonWidth in buttonWidths)
+        {
+            var width = buttonWidth > 0 ? buttonWidth : 0;
+
+            if (!hasButtons)
+            {
+                rows = 1;
+                rowWidth = width;
+                hasButtons = true;
+                continue;
+            }
+
+            var withNext = rowWidth + (spacing > 0 ? spacing : 0) + width;
+            if (availableWidth > 0 && withNext > availableWidth)
+            {
+                // Кнопка не помещается в текущую строку — WrapPanel переносит её.
+                rows++;
+                rowWidth = width;
+            }
+            else
+            {
+                rowWidth = withNext;
+            }
+        }
+
+        if (!hasButtons)
+            return 0;
+
+        var height = rows * (rowHeight > 0 ? rowHeight : 0);
+        if (rows > 1)
+            height += (rows - 1) * (rowGap > 0 ? rowGap : 0);
+        return height;
     }
 
     /// <summary>
     /// True — точку попадания на границу окна нужно трактовать как клиентскую
-    /// (запрет изменения размера). Актуально только для окна с
-    /// <c>SizeToContent="WidthAndHeight"</c> и <c>ResizeMode="NoResize"</c>:
-    /// перетаскивание границы уменьшало ширину, а контент не пересчитывался.
+    /// (запрет изменения размера). Актуально для окна с <c>ResizeMode="NoResize"</c>
+    /// и размером, который вычисляется явно: перетаскивание границы уменьшало
+    /// ширину, а контент не пересчитывался и обрезался (issue #139).
     /// Заголовок (<see cref="HtCaption"/>) и клиентская область
     /// (<see cref="HtClient"/>) не блокируются.
     /// </summary>

@@ -1173,14 +1173,11 @@
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Margin" Value="2,1"/>
 
-        <!-- issue #134 (1.0.1.84): меню «Колонки» инспектора процессов использует
-             MenuItem.ToggleType = CheckBox. Индикатор галочки рисует базовый шаблон
-             Fluent (PART_ToggleIconPresenter по псевдоклассам :checked:toggle).
-             Резервируем место под индикатор и у снятого флажка, чтобы подписи
-             пунктов не «прыгали» при переключении видимости колонки. -->
-        <Style Selector="^:toggle /template/ ContentControl#PART_ToggleIconPresenter">
-            <Setter Property="IsVisible" Value="True"/>
-        </Style>
+        <!-- issue #134 (1.0.1.95): индикатор видимости колонки в меню «Колонки»
+             рисует собственный элемент в MenuItem.Icon (см. ProcessInspectorWindow.*),
+             поэтому тема не опирается на внутреннюю часть шаблона Fluent
+             PART_ToggleIconPresenter: в используемой версии Avalonia она не
+             отображалась, и галочек пользователь не видел. -->
 
         <!-- Цвет подписи штатная тема меняет не на контроле, а на части шаблона,
              поэтому и здесь красится часть: у автора подсветка меняет только фон

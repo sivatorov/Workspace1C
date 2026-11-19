@@ -4,6 +4,7 @@ using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
@@ -85,7 +86,10 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Меню «Колонки» (issue #134): чек-лист всех колонок инспектора.
+        /// Меню «Колонки» (issue #134; индикатор переделан в 1.0.1.95):
+        /// чек-лист всех колонок инспектора. Видимость показывает собственная
+        /// векторная галочка в <see cref="MenuItem.Icon"/> (см.
+        /// <see cref="BuildColumnCheckIndicator"/>), а не часть шаблона меню.
         /// Скрытые колонки не отображаются, выбор сохраняется в настройках.
         /// </summary>
         private void OnColumns_Click(object sender, RoutedEventArgs e)
@@ -104,6 +108,12 @@ namespace Workspace1C
                 {
                     Header = LocalizationManager.T(info.TitleKey),
                     Style = TryFindResource("ModernMenuItem") as Style,
+                    // issue #134 (1.0.1.95): видимый индикатор видимости колонки —
+                    // векторная галочка в MenuItem.Icon. Штатный шаблон
+                    // ModernMenuItem не рисует IsChecked, поэтому IsCheckable
+                    // оставлен ради поведения (клик переключает флажок), а внешний
+                    // вид задаёт собственный индикатор.
+                    Icon = BuildColumnCheckIndicator(),
                     IsCheckable = true,
                     IsChecked = _vm.IsColumnVisible(column)
                 };
@@ -112,6 +122,44 @@ namespace Workspace1C
             }
 
             menu.IsOpen = true;
+        }
+
+        /// <summary>
+        /// Индикатор видимости колонки в меню «Колонки» (issue #134, 1.0.1.95).
+        /// Векторная галочка лежит в <see cref="MenuItem.Icon"/> и показывается только
+        /// при <see cref="MenuItem.IsChecked"/>; у скрытой колонки остаётся пустой
+        /// резерв 16×16, поэтому подписи пунктов не сдвигаются. Привязка идёт к
+        /// свойству самого пункта, а не к части шаблона Fluent, имя которой зависит
+        /// от версии Avalonia/WPF.
+        /// </summary>
+        private static Grid BuildColumnCheckIndicator()
+        {
+            var check = new System.Windows.Shapes.Path
+            {
+                Data = Converters.IconKeyToGeometryConverter.ResolveGeometry("IconCheck"),
+                Fill = Themes.WpfBrushes.FromSpec("@AccentBrush"),
+                Width = 12,
+                Height = 12,
+                Stretch = System.Windows.Media.Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Hidden
+            };
+            check.SetBinding(
+                UIElement.VisibilityProperty,
+                new Binding(nameof(MenuItem.IsChecked))
+                {
+                    RelativeSource = new RelativeSource(
+                        RelativeSourceMode.FindAncestor, typeof(MenuItem), 1),
+                    Converter = new BooleanToVisibilityConverter()
+                });
+
+            return new Grid
+            {
+                Width = 16,
+                Height = 16,
+                Children = { check }
+            };
         }
 
         /// <summary>

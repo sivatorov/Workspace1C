@@ -403,10 +403,11 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Меню «Колонки» (issue #134, доработка ArtyoZ в 1.0.1.84): чек-лист всех
-        /// колонок инспектора. Видимость обозначает настоящий чекбокс
-        /// <see cref="MenuItemToggleType.CheckBox"/> (индикатор галочки рисует шаблон
-        /// <see cref="ControlThemes.ModernMenuItem"/>), а не текстовый префикс галочки.
+        /// Меню «Колонки» (issue #134, доработка ArtyoZ в 1.0.1.84; индикатор
+        /// переделан в 1.0.1.95): чек-лист всех колонок инспектора. Видимость
+        /// обозначает <see cref="MenuItemToggleType.CheckBox"/> с собственной
+        /// векторной галочкой в <see cref="MenuItem.Icon"/> (см.
+        /// <see cref="BuildColumnCheckIndicator"/>), а не текстовый префикс галочки.
         /// </summary>
         private void ShowColumnsMenu(Button? anchor)
         {
@@ -416,12 +417,16 @@ namespace Workspace1C
             foreach (var info in ProcessInspectorViewModel.AllColumns)
             {
                 var column = info.Column;
-                // issue #134 (1.0.1.84): IsChecked отражает видимость колонки — у видимых
-                // галочка стоит, у скрытых её нет. Клик переключает состояние и сохраняет
-                // выбор в настройках.
+                // issue #134 (1.0.1.84, индикатор 1.0.1.95): IsChecked отражает
+                // видимость колонки — у видимых галочка в Icon показана, у скрытых
+                // её нет. Клик переключает состояние и сохраняет выбор в настройках.
                 var item = new MenuItem
                 {
                     Header = LocalizationManager.T(info.TitleKey),
+                    // issue #134 (1.0.1.95): собственный индикатор в Icon — галочка
+                    // видна только у видимой колонки; у скрытой остаётся пустой
+                    // резерв 16×16, поэтому подписи не сдвигаются.
+                    Icon = BuildColumnCheckIndicator(),
                     ToggleType = MenuItemToggleType.CheckBox,
                     IsChecked = _vm.IsColumnVisible(column)
                 };
@@ -438,6 +443,50 @@ namespace Workspace1C
                 menu.Placement = PlacementMode.Bottom;
                 menu.Open(anchor);
             }
+        }
+
+        /// <summary>
+        /// Индикатор видимости колонки в меню «Колонки» (issue #134, 1.0.1.95).
+        /// Векторная галочка лежит в <see cref="MenuItem.Icon"/> и привязана к
+        /// <see cref="MenuItem.IsChecked"/> самого пункта. Раньше индикатор рисовал
+        /// базовый шаблон Fluent через PART_ToggleIconPresenter, но эта часть в
+        /// используемой версии Avalonia не отображалась — пользователь галочек не
+        /// видел. Собственный индикатор от внутренних частей шаблона не зависит.
+        /// Пустой резерв 16×16 у скрытой колонки сохраняет ширину иконки, поэтому
+        /// подписи пунктов не «прыгают».
+        /// </summary>
+        private static Control BuildColumnCheckIndicator()
+        {
+            var check = new Avalonia.Controls.Shapes.Path
+            {
+                Data = IconHelper.Geometry("IconCheck"),
+                Fill = Themes.ThemeBrushes.FromSpec("@AccentBrush"),
+                Width = 12,
+                Height = 12,
+                Stretch = Stretch.Uniform,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsVisible = false
+            };
+            check.Bind(
+                Visual.IsVisibleProperty,
+                new Binding(nameof(MenuItem.IsChecked))
+                {
+                    RelativeSource = new RelativeSource
+                    {
+                        Mode = RelativeSourceMode.FindAncestor,
+                        AncestorType = typeof(MenuItem)
+                    },
+                    Converter = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(
+                        value => value == true)
+                });
+
+            return new Grid
+            {
+                Width = 16,
+                Height = 16,
+                Children = { check }
+            };
         }
 
         /// <summary>

@@ -193,6 +193,104 @@ public sealed class Issue139UpdateDialogSizeTests
             UpdateDialogSizePolicy.ContentMinWidth(null!, spacing: 10, chrome: 120));
     }
 
+    // ===================== Высота панели кнопок с переносом =====================
+
+    [Fact]
+    public void ButtonPanelHeight_TwoButtonsWrapAtNarrowWidth()
+    {
+        // «Перезапустить сейчас» 230 + «Обновить после закрытия» 240 при ширине 400:
+        // вторая кнопка не помещается (230 + 10 + 240 > 400) → две строки.
+        var height = UpdateDialogSizePolicy.ButtonPanelHeight(
+            new double[] { 230, 240 }, availableWidth: 400, spacing: 10,
+            rowHeight: UpdateDialogSizePolicy.ButtonHeight);
+
+        Assert.Equal(
+            2 * UpdateDialogSizePolicy.ButtonHeight + UpdateDialogSizePolicy.ButtonRowGap,
+            height);
+    }
+
+    [Fact]
+    public void ButtonPanelHeight_TwoButtonsSingleRowAtWideWidth()
+    {
+        // При ширине 700 обе кнопки помещаются в одну строку.
+        var height = UpdateDialogSizePolicy.ButtonPanelHeight(
+            new double[] { 230, 240 }, availableWidth: 700, spacing: 10,
+            rowHeight: UpdateDialogSizePolicy.ButtonHeight);
+
+        Assert.Equal(UpdateDialogSizePolicy.ButtonHeight, height);
+    }
+
+    [Fact]
+    public void ButtonPanelHeight_AccountsForSpacingBetweenButtons()
+    {
+        // 230 + 10 + 240 = 480: ровно при 480 — одна строка, при 479 — перенос.
+        var oneRow = UpdateDialogSizePolicy.ButtonPanelHeight(
+            new double[] { 230, 240 }, availableWidth: 480, spacing: 10,
+            rowHeight: UpdateDialogSizePolicy.ButtonHeight);
+        var twoRows = UpdateDialogSizePolicy.ButtonPanelHeight(
+            new double[] { 230, 240 }, availableWidth: 479, spacing: 10,
+            rowHeight: UpdateDialogSizePolicy.ButtonHeight);
+
+        Assert.Equal(UpdateDialogSizePolicy.ButtonHeight, oneRow);
+        Assert.Equal(
+            2 * UpdateDialogSizePolicy.ButtonHeight + UpdateDialogSizePolicy.ButtonRowGap,
+            twoRows);
+    }
+
+    [Fact]
+    public void ButtonPanelHeight_NoButtons_IsZero()
+    {
+        Assert.Equal(0, UpdateDialogSizePolicy.ButtonPanelHeight(
+            Array.Empty<double>(), availableWidth: 400, spacing: 10,
+            rowHeight: UpdateDialogSizePolicy.ButtonHeight));
+    }
+
+    [Fact]
+    public void ButtonPanelHeight_ThrowsOnNull()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            UpdateDialogSizePolicy.ButtonPanelHeight(
+                null!, availableWidth: 400, spacing: 10,
+                rowHeight: UpdateDialogSizePolicy.ButtonHeight));
+    }
+
+    // ===================== Итоговая высота окна =====================
+
+    [Fact]
+    public void ClampWindowHeight_NeverBelowMinHeight()
+    {
+        Assert.Equal(
+            UpdateDialogSizePolicy.MinHeight,
+            UpdateDialogSizePolicy.ClampWindowHeight(50, 1080));
+    }
+
+    [Fact]
+    public void ClampWindowHeight_NeverAboveMaxHeight()
+    {
+        Assert.Equal(
+            UpdateDialogSizePolicy.MaxHeight,
+            UpdateDialogSizePolicy.ClampWindowHeight(2000, 1080));
+    }
+
+    [Fact]
+    public void ClampWindowHeight_NeverAboveWorkArea()
+    {
+        Assert.Equal(
+            500 - 2 * UpdateDialogSizePolicy.WorkAreaMargin,
+            UpdateDialogSizePolicy.ClampWindowHeight(2000, 500));
+    }
+
+    [Fact]
+    public void ClampWindowHeight_TinyWorkArea_StillFitsScreen()
+    {
+        // Экран ниже минимальной высоты: приоритет у рабочей области, длинное
+        // содержимое прокручивается, но окно не выходит за экран.
+        var height = UpdateDialogSizePolicy.ClampWindowHeight(1000, 150);
+
+        Assert.Equal(150 - 2 * UpdateDialogSizePolicy.WorkAreaMargin, height);
+        Assert.True(height < UpdateDialogSizePolicy.MinHeight);
+    }
+
     // ===================== WPF: разметка =====================
 
     [Fact]
@@ -207,12 +305,26 @@ public sealed class Issue139UpdateDialogSizeTests
         Assert.Contains("x:Name=\"DownloadButton\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Name=\"RestartNowButton\"", xaml, StringComparison.Ordinal);
 
-        // Литералы, на которые завязаны тесты Issue116, сохранены.
-        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.95): авторазмер по обеим осям убран — он и давал
+        // обрезание снизу после переноса кнопок.
+        Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MinWidth=\"440\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"760\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"140\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Xaml_UsesVerticalScrollViewerForOverflow()
+    {
+        var xaml = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
+
+        // Длинный текст/кнопки прокручиваются, горизонтальной прокрутки нет.
+        Assert.Contains("<ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -309,21 +421,23 @@ public sealed class Issue139UpdateDialogSizeTests
     }
 
     [Fact]
-    public void Wpf_Code_NoManualMeasurementOrFixedSize()
+    public void Wpf_Code_ComputesExplicitHeightWithButtonWrap()
     {
         var source = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
 
-        // Размер окна определяет SizeToContent, ручного измерения/фиксации нет
-        // (issue #116), при смене этапа — только безопасный UpdateLayout.
-        // Сравнение SizeToContent == ... в хуке и упоминания в doc-комментариях
-        // допустимы; запрещено именно присваивание (пробелы вокруг «=»).
-        Assert.DoesNotContain(".Measure(", source, StringComparison.Ordinal);
-        Assert.DoesNotContain(".Arrange(", source, StringComparison.Ordinal);
-        Assert.DoesNotMatch(@"(?<![\w.])SizeToContent\s+=\s+(?!=)", source);
-        Assert.DoesNotMatch(@"(?<![\w.])Width\s+=\s+(?!=)", source);
-        Assert.DoesNotMatch(@"(?<![\w.])Height\s+=\s+(?!=)", source);
-        Assert.Contains("UpdateLayout();", source, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.95): высота считается явно — измерением контента при
+        // итоговой ширине (WrapPanel уже перенёс кнопки) и клампом политикой.
+        Assert.Contains(".Measure(", source, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", source, StringComparison.Ordinal);
+        Assert.Contains("Height = height;", source, StringComparison.Ordinal);
+        Assert.Contains("Width = width;", source, StringComparison.Ordinal);
+        Assert.Contains("ApplyExplicitSize", source, StringComparison.Ordinal);
+
+        // Ручного сброса в Manual нет (размер явный и без скачка), WndProc не возвращается.
+        Assert.DoesNotContain("SizeToContent = SizeToContent.Manual", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WndProc", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("WmGetMinMaxInfo", source, StringComparison.Ordinal);
     }
 
     // ===================== Avalonia =====================
@@ -345,9 +459,11 @@ public sealed class Issue139UpdateDialogSizeTests
         // Литералы, на которые завязаны тесты Issue116, сохранены.
         Assert.Contains("MinWidth = 440;", window, StringComparison.Ordinal);
         Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
-        // Issue #139: высота ограничена до первого кадра, как в WPF-разметке.
+        // Issue #139 (1.0.1.95): высота ограничена и считается явно, авторазмер
+        // по обеим осям убран (он не учитывал перенос кнопок WrapPanel).
         Assert.Contains("MaxHeight = 640;", window, StringComparison.Ordinal);
-        Assert.Contains("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
         Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);
     }
 
@@ -365,15 +481,19 @@ public sealed class Issue139UpdateDialogSizeTests
     }
 
     [Fact]
-    public void Avalonia_FitContent_NoManualMeasurement()
+    public void Avalonia_FitContent_UsesExplicitHeightAndBodyScroll()
     {
         var window = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs"));
 
-        // Размер по содержимому считает Avalonia; ручных Measure/Arrange нет.
-        Assert.DoesNotContain(".Measure(", window, StringComparison.Ordinal);
-        Assert.DoesNotContain(".Arrange(", window, StringComparison.Ordinal);
-        Assert.DoesNotContain("SizeToContent.Manual", window, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.95): явный размер вместо авторазмера по обеим осям,
+        // тело прокручивается, панель кнопок закреплена снизу.
+        Assert.Contains("SizeToContent.Manual", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.Contains(".Measure(", window, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
+        Assert.Contains("ScrollBarVisibility.Auto", window, StringComparison.Ordinal);
+        Assert.Contains("DockPanel.SetDock(buttonsPanel, Dock.Bottom)", window, StringComparison.Ordinal);
     }
 
     [Fact]

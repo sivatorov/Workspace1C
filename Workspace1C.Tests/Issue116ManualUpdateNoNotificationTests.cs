@@ -219,25 +219,32 @@ public sealed class Issue116ManualUpdateNoNotificationTests
     // ===================== Стабильный размер окна =====================
 
     [Fact]
-    public void Wpf_DialogSize_IsCalculatedBySizeToContentOnly()
+    public void Wpf_DialogSize_IsCalculatedExplicitly()
     {
+        // Issue #139 (1.0.1.95): авторазмер по обеим осям убран — высота считается
+        // явно с учётом переноса кнопок WrapPanel, длинное содержимое прокручивается.
         var xaml = ReadProjectFile("Workspace1C", "Services", "UpdateAvailableWindow.xaml");
-        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("<ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
 
         var code = ReadProjectFile("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs");
+        Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", code, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent = SizeToContent.Manual", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WndProc", code, StringComparison.Ordinal);
         Assert.DoesNotContain("CaptureFixedSize", code, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Avalonia_DialogSize_FitsContentWithoutManualMeasurement()
+    public void Avalonia_DialogSize_ComputesExplicitHeight()
     {
         var window = ReadProjectFile("Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs");
         Assert.Contains("bool fitContent = false", window, StringComparison.Ordinal);
-        Assert.Contains("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
+        Assert.Contains("SizeToContent.Manual", window, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
         Assert.Contains("MinWidth = 440;", window, StringComparison.Ordinal);
         Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
         Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);

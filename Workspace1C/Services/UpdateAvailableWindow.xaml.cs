@@ -32,6 +32,10 @@ public partial class UpdateAvailableWindow : Window
     // файл ещё понадобится помощнику, удалять его нельзя (issue #302).
     private bool _applyScheduled;
 
+    // Issue #139 (1.0.1.95): HWND окна после SourceInitialized — по нему берётся
+    // рабочая область монитора владельца при пересчёте размера.
+    private IntPtr _windowHandle;
+
     /// <param name="showReleaseNotes">
     /// Issue #116: показывать ли блок «Что нового» (подпись и описание релиза).
     /// В ручных режимах (<see cref="AppUpdateMode.Manual"/>, <see cref="AppUpdateMode.NotifyOnly"/>)
@@ -124,10 +128,17 @@ public partial class UpdateAvailableWindow : Window
         InstallButton.IsDefault = readyToInstall;
         DownloadButton.IsDefault = !readyToInstall;
 
-        // Issue #116 (17.11.2026 14:07): размер окна целиком определяет
-        // SizeToContent="WidthAndHeight" в XAML — ручного измерения и фиксации
-        // габаритов нет, поэтому окно не «прыгает» после первого показа.
-        Loaded += (_, _) => (readyToInstall ? InstallButton : DownloadButton).Focus();
+        // Issue #139 (1.0.1.95): размер вычисляем явно ДО первого показа, чтобы окно
+        // не «прыгало» (issue #116) и не обрезалось снизу после переноса кнопок.
+        ApplyExplicitSize();
+
+        Loaded += (_, _) =>
+        {
+            // Повторный расчёт после применения шаблонов/стилей уточняет неклиентскую
+            // область; значения совпадают с первичными, поэтому скачка нет.
+            ApplyExplicitSize();
+            (readyToInstall ? InstallButton : DownloadButton).Focus();
+        };
 
         // Закрытие окна по Esc (issue #371): единообразно с остальными окнами приложения
         // (ActualReleasesWindow и др.). Во время скачивания окно не закрывается — как и
@@ -164,10 +175,14 @@ public partial class UpdateAvailableWindow : Window
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
         var handle = new WindowInteropHelper(this).Handle;
+        _windowHandle = handle;
 
         // Issue #139 (1.0.1.84): лимиты выставляем до подключения хука и до
         // первого рендера — HWND уже есть, можно взять монитор владельца.
         ApplyWorkAreaLimits(handle);
+        // Issue #139 (1.0.1.95): уточняем явный размер по фактическому монитору
+        // владельца и его DPI.
+        ApplyExplicitSize();
 
         if (handle != IntPtr.Zero && HwndSource.FromHwnd(handle) is { } source)
             source.AddHook(OnWindowMessage);
@@ -191,6 +206,9 @@ public partial class UpdateAvailableWindow : Window
             workAreaWidth,
             workAreaHeight);
         MaxWidth = clamped.Width;
+        // Issue #139 (1.0.1.95): MinHeight не должен оказаться больше рассчитанного
+        // MaxHeight (крошечный экран) — иначе окно нельзя корректно ограничить.
+        MinHeight = Math.Min(UpdateDialogSizePolicy.MinHeight, clamped.Height);
         MaxHeight = clamped.Height;
     }
 
@@ -231,6 +249,79 @@ public partial class UpdateAvailableWindow : Window
     }
 
     /// <summary>
+    /// Issue #139 (1.0.1.95): явный размер окна вместо <c>SizeToContent</c> по обеим
+    /// осям. Порядок важен:
+    /// <list type="number">
+    /// <item>ширина измеряется при неограниченной доступной ширине и клампится
+    /// политикой в <c>[MinWidth, min(MaxWidth, WorkArea − margin)]</c>;</item>
+    /// <item>высота измеряется уже при итоговой ширине — <c>WrapPanel</c> переносит
+    /// кнопки так же, как при реальной раскладке, поэтому вторая строка учитывается;</item>
+    /// <item>высота клампится в <c>[MinHeight, min(MaxHeight, WorkArea − margin)]</c>.
+    /// Если содержимое всё равно выше, прокручивается только тело
+    /// (<c>ScrollViewer</c> в разметке), а панель кнопок остаётся доступной.</item>
+    /// </list>
+    /// Расчёты выполняет чистая <see cref="UpdateDialogSizePolicy"/>, чтобы WPF и
+    /// Avalonia давали одинаковый результат.
+    /// </summary>
+    private void ApplyExplicitSize()
+    {
+        if (Content is not FrameworkElement content)
+            return;
+
+        try
+        {
+            var (workWidth, workHeight) = GetWorkAreaDip(_windowHandle);
+
+            // 1. Желаемая ширина по содержимому (без переноса текста по бесконечности
+            //    окно не «раздувается» — политика клампит до MaxWidth).
+            content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var width = UpdateDialogSizePolicy.Clamp(
+                content.DesiredSize.Width + ChromeWidth(), 0, workWidth, 0).Width;
+
+            // 2. Желаемая высота при итоговой ширине: WrapPanel уже переносит кнопки.
+            var contentWidth = Math.Max(0, width - ChromeWidth());
+            content.Measure(new Size(contentWidth, double.PositiveInfinity));
+            var height = UpdateDialogSizePolicy.ClampWindowHeight(
+                content.DesiredSize.Height + ChromeHeight(), workHeight);
+
+            if (Math.Abs(Width - width) > 0.5)
+                Width = width;
+            if (Math.Abs(Height - height) > 0.5)
+                Height = height;
+
+            UpdateLayout();
+        }
+        catch
+        {
+            // Сбой измерения не должен ломать диалог: окно останется в текущем размере.
+        }
+    }
+
+    /// <summary>
+    /// Ширина неклиентской области окна (рамка), DIP. После показа известна точно
+    /// как разница между габаритом окна и клиентской шириной; до показа — по
+    /// системным метрикам, без «пикселей на глаз».
+    /// </summary>
+    private double ChromeWidth()
+    {
+        if (Content is FrameworkElement content && ActualWidth > 0 && content.ActualWidth > 0)
+            return Math.Max(0, ActualWidth - content.ActualWidth);
+        return 2 * SystemParameters.ResizeFrameVerticalBorderWidth;
+    }
+
+    /// <summary>
+    /// Высота неклиентской области окна (заголовок + рамка), DIP. После показа —
+    /// точная разница габарита и клиентской высоты; до показа — системные метрики.
+    /// </summary>
+    private double ChromeHeight()
+    {
+        if (Content is FrameworkElement content && ActualHeight > 0 && content.ActualHeight > 0)
+            return Math.Max(0, ActualHeight - content.ActualHeight);
+        return SystemParameters.WindowCaptionHeight
+               + 2 * SystemParameters.ResizeFrameHorizontalBorderHeight;
+    }
+
+    /// <summary>
     /// Issue #139 (1.0.1.84): на <c>WM_NCHITTEST</c> попадание на границу окна
     /// трактуем как клиентскую область. Иначе при <c>SizeToContent="WidthAndHeight"</c>
     /// и <c>ResizeMode="NoResize"</c> перетаскивание границы уменьшало ширину, а
@@ -248,7 +339,10 @@ public partial class UpdateAvailableWindow : Window
         var hitTestCode = unchecked((short)(lParam.ToInt64() & 0xFFFF));
         if (!UpdateDialogSizePolicy.ShouldBlockResize(
                 hitTestCode,
-                SizeToContent == SizeToContent.WidthAndHeight,
+                // Issue #139 (1.0.1.95): SizeToContent больше не используется, но
+                // размер по-прежнему вычисляется явно и не пересчитывается при
+                // перетаскивании границы — блокировка HT* сохраняется.
+                sizeToContent: true,
                 ResizeMode == ResizeMode.NoResize))
         {
             return IntPtr.Zero;
@@ -500,24 +594,13 @@ public partial class UpdateAvailableWindow : Window
     }
 
     /// <summary>
-    /// Пересчитывает компоновку текущего этапа. Размер окна при этом НЕ измеряется
-    /// и не фиксируется вручную (issue #116, комментарий 7OH от 17.11.2026 14:07):
-    /// его целиком определяет <c>SizeToContent="WidthAndHeight"</c> из XAML. Ручной
-    /// сброс в <c>SizeToContent.Manual</c> и обратно давал заметный скачок размера
-    /// после первого показа, поэтому оставлен только безопасный пересчёт разметки.
+    /// Пересчитывает размер окна после смены этапа (Offer → Progress → Restart →
+    /// Done → Error). Issue #139 (1.0.1.95): высота считается явно по фактическому
+    /// содержимому при текущей ширине, поэтому второй строке кнопок <c>WrapPanel</c>
+    /// всегда хватает места. Ручного сброса в <c>SizeToContent.Manual</c> нет —
+    /// окно не «прыгает» после первого показа (issue #116).
     /// </summary>
-    private void RefreshWindowSize()
-    {
-        try
-        {
-            if (IsLoaded)
-                UpdateLayout();
-        }
-        catch
-        {
-            // Сбой пересчёта размера не должен ломать диалог.
-        }
-    }
+    private void RefreshWindowSize() => ApplyExplicitSize();
 
     /// <summary>
     /// Записывает диагностическую информацию об ошибках обновления во временный файл

@@ -2643,6 +2643,9 @@ namespace Workspace1C
                 FontWeight = FontWeight.SemiBold,
                 TextWrapping = TextWrapping.Wrap
             };
+            // Issue #141/#138 (1.0.1.95): значение — основная кисть темы (как desc ниже).
+            // Без явной привязки в тёмной теме оно наследовало чёрный и сливалось с фоном.
+            ThemeBrushes.Bind(valueBlock, TextBlock.ForegroundProperty, "TextPrimaryBrush");
             if (row.Copyable)
             {
                 valueBlock.Cursor = new Cursor(StandardCursorType.Hand);

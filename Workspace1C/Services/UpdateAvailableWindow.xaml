@@ -5,10 +5,10 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Title="{loc:Loc Update.NewVersionAvailable}"
         Icon="{StaticResource AppIcon}"
-        SizeToContent="WidthAndHeight"
         MaxWidth="760"
         MaxHeight="640"
         MinWidth="440"
+        MinHeight="140"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontFamily="Segoe UI"
@@ -23,7 +23,15 @@
     </Window.Resources>
 
     <Border Padding="0" CornerRadius="12" Background="{DynamicResource CardBackgroundBrush}">
-        <Grid Margin="20">
+        <!-- Issue #139 (1.0.1.95): размер окна считается явно (см. ApplyExplicitSize
+             в код-бихайнде) с учётом переноса кнопок WrapPanel. Если содержимое всё
+             равно выше доступной высоты, прокручивается только оно: панель кнопок
+             остаётся доступной и не отсекается нижней границей окна. -->
+        <ScrollViewer x:Name="ContentScroller"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Focusable="False">
+            <Grid Margin="20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -193,6 +201,7 @@
                 </StackPanel>
 
             </StackPanel>
-        </Grid>
+            </Grid>
+        </ScrollViewer>
     </Border>
 </Window>

@@ -3029,8 +3029,12 @@
                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                                                 <!-- Кликабельные значения копируются в буфер обмена
                                                      (issue #138, 1.0.1.84). -->
+                                                <!-- Issue #141/#138 (1.0.1.95): значение — основная кисть
+                                                     темы. Без явного Foreground в тёмной теме оно
+                                                     наследовало чёрный и сливалось с фоном. -->
                                                 <TextBlock Grid.Column="1" Text="{Binding Value}" Tag="{Binding Value}"
                                                            FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                                            MouseLeftButtonUp="OnConnectionInfoValueClick">
                                                     <TextBlock.Style>
                                                         <Style TargetType="TextBlock">

@@ -428,41 +428,70 @@ public sealed class Issue134ProcessInspectorTests
 
     // ===================== Меню «Колонки»: настоящие чекбоксы =====================
 
-    /// <summary>issue #134 (1.0.1.84): WPF использует IsCheckable/IsChecked.</summary>
+    /// <summary>
+    /// issue #134 (1.0.1.95): WPF-пункт остаётся <c>IsCheckable/IsChecked</c>, но
+    /// индикатор — собственная векторная галочка в <c>MenuItem.Icon</c>, видимая
+    /// только при <c>IsChecked</c>. Текстового префикса «✓» нет.
+    /// </summary>
     [Fact]
-    public void Wpf_ColumnsMenu_UsesIsCheckableIsChecked()
+    public void Wpf_ColumnsMenu_UsesIsCheckableAndVisibleIconIndicator()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
 
         Assert.Contains("IsCheckable = true", code, StringComparison.Ordinal);
         Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
         Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"✓ \"", code, StringComparison.Ordinal);
+        Assert.Contains("Icon = BuildColumnCheckIndicator()", code, StringComparison.Ordinal);
+
+        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
+        Assert.Contains("\"IconCheck\"", indicator, StringComparison.Ordinal);
+        Assert.Contains("Width = 16", indicator, StringComparison.Ordinal);
+        Assert.Contains("Height = 16", indicator, StringComparison.Ordinal);
+        Assert.Contains("Visibility.Hidden", indicator, StringComparison.Ordinal);
+        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
+        Assert.Contains("BooleanToVisibilityConverter", indicator, StringComparison.Ordinal);
+        Assert.Contains("@AccentBrush", indicator, StringComparison.Ordinal);
+
+        Assert.DoesNotContain("✓", code, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): Avalonia рисует настоящий чекбокс
-    /// <c>MenuItemToggleType.CheckBox</c>; текстового префикса «✓ » нет.
+    /// issue #134 (1.0.1.95): Avalonia сохраняет <c>MenuItemToggleType.CheckBox</c>
+    /// (клик переключает флажок), но видимую галочку рисует собственный индикатор
+    /// в <c>MenuItem.Icon</c>, привязанный к <c>IsChecked</c>. Текстового префикса
+    /// «✓» нет.
     /// </summary>
     [Fact]
-    public void Avalonia_ColumnsMenu_UsesMenuItemToggleTypeCheckBox()
+    public void Avalonia_ColumnsMenu_UsesToggleTypeAndVisibleIconIndicator()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
 
         Assert.Contains("ToggleType = MenuItemToggleType.CheckBox", code, StringComparison.Ordinal);
         Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
         Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
-        // Текстовый префикс галочки полностью заменён индикатором MenuItem.
+        Assert.Contains("Icon = BuildColumnCheckIndicator()", code, StringComparison.Ordinal);
+
+        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
+        Assert.Contains("\"IconCheck\"", indicator, StringComparison.Ordinal);
+        Assert.Contains("Width = 16", indicator, StringComparison.Ordinal);
+        Assert.Contains("Height = 16", indicator, StringComparison.Ordinal);
+        Assert.Contains("IsVisible = false", indicator, StringComparison.Ordinal);
+        Assert.Contains("Visual.IsVisibleProperty", indicator, StringComparison.Ordinal);
+        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
+        Assert.Contains("FuncValueConverter<bool?, bool>", indicator, StringComparison.Ordinal);
+        Assert.Contains("@AccentBrush", indicator, StringComparison.Ordinal);
+
         Assert.DoesNotContain("✓", code, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): шаблон <c>ModernMenuItem</c> наследует Fluent-шаблон,
-    /// который рисует индикатор <c>PART_ToggleIconPresenter</c>; тема резервирует
-    /// место под него, чтобы подписи пунктов не смещались.
+    /// issue #134 (1.0.1.95): тема больше не опирается на внутреннюю часть шаблона
+    /// Fluent <c>PART_ToggleIconPresenter</c> — в используемой версии Avalonia она
+    /// не отображалась. Индикатор задаётся в <c>MenuItem.Icon</c> самим окном
+    /// инспектора, поэтому подменю и прочие пункты меню не затрагиваются.
     /// </summary>
     [Fact]
-    public void Avalonia_ModernMenuItem_ReservesToggleIndicator()
+    public void Avalonia_ModernMenuItem_DoesNotRelyOnFluentTogglePresenter()
     {
         var axaml = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
         var start = axaml.IndexOf("x:Key=\"ModernMenuItem\"", StringComparison.Ordinal);
@@ -471,8 +500,53 @@ public sealed class Issue134ProcessInspectorTests
         Assert.True(end > start, "ControlTheme ModernMenuItem не закрыт.");
 
         var theme = axaml[start..end];
-        Assert.Contains("PART_ToggleIconPresenter", theme, StringComparison.Ordinal);
-        Assert.Contains(":toggle", theme, StringComparison.Ordinal);
+        // Имя части шаблона может упоминаться в пояснении; зависимости нет, если
+        // тема не объявляет селектор по ней и не переопределяет её видимость.
+        Assert.DoesNotContain(
+            "ContentControl#PART_ToggleIconPresenter", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("Selector=\"^:toggle", theme, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.95): WPF-шаблон <c>ModernMenuItem</c> выводит индикатор из
+    /// <c>MenuItem.Icon</c> (<c>ContentSource="Icon"</c>) и сохраняет обязательную
+    /// часть <c>PART_Popup</c>, чтобы подменю остальных меню не сломались.
+    /// </summary>
+    [Theory]
+    [InlineData("LightTheme.xaml")]
+    [InlineData("DarkTheme.xaml")]
+    public void Wpf_ModernMenuItem_RendersIconAndKeepsPopup(string themeFile)
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Themes", themeFile);
+        var start = xaml.IndexOf("x:Key=\"ModernMenuItem\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, $"В {themeFile} нет стиля ModernMenuItem.");
+        var end = xaml.IndexOf("</Style>", start, StringComparison.Ordinal);
+        Assert.True(end > start, $"Стиль ModernMenuItem в {themeFile} не закрыт.");
+
+        var style = xaml[start..end];
+        Assert.Contains("ContentSource=\"Icon\"", style, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PART_Popup\"", style, StringComparison.Ordinal);
+        Assert.DoesNotContain("PART_ToggleIconPresenter", style, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.95): начальное состояние индикатора — скрытое, а видимость
+    /// вычисляется из <c>IsChecked</c>, который инициализируется
+    /// <c>IsColumnVisible(column)</c>: у скрытой колонки галочки нет, у видимой — есть.
+    /// </summary>
+    [Theory]
+    [InlineData("ProcessInspectorWindow.xaml.cs", "Visibility.Hidden", "BooleanToVisibilityConverter")]
+    [InlineData("ProcessInspectorWindow.Avalonia.cs", "IsVisible = false", "FuncValueConverter<bool?, bool>")]
+    public void ColumnsMenu_IndicatorVisibilityFollowsIsChecked(
+        string file, string hiddenMarker, string converterMarker)
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", file);
+        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
+
+        Assert.Contains(hiddenMarker, indicator, StringComparison.Ordinal);
+        Assert.Contains(converterMarker, indicator, StringComparison.Ordinal);
+        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
+        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
     }
 
     // ===================== Мультивыбор, выделение и зебра =====================
@@ -699,6 +773,32 @@ public sealed class Issue134ProcessInspectorTests
 
     private static RunningOneCProcessDetails Proc(int pid, string processName, string commandLine = "") =>
         new(pid, processName, commandLine, null, null, null);
+
+    /// <summary>
+    /// Вырезает объявление метода вместе с телом: source-гвардам нужен именно
+    /// метод индикатора, а не весь файл, иначе проверки ловят посторонний код
+    /// (например, вызов <c>BuildColumnCheckIndicator()</c> в обработчике меню).
+    /// </summary>
+    private static string ExtractMethod(string code, string methodName)
+    {
+        const string declaration = "private static ";
+        var searchFrom = 0;
+        while (true)
+        {
+            var decl = code.IndexOf(declaration, searchFrom, StringComparison.Ordinal);
+            Assert.True(decl >= 0, $"В файле нет объявления метода {methodName}.");
+            var nameStart = code.IndexOf(methodName + "(", decl, StringComparison.Ordinal);
+            var lineEnd = code.IndexOf('\n', decl);
+            if (nameStart >= 0 && (lineEnd < 0 || nameStart < lineEnd))
+            {
+                var end = code.IndexOf("\n        }", nameStart, StringComparison.Ordinal);
+                Assert.True(end > nameStart, $"Не найден конец метода {methodName}.");
+                return code[decl..end];
+            }
+
+            searchFrom = decl + declaration.Length;
+        }
+    }
 
     private static string FindRepoRoot()
     {

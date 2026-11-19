@@ -169,6 +169,30 @@ public sealed class Issue138ConnectionInfoPanelTests
         Assert.Contains("ShowOpenFolderLink", xaml);
     }
 
+    [Fact]
+    public void Wpf_ConnectionInfoValue_UsesPrimaryThemeBrush()
+    {
+        // Issue #141/#138 (1.0.1.95): значение строки — основная кисть темы,
+        // подпись — вторичная. Раньше у TextBlock значения не было Foreground,
+        // и в тёмной теме он наследовал чёрный (значения «сливались» с фоном).
+        var xaml = File.ReadAllText(FindSourceFile("Workspace1C", "Views", "MainWindow.xaml"));
+        var panel = ExtractBetween(
+            xaml,
+            "<ItemsControl ItemsSource=\"{Binding ConnectionInfoFields}\">",
+            "</ItemsControl>");
+
+        Assert.Contains("Text=\"{Binding Value}\"", panel);
+        Assert.Contains("Foreground=\"{DynamicResource TextPrimaryBrush}\"", panel);
+        Assert.Contains("Foreground=\"{DynamicResource TextSecondaryBrush}\"", panel);
+
+        // Кликабельность копируемых значений сохранена.
+        Assert.Contains("Value=\"Hand\"", panel);
+        Assert.Contains("Main.ConnectionInfo.CopyTooltip", panel);
+        Assert.Contains("OnConnectionInfoValueClick", panel);
+
+        AssertNoHardcodedBlack(panel);
+    }
+
     // ===================== Оболочка Avalonia =====================
 
     [Fact]
@@ -181,6 +205,31 @@ public sealed class Issue138ConnectionInfoPanelTests
         Assert.Contains("SetTextAsync", code);
         Assert.Contains("OpenInfobaseFolderCommand", code);
         Assert.Contains("ShowOpenFolderLink", code);
+    }
+
+    [Fact]
+    public void Avalonia_ConnectionInfoValue_UsesPrimaryThemeBrush()
+    {
+        // Issue #141/#138 (1.0.1.95): значение строки привязано к основной кисти
+        // темы через ThemeBrushes.Bind (как desc панели), подпись — вторичная.
+        var code = File.ReadAllText(FindSourceFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs"));
+        // Маркер конца — закрывающая скобка метода на отступе 8 пробелов;
+        // без завершающего \n, чтобы не зависеть от CRLF/LF в исходнике.
+        var method = ExtractBetween(
+            code,
+            "private Control BuildConnectionInfoRow(",
+            "\n        }");
+
+        Assert.Contains("Text = row.Value", method);
+        Assert.Contains("TextBlock.ForegroundProperty, \"TextPrimaryBrush\"", method);
+        Assert.Contains("TextBlock.ForegroundProperty, \"TextSecondaryColorBrush\"", method);
+
+        // Кликабельность копируемых значений сохранена.
+        Assert.Contains("StandardCursorType.Hand", method);
+        Assert.Contains("Main.ConnectionInfo.CopyTooltip", method);
+        Assert.Contains("CopyConnectionInfoValue", method);
+
+        AssertNoHardcodedBlack(method);
     }
 
     // ===================== Локализация =====================
@@ -207,6 +256,33 @@ public sealed class Issue138ConnectionInfoPanelTests
 
     private static IReadOnlyList<ConnectionInfoFieldInfo> rows(Infobase infobase) =>
         ConnectionInfoPresenter.Build(infobase);
+
+    /// <summary>Вырезает фрагмент между маркерами (сами маркеры не включаются).</summary>
+    private static string ExtractBetween(string text, string startMarker, string endMarker)
+    {
+        var start = text.IndexOf(startMarker, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"не найден маркер начала: {startMarker}");
+        start += startMarker.Length;
+
+        var end = text.IndexOf(endMarker, start, StringComparison.Ordinal);
+        Assert.True(end >= 0, $"не найден маркер конца: {endMarker}");
+        return text[start..end];
+    }
+
+    /// <summary>
+    /// Жёсткий чёрный цвет в блоке недопустим: цвет должен приходить из кистей
+    /// темы (DynamicResource в WPF / ThemeBrushes в Avalonia), иначе переключение
+    /// темы на лету не работает (issue #141/#138).
+    /// </summary>
+    private static void AssertNoHardcodedBlack(string snippet)
+    {
+        Assert.False(snippet.Contains("#000000", StringComparison.OrdinalIgnoreCase),
+            "Найден жёсткий цвет #000000 — нужна кисть темы.");
+        Assert.False(snippet.Contains("Black", StringComparison.Ordinal),
+            "Найден жёсткий цвет Black — нужна кисть темы.");
+        Assert.False(snippet.Contains("SystemColors.ControlTextBrush", StringComparison.Ordinal),
+            "Найден SystemColors.ControlTextBrush — нужна кисть темы.");
+    }
 
     private static Infobase CreateFileBase(string path) => new()
     {

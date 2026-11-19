@@ -458,12 +458,13 @@ public sealed class Issue116UpdateIntervalTests
     public void Wpf_UpdateAvailableWindow_FitsContentWithoutManualSizeLocks()
     {
         // Issue #116 (17.11.2026 14:07): ручная фиксация габаритов через WndProc
-        // убрана — она давала скачок размера после показа. Окно подстраивается под
-        // содержимое средствами XAML (SizeToContent) и не растягивается мышью.
+        // убрана — она давала скачок размера после показа. Issue #139 (1.0.1.95):
+        // авторазмер по обеим осям заменён явным расчётом высоты; содержимое при
+        // переполнении прокручивается, окно мышью не растягивается.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
-        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml);
+        Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml);
-        // Вертикальная прокрутка «Что нового» внутри окна сохранена (разметка окна).
+        // Вертикальная прокрутка содержимого внутри окна сохранена (разметка окна).
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml);
 
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));

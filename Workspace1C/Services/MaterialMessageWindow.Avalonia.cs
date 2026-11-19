@@ -30,6 +30,20 @@ internal sealed class MaterialMessageWindowAvalonia : Window
     /// <summary>Кнопка по умолчанию — для фокуса при открытии и клавиш Space/Enter (issue #100).</summary>
     private Button _okButton = null!;
 
+    /// <summary>
+    /// Issue #139 (1.0.1.95): диалог с явным размером по содержимому (окно
+    /// обновления и подтверждение перезапуска). Высота считается в
+    /// <see cref="ApplyFitContentSize"/>, а не через <c>SizeToContent</c> по обеим осям.
+    /// </summary>
+    private readonly bool _fitContent;
+
+    // Оценка неклиентской области до первого показа (рамка + заголовок), DIP.
+    // После открытия окна заменяется точной разницей Bounds/ClientSize; здесь
+    // только начальное приближение, чтобы первый кадр не был нулевым. Значения
+    // оформления собраны в одном месте, а не «на глаз» по коду.
+    private const double FallbackChromeWidth = 16;
+    private const double FallbackChromeHeight = 40;
+
     /// <param name="markdownBody">
     /// Необязательный текст «Что нового» в формате markdown. Показывается под
     /// основным сообщением с рендером стилей (заголовки, жирный, списки). При
@@ -61,17 +75,20 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         string? notesLinkText = null, Action? onNotesLink = null, bool fitContent = false)
     {
         Title = title;
+        _fitContent = fitContent;
         if (fitContent)
         {
-            // Ширина и высота — по содержимому в разумных пределах; CanResize=false
-            // запрещает менять размер мышью. Никакого ручного измерения после показа:
-            // Avalonia считает размер до первого отображения, скачка нет.
-            // Issue #139 (1.0.1.84): MaxHeight ограничивает окно до первого кадра —
-            // длинное описание релиза не открывает окно выше экрана.
-            MinWidth = 440;
-            MaxWidth = 760;
-            MaxHeight = 640;
-            SizeToContent = SizeToContent.WidthAndHeight;
+            // Issue #139 (1.0.1.95): явный размер по содержимому. Авторазмер по
+            // обеим осям давал ту же ошибку, что и WPF: WrapPanel измерялся с
+            // бесконечной шириной (одна строка), затем ширина клампилась, кнопки
+            // переносились, а высота уже была посчитана — низ обрезался.
+            // Ширина/высота вычисляются в ApplyFitContentSize при конечной ширине,
+            // тело прокручивается, панель кнопок закреплена снизу.
+            MinWidth = 440;   // UpdateDialogSizePolicy.MinWidth
+            MaxWidth = 760;   // UpdateDialogSizePolicy.MaxWidth
+            MaxHeight = 640;  // UpdateDialogSizePolicy.MaxHeight
+            MinHeight = 140;  // UpdateDialogSizePolicy.MinHeight
+            SizeToContent = SizeToContent.Manual;
         }
         else
         {
@@ -208,12 +225,8 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             buttonsPanel.Children.Add(cancelButton);
         }
 
-        var content = new StackPanel
-        {
-            Spacing = 16,
-            Margin = new Thickness(16)
-        };
-        content.Children.Add(body);
+        var bodyContent = new StackPanel { Spacing = 16 };
+        bodyContent.Children.Add(body);
 
         // «Что нового»: рендерим markdown описания релиза со стилями (заголовки,
         // жирный, списки и т.п.) под основным сообщением, если описание задано.
@@ -230,9 +243,9 @@ internal sealed class MaterialMessageWindowAvalonia : Window
                 FontSize = 12
             };
             ThemeBrushes.Bind(whatsNewHeading, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
-            content.Children.Add(whatsNewHeading);
+            bodyContent.Children.Add(whatsNewHeading);
 
-            content.Children.Add(new ScrollViewer
+            bodyContent.Children.Add(new ScrollViewer
             {
                 MaxHeight = 180,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -256,45 +269,73 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             };
             notesLink.Styled(ControlThemes.SecondaryButton);
             notesLink.Click += (_, _) => onNotesLink?.Invoke();
-            content.Children.Add(notesLink);
+            bodyContent.Children.Add(notesLink);
         }
 
-        content.Children.Add(buttonsPanel);
+        if (_fitContent)
+        {
+            // Issue #139 (1.0.1.95): тело прокручивается, панель кнопок закреплена
+            // снизу и не обрезается. Высота окна считается явно, а не авторазмером
+            // по обеим осям (тот не учитывал перенос кнопок WrapPanel).
+            var bodyScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = bodyContent
+            };
 
-        Content = content;
+            var dock = new DockPanel
+            {
+                LastChildFill = true,
+                Margin = new Thickness(16)
+            };
+            buttonsPanel.Margin = new Thickness(0, 16, 0, 0);
+            DockPanel.SetDock(buttonsPanel, Dock.Bottom);
+            dock.Children.Add(buttonsPanel);
+            dock.Children.Add(bodyScroll);
+            Content = dock;
+
+            // Первичный размер — до первого кадра; после Opened уточняется
+            // фактической неклиентской областью и рабочей областью монитора.
+            ApplyFitContentSize();
+        }
+        else
+        {
+            bodyContent.Margin = new Thickness(16);
+            bodyContent.Children.Add(buttonsPanel);
+            Content = bodyContent;
+        }
     }
 
     /// <summary>
-    /// Issue #139 (1.0.1.84): ограничивает окно рабочей областью монитора.
-    /// Размер по содержимому (<see cref="SizeToContent.WidthAndHeight"/>) сохраняется,
-    /// но окно не должно оказаться шире/выше экрана — иначе кнопки и текст
-    /// обрезаются. <see cref="Screen.WorkingArea"/> задана в физических пикселях,
-    /// поэтому переводим её в DIP через масштаб окна. Для диалогов с фиксированной
-    /// шириной (обычные сообщения, диалог перезапуска) ограничиваем саму ширину.
+    /// Issue #139: ограничивает окно рабочей областью монитора.
+    /// Для <c>fitContent</c> (окно обновления, подтверждение перезапуска) размер
+    /// считается явно в <see cref="ApplyFitContentSize"/>: ширина и высота по
+    /// фактическому содержимому при конечной ширине, кламп в <c>[Min*, Max*]</c> и
+    /// рабочую область с отступами. Для диалогов с фиксированной шириной (обычные
+    /// сообщения) ограничиваем саму ширину/высоту.
+    /// <see cref="Screen.WorkingArea"/> задана в физических пикселях, поэтому
+    /// переводим её в DIP через масштаб окна.
     /// </summary>
     private void ClampToScreen()
     {
-        var screen = Screens.ScreenFromWindow(this);
-        if (screen is null)
+        if (_fitContent)
+        {
+            ApplyFitContentSize();
+            return;
+        }
+
+        var (workWidth, workHeight) = GetWorkAreaDip();
+        if (workWidth <= 0 || workHeight <= 0)
             return;
 
-        var scaling = RenderScaling > 0 ? RenderScaling : screen.Scaling;
-        if (scaling <= 0)
-            scaling = 1.0;
-
-        var workArea = screen.WorkingArea;
         var clamped = UpdateDialogSizePolicy.Clamp(
             double.IsNaN(Width) ? MaxWidth : Width,
             double.IsNaN(Height) ? MaxHeight : Height,
-            workArea.Width / scaling,
-            workArea.Height / scaling);
+            workWidth,
+            workHeight);
 
         MaxWidth = clamped.Width;
-        if (SizeToContent == SizeToContent.WidthAndHeight)
-        {
-            MaxHeight = clamped.Height;
-            return;
-        }
 
         // Issue #139 (1.0.1.84): фиксированная ширина/высота (fitContent=false)
         // тоже не должна выходить за рабочую область.
@@ -303,6 +344,87 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         if (!double.IsNaN(Height) && Height > clamped.Height)
             Height = clamped.Height;
     }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.95): явный размер окна с содержимым по ширине. Ширина
+    /// измеряется без ограничения и клампится политикой; высота — уже при итоговой
+    /// ширине, поэтому <c>WrapPanel</c> переносит кнопки как в реальной раскладке.
+    /// Если тело выше доступной высоты, прокручивается только оно (ScrollViewer в
+    /// <c>Content</c>), панель кнопок остаётся видимой.
+    /// </summary>
+    private void ApplyFitContentSize()
+    {
+        if (!_fitContent || Content is not Control content)
+            return;
+
+        try
+        {
+            var (workWidth, workHeight) = GetWorkAreaDip();
+
+            // 1. Желаемая ширина по содержимому (политика клампит до MaxWidth).
+            content.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var width = UpdateDialogSizePolicy.Clamp(
+                content.DesiredSize.Width + ChromeWidth(), 0, workWidth, 0).Width;
+
+            // 2. Желаемая высота при итоговой ширине — с учётом переноса кнопок.
+            content.Measure(new Size(
+                Math.Max(0, width - ChromeWidth()), double.PositiveInfinity));
+            var height = UpdateDialogSizePolicy.ClampWindowHeight(
+                content.DesiredSize.Height + ChromeHeight(), workHeight);
+
+            MaxWidth = UpdateDialogSizePolicy.Clamp(
+                UpdateDialogSizePolicy.MaxWidth, 0, workWidth, 0).Width;
+
+            // MinHeight не должен быть больше MaxHeight (крошечный экран) —
+            // иначе окно нельзя корректно ограничить рабочей областью.
+            var maxHeight = UpdateDialogSizePolicy.ClampWindowHeight(
+                UpdateDialogSizePolicy.MaxHeight, workHeight);
+            MinHeight = Math.Min(UpdateDialogSizePolicy.MinHeight, maxHeight);
+            MaxHeight = maxHeight;
+
+            Width = width;
+            Height = height;
+        }
+        catch
+        {
+            // Сбой измерения не должен мешать показу диалога.
+        }
+    }
+
+    /// <summary>Рабочая область монитора в DIP (0×0 — неизвестна).</summary>
+    private (double Width, double Height) GetWorkAreaDip()
+    {
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (screen is null)
+            return (0, 0);
+
+        var scaling = RenderScaling > 0 ? RenderScaling : screen.Scaling;
+        if (scaling <= 0)
+            scaling = 1.0;
+
+        var area = screen.WorkingArea;
+        return (area.Width / scaling, area.Height / scaling);
+    }
+
+    /// <summary>
+    /// Ширина неклиентской области окна, DIP. После показа известна точно как
+    /// разница между габаритом и клиентской шириной; до показа — оценка
+    /// <see cref="FallbackChromeWidth"/>.
+    /// </summary>
+    private double ChromeWidth()
+        => Bounds.Width > ClientSize.Width && ClientSize.Width > 0
+            ? Bounds.Width - ClientSize.Width
+            : FallbackChromeWidth;
+
+    /// <summary>
+    /// Высота неклиентской области окна, DIP. После показа — точная разница
+    /// габарита и клиентской высоты; до показа — оценка
+    /// <see cref="FallbackChromeHeight"/>.
+    /// </summary>
+    private double ChromeHeight()
+        => Bounds.Height > ClientSize.Height && ClientSize.Height > 0
+            ? Bounds.Height - ClientSize.Height
+            : FallbackChromeHeight;
 
     /// <summary>
     /// ESC закрывает окно сообщения (issue #47), как кнопка «Нет»/«Отмена»:

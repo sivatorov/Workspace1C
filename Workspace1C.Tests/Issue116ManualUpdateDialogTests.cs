@@ -39,9 +39,10 @@ public sealed class Issue116ManualUpdateDialogTests
         var xaml = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
 
-        // Issue #116 (1.0.1.82): окно подстраивается по обеим осям, минимальная
-        // высота 320 больше не держит пустое место.
-        Assert.Contains("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
+        // Issue #116 (1.0.1.82): окно подстраивается под содержимое, минимальная
+        // высота 320 больше не держит пустое место. Issue #139 (1.0.1.95):
+        // авторазмер по обеим осям заменён явным расчётом высоты (см. код-бихайнд).
+        Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MinWidth=\"440\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MinHeight=\"320\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent=\"Height\"", xaml, StringComparison.Ordinal);
