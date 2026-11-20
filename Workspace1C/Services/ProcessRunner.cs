@@ -19,6 +19,12 @@ public sealed class ProcessRunResult
 
     public bool TimedOut { get; init; }
 
+    /// <summary>
+    /// Запуск прерван вызывающим кодом (issue #143): процесс убит, вывод может быть
+    /// неполным. В отличие от <see cref="TimedOut"/>, это не ошибка утилиты.
+    /// </summary>
+    public bool Canceled { get; init; }
+
     public bool Success => StartError is null && !TimedOut && ExitCode == 0;
 
     /// <summary>Текст для журнала: stdout + stderr или причина отказа.</summary>
@@ -114,6 +120,10 @@ public static class ProcessRunner
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            // issue #143: stdin обязательно перенаправляем и сразу закрываем. Иначе
+            // утилита, запросившая пароль/подтверждение, ждёт консоль, которой у
+            // GUI-приложения нет, и «Сделать копию сейчас» висит бесконечно.
+            RedirectStandardInput = true,
             CreateNoWindow = true
         };
         if (!rawReading)
@@ -145,12 +155,20 @@ public static class ProcessRunner
 
         using (process)
         {
+            // issue #143: закрываем stdin сразу после старта — утилита не может
+            // «зависнуть» на приглашении ввода.
+            try { process.StandardInput.Close(); } catch { /* поток уже закрыт */ }
+
+            // Чтение с отменой: при таймауте/отмене отмена токена гарантированно
+            // освобождает чтение, а не оставляет его висеть на незакрытой трубе.
+            using var readCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+
             // Сырое чтение байтов (issue #83) или готовых строк (явная кодировка).
             Task<byte[]> stdoutBytesTask = rawReading
-                ? ReadToEndBytesAsync(process.StandardOutput.BaseStream)
+                ? ReadToEndBytesAsync(process.StandardOutput.BaseStream, readCts.Token)
                 : Task.FromResult(Array.Empty<byte>());
             Task<byte[]> stderrBytesTask = rawReading
-                ? ReadToEndBytesAsync(process.StandardError.BaseStream)
+                ? ReadToEndBytesAsync(process.StandardError.BaseStream, readCts.Token)
                 : Task.FromResult(Array.Empty<byte>());
             var stdoutText = rawReading ? Task.FromResult(string.Empty) : process.StandardOutput.ReadToEndAsync();
             var stderrText = rawReading ? Task.FromResult(string.Empty) : process.StandardError.ReadToEndAsync();
@@ -163,14 +181,29 @@ public static class ProcessRunner
             }
             catch (OperationCanceledException)
             {
-                try { process.Kill(entireProcessTree: true); } catch { /* уже завершён */ }
-                ct.ThrowIfCancellationRequested();
+                // issue #143: убиваем процесс и прерываем чтение — иначе ожидание
+                // вывода может не завершиться никогда (поток держит потомок).
+                var canceled = ct.IsCancellationRequested;
+                Kill(process);
+                readCts.Cancel();
+
+                var stdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false);
+                var stdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false);
+                if (canceled)
+                    ct.ThrowIfCancellationRequested();
+
                 return new ProcessRunResult
                 {
                     TimedOut = true,
-                    StdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false),
-                    StdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false)
+                    StdOut = stdOut,
+                    StdErr = stdErr
                 };
+            }
+            finally
+            {
+                // Процесс не должен переживать вызов ни при каком исходе.
+                if (!process.HasExited)
+                    Kill(process);
             }
 
             return new ProcessRunResult
@@ -182,11 +215,32 @@ public static class ProcessRunner
         }
     }
 
-    /// <summary>Читает поток до конца в массив байтов (без декодирования).</summary>
-    private static async Task<byte[]> ReadToEndBytesAsync(Stream stream)
+    /// <summary>
+    /// Короткая проверка утилиты окружения (issue #143): «--version», «pg_isready»,
+    /// «sqlcmd -Q SELECT 1». Таймаут по умолчанию — 10 секунд.
+    /// </summary>
+    public static Task<ProcessRunResult> ProbeAsync(
+        string fileName,
+        IEnumerable<string> arguments,
+        TimeSpan? timeout = null,
+        CancellationToken ct = default)
+        => RunAsync(fileName, arguments, null, timeout ?? TimeSpan.FromSeconds(10), null, null, ct);
+
+    /// <summary>
+    /// Убивает процесс вместе с потомками и коротко ждёт завершения. Ошибки
+    /// игнорируются: процесс мог уже завершиться или быть чужим.
+    /// </summary>
+    private static void Kill(Process process)
+    {
+        try { process.Kill(entireProcessTree: true); } catch { /* уже завершён */ }
+        try { process.WaitForExit(2000); } catch { /* нет доступа/уже закрыт */ }
+    }
+
+    /// <summary>Читает поток до конца в массив байтов (без декодирования), с отменой.</summary>
+    private static async Task<byte[]> ReadToEndBytesAsync(Stream stream, CancellationToken ct)
     {
         using var buffer = new MemoryStream();
-        await stream.CopyToAsync(buffer).ConfigureAwait(false);
+        await stream.CopyToAsync(buffer, ct).ConfigureAwait(false);
         return buffer.ToArray();
     }
 

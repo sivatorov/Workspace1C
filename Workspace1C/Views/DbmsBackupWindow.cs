@@ -23,7 +23,8 @@ namespace Workspace1C
             DataContext = _vm;
             WpfUi.SetupWindow(this, "Dbms.Title", 960, 760);
 
-            var root = WpfUi.Rows(0, 0, 0, -1, 0);
+            // issue #143: добавлен ряд прогресса (этап, таймер, полоса).
+            var root = WpfUi.Rows(0, 0, 0, 0, -1, 0);
             root.Margin = new Thickness(16);
 
             var intro = WpfUi.Label("Dbms.Intro");
@@ -74,20 +75,26 @@ namespace Workspace1C
             cloud.Children.Add(WpfUi.Label("Dbms.CloudHint", 11));
             WpfUi.Place(root, WpfUi.Card(cloud), 2);
 
-            WpfUi.Place(root, WpfUi.ReadOnlyText(nameof(DbmsBackupViewModel.LogText)), 3);
+            WpfUi.Place(root, BuildProgressPanel(), 3);
+            WpfUi.Place(root, WpfUi.ReadOnlyText(nameof(DbmsBackupViewModel.LogText)), 4);
 
+            // issue #143: проверки до запуска — подключение к СУБД и права на каталог.
+            var checkConnection = WpfUi.Button("Dbms.CheckConnection",
+                async (_, _) => await _vm.CheckConnectionAsync(), 190);
+            var checkDirectory = WpfUi.Button("Dbms.CheckDirectory",
+                async (_, _) => await _vm.CheckDirectoryAsync(), 180);
             var save = WpfUi.Button("Common.Save", (_, _) => _vm.Save(), 120);
             var run = WpfUi.Button("Dbms.RunNow", async (_, _) => await _vm.RunAsync(), 190, accent: true);
-            foreach (var b in new[] { save, run })
+            foreach (var b in new[] { checkConnection, checkDirectory, save, run })
                 b.SetBinding(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsIdle)));
             var cancel = WpfUi.Button("Common.Cancel", (_, _) => _vm.Cancel(), 100);
             cancel.SetBinding(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsBusy)));
             var close = WpfUi.Button("Common.Close", (_, _) => Close(), 110);
             close.IsCancel = true;
-            var buttons = WpfUi.ButtonRow(save, run, cancel, close);
+            var buttons = WpfUi.ButtonRow(checkConnection, checkDirectory, save, run, cancel, close);
             buttons.HorizontalAlignment = HorizontalAlignment.Right;
             buttons.Margin = new Thickness(0, 12, 0, 0);
-            WpfUi.Place(root, buttons, 4);
+            WpfUi.Place(root, buttons, 5);
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
@@ -96,6 +103,37 @@ namespace Workspace1C
             _ = _vm.ResolveDbmsFromClusterAsync();
             if (!_vm.HasBases)
                 _vm.AppendLog(LocalizationManager.T("Dbms.NoBases"));
+        }
+
+        /// <summary>
+        /// Ряд прогресса операции (issue #143): этап, прошедшее время и полоса.
+        /// Полоса «бежит» на этапах без измеримого прогресса (дамп, выгрузка).
+        /// </summary>
+        private StackPanel BuildProgressPanel()
+        {
+            var header = new StackPanel { Orientation = Orientation.Horizontal };
+            var stage = WpfUi.BoundText(nameof(DbmsBackupViewModel.ProgressStageText), 12);
+            var elapsed = WpfUi.BoundText(nameof(DbmsBackupViewModel.ElapsedText), 11);
+            elapsed.Margin = new Thickness(12, 0, 0, 0);
+            header.Children.Add(stage);
+            header.Children.Add(elapsed);
+
+            var bar = new ProgressBar
+            {
+                Height = 6,
+                Minimum = 0,
+                Maximum = 100,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            bar.SetBinding(ProgressBar.IsIndeterminateProperty,
+                new Binding(nameof(DbmsBackupViewModel.IsProgressIndeterminate)));
+            bar.SetBinding(ProgressBar.ValueProperty,
+                new Binding(nameof(DbmsBackupViewModel.ProgressPercent)));
+
+            var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            panel.Children.Add(header);
+            panel.Children.Add(bar);
+            return panel;
         }
 
         private void Browse(bool output)

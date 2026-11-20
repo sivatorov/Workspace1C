@@ -136,12 +136,16 @@
                                    VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Maintenance.HistoryPeriod}" FontSize="12" Margin="14,0,4,0"
                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                        <!-- issue #142 (1.0.1.96): обработчик Checked подписывается в конструкторе
+                             ПОСЛЕ создания ViewModel. Атрибут Checked в разметке недопустим:
+                             IsChecked="True" применяется во время InitializeComponent, когда
+                             поле _vm ещё null, и даёт NullReferenceException. -->
                         <RadioButton x:Name="Period7Radio" GroupName="HistoryPeriod" Content="7" Margin="4,0,0,0"
-                                     Cursor="Hand" VerticalAlignment="Center" Checked="OnHistoryPeriodChanged"/>
+                                     Cursor="Hand" VerticalAlignment="Center"/>
                         <RadioButton x:Name="Period30Radio" GroupName="HistoryPeriod" Content="30" Margin="6,0,0,0"
-                                     IsChecked="True" Cursor="Hand" VerticalAlignment="Center" Checked="OnHistoryPeriodChanged"/>
+                                     IsChecked="True" Cursor="Hand" VerticalAlignment="Center"/>
                         <RadioButton x:Name="Period90Radio" GroupName="HistoryPeriod" Content="90" Margin="6,0,0,0"
-                                     Cursor="Hand" VerticalAlignment="Center" Checked="OnHistoryPeriodChanged"/>
+                                     Cursor="Hand" VerticalAlignment="Center"/>
                     </StackPanel>
                     <ListBox x:Name="HistoryList" Height="132" Margin="0,8,0,0"
                              BorderThickness="0" Background="Transparent"

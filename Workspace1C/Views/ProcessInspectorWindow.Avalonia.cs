@@ -403,37 +403,50 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Геометрия галочки — та же, что <c>IconCheck</c> в Icons.axaml. Константа в
+        /// коде убирает зависимость индикатора от активного набора иконок и ресурсов
+        /// приложения (issue #134, 1.0.1.96).
+        /// </summary>
+        private const string CheckGeometryData = "M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z";
+
+        /// <summary>
         /// Меню «Колонки» (issue #134, доработка ArtyoZ в 1.0.1.84; индикатор
-        /// переделан в 1.0.1.95): чек-лист всех колонок инспектора. Видимость
-        /// обозначает <see cref="MenuItemToggleType.CheckBox"/> с собственной
-        /// векторной галочкой в <see cref="MenuItem.Icon"/> (см.
-        /// <see cref="BuildColumnCheckIndicator"/>), а не текстовый префикс галочки.
+        /// переделан в 1.0.1.96): чек-лист всех колонок инспектора.
+        /// <para>
+        /// Индикатор — часть <see cref="MenuItem.Header"/>: рамка 16×16 и векторная
+        /// галочка внутри. Видимость задаётся ЯВНО из
+        /// <see cref="ProcessInspectorViewModel.IsColumnVisible"/> при построении меню
+        /// и обновляется в обработчике клика. Ни шаблон Fluent, ни
+        /// <c>PART_ToggleIconPresenter</c>, ни <see cref="MenuItem.IsChecked"/>, ни
+        /// привязки не участвуют в отрисовке — поэтому галочка видна при любом наборе
+        /// иконок и теме.
+        /// </para>
         /// </summary>
         private void ShowColumnsMenu(Button? anchor)
         {
             var menu = new ContextMenu();
             menu.Styled(ControlThemes.ModernContextMenu);
 
-            foreach (var info in ProcessInspectorViewModel.AllColumns)
+            foreach (var info in _vm.GetColumnMenuItems())
             {
                 var column = info.Column;
-                // issue #134 (1.0.1.84, индикатор 1.0.1.95): IsChecked отражает
-                // видимость колонки — у видимых галочка в Icon показана, у скрытых
-                // её нет. Клик переключает состояние и сохраняет выбор в настройках.
+                var header = BuildColumnHeader(info, out var check);
                 var item = new MenuItem
                 {
-                    Header = LocalizationManager.T(info.TitleKey),
-                    // issue #134 (1.0.1.95): собственный индикатор в Icon — галочка
-                    // видна только у видимой колонки; у скрытой остаётся пустой
-                    // резерв 16×16, поэтому подписи не сдвигаются.
-                    Icon = BuildColumnCheckIndicator(),
-                    ToggleType = MenuItemToggleType.CheckBox,
-                    IsChecked = _vm.IsColumnVisible(column)
+                    Header = header,
+                    // Индикатор рисует Header: шаблонный чекбокс не нужен.
+                    ToggleType = MenuItemToggleType.None,
+                    // Меню не закрывается после клика — можно переключить несколько колонок.
+                    StaysOpenOnClick = true
                 };
                 item.Styled(ControlThemes.ModernMenuItem);
-                // Интеракция меню переключает IsChecked до события Click,
-                // поэтому передаём уже новое состояние флажка.
-                item.Click += (_, _) => _vm.SetColumnVisible(column, item.IsChecked);
+                item.Click += (_, _) =>
+                {
+                    _vm.ToggleColumn(column);
+                    var visible = _vm.IsColumnVisible(column);
+                    check.IsVisible = visible;
+                    UiAutomation.SetName(header, BuildColumnAccessibleName(info.TitleKey, visible));
+                };
                 menu.Items.Add(item);
             }
 
@@ -446,48 +459,56 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Индикатор видимости колонки в меню «Колонки» (issue #134, 1.0.1.95).
-        /// Векторная галочка лежит в <see cref="MenuItem.Icon"/> и привязана к
-        /// <see cref="MenuItem.IsChecked"/> самого пункта. Раньше индикатор рисовал
-        /// базовый шаблон Fluent через PART_ToggleIconPresenter, но эта часть в
-        /// используемой версии Avalonia не отображалась — пользователь галочек не
-        /// видел. Собственный индикатор от внутренних частей шаблона не зависит.
-        /// Пустой резерв 16×16 у скрытой колонки сохраняет ширину иконки, поэтому
-        /// подписи пунктов не «прыгают».
+        /// Заголовок пункта меню «Колонки» (issue #134, 1.0.1.96): индикатор 16×16
+        /// (рамка + галочка) и подпись. Пустая рамка у скрытой колонки сохраняет
+        /// ширину, поэтому подписи пунктов не «прыгают».
         /// </summary>
-        private static Control BuildColumnCheckIndicator()
+        private static Grid BuildColumnHeader(ProcessInspectorColumnMenuItem info,
+            out Avalonia.Controls.Shapes.Path check)
         {
-            var check = new Avalonia.Controls.Shapes.Path
+            var box = new Border
             {
-                Data = IconHelper.Geometry("IconCheck"),
-                Fill = Themes.ThemeBrushes.FromSpec("@AccentBrush"),
+                Width = 16,
+                Height = 16,
+                CornerRadius = new CornerRadius(3),
+                BorderThickness = new Thickness(1),
+                BorderBrush = Themes.ThemeBrushes.Get("TextSecondaryBrush", "#888888"),
+                Margin = new Thickness(0, 0, 8, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            check = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Geometry.Parse(CheckGeometryData),
+                Fill = Themes.ThemeBrushes.Get("AccentBrush", "#2D6CDF"),
                 Width = 12,
                 Height = 12,
                 Stretch = Stretch.Uniform,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                IsVisible = false
+                IsVisible = info.IsVisible
             };
-            check.Bind(
-                Visual.IsVisibleProperty,
-                new Binding(nameof(MenuItem.IsChecked))
-                {
-                    RelativeSource = new RelativeSource
-                    {
-                        Mode = RelativeSourceMode.FindAncestor,
-                        AncestorType = typeof(MenuItem)
-                    },
-                    Converter = new Avalonia.Data.Converters.FuncValueConverter<bool?, bool>(
-                        value => value == true)
-                });
+            box.Child = check;
 
-            return new Grid
+            var title = new TextBlock
             {
-                Width = 16,
-                Height = 16,
-                Children = { check }
+                Text = LocalizationManager.T(info.TitleKey),
+                VerticalAlignment = VerticalAlignment.Center
             };
+            var header = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                Children = { box, title }
+            };
+            Grid.SetColumn(title, 1);
+            UiAutomation.SetName(header, BuildColumnAccessibleName(info.TitleKey, info.IsVisible));
+            return header;
         }
+
+        /// <summary>Доступное имя пункта: «База: видима» / «База: скрыта».</summary>
+        private static string BuildColumnAccessibleName(string titleKey, bool visible) =>
+            LocalizationManager.T(titleKey) + ": " + LocalizationManager.T(
+                visible ? "ProcessInspector.ColumnVisible" : "ProcessInspector.ColumnHidden");
 
         /// <summary>
         /// Переставляет выделение ListBox по восстановленному набору ViewModel

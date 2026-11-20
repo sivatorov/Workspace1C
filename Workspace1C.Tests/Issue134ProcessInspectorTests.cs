@@ -429,58 +429,68 @@ public sealed class Issue134ProcessInspectorTests
     // ===================== Меню «Колонки»: настоящие чекбоксы =====================
 
     /// <summary>
-    /// issue #134 (1.0.1.95): WPF-пункт остаётся <c>IsCheckable/IsChecked</c>, но
-    /// индикатор — собственная векторная галочка в <c>MenuItem.Icon</c>, видимая
-    /// только при <c>IsChecked</c>. Текстового префикса «✓» нет.
+    /// issue #134 (1.0.1.96): WPF-индикатор — часть <c>MenuItem.Header</c>
+    /// (рамка 16×16 + векторная галочка), видимость задаётся ЯВНО из
+    /// <c>IsColumnVisible</c>. Шаблон, <c>IsChecked</c> и привязки не участвуют.
     /// </summary>
     [Fact]
-    public void Wpf_ColumnsMenu_UsesIsCheckableAndVisibleIconIndicator()
+    public void Wpf_ColumnsMenu_HeaderIndicatorIsExplicit()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
 
-        Assert.Contains("IsCheckable = true", code, StringComparison.Ordinal);
-        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
-        Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
-        Assert.Contains("Icon = BuildColumnCheckIndicator()", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.GetColumnMenuItems()", code, StringComparison.Ordinal);
+        Assert.Contains("IsCheckable = false", code, StringComparison.Ordinal);
+        Assert.Contains("StaysOpenOnClick = true", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.ToggleColumn(column)", code, StringComparison.Ordinal);
+        Assert.Contains("check.Visibility = visible ? Visibility.Visible : Visibility.Hidden",
+            code, StringComparison.Ordinal);
 
-        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
-        Assert.Contains("\"IconCheck\"", indicator, StringComparison.Ordinal);
-        Assert.Contains("Width = 16", indicator, StringComparison.Ordinal);
-        Assert.Contains("Height = 16", indicator, StringComparison.Ordinal);
-        Assert.Contains("Visibility.Hidden", indicator, StringComparison.Ordinal);
-        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
-        Assert.Contains("BooleanToVisibilityConverter", indicator, StringComparison.Ordinal);
-        Assert.Contains("@AccentBrush", indicator, StringComparison.Ordinal);
+        var header = ExtractMethod(code, "BuildColumnHeader");
+        Assert.Contains("Geometry.Parse(CheckGeometryData)", header, StringComparison.Ordinal);
+        Assert.Contains("Border", header, StringComparison.Ordinal);
+        Assert.Contains("Width = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Height = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Margin = new Thickness(0, 0, 8, 0)", header, StringComparison.Ordinal);
+        Assert.Contains("Visibility.Visible", header, StringComparison.Ordinal);
+        Assert.Contains("Visibility.Hidden", header, StringComparison.Ordinal);
 
+        // Никакой зависимости от шаблона меню, IsChecked, набора иконок и конвертеров.
+        Assert.DoesNotContain("BooleanToVisibilityConverter", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("nameof(MenuItem.IsChecked)", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildColumnCheckIndicator", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ResolveGeometry(\"IconCheck\")", code, StringComparison.Ordinal);
         Assert.DoesNotContain("✓", code, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.95): Avalonia сохраняет <c>MenuItemToggleType.CheckBox</c>
-    /// (клик переключает флажок), но видимую галочку рисует собственный индикатор
-    /// в <c>MenuItem.Icon</c>, привязанный к <c>IsChecked</c>. Текстового префикса
-    /// «✓» нет.
+    /// issue #134 (1.0.1.96): Avalonia-индикатор — часть <c>MenuItem.Header</c>,
+    /// видимость задаётся ЯВНО из <c>IsColumnVisible</c>. Шаблон Fluent, ToggleType,
+    /// IsChecked и FindAncestor-привязки не участвуют.
     /// </summary>
     [Fact]
-    public void Avalonia_ColumnsMenu_UsesToggleTypeAndVisibleIconIndicator()
+    public void Avalonia_ColumnsMenu_HeaderIndicatorIsExplicit()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
 
-        Assert.Contains("ToggleType = MenuItemToggleType.CheckBox", code, StringComparison.Ordinal);
-        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
-        Assert.Contains("_vm.SetColumnVisible(column, item.IsChecked)", code, StringComparison.Ordinal);
-        Assert.Contains("Icon = BuildColumnCheckIndicator()", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.GetColumnMenuItems()", code, StringComparison.Ordinal);
+        Assert.Contains("ToggleType = MenuItemToggleType.None", code, StringComparison.Ordinal);
+        Assert.Contains("StaysOpenOnClick = true", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.ToggleColumn(column)", code, StringComparison.Ordinal);
+        Assert.Contains("check.IsVisible = visible", code, StringComparison.Ordinal);
 
-        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
-        Assert.Contains("\"IconCheck\"", indicator, StringComparison.Ordinal);
-        Assert.Contains("Width = 16", indicator, StringComparison.Ordinal);
-        Assert.Contains("Height = 16", indicator, StringComparison.Ordinal);
-        Assert.Contains("IsVisible = false", indicator, StringComparison.Ordinal);
-        Assert.Contains("Visual.IsVisibleProperty", indicator, StringComparison.Ordinal);
-        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
-        Assert.Contains("FuncValueConverter<bool?, bool>", indicator, StringComparison.Ordinal);
-        Assert.Contains("@AccentBrush", indicator, StringComparison.Ordinal);
+        var header = ExtractMethod(code, "BuildColumnHeader");
+        Assert.Contains("Geometry.Parse(CheckGeometryData)", header, StringComparison.Ordinal);
+        Assert.Contains("Border", header, StringComparison.Ordinal);
+        Assert.Contains("Width = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Height = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Margin = new Thickness(0, 0, 8, 0)", header, StringComparison.Ordinal);
+        Assert.Contains("IsVisible = info.IsVisible", header, StringComparison.Ordinal);
 
+        // Никакой зависимости от шаблона Fluent, IsChecked, набора иконок и конвертеров.
+        Assert.DoesNotContain("FuncValueConverter", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("MenuItemToggleType.CheckBox", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("BuildColumnCheckIndicator", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Geometry(\"IconCheck\")", code, StringComparison.Ordinal);
         Assert.DoesNotContain("✓", code, StringComparison.Ordinal);
     }
 
@@ -530,23 +540,76 @@ public sealed class Issue134ProcessInspectorTests
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.95): начальное состояние индикатора — скрытое, а видимость
-    /// вычисляется из <c>IsChecked</c>, который инициализируется
-    /// <c>IsColumnVisible(column)</c>: у скрытой колонки галочки нет, у видимой — есть.
+    /// issue #134 (1.0.1.96): единая модель пунктов меню отдаёт фактическую
+    /// видимость колонки — окна не хранят состояние индикатора отдельно.
+    /// </summary>
+    [Fact]
+    public void ColumnsMenu_ViewModel_ExposesActualVisibility()
+    {
+        using var vm = CreateViewModel(new FakeRunningService(), out _, out _);
+
+        var items = vm.GetColumnMenuItems();
+        Assert.Equal(ProcessInspectorViewModel.AllColumns.Count, items.Count);
+        Assert.All(items, item => Assert.True(item.IsVisible));
+        Assert.Equal(
+            ProcessInspectorViewModel.AllColumns.Select(c => c.Column),
+            items.Select(i => i.Column));
+
+        vm.SetColumnVisible(ProcessInspectorColumn.Pid, false);
+        var pid = vm.GetColumnMenuItems().Single(i => i.Column == ProcessInspectorColumn.Pid);
+        Assert.False(pid.IsVisible);
+
+        vm.ToggleColumn(ProcessInspectorColumn.Pid);
+        Assert.True(vm.IsColumnVisible(ProcessInspectorColumn.Pid));
+        Assert.True(vm.GetColumnMenuItems().Single(i => i.Column == ProcessInspectorColumn.Pid).IsVisible);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.96): оба окна берут геометрию галочки из константы в коде —
+    /// набор иконок и ресурсы приложения на индикатор не влияют.
     /// </summary>
     [Theory]
-    [InlineData("ProcessInspectorWindow.xaml.cs", "Visibility.Hidden", "BooleanToVisibilityConverter")]
-    [InlineData("ProcessInspectorWindow.Avalonia.cs", "IsVisible = false", "FuncValueConverter<bool?, bool>")]
-    public void ColumnsMenu_IndicatorVisibilityFollowsIsChecked(
-        string file, string hiddenMarker, string converterMarker)
+    [InlineData("ProcessInspectorWindow.xaml.cs")]
+    [InlineData("ProcessInspectorWindow.Avalonia.cs")]
+    public void ColumnsMenu_IndicatorUsesConstantGeometry(string file)
     {
         var code = ReadProjectFile("Workspace1C", "Views", file);
-        var indicator = ExtractMethod(code, "BuildColumnCheckIndicator");
+        var header = ExtractMethod(code, "BuildColumnHeader");
 
-        Assert.Contains(hiddenMarker, indicator, StringComparison.Ordinal);
-        Assert.Contains(converterMarker, indicator, StringComparison.Ordinal);
-        Assert.Contains("nameof(MenuItem.IsChecked)", indicator, StringComparison.Ordinal);
-        Assert.Contains("IsChecked = _vm.IsColumnVisible(column)", code, StringComparison.Ordinal);
+        Assert.Contains("private const string CheckGeometryData", code, StringComparison.Ordinal);
+        Assert.Contains("Geometry.Parse(CheckGeometryData)", header, StringComparison.Ordinal);
+        Assert.Contains("Border", header, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.96): подписи пунктов не сдвигаются — у скрытой колонки
+    /// остаётся пустая рамка того же размера 16×16.
+    /// </summary>
+    [Theory]
+    [InlineData("ProcessInspectorWindow.xaml.cs")]
+    [InlineData("ProcessInspectorWindow.Avalonia.cs")]
+    public void ColumnsMenu_IndicatorKeepsFixedSlot(string file)
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", file);
+        var header = ExtractMethod(code, "BuildColumnHeader");
+
+        Assert.Contains("Width = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Height = 16", header, StringComparison.Ordinal);
+        Assert.Contains("Width = 12", header, StringComparison.Ordinal);
+        Assert.Contains("Height = 12", header, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("ru.json")]
+    [InlineData("en.json")]
+    public void Localization_HasColumnVisibilityKeys(string file)
+    {
+        var strings = LoadStrings(file);
+
+        Assert.True(strings.ContainsKey("ProcessInspector.ColumnVisible"));
+        Assert.True(strings.ContainsKey("ProcessInspector.ColumnHidden"));
+        Assert.False(string.IsNullOrWhiteSpace(strings["ProcessInspector.ColumnVisible"]));
+        Assert.False(string.IsNullOrWhiteSpace(strings["ProcessInspector.ColumnHidden"]));
     }
 
     // ===================== Мультивыбор, выделение и зебра =====================

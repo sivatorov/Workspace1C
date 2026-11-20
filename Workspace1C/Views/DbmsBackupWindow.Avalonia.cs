@@ -31,7 +31,8 @@ namespace Workspace1C
             FontSize = 13;
             CanResize = true;
 
-            var root = AvaloniaUi.Rows(0, 0, 0, -1, 0);
+            // issue #143: добавлен ряд прогресса (этап, таймер, полоса).
+            var root = AvaloniaUi.Rows(0, 0, 0, 0, -1, 0);
             root.Margin = new Thickness(16);
 
             var intro = AvaloniaUi.Label("Dbms.Intro");
@@ -81,20 +82,26 @@ namespace Workspace1C
             cloud.Children.Add(AvaloniaUi.Label("Dbms.CloudHint", 11));
             AvaloniaUi.Place(root, AvaloniaUi.Card(cloud), 2);
 
-            AvaloniaUi.Place(root, AvaloniaUi.ReadOnlyText(nameof(DbmsBackupViewModel.LogText)), 3);
+            AvaloniaUi.Place(root, BuildProgressPanel(), 3);
+            AvaloniaUi.Place(root, AvaloniaUi.ReadOnlyText(nameof(DbmsBackupViewModel.LogText)), 4);
 
+            // issue #143: проверки до запуска — подключение к СУБД и права на каталог.
+            var checkConnection = AvaloniaUi.Button("Dbms.CheckConnection",
+                async (_, _) => await _vm.CheckConnectionAsync(), 190);
+            var checkDirectory = AvaloniaUi.Button("Dbms.CheckDirectory",
+                async (_, _) => await _vm.CheckDirectoryAsync(), 180);
             var save = AvaloniaUi.Button("Common.Save", (_, _) => _vm.Save(), 120);
             var run = AvaloniaUi.Button("Dbms.RunNow", async (_, _) => await _vm.RunAsync(), 190, accent: true);
-            foreach (var b in new[] { save, run })
+            foreach (var b in new[] { checkConnection, checkDirectory, save, run })
                 b.Bind(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsIdle)));
             var cancel = AvaloniaUi.Button("Common.Cancel", (_, _) => _vm.Cancel(), 100);
             cancel.Bind(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsBusy)));
             var close = AvaloniaUi.Button("Common.Close", (_, _) => Close(), 110);
             close.IsCancel = true;
-            var buttons = AvaloniaUi.ButtonRow(save, run, cancel, close);
+            var buttons = AvaloniaUi.ButtonRow(checkConnection, checkDirectory, save, run, cancel, close);
             buttons.HorizontalAlignment = HorizontalAlignment.Right;
             buttons.Margin = new Thickness(0, 12, 0, 0);
-            AvaloniaUi.Place(root, buttons, 4);
+            AvaloniaUi.Place(root, buttons, 5);
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
@@ -103,6 +110,37 @@ namespace Workspace1C
             _ = _vm.ResolveDbmsFromClusterAsync();
             if (!_vm.HasBases)
                 _vm.AppendLog(LocalizationManager.T("Dbms.NoBases"));
+        }
+
+        /// <summary>
+        /// Ряд прогресса операции (issue #143): этап, прошедшее время и полоса.
+        /// Полоса «бежит» на этапах без измеримого прогресса (дамп, выгрузка).
+        /// </summary>
+        private StackPanel BuildProgressPanel()
+        {
+            var header = new StackPanel { Orientation = Orientation.Horizontal };
+            var stage = AvaloniaUi.BoundText(nameof(DbmsBackupViewModel.ProgressStageText), 12);
+            var elapsed = AvaloniaUi.BoundText(nameof(DbmsBackupViewModel.ElapsedText), 11);
+            elapsed.Margin = new Thickness(12, 0, 0, 0);
+            header.Children.Add(stage);
+            header.Children.Add(elapsed);
+
+            var bar = new ProgressBar
+            {
+                Height = 6,
+                Minimum = 0,
+                Maximum = 100,
+                Margin = new Thickness(0, 4, 0, 0)
+            };
+            bar.Bind(ProgressBar.IsIndeterminateProperty,
+                new Binding(nameof(DbmsBackupViewModel.IsProgressIndeterminate)));
+            bar.Bind(ProgressBar.ValueProperty,
+                new Binding(nameof(DbmsBackupViewModel.ProgressPercent)));
+
+            var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            panel.Children.Add(header);
+            panel.Children.Add(bar);
+            return panel;
         }
 
         private void Browse(bool output)

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Net.Sockets;
 using System.Text;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -46,6 +47,12 @@ public sealed class DbmsBackupProfile
     /// <summary>Сколько последних копий хранить (0 — все).</summary>
     public int KeepCount { get; set; } = 7;
 
+    /// <summary>
+    /// Таймаут операции дампа в минутах (issue #143). 0 или отрицательное —
+    /// значение по умолчанию 360. Таймаут всегда прерывается кнопкой «Отмена».
+    /// </summary>
+    public int TimeoutMinutes { get; set; } = 360;
+
     /// <summary>Адрес WebDAV-каталога для выгрузки копии (пусто — не выгружать).</summary>
     public string WebDavUrl { get; set; } = string.Empty;
 
@@ -69,6 +76,42 @@ public sealed class DbmsBackupData
         Profiles.RemoveAll(p => string.Equals(p.InfobaseId, profile.InfobaseId, StringComparison.Ordinal));
         Profiles.Add(profile);
     }
+}
+
+/// <summary>Этап операции резервного копирования средствами СУБД (issue #143).</summary>
+public enum DbmsBackupStage
+{
+    Prepare,
+    Check,
+    Dump,
+    Rotate,
+    Upload,
+    Done
+}
+
+/// <summary>Прогресс операции резервного копирования (issue #143).</summary>
+/// <param name="Stage">Текущий этап.</param>
+public sealed record DbmsBackupProgress(DbmsBackupStage Stage);
+
+/// <summary>
+/// Результат предварительной проверки (issue #143): утилита, каталог, подключение.
+/// </summary>
+public sealed class DbmsCheckResult
+{
+    /// <summary>Проверка пройдена.</summary>
+    public bool Success { get; init; }
+
+    /// <summary>Ключ локализации сообщения (успех или причина отказа).</summary>
+    public string MessageKey { get; init; } = "Dbms.CheckFailed";
+
+    /// <summary>Подробности: путь, версия утилиты, вывод сервера.</summary>
+    public string? Detail { get; init; }
+
+    public static DbmsCheckResult Ok(string? detail = null) =>
+        new() { Success = true, MessageKey = "Dbms.CheckOk", Detail = detail };
+
+    public static DbmsCheckResult Fail(string messageKey, string? detail = null) =>
+        new() { Success = false, MessageKey = messageKey, Detail = detail };
 }
 
 /// <summary>
@@ -177,9 +220,187 @@ public static class DbmsBackupService
         return null;
     }
 
-    /// <summary>Создаёт копию, применяет ротацию и при необходимости выгружает в WebDAV.</summary>
-    public static async Task<BackupRunResult> RunAsync(DbmsBackupProfile profile, Action<string>? log = null,
+    /// <summary>
+    /// Точка подмены запуска утилит (тесты). По умолчанию — <see cref="ProcessRunner"/>.
+    /// </summary>
+    public static Func<string, IReadOnlyList<string>, TimeSpan, IDictionary<string, string>?,
+        CancellationToken, Task<ProcessRunResult>> RunToolOverride { get; set; } =
+        (fileName, args, timeout, environment, ct) =>
+            ProcessRunner.RunAsync(fileName, args, timeout: timeout, environment: environment, ct: ct);
+
+    /// <summary>Порт СУБД по умолчанию (0 в профиле — «по умолчанию»).</summary>
+    public static int EffectivePort(DbmsBackupProfile profile) => profile.Port > 0
+        ? profile.Port
+        : profile.Dbms == DbmsKind.PostgreSql ? 5432 : 1433;
+
+    /// <summary>
+    /// Проверка наличия и работоспособности утилиты резервного копирования
+    /// (issue #143): <c>pg_dump --version</c> или <c>sqlcmd -?</c> с таймаутом 10 с.
+    /// </summary>
+    public static async Task<DbmsCheckResult> CheckToolsAsync(DbmsBackupProfile profile,
         CancellationToken ct = default)
+    {
+        var tool = ToolPath(profile);
+        var args = profile.Dbms == DbmsKind.PostgreSql
+            ? new[] { "--version" }
+            : new[] { "-?" };
+        var run = await RunToolAsync(tool, args, TimeSpan.FromSeconds(10), null, ct).ConfigureAwait(false);
+
+        if (run.StartError is not null)
+            return DbmsCheckResult.Fail("Dbms.ToolNotFound", $"{tool}: {run.StartError}");
+        if (run.TimedOut)
+            return DbmsCheckResult.Fail("Dbms.CheckTimeout", tool);
+        if (!run.Success && string.IsNullOrWhiteSpace(run.CombinedOutput))
+            return DbmsCheckResult.Fail("Dbms.CheckFailed", tool);
+
+        var detail = run.CombinedOutput.Trim();
+        return DbmsCheckResult.Ok(string.IsNullOrWhiteSpace(detail) ? tool : detail);
+    }
+
+    /// <summary>
+    /// Проверка каталога копий (issue #143): каталог создаётся, в него пишется и
+    /// удаляется пробный файл. Так пользователь видит отсутствие прав до запуска
+    /// многоминутного дампа.
+    /// </summary>
+    public static Task<DbmsCheckResult> CheckOutputDirectoryAsync(DbmsBackupProfile profile,
+        CancellationToken ct = default) =>
+        Task.Run(() => CheckOutputDirectoryCore(profile), ct);
+
+    private static DbmsCheckResult CheckOutputDirectoryCore(DbmsBackupProfile profile)
+    {
+        var dir = profile.OutputDirectory?.Trim();
+        if (string.IsNullOrWhiteSpace(dir))
+            return DbmsCheckResult.Fail("Dbms.DirRequired");
+
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var probe = Path.Combine(dir, ".w1c_write_test");
+            File.WriteAllText(probe, "ok");
+            File.Delete(probe);
+            return DbmsCheckResult.Ok(dir);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return DbmsCheckResult.Fail("Dbms.NoWriteAccess", $"{dir}: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            return DbmsCheckResult.Fail("Dbms.DirUnavailable", $"{dir}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Проверка доступности СУБД (issue #143): TCP-подключение к host:port (5 с),
+    /// затем, если утилита доступна, <c>pg_isready</c> или <c>sqlcmd -Q "SELECT 1"</c>.
+    /// </summary>
+    public static async Task<DbmsCheckResult> CheckConnectionAsync(DbmsBackupProfile profile,
+        CancellationToken ct = default)
+    {
+        var host = profile.Host?.Trim();
+        if (string.IsNullOrWhiteSpace(host))
+            return DbmsCheckResult.Fail("Dbms.HostRequired");
+
+        var port = EffectivePort(profile);
+        var endpoint = $"{host}:{port}";
+        if (!await CanConnectAsync(host, port, TimeSpan.FromSeconds(5), ct).ConfigureAwait(false))
+            return DbmsCheckResult.Fail("Dbms.ConnectionFailed", endpoint);
+
+        if (profile.Dbms == DbmsKind.PostgreSql)
+        {
+            var pgIsReadyName = OperatingSystem.IsWindows() ? "pg_isready.exe" : "pg_isready";
+            // Пусто в ToolsDirectory — ищем pg_isready в PATH (не "./pg_isready").
+            var pgIsReady = string.IsNullOrWhiteSpace(profile.ToolsDirectory)
+                ? pgIsReadyName
+                : Path.Combine(profile.ToolsDirectory.Trim(), pgIsReadyName);
+            var args = new List<string> { "-h", host, "-p", port.ToString(CultureInfo.InvariantCulture) };
+            if (!string.IsNullOrWhiteSpace(profile.Database))
+            {
+                args.Add("-d");
+                args.Add(profile.Database.Trim());
+            }
+
+            var run = await RunToolAsync(pgIsReady, args, TimeSpan.FromSeconds(10), null, ct)
+                .ConfigureAwait(false);
+            // pg_isready может отсутствовать — TCP-проверка уже подтвердила доступность.
+            if (run.StartError is null && !run.TimedOut && !run.Success)
+                return DbmsCheckResult.Fail("Dbms.ConnectionFailed", $"{endpoint}: {run.CombinedOutput.Trim()}");
+            return DbmsCheckResult.Ok(endpoint);
+        }
+
+        var sqlArgs = BuildSqlCmdArguments(profile, Path.Combine(
+            string.IsNullOrWhiteSpace(profile.OutputDirectory) ? "." : profile.OutputDirectory.Trim(),
+            "probe.bak"));
+        // Для проверки достаточно SELECT 1: подменяем команду резервного копирования.
+        var queryIndex = sqlArgs.IndexOf("-Q");
+        if (queryIndex >= 0 && queryIndex + 1 < sqlArgs.Count)
+            sqlArgs[queryIndex + 1] = "SET NOCOUNT ON; SELECT 1";
+        var sqlRun = await RunToolAsync(ToolPath(profile), sqlArgs, TimeSpan.FromSeconds(10), null, ct)
+            .ConfigureAwait(false);
+        if (sqlRun.StartError is not null)
+            return DbmsCheckResult.Fail("Dbms.ToolNotFound", ToolPath(profile));
+        if (sqlRun.TimedOut)
+            return DbmsCheckResult.Fail("Dbms.CheckTimeout", endpoint);
+        return sqlRun.Success
+            ? DbmsCheckResult.Ok(endpoint)
+            : DbmsCheckResult.Fail("Dbms.ConnectionFailed", $"{endpoint}: {sqlRun.CombinedOutput.Trim()}");
+    }
+
+    private static async Task<bool> CanConnectAsync(string host, int port, TimeSpan timeout,
+        CancellationToken ct)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            cts.CancelAfter(timeout);
+            await client.ConnectAsync(host, port, cts.Token).ConfigureAwait(false);
+            return true;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static Task<ProcessRunResult> RunToolAsync(string fileName, IReadOnlyList<string> args,
+        TimeSpan timeout, IDictionary<string, string>? environment, CancellationToken ct) =>
+        RunToolOverride(fileName, args, timeout, environment, ct);
+
+    /// <summary>Удаляет недописанный файл копии после отмены/таймаута/ошибки.</summary>
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+        catch
+        {
+            // Файл занят или уже удалён — это не ошибка сценария.
+        }
+    }
+
+    /// <summary>Создаёт копию, применяет ротацию и при необходимости выгружает в WebDAV.</summary>
+    public static Task<BackupRunResult> RunAsync(DbmsBackupProfile profile, Action<string>? log = null,
+        CancellationToken ct = default)
+        => RunAsync(profile, log, null, ct);
+
+    /// <summary>
+    /// Создаёт копию с отчётом о прогрессе (issue #143). Вся работа с файловой
+    /// системой и процессами уходит с вызывающего потока, поэтому окно остаётся
+    /// отзывчивым, а «Отмена» и таймаут действительно прерывают операцию.
+    /// </summary>
+    /// <param name="profile">Профиль копирования.</param>
+    /// <param name="log">Журнал окна (строка текста).</param>
+    /// <param name="progress">Этапы операции; null — без отчёта.</param>
+    /// <param name="ct">Отмена (кнопка «Отмена», закрытие окна).</param>
+    public static async Task<BackupRunResult> RunAsync(DbmsBackupProfile profile, Action<string>? log,
+        IProgress<DbmsBackupProgress>? progress, CancellationToken ct = default)
     {
         var result = new BackupRunResult();
         var error = Validate(profile);
@@ -189,62 +410,114 @@ public static class DbmsBackupService
             return result;
         }
 
-        var target = Path.Combine(profile.OutputDirectory.Trim(), BuildFileName(profile, DateTime.Now));
-        ProcessRunResult run;
-        if (profile.Dbms == DbmsKind.PostgreSql)
-        {
-            Directory.CreateDirectory(profile.OutputDirectory.Trim());
-            var env = new Dictionary<string, string>();
-            if (!string.IsNullOrEmpty(profile.Password))
-                env["PGPASSWORD"] = profile.Password;
-            log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
-            run = await ProcessRunner.RunAsync(ToolPath(profile), BuildPgDumpArguments(profile, target), null,
-                TimeSpan.FromHours(6), env, ct: ct).ConfigureAwait(false);
-        }
-        else
-        {
-            // Каталог копии должен существовать на стороне сервера SQL; для локального
-            // сервера создаём его сами, для удалённого — это забота администратора.
-            try { Directory.CreateDirectory(profile.OutputDirectory.Trim()); } catch { /* путь сервера */ }
-            log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
-            run = await ProcessRunner.RunAsync(ToolPath(profile), BuildSqlCmdArguments(profile, target), null,
-                TimeSpan.FromHours(6), null, ct: ct).ConfigureAwait(false);
-        }
+        var timeout = TimeSpan.FromMinutes(profile.TimeoutMinutes > 0 ? profile.TimeoutMinutes : 360);
+        var directory = profile.OutputDirectory.Trim();
+        var target = Path.Combine(directory, BuildFileName(profile, DateTime.Now));
 
-        if (!run.Success)
+        try
         {
-            result.ErrorMessage = string.IsNullOrWhiteSpace(run.CombinedOutput)
-                ? LocalizationManager.T("Dbms.Failed")
-                : run.CombinedOutput;
-            return result;
-        }
+            progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Prepare));
 
-        result.Success = true;
-        result.CreatedFiles = new[] { target };
-        log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDone"), target));
+            // Создание каталога — не на UI-потоке: сетевой путь может отвечать
+            // десятки секунд, и раньше это выглядело как «наглухо зависло».
+            await Task.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
 
-        if (profile.KeepCount > 0)
-        {
-            var removed = BackupRotation.Apply(profile.OutputDirectory.Trim(), BuildFilePrefix(profile),
-                FileExtension(profile), profile.KeepCount, 0);
-            if (removed.Count > 0)
-                log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogRotated"), removed.Count));
-        }
+            progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Check));
 
-        if (!string.IsNullOrWhiteSpace(profile.WebDavUrl) && File.Exists(target))
-        {
-            log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogUploading"), profile.WebDavUrl));
-            var upload = await WebDavUploader.UploadAsync(target, profile.WebDavUrl, profile.WebDavUser,
-                profile.WebDavPassword, ct).ConfigureAwait(false);
-            if (upload is not null)
+            ProcessRunResult run;
+            if (profile.Dbms == DbmsKind.PostgreSql)
             {
-                result.Success = false;
-                result.ErrorMessage = string.Format(LocalizationManager.T("Dbms.UploadFailed"), upload);
+                var env = new Dictionary<string, string>();
+                if (!string.IsNullOrEmpty(profile.Password))
+                    env["PGPASSWORD"] = profile.Password;
+                log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
+                progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Dump));
+                run = await RunToolAsync(ToolPath(profile), BuildPgDumpArguments(profile, target),
+                    timeout, env, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                // Каталог копии должен существовать на стороне сервера SQL; для
+                // локального сервера создаём его сами, для удалённого — забота
+                // администратора (ошибку не показываем).
+                try
+                {
+                    await Task.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Путь существует только на сервере SQL.
+                }
+
+                log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
+                progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Dump));
+                run = await RunToolAsync(ToolPath(profile), BuildSqlCmdArguments(profile, target),
+                    timeout, null, ct).ConfigureAwait(false);
+            }
+
+            if (run.Canceled)
+            {
+                TryDelete(target);
+                ct.ThrowIfCancellationRequested();
+            }
+
+            if (run.TimedOut)
+            {
+                TryDelete(target);
+                result.ErrorMessage = LocalizationManager.T("Dbms.TimedOut");
                 return result;
             }
-            log?.Invoke(LocalizationManager.T("Dbms.LogUploaded"));
+
+            if (!run.Success)
+            {
+                TryDelete(target);
+                result.ErrorMessage = string.IsNullOrWhiteSpace(run.CombinedOutput)
+                    ? LocalizationManager.T("Dbms.Failed")
+                    : run.CombinedOutput;
+                return result;
+            }
+
+            result.Success = true;
+            result.CreatedFiles = new[] { target };
+            log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDone"), target));
+
+            if (profile.KeepCount > 0)
+            {
+                progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Rotate));
+                var removed = await Task.Run(() => BackupRotation.Apply(directory, BuildFilePrefix(profile),
+                    FileExtension(profile), profile.KeepCount, 0), ct).ConfigureAwait(false);
+                if (removed.Count > 0)
+                    log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogRotated"), removed.Count));
+            }
+
+            if (!string.IsNullOrWhiteSpace(profile.WebDavUrl) && File.Exists(target))
+            {
+                progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Upload));
+                log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogUploading"), profile.WebDavUrl));
+                var upload = await WebDavUploader.UploadAsync(target, profile.WebDavUrl, profile.WebDavUser,
+                    profile.WebDavPassword, ct).ConfigureAwait(false);
+                if (upload is not null)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = string.Format(LocalizationManager.T("Dbms.UploadFailed"), upload);
+                    return result;
+                }
+                log?.Invoke(LocalizationManager.T("Dbms.LogUploaded"));
+            }
+
+            progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Done));
+            return result;
         }
-        return result;
+        catch (OperationCanceledException)
+        {
+            // Недописанный файл не должен попасть в ротацию и выглядеть как копия.
+            TryDelete(target);
+            throw;
+        }
     }
 }
 

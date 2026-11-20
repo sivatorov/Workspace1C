@@ -45,6 +45,14 @@ namespace Workspace1C
             // Одиночный клик по строке таблицы → график истории этой базы (п.7, 1.0.0.89).
             BasesGrid.SelectionChanged += OnBasesGridSelectionChanged;
 
+            // issue #142 (1.0.1.96): подписка на смену периода — только здесь, после
+            // создания ViewModel. Раньше обработчик висел в XAML, и IsChecked="True"
+            // у Period30Radio поднимал Checked во время InitializeComponent, когда
+            // _vm ещё не был присвоен, — NullReferenceException на SetHistoryPeriod.
+            Period7Radio.Checked += OnHistoryPeriodChanged;
+            Period30Radio.Checked += OnHistoryPeriodChanged;
+            Period90Radio.Checked += OnHistoryPeriodChanged;
+
             // Перерисовка графика при смене выбранной базы/периода (п.7, 1.0.0.89).
             _vm.PropertyChanged += OnViewModelPropertyChanged;
             DrawHistoryChart();
@@ -63,6 +71,11 @@ namespace Workspace1C
 
         private void OnHistoryPeriodChanged(object sender, RoutedEventArgs e)
         {
+            // issue #142: страховка от события, пришедшего до создания ViewModel
+            // (WPF поднимает Checked при применении IsChecked из разметки).
+            if (_vm is null)
+                return;
+
             var days = ReferenceEquals(sender, Period7Radio) ? 7
                 : ReferenceEquals(sender, Period90Radio) ? 90
                 : 30;

@@ -39,6 +39,12 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     private string _webDavUser = string.Empty;
     private string _webDavPassword = string.Empty;
     private bool _isBusy;
+    private int _running;
+    private string _statusText = string.Empty;
+    private string _progressStageText = string.Empty;
+    private double _progressPercent;
+    private bool _isProgressIndeterminate;
+    private string _elapsedText = string.Empty;
 
     /// <param name="data">Профили копирования; null — читать <c>dbms_backups.json</c>.</param>
     /// <param name="defaultDbms">Общая настройка «Тип СУБД по умолчанию» (issue #106,
@@ -221,6 +227,41 @@ public sealed class DbmsBackupViewModel : ViewModelBase
 
     public bool IsIdle => !_isBusy;
 
+    /// <summary>Статус последней проверки или операции (issue #143).</summary>
+    public string StatusText
+    {
+        get => _statusText;
+        private set => SetProperty(ref _statusText, value ?? string.Empty);
+    }
+
+    /// <summary>Название текущего этапа операции (issue #143).</summary>
+    public string ProgressStageText
+    {
+        get => _progressStageText;
+        private set => SetProperty(ref _progressStageText, value ?? string.Empty);
+    }
+
+    /// <summary>Прогресс операции в процентах (оценочный, по этапам).</summary>
+    public double ProgressPercent
+    {
+        get => _progressPercent;
+        private set => SetProperty(ref _progressPercent, value);
+    }
+
+    /// <summary>Этап без измеримого прогресса (дамп, выгрузка) — бегущая полоса.</summary>
+    public bool IsProgressIndeterminate
+    {
+        get => _isProgressIndeterminate;
+        private set => SetProperty(ref _isProgressIndeterminate, value);
+    }
+
+    /// <summary>Прошедшее время операции «мм:сс».</summary>
+    public string ElapsedText
+    {
+        get => _elapsedText;
+        private set => SetProperty(ref _elapsedText, value ?? string.Empty);
+    }
+
     public string LogText => _log.ToString();
 
     public void AppendLog(string message)
@@ -289,32 +330,162 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         catch (ObjectDisposedException) { }
     }
 
+    /// <summary>
+    /// Запускает копирование (issue #143): защита от повторного запуска, прогресс,
+    /// отмена и очистка состояния в <c>finally</c>. Вся тяжёлая работа — в сервисе,
+    /// вне UI-потока; окно остаётся отзывчивым.
+    /// </summary>
     public async Task RunAsync()
     {
-        if (IsBusy || !Save())
+        // Двойной клик/автоповтор не должен запускать второй дамп.
+        if (Interlocked.Exchange(ref _running, 1) == 1)
+        {
+            AppendLog(LocalizationManager.T("Dbms.Reentrancy"));
             return;
-        var profile = CurrentProfile()!;
-        _cts?.Dispose();
-        _cts = new CancellationTokenSource();
+        }
+
         IsBusy = true;
+        CancellationTokenSource? elapsedCts = null;
         try
         {
-            var result = await DbmsBackupService.RunAsync(profile, AppendLog, _cts.Token);
-            AppendLog(result.Success
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource();
+
+            // Запись профиля — вне UI-потока (issue #143): диск/профиль могут
+            // отвечать медленно, а окно должно оставаться отзывчивым.
+            if (!await Task.Run(Save, _cts.Token))
+                return;
+
+            var profile = CurrentProfile();
+            if (profile is null)
+                return;
+
+            elapsedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
+            _ = TrackElapsedAsync(elapsedCts.Token);
+
+            ResetProgress();
+            var progress = new Progress<DbmsBackupProgress>(OnProgress);
+            var result = await DbmsBackupService.RunAsync(profile, AppendLog, progress, _cts.Token);
+            StatusText = result.Success
                 ? LocalizationManager.T("Dbms.Success")
-                : result.ErrorMessage ?? LocalizationManager.T("Dbms.Failed"));
+                : result.ErrorMessage ?? LocalizationManager.T("Dbms.Failed");
+            AppendLog(StatusText);
         }
         catch (OperationCanceledException)
         {
-            AppendLog(LocalizationManager.T("Designer.Cancelled"));
+            StatusText = LocalizationManager.T("Designer.Cancelled");
+            AppendLog(StatusText);
         }
         catch (Exception ex)
         {
+            StatusText = ex.Message;
+            AppendLog(ex.Message);
+        }
+        finally
+        {
+            elapsedCts?.Cancel();
+            elapsedCts?.Dispose();
+            ProgressStageText = string.Empty;
+            IsProgressIndeterminate = false;
+            ElapsedText = string.Empty;
+            IsBusy = false;
+            Interlocked.Exchange(ref _running, 0);
+        }
+    }
+
+    /// <summary>Проверка подключения к СУБД до запуска копии (issue #143).</summary>
+    public Task CheckConnectionAsync() => RunCheckAsync(DbmsBackupService.CheckConnectionAsync);
+
+    /// <summary>Проверка каталога копий на запись (issue #143).</summary>
+    public Task CheckDirectoryAsync() => RunCheckAsync(DbmsBackupService.CheckOutputDirectoryAsync);
+
+    private async Task RunCheckAsync(
+        Func<DbmsBackupProfile, CancellationToken, Task<DbmsCheckResult>> check)
+    {
+        if (IsBusy)
+            return;
+
+        var profile = CurrentProfile();
+        if (profile is null)
+        {
+            AppendLog(LocalizationManager.T("Dbms.NoBases"));
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            AppendLog(LocalizationManager.T("Dbms.CheckRunning"));
+            var result = await check(profile, CancellationToken.None);
+            StatusText = FormatCheckResult(result);
+            AppendLog(StatusText);
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
             AppendLog(ex.Message);
         }
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private static string FormatCheckResult(DbmsCheckResult result)
+    {
+        var text = LocalizationManager.T(result.MessageKey);
+        return string.IsNullOrWhiteSpace(result.Detail) ? text : text + ": " + result.Detail;
+    }
+
+    private void OnProgress(DbmsBackupProgress progress)
+    {
+        ProgressStageText = LocalizationManager.T(StageKey(progress.Stage));
+        IsProgressIndeterminate = progress.Stage is DbmsBackupStage.Dump or DbmsBackupStage.Upload;
+        ProgressPercent = progress.Stage switch
+        {
+            DbmsBackupStage.Prepare => 5,
+            DbmsBackupStage.Check => 10,
+            DbmsBackupStage.Dump => 20,
+            DbmsBackupStage.Rotate => 85,
+            DbmsBackupStage.Upload => 90,
+            DbmsBackupStage.Done => 100,
+            _ => ProgressPercent
+        };
+    }
+
+    private static string StageKey(DbmsBackupStage stage) => stage switch
+    {
+        DbmsBackupStage.Prepare => "Dbms.Progress.Prepare",
+        DbmsBackupStage.Check => "Dbms.Progress.Check",
+        DbmsBackupStage.Dump => "Dbms.Progress.Dump",
+        DbmsBackupStage.Rotate => "Dbms.Progress.Rotate",
+        DbmsBackupStage.Upload => "Dbms.Progress.Upload",
+        _ => "Dbms.Progress.Done"
+    };
+
+    private void ResetProgress()
+    {
+        ProgressPercent = 0;
+        ProgressStageText = string.Empty;
+        IsProgressIndeterminate = false;
+        ElapsedText = "00:00";
+        StatusText = string.Empty;
+    }
+
+    private async Task TrackElapsedAsync(CancellationToken ct)
+    {
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                ElapsedText = started.Elapsed.ToString(@"mm\:ss");
+                await Task.Delay(1000, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Операция завершилась — таймер больше не нужен.
         }
     }
 }

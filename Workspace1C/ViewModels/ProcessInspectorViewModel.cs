@@ -44,6 +44,17 @@ public enum ProcessInspectorColumn
 public sealed record ProcessInspectorColumnInfo(ProcessInspectorColumn Column, string TitleKey);
 
 /// <summary>
+/// Пункт меню «Колонки» инспектора процессов (issue #134, 1.0.1.96): единая модель
+/// для WPF и Avalonia. <see cref="IsVisible"/> — фактическая видимость колонки в
+/// таблице, по ней окна строят явный индикатор (без привязок к шаблону меню).
+/// </summary>
+/// <param name="Column">Колонка.</param>
+/// <param name="TitleKey">Ключ локализации заголовка.</param>
+/// <param name="IsVisible">Колонка видима в таблице.</param>
+public sealed record ProcessInspectorColumnMenuItem(
+    ProcessInspectorColumn Column, string TitleKey, bool IsVisible);
+
+/// <summary>
 /// ViewModel окна «Инспектор процессов 1С» (0.3.9.93): таблица всех запущенных
 /// процессов платформы 1С (база/режим/пользователь/время старта/PID/строка
 /// подключения/значок сопоставления), обновление по кнопке и по таймеру,
@@ -206,6 +217,17 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
 
     /// <summary>Колонка видима (по умолчанию все колонки видимы).</summary>
     public bool IsColumnVisible(ProcessInspectorColumn column) => !_hiddenColumns.Contains(column);
+
+    /// <summary>
+    /// Пункты меню «Колонки» с фактической видимостью (issue #134, 1.0.1.96).
+    /// Источник истины — <see cref="IsColumnVisible"/>; окна не хранят состояние
+    /// индикатора отдельно и не зависят от шаблона меню.
+    /// </summary>
+    public IReadOnlyList<ProcessInspectorColumnMenuItem> GetColumnMenuItems() =>
+        AllColumns
+            .Select(info => new ProcessInspectorColumnMenuItem(
+                info.Column, info.TitleKey, IsColumnVisible(info.Column)))
+            .ToList();
 
     /// <summary>
     /// Показывает/скрывает колонку (issue #134) и сохраняет выбор в настройках.
