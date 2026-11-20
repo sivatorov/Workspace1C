@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Workspace1C.Models;
+using Workspace1C.Services;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -21,6 +23,7 @@ namespace Workspace1C.Tests;
 /// чистой ViewModel.
 /// </para>
 /// </summary>
+[Collection("LocalDataStoreState")]
 public sealed class Issue142MaintenanceCenterTests
 {
     // ===================== WPF: порядок инициализации =====================
@@ -111,6 +114,40 @@ public sealed class Issue142MaintenanceCenterTests
 
         Assert.Equal(days, vm.HistoryPeriodDays);
         Assert.Single(vm.AllRows);
+    }
+
+    [Fact]
+    public void SwitchingPeriods_RefreshesHistoryRows()
+    {
+        var directory = Directory.CreateTempSubdirectory("workspace1c-issue142-");
+        var previousDirectory = FeatureDataStore.DirectoryOverride;
+        FeatureDataStore.DirectoryOverride = directory.FullName;
+        try
+        {
+            var today = DateTime.UtcNow.Date;
+            var bases = new[] { ServerBase("recent"), ServerBase("monthly"), ServerBase("quarterly") };
+            var olderDays = new[] { 3, 20, 60 };
+            var snapshots = bases.SelectMany((infobase, index) => new[]
+            {
+                new SizeSnapshotEntry { InfobaseId = infobase.Id, DateUtc = today.AddDays(-olderDays[index]), SizeBytes = 1000 },
+                new SizeSnapshotEntry { InfobaseId = infobase.Id, DateUtc = today, SizeBytes = 2000 },
+            }).ToArray();
+            new SizeHistoryStore(directory.FullName).Save(snapshots);
+            var vm = CreateViewModel(bases);
+
+            foreach (var (days, count) in new[] { (7, 1), (30, 2), (90, 3), (7, 1) })
+            {
+                vm.SetHistoryPeriod(days);
+                Assert.Equal(days, vm.HistoryPeriodDays);
+                Assert.Equal(bases.Take(count).Select(b => b.Id).OrderBy(id => id),
+                    vm.HistoryRows.Select(row => row.Infobase.Id).OrderBy(id => id));
+            }
+        }
+        finally
+        {
+            FeatureDataStore.DirectoryOverride = previousDirectory;
+            directory.Delete(recursive: true);
+        }
     }
 
     [Fact]

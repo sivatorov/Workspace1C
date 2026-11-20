@@ -486,7 +486,9 @@ namespace Workspace1C
             WindowChrome.SetWindowChrome(window, new WindowChrome
             {
                 CaptionHeight = 0,
-                ResizeBorderThickness = new Thickness(6),
+                ResizeBorderThickness = window.ResizeMode is ResizeMode.CanResize or ResizeMode.CanResizeWithGrip
+                    ? new Thickness(6)
+                    : new Thickness(0),
                 GlassFrameThickness = new Thickness(-1),
                 CornerRadius = new CornerRadius(0),
                 UseAeroCaptionButtons = false

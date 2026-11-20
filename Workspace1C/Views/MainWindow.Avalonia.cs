@@ -994,13 +994,13 @@ namespace Workspace1C
         /// <summary>Кнопки панели команд одной строкой, слева направо.</summary>
         private Control BuildCommandPanelContent()
         {
-            var panel = new StackPanel
+            var panel = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
                 // В разметке зазор задан отступом каждой кнопки (Margin="0,0,2,0",
                 // MainWindow.xaml:496 и далее), здесь он общий для всей строки.
-                Spacing = 2
+                ItemSpacing = 2
             };
 
             // Развернуть и свернуть группы, сортировка групп, показ тегов в строках.

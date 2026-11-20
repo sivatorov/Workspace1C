@@ -23,15 +23,66 @@
     </Window.Resources>
 
     <Border Padding="0" CornerRadius="12" Background="{DynamicResource CardBackgroundBrush}">
-        <!-- Issue #139 (1.0.1.95): размер окна считается явно (см. ApplyExplicitSize
-             в код-бихайнде) с учётом переноса кнопок WrapPanel. Если содержимое всё
-             равно выше доступной высоты, прокручивается только оно: панель кнопок
-             остаётся доступной и не отсекается нижней границей окна. -->
+        <DockPanel Margin="20">
+            <WrapPanel DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=OfferPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <!-- Issue #116 (v1.0.1.58): когда файл обновления уже скачан в фоне
+                     (режим «Загружать с предложением установки»), вместо «Скачать»
+                     показывается «Установить» — она применяет готовый файл по
+                     существующей логике автообновления. Видимость кнопок
+                     переключает код-бихайнд по состоянию UpdateService. -->
+                <Button x:Name="InstallButton" Width="150" Height="34" Padding="0"
+                        Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
+                        Visibility="Collapsed"
+                        Click="OnInstallClick">
+                    <!-- Issue #116 (17.11.2026 14:07): основная кнопка диалога
+                         называется «Обновить» во всех режимах и на всех путях —
+                         в том числе когда файл уже скачан (действие прежнее:
+                         применить готовый файл). -->
+                    <TextBlock x:Name="InstallText" Text="{loc:Loc Update.Update}" VerticalAlignment="Center"
+                               FontWeight="SemiBold" FontSize="13"/>
+                </Button>
+                <Button x:Name="DownloadButton" Width="150" Height="34" Padding="0" IsDefault="True"
+                        Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
+                        Click="OnDownloadClick">
+                    <!-- Issue #116 (1.0.1.82): «Скачать» → «Обновить» — кнопка
+                         запускает загрузку и установку, а не только скачивание. -->
+                    <TextBlock x:Name="DownloadText" Text="{loc:Loc Update.Update}" VerticalAlignment="Center"
+                               FontWeight="SemiBold" FontSize="13"/>
+                </Button>
+                <!-- Issue #107 п.2 (v1.0.1.50): MinWidth вместо Width — кнопка
+                     авторасширяется, «Пропустить эту версию» больше не обрезается
+                     при другом масштабе шрифта/длинных локализациях. -->
+                <Button x:Name="SkipVersionButton" MinWidth="170" Height="34"
+                        Style="{DynamicResource SecondaryButton}" Margin="0,0,10,0"
+                        ToolTip="{loc:Loc Update.SkipHint}"
+                        Click="OnSkipVersionClick">
+                    <TextBlock x:Name="SkipVersionText" Text="{loc:Loc Update.SkipVersion}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </Button>
+                <Button x:Name="CancelButton" Width="100" Height="34"
+                        Style="{DynamicResource SecondaryButton}"
+                        Click="OnCancelClick">
+                    <TextBlock x:Name="CancelText" Text="{loc:Loc Update.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </Button>
+            </WrapPanel>
+            <WrapPanel DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=RestartPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+                <Button x:Name="RestartNowButton" Width="230" Height="34" Padding="0" IsDefault="True"
+                        Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
+                        Click="OnRestartNowClick">
+                    <TextBlock x:Name="RestartNowText" Text="{loc:Loc Update.RestartNow}" VerticalAlignment="Center"
+                               FontWeight="SemiBold" FontSize="13"/>
+                </Button>
+                <Button x:Name="UpdateAfterCloseButton" Width="240" Height="34"
+                        Style="{DynamicResource SecondaryButton}"
+                        Click="OnUpdateAfterCloseClick">
+                    <TextBlock x:Name="UpdateAfterCloseText" Text="{loc:Loc Update.UpdateAfterClose}"
+                               VerticalAlignment="Center" FontWeight="SemiBold"/>
+                </Button>
+            </WrapPanel>
         <ScrollViewer x:Name="ContentScroller"
                       VerticalScrollBarVisibility="Auto"
                       HorizontalScrollBarVisibility="Disabled"
                       Focusable="False">
-            <Grid Margin="20">
+            <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -79,46 +130,7 @@
                          Issue #139 (1.0.1.84): WrapPanel вместо горизонтального
                          StackPanel — при узкой ширине кнопки переносятся, а не
                          обрезаются справа. -->
-                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-                        <!-- Issue #116 (v1.0.1.58): когда файл обновления уже скачан в фоне
-                             (режим «Загружать с предложением установки»), вместо «Скачать»
-                             показывается «Установить» — она применяет готовый файл по
-                             существующей логике автообновления. Видимость кнопок
-                             переключает код-бихайнд по состоянию UpdateService. -->
-                        <Button x:Name="InstallButton" Width="150" Height="34" Padding="0"
-                                Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
-                                Visibility="Collapsed"
-                                Click="OnInstallClick">
-                            <!-- Issue #116 (17.11.2026 14:07): основная кнопка диалога
-                                 называется «Обновить» во всех режимах и на всех путях —
-                                 в том числе когда файл уже скачан (действие прежнее:
-                                 применить готовый файл). -->
-                            <TextBlock x:Name="InstallText" Text="{loc:Loc Update.Update}" VerticalAlignment="Center"
-                                       FontWeight="SemiBold" FontSize="13"/>
-                        </Button>
-                        <Button x:Name="DownloadButton" Width="150" Height="34" Padding="0" IsDefault="True"
-                                Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
-                                Click="OnDownloadClick">
-                            <!-- Issue #116 (1.0.1.82): «Скачать» → «Обновить» — кнопка
-                                 запускает загрузку и установку, а не только скачивание. -->
-                            <TextBlock x:Name="DownloadText" Text="{loc:Loc Update.Update}" VerticalAlignment="Center"
-                                       FontWeight="SemiBold" FontSize="13"/>
-                        </Button>
-                        <!-- Issue #107 п.2 (v1.0.1.50): MinWidth вместо Width — кнопка
-                             авторасширяется, «Пропустить эту версию» больше не обрезается
-                             при другом масштабе шрифта/длинных локализациях. -->
-                        <Button x:Name="SkipVersionButton" MinWidth="170" Height="34"
-                                Style="{DynamicResource SecondaryButton}" Margin="0,0,10,0"
-                                ToolTip="{loc:Loc Update.SkipHint}"
-                                Click="OnSkipVersionClick">
-                            <TextBlock x:Name="SkipVersionText" Text="{loc:Loc Update.SkipVersion}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        </Button>
-                        <Button x:Name="CancelButton" Width="100" Height="34"
-                                Style="{DynamicResource SecondaryButton}"
-                                Click="OnCancelClick">
-                            <TextBlock x:Name="CancelText" Text="{loc:Loc Update.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        </Button>
-                    </WrapPanel>
+
                 </StackPanel>
 
                 <!-- Этап 2: скачивание -->
@@ -137,20 +149,7 @@
 
                     <!-- «Перезапустить сейчас» (основная кнопка) и «Обновить после закрытия».
                          Issue #139 (1.0.1.84): WrapPanel — кнопки переносятся при узкой ширине. -->
-                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-                        <Button x:Name="RestartNowButton" Width="230" Height="34" Padding="0" IsDefault="True"
-                                Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
-                                Click="OnRestartNowClick">
-                            <TextBlock x:Name="RestartNowText" Text="{loc:Loc Update.RestartNow}" VerticalAlignment="Center"
-                                       FontWeight="SemiBold" FontSize="13"/>
-                        </Button>
-                        <Button x:Name="UpdateAfterCloseButton" Width="240" Height="34"
-                                Style="{DynamicResource SecondaryButton}"
-                                Click="OnUpdateAfterCloseClick">
-                            <TextBlock x:Name="UpdateAfterCloseText" Text="{loc:Loc Update.UpdateAfterClose}"
-                                       VerticalAlignment="Center" FontWeight="SemiBold"/>
-                        </Button>
-                    </WrapPanel>
+
                 </StackPanel>
 
                 <!-- Этап 4: завершение (подтверждение применения) -->
@@ -203,5 +202,6 @@
             </StackPanel>
             </Grid>
         </ScrollViewer>
+        </DockPanel>
     </Border>
 </Window>

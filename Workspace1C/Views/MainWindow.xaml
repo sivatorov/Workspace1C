@@ -572,32 +572,32 @@
                             Background="{DynamicResource CardBackgroundBrush}"
                             BorderBrush="{DynamicResource BorderBrushColor}"
                             BorderThickness="0,0,0,1">
-                        <StackPanel x:Name="CommandPanelStack" Orientation="Horizontal" VerticalAlignment="Center">
+                        <WrapPanel x:Name="CommandPanelStack" Orientation="Horizontal" VerticalAlignment="Center">
                             <!-- Управление группами: развернуть/свернуть все, сортировка, отображение тегов.
                                  Видно при группировке списка (ShowExpandCollapseButtons). -->
                             <Button Command="{Binding ExpandAllGroupsCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.ExpandAllGroups}"
                                     Visibility="{Binding ShowExpandCollapseButtons, Converter={StaticResource BoolToVis}}">
                                 <materialDesign:PackIcon Kind="ExpandAll" Width="18" Height="18"
                                                          Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
                             <Button Command="{Binding CollapseAllGroupsCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.CollapseAllGroups}"
                                     Visibility="{Binding ShowExpandCollapseButtons, Converter={StaticResource BoolToVis}}">
                                 <materialDesign:PackIcon Kind="CollapseAll" Width="18" Height="18"
                                                          Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
                             <Button Command="{Binding SortGroupsAscendingCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.SortGroupsAscending}"
                                     Visibility="{Binding ShowExpandCollapseButtons, Converter={StaticResource BoolToVis}}">
                                 <materialDesign:PackIcon Kind="SortAscending" Width="18" Height="18"
                                                          Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
                             <Button Command="{Binding SortGroupsDescendingCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.SortGroupsDescending}"
                                     Visibility="{Binding ShowExpandCollapseButtons, Converter={StaticResource BoolToVis}}">
                                 <materialDesign:PackIcon Kind="SortDescending" Width="18" Height="18"
@@ -617,17 +617,17 @@
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
                             <!-- «Правка»: добавить / правка / удалить выбранной базы -->
                             <Button Command="{Binding AddInfobaseCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.AddBase}">
                                 <materialDesign:PackIcon Kind="Plus" Width="18" Height="18" Foreground="{DynamicResource SuccessBrush}"/>
                             </Button>
                             <Button Command="{Binding EditInfobaseCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.EditBaseTooltip}">
                                 <materialDesign:PackIcon Kind="Pencil" Width="18" Height="18" Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
                             <Button Command="{Binding DeleteInfobaseCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.DeleteTooltip}">
                                 <materialDesign:PackIcon Kind="Delete" Width="18" Height="18" Foreground="{DynamicResource ErrorBrush}"/>
                             </Button>
@@ -636,7 +636,7 @@
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
                             <!-- «Управление списком»: очистить кеш, выгрузка, синхронизация, проверка -->
                             <Button Command="{Binding ClearCacheCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.ClearCacheTooltip}">
                                 <materialDesign:PackIcon Kind="Broom" Width="18" Height="18" Foreground="{DynamicResource WarningBrush}"/>
                             </Button>
@@ -644,7 +644,7 @@
                                  анимируется (стрелка вверх подпрыгивает) и скрывается по её завершении.
                                  При наведении показывает сводку о текущей выгрузке. -->
                             <Button x:Name="ExportIndicatorButton"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     Visibility="{Binding IsExporting, Converter={StaticResource BoolToVis}}"
                                     ToolTip="{Binding ExportIndicatorTooltip}"
                                     Focusable="False" Cursor="Hand">
@@ -656,12 +656,12 @@
                                 </materialDesign:PackIcon>
                             </Button>
                             <Button Command="{Binding SynchronizeWithIbasesCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.SyncDetailedTooltip}">
                                 <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                             </Button>
                             <Button Command="{Binding CheckAvailabilityCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0"
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     ToolTip="{loc:Loc Main.CheckAvailabilityTooltip}">
                                 <Path Width="18" Height="18" Stretch="Uniform"
                                       Data="{DynamicResource IconSonar}" Fill="{DynamicResource InfoBrush}"/>
@@ -672,7 +672,7 @@
                                  «Утилиты → Операции», где он был неюзабелен. -->
                             <Button x:Name="ProcessInspectorButton"
                                     Command="{Binding ProcessInspectorCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="8,7"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     ToolTip="{loc:Loc Main.ProcessInspectorTooltip}">
                                 <Path Width="18" Height="18" Stretch="Uniform"
                                       Data="{DynamicResource IconApplicationCog}"
@@ -690,7 +690,8 @@
                                  UtilitiesMenuCatalog + компоновке UtilitiesMenuLayout. -->
                             <Button x:Name="UtilitiesButton" Click="OnUtilitiesMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="10,7"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
+                                    Width="Auto" MinWidth="32"
                                     ToolTip="{loc:Loc Main.UtilitiesTooltip}">
                                 <!-- ПКМ по заголовку «Утилиты» (issue #374): сразу открывает
                                      редактор структуры меню, минуя окно настроек и контекстное
@@ -708,7 +709,7 @@
                             </Button>
                             <!-- «Настройки»: тема, компактный режим, настройки, справка -->
                             <Button x:Name="ThemeToggleButton" Click="OnToggleTheme_Click"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" ToolTip="{loc:Loc Main.Theme}">
+                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0" ToolTip="{loc:Loc Main.Theme}">
                                 <Path x:Name="ThemeToggleIcon" Width="18" Height="18" Stretch="Uniform"
                                       Data="{DynamicResource IconMoon}" Fill="{DynamicResource PurpleAccentBrush}"/>
                             </Button>
@@ -719,20 +720,20 @@
                                 <materialDesign:PackIcon Kind="Compress" Width="18" Height="18"
                                     Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
                             </ToggleButton>
-                            <Button Command="{Binding SwitchUserCommand}" Style="{DynamicResource IconButton}"
+                            <Button Command="{Binding SwitchUserCommand}" Style="{DynamicResource IconButton}" Padding="6"
                                     Margin="0,0,2,0"
                                     Visibility="{Binding SwitchUserVisible, Converter={StaticResource BoolToVis}}"
                                     ToolTip="{loc:Loc Main.SwitchUserTooltip}">
                                 <materialDesign:PackIcon Kind="AccountSwitch" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
                             </Button>
-                            <Button Command="{Binding OpenSettingsCommand}" Style="{DynamicResource IconButton}"
+                            <Button Command="{Binding OpenSettingsCommand}" Style="{DynamicResource IconButton}" Padding="6"
                                     ToolTip="{loc:Loc Main.SettingsTooltip}">
                                 <materialDesign:PackIcon Kind="Cog" Width="18" Height="18" Foreground="{DynamicResource TextSecondaryBrush}"/>
                             </Button>
                             <!-- Подсказка «?»: после всех команд панели -->
                             <controls:HelpLink Margin="4,0,0,0"
                                                HelpText="{loc:Loc Main.BaseListHelp}"/>
-                        </StackPanel>
+                        </WrapPanel>
                     </Border>
 
                     <!-- Область списка (issue #309): горизонтальную прокрутку ведёт ВНЕШНИЙ общий

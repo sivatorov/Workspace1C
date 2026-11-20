@@ -284,9 +284,9 @@ public partial class UpdateAvailableWindow : Window
             var height = UpdateDialogSizePolicy.ClampWindowHeight(
                 content.DesiredSize.Height + ChromeHeight(), workHeight);
 
-            if (Math.Abs(Width - width) > 0.5)
+            if (double.IsNaN(Width) || Math.Abs(Width - width) > 0.5)
                 Width = width;
-            if (Math.Abs(Height - height) > 0.5)
+            if (double.IsNaN(Height) || Math.Abs(Height - height) > 0.5)
                 Height = height;
 
             UpdateLayout();

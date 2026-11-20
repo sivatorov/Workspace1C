@@ -138,7 +138,7 @@
                                         <Setter Property="Fill" Value="{DynamicResource TextSecondaryBrush}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsKnown}" Value="True">
-                                                <Setter Property="Data" Value="{DynamicResource IconBullet}"/>
+                                                <Setter Property="Data" Value="M2,8 L4,6 L7,9 L14,2 L16,4 L7,13 Z"/>
                                                 <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>

@@ -135,7 +135,7 @@ namespace Workspace1C
             bar.Bind(ProgressBar.IsIndeterminateProperty,
                 new Binding(nameof(DbmsBackupViewModel.IsProgressIndeterminate)));
             bar.Bind(ProgressBar.ValueProperty,
-                new Binding(nameof(DbmsBackupViewModel.ProgressPercent)));
+                new Binding(nameof(DbmsBackupViewModel.ProgressPercent)) { Mode = BindingMode.OneWay });
 
             var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             panel.Children.Add(header);

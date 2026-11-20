@@ -27,6 +27,18 @@ namespace Workspace1C.Tests;
 [Collection("LocalDataStoreState")]
 public sealed class Issue143DbmsBackupTests
 {
+    [Theory]
+    [InlineData("DbmsBackupWindow.cs")]
+    [InlineData("DbmsBackupWindow.Avalonia.cs")]
+    public void ProgressPercent_IsBoundOneWay(string file)
+    {
+        var source = ReadProjectFile("Workspace1C", "Views", file);
+
+        Assert.Matches(
+            @"new Binding\(nameof\(DbmsBackupViewModel\.ProgressPercent\)\)\s*\{\s*Mode\s*=\s*BindingMode\.OneWay\s*\}",
+            source);
+    }
+
     // ===================== Проверка каталога =====================
 
     [Fact]

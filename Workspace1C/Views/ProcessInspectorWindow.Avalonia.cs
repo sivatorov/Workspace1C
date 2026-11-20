@@ -379,7 +379,7 @@ namespace Workspace1C
                 case ProcessInspectorColumn.Known:
                     // P1b: значок-флаг — векторная иконка (известная/неизвестная база).
                     return IconHelper.MakeIcon(
-                        row.IsKnown ? "IconBullet" : "IconUnknown",
+                        row.IsKnown ? "IconCheck" : "IconUnknown",
                         UiMetrics.IconControl,
                         Themes.ThemeBrushes.FromSpec(row.IsKnown ? "@SuccessBrush" : "@TextSecondaryBrush"));
 
