@@ -149,6 +149,27 @@ public static partial class OneCLauncher
         BackupCredential? credential, int? repositoryVersion, int? repositoryReportBegin,
         int? repositoryReportEnd, string? permissionCode, out string? startError)
     {
+        var started = TryStartDesignerBatch(infobase, operation, outputPath, credential, repositoryVersion,
+            repositoryReportBegin, repositoryReportEnd, permissionCode, out startError);
+        if (!started)
+            WriteDesignerAudit(operation, infobase.Name, false);
+        return started;
+    }
+
+    private static void WriteDesignerAudit(DesignerBatchOperation operation, string target, bool success, string? source = null)
+    {
+        if (operation == DesignerBatchOperation.DumpIB)
+            Audit.AuditHub.Write(Audit.AuditActions.DtDump, target, success, source: source);
+        else if (operation == DesignerBatchOperation.LoadCfg)
+            Audit.AuditHub.Write(Audit.AuditActions.CfLoad, target, success, source: source);
+        else if (operation == DesignerBatchOperation.UnlockIB)
+            Audit.AuditHub.Write(Audit.AuditActions.SessionUnlock, target, success, source: source);
+    }
+
+    private static bool TryStartDesignerBatch(Infobase infobase, DesignerBatchOperation operation, string? outputPath,
+        BackupCredential? credential, int? repositoryVersion, int? repositoryReportBegin,
+        int? repositoryReportEnd, string? permissionCode, out string? startError)
+    {
         startError = null;
         var arch = ResolveArchitecture(infobase.Architecture, infobase.PlatformVersion);
         var exePath = FindExecutable(infobase.PlatformVersion, arch, null, OneCLaunchMode.Configurator);
@@ -380,6 +401,7 @@ public static partial class OneCLauncher
             return false;
 
         _activeBatchProcesses[token] = process;
+        var auditSource = Audit.AuditHub.CurrentSource;
         try
         {
             process.EnableRaisingEvents = true;
@@ -389,6 +411,7 @@ public static partial class OneCLauncher
                 // Читаем лог, определяем успех операции и формируем сообщение об ошибке.
                 try { CompleteDesignerBatch(process, info); }
                 catch { /* не должны ронять поток обработчика */ }
+                WriteDesignerAudit(info.Operation, info.InfobaseName, info.Success, auditSource);
                 // Оповещаем об окончании операции (индикатор выгрузки в главном окне).
                 DesignerBatchCompleted?.Invoke(null, info);
             };

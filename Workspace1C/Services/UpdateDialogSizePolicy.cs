@@ -17,8 +17,15 @@ public readonly record struct UpdateDialogSize(double Width, double Height);
 /// </summary>
 public static class UpdateDialogSizePolicy
 {
-    /// <summary>Минимальная ширина диалога (совпадает с MinWidth в разметке).</summary>
-    public const double MinWidth = 440;
+    /// <summary>
+    /// Минимальная ширина диалога (совпадает с MinWidth в разметке).
+    /// Issue #139 (1.0.1.97): 600 DIP — столько нужно строке кнопок
+    /// «Перезапустить сейчас» + «Обновить после закрытия» (230 + 10 + 240)
+    /// вместе с полями и оформлением окна. При меньшей ширине <c>WrapPanel</c>
+    /// переносил «Отмену»/вторую кнопку на новую строку, и окно выглядело
+    /// «разъехавшимся».
+    /// </summary>
+    public const double MinWidth = 600;
 
     /// <summary>Максимальная ширина диалога по содержимому.</summary>
     public const double MaxWidth = 760;

@@ -1032,11 +1032,16 @@ public sealed class RacClient : IRacClient
         RunActionAsync(parameters, cancellationToken, InfobaseCreateArgs(clusterId, request));
 
     /// <inheritdoc />
-    public Task<bool> UpdateInfobaseAsync(
+    public async Task<bool> UpdateInfobaseAsync(
         RacConnectionParams parameters, Guid clusterId, Guid infobaseId,
-        RacInfobaseUpdateRequest request, CancellationToken cancellationToken = default) =>
-        RunActionAsync(parameters, cancellationToken,
-            InfobaseUpdateArgs(clusterId, infobaseId, request));
+        RacInfobaseUpdateRequest request, CancellationToken cancellationToken = default)
+    {
+        var ok = await RunActionAsync(parameters, cancellationToken,
+            InfobaseUpdateArgs(clusterId, infobaseId, request)).ConfigureAwait(false);
+        if (request.SessionsDeny == false)
+            Audit.AuditHub.Write(Audit.AuditActions.SessionUnlock, request.Name, ok);
+        return ok;
+    }
 
     /// <inheritdoc />
     public async Task<RacInfobaseInfo?> GetInfobaseInfoAsync(

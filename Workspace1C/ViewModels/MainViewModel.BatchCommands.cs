@@ -229,6 +229,7 @@ public partial class MainViewModel
             }
 
             Infobases.Remove(ib);
+            Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, ib.Name, true);
             if (ReferenceEquals(SelectedInfobase, ib))
                 SelectedInfobase = null;
         }

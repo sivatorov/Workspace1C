@@ -10,8 +10,29 @@ namespace Workspace1C.Tests;
 /// учётные данные Предприятия/Конфигуратора) не подставляются, автовход по учётной
 /// записи ОС отключается ключом /WA-.
 /// </summary>
-public sealed class LaunchWithAuthPromptTests
+[Collection("CommonAuthStatics")]
+public sealed class LaunchWithAuthPromptTests : IDisposable
 {
+    private readonly InfobaseAuthSettings? _enterprise = OneCLauncher.CommonEnterpriseAuthorization;
+    private readonly InfobaseAuthSettings? _configurator = OneCLauncher.CommonConfiguratorAuthorization;
+    private readonly InfobaseAuthSettings? _legacy = OneCLauncher.CommonAuthorization;
+
+    public LaunchWithAuthPromptTests()
+    {
+        // Коллекция сериализует тесты, но статические общие авторизации могут остаться
+        // от предыдущего теста и перекрыть авторизацию ОС базы (шаг 2 резолвера).
+        OneCLauncher.CommonEnterpriseAuthorization = null;
+        OneCLauncher.CommonConfiguratorAuthorization = null;
+        OneCLauncher.CommonAuthorization = null;
+    }
+
+    public void Dispose()
+    {
+        OneCLauncher.CommonEnterpriseAuthorization = _enterprise;
+        OneCLauncher.CommonConfiguratorAuthorization = _configurator;
+        OneCLauncher.CommonAuthorization = _legacy;
+    }
+
     private static Infobase FileBase(AuthenticationMode mode, string user = "Админ", string password = "123")
     {
         var ib = new Infobase { Name = "Тест" };

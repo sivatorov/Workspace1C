@@ -165,6 +165,8 @@ public partial class MainViewModel : ViewModelBase
         var remaining = _allInfobases.Where(ib => !removing.Contains(ib)).ToList();
         if (!SaveList(remaining))
         {
+            foreach (var infobase in missing)
+                Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, infobase.Name, false);
             _dialog.ShowError(LocalizationManager.T("Main.SaveFailedHint"),
                 LocalizationManager.T("Main.RemoveMissingTitle"));
             return;
@@ -172,6 +174,8 @@ public partial class MainViewModel : ViewModelBase
 
         _allInfobases.Clear();
         _allInfobases.AddRange(remaining);
+        foreach (var infobase in missing)
+            Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, infobase.Name, true);
         // Состав списка изменился: слоты избранного пересчитываются, иначе
         // номер остаётся у удалённой базы, а её слот занят навсегда.
         SyncFavoriteHotkeys();
@@ -1122,6 +1126,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         _allInfobases.Remove(ib);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, ib.Name, true);
         // Состав списка изменился: слоты избранного пересчитываются, иначе
         // номер остаётся у удалённой базы, а её слот занят навсегда.
         SyncFavoriteHotkeys();

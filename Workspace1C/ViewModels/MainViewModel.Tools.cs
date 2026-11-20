@@ -1515,6 +1515,8 @@ public partial class MainViewModel : ViewModelBase
         RebuildGroupTree();
         InfobasesView.Refresh();
         Save();
+        foreach (var infobase in missing)
+            Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, infobase.Name, true);
         _logger.Info($"Удалено отсутствующих файловых баз: {missing.Count}");
         _dialogs.ShowInfo(
             string.Format(LocalizationManager.T("Main.MissingRemoved"), missing.Count),

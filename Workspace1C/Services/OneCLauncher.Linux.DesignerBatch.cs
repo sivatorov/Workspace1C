@@ -120,6 +120,27 @@ namespace Workspace1C.Services
             BackupCredential? credential, int? repositoryVersion, int? repositoryReportBegin,
             int? repositoryReportEnd, string? permissionCode, out string? startError)
         {
+            var started = TryStartDesignerBatch(infobase, operation, outputPath, credential, repositoryVersion,
+                repositoryReportBegin, repositoryReportEnd, permissionCode, out startError);
+            if (!started)
+                WriteDesignerAudit(operation, infobase.Name, false);
+            return started;
+        }
+
+        private static void WriteDesignerAudit(DesignerBatchOperation operation, string target, bool success, string? source = null)
+        {
+            if (operation == DesignerBatchOperation.DumpIB)
+                Audit.AuditHub.Write(Audit.AuditActions.DtDump, target, success, source: source);
+            else if (operation == DesignerBatchOperation.LoadCfg)
+                Audit.AuditHub.Write(Audit.AuditActions.CfLoad, target, success, source: source);
+            else if (operation == DesignerBatchOperation.UnlockIB)
+                Audit.AuditHub.Write(Audit.AuditActions.SessionUnlock, target, success, source: source);
+        }
+
+        private static bool TryStartDesignerBatch(Infobase infobase, DesignerBatchOperation operation, string? outputPath,
+            BackupCredential? credential, int? repositoryVersion, int? repositoryReportBegin,
+            int? repositoryReportEnd, string? permissionCode, out string? startError)
+        {
             startError = null;
             var arch = ResolveArchitecture(infobase.Architecture, infobase.PlatformVersion);
             var exePath = FindExecutable(infobase.PlatformVersion, arch, null, OneCLaunchMode.Configurator);
@@ -305,6 +326,7 @@ namespace Workspace1C.Services
                 return;
 
             _activeBatchProcesses[token] = process;
+            var auditSource = Audit.AuditHub.CurrentSource;
             try
             {
                 process.EnableRaisingEvents = true;
@@ -313,6 +335,7 @@ namespace Workspace1C.Services
                     _activeBatchProcesses.TryRemove(token, out _);
                     try { CompleteDesignerBatch(process, info); }
                     catch { }
+                    WriteDesignerAudit(info.Operation, info.InfobaseName, info.Success, auditSource);
                     DesignerBatchCompleted?.Invoke(null, info);
                 };
             }

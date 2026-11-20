@@ -328,7 +328,8 @@ public class SchedulerService : IDisposable
 
     private async Task<BackupRunResult?> ExecuteAsync(ScheduledTask task)
     {
-        var result = await ExecuteCoreAsync(task).ConfigureAwait(false);
+        var result = await Audit.AuditHub.WithSourceAsync(Audit.AuditSources.Scheduler,
+            () => ExecuteCoreAsync(task)).ConfigureAwait(false);
         if (result is not null)
             Audit.AuditHub.Write(Audit.AuditActions.ScheduledTaskRun, task.Name, result.Success,
                 task.Kind + (result.Success ? string.Empty : "; " + result.ErrorMessage), Audit.AuditSources.Scheduler);

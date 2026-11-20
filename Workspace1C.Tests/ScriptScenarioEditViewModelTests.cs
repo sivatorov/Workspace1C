@@ -12,6 +12,7 @@ namespace Workspace1C.Tests;
 /// не плодит копию), генерация Id у нового сценария и перенос свойства
 /// <see cref="ScriptScenario.HideWindow"/>.
 /// </summary>
+[Collection("ScriptLaunchContextState")]
 public sealed class ScriptScenarioEditViewModelTests
 {
     [Fact]

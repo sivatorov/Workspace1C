@@ -23,6 +23,7 @@ namespace Workspace1C.Tests;
 /// чистой ViewModel.
 /// </para>
 /// </summary>
+[Collection("LocalDataStoreState")]
 public sealed class Issue142MaintenanceCenterTests
 {
     // ===================== WPF: порядок инициализации =====================
@@ -131,8 +132,9 @@ public sealed class Issue142MaintenanceCenterTests
             }).ToArray();
             var historyStore = new SizeHistoryStore(directory.FullName);
             historyStore.Save(snapshots);
-            var vm = new MaintenanceCenterViewModel(bases, () => { }, _ => { },
-                DiskFreeSpaceHelper.DefaultWarningGb, historyStore);
+            // Хранилище внедряется явно: глобальный FeatureDataStore.DirectoryOverride
+            // и DI-регистрации других тестов не должны влиять на результат.
+            var vm = CreateViewModel(bases, historyStore);
 
             foreach (var (days, count) in new[] { (7, 1), (30, 2), (90, 3), (7, 1) })
             {
@@ -171,8 +173,10 @@ public sealed class Issue142MaintenanceCenterTests
 
     // ===================== Вспомогательные методы =====================
 
-    private static MaintenanceCenterViewModel CreateViewModel(IEnumerable<Infobase> bases) =>
-        new(bases, () => { }, _ => { });
+    private static MaintenanceCenterViewModel CreateViewModel(
+        IEnumerable<Infobase> bases, SizeHistoryStore? historyStore = null) =>
+        new(bases, () => { }, _ => { },
+            DiskFreeSpaceHelper.DefaultWarningGb, historyStore);
 
     private static Infobase ServerBase(string id) => new()
     {

@@ -90,11 +90,17 @@ namespace Workspace1C.Services
                     WorkingDirectory = Path.GetDirectoryName(exePath) ?? ""
                 };
                 LinuxProcessEnvironment.Start(psi);
+                if (mode == OneCLaunchMode.Enterprise && !string.IsNullOrWhiteSpace(infobase.ExternalProcessingPath)
+                    && IsSafeCliValue(infobase.ExternalProcessingPath.Trim()))
+                    Audit.AuditHub.Write(Audit.AuditActions.ExternalProcessingLaunch, infobase.Name, true);
                 infobase.LastLaunchDate = DateTime.Now;
                 return true;
             }
             catch (Exception ex)
             {
+                if (mode == OneCLaunchMode.Enterprise && !string.IsNullOrWhiteSpace(infobase.ExternalProcessingPath)
+                    && IsSafeCliValue(infobase.ExternalProcessingPath.Trim()))
+                    Audit.AuditHub.Write(Audit.AuditActions.ExternalProcessingLaunch, infobase.Name, false);
                 GetLogger()?.Error(string.Format(LocalizationManager.T("Launcher.LaunchFailedFormat"), ex.Message), ex);
                 return false;
             }

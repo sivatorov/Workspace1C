@@ -10,6 +10,7 @@ namespace Workspace1C.Tests;
 /// Issue #67 «Подстановки для сценариев»: сценарий понимает ВСЕ реквизиты базы
 /// (включая логин при общей авторизации) + диалог «Выбрать» переменную.
 /// </summary>
+[Collection("ScriptLaunchContextState")]
 public sealed class ScriptTokenPickerViewModelTests
 {
     private static Infobase BuildBase(string? user = null, string? password = null)

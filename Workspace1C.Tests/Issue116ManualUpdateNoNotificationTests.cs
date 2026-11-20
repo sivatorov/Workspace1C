@@ -245,7 +245,8 @@ public sealed class Issue116ManualUpdateNoNotificationTests
         Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
         Assert.Contains("SizeToContent.Manual", window, StringComparison.Ordinal);
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
-        Assert.Contains("MinWidth = 440;", window, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.97): ширина согласована с политикой (600 DIP).
+        Assert.Contains("MinWidth = 600;", window, StringComparison.Ordinal);
         Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
         Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);
 

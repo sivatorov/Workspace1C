@@ -10,6 +10,7 @@ namespace Workspace1C.Tests;
 /// Реальный поиск платформы на диске проверяется только через переопределяемый резолвер —
 /// сам поиск не зависит от логики теста.
 /// </summary>
+[Collection("ScriptLaunchContextState")]
 public sealed class ScriptLaunchContextResolverTests
 {
     private static ScriptLaunchContext MakeContext() => new(

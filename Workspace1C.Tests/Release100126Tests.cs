@@ -24,6 +24,7 @@ namespace Workspace1C.Tests;
 /// «занято 0 из N».</item>
 /// </list>
 /// </summary>
+[Collection("LocalDataStoreState")]
 public sealed class Release100126Tests
 {
     private static string FindRepoRoot()

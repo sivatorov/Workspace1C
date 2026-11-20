@@ -168,6 +168,23 @@ public sealed class Issue139UpdateDialogSizeTests
     }
 
     [Fact]
+    public void MinWidth_FitsButtonRowsInSingleRow()
+    {
+        // Issue #139 (1.0.1.97): минимальная ширина окна должна вмещать обе
+        // строки кнопок без переноса, иначе «Отмена»/вторая кнопка уезжает
+        // на новую строку. Chrome (поля, иконка, рамка) — 120 DIP.
+        var offerRow = UpdateDialogSizePolicy.ContentMinWidth(
+            new double[] { 150, 170, 100 }, spacing: 10, chrome: 120);
+        var restartRow = UpdateDialogSizePolicy.ContentMinWidth(
+            new double[] { 230, 240 }, spacing: 10, chrome: 120);
+
+        Assert.True(UpdateDialogSizePolicy.MinWidth >= offerRow,
+            $"MinWidth {UpdateDialogSizePolicy.MinWidth} меньше строки предложения {offerRow}");
+        Assert.True(UpdateDialogSizePolicy.MinWidth >= restartRow,
+            $"MinWidth {UpdateDialogSizePolicy.MinWidth} меньше строки перезапуска {restartRow}");
+    }
+
+    [Fact]
     public void ContentMinWidth_Empty_ReturnsChrome()
     {
         var width = UpdateDialogSizePolicy.ContentMinWidth(
@@ -309,10 +326,36 @@ public sealed class Issue139UpdateDialogSizeTests
         // обрезание снизу после переноса кнопок.
         Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MinWidth=\"440\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.97): 600 DIP — строка кнопок перезапуска без переноса.
+        Assert.Contains("MinWidth=\"600\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxWidth=\"760\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MinHeight=\"140\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Wpf_Xaml_ButtonsAreOutsideScrollViewer()
+    {
+        var xaml = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
+
+        // Issue #139 (1.0.1.97): панели кнопок закреплены в DockPanel снизу и
+        // не участвуют в прокрутке текста. Иначе при длинном описании релиза
+        // появлялась полоса прокрутки, а «Отмена» оказывалась ниже остальных.
+        var scroll = xaml.IndexOf("<ScrollViewer", StringComparison.Ordinal);
+        Assert.True(scroll > 0, "ScrollViewer не найден");
+        foreach (var button in new[]
+                 {
+                     "x:Name=\"DownloadButton\"", "x:Name=\"CancelButton\"",
+                     "x:Name=\"RestartNowButton\"", "x:Name=\"UpdateAfterCloseButton\"",
+                 })
+        {
+            var index = xaml.IndexOf(button, StringComparison.Ordinal);
+            Assert.True(index > 0 && index < scroll,
+                $"{button} должен находиться до ScrollViewer (вне прокручиваемого текста)");
+        }
+
+        Assert.Contains("DockPanel.Dock=\"Bottom\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -456,8 +499,8 @@ public sealed class Issue139UpdateDialogSizeTests
         // Кнопки диалога — в WrapPanel, а не в горизонтальном StackPanel.
         Assert.Contains("new WrapPanel", window, StringComparison.Ordinal);
 
-        // Литералы, на которые завязаны тесты Issue116, сохранены.
-        Assert.Contains("MinWidth = 440;", window, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.97): ширина согласована с политикой (600 DIP).
+        Assert.Contains("MinWidth = 600;", window, StringComparison.Ordinal);
         Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
         // Issue #139 (1.0.1.95): высота ограничена и считается явно, авторазмер
         // по обеим осям убран (он не учитывал перенос кнопок WrapPanel).

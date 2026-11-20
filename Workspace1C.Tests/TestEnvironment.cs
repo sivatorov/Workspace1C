@@ -40,6 +40,15 @@ public sealed class UiDialogsStateCollection { }
 public sealed class LocalDataStoreStateCollection { }
 
 /// <summary>
+/// Коллекция с отключённой параллельностью для тестов, подменяющих статический
+/// <see cref="Workspace1C.Services.ScriptLaunchContextResolver.ResolverOverride"/>.
+/// Без сериализации один тест сбрасывает override другого, и резолвер начинает
+/// обращаться к реальной платформе/профилю (падение или пустой контекст).
+/// </summary>
+[CollectionDefinition("ScriptLaunchContextState", DisableParallelization = true)]
+public sealed class ScriptLaunchContextStateCollection { }
+
+/// <summary>
 /// Коллекция статиков общих авторизаций (<see cref="OneCLauncher.CommonAuthorization"/>,
 /// CommonEnterpriseAuthorization/CommonConfiguratorAuthorization): выполняется БЕЗ
 /// параллели с другими коллекциями.

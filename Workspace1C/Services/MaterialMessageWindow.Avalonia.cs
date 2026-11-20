@@ -84,7 +84,7 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             // переносились, а высота уже была посчитана — низ обрезался.
             // Ширина/высота вычисляются в ApplyFitContentSize при конечной ширине,
             // тело прокручивается, панель кнопок закреплена снизу.
-            MinWidth = 440;   // UpdateDialogSizePolicy.MinWidth
+            MinWidth = 600;   // UpdateDialogSizePolicy.MinWidth (issue #139, 1.0.1.97)
             MaxWidth = 760;   // UpdateDialogSizePolicy.MaxWidth
             MaxHeight = 640;  // UpdateDialogSizePolicy.MaxHeight
             MinHeight = 140;  // UpdateDialogSizePolicy.MinHeight

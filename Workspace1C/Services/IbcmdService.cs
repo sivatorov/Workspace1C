@@ -206,10 +206,14 @@ public static class IbcmdService
     /// (issue #79, 1.0.1.9: мастер «Развернуть тестовую копию» передаёт значения полей
     /// формы — «либо из профиля, либо вручную»; null — сохранённый профиль базы, как раньше).
     /// </summary>
-    public static Task<IbcmdResult> DumpAsync(Infobase infobase, string dtPath, BackupCredential? credential = null,
-        CancellationToken ct = default, DbmsBackupProfile? dbmsProfileOverride = null) =>
-        RunForInfobaseAsync(infobase, DumpCommand, new[] { dtPath }, credential, ct, ensureDirOf: dtPath,
-            dbmsProfileOverride: dbmsProfileOverride);
+    public static async Task<IbcmdResult> DumpAsync(Infobase infobase, string dtPath, BackupCredential? credential = null,
+        CancellationToken ct = default, DbmsBackupProfile? dbmsProfileOverride = null)
+    {
+        var result = await RunForInfobaseAsync(infobase, DumpCommand, new[] { dtPath }, credential, ct,
+            ensureDirOf: dtPath, dbmsProfileOverride: dbmsProfileOverride).ConfigureAwait(false);
+        Audit.AuditHub.Write(Audit.AuditActions.DtDump, infobase?.Name ?? string.Empty, result.Success);
+        return result;
+    }
 
     public static Task<IbcmdResult> RestoreAsync(Infobase infobase, string dtPath, BackupCredential? credential = null,
         CancellationToken ct = default) =>

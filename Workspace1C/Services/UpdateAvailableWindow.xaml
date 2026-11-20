@@ -7,7 +7,7 @@
         Icon="{StaticResource AppIcon}"
         MaxWidth="760"
         MaxHeight="640"
-        MinWidth="440"
+        MinWidth="600"
         MinHeight="140"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"

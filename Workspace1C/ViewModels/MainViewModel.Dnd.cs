@@ -96,11 +96,16 @@ public partial class MainViewModel
         }
         catch (Exception ex)
         {
+            foreach (var infobase in addedBases)
+                Services.Audit.AuditHub.Write(Services.Audit.AuditActions.InfobaseAdd, infobase.Name, false);
             _logger.Error("Ошибка сохранения списка после drag&drop добавления баз", ex);
             var error = string.Format(LocalizationManager.T("Dnd.AddError"), ex.Message);
             NotifyDroppedInfobasesError(error);
             return new DroppedBasesAddResult(added, duplicates, notRecognized, error);
         }
+
+        foreach (var infobase in addedBases)
+            Services.Audit.AuditHub.Write(Services.Audit.AuditActions.InfobaseAdd, infobase.Name, true);
 
         if (addedBases.Count > 0)
             SelectedInfobase = addedBases[^1];

@@ -85,6 +85,7 @@ public partial class MainViewModel : ViewModelBase
                 if (createDlg.ShowDialog() == true && createDlg.Result is not null)
                 {
                     Infobases.Add(createDlg.Result);
+                    Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, createDlg.Result.Name, true);
                     SelectedInfobase = createDlg.Result;
                     Save();
                     RebuildGroupTree();
@@ -111,6 +112,7 @@ public partial class MainViewModel : ViewModelBase
                 if (dialog.ShowDialog() == true)
                 {
                     Infobases.Add(dialog.Result);
+                    Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, dialog.Result.Name, true);
                     SelectedInfobase = dialog.Result;
                     Save();
                     RebuildGroupTree();
@@ -493,6 +495,7 @@ public partial class MainViewModel : ViewModelBase
         }
 
         Infobases.Remove(ib);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseRemove, ib.Name, true);
         if (ReferenceEquals(SelectedInfobase, ib))
             SelectedInfobase = null;
         Save();
@@ -1988,6 +1991,7 @@ public string HotkeyEnterprise
             Infobases.Insert(index + 1, clone);
         else
             Infobases.Add(clone);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, clone.Name, true);
 
         Save();
         RebuildGroupTree();
@@ -2054,6 +2058,7 @@ public string HotkeyEnterprise
             Infobases.Insert(index + 1, clone);
         else
             Infobases.Add(clone);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, clone.Name, true);
 
         Save();
         RebuildGroupTree();

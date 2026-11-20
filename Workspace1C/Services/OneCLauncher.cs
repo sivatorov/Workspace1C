@@ -387,6 +387,9 @@ public static partial class OneCLauncher
                 Verb = runAsAdmin ? "runas" : string.Empty
             };
             Process.Start(psi);
+            if (mode == OneCLaunchMode.Enterprise && !string.IsNullOrWhiteSpace(infobase.ExternalProcessingPath)
+                && IsSafeCliValue(infobase.ExternalProcessingPath.Trim()))
+                Audit.AuditHub.Write(Audit.AuditActions.ExternalProcessingLaunch, infobase.Name, true);
 
             // Обновляем дату последнего запуска базы.
             infobase.LastLaunchDate = DateTime.Now;
@@ -395,6 +398,9 @@ public static partial class OneCLauncher
         }
         catch (Exception ex)
         {
+            if (mode == OneCLaunchMode.Enterprise && !string.IsNullOrWhiteSpace(infobase.ExternalProcessingPath)
+                && IsSafeCliValue(infobase.ExternalProcessingPath.Trim()))
+                Audit.AuditHub.Write(Audit.AuditActions.ExternalProcessingLaunch, infobase.Name, false);
             GetLogger()?.Error(
                 string.Format(LocalizationManager.T("Launcher.LaunchFailedFormat"), ex.Message), ex);
             return false;

@@ -551,6 +551,7 @@ public partial class MainViewModel : ViewModelBase
             _allInfobases.Insert(index + 1, clone);
         else
             _allInfobases.Add(clone);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, clone.Name, true);
 
         OnPropertyChanged(nameof(Infobases));
         SaveSilently();
@@ -618,6 +619,7 @@ public partial class MainViewModel : ViewModelBase
             _allInfobases.Insert(index + 1, clone);
         else
             _allInfobases.Add(clone);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, clone.Name, true);
 
         OnPropertyChanged(nameof(Infobases));
         SaveSilently();

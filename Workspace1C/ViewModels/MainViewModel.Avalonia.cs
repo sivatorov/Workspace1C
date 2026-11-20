@@ -1854,6 +1854,7 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         _allInfobases.Add(dialog.Result);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, dialog.Result.Name, true);
         SaveSilently();
         RebuildTree();
         ExportToIbasesAfterLocalChange();
@@ -1887,6 +1888,7 @@ public partial class MainViewModel : ViewModelBase
             return;
 
         _allInfobases.Add(dialog.Result);
+        Workspace1C.Services.Audit.AuditHub.Write(Workspace1C.Services.Audit.AuditActions.InfobaseAdd, dialog.Result.Name, true);
         SaveSilently();
         RebuildTree();
         ExportToIbasesAfterLocalChange();

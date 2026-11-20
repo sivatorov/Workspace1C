@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Workspace1C.Services.Audit;
 
@@ -19,6 +21,11 @@ public static class AuditActions
     public const string ExtensionInstall = "extension.install";
     public const string ExtensionDelete = "extension.delete";
     public const string DtRestore = "dt.restore";
+    public const string DtDump = "dt.dump";
+    public const string CfLoad = "cf.load";
+    public const string InfobaseAdd = "infobase.add";
+    public const string InfobaseRemove = "infobase.remove";
+    public const string SessionUnlock = "session.unlock";
     public const string ConfigUpdate = "config.update";
     public const string CfMassLoad = "cf.massload";
     public const string TestDeploy = "testdeploy.run";
@@ -32,11 +39,12 @@ public static class AuditActions
     public const string LicenseActivate = "license.activate";
     public const string LicenseDeactivate = "license.deactivate";
     public const string ExternalProcessingsLoad = "extproc.load";
+    public const string ExternalProcessingLaunch = "extproc.launch";
 }
 
 /// <summary>Событие журнала аудита.</summary>
 /// <param name="Time">Локальное время события.</param>
-/// <param name="Actor">Пользователь ОС (DOMAIN\user или user).</param>
+/// <param name="Actor">Пользователь ОС и, если доступен, активный профиль приложения.</param>
 /// <param name="Source">Источник: <see cref="AuditSources"/>.</param>
 /// <param name="Action">Код действия: <see cref="AuditActions"/>.</param>
 /// <param name="Target">Объект действия (база, сервер, задание).</param>
@@ -59,6 +67,18 @@ public static class AuditHub
     /// <summary>Источник по умолчанию для текущего процесса (CLI/MCP переопределяют при старте).</summary>
     public static string DefaultSource { get; set; } = AuditSources.Ui;
 
+    private static readonly AsyncLocal<string?> OperationSource = new();
+
+    internal static string CurrentSource => OperationSource.Value ?? DefaultSource;
+
+    internal static async Task<T> WithSourceAsync<T>(string source, Func<Task<T>> operation)
+    {
+        var previous = OperationSource.Value;
+        OperationSource.Value = source;
+        try { return await operation().ConfigureAwait(false); }
+        finally { OperationSource.Value = previous; }
+    }
+
     /// <summary>Записывает событие (если журнал подключён).</summary>
     public static void Write(string action, string target, bool success, string? details = null, string? source = null)
     {
@@ -70,7 +90,10 @@ public static class AuditHub
             var actor = string.IsNullOrEmpty(Environment.UserDomainName) || Environment.UserDomainName == Environment.MachineName
                 ? Environment.UserName
                 : Environment.UserDomainName + "\\" + Environment.UserName;
-            sink(new AuditEvent(DateTime.Now, actor, source ?? DefaultSource, action ?? string.Empty,
+            var profile = AppServices.TryGetService<IProfileService>()?.CurrentProfile?.Name;
+            if (!string.IsNullOrWhiteSpace(profile))
+                actor += " (" + profile + ")";
+            sink(new AuditEvent(DateTime.Now, actor, source ?? CurrentSource, action ?? string.Empty,
                 target ?? string.Empty, success, MaskSecrets(details ?? string.Empty)));
         }
         catch

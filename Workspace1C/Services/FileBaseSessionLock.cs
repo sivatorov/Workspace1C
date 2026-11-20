@@ -50,6 +50,13 @@ public class FileBaseSessionLock
     /// <summary>Снимает блокировку: удаляет 1cv8.cdn из каталога файловой базы.</summary>
     public SessionLockResult Unlock(Infobase infobase)
     {
+        var result = UnlockCore(infobase);
+        Audit.AuditHub.Write(Audit.AuditActions.SessionUnlock, infobase?.Name ?? string.Empty, result.Success);
+        return result;
+    }
+
+    private static SessionLockResult UnlockCore(Infobase infobase)
+    {
         if (infobase is null)
             return SessionLockResult.Fail(LocalizationManager.T("SessionLock.NoBase"));
 
