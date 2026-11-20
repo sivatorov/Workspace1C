@@ -101,6 +101,11 @@ public class ScheduledTaskItemViewModel : ViewModelBase
         ScheduledTaskKind.InstallExtension => LocalizationManager.T("Schedule.Kind.InstallExtension"),
         ScheduledTaskKind.GitCommitConfig => LocalizationManager.T("Schedule.Kind.GitCommitConfig"),
         ScheduledTaskKind.DbmsBackup => LocalizationManager.T("Schedule.Kind.DbmsBackup"),
+        ScheduledTaskKind.SettingsSync => LocalizationManager.T("Schedule.Kind.SettingsSync"),
+        ScheduledTaskKind.TestDeploy => LocalizationManager.T("Schedule.Kind.TestDeploy"),
+        ScheduledTaskKind.Pipeline => LocalizationManager.T("Schedule.Kind.Pipeline"),
+        ScheduledTaskKind.AutoTests => LocalizationManager.T("Schedule.Kind.AutoTests"),
+        ScheduledTaskKind.PerformanceSnapshot => LocalizationManager.T("Schedule.Kind.PerformanceSnapshot"),
         _ => LocalizationManager.T("Schedule.Kind.Backup")
     };
 

@@ -182,6 +182,9 @@ public sealed class TechLogAnalysisViewModel : ViewModelBase
             _events = events;
             Recompute();
 
+            // ПРО PerformanceTrends: модуль сохраняет дневную сводку по прочитанным событиям.
+            PerfSnapshotHooks.Notify(new PerfSnapshotContext(BaseFilter, _now.Date, _events));
+
             var seconds = (DateTime.Now - started).TotalSeconds;
             StatusText = string.Format(
                 LocalizationManager.T(_events.Count == 0

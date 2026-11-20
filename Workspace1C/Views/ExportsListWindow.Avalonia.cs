@@ -26,6 +26,7 @@ public sealed class ExportsListWindow : ModalWindowBase
     private readonly ListBox _list = new();
     private readonly Button _restoreButton = new();
     private readonly Button _refreshButton = new();
+    private readonly Button _decryptButton = new();
 
     /// <param name="infobase">ИБ, в которую выполняется восстановление (может быть null).</param>
     /// <param name="mainVm">MainViewModel для операции восстановления (может быть null).</param>
@@ -89,6 +90,13 @@ public sealed class ExportsListWindow : ModalWindowBase
         refresh.Styled(ControlThemes.SecondaryButton);
         refresh.Click += async (_, _) => await RefreshItemsAsync();
 
+        _decryptButton.Content = T("Restore.Decrypt");
+        _decryptButton.Width = 120;
+        _decryptButton.Styled(ControlThemes.SecondaryButton);
+        _decryptButton.IsVisible = CloudDecryptHooks.IsAvailable;
+        _decryptButton.IsEnabled = false;
+        _decryptButton.Click += async (_, _) => await DecryptSelectedAsync();
+
         _restoreButton.Content = T("Restore.Title");
         _restoreButton.Width = 110;
         _restoreButton.Styled(ControlThemes.SecondaryButton);
@@ -104,6 +112,7 @@ public sealed class ExportsListWindow : ModalWindowBase
         close.Click += (_, _) => Close();
 
         bottom.Children.Add(refresh);
+        bottom.Children.Add(_decryptButton);
         bottom.Children.Add(_restoreButton);
         bottom.Children.Add(openFolder);
         bottom.Children.Add(close);
@@ -111,7 +120,10 @@ public sealed class ExportsListWindow : ModalWindowBase
         _list.ItemsSource = _vm.Items;
         _list.ItemTemplate = new FuncDataTemplate<BackupExportItem>((item, _) => BuildItem(item));
         _list.SelectionChanged += (_, _) =>
+        {
             _restoreButton.IsEnabled = _list.SelectedItem is not null && _infobase is not null && _mainVm is not null;
+            _decryptButton.IsEnabled = _list.SelectedItem is not null && CloudDecryptHooks.IsAvailable;
+        };
         _list.Margin = new Avalonia.Thickness(0, 0, 0, 8);
 
         DockPanel.SetDock(bottom, Dock.Bottom);
@@ -151,6 +163,20 @@ public sealed class ExportsListWindow : ModalWindowBase
         if (Selected is not { } item || _infobase is null || _mainVm is null)
             return;
         await _mainVm.RestoreAsync(_infobase, item);
+    }
+
+    /// <summary>ПРО CloudBackup: расшифровка выбранной копии паролем из настроек модуля.</summary>
+    private async System.Threading.Tasks.Task DecryptSelectedAsync()
+    {
+        if (Selected is not { } item)
+            return;
+
+        var result = await CloudDecryptHooks.DecryptAsync(item.FilePath);
+        if (result.Success)
+            _dialogs.ShowInfo(T("Restore.Decrypted") + " " + result.OutputPath, T("Restore.Decrypt"));
+        else
+            _dialogs.ShowError(result.Error ?? T("Restore.DecryptFailed"), T("Restore.Decrypt"));
+        await RefreshItemsAsync();
     }
 
     private void OpenFolder()

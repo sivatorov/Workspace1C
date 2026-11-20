@@ -326,31 +326,47 @@ public sealed class ProLicensingTests : IDisposable
     [Fact]
     public void ProFeatures_ImplementedSet_MatchesAudit()
     {
-        // Порядок ключа статуса: реализованные — «доступна», нереализованные — «в разработке».
-        Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.ServerAlerts));
-        Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.AuditLog));
-        Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.Pipelines));
-        Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.CloudBackup));
-
-        ProFeature[] implemented =
+        // Реестр реализованных функций: публичное ядро доступно всегда, модули ПРО
+        // отмечают себя при регистрации. Сбрасываем состояние, чтобы тест не зависел
+        // от того, подключены ли модули ПРО в этой сборке, и от порядка выполнения.
+        ProFeatures.ResetImplemented();
+        try
         {
-            ProFeature.ServerAlerts, ProFeature.TelegramBot, ProFeature.Mcp,
-            ProFeature.ClusterMigration, ProFeature.TestDeploy, ProFeature.MassLoadCf,
-            ProFeature.AuditLog
-        };
-        ProFeature[] planned =
+            Assert.False(ProFeatures.IsImplemented(ProFeature.AuditLog));
+            ProFeatures.MarkImplemented(ProFeature.AuditLog);
+            Assert.True(ProFeatures.IsImplemented(ProFeature.AuditLog));
+            ProFeatures.MarkImplemented(ProFeature.AuditLog); // повторный вызов идемпотентен
+
+            // Порядок ключа статуса: реализованные — «доступна», нереализованные — «в разработке».
+            Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.ServerAlerts));
+            Assert.Equal("Pro.FeatureStatus.Available", ProFeatures.StatusKey(ProFeature.AuditLog));
+            Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.Pipelines));
+            Assert.Equal("Pro.FeatureStatus.InDevelopment", ProFeatures.StatusKey(ProFeature.CloudBackup));
+
+            ProFeature[] implemented =
+            {
+                ProFeature.ServerAlerts, ProFeature.TelegramBot, ProFeature.Mcp,
+                ProFeature.ClusterMigration, ProFeature.TestDeploy, ProFeature.MassLoadCf,
+                ProFeature.AuditLog
+            };
+            ProFeature[] planned =
+            {
+                ProFeature.Pipelines, ProFeature.MultiBaseQuery, ProFeature.EnvironmentDiff,
+                ProFeature.AutoTests, ProFeature.PerformanceTrends, ProFeature.CloudBackup
+            };
+
+            foreach (var f in implemented)
+                Assert.True(ProFeatures.IsImplemented(f), f + " должен быть реализован");
+            foreach (var f in planned)
+                Assert.False(ProFeatures.IsImplemented(f), f + " должен быть помечен «в разработке»");
+
+            // Перечень покрыт полностью: реализованные + планируемые = все функции.
+            Assert.Equal(ProFeatures.All.Count, implemented.Length + planned.Length);
+        }
+        finally
         {
-            ProFeature.Pipelines, ProFeature.MultiBaseQuery, ProFeature.EnvironmentDiff,
-            ProFeature.AutoTests, ProFeature.PerformanceTrends, ProFeature.CloudBackup
-        };
-
-        foreach (var f in implemented)
-            Assert.True(ProFeatures.IsImplemented(f), f + " должен быть реализован");
-        foreach (var f in planned)
-            Assert.False(ProFeatures.IsImplemented(f), f + " должен быть помечен «в разработке»");
-
-        // Перечень покрыт полностью: реализованные + планируемые = все функции.
-        Assert.Equal(ProFeatures.All.Count, implemented.Length + planned.Length);
+            ProFeatures.ResetImplemented();
+        }
     }
 
     /// <summary>

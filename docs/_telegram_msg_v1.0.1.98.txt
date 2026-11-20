@@ -1,0 +1,11 @@
+🚀 Workspace 1C 1.0.1.98 — модули ПРО 2.x
+
+• Автотесты в тестовом контуре: Vanessa Automation, YAXUnit и произвольная команда, разбор JUnit, таймаут, первые N упавших тестов, планировщик, шаг конвейера и MCP run_autotests.
+• Тренды производительности: дневные снимки p50/p95/max и APDEX, сравнение периодов, топ ухудшившихся контекстов, оповещение о росте p95.
+• Копии в S3: собственная подпись AWS Signature V4, multipart по 64 МБ, потоковое шифрование W1CENC1, ротация, CLI --decrypt и расшифровка из «Списка выгрузок».
+• Все шесть модулей ПРО зарегистрированы; публичное ядро получило хуки SchedulerExecutors, BackupUploadHooks, CloudDecryptHooks, PerfSnapshotHooks, McpToolHooks и ProCliCommands.
+
+Windows: Workspace1C.exe
+Linux: Workspace1C-linux-x64
+
+Релиз: https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.98

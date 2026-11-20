@@ -172,6 +172,10 @@ public class BackupService : IBackupService
             result.Success = true;
             result.CreatedFiles = created;
             result.PurgedFiles = purged;
+
+            // ПРО CloudBackup: готовый файл получают загрузчики (S3, шифрование).
+            await RunUploadHooksAsync(created, infobase.Name, scenario.Name, "scenario").ConfigureAwait(false);
+
             // Метка последней успешной копии для колонки «Последняя копия» (0.3.9.86).
             if (infobase is not null)
                 infobase.LastBackupUtc = DateTime.UtcNow;
@@ -182,6 +186,19 @@ public class BackupService : IBackupService
             _logger?.Error("Ошибка выполнения сценария резервирования", ex);
             result.ErrorMessage = ex.Message;
             return result;
+        }
+    }
+
+    private static async Task RunUploadHooksAsync(IEnumerable<string> files, string infobaseName,
+        string scenarioName, string kind)
+    {
+        foreach (var file in files)
+        {
+            if (string.IsNullOrWhiteSpace(file) || !File.Exists(file))
+                continue;
+            await BackupUploadHooks.RunAsync(
+                new BackupUploadContext(file, infobaseName ?? string.Empty, scenarioName ?? string.Empty, kind))
+                .ConfigureAwait(false);
         }
     }
 

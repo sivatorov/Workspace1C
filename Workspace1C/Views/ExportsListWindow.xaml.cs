@@ -38,6 +38,8 @@ public partial class ExportsListWindow : Window
         Title = T("Restore.Title");
         RefreshButton.Content = T("Common.Refresh");
         RestoreButton.Content = T("Restore.Title");
+        // ПРО CloudBackup: кнопка расшифровки видна только при подключённом модуле.
+        DecryptButton.Visibility = CloudDecryptHooks.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
         OpenFolderButton.Content = T("Restore.OpenFolder");
         ColFileName.Header = T("Restore.FileColumn");
         ColDirectory.Header = T("Restore.DirectoryColumn");
@@ -74,6 +76,28 @@ public partial class ExportsListWindow : Window
     {
         // Активность «Восстановить» зависит и от выбранного файла, и от наличия ИБ.
         RestoreButton.IsEnabled = Selected is not null && _infobase is not null && _mainVm is not null;
+        DecryptButton.IsEnabled = Selected is not null && CloudDecryptHooks.IsAvailable;
+    }
+
+    /// <summary>ПРО CloudBackup: расшифровка выбранной копии паролем из настроек модуля.</summary>
+    private async void Decrypt_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (Selected is not { } item)
+                return;
+            var result = await CloudDecryptHooks.DecryptAsync(item.FilePath);
+            if (result.Success)
+                _dialogs.ShowInfo(T("Restore.Decrypted") + " " + result.OutputPath, T("Restore.Decrypt"));
+            else
+                _dialogs.ShowError(result.Error ?? T("Restore.DecryptFailed"), T("Restore.Decrypt"));
+            await RefreshItemsAsync();
+        }
+        catch (System.Exception ex)
+        {
+            try { AppServices.TryGetService<Services.IAppLogger>()?.Error("Ошибка расшифровки копии", ex); } catch { /* лог не роняет обработчик */ }
+            _dialogs.ShowError(ex.Message, T("Restore.Decrypt"));
+        }
     }
 
     private async void Refresh_Click(object sender, RoutedEventArgs e)

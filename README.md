@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.97-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.98-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.97**
-(поддерживается **7517 юнит-тестов**).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.98**
+(поддерживается **7545 юнит-тестов** публичного ядра и **114 тестов ПРО**).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,20 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Модули ПРО 2.x: автотесты, тренды производительности и копии в S3 (1.0.1.98,
+  Windows и Linux)** — реализованы и подключены все шесть модулей редакции ПРО:
+  конвейеры обслуживания, запросы по нескольким базам, сравнение окружений,
+  журнал аудита, а также новые автотесты в тестовом контуре (`AutoTests`),
+  тренды производительности по техжурналу (`PerformanceTrends`) и копии в S3
+  с шифрованием (`CloudBackup`). Автотесты разбирают JUnit Vanessa Automation и
+  YAXUnit, работают по расписанию и как шаг конвейера; тренды сохраняют дневные
+  снимки p50/p95/max и APDEX и сравнивают периоды; копии в S3 используют
+  собственную подпись AWS Signature V4, multipart по 64 МБ, потоковое
+  AES-256-GCM `W1CENC1`, ротацию облачных копий, CLI `--decrypt` и расшифровку
+  из «Списка выгрузок». Публичное ядро получило точки расширения
+  `SchedulerExecutors`, `BackupUploadHooks`, `CloudDecryptHooks`,
+  `PerfSnapshotHooks`, `McpToolHooks`, `ProCliCommands` и
+  `ProFeatures.MarkImplemented`.
 - **Иконки панели, окно копии СУБД и диалог обновления (1.0.1.97,
   Windows и Linux)** — значки командной панели списка баз больше не смещаются
   и не обрезаются: внутренний отступ кнопок уменьшен, иконка 18×18 помещается
@@ -1767,7 +1781,7 @@ Linux-порт выполнен и включает Avalonia UI, сервисы 
 
 - инструменты администратора публичного ядра (в редакции 1.0.x — бесплатны, ключ потребуется с 2.0): мониторинг и оповещения (`ServerAlerts`), команды Telegram-бота (`TelegramBot`), MCP-сервер для ИИ-агентов — `--mcp` (`Mcp`), миграция баз между кластерами (`ClusterMigration`), тестовый контур / «Развернуть тестовую копию» (`TestDeploy`), массовая загрузка конфигурации из .cf (`MassLoadCf`);
 - модуль журнала аудита действий программы (`AuditLog`);
-- в разработке (планируются в 2.x): конвейеры обслуживания (`Pipelines`), консоль запросов по нескольким базам (`MultiBaseQuery`), сравнение окружения баз (`EnvironmentDiff`), автотесты (`AutoTests`), тренды производительности (`PerformanceTrends`), копии в S3 (`CloudBackup`).
+- модули 2.x: конвейеры обслуживания (`Pipelines`), консоль запросов по нескольким базам (`MultiBaseQuery`), сравнение окружения баз (`EnvironmentDiff`), автотесты в тестовом контуре (`AutoTests`), тренды производительности по техжурналу (`PerformanceTrends`), копии в S3 и шифрование копий (`CloudBackup`).
 
 **Как купить:**
 

@@ -72,7 +72,26 @@ public enum ScheduledTaskKind
     /// тест из прода». Источник — база сценария, выполняет
     /// <see cref="Services.TestDeployService"/>.
     /// </summary>
-    TestDeploy
+    TestDeploy,
+
+    /// <summary>
+    /// Конвейер обслуживания (ПРО 2.x): имя конвейера — в
+    /// <see cref="ScheduledTask.ScenarioId"/>, исполнитель регистрируется модулем
+    /// <c>Pipelines</c> через <see cref="Services.SchedulerExecutors"/>.
+    /// </summary>
+    Pipeline,
+
+    /// <summary>
+    /// Автотесты в тестовом контуре (ПРО 2.x): Vanessa Automation / YAXUnit,
+    /// исполнитель регистрируется модулем <c>AutoTests</c>.
+    /// </summary>
+    AutoTests,
+
+    /// <summary>
+    /// Снимок трендов производительности по ТЖ (ПРО 2.x): дневная сводка по базам,
+    /// исполнитель регистрируется модулем <c>PerformanceTrends</c>.
+    /// </summary>
+    PerformanceSnapshot
 }
 
 /// <summary>

@@ -10,6 +10,8 @@
         <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button x:Name="RefreshButton" Content="{loc:Loc Common.Refresh}" MinWidth="96" Margin="0,0,8,0" Padding="12,5"
                     Style="{DynamicResource SecondaryButton}" Click="Refresh_Click"/>
+            <Button x:Name="DecryptButton" Content="{loc:Loc Restore.Decrypt}" MinWidth="110" Margin="0,0,8,0" Padding="12,5"
+                    Style="{DynamicResource SecondaryButton}" Click="Decrypt_Click" Visibility="Collapsed"/>
             <Button x:Name="RestoreButton" Content="{loc:Loc Common.Restore}" MinWidth="96" Margin="0,0,8,0" Padding="12,5"
                     Style="{DynamicResource SecondaryButton}" Click="Restore_Click"/>
             <Button x:Name="OpenFolderButton" Content="{loc:Loc Common.OpenFolder}" MinWidth="96" Margin="0,0,8,0" Padding="12,5"

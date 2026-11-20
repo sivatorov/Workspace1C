@@ -40,6 +40,32 @@ public static class AuditActions
     public const string LicenseDeactivate = "license.deactivate";
     public const string ExternalProcessingsLoad = "extproc.load";
     public const string ExternalProcessingLaunch = "extproc.launch";
+
+    // ---- Модули ПРО 2.x (docs/plans/plan-v2-pro-modules.md) ----
+
+    /// <summary>Прогон конвейера обслуживания (Pipelines).</summary>
+    public const string PipelineRun = "pipeline.run";
+
+    /// <summary>Отдельный шаг конвейера (Pipelines).</summary>
+    public const string PipelineStep = "pipeline.step";
+
+    /// <summary>Запрос по нескольким базам (MultiBaseQuery).</summary>
+    public const string QueryRun = "query.run";
+
+    /// <summary>Сравнение окружения баз (EnvironmentDiff).</summary>
+    public const string EnvDiffRun = "envdiff.run";
+
+    /// <summary>Прогон автотестов (AutoTests).</summary>
+    public const string AutoTestRun = "autotest.run";
+
+    /// <summary>Снимок трендов производительности (PerformanceTrends).</summary>
+    public const string PerfSnapshot = "perf.snapshot";
+
+    /// <summary>Загрузка резервной копии во внешнее хранилище (CloudBackup).</summary>
+    public const string CloudUpload = "cloud.upload";
+
+    /// <summary>Расшифровка резервной копии (CloudBackup).</summary>
+    public const string CloudDecrypt = "cloud.decrypt";
 }
 
 /// <summary>Событие журнала аудита.</summary>

@@ -55,7 +55,13 @@ public enum CliCommandKind
     LicenseInfo,
 
     /// <summary>Активация ключа ПРО (--activate "W1C2.…", 2.0).</summary>
-    Activate
+    Activate,
+
+    /// <summary>Запуск конвейера обслуживания (--pipeline, ПРО 2.x).</summary>
+    Pipeline,
+
+    /// <summary>Расшифровка резервной копии (--decrypt, ПРО 2.x).</summary>
+    Decrypt
 }
 
 /// <summary>Общие параметры любой команды CLI.</summary>
@@ -254,6 +260,23 @@ public static class CliArgs
                 continue;
             }
 
+            // ---- Команды модулей ПРО (2.x): обработчики регистрирует модуль, ----
+            // ---- без лицензии команда завершается кодом 6 («требуется ПРО»). ----
+
+            if (string.Equals(key, "--pipeline", StringComparison.OrdinalIgnoreCase))
+            {
+                action = CliCommandKind.Pipeline;
+                target = value ?? ReadNextValue(args, ref i) ?? string.Empty;
+                continue;
+            }
+
+            if (string.Equals(key, "--decrypt", StringComparison.OrdinalIgnoreCase))
+            {
+                action = CliCommandKind.Decrypt;
+                target = value ?? ReadNextValue(args, ref i) ?? string.Empty;
+                continue;
+            }
+
             // ---- Лицензия редакции ПРО (2.0, docs/pro/PRO-EDITION.md): ----
 
             if (string.Equals(key, "--license-info", StringComparison.OrdinalIgnoreCase))
@@ -373,6 +396,22 @@ public static class CliArgs
                 Kind = action,
                 Options = options,
                 Error = "Команда --eventlog требует цель выборки (--target <база или каталог файловой ИБ>)"
+            };
+
+        if (action == CliCommandKind.Pipeline && string.IsNullOrWhiteSpace(target))
+            return new CliParseResult
+            {
+                Kind = action,
+                Options = options,
+                Error = "Команда --pipeline требует имя конвейера (--pipeline <имя>)"
+            };
+
+        if (action == CliCommandKind.Decrypt && string.IsNullOrWhiteSpace(target))
+            return new CliParseResult
+            {
+                Kind = action,
+                Options = options,
+                Error = "Команда --decrypt требует путь к файлу (--decrypt <файл>)"
             };
 
         return new CliParseResult { Kind = action, Target = target, Options = options };

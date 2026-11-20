@@ -73,7 +73,7 @@ public static class McpToolRegistry
     /// безопасности <paramref name="safetyGate"/> (не null).</summary>
     public static IReadOnlyList<McpToolDefinition> Build(McpSafetyGate safetyGate)
     {
-        return new List<McpToolDefinition>
+        var tools = new List<McpToolDefinition>
         {
             ListInfobasesTool(),
             LaunchInfobaseTool(),
@@ -83,6 +83,14 @@ public static class McpToolRegistry
             ScheduledJobsStateTool(),
             TerminateSessionTool(safetyGate),
         };
+
+        // Инструменты модулей ПРО (2.x): одноимённые встроенные имеют приоритет.
+        foreach (var tool in McpToolHooks.Tools)
+        {
+            if (!tools.Exists(t => string.Equals(t.Name, tool.Name, StringComparison.Ordinal)))
+                tools.Add(tool);
+        }
+        return tools;
     }
 
     // ------------------------------------------------------------ list_infobases

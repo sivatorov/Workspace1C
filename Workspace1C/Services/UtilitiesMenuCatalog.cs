@@ -518,7 +518,19 @@ public static class UtilitiesMenuCatalog
             return string.Empty;
         if (wpfIconKey.StartsWith("Icon", StringComparison.Ordinal))
             return wpfIconKey;
-        return _wpfIconToGeometryMap.TryGetValue(wpfIconKey, out var geometryKey) ? geometryKey : string.Empty;
+        if (_wpfIconToGeometryMap.TryGetValue(wpfIconKey, out var geometryKey))
+            return geometryKey;
+
+        // Пункты, зарегистрированные модулями ПРО (RegisterExternal) уже после
+        // построения статического словаря, должны резолвиться так же: ищем пару
+        // в текущем каталоге, иначе иконка внешнего пункта молча пропадала.
+        foreach (var item in All)
+        {
+            if (string.Equals(item.WpfIconKind, wpfIconKey, StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(item.AvaloniaIconKey))
+                return item.AvaloniaIconKey;
+        }
+        return string.Empty;
     }
 
     private static IReadOnlyList<UtilitiesMenuItem> BuildAll()

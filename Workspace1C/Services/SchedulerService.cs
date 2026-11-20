@@ -323,6 +323,9 @@ public class SchedulerService : IDisposable
         ScheduledTaskKind.DbmsBackup => LocalizationManager.T("Schedule.Kind.DbmsBackup"),
         ScheduledTaskKind.SettingsSync => LocalizationManager.T("Schedule.Kind.SettingsSync"),
         ScheduledTaskKind.TestDeploy => LocalizationManager.T("Schedule.Kind.TestDeploy"),
+        ScheduledTaskKind.Pipeline => LocalizationManager.T("Schedule.Kind.Pipeline"),
+        ScheduledTaskKind.AutoTests => LocalizationManager.T("Schedule.Kind.AutoTests"),
+        ScheduledTaskKind.PerformanceSnapshot => LocalizationManager.T("Schedule.Kind.PerformanceSnapshot"),
         _ => LocalizationManager.T("Schedule.Kind.Backup")
     };
 
@@ -336,10 +339,29 @@ public class SchedulerService : IDisposable
         return result;
     }
 
+    /// <summary>
+    /// Диспетчеризация задания внешнего (ПРО) вида: обработчик регистрируется модулем
+    /// через <see cref="SchedulerExecutors"/>. null — обработчик не зарегистрирован,
+    /// дальше работает встроенный switch.
+    /// </summary>
+    internal static async Task<BackupRunResult?> ExecuteRegisteredAsync(ScheduledTask task,
+        CancellationToken ct = default)
+    {
+        if (task is not null && SchedulerExecutors.TryGet(task.Kind, out var executor))
+            return await executor(task, ct).ConfigureAwait(false);
+        return null;
+    }
+
     private async Task<BackupRunResult?> ExecuteCoreAsync(ScheduledTask task)
     {
         try
         {
+            // Виды заданий, добавленные модулями ПРО (Pipeline, AutoTests): обработчик
+            // регистрируется в RegisterProModules; без модуля — встроенный switch ниже.
+            var external = await ExecuteRegisteredAsync(task).ConfigureAwait(false);
+            if (external is not null)
+                return external;
+
             return task.Kind switch
             {
                 ScheduledTaskKind.Backup => await RunBackupAsync(task).ConfigureAwait(false),

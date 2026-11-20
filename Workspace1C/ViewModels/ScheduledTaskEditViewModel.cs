@@ -195,8 +195,14 @@ public class ScheduledTaskEditViewModel : ViewModelBase
     /// строится на этом маппинге + <see cref="ProGate.Ensure"/>, чтобы ПРО-задание
     /// нельзя было создать без лицензии (иначе оно падало бы при каждом запуске).
     /// </summary>
-    public static ProFeature? RequiredProFeature(ScheduledTaskKind kind) =>
-        kind == ScheduledTaskKind.TestDeploy ? ProFeature.TestDeploy : null;
+    public static ProFeature? RequiredProFeature(ScheduledTaskKind kind) => kind switch
+    {
+        ScheduledTaskKind.TestDeploy => ProFeature.TestDeploy,
+        ScheduledTaskKind.Pipeline => ProFeature.Pipelines,
+        ScheduledTaskKind.AutoTests => ProFeature.AutoTests,
+        ScheduledTaskKind.PerformanceSnapshot => ProFeature.PerformanceTrends,
+        _ => null
+    };
 
     /// <summary>Нужен ли выбор базы (кроме обновления приложения).</summary>
     public bool NeedsInfobase => Kind is ScheduledTaskKind.Backup
@@ -241,7 +247,12 @@ public class ScheduledTaskEditViewModel : ViewModelBase
             new ScheduledTaskOption("SettingsSync", LocalizationManager.T("Schedule.Kind.SettingsSync")),
             // Развёртывание тестовой копии (п.10, 1.0.0.92): «каждый понедельник
             // обновлять тест из прода» — сценарий TestDeployScenario + TestDeployService.
-            new ScheduledTaskOption("TestDeploy", LocalizationManager.T("Schedule.Kind.TestDeploy"))
+            new ScheduledTaskOption("TestDeploy", LocalizationManager.T("Schedule.Kind.TestDeploy")),
+            // ПРО 2.x: конвейеры обслуживания и автотесты — исполнители регистрируются
+            // модулями через SchedulerExecutors (без лицензии/модуля вид не выполняется).
+            new ScheduledTaskOption("Pipeline", LocalizationManager.T("Schedule.Kind.Pipeline")),
+            new ScheduledTaskOption("AutoTests", LocalizationManager.T("Schedule.Kind.AutoTests")),
+            new ScheduledTaskOption("PerformanceSnapshot", LocalizationManager.T("Schedule.Kind.PerformanceSnapshot"))
         };
 #if DEBUG
         // Диагностика локализации опций (issue #372): язык и текст первой опции — чтобы

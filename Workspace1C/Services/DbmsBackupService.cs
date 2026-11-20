@@ -509,6 +509,12 @@ public static class DbmsBackupService
                 log?.Invoke(LocalizationManager.T("Dbms.LogUploaded"));
             }
 
+            // ПРО CloudBackup: готовый файл получают загрузчики (S3, шифрование).
+            // Ошибка загрузчика не делает копию неуспешной.
+            await BackupUploadHooks.RunAsync(
+                new BackupUploadContext(target, profile.InfobaseId, profile.Database, "dbms"), ct)
+                .ConfigureAwait(false);
+
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Done));
             return result;
         }

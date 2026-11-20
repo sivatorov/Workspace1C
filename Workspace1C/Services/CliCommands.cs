@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using Workspace1C.Models;
 using Workspace1C.Services.EventLog;
+using Workspace1C.Services.Licensing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Workspace1C.Services;
@@ -38,6 +39,12 @@ public static class CliCommands
             CliCommandKind.Check => ExecuteCheck(command, parsed.Options),
             CliCommandKind.LicenseInfo => CliLicenseCommands.Info(command, parsed.Options),
             CliCommandKind.Activate => CliLicenseCommands.Activate(command, parsed.Options),
+            // Команды модулей ПРО (2.x): обработчик регистрирует модуль; без
+            // лицензии — код 6 (ProRequired) внутри ProCliCommands.
+            CliCommandKind.Pipeline => ProCliCommands
+                .ExecuteAsync(parsed, ProFeature.Pipelines).GetAwaiter().GetResult(),
+            CliCommandKind.Decrypt => ProCliCommands
+                .ExecuteAsync(parsed, ProFeature.CloudBackup).GetAwaiter().GetResult(),
             _ => Unsupported(command, parsed.Options)
         };
     }

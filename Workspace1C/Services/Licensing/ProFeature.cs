@@ -56,6 +56,9 @@ public enum ProFeature
 /// <summary>Метаданные функций ПРО: ключи локализации названий.</summary>
 public static class ProFeatures
 {
+    private static readonly HashSet<ProFeature> ImplementedFeatures = new();
+    private static readonly object Sync = new();
+
     /// <summary>Все функции ПРО в порядке показа в окне «Лицензия».</summary>
     public static IReadOnlyList<ProFeature> All { get; } = (ProFeature[])System.Enum.GetValues(typeof(ProFeature));
 
@@ -69,13 +72,36 @@ public static class ProFeatures
     public static bool IsInPublicCore(ProFeature feature) => feature <= ProFeature.MassLoadCf;
 
     /// <summary>
-    /// Функция реализована в коде: публичное ядро плюс модуль журнала аудита (AuditLog)
-    /// официальной сборки. Остальные из перечня 2.x пока только объявлены — в окне
-    /// «Лицензия» и в <c>--license-info</c> они помечаются «в разработке»
-    /// (аудит лицензирования ПРО, 2026-11). Не влияет на <see cref="EditionService.Has"/>.
+    /// Отмечает функцию как реализованную. Вызывается модулем ПРО при регистрации
+    /// (<c>RegisterProModules</c>): в бесплатной сборке без модуля функция остаётся
+    /// «в разработке». Повторный вызов идемпотентен.
     /// </summary>
-    public static bool IsImplemented(ProFeature feature) =>
-        IsInPublicCore(feature) || feature == ProFeature.AuditLog;
+    public static void MarkImplemented(ProFeature feature)
+    {
+        lock (Sync)
+            ImplementedFeatures.Add(feature);
+    }
+
+    /// <summary>Сбрасывает реестр реализованных функций (тесты).</summary>
+    internal static void ResetImplemented()
+    {
+        lock (Sync)
+            ImplementedFeatures.Clear();
+    }
+
+    /// <summary>
+    /// Функция реализована: публичное ядро (было в 1.0.x) или модуль ПРО,
+    /// отметивший себя через <see cref="MarkImplemented"/>. Не влияет на
+    /// <see cref="EditionService.Has"/>: реализованность и доступность по лицензии —
+    /// разные признаки.
+    /// </summary>
+    public static bool IsImplemented(ProFeature feature)
+    {
+        if (IsInPublicCore(feature))
+            return true;
+        lock (Sync)
+            return ImplementedFeatures.Contains(feature);
+    }
 
     /// <summary>
     /// Ключ локализации статуса функции: «доступна» (реализована) или

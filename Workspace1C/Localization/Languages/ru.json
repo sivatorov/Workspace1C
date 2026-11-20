@@ -1,4 +1,7 @@
 {
+    "Restore.Decrypt": "Расшифровать",
+    "Restore.Decrypted": "Расшифровано:",
+    "Restore.DecryptFailed": "Не удалось расшифровать копию",
   "code": "ru",
   "name": "Русский",
   "strings": {
@@ -4487,6 +4490,9 @@
     "Schedule.Kind.DbmsBackup": "Копия средствами СУБД",
     "Schedule.Kind.SettingsSync": "Синхронизация настроек",
     "Schedule.Kind.TestDeploy": "Развернуть тестовую копию",
+    "Schedule.Kind.Pipeline": "Конвейер обслуживания",
+    "Schedule.Kind.AutoTests": "Автотесты (Vanessa / YAXUnit)",
+    "Schedule.Kind.PerformanceSnapshot": "Снимок трендов производительности",
     "TestDeploy.MenuItem": "Развернуть тестовую копию…",
     "TestDeploy.Title": "Развернуть тестовую копию",
     "TestDeploy.OpenBaseProperties": "Свойства исходной базы…",

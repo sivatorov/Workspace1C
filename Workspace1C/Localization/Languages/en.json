@@ -1,4 +1,7 @@
 {
+    "Restore.Decrypt": "Decrypt",
+    "Restore.Decrypted": "Decrypted:",
+    "Restore.DecryptFailed": "Failed to decrypt the backup",
   "code": "en",
   "name": "English",
   "strings": {
@@ -4488,6 +4491,9 @@
     "Schedule.Kind.DbmsBackup": "DBMS backup",
     "Schedule.Kind.SettingsSync": "Settings sync",
     "Schedule.Kind.TestDeploy": "Deploy test copy",
+    "Schedule.Kind.Pipeline": "Maintenance pipeline",
+    "Schedule.Kind.AutoTests": "Automated tests (Vanessa / YAXUnit)",
+    "Schedule.Kind.PerformanceSnapshot": "Performance trends snapshot",
     "TestDeploy.MenuItem": "Deploy test copy…",
     "TestDeploy.Title": "Deploy test copy",
     "TestDeploy.OpenBaseProperties": "Source database properties…",
