@@ -23,7 +23,6 @@ namespace Workspace1C.Tests;
 /// чистой ViewModel.
 /// </para>
 /// </summary>
-[Collection("LocalDataStoreState")]
 public sealed class Issue142MaintenanceCenterTests
 {
     // ===================== WPF: порядок инициализации =====================
@@ -120,8 +119,6 @@ public sealed class Issue142MaintenanceCenterTests
     public void SwitchingPeriods_RefreshesHistoryRows()
     {
         var directory = Directory.CreateTempSubdirectory("workspace1c-issue142-");
-        var previousDirectory = FeatureDataStore.DirectoryOverride;
-        FeatureDataStore.DirectoryOverride = directory.FullName;
         try
         {
             var today = DateTime.UtcNow.Date;
@@ -132,8 +129,10 @@ public sealed class Issue142MaintenanceCenterTests
                 new SizeSnapshotEntry { InfobaseId = infobase.Id, DateUtc = today.AddDays(-olderDays[index]), SizeBytes = 1000 },
                 new SizeSnapshotEntry { InfobaseId = infobase.Id, DateUtc = today, SizeBytes = 2000 },
             }).ToArray();
-            new SizeHistoryStore(directory.FullName).Save(snapshots);
-            var vm = CreateViewModel(bases);
+            var historyStore = new SizeHistoryStore(directory.FullName);
+            historyStore.Save(snapshots);
+            var vm = new MaintenanceCenterViewModel(bases, () => { }, _ => { },
+                DiskFreeSpaceHelper.DefaultWarningGb, historyStore);
 
             foreach (var (days, count) in new[] { (7, 1), (30, 2), (90, 3), (7, 1) })
             {
@@ -145,7 +144,6 @@ public sealed class Issue142MaintenanceCenterTests
         }
         finally
         {
-            FeatureDataStore.DirectoryOverride = previousDirectory;
             directory.Delete(recursive: true);
         }
     }

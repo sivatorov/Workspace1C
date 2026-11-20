@@ -241,9 +241,20 @@ public sealed class MaintenanceCenterViewModel : ViewModelBase
         Action checkAvailability,
         Action<Infobase> openBase,
         int freeSpaceWarningGb = DiskFreeSpaceHelper.DefaultWarningGb)
+        : this(infobases, checkAvailability, openBase, freeSpaceWarningGb, null)
+    {
+    }
+
+    internal MaintenanceCenterViewModel(
+        IEnumerable<Infobase> infobases,
+        Action checkAvailability,
+        Action<Infobase> openBase,
+        int freeSpaceWarningGb,
+        SizeHistoryStore? historyStore)
     {
         _checkAvailability = checkAvailability;
         _openBase = openBase;
+        _historyStore = historyStore;
 
         var cache = LoadUpdateCache();
         foreach (var ib in infobases)
