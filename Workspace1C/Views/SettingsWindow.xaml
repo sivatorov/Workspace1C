@@ -2692,26 +2692,9 @@
                                                     <TextBlock Text="{loc:Loc Settings.Bases.ImportV8i}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
-                                            <!-- Экспорт/импорт в произвольный файл *.v8i (issue #29): подготовка общего
-                                                 списка информационных баз в отдельном профиле, не затрагивая основной список. -->
-                                            <Button Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Padding="10,8"
-                                                    HorizontalAlignment="Stretch"
-                                                    Click="OnExportIbasesV8iFile_Click"
-                                                    ToolTip="{loc:Loc Settings.Bases.ExportV8iFileTooltip}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="Upload" Width="16" Height="16" Foreground="{DynamicResource PurpleAccentBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{loc:Loc Settings.Bases.ExportV8iFile}" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                            <Button Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Padding="10,8"
-                                                    HorizontalAlignment="Stretch"
-                                                    Click="OnImportIbasesV8iFile_Click"
-                                                    ToolTip="{loc:Loc Settings.Bases.ImportV8iFileTooltip}">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <materialDesign:PackIcon Kind="FileDownload" Width="16" Height="16" Foreground="{DynamicResource WarningBrush}" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="{loc:Loc Settings.Bases.ImportV8iFile}" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
+                                            <!-- Экспорт/импорт в произвольный файл *.v8i убран из настроек:
+                                                 это дубль основного пути «Инструменты» → «Списки баз»
+                                                 (навигация 1.0.1.99). Сами операции доступны в меню раздела. -->
                                             <!-- Определение/обновление конфигураций всех баз (issue #236). -->
                                             <Button Style="{DynamicResource SecondaryButton}" Margin="0,0,0,8" Padding="10,8"
                                                     HorizontalAlignment="Stretch"

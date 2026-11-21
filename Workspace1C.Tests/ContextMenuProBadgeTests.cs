@@ -105,9 +105,9 @@ public sealed class ContextMenuProBadgeTests : IDisposable
             var testDeploy = ContextMenuCatalog.Find("TestDeploy")!;
             var massLoadCf = ContextMenuCatalog.Find("MassLoadCf")!;
 
-            // Тот же формат суффикса, что в UtilitiesMenuItem.DisplayText: «  · ПРО».
-            Assert.EndsWith("  · " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
-            Assert.EndsWith("  · " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
+            // Тот же формат суффикса, что в UtilitiesMenuItem.DisplayText: « *».
+            Assert.EndsWith(" " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
+            Assert.EndsWith(" " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {
@@ -128,7 +128,8 @@ public sealed class ContextMenuProBadgeTests : IDisposable
         var testDeploy = ContextMenuCatalog.Find("TestDeploy")!;
         var massLoadCf = ContextMenuCatalog.Find("MassLoadCf")!;
 
-        Assert.DoesNotContain("· " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
-        Assert.DoesNotContain("· " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
+        Assert.DoesNotContain(" " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
+        Assert.DoesNotContain(" " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
     }
+
 }

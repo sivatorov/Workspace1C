@@ -279,6 +279,27 @@ public partial class MainWindow
     }
 
     /// <summary>
+    /// Клик по кнопке сценарного раздела (навигация 1.0.1.99): открывает меню только
+    /// этого раздела — «Серверы», «Обслуживание», «Инструменты» или «Ещё».
+    /// Меню строится динамически и открывается отложенно, как и «Утилиты» (issue #282).
+    /// </summary>
+    private void OnSectionMenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not System.Windows.Controls.Button btn)
+            return;
+        if (btn.Tag is not string section || string.IsNullOrWhiteSpace(section))
+            return;
+
+        var menu = BuildUtilitiesMenu(section);
+        menu.PlacementTarget = btn;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        menu.DataContext = DataContext;
+        Dispatcher.BeginInvoke(
+            new Action(() => menu.IsOpen = true),
+            System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    /// <summary>
     /// ПКМ по заголовку «Утилиты» (issue #374): сразу открывает редактор структуры меню,
     /// минуя окно настроек и контекстное меню с единственной командой. Событие помечается
     /// обработанным, чтобы не сработал левый клик (открытие меню «Утилиты»).

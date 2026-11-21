@@ -634,15 +634,11 @@
                             <!-- Вертикальный разделитель: отделяет группу «Правка» от «Управление списком» -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
-                            <!-- «Управление списком»: очистить кеш, выгрузка, синхронизация, проверка -->
-                            <Button Command="{Binding ClearCacheCommand}"
-                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
-                                    ToolTip="{loc:Loc Main.ClearCacheTooltip}">
-                                <materialDesign:PackIcon Kind="Broom" Width="18" Height="18" Foreground="{DynamicResource WarningBrush}"/>
-                            </Button>
                             <!-- Индикатор выгрузки .dt/.cf: появляется при запуске пакетной операции,
                                  анимируется (стрелка вверх подпрыгивает) и скрывается по её завершении.
-                                 При наведении показывает сводку о текущей выгрузке. -->
+                                 При наведении показывает сводку о текущей выгрузке.
+                                 Очистка кеша, синхронизация с ibases.v8i и проверка доступности
+                                 перенесены в разделы «Обслуживание» и «Инструменты» (1.0.1.99). -->
                             <Button x:Name="ExportIndicatorButton"
                                     Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
                                     Visibility="{Binding IsExporting, Converter={StaticResource BoolToVis}}"
@@ -654,17 +650,6 @@
                                         <TranslateTransform x:Name="ExportIndicatorBounce" Y="0"/>
                                     </materialDesign:PackIcon.RenderTransform>
                                 </materialDesign:PackIcon>
-                            </Button>
-                            <Button Command="{Binding SynchronizeWithIbasesCommand}"
-                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
-                                    ToolTip="{loc:Loc Main.SyncDetailedTooltip}">
-                                <materialDesign:PackIcon Kind="Sync" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
-                            </Button>
-                            <Button Command="{Binding CheckAvailabilityCommand}"
-                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0"
-                                    ToolTip="{loc:Loc Main.CheckAvailabilityTooltip}">
-                                <Path Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconSonar}" Fill="{DynamicResource InfoBrush}"/>
                             </Button>
                             <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ):
                                  иконка набора инструментов сразу после «Проверить доступность
@@ -681,51 +666,56 @@
                             <!-- Вертикальный разделитель: отделяет группу «Управление списком» от «Настройки» -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
-                            <!-- «Утилиты»: общие команды, не привязанные к конкретной базе (issue #262).
-                                 Раньше такие команды лежали в контекстном меню базы; теперь собраны
-                                 в отдельное подменю общей панели, куда можно добавлять новые.
-                                 Подпись рядом с иконкой показывается как на Linux (issue #282).
-                                 С 0.3.12.29 (issue #374) меню строится ДИНАМИЧЕСКИ в коде
-                                 (BuildUtilitiesMenu, см. MainWindow.UtilitiesMenu.cs) по каталогу
-                                 UtilitiesMenuCatalog + компоновке UtilitiesMenuLayout. -->
-                            <Button x:Name="UtilitiesButton" Click="OnUtilitiesMenuButton_Click"
-                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
+                            <!-- Навигация 1.0.1.99: четыре сценарных раздела вместо одной кнопки
+                                 «Утилиты». Каждая кнопка открывает только свой раздел, меню
+                                 строится динамически (BuildUtilitiesMenu) по компоновке. -->
+                            <Button Tag="Servers" Click="OnSectionMenuButton_Click"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
-                                    Width="Auto" MinWidth="32"
-                                    ToolTip="{loc:Loc Main.UtilitiesTooltip}">
-                                <!-- ПКМ по заголовку «Утилиты» (issue #374): сразу открывает
-                                     редактор структуры меню, минуя окно настроек и контекстное
-                                     меню с единственной командой. -->
+                                    Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Servers}">
                                 <StackPanel Orientation="Horizontal">
-                                    <!-- Отдельная иконка (Apps-сетка), чтобы не путать с «Конфигуратором»
-                                         (гаечный ключ Wrench) — issue #282. -->
-                                    <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Main.Utilities}" FontSize="13"
+                                    <materialDesign:PackIcon Kind="ServerNetwork" Width="16" Height="16"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Servers}" FontSize="13"
                                         Foreground="{DynamicResource TextSecondaryBrush}"
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                            <!-- «Настройки»: тема, компактный режим, настройки, справка -->
-                            <Button x:Name="ThemeToggleButton" Click="OnToggleTheme_Click"
-                                    Style="{DynamicResource IconButton}" Padding="6" Margin="0,0,2,0" ToolTip="{loc:Loc Main.Theme}">
-                                <Path x:Name="ThemeToggleIcon" Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconMoon}" Fill="{DynamicResource PurpleAccentBrush}"/>
+                            <Button Tag="Maintenance" Click="OnSectionMenuButton_Click"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
+                                    Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Maintenance}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Cog" Width="16" Height="16"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Maintenance}" FontSize="13"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
                             </Button>
-                            <!-- Компактный режим: быстрый переключатель плотности интерфейса -->
-                            <ToggleButton x:Name="CompactModeButton" Click="OnCompactMode_Toggled"
-                                          Style="{DynamicResource ToolbarToggleButton}" Margin="0,0,2,0"
-                                          ToolTip="{loc:Loc Main.CompactModeTooltip}">
-                                <materialDesign:PackIcon Kind="Compress" Width="18" Height="18"
-                                    Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
-                            </ToggleButton>
-                            <Button Command="{Binding SwitchUserCommand}" Style="{DynamicResource IconButton}" Padding="6"
-                                    Margin="0,0,2,0"
-                                    Visibility="{Binding SwitchUserVisible, Converter={StaticResource BoolToVis}}"
-                                    ToolTip="{loc:Loc Main.SwitchUserTooltip}">
-                                <materialDesign:PackIcon Kind="AccountSwitch" Width="18" Height="18" Foreground="{DynamicResource InfoBrush}"/>
+                            <Button Tag="Tools" Click="OnSectionMenuButton_Click"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
+                                    Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Tools}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Tune" Width="16" Height="16"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Tools}" FontSize="13"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
                             </Button>
+                            <Button Tag="More" Click="OnSectionMenuButton_Click"
+                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
+                                    Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.More}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Utilities.Submenu.More}" FontSize="13"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- Тема, компактный режим и смена пользователя перенесены
+                                 в «Ещё» → «Блокировка» (навигация 1.0.1.99). -->
                             <Button Command="{Binding OpenSettingsCommand}" Style="{DynamicResource IconButton}" Padding="6"
                                     ToolTip="{loc:Loc Main.SettingsTooltip}">
                                 <materialDesign:PackIcon Kind="Cog" Width="18" Height="18" Foreground="{DynamicResource TextSecondaryBrush}"/>

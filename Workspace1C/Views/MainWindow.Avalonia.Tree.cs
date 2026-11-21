@@ -2684,7 +2684,7 @@ namespace Workspace1C
         /// базы (issue #287): она не связана с конкретной базой и стоит сразу после
         /// «Списка типовых конфигураций», между разделителями.
         /// </summary>
-        private ContextMenu BuildUtilitiesMenu()
+        private ContextMenu BuildUtilitiesMenu(string? sectionGroupId = null)
         {
             var menu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
             if (_vm is null)
@@ -2698,11 +2698,40 @@ namespace Workspace1C
             // «Новинки программы» (issue #4): группа автоматически добавляется в компоновку
             // (даже если её нет в файле), в неё попадают пункты, отсутствующие в файле.
             // Видимость группы зафиксирована — скрытие в редакторе не влияет на отображение.
-            var layout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(vm.Settings, store));
-            if (layout is null)
+            var fullLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(vm.Settings, store));
+            if (fullLayout is null)
                 return menu;
 
+            // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
+            UtilitiesMenuLayout? layout = fullLayout;
+            if (sectionGroupId is not null)
+            {
+                layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
+                if (layout is null)
+                    return menu;
+                // В «Ещё» показываем новинки программы: это служебный раздел.
+                if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+                {
+                    var newItems = fullLayout.Root.FirstOrDefault(n =>
+                        string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                        && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal));
+                    if (newItems is not null)
+                        layout.Root.Add(newItems);
+                }
+            }
+
             AppendAvaloniaNodes(menu.Items, layout.Root);
+
+            // Сноска к пометке PRO (навигация 1.0.1.99): звёздочка рядом с названием
+            // означает функцию редакции PRO. Пункт отключён и не мешает навигации.
+            menu.Items.Add(MenuSeparator());
+            var footnote = new MenuItem
+            {
+                Header = LocalizationManager.T("Pro.Footnote"),
+                IsEnabled = false
+            };
+            footnote.Styled(Themes.ControlThemes.ModernMenuItem);
+            menu.Items.Add(footnote);
 
             // Меню строится один раз при старте (в отличие от WPF, где оно пересобирается
             // при каждом открытии), поэтому динамическую доступность «Отменить последнюю
@@ -3016,6 +3045,27 @@ namespace Workspace1C
                     // «Собрать диагностику» (issue #99): тот же сбор ZIP, что и на вкладке
                     // «О программе» настроек, без открытия окна настроек.
                     item.Click += async (_, _) => await OnCollectDiagnosticsMenuClickAsync(); break;
+                // Команды панели, перенесённые в разделы (навигация 1.0.1.99).
+                case UtilitiesMenuCommandKind.ClearCache:
+                    item.Command = _vm!.ClearCacheCommand; break;
+                case UtilitiesMenuCommandKind.SyncIbases:
+                    item.Command = _vm!.SynchronizeWithIbasesCommand; break;
+                case UtilitiesMenuCommandKind.CheckAvailability:
+                    item.Command = _vm!.CheckAvailabilityCommand; break;
+                case UtilitiesMenuCommandKind.ToggleTheme:
+                    item.Command = _vm!.ToggleThemeCommand; break;
+                case UtilitiesMenuCommandKind.SwitchUser:
+                    item.Command = _vm!.SwitchUserCommand; break;
+                case UtilitiesMenuCommandKind.ToggleCompact:
+                    item.Click += (_, _) =>
+                    {
+                        if (_vm is null)
+                            return;
+                        var next = !_vm.CompactMode;
+                        _vm.CompactMode = next;
+                        ApplyCompactMode(next);
+                    };
+                    break;
             }
         }
 

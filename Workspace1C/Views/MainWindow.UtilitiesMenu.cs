@@ -28,7 +28,7 @@ public partial class MainWindow
     /// программы (признак «новинка»), не размещённые в компоновке, автоматически
     /// попадают в подменю «Новинки программы» в конце меню.
     /// </summary>
-    private ContextMenu BuildUtilitiesMenu()
+    private ContextMenu BuildUtilitiesMenu(string? sectionGroupId = null)
     {
         var menu = new ContextMenu
         {
@@ -44,11 +44,38 @@ public partial class MainWindow
         // «Новинки программы» (issue #4): группа автоматически добавляется в компоновку
         // (даже если её нет в файле), в неё попадают пункты, отсутствующие в файле.
         // Видимость группы зафиксирована — скрытие в редакторе не влияет на отображение.
-        var layout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(settings, store));
-        if (layout is null)
+        var fullLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(settings, store));
+        if (fullLayout is null)
             return menu;
 
+        // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
+        UtilitiesMenuLayout? layout = fullLayout;
+        if (sectionGroupId is not null)
+        {
+            layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
+            if (layout is null)
+                return menu;
+            if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+            {
+                var newItems = fullLayout.Root.FirstOrDefault(n =>
+                    string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                    && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal));
+                if (newItems is not null)
+                    layout.Root.Add(newItems);
+            }
+        }
+
         AppendNodes(menu.Items, layout.Root);
+
+        // Сноска к пометке PRO (навигация 1.0.1.99): звёздочка рядом с названием
+        // означает функцию редакции PRO. Пункт отключён и не мешает навигации.
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem
+        {
+            Header = LocalizationManager.T("Pro.Footnote"),
+            IsEnabled = false,
+            Style = TryFindResource("ModernMenuItem") as Style
+        });
 
         return menu;
     }
@@ -359,6 +386,24 @@ public partial class MainWindow
                 // «Собрать диагностику» (issue #99): тот же сбор ZIP, что и на вкладке
                 // «О программе» настроек, без открытия окна настроек.
                 item.Click += async (_, _) => await OnCollectDiagnosticsMenuClickAsync(); break;
+            // Команды панели, перенесённые в разделы (навигация 1.0.1.99).
+            case UtilitiesMenuCommandKind.ClearCache:
+                item.Command = _viewModel.ClearCacheCommand; break;
+            case UtilitiesMenuCommandKind.SyncIbases:
+                item.Command = _viewModel.SynchronizeWithIbasesCommand; break;
+            case UtilitiesMenuCommandKind.CheckAvailability:
+                item.Command = _viewModel.CheckAvailabilityCommand; break;
+            case UtilitiesMenuCommandKind.ToggleTheme:
+                item.Click += (_, _) =>
+                {
+                    _viewModel.ToggleTheme();
+                    UpdateThemeButton();
+                };
+                break;
+            case UtilitiesMenuCommandKind.SwitchUser:
+                item.Command = _viewModel.SwitchUserCommand; break;
+            case UtilitiesMenuCommandKind.ToggleCompact:
+                item.Click += (_, _) => _viewModel.ApplyCompactMode(!_viewModel.CompactMode); break;
         }
     }
 
@@ -413,13 +458,8 @@ public partial class MainWindow
         // от наличия кнопки «Утилиты»).
         RebuildRowContextMenu();
 
-        if (UtilitiesButton is null)
-            return;
-        var menu = BuildUtilitiesMenu();
-        menu.PlacementTarget = UtilitiesButton;
-        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
-        menu.DataContext = DataContext;
-        UtilitiesButton.ContextMenu = menu;
+        // Навигация 1.0.1.99: кнопки разделов строят меню при каждом клике,
+        // поэтому обновлять заранее построенное меню не нужно.
     }
 }
 #endif

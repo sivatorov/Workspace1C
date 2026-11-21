@@ -41,9 +41,9 @@ public sealed class UtilitiesMenuV8iUnificationTests
         Assert.Equal("Settings.Bases.ImportV8iFile", import!.TextKey);
     }
 
-    /// <summary>Стандартная компоновка меню «Утилиты» включает пункты *.v8i в группе «Операции».</summary>
+    /// <summary>Стандартная компоновка включает пункты *.v8i в подгруппе «Списки баз».</summary>
     [Fact]
-    public void DefaultLayout_IncludesV8iItemsInOperationsGroup()
+    public void DefaultLayout_IncludesV8iItemsInBaseListsGroup()
     {
         var layout = UtilitiesMenuLayouts.Default();
         var ids = new System.Collections.Generic.HashSet<string>();
@@ -52,15 +52,32 @@ public sealed class UtilitiesMenuV8iUnificationTests
         Assert.Contains("ExportV8iFile", ids);
         Assert.Contains("ImportV8iFile", ids);
 
-        // Пункты находятся в подменю «Операции» (как и остальные операции экспорта/импорта).
-        var operations = layout.Root.FirstOrDefault(n =>
-            string.Equals(n.Kind, "group", System.StringComparison.Ordinal) &&
-            string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupOperations, System.StringComparison.Ordinal));
-        Assert.NotNull(operations);
+        // Пункты находятся в подгруппе «Списки баз» раздела «Инструменты»
+        // (как и остальные операции экспорта/импорта).
+        var baseLists = FindGroup(layout.Root, UtilitiesMenuCatalog.GroupBaseLists);
+        Assert.NotNull(baseLists);
         var opsIds = new System.Collections.Generic.HashSet<string>();
-        UtilitiesMenuResolver.CollectItemIds(operations!.Children, opsIds);
+        UtilitiesMenuResolver.CollectItemIds(baseLists!.Children, opsIds);
         Assert.Contains("ExportV8iFile", opsIds);
         Assert.Contains("ImportV8iFile", opsIds);
+    }
+
+    private static Workspace1C.Models.UtilitiesMenuNode? FindGroup(
+        System.Collections.Generic.IEnumerable<Workspace1C.Models.UtilitiesMenuNode>? nodes, string groupId)
+    {
+        if (nodes is null)
+            return null;
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Kind, "group", System.StringComparison.Ordinal)
+                && string.Equals(node.GroupId, groupId, System.StringComparison.Ordinal))
+            {
+                return node;
+            }
+            if (node.Children is { Count: > 0 } && FindGroup(node.Children, groupId) is { } nested)
+                return nested;
+        }
+        return null;
     }
 
     /// <summary>Пункты *.v8i не помечены как «новинки» — они сразу в стандартной компоновке.</summary>

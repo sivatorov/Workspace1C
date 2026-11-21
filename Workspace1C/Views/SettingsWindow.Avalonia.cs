@@ -2775,17 +2775,9 @@ namespace Workspace1C
             ToolTip.SetTip(importV8i, LocalizationManager.T("Settings.Bases.ImportV8iTooltip"));
             importV8i.Click += (_, _) => _viewModel.ImportFromIbasesV8i();
 
-            // Экспорт/импорт в произвольный файл *.v8i (issue #29): подготовка общего
-            // списка информационных баз в отдельном профиле, не затрагивая основной список.
-            // Единые методы ExportToIbasesFileInteractive/ImportFromIbasesFileInteractive
-            // используются и меню «Утилиты» — оба места работают через один диалог и сервис.
-            var exportV8iFile = new Button { Content = LocalizationManager.T("Settings.Bases.ExportV8iFile") };
-            ToolTip.SetTip(exportV8iFile, LocalizationManager.T("Settings.Bases.ExportV8iFileTooltip"));
-            exportV8iFile.Click += (_, _) => _viewModel.ExportToIbasesFileInteractive();
- 
-            var importV8iFile = new Button { Content = LocalizationManager.T("Settings.Bases.ImportV8iFile") };
-            ToolTip.SetTip(importV8iFile, LocalizationManager.T("Settings.Bases.ImportV8iFileTooltip"));
-            importV8iFile.Click += (_, _) => _viewModel.ImportFromIbasesFileInteractive();
+            // Экспорт/импорт в произвольный файл *.v8i (issue #29) убран из настроек:
+            // это дубль основного пути «Инструменты» → «Списки баз» (навигация 1.0.1.99).
+            // Сами операции не удалены — они доступны в меню раздела.
 
             // Импорт баз и настроек платформы из программы StartManager (issue #163).
             var importStartManager = new Button { Content = LocalizationManager.T("Settings.Bases.ImportStartManager") };
@@ -2837,8 +2829,6 @@ namespace Workspace1C
             listButtons.Children.Add(importList);
             listButtons.Children.Add(importMerge);
             listButtons.Children.Add(importV8i);
-            listButtons.Children.Add(exportV8iFile);
-            listButtons.Children.Add(importV8iFile);
             listButtons.Children.Add(importStartManager);
             listButtons.Children.Add(detectAll);
             listButtons.Children.Add(findLostBases);

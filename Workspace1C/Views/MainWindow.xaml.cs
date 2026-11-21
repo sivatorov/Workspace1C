@@ -605,9 +605,8 @@ namespace Workspace1C
 
             UpdateThemeButton();
 
-            // Компактный режим: синхронизируем состояние кнопки на верхней панели.
-            if (CompactModeButton != null)
-                CompactModeButton.IsChecked = _viewModel.CompactMode;
+            // Навигация 1.0.1.99: отдельного переключателя компактного режима
+            // на панели больше нет — состояние хранится в настройках.
 
             // Применяем сохранённые ширины колонок списка баз.
             ApplySavedColumnWidths();

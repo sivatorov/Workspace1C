@@ -309,51 +309,43 @@ public sealed class Issue134ProcessInspectorTests
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): иконка инспектора стоит на панели сразу после
-    /// «Проверить доступность всех баз» и до вертикального разделителя.
+    /// issue #134 (1.0.1.84), обновлено в 1.0.1.99: инспектор процессов остаётся
+    /// быстрым действием на панели (до разделителя), а «Проверить доступность»
+    /// перенесена в раздел «Обслуживание» → «Процессы».
     /// </summary>
     [Fact]
-    public void Wpf_ProcessInspectorButton_IsAfterCheckAvailability_BeforeSeparator()
+    public void Wpf_ProcessInspectorButton_StaysOnToolbar_BeforeSeparator()
     {
         var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
 
-        var checkAvailability = xaml.IndexOf("CheckAvailabilityCommand", StringComparison.Ordinal);
         var inspector = xaml.IndexOf("x:Name=\"ProcessInspectorButton\"", StringComparison.Ordinal);
-        var separator = xaml.IndexOf(
-            "Вертикальный разделитель: отделяет группу «Управление списком»",
-            StringComparison.Ordinal);
+        // После действий панели идут кнопки разделов («Серверы» — первая).
+        var sections = xaml.IndexOf("Tag=\"Servers\"", StringComparison.Ordinal);
 
-        Assert.True(checkAvailability >= 0, "Не найдена кнопка «Проверить доступность».");
         Assert.True(inspector >= 0, "Не найдена кнопка инспектора процессов.");
-        Assert.True(separator >= 0, "Не найден разделитель после группы «Управление списком».");
-        Assert.True(checkAvailability < inspector,
-            "Инспектор должен идти после «Проверить доступность всех баз».");
-        Assert.True(inspector < separator, "Инспектор должен стоять до разделителя.");
+        Assert.True(sections >= 0, "Не найдены кнопки сценарных разделов.");
+        Assert.True(inspector < sections, "Инспектор должен стоять до кнопок разделов.");
+        // На панели кнопки проверки доступности больше нет — она в меню раздела.
+        Assert.DoesNotContain("CheckAvailabilityCommand", xaml, StringComparison.Ordinal);
+        Assert.Equal(UtilitiesMenuCommandKind.CheckAvailability,
+            UtilitiesMenuCatalog.Find("CheckAvailability")!.CommandKind);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): в Avalonia кнопка инспектора добавляется после
-    /// <c>checkAvailBtn</c> и до следующего <c>CommandPanelSeparator()</c>.
+    /// issue #134 (1.0.1.84), обновлено в 1.0.1.99: в Avalonia кнопка инспектора
+    /// добавляется на панель, а проверка доступности — пункт раздела «Обслуживание».
     /// </summary>
     [Fact]
-    public void Avalonia_ProcessInspectorButton_IsAfterCheckAvailability_BeforeSeparator()
+    public void Avalonia_ProcessInspectorButton_StaysOnToolbar_CheckAvailabilityInMenu()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
 
-        var checkAvailability = code.IndexOf(
-            "panel.Children.Add(checkAvailBtn);", StringComparison.Ordinal);
         var inspector = code.IndexOf(
             "panel.Children.Add(processInspectorBtn);", StringComparison.Ordinal);
-        Assert.True(checkAvailability >= 0, "Не найдено добавление кнопки «Проверить доступность».");
         Assert.True(inspector >= 0, "Не найдено добавление кнопки инспектора процессов.");
-
-        var separator = code.IndexOf(
-            "panel.Children.Add(CommandPanelSeparator());", checkAvailability, StringComparison.Ordinal);
-        Assert.True(separator > checkAvailability, "После «Проверить доступность» нет разделителя.");
-
-        Assert.True(checkAvailability < inspector,
-            "Инспектор должен идти после «Проверить доступность всех баз».");
-        Assert.True(inspector < separator, "Инспектор должен стоять до разделителя.");
+        Assert.DoesNotContain("checkAvailBtn", code, StringComparison.Ordinal);
+        Assert.Equal(UtilitiesMenuCatalog.GroupProcesses,
+            UtilitiesMenuCatalog.Find("CheckAvailability")!.DefaultGroup);
     }
 
     // ===================== Инспектор убран из меню «Утилиты» =====================
@@ -415,7 +407,10 @@ public sealed class Issue134ProcessInspectorTests
             var layout = store.Load();
 
             Assert.NotNull(layout);
-            var ids = layout!.Root.Select(node => node.ItemId).ToList();
+            // После миграции v1 → разделы пункты лежат во вложенных группах:
+            // собираем идентификаторы рекурсивно.
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            UtilitiesMenuResolver.CollectItemIds(layout!.Root, ids);
             Assert.DoesNotContain("ProcessInspector", ids);
             Assert.Contains("CommandPalette", ids);
             Assert.Contains("KillOneCProcesses", ids);

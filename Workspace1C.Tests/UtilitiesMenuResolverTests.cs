@@ -20,7 +20,8 @@ public sealed class UtilitiesMenuResolverTests
         var settings = new AppSettings { UtilitiesMenuEditingEnabled = false };
         var layout = UtilitiesMenuResolver.Resolve(settings, null);
         Assert.NotNull(layout);
-        Assert.Equal("CommandPalette", layout!.Root[0].ItemId);
+        // Первый раздел новой компоновки — «Серверы».
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
     }
 
     [Fact]
@@ -36,7 +37,7 @@ public sealed class UtilitiesMenuResolverTests
         });
         var layout = UtilitiesMenuResolver.Resolve(settings, store);
         // Правка выключена — файл компоновки игнорируется.
-        Assert.Equal("CommandPalette", layout!.Root[0].ItemId);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
     }
 
     [Fact]
@@ -45,9 +46,9 @@ public sealed class UtilitiesMenuResolverTests
         var settings = new AppSettings { UtilitiesMenuEditingEnabled = true };
         var layout = UtilitiesMenuResolver.Resolve(settings, null);
         Assert.NotNull(layout);
-        // 13 пунктов/групп («Лицензия…» — 2.0) + 5 узлов-разделителей (issue #374; «Управление службами»
-        // issue #11 добавлено после «Серверы 1С»).
-        Assert.Equal(18, layout!.Root.Count);
+        // Четыре сценарных раздела первого уровня (навигация 1.0.1.99).
+        Assert.Equal(4, layout!.Root.Count);
+        Assert.Equal(UtilitiesMenuCatalog.RootSections, layout.Root.Select(n => n.GroupId!).ToArray());
     }
 
     [Fact]
@@ -76,7 +77,7 @@ public sealed class UtilitiesMenuResolverTests
     {
         var layout = UtilitiesMenuResolver.Resolve(null, null);
         Assert.NotNull(layout);
-        Assert.Equal("CommandPalette", layout!.Root[0].ItemId);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
     }
 
     /// <summary>

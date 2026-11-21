@@ -20,103 +20,105 @@ public sealed class UtilitiesMenuLayoutTests
         Converters = { new JsonStringEnumConverter() }
     };
 
-    /// <summary>Стандартная компоновка идентична текущему статическому меню «Утилиты» (обратная совместимость).
-    /// Разделители — самостоятельные узлы <c>Kind == "separator"</c> (issue #374).</summary>
+    /// <summary>
+    /// Стандартная компоновка — четыре сценарных раздела первого уровня
+    /// («Серверы», «Обслуживание», «Инструменты», «Ещё»), внутри — подгруппы.
+    /// Разделители — самостоятельные узлы <c>Kind == "separator"</c> (issue #374).
+    /// </summary>
     [Fact]
-    public void DefaultLayout_MatchesCurrentStaticMenu()
+    public void DefaultLayout_HasFourScenarioSections()
     {
         var layout = UtilitiesMenuLayouts.Default();
 
-        // Корень: 18 узлов — 13 пунктов/групп + 5 узлов-разделителей (issue #374):
-        // перед «Актуальные релизы», «Блокировка приложения», «Информация», «Операции», «Проверить обновления».
-        // «Управление службами» (issue #11) стоит сразу после «Серверы 1С».
-        Assert.Equal(18, layout.Root.Count);
+        Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, layout.SchemaVersion);
+        Assert.Equal(4, layout.Root.Count);
+        AssertGroup(layout.Root[0], UtilitiesMenuCatalog.GroupServers);
+        AssertGroup(layout.Root[1], UtilitiesMenuCatalog.GroupMaintenance);
+        AssertGroup(layout.Root[2], UtilitiesMenuCatalog.GroupTools);
+        AssertGroup(layout.Root[3], UtilitiesMenuCatalog.GroupMore);
 
-        // ---- Верхний уровень ----
-        AssertItem(layout.Root[0], "CommandPalette");
-        AssertSeparator(layout.Root[1]);
-        AssertItem(layout.Root[2], "ActualReleases");
-        AssertItem(layout.Root[3], "PlatformUpdate");
-        AssertItem(layout.Root[4], "PlatformDownload");
-        AssertItem(layout.Root[5], "ServerMonitor");
-        AssertItem(layout.Root[6], "Services");
-        AssertItem(layout.Root[7], "ServerConsoleExternal");
-        AssertSeparator(layout.Root[8]);
+        // ---- Серверы: кластеры и консоль ----
+        var servers = layout.Root[0].Children;
+        AssertItem(servers[0], "ServerMonitor");
+        AssertItem(servers[1], "Services");
+        AssertItem(servers[2], "ServerConsoleExternal");
+        AssertSeparator(servers[3]);
+        AssertItem(servers[4], "ServerConsoleRegister");
+        AssertSeparator(servers[5]);
+        AssertItem(servers[6], "ClusterImport");
+        AssertItem(servers[7], "ClusterMigration");
 
-        // «Блокировка приложения» на верхнем уровне, перед подменю (issue #294).
-        AssertItem(layout.Root[9], "AppLock");
+        // ---- Обслуживание: копии, планировщик, диагностика, процессы ----
+        var maintenance = layout.Root[1].Children;
+        Assert.Equal(7, maintenance.Count);
+        AssertGroup(maintenance[0], UtilitiesMenuCatalog.GroupBackups);
+        AssertSeparator(maintenance[1]);
+        AssertGroup(maintenance[2], UtilitiesMenuCatalog.GroupSchedule);
+        AssertSeparator(maintenance[3]);
+        AssertGroup(maintenance[4], UtilitiesMenuCatalog.GroupDiagnostics);
+        AssertSeparator(maintenance[5]);
+        AssertGroup(maintenance[6], UtilitiesMenuCatalog.GroupProcesses);
+        Assert.Contains(maintenance[0].Children, n => n.ItemId == "DbmsBackup");
+        Assert.Contains(maintenance[4].Children, n => n.ItemId == "CollectDiagnostics");
+        // Команды панели, перенесённые в разделы (навигация 1.0.1.99).
+        Assert.Contains(maintenance[4].Children, n => n.ItemId == "ClearCache");
+        Assert.Contains(maintenance[6].Children, n => n.ItemId == "CheckAvailability");
 
-        // ---- Подменю «Опции блокировки» ----
-        AssertGroup(layout.Root[10], UtilitiesMenuCatalog.GroupLockOptions);
-        var lockChildren = layout.Root[10].Children;
-        Assert.Equal(4, lockChildren.Count);
-        AssertItem(lockChildren[0], "UnlockPrivateBases");
-        AssertItem(lockChildren[1], "ChangeAppLock");
-        AssertSeparator(lockChildren[2]);
-        AssertItem(lockChildren[3], "RunBackupScenario");
+        // ---- Инструменты: сравнение, журналы, списки баз, разработка, сервисы ----
+        var tools = layout.Root[2].Children;
+        Assert.Equal(9, tools.Count);
+        AssertGroup(tools[0], UtilitiesMenuCatalog.GroupCompare);
+        AssertGroup(tools[2], UtilitiesMenuCatalog.GroupJournals);
+        AssertGroup(tools[4], UtilitiesMenuCatalog.GroupBaseLists);
+        AssertGroup(tools[6], UtilitiesMenuCatalog.GroupDevelopment);
+        AssertGroup(tools[8], UtilitiesMenuCatalog.GroupProServices);
+        Assert.Contains(tools[8].Children, n => n.ItemId == "TelegramBot");
+        Assert.Contains(tools[4].Children, n => n.ItemId == "ExportV8iFile");
+        Assert.Contains(tools[4].Children, n => n.ItemId == "SyncIbases");
 
-        // ---- Подменю «Информация» ----
-        AssertSeparator(layout.Root[11]);
-        AssertGroup(layout.Root[12], UtilitiesMenuCatalog.GroupInformation);
-        var infoChildren = layout.Root[12].Children;
-        Assert.Equal(12, infoChildren.Count);
-        AssertItem(infoChildren[0], "MaintenanceCenter");
-        AssertSeparator(infoChildren[1]);
-        AssertItem(infoChildren[2], "ConfigTypesEdit");
-        AssertItem(infoChildren[3], "ItsAccounts");
-        // Уведомления в Telegram и по email (выпуск 0.3.12.69).
-        AssertItem(infoChildren[4], "NotificationChannels");
-        AssertSeparator(infoChildren[5]);
-        AssertItem(infoChildren[6], "ScheduledTasks");
-        AssertItem(infoChildren[7], "BackupScenarios");
-        AssertSeparator(infoChildren[8]);
-        AssertItem(infoChildren[9], "ScriptsSettings");
-        AssertItem(infoChildren[10], "UsageStatistics");
-        // «Собрать диагностику» (issue #99) — сразу в стандартной компоновке.
-        AssertItem(infoChildren[11], "CollectDiagnostics");
+        // ---- Ещё: обновления, блокировка, справка ----
+        var more = layout.Root[3].Children;
+        Assert.Equal(5, more.Count);
+        AssertGroup(more[0], UtilitiesMenuCatalog.GroupUpdates);
+        AssertGroup(more[2], UtilitiesMenuCatalog.GroupApp);
+        AssertGroup(more[4], UtilitiesMenuCatalog.GroupHelp);
+        Assert.Contains(more[4].Children, n => n.ItemId == "License");
+        Assert.Contains(more[2].Children, n => n.ItemId == "AppLock");
+        Assert.Contains(more[2].Children, n => n.ItemId == "ToggleTheme");
+        Assert.Contains(more[2].Children, n => n.ItemId == "ToggleCompact");
+        Assert.Contains(more[2].Children, n => n.ItemId == "SwitchUser");
+    }
 
-        // ---- Подменю «Операции» ----
-        AssertSeparator(layout.Root[13]);
-        AssertGroup(layout.Root[14], UtilitiesMenuCatalog.GroupOperations);
-        var opsChildren = layout.Root[14].Children;
-        // Ожидаемый состав подменю «Операции» по порядку (null — разделитель).
-        // Новые функции 1.0.0.69–1.0.0.71 — сразу после «Обозревателя метаданных»;
-        // «Пользователи ИБ» (1.0.0.83) — после «Расширений конфигурации».
-        // «Публикация на веб-сервере» перенесена в контекстное меню базы (issue #63);
-        // «Блокировка сеансов ИБ» удалена из меню (issue #66); экспорт/импорт *.v8i
-        // (issue #29); импорт и миграция кластера — отдельные пункты (issue #41).
-        var expected = new string?[]
+    /// <summary>
+    /// Ни одна функция не потеряна: все пункты плоского меню версии 1.0.1.98
+    /// присутствуют в новой компоновке (проверка по явному списку идентификаторов).
+    /// </summary>
+    [Fact]
+    public void DefaultLayout_ContainsEveryV1Item()
+    {
+        var layout = UtilitiesMenuLayouts.Default();
+        var ids = new HashSet<string>();
+        UtilitiesMenuResolver.CollectItemIds(layout.Root, ids);
+
+        string[] v1Items =
         {
-            "ConfigDiff", "MetadataExplorer", "EventLog", "ConfigExtensions", "InfobaseUsers", "InfobaseScheduledJobs",
-            "GitVersioning", "TechLog", "ServerAlerts", "DbmsBackup", "TelegramBot", "SharedLists",
-            null,
-            "RepositoryBatchUpdate", "RepositoryBrowser",
-            null,
-            // Массовые операции по списку баз (issue #91).
-            "BatchDumpDt", "BatchLoadCf",
-            null,
-            "ExportCsv", "ExportHtml", "ExportJson", "ImportJson", "ExportV8iFile", "ImportV8iFile",
-            "ClusterImport", "ClusterMigration",
-            null,
-            // issue #134 (1.0.1.84): «Инспектор процессов 1С» убран из «Утилит».
-            "KillOneCProcesses",
-            null,
-            "ConnectionReplace", "UndoConnectionReplace", "RemoveMissingFileBases"
+            "CommandPalette", "ActualReleases", "PlatformUpdate", "PlatformDownload",
+            "ServerMonitor", "Services", "ServerConsoleExternal", "ServerConsoleRegister",
+            "AppLock", "UnlockPrivateBases", "ChangeAppLock", "RunBackupScenario",
+            "MaintenanceCenter", "ConfigTypesEdit", "ItsAccounts", "NotificationChannels",
+            "ScheduledTasks", "BackupScenarios", "ScriptsSettings", "UsageStatistics",
+            "CollectDiagnostics", "ConfigDiff", "MetadataExplorer", "EventLog",
+            "ConfigExtensions", "InfobaseUsers", "InfobaseScheduledJobs", "GitVersioning",
+            "TechLog", "ServerAlerts", "DbmsBackup", "TelegramBot", "SharedLists",
+            "RepositoryBatchUpdate", "RepositoryBrowser", "BatchDumpDt", "BatchLoadCf",
+            "ExportCsv", "ExportHtml", "ExportJson", "ImportJson", "ExportV8iFile",
+            "ImportV8iFile", "ClusterImport", "ClusterMigration", "KillOneCProcesses",
+            "ConnectionReplace", "UndoConnectionReplace", "RemoveMissingFileBases",
+            "CheckForUpdates", "License"
         };
-        Assert.Equal(expected.Length, opsChildren.Count);
-        for (var i = 0; i < expected.Length; i++)
-        {
-            if (expected[i] is null)
-                AssertSeparator(opsChildren[i]);
-            else
-                AssertItem(opsChildren[i], expected[i]!);
-        }
-
-        // ---- «Проверить обновления» в конце, с разделителем ----
-        AssertSeparator(layout.Root[15]);
-        AssertItem(layout.Root[16], "CheckForUpdates");
-        // ---- «Лицензия…» (2.0, редакция ПРО) — сразу после «Проверить обновления» ----
-        AssertItem(layout.Root[17], "License");
+        foreach (var id in v1Items)
+            Assert.Contains(id, ids);
+        Assert.Equal(v1Items.Length, v1Items.Distinct().Count());
     }
 
     /// <summary>Каталог содержит все пункты стандартной компоновки (ни один ItemId не теряется).</summary>
@@ -148,12 +150,11 @@ public sealed class UtilitiesMenuLayoutTests
         Assert.Null(item.HotkeyKey); // без хоткея
         Assert.Equal("ClusterMigration.MenuItem", item.TextKey);
 
-        // В стандартной компоновке — сразу после «Импорта из кластера 1С».
+        // В стандартной компоновке — в разделе «Серверы», сразу после «Импорта из кластера 1С».
         var layout = UtilitiesMenuLayouts.Default();
-        var ops = layout.Root
-            .First(n => string.Equals(n.Kind, "group", StringComparison.Ordinal)
-                && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupOperations, StringComparison.Ordinal));
-        var ids = ops.Children.Select(n => n.ItemId).ToList();
+        var servers = FindGroupById(layout.Root, UtilitiesMenuCatalog.GroupServers);
+        Assert.NotNull(servers);
+        var ids = servers!.Children.Select(n => n.ItemId).ToList();
         var importIndex = ids.IndexOf("ClusterImport");
         var migrationIndex = ids.IndexOf("ClusterMigration");
         Assert.True(importIndex >= 0);

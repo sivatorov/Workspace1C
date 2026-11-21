@@ -231,7 +231,7 @@ public sealed class InfobaseUsersServiceTests
     {
         var item = UtilitiesMenuCatalog.All.Single(i => i.Id == "InfobaseUsers");
         Assert.Equal(UtilitiesMenuCommandKind.InfobaseUsers, item.CommandKind);
-        Assert.Equal(UtilitiesMenuCatalog.GroupOperations, item.DefaultGroup);
+        Assert.Equal(UtilitiesMenuCatalog.GroupDevelopment, item.DefaultGroup);
     }
 
     [Fact]

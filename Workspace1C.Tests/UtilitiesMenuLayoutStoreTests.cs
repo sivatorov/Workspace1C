@@ -54,15 +54,72 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         var restored = store.Load();
         Assert.NotNull(restored);
         Assert.Equal(layout.Root.Count, restored!.Root.Count);
-        Assert.Equal("CommandPalette", restored.Root[0].ItemId);
+        Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, restored.SchemaVersion);
+        // Первый раздел — «Серверы»; первый пункт — «Серверы 1С».
+        Assert.Equal("group", restored.Root[0].Kind);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, restored.Root[0].GroupId);
+        AssertItem(restored.Root[0].Children[0], "ServerMonitor");
         // Разделители сохраняются как самостоятельные узлы (issue #374).
-        Assert.Equal("separator", restored.Root[1].Kind);
-        // «Управление службами» (issue #11) добавлено после «Серверы 1С» — группа
-        // «Опции блокировки» сдвинулась на индекс 10.
-        AssertItem(restored.Root[6], "Services");
-        Assert.Equal("group", restored.Root[10].Kind);
-        Assert.Equal(UtilitiesMenuCatalog.GroupLockOptions, restored.Root[10].GroupId);
-        Assert.Equal(4, restored.Root[10].Children.Count);
+        Assert.Equal("separator", restored.Root[0].Children[3].Kind);
+    }
+
+    [Fact]
+    public void Load_V1Layout_MigratesToSections_KeepsVisibilityAndIcons()
+    {
+        var store = CreateStore();
+        File.WriteAllText(store.FilePath,
+            """
+            {
+              "SchemaVersion": 1,
+              "Root": [
+                { "Kind": "item", "ItemId": "CommandPalette", "Visible": false },
+                { "Kind": "group", "GroupId": "Operations", "Visible": true, "Children": [
+                    { "Kind": "item", "ItemId": "ExportCsv", "Visible": true, "IconColor": "#123456" }
+                ] }
+              ]
+            }
+            """);
+
+        var result = store.Load();
+        Assert.NotNull(result);
+        Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, result!.SchemaVersion);
+        Assert.Equal(4, result.Root.Count);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, result.Root[0].GroupId);
+
+        var ids = new System.Collections.Generic.HashSet<string>();
+        UtilitiesMenuResolver.CollectItemIds(result.Root, ids);
+        Assert.Contains("CommandPalette", ids);
+        Assert.Contains("ExportCsv", ids);
+        // Пункт, которого не было в старой компоновке и который не является новинкой,
+        // не возвращается (пользователь его убрал).
+        Assert.DoesNotContain("MetadataExplorer", ids);
+        // Новинки каталога остаются доступными.
+        Assert.Contains("TelegramBot", ids);
+
+        var palette = FindItem(result.Root, "CommandPalette");
+        Assert.NotNull(palette);
+        Assert.False(palette!.Visible);
+        var exportCsv = FindItem(result.Root, "ExportCsv");
+        Assert.NotNull(exportCsv);
+        Assert.Equal("#123456", exportCsv!.IconColor);
+    }
+
+    private static UtilitiesMenuNode? FindItem(
+        System.Collections.Generic.IEnumerable<UtilitiesMenuNode>? nodes, string itemId)
+    {
+        if (nodes is null)
+            return null;
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
+                && string.Equals(node.ItemId, itemId, StringComparison.Ordinal))
+            {
+                return node;
+            }
+            if (node.Children is { Count: > 0 } && FindItem(node.Children, itemId) is { } nested)
+                return nested;
+        }
+        return null;
     }
 
     private static void AssertItem(UtilitiesMenuNode node, string itemId)
@@ -117,7 +174,7 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         File.WriteAllText(store.FilePath,
             """
             {
-              "SchemaVersion": 1,
+              "SchemaVersion": 2,
               "Root": [
                 { "Kind": "item", "ItemId": "CommandPalette", "Visible": true },
                 { "Kind": "item", "ItemId": "UnknownItemId", "Visible": true },
@@ -140,7 +197,7 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         File.WriteAllText(store.FilePath,
             """
             {
-              "SchemaVersion": 1,
+              "SchemaVersion": 2,
               "Root": [
                 { "Kind": "group", "GroupId": "Operations", "Children": null }
               ]
@@ -161,7 +218,7 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         File.WriteAllText(store.FilePath,
             """
             {
-              "SchemaVersion": 1,
+              "SchemaVersion": 2,
               "Root": [
                 { "Kind": "item", "ItemId": "CommandPalette", "Visible": true },
                 { "Kind": "separator", "Visible": true },
@@ -184,7 +241,7 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         File.WriteAllText(store.FilePath,
             """
             {
-              "SchemaVersion": 1,
+              "SchemaVersion": 2,
               "Root": [
                 { "Kind": "item", "ItemId": "CommandPalette", "Visible": true },
                 { "Kind": "item", "ItemId": "ActualReleases", "Visible": true, "SeparatorBefore": true }

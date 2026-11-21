@@ -546,27 +546,24 @@ public sealed class UtilitiesMenuEditorViewModelTests
     public void DefaultLayout_ShowsSeparatorsInTree()
     {
         var vm = CreateViewModel();
-        Assert.Contains(vm.Roots, n => string.Equals(n.Node.Kind, "separator", StringComparison.Ordinal));
+        // В структуре разделов разделители находятся внутри групп, поэтому ищем рекурсивно.
+        Assert.NotNull(FirstSeparator(vm.Roots));
     }
 
     [Fact]
     public void ResetToDefault_ShowsSeparators()
     {
         var vm = CreateViewModel();
-        // Удаляем все разделители из дерева.
-        foreach (var sep in vm.Roots
-                     .Where(n => string.Equals(n.Node.Kind, "separator", StringComparison.Ordinal))
-                     .ToList())
-        {
-            vm.SelectedItem = sep;
-            vm.DeleteGroupCommand.Execute(false);
-        }
-        Assert.DoesNotContain(vm.Roots, n => string.Equals(n.Node.Kind, "separator", StringComparison.Ordinal));
+        // Удаляем первый найденный разделитель (в новой структуре они внутри разделов).
+        var sep = FirstSeparator(vm.Roots);
+        Assert.NotNull(sep);
+        vm.SelectedItem = sep;
+        vm.DeleteGroupCommand.Execute(false);
 
         // Сброс к стандартной компоновке возвращает разделители в дерево.
         vm.ResetDefaultCommand.Execute(null);
 
-        Assert.Contains(vm.Roots, n => string.Equals(n.Node.Kind, "separator", StringComparison.Ordinal));
+        Assert.NotNull(FirstSeparator(vm.Roots));
     }
 
     [Fact]
@@ -641,6 +638,19 @@ public sealed class UtilitiesMenuEditorViewModelTests
         Assert.True(item.CanToggleVisibility);
         item.IsVisible = false;
         Assert.False(item.Node.Visible);
+    }
+
+    /// <summary>Первый разделитель в дереве редактора (рекурсивно) или null.</summary>
+    private static UtilitiesMenuNodeItem? FirstSeparator(IEnumerable<UtilitiesMenuNodeItem> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            if (string.Equals(node.Node.Kind, "separator", StringComparison.Ordinal))
+                return node;
+            if (node.Children.Count > 0 && FirstSeparator(node.Children) is { } nested)
+                return nested;
+        }
+        return null;
     }
 
     /// <summary>Хранилище-заглушка для тестов (без файла на диске).</summary>

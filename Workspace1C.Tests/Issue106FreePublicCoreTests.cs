@@ -155,7 +155,7 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
             {
                 var item = ContextMenuCatalog.Find(id);
                 Assert.NotNull(item);
-                Assert.DoesNotContain("· " + badge, item!.DisplayText(), StringComparison.Ordinal);
+                Assert.DoesNotContain(" " + badge, item!.DisplayText(), StringComparison.Ordinal);
             }
 
             // Public core в 1.x бесплатен — бейдж исчезает; функции вне ядра
@@ -164,12 +164,12 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
                 .Where(i => i.RequiredFeature is { } f && ProFeatures.IsInPublicCore(f)).ToList();
             Assert.NotEmpty(utilityCoreItems); // в каталоге есть пункты public core
             foreach (var item in utilityCoreItems)
-                Assert.DoesNotContain("· " + badge, item.DisplayText(), StringComparison.Ordinal);
+                Assert.DoesNotContain(" " + badge, item.DisplayText(), StringComparison.Ordinal);
 
             var auditLogItem = UtilitiesMenuCatalog.All
                 .FirstOrDefault(i => i.RequiredFeature == ProFeature.AuditLog);
             if (auditLogItem is not null)
-                Assert.Contains("· " + badge, auditLogItem.DisplayText(), StringComparison.Ordinal);
+                Assert.Contains(" " + badge, auditLogItem.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {
@@ -250,14 +250,14 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
             {
                 var item = ContextMenuCatalog.Find(id);
                 Assert.NotNull(item);
-                Assert.Contains("· " + badge, item!.DisplayText(), StringComparison.Ordinal);
+                Assert.Contains(" " + badge, item!.DisplayText(), StringComparison.Ordinal);
             }
 
             // В 2.x бейдж возвращается на все ПРО-пункты, включая функции вне ядра.
             var utilityProItems = UtilitiesMenuCatalog.All.Where(i => i.RequiredFeature is not null).ToList();
             Assert.NotEmpty(utilityProItems);
             foreach (var item in utilityProItems)
-                Assert.Contains("· " + badge, item.DisplayText(), StringComparison.Ordinal);
+                Assert.Contains(" " + badge, item.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {

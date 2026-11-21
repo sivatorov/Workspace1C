@@ -238,9 +238,11 @@ namespace Workspace1C
         /// <summary>Переключатель компактного режима на верхней панели: применяет сразу и сохраняет.</summary>
         private void OnCompactMode_Toggled(object sender, RoutedEventArgs e)
         {
-            if (CompactModeButton is null || _viewModel is null)
+            // Навигация 1.0.1.99: переключатель компактного режима перенесён
+            // в «Ещё» → «Блокировка» → «Компактный режим».
+            if (_viewModel is null)
                 return;
-            _viewModel.ApplyCompactMode(CompactModeButton.IsChecked == true);
+            _viewModel.ApplyCompactMode(!_viewModel.CompactMode);
         }
 
         /// <summary>

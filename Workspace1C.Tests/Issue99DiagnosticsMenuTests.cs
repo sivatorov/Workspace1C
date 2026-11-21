@@ -41,7 +41,7 @@ public sealed class Issue99DiagnosticsMenuTests
         var item = UtilitiesMenuCatalog.Find("CollectDiagnostics");
         Assert.NotNull(item);
         Assert.Equal(UtilitiesMenuCommandKind.CollectDiagnostics, item!.CommandKind);
-        Assert.Equal(UtilitiesMenuCatalog.GroupInformation, item.DefaultGroup);
+        Assert.Equal(UtilitiesMenuCatalog.GroupDiagnostics, item.DefaultGroup);
         // Иконки заданы для обеих платформ (единый источник пар каталога).
         Assert.False(string.IsNullOrWhiteSpace(item.WpfIconKind));
         Assert.False(string.IsNullOrWhiteSpace(item.AvaloniaIconKey));

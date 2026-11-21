@@ -471,6 +471,14 @@ namespace Workspace1C
         /// </summary>
         private void RebuildUtilitiesMenu()
         {
+            // Навигация 1.0.1.99: разделы строят меню при каждом клике, поэтому
+            // достаточно пересобрать панель команд — новые меню сразу получат
+            // актуальные пометки «ПРО» после активации/деактивации лицензии.
+            if (_commandPanel is not null)
+            {
+                RefreshCommandPanel();
+                return;
+            }
             if (_utilitiesButton is null)
                 return;
             var menu = BuildUtilitiesMenu();
@@ -1027,13 +1035,6 @@ namespace Workspace1C
 
             panel.Children.Add(CommandPanelSeparator());
 
-            // «Управление списком»: очистка кеша, индикатор выгрузки, синхронизация
-            // с ibases.v8i и проверка доступности баз.
-            var clearCacheBtn = TopBarIconButton("IconBroom", LocalizationManager.T("Main.ClearCacheTooltip"),
-                themeBrushKey: "TopBarActionBrush");
-            clearCacheBtn.Bind(Button.CommandProperty, new Binding("ClearCacheCommand"));
-            panel.Children.Add(clearCacheBtn);
-
             // Индикатор выгрузки .dt и .cf: виден только во время пакетной
             // операции, подсказка сводкой (MainWindow.xaml:563).
             // Индикатор выгрузки — статус, а не действие: семантический WarningBrush сохранён.
@@ -1043,29 +1044,8 @@ namespace Workspace1C
             exportBtn.Focusable = false;
             panel.Children.Add(exportBtn);
 
-            var syncBtn = TopBarIconButton("IconSync", LocalizationManager.T("Main.SyncDetailedTooltip"),
-                themeBrushKey: "TopBarActionBrush");
-            syncBtn.Bind(Button.CommandProperty, new Binding("SynchronizeWithIbasesCommand"));
-            panel.Children.Add(syncBtn);
-
-            // Проверить доступность всех баз 1С: ручная команда вместо автопроверки при запуске.
-            // Иконка — зелёный гидролокатор (сонар), как экран на подводных лодках.
-            var checkAvailBtn = new Button
-            {
-                // Аудит UI P0-3: действие верхней панели — нейтральная кисть темы.
-                Content = IconHelper.MakeIcon("IconSonar", UiMetrics.Scaled(UiMetrics.IconToolbar), "TopBarActionBrush"),
-                Padding = new Thickness(UiMetrics.Scaled(8)),
-                HorizontalContentAlignment = HorizontalAlignment.Center
-            };
-            checkAvailBtn.Styled(Themes.ControlThemes.IconButton);
-            ToolTip.SetTip(checkAvailBtn, LocalizationManager.T("Main.CheckAvailabilityTooltip"));
-            UiAutomation.SetNameFromTip(checkAvailBtn);
-            checkAvailBtn.Bind(Button.CommandProperty, new Binding("CheckAvailabilityCommand"));
-            panel.Children.Add(checkAvailBtn);
-
-            // Инспектор процессов 1С (issue #134, доработка ArtyoZ): иконка набора
-            // инструментов сразу после «Проверить доступность всех баз» и до разделителя.
-            // Пункт «Утилиты → Операции» убран — он был «закопан» и неюзабелен.
+            // Инспектор процессов 1С (issue #134): остаётся быстрым действием —
+            // он нужен во время разбора «зависших» сеансов при открытом списке.
             var processInspectorBtn = TopBarIconButton(
                 "IconApplicationCog",
                 LocalizationManager.T("Main.ProcessInspectorTooltip"),
@@ -1073,76 +1053,53 @@ namespace Workspace1C
             processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
             panel.Children.Add(processInspectorBtn);
 
+            // Очистка кеша, синхронизация с ibases.v8i и проверка доступности
+            // перенесены в разделы «Обслуживание» и «Инструменты» (навигация 1.0.1.99).
             panel.Children.Add(CommandPanelSeparator());
 
-            // «Утилиты»: общие команды, не привязанные к конкретной базе (issue #262).
-            // Раньше такие команды лежали в контекстном меню базы; теперь собраны в
-            // отдельное подменю общей панели, куда в будущем можно добавлять новые.
-            var utilitiesMenu = BuildUtilitiesMenu();
-            _utilitiesMenu = utilitiesMenu;
-            var utilitiesBtn = new Button
+            // Четыре сценарных раздела вместо одной кнопки «Утилиты» (навигация 1.0.1.99):
+            // «Серверы», «Обслуживание», «Инструменты», «Ещё». Каждая кнопка открывает
+            // только свой раздел — нужная функция в 2–3 кликах.
+            foreach (var (sectionId, sectionIcon, sectionTitleKey) in new[]
+                     {
+                         (UtilitiesMenuCatalog.GroupServers, "IconServer", "Utilities.Submenu.Servers"),
+                         (UtilitiesMenuCatalog.GroupMaintenance, "IconSettings", "Utilities.Submenu.Maintenance"),
+                         (UtilitiesMenuCatalog.GroupTools, "IconTune", "Utilities.Submenu.Tools"),
+                         (UtilitiesMenuCatalog.GroupMore, "IconMenu", "Utilities.Submenu.More")
+                     })
             {
-                // Отдельная иконка (Apps-сетка), чтобы не путать с «Конфигуратором»
-                // (гаечный ключ IconWrench) — issue #282.
-                Content = ThemedIconAndText("IconApps",
-                    LocalizationManager.T("Main.Utilities"), "TextSecondaryColorBrush",
-                    UiMetrics.ScaledFont(13), centered: false),
-                Padding = new Thickness(UiMetrics.ButtonPadH, UiMetrics.ButtonPadV),
-                HorizontalContentAlignment = HorizontalAlignment.Center
-            };
-            utilitiesBtn.Styled(Themes.ControlThemes.IconButton);
-            ToolTip.SetTip(utilitiesBtn, LocalizationManager.T("Main.UtilitiesTooltip"));
-            UiAutomation.SetNameFromTip(utilitiesBtn);
-            // ПКМ по заголовку «Утилиты» (issue #374): сразу открывает редактор структуры
-            // меню, минуя окно настроек и контекстное меню с единственной командой.
-            utilitiesBtn.PointerPressed += (_, e) =>
-            {
-                if (e.GetCurrentPoint(utilitiesBtn).Properties.IsRightButtonPressed)
+                var sectionBtn = new Button
                 {
-                    e.Handled = true;
-                    OpenUtilitiesMenuEditorDirectly();
+                    Content = ThemedIconAndText(sectionIcon,
+                        LocalizationManager.T(sectionTitleKey), "TextSecondaryColorBrush",
+                        UiMetrics.ScaledFont(13), centered: false),
+                    Padding = new Thickness(UiMetrics.ButtonPadH, UiMetrics.ButtonPadV),
+                    HorizontalContentAlignment = HorizontalAlignment.Center
+                };
+                sectionBtn.Styled(Themes.ControlThemes.IconButton);
+                ToolTip.SetTip(sectionBtn, LocalizationManager.T(sectionTitleKey));
+                UiAutomation.SetNameFromTip(sectionBtn);
+                var id = sectionId;
+                if (string.Equals(id, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+                {
+                    // ПКМ по «Ещё» — редактор структуры меню (как раньше по «Утилитам»).
+                    sectionBtn.PointerPressed += (_, e) =>
+                    {
+                        if (!e.GetCurrentPoint(sectionBtn).Properties.IsRightButtonPressed)
+                            return;
+                        e.Handled = true;
+                        OpenUtilitiesMenuEditorDirectly();
+                    };
                 }
-            };
-            // Открываем актуальное меню из поля (Дефект №4, аудит активации): после
-            // пересборки по смене темы/лицензии клик должен открывать новое меню,
-            // а не захваченный при сборке панели экземпляр.
-            utilitiesBtn.Click += (_, _) => _utilitiesMenu?.Open(utilitiesBtn);
-            _utilitiesButton = utilitiesBtn;
-            panel.Children.Add(utilitiesBtn);
+                // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
+                sectionBtn.Click += (_, _) => BuildUtilitiesMenu(id)?.Open(sectionBtn);
+                panel.Children.Add(sectionBtn);
+            }
 
-            // «Актуальные релизы» перенесены в подменю «Утилиты» (issue #279), отдельная
-            // кнопка на панели не нужна — в меню команда уже есть (пункт первый).
             panel.Children.Add(CommandPanelSeparator());
 
-            // «Настройки»: тема, компактный режим, окно настроек и справка.
-            // Значок темы меняется вместе со схемой, как в версии для Windows
-            // (MainWindow.Language.cs:41): в тёмной солнце, в светлой луна.
-            var themeIconKey = ThemeManager.CurrentTheme == ThemeManager.DarkThemeName ? "IconSun" : "IconMoon";
-            var themeBtn = TopBarIconButton(themeIconKey, LocalizationManager.T("Main.Theme"),
-                themeBrushKey: "TopBarActionBrush");
-            themeBtn.Bind(Button.CommandProperty, new Binding("ToggleThemeCommand"));
-            panel.Children.Add(themeBtn);
-
-            // Это ToggleButton (MainWindow.xaml:596): включённый компактный режим
-            // виден акцентной заливкой, а не только по плотности списка.
-            _compactToggle = MakeSegmentToggle("IconCompress", LocalizationManager.T("Main.CompactModeTooltip"));
-            _compactToggle.IsChecked = _vm?.CompactMode ?? false;
-            _compactToggle.Click += (_, _) =>
-            {
-                if (_vm is null)
-                    return;
-                var next = _compactToggle.IsChecked == true;
-                _vm.CompactMode = next;
-                ApplyCompactMode(next);
-            };
-            panel.Children.Add(_compactToggle);
-
-            // «Смена пользователя» (issue #200): видна только при нескольких учётных записях.
-            var switchUserBtn = TopBarIconButton("IconAccountMultiple", LocalizationManager.T("Main.SwitchUserTooltip"),
-                themeBrushKey: "TextSecondaryColorBrush");
-            switchUserBtn.Bind(Button.CommandProperty, new Binding("SwitchUserCommand"));
-            switchUserBtn.Bind(Control.IsVisibleProperty, new Binding("SwitchUserVisible"));
-            panel.Children.Add(switchUserBtn);
+            // Тема, компактный режим и смена пользователя перенесены в «Ещё» → «Блокировка»
+            // (навигация 1.0.1.99): на панели остаются настройки и справка.
 
             var settingsBtn = TopBarIconButton("IconSettings", LocalizationManager.T("Main.SettingsTooltip"),
                 themeBrushKey: "TextSecondaryColorBrush");

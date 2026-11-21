@@ -29,25 +29,8 @@ namespace Workspace1C
 
         private void UpdateThemeButton()
         {
-            if (ThemeToggleButton is null)
-                return;
-
-            // В тёмной теме кнопка предлагает перейти на светлую (иконка солнца), и наоборот.
-            var isDark = ThemeManager.CurrentTheme == ThemeManager.DarkThemeName;
-            ThemeToggleButton.ToolTip = isDark ? LocalizationManager.T("Main.LightTheme") : LocalizationManager.T("Main.DarkTheme");
-
-            if (ThemeToggleIcon is not null)
-            {
-                ThemeToggleIcon.Data = isDark
-                    ? (System.Windows.Media.Geometry)FindResource("IconSun")
-                    : (System.Windows.Media.Geometry)FindResource("IconMoon");
-            }
-            else if (ThemeToggleButton.Content is System.Windows.Shapes.Path path)
-            {
-                path.Data = isDark
-                    ? (System.Windows.Media.Geometry)FindResource("IconSun")
-                    : (System.Windows.Media.Geometry)FindResource("IconMoon");
-            }
+            // Навигация 1.0.1.99: отдельная кнопка темы на панели заменена пунктом
+            // «Ещё» → «Блокировка» → «Сменить тему»; обновлять глиф не нужно.
         }
 
         /// <summary>

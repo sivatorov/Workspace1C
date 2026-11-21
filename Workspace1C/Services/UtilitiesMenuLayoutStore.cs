@@ -62,7 +62,9 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
         {
             var json = File.ReadAllText(FilePath);
             var layout = JsonSerializer.Deserialize<UtilitiesMenuLayout>(json, _jsonOptions);
-            return Normalize(layout);
+            // Миграция компоновок версии 1 (плоское меню до 1.0.1.99) в разделы:
+            // настройки видимости/иконок переносятся по ItemId, функции не теряются.
+            return UtilitiesMenuLayouts.Migrate(Normalize(layout));
         }
         catch
         {
@@ -78,7 +80,7 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
     {
         if (layout is null)
             return;
-        layout.SchemaVersion = 1;
+        layout.SchemaVersion = UtilitiesMenuLayouts.CurrentSchemaVersion;
         Directory.CreateDirectory(DataDirectory);
         var json = JsonSerializer.Serialize(layout, _jsonOptions);
 

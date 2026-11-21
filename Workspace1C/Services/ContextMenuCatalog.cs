@@ -209,12 +209,12 @@ public sealed class ContextMenuItem
     /// </summary>
     public Licensing.ProFeature? RequiredFeature { get; }
 
-    /// <summary>Заголовок пункта с отметкой «ПРО», если функция закрыта лицензией.</summary>
+    /// <summary>Заголовок пункта с отметкой «*», если функция закрыта лицензией.</summary>
     public string DisplayText()
     {
         var text = Localization.LocalizationManager.T(TextKey);
         if (RequiredFeature is { } feature && !Licensing.EditionService.Has(feature))
-            text += "  · " + Localization.LocalizationManager.T("Pro.Badge");
+            text += " " + Localization.LocalizationManager.T("Pro.Badge");
         return text;
     }
 }
