@@ -10,7 +10,7 @@ namespace Workspace1C.Tests;
 /// насыщенным цветом группы с белым текстом. Вместо этого:
 /// <list type="bullet">
 /// <item>фон строки — пастель: цвет группы, смешанный с ContentBackground темы
-/// в пропорции 12–16 % (используется 14 %);</item>
+/// (issue #145: доля повышена с 14 % до 30 %, чтобы папка не выглядела бледной);</item>
 /// <item>слева — вертикальная полоса 3 px исходным цветом группы (сохраняет
 /// идентичность выбранного пользователем цвета);</item>
 /// <item>текст — TextPrimary темы или WCAG-контраст ≥ 4.5:1 к фактическому фону.</item>
@@ -107,11 +107,12 @@ public sealed class GroupRowAppearanceTests
         Assert.True(Distance(background, surfaceHex) < Distance(normalizedGroup, surfaceHex),
             $"Фон {background} должен быть ближе к фону темы {surfaceHex}, чем цвет группы {normalizedGroup}");
 
-        // Точная смесь 14 %: каждый канал = round(group*0.14 + surface*0.86).
+        // Точная смесь от текущего веса (issue #145: 30 % вместо прежних 14 %).
+        var weight = Workspace1C.Models.ColorScheme.GroupRowTintWeight;
         var (gr, gg, gb) = Rgb(normalizedGroup);
         var (sr, sg, sb) = Rgb(surfaceHex);
         var (br, bg, bb) = Rgb(background);
-        int Mix(int g, int s) => (int)Math.Round(g * 0.14 + s * 0.86);
+        int Mix(int g, int s) => (int)Math.Round(g * weight + s * (1.0 - weight));
         Assert.Equal(Mix(gr, sr), br);
         Assert.Equal(Mix(gg, sg), bg);
         Assert.Equal(Mix(gb, sb), bb);
@@ -121,10 +122,10 @@ public sealed class GroupRowAppearanceTests
     [MemberData(nameof(GroupColors))]
     public void Background_StaysWithinRecommendedPastelRange(string groupHex)
     {
-        // 12–16 % — рекомендованный диапазон: на 12 % и 16 % результат ближе к фону,
-        // чем исходный цвет (насыщенная заливка не возвращается).
+        // Пастель при любом весе из диапазона остаётся ближе к фону, чем исходный
+        // цвет (насыщенная заливка не возвращается). Issue #145: рабочий вес — 30 %.
         const string surface = "#F1F5F9";
-        foreach (var weight in new[] { 0.12, 0.14, 0.16 })
+        foreach (var weight in new[] { 0.12, 0.14, 0.16, 0.30 })
         {
             var background = Workspace1C.Models.ColorScheme.GroupRowBackgroundHex(groupHex, surface, weight);
             Assert.True(Distance(background, surface) < Distance(groupHex, surface),

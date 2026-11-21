@@ -62,7 +62,8 @@
                   RowHeight="38"
                   AlternationCount="2"
                   BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}"
-                  MouseDoubleClick="OnGrid_MouseDoubleClick">
+                  MouseDoubleClick="OnGrid_MouseDoubleClick"
+                  PreviewKeyDown="OnGrid_PreviewKeyDown">
             <!-- issue #140 (1.0.1.84): зебра задаётся триггером локального RowStyle, а не
                  AlternatingRowBackground. Локальный фон чередования перекрывал триггер
                  IsSelected стиля строки, из-за чего выделение не было видно. Триггер

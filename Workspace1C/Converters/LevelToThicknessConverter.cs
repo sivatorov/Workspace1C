@@ -26,6 +26,13 @@ public class LevelToThicknessConverter : IMultiValueConverter
     /// выделения начинался немного раньше значка «избранное» (см. параметр "base-hl").</summary>
     public const double HighlightGap = 8.0;
 
+    /// <summary>
+    /// Вертикальный отступ полосы-идентификатора группы (px). Полоса рисуется внутри
+    /// скруглённой рамки строки; без отступа её прямые торцы выходили за скруглённые
+    /// углы и «торчали» из рамки (issue #145).
+    /// </summary>
+    public const double GroupStripeVerticalInset = 4.0;
+
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
     {
         var level = values.Length > 0 && values[0] is int i ? i : 0;
@@ -57,10 +64,12 @@ public class LevelToThicknessConverter : IMultiValueConverter
         }
         else if (string.Equals(param, "group-stripe", StringComparison.OrdinalIgnoreCase))
         {
-            // Аудит UI P1-2: вертикальная полоса 3 px исходным цветом группы. Тот же
-            // сдвиг, что у фона строки ("group-hl"), плюс 2 px — полоса рисуется
-            // внутри рамки толщиной 2 (акцентной у выбранной группы).
+            // Аудит UI P1-2 / issue #145: вертикальная полоса 3 px исходным цветом
+            // группы. Тот же сдвиг, что у фона строки ("group-hl"), плюс 2 px —
+            // полоса рисуется внутри рамки толщиной 2. Вертикальный отступ не даёт
+            // торцам полосы выходить за скруглённые углы рамки.
             offset = level * IndentStep + ExpanderWidth - HighlightGap + 2;
+            return new Thickness(offset, GroupStripeVerticalInset, 0, GroupStripeVerticalInset);
         }
         else if (string.Equals(param, "group", StringComparison.OrdinalIgnoreCase))
         {

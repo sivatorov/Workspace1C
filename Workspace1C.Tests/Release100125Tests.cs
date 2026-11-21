@@ -354,10 +354,11 @@ public sealed class Release100125Tests
         // v1.0.1.26: версия ушла вперёд — тест проверяет, что версия НЕ НИЖЕ 1.0.1.25
         // (актуальная версия и все 4 свойства тестируются в Release100126Tests).
         var csproj = ReadProjectFile("Workspace1C/Workspace1C.csproj");
-        Assert.Matches(@"<Version>1\.0\.1\.(2[5-9]|[3-9]\d)</Version>", csproj);
-        Assert.Matches(@"<AssemblyVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</AssemblyVersion>", csproj);
-        Assert.Matches(@"<FileVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</FileVersion>", csproj);
-        Assert.Matches(@"<InformationalVersion>1\.0\.1\.(2[5-9]|[3-9]\d)</InformationalVersion>", csproj);
+        // \d{3,} — версии с трёхзначным последним компонентом (1.0.1.100 и далее).
+        Assert.Matches(@"<Version>1\.0\.1\.(2[5-9]|[3-9]\d|\d{3,})</Version>", csproj);
+        Assert.Matches(@"<AssemblyVersion>1\.0\.1\.(2[5-9]|[3-9]\d|\d{3,})</AssemblyVersion>", csproj);
+        Assert.Matches(@"<FileVersion>1\.0\.1\.(2[5-9]|[3-9]\d|\d{3,})</FileVersion>", csproj);
+        Assert.Matches(@"<InformationalVersion>1\.0\.1\.(2[5-9]|[3-9]\d|\d{3,})</InformationalVersion>", csproj);
     }
 
     [Fact]

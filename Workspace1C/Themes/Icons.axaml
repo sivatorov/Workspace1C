@@ -44,6 +44,9 @@
     <!-- Открыть / Open folder -->
     <StreamGeometry x:Key="IconOpen">M19,20H5V9H19M19,7H5A2,2 0 0,0 3,9V20A2,2 0 0,0 5,22H19A2,2 0 0,0 21,20V9A2,2 0 0,0 19,7M19,3H12L10,1H5A2,2 0 0,0 3,3V7H5V3H19V7H21V3A2,2 0 0,0 19,3Z</StreamGeometry>
 
+    <!-- Труба / Pipe (конвейеры обслуживания ПРО, ProPipelines; ключ IconPipe) -->
+    <StreamGeometry x:Key="IconPipe">M22,13H20V16A2,2 0 0,1 18,18H15V20H13V18H10A2,2 0 0,1 8,16V13H6V11H8V8A2,2 0 0,1 10,6H13V4H15V6H18A2,2 0 0,1 20,8V11H22V13M15,8H10V16H15V8Z</StreamGeometry>
+
     <!-- Новинка / New (четырёхлучевая звезда «NEW», issue #81): та же иконка, что в
          контекстном меню, чтобы «Новинки программы» меню «Утилиты» не резолвились
          в запасную «папку» (GroupAvaloniaIconKey(NewItems) = IconNewBox). -->
@@ -360,6 +363,8 @@
     <StreamGeometry x:Key="IconLan">M10,2C8.89,2 8,2.89 8,4V7C8,8.11 8.89,9 10,9H11V11H2V13H6V15H5C3.89,15 3,15.89 3,17V20C3,21.11 3.89,22 5,22H9C10.11,22 11,21.11 11,20V17C11,15.89 10.11,15 9,15H8V13H16V15H15C13.89,15 13,15.89 13,17V20C13,21.11 13.89,22 15,22H19C20.11,22 21,21.11 21,20V17C21,15.89 20.11,15 19,15H18V13H22V11H13V9H14C15.11,9 16,8.11 16,7V4C16,2.89 15.11,2 14,2H10M10,4H14V7H10V4M5,17H9V20H5V17M15,17H19V20H15V17Z</StreamGeometry>
     <StreamGeometry x:Key="IconChip">M6,4H18V5H21V7H18V9H21V11H18V13H21V15H18V17H21V19H18V20H6V19H3V17H6V15H3V13H6V11H3V9H6V7H3V5H6V4M11,15V18H12V15H11M13,15V18H14V15H13M15,15V18H16V15H15Z</StreamGeometry>
     <StreamGeometry x:Key="IconPlayCircleOutline">M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M10,16.5L16,12L10,7.5V16.5Z</StreamGeometry>
+    <!-- Запуск в круге / PlayCircle (автотесты ПРО, ProAutoTests; ключ IconPlayCircle). -->
+    <StreamGeometry x:Key="IconPlayCircle">M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M10,16.5L16,12L10,7.5V16.5Z</StreamGeometry>
     <StreamGeometry x:Key="IconAccount">M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z</StreamGeometry>
     <StreamGeometry x:Key="IconIdentifier">M10 7V9H9V15H10V17H6V15H7V9H6V7H10M16 7C17.11 7 18 7.9 18 9V15C18 16.11 17.11 17 16 17H12V7M16 9H14V15H16V9Z</StreamGeometry>
     <StreamGeometry x:Key="IconFormatTitle">M5,4V7H10.5V19H13.5V7H19V4H5Z</StreamGeometry>

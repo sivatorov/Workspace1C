@@ -226,9 +226,11 @@ namespace Workspace1C
             Grid.SetColumnSpan(caption, actionsIndex);
             row.Children.Add(caption);
 
-            // Аудит UI P1-2: вертикальная полоса 3 px исходным цветом группы —
-            // сохраняет идентичность цвета, пока фон строки остаётся пастельным.
-            // Привязка к HeaderStripeBrush обновляет её при смене темы.
+            // Аудит UI P1-2 / issue #145: вертикальная полоса 3 px исходным цветом
+            // группы — сохраняет идентичность цвета, пока фон строки остаётся
+            // пастельным. Привязка к HeaderStripeBrush обновляет её при смене темы.
+            // Вертикальный отступ 4 не даёт торцам полосы выходить за скруглённые
+            // углы рамки (issue #145).
             var stripe = new Border
             {
                 Width = 3,
@@ -237,7 +239,7 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Stretch,
                 IsHitTestVisible = false,
                 // Внутри рамки толщиной 2 (акцентной у выбранной группы).
-                Margin = new Thickness(2, 0, 0, 0)
+                Margin = new Thickness(2, 4, 0, 4)
             };
             stripe.Bind(Border.BackgroundProperty, new Binding("HeaderStripeBrush") { Source = group });
 

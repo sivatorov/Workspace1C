@@ -17,7 +17,7 @@ namespace Workspace1C
     /// процессов платформы 1С (база/режим/пользователь/время старта/PID/строка
     /// подключения/значок сопоставления) с автообновлением по таймеру, кнопкой
     /// «Обновить» и завершением выбранных процессов с подтверждением. Двойной клик
-    /// по строке с известной базой — переход к базе в главном окне (FindInList-механика).
+    /// по строке и клавиша Enter завершают выбранные процессы (issue #134, 1.0.1.100).
     /// Вся логика — в чистой ViewModel <see cref="ProcessInspectorViewModel"/>.
     /// <para>
     /// issue #134 (доработка ArtyoZ): мультивыделение (Ctrl/Shift) и массовое
@@ -64,6 +64,11 @@ namespace Workspace1C
             _vm.ColumnsChanged += (_, _) => ApplyColumnVisibility();
 
             ApplyColumnVisibility();
+
+            // issue #134 (1.0.1.100, замечание 7OH): список получает фокус при
+            // открытии окна, поэтому Ctrl+A выделяет все процессы без клика мышью.
+            Loaded += (_, _) => ProcessesGrid.Focus();
+
             Closed += (_, _) => _vm.Dispose();
         }
 
@@ -81,8 +86,25 @@ namespace Workspace1C
 
         private void OnGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (ProcessesGrid.SelectedItem is ProcessRowViewModel row)
-                _vm.OpenBase(row);
+            // issue #134 (1.0.1.100, замечание 7OH): двойной клик завершает
+            // выбранные процессы (с подтверждением), а не активирует базу в
+            // главном списке, до которого из модального окна не добраться.
+            if (ProcessesGrid.SelectedItem is ProcessRowViewModel)
+                _vm.KillSelectedMany();
+        }
+
+        /// <summary>
+        /// issue #134 (1.0.1.100, замечание 7OH): Enter завершает выбранные
+        /// процессы — то же действие, что и двойной клик по строке.
+        /// </summary>
+        private void OnGrid_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Enter)
+                return;
+            if (ProcessesGrid.SelectedItem is not ProcessRowViewModel)
+                return;
+            e.Handled = true;
+            _vm.KillSelectedMany();
         }
 
         /// <summary>

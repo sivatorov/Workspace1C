@@ -26,7 +26,7 @@ namespace Workspace1C
     /// процессов платформы 1С (база/режим/пользователь/время старта/PID/строка
     /// подключения/значок сопоставления) с автообновлением по таймеру, кнопкой
     /// «Обновить» и завершением выбранных процессов с подтверждением. Двойной клик
-    /// по строке с известной базой — переход к базе в главном окне (FindInList-механика).
+    /// по строке и клавиша Enter завершают выбранные процессы (issue #134, 1.0.1.100).
     /// Вся логика — в чистой ViewModel <see cref="ProcessInspectorViewModel"/>.
     /// <para>
     /// issue #134 (доработка ArtyoZ): мультивыделение (Ctrl/Shift) и массовое
@@ -122,6 +122,7 @@ namespace Workspace1C
                     : selected.Cast<ProcessRowViewModel>().ToList());
             };
             _grid.DoubleTapped += OnGrid_DoubleTapped;
+            _grid.KeyDown += OnGrid_KeyDown;
             ScrollViewer.SetHorizontalScrollBarVisibility(_grid, ScrollBarVisibility.Disabled);
 
             // issue #134: набор видимых колонок изменён — перестраиваем шапку и строки,
@@ -183,6 +184,10 @@ namespace Workspace1C
             Place(grid, buttons, 3);
             Place(grid, hint, 4);
             Content = grid;
+
+            // issue #134 (1.0.1.100, замечание 7OH): список получает фокус при
+            // открытии окна, поэтому Ctrl+A выделяет все процессы без клика мышью.
+            Opened += (_, _) => _grid.Focus();
         }
 
         private static void Place(Grid grid, Control control, int row)
@@ -535,8 +540,25 @@ namespace Workspace1C
 
         private void OnGrid_DoubleTapped(object? sender, TappedEventArgs e)
         {
-            if (_grid.SelectedItem is ProcessRowViewModel row)
-                _vm.OpenBase(row);
+            // issue #134 (1.0.1.100, замечание 7OH): двойной клик завершает
+            // выбранные процессы (с подтверждением), а не активирует базу в
+            // главном списке, до которого из модального окна не добраться.
+            if (_grid.SelectedItem is ProcessRowViewModel)
+                _vm.KillSelectedMany();
+        }
+
+        /// <summary>
+        /// issue #134 (1.0.1.100, замечание 7OH): Enter завершает выбранные
+        /// процессы — то же действие, что и двойной клик по строке.
+        /// </summary>
+        private void OnGrid_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter)
+                return;
+            if (_grid.SelectedItem is not ProcessRowViewModel)
+                return;
+            e.Handled = true;
+            _vm.KillSelectedMany();
         }
     }
 }
