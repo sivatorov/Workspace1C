@@ -55,7 +55,7 @@ namespace Workspace1C.Services
                 runMode ??= OneCRunMode.Managed;
             }
 
-            var exePath = FindExecutable(infobase.PlatformVersion, architecture, clientType, mode);
+            var exePath = FindExecutable(ResolveLaunchVersion(infobase, architecture), architecture, clientType, mode);
             if (string.IsNullOrEmpty(exePath))
             {
                 var archLabel = architecture == OneCArchitecture.x64

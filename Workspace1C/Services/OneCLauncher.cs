@@ -365,7 +365,7 @@ public static partial class OneCLauncher
             runMode ??= OneCRunMode.Managed;
         }
 
-        var exePath = FindExecutable(infobase.PlatformVersion, architecture, clientType, mode);
+        var exePath = FindExecutable(ResolveLaunchVersion(infobase, architecture), architecture, clientType, mode);
         if (string.IsNullOrEmpty(exePath))
         {
             var archLabel = architecture == OneCArchitecture.x64
@@ -481,6 +481,10 @@ public static partial class OneCLauncher
             return false;
         }
     }
+
+    // Версия платформы с учётом закрепления базы в ibases.v8i (ResolveLaunchVersion,
+    // PickEffectiveVersion, FindPinnedVersion) — общая часть на обе платформы:
+    // Services/OneCLauncher.VersionPinning.Shared.cs.
 
     /// <summary>
     /// Ищет исполняемый файл платформы 1С нужной разрядности и типа клиента.

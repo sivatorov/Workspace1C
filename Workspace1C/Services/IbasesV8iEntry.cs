@@ -76,6 +76,13 @@ internal sealed class IbaseEntry
     /// <summary>Версия платформы 1С.</summary>
     public string Version { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Версия платформы, закреплённая за базой штатным стартером 1С (DefaultVersion).
+    /// Только чтение при запуске: в записи файла строка переносится дословно, а экспорт
+    /// по-прежнему пишет Version из PlatformVersion базы.
+    /// </summary>
+    public string DefaultVersion { get; set; } = string.Empty;
+
     /// <summary>Дополнительные параметры подключения (AdditionalParameters).</summary>
     public string AdditionalParameters { get; set; } = string.Empty;
 
@@ -232,6 +239,9 @@ internal sealed class IbaseEntry
                     break;
                 case "Version":
                     current.Version = value;
+                    break;
+                case "DefaultVersion":
+                    current.DefaultVersion = value;
                     break;
                 case "AdditionalParameters":
                     current.AdditionalParameters = value;
