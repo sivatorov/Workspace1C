@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.100-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.101-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,7 +8,7 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.100**
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.101**
 (поддерживается **7547 юнит-тестов** публичного ядра и **114 тестов ПРО**).
 
 ## 📣 Telegram-канал
@@ -224,6 +224,9 @@
   Дубли экспорта/импорта `*.v8i` из настроек убраны — основной путь один.
   Функции редакции PRO помечены звёздочкой «*» с пояснением в подвале меню;
   при выборе без лицензии открывается окно «Лицензия» с описанием тарифа.
+  Исправление 1.0.1.101 (Windows и Linux): кнопки разделов открывают сразу
+  содержимое раздела — без дублирующего подменю с тем же названием, и в каждый
+  момент открыто только одно меню раздела.
 - **Модули ПРО 2.x: автотесты, тренды производительности и копии в S3 (1.0.1.98,
   Windows и Linux)** — реализованы и подключены все шесть модулей редакции ПРО:
   конвейеры обслуживания, запросы по нескольким базам, сравнение окружений,

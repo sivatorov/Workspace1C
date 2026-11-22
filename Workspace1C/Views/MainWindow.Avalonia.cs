@@ -487,6 +487,31 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Открывает меню раздела верхней панели (навигация 1.0.1.99) с защитой от
+        /// одновременного показа двух меню разделов: ранее открытое меню закрывается,
+        /// ссылка на него обнуляется по событию <see cref="ContextMenu.Closed"/>.
+        /// </summary>
+        private void OpenSectionMenu(string sectionId, Control anchor)
+        {
+            var menu = BuildUtilitiesMenu(sectionId);
+            if (menu is null)
+                return;
+            if (_openSectionMenu is not null && !ReferenceEquals(_openSectionMenu, menu))
+            {
+                // В Avalonia сеттер IsOpen у ContextMenu недоступен — закрываем методом Close().
+                _openSectionMenu.Close();
+                _openSectionMenu = null;
+            }
+            menu.Closed += (_, _) =>
+            {
+                if (ReferenceEquals(_openSectionMenu, menu))
+                    _openSectionMenu = null;
+            };
+            _openSectionMenu = menu;
+            menu.Open(anchor);
+        }
+
+        /// <summary>
         /// Grace-таймер деактивации (issue #340, F3, план 0.3.9.306): запускается при
         /// <see cref="Window.Deactivated"/> на ~300 мс; если окно снова стало активным
         /// (<see cref="Window.Activated"/>) — таймер отменяется и состояние menu-close
@@ -711,6 +736,13 @@ namespace Workspace1C
         /// меню, захваченное при последней сборке панели команд, — бейджи «· ПРО»
         /// оставались бы устаревшими после активации/деактивации.</summary>
         private ContextMenu? _utilitiesMenu;
+
+        /// <summary>Последнее открытое меню раздела верхней панели (навигация 1.0.1.99):
+        /// перед открытием следующего меню раздела предыдущее принудительно закрывается,
+        /// чтобы на экране не висели одновременно два меню («Серверы», «Обслуживание»,
+        /// «Инструменты», «Ещё»). Ссылка обнуляется по событию
+        /// <see cref="Avalonia.Controls.ContextMenu.Closed"/>.</summary>
+        private ContextMenu? _openSectionMenu;
 
         // ======================= Построение UI =======================
 
@@ -1092,7 +1124,8 @@ namespace Workspace1C
                     };
                 }
                 // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
-                sectionBtn.Click += (_, _) => BuildUtilitiesMenu(id)?.Open(sectionBtn);
+                // Ранее открытое меню раздела закрывается (навигация 1.0.1.99).
+                sectionBtn.Click += (_, _) => OpenSectionMenu(id, sectionBtn);
                 panel.Children.Add(sectionBtn);
             }
 

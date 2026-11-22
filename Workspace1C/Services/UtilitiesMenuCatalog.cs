@@ -1084,8 +1084,13 @@ public static class UtilitiesMenuLayouts
     }
 
     /// <summary>
-    /// Выделяет из компоновки один раздел первого уровня (для отдельного меню на панели
-    /// навигации). null — раздела нет в компоновке.
+    /// Выделяет СОДЕРЖИМОЕ раздела первого уровня для отдельного меню на панели навигации
+    /// (навигация 1.0.1.99). В результат попадают дочерние узлы раздела, а не сам узел:
+    /// иначе кнопка раздела («Серверы», «Обслуживание», «Инструменты», «Ещё») открывала бы
+    /// меню с единственным подменю того же названия — дублирование уровня раздела.
+    /// Возвращается новая копия списка детей, исходная компоновка не изменяется.
+    /// null — раздела нет в компоновке; пустой <c>Root</c> — раздел есть, но без пунктов
+    /// (меню открывается пустым, а не падает).
     /// </summary>
     public static UtilitiesMenuLayout? ExtractSection(UtilitiesMenuLayout? layout, string sectionGroupId)
     {
@@ -1096,10 +1101,14 @@ public static class UtilitiesMenuLayouts
             && string.Equals(n.GroupId, sectionGroupId, StringComparison.Ordinal));
         if (node is null)
             return null;
+        // Разворачиваем раздел на уровень меню: копия детей без дублирующего узла-раздела.
+        var children = node.Children is null
+            ? new List<UtilitiesMenuNode>()
+            : new List<UtilitiesMenuNode>(node.Children);
         return new UtilitiesMenuLayout
         {
             SchemaVersion = CurrentSchemaVersion,
-            Root = new List<UtilitiesMenuNode> { node }
+            Root = children
         };
     }
 

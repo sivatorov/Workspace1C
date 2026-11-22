@@ -294,8 +294,30 @@ public partial class MainWindow
         menu.PlacementTarget = btn;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
         menu.DataContext = DataContext;
+
+        // Навигация 1.0.1.99: не допускаем одновременного открытия двух меню разделов.
+        // Перед показом нового закрываем ранее открытое меню раздела (если оно ещё живо),
+        // а ссылку обнуляем по событию Closed. Само открытие остаётся отложенным (issue #282).
+        if (_openSectionMenu is not null && !ReferenceEquals(_openSectionMenu, menu))
+        {
+            _openSectionMenu.IsOpen = false;
+            _openSectionMenu = null;
+        }
+        menu.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_openSectionMenu, menu))
+                _openSectionMenu = null;
+        };
+        _openSectionMenu = menu;
+
         Dispatcher.BeginInvoke(
-            new Action(() => menu.IsOpen = true),
+            new Action(() =>
+            {
+                // Если до отложенного показа уже открыли другое меню раздела — устаревшее
+                // не показываем, иначе на экране оказались бы два меню одновременно.
+                if (ReferenceEquals(_openSectionMenu, menu))
+                    menu.IsOpen = true;
+            }),
             System.Windows.Threading.DispatcherPriority.Input);
     }
 
