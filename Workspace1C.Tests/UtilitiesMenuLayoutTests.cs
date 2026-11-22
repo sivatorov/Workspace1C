@@ -230,6 +230,50 @@ public sealed class UtilitiesMenuLayoutTests
         }
     }
 
+    /// <summary>
+    /// Issue #146: миграция схемы 1 → 2 сохраняет пользовательские группы и порядок,
+    /// а не заменяет дерево стандартной компоновкой.
+    /// </summary>
+    [Fact]
+    public void Migrate_V1_PreservesCustomGroupsAndOrder()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = 1,
+            Root = new List<UtilitiesMenuNode>
+            {
+                new() { Kind = "item", ItemId = "ServerMonitor" },
+                new()
+                {
+                    Kind = "group",
+                    GroupId = null,
+                    CustomTitle = "Моя папка",
+                    Children = new List<UtilitiesMenuNode>
+                    {
+                        new() { Kind = "item", ItemId = "Services" }
+                    }
+                }
+            }
+        };
+
+        var migrated = UtilitiesMenuLayouts.Migrate(layout);
+
+        Assert.Equal("ServerMonitor", migrated.Root[0].ItemId);
+        Assert.Equal("Моя папка", migrated.Root[1].CustomTitle);
+        Assert.Equal("Services", migrated.Root[1].Children[0].ItemId);
+    }
+
+    /// <summary>Issue #146: скрытый раздел не открывается кнопкой на панели.</summary>
+    [Fact]
+    public void ExtractSection_HiddenSection_ReturnsNull()
+    {
+        var layout = UtilitiesMenuLayouts.Default();
+        layout.Root.First(n => n.GroupId == UtilitiesMenuCatalog.GroupTools).Visible = false;
+
+        Assert.Null(UtilitiesMenuLayouts.ExtractSection(layout, UtilitiesMenuCatalog.GroupTools));
+        Assert.NotNull(UtilitiesMenuLayouts.ExtractSection(layout, UtilitiesMenuCatalog.GroupServers));
+    }
+
     private static void RemoveItem(UtilitiesMenuLayout layout, string itemId)
     {
         static bool RemoveFrom(List<UtilitiesMenuNode> nodes, string id)

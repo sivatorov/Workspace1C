@@ -129,19 +129,24 @@ public sealed class Issue134ProcessInspectorTests
     [Fact]
     public void Refresh_RestoresAllSelectedRows()
     {
+        var applies = 0;
         var service = new FakeRunningService(Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"));
-        using var vm = CreateViewModel(service, out _, out _);
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
 
-        WaitFor(() => vm.Processes.Count == 3);
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 3);
         var original = vm.Processes.Where(row => row.Pid is 1 or 3).ToList();
         vm.SetSelectedRows(original);
 
         service.Set(Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"));
         vm.Refresh();
 
-        WaitFor(() => vm.SelectedRows.Count == 2 && vm.SelectedRows.All(row => !original.Contains(row)));
+        // issue #134 (1.0.1.102): набор процессов тот же — строки переиспользуются,
+        // поэтому выбранные экземпляры остаются прежними (контейнеры не пересоздаются).
+        WaitFor(() => Volatile.Read(ref applies) >= 2);
         Assert.Equal(new[] { 1, 3 }, vm.SelectedRows.Select(row => row.Pid).OrderBy(pid => pid));
-        Assert.Equal(1, vm.SelectedRow!.Pid);
+        Assert.All(original, row => Assert.Contains(row, vm.SelectedRows));
+        Assert.Same(original[0], vm.SelectedRow);
     }
 
     [Fact]
@@ -655,17 +660,20 @@ public sealed class Issue134ProcessInspectorTests
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): после автообновления восстанавливаются ВСЕ выбранные
-    /// строки, включая чётные, — а не только первая.
+    /// issue #134 (1.0.1.84): после автообновления сохраняются ВСЕ выбранные
+    /// строки, включая чётные, — а не только первая. С 1.0.1.102 строки ещё и
+    /// переиспользуются, поэтому выделение не «мигает».
     /// </summary>
     [Fact]
     public void RestoreSelectedRows_RestoresAllSelectedRows()
     {
+        var applies = 0;
         var service = new FakeRunningService(
             Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"), Proc(4, "Четвёртый"));
-        using var vm = CreateViewModel(service, out _, out _);
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
 
-        WaitFor(() => vm.Processes.Count == 4);
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 4);
         var original = vm.Processes.Where(row => row.Pid is 2 or 4).ToList();
         vm.SetSelectedRows(original);
 
@@ -673,8 +681,284 @@ public sealed class Issue134ProcessInspectorTests
             Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"), Proc(4, "Четвёртый"));
         vm.Refresh();
 
-        WaitFor(() => vm.SelectedRows.Count == 2 && vm.SelectedRows.All(row => !original.Contains(row)));
+        WaitFor(() => Volatile.Read(ref applies) >= 2);
         Assert.Equal(new[] { 2, 4 }, vm.SelectedRows.Select(row => row.Pid).OrderBy(pid => pid));
+        Assert.All(original, row => Assert.Contains(row, vm.SelectedRows));
+    }
+
+    // ===================== Инкрементальное автообновление (1.0.1.102) =====================
+
+    /// <summary>
+    /// issue #134 (1.0.1.102, замечание 7OH): при том же наборе процессов повторный
+    /// опрос не пересоздаёт строки — именно это сохраняет фокус и навигацию по таблице.
+    /// </summary>
+    [Fact]
+    public void ApplyRows_ReusesRowInstances_WhenProcessSetUnchanged()
+    {
+        var applies = 0;
+        var service = new FakeRunningService(Proc(1, "Первый"), Proc(2, "Второй"));
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
+
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 2);
+        var before = vm.Processes.ToList();
+
+        service.Set(Proc(1, "Первый"), Proc(2, "Второй"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 2);
+
+        Assert.Equal(before, vm.Processes);
+        Assert.All(before, row => Assert.Contains(row, vm.Processes));
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): при добавлении/удалении процесса переиспользуются
+    /// экземпляры неизменившихся строк — контейнеры таблицы не пересоздаются.
+    /// </summary>
+    [Fact]
+    public void ApplyRows_ReplacesOnlyChangedRows_WhenProcessSetChanges()
+    {
+        var applies = 0;
+        var service = new FakeRunningService(Proc(1, "Первый"), Proc(2, "Второй"));
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
+
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 2);
+        var first = vm.Processes.Single(row => row.Pid == 1);
+        var second = vm.Processes.Single(row => row.Pid == 2);
+
+        // Добавлен третий процесс: первые две строки — те же экземпляры.
+        service.Set(Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 2 && vm.Processes.Count == 3);
+
+        Assert.Same(first, vm.Processes.Single(row => row.Pid == 1));
+        Assert.Same(second, vm.Processes.Single(row => row.Pid == 2));
+        var third = vm.Processes.Single(row => row.Pid == 3);
+
+        // Удалён третий процесс: оставшиеся строки — те же экземпляры.
+        service.Set(Proc(1, "Первый"), Proc(2, "Второй"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 3 && vm.Processes.Count == 2);
+
+        Assert.Same(first, vm.Processes.Single(row => row.Pid == 1));
+        Assert.Same(second, vm.Processes.Single(row => row.Pid == 2));
+        Assert.DoesNotContain(third, vm.Processes);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): выделение и основная строка сохраняются после
+    /// автообновления (в том числе мультивыделение) и указывают на те же экземпляры.
+    /// </summary>
+    [Fact]
+    public void Refresh_PreservesSelectedRow_AndSelection()
+    {
+        var applies = 0;
+        var service = new FakeRunningService(Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"));
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
+
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 3);
+        var selected = vm.Processes.Where(row => row.Pid is 1 or 3).ToList();
+        vm.SetSelectedRows(selected);
+
+        service.Set(Proc(1, "Первый"), Proc(2, "Второй"), Proc(3, "Третий"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 2);
+
+        Assert.Equal(new[] { 1, 3 }, vm.SelectedRows.Select(row => row.Pid).OrderBy(pid => pid));
+        Assert.All(selected, row => Assert.Contains(row, vm.SelectedRows));
+        Assert.Same(selected[0], vm.SelectedRow);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): ключ текущей строки (PID + командная строка + время
+    /// старта) не меняется, если процесс остался, — таблица остаётся на той же строке.
+    /// </summary>
+    [Fact]
+    public void Refresh_DoesNotResetCurrentRowKey()
+    {
+        var applies = 0;
+        var service = new FakeRunningService(Proc(1, "Первый"), Proc(2, "Второй"));
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
+
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 2);
+        var current = vm.Processes.Single(row => row.Pid == 2);
+        vm.SelectedRow = current;
+
+        service.Set(Proc(1, "Первый"), Proc(2, "Второй"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 2);
+
+        Assert.Equal(2, vm.SelectedRow!.Pid);
+        Assert.Same(current, vm.SelectedRow);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): перезапуск процесса с тем же PID, но другой командной
+    /// строкой — это другая строка; выделение не перескакивает на чужой процесс.
+    /// </summary>
+    [Fact]
+    public void Refresh_RecreatesRow_WhenPidReusedWithDifferentCommandLine()
+    {
+        var applies = 0;
+        var service = new FakeRunningService(Proc(7, "1cv8.exe", "/S srv\\БазаA"));
+        using var vm = CreateViewModel(
+            service, out _, out _, dispatchToUi: action => { action(); Interlocked.Increment(ref applies); });
+
+        WaitFor(() => Volatile.Read(ref applies) >= 1 && vm.Processes.Count == 1);
+        var original = vm.Processes[0];
+
+        service.Set(Proc(7, "1cv8.exe", "/S srv\\БазаB"));
+        vm.Refresh();
+        WaitFor(() => Volatile.Read(ref applies) >= 2 && vm.Processes.Count == 1);
+
+        Assert.NotSame(original, vm.Processes[0]);
+        Assert.Equal("/S srv\\БазаB", vm.Processes[0].FullCommandLine);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): пока идёт серия клавиатурных событий, тик автообновления
+    /// откладывается (короткий debounce); после паузы данные снова обновляются.
+    /// </summary>
+    [Fact]
+    public void AutoRefreshDebounce_DefersOnlyRecentNavigation()
+    {
+        // Навигации не было — тик выполняется.
+        Assert.False(ProcessInspectorViewModel.ShouldDeferTimerRefresh(0, 10_000, 1500));
+        // Навигация только что — откладываем.
+        Assert.True(ProcessInspectorViewModel.ShouldDeferTimerRefresh(10_000, 10_200, 1500));
+        // Пауза истекла — тик выполняется (данные обновляются).
+        Assert.False(ProcessInspectorViewModel.ShouldDeferTimerRefresh(10_000, 11_600, 1500));
+        // Часы «назад»/переполнение не считаются активной навигацией.
+        Assert.False(ProcessInspectorViewModel.ShouldDeferTimerRefresh(10_000, 9_000, 1500));
+        // Debounce выключен.
+        Assert.False(ProcessInspectorViewModel.ShouldDeferTimerRefresh(10_000, 10_100, 0));
+    }
+
+    /// <summary>issue #134 (1.0.1.102): окна сообщают ViewModel о навигации клавиатурой.</summary>
+    [Fact]
+    public void NotifyKeyboardNavigation_PausesAutoRefreshTemporarily()
+    {
+        using var vm = CreateViewModel(new FakeRunningService(Proc(1, "Первый")), out _, out _);
+
+        Assert.False(vm.IsAutoRefreshPaused);
+        vm.NotifyKeyboardNavigation();
+        Assert.True(vm.IsAutoRefreshPaused);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): обновление строки «на месте» уведомляет привязки —
+    /// значения в таблице обновляются без пересоздания контейнера.
+    /// </summary>
+    [Fact]
+    public void ProcessRow_UpdateFrom_RaisesPropertyChanged()
+    {
+        var row = new ProcessRowViewModel(Proc(1, "1cv8.exe", "/S srv\\БазаA"), null);
+        var changed = new List<string>();
+        row.PropertyChanged += (_, e) => changed.Add(e.PropertyName ?? string.Empty);
+
+        row.UpdateFrom(Proc(1, "1cv8.exe", "/S srv\\БазаB"), null);
+
+        Assert.Equal("/S srv\\БазаB", row.FullCommandLine);
+        Assert.Equal("/S srv\\БазаB", row.ConnectionText);
+        Assert.Contains(nameof(ProcessRowViewModel.ConnectionText), changed);
+        Assert.Contains(nameof(ProcessRowViewModel.FullCommandLine), changed);
+    }
+
+    [Fact]
+    public void ProcessRow_HasSameIdentity_IncludesCommandLineAndStartToken()
+    {
+        var row = new ProcessRowViewModel(Proc(7, "1cv8.exe", "/S srv\\БазаA"), null);
+
+        Assert.True(row.HasSameIdentity(Proc(7, "1cv8.exe", "/S srv\\БазаA")));
+        Assert.False(row.HasSameIdentity(Proc(7, "1cv8.exe", "/S srv\\БазаB")));
+        Assert.False(row.HasSameIdentity(Proc(8, "1cv8.exe", "/S srv\\БазаA")));
+        Assert.False(row.HasSameIdentity(new RunningOneCProcessDetails(
+            7, "1cv8.exe", "/S srv\\БазаA", null, "999", null)));
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): инкрементальное применение строк не вызывает
+    /// <c>Processes.Clear()</c> — иначе контрол пересоздал бы контейнеры и сбросил фокус.
+    /// </summary>
+    [Fact]
+    public void ViewModel_ApplyRows_IsIncremental_WithoutClear()
+    {
+        var code = ReadProjectFile("Workspace1C", "ViewModels", "ProcessInspectorViewModel.cs");
+        var start = code.IndexOf("private void ApplyRows(", StringComparison.Ordinal);
+        Assert.True(start >= 0, "В ProcessInspectorViewModel нет ApplyRows.");
+        var end = code.IndexOf("\n    /// <summary>", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец метода ApplyRows.");
+        var body = code[start..end];
+
+        Assert.DoesNotContain("Processes.Clear()", body, StringComparison.Ordinal);
+        Assert.Contains("existing.UpdateFrom(", body, StringComparison.Ordinal);
+        Assert.Contains("Processes.RemoveAt(", body, StringComparison.Ordinal);
+        Assert.Contains("Processes.Move(", body, StringComparison.Ordinal);
+        Assert.Contains("Processes.Insert(", body, StringComparison.Ordinal);
+        Assert.Contains("RestoreSelection(selectedKeys)", body, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): WPF-окно ставит фокус отложенно после загрузки данных
+    /// (ContentRendered/Dispatcher/Keyboard.Focus), задаёт текущую ячейку и сообщает
+    /// ViewModel о навигационных клавишах.
+    /// </summary>
+    [Fact]
+    public void Wpf_FocusAndNavigation_AreDeferredAndPreserveFocus()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
+        var xaml = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml");
+
+        Assert.Contains("ContentRendered += (_, _) => QueueGridFocus();", code, StringComparison.Ordinal);
+        Assert.Contains(
+            "Dispatcher.BeginInvoke(new Action(FocusProcessesGrid), DispatcherPriority.Input)",
+            code, StringComparison.Ordinal);
+        Assert.Contains("Keyboard.Focus(ProcessesGrid)", code, StringComparison.Ordinal);
+        Assert.Contains("ProcessesGrid.CurrentCell = new DataGridCellInfo(row, column)", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.NotifyKeyboardNavigation();", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.Processes.CollectionChanged", code, StringComparison.Ordinal);
+        Assert.Contains("Focusable=\"True\"", xaml, StringComparison.Ordinal);
+        // Прежний синхронный фокус в Loaded больше не используется.
+        Assert.DoesNotContain("Loaded += (_, _) => ProcessesGrid.Focus();", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): Avalonia-окно ставит фокус через Dispatcher.UIThread.Post
+    /// после загрузки данных, с повтором, и сообщает ViewModel о навигационных клавишах.
+    /// </summary>
+    [Fact]
+    public void Avalonia_FocusAndNavigation_AreDeferredAndPreserveFocus()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
+
+        Assert.Contains("FocusGridAttempt(0)", code, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.Focus()", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.SelectedIndex = 0", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.NotifyKeyboardNavigation();", code, StringComparison.Ordinal);
+        Assert.Contains("_vm.Processes.CollectionChanged", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Opened += (_, _) => _grid.Focus();", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.102): паритет оболочек — фокус, debounce и сохранение
+    /// фокуса реализованы в обеих оболочках одинаковым набором механик.
+    /// </summary>
+    [Theory]
+    [InlineData("NotifyKeyboardNavigation")]
+    [InlineData("IsNavigationKey")]
+    [InlineData("Processes.CollectionChanged")]
+    [InlineData("Deactivated += (_, _) =>")]
+    public void FocusAndNavigation_ParityBetweenShells(string marker)
+    {
+        var wpf = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
+        var avalonia = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
+
+        Assert.Contains(marker, wpf, StringComparison.Ordinal);
+        Assert.Contains(marker, avalonia, StringComparison.Ordinal);
     }
 
     // ===================== Инспектор: мультивыбор и колонки в оболочках =====================
@@ -803,7 +1087,8 @@ public sealed class Issue134ProcessInspectorTests
         out FakeKiller killer,
         out RecordingDialogs dialogs,
         AppSettings? settings = null,
-        Action? saveSettings = null)
+        Action? saveSettings = null,
+        Action<Action>? dispatchToUi = null)
     {
         killer = new FakeKiller();
         dialogs = new RecordingDialogs();
@@ -813,7 +1098,7 @@ public sealed class Issue134ProcessInspectorTests
             dialogs,
             Enumerable.Empty<Infobase>(),
             _ => { },
-            null,
+            dispatchToUi,
             settings,
             saveSettings);
     }

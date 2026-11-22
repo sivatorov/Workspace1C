@@ -1561,6 +1561,55 @@
                                     </ItemsControl>
                                 </StackPanel>
                             </GroupBox>
+
+                            <!-- Issue #145: доли цвета строки-папки (0–100 %).
+                                 0 — цвет группы не подмешивается в фон строки,
+                                 100 — строка окрашена чистым цветом группы. -->
+                            <GroupBox Header="{loc:Loc Settings.GroupColorTintGroup}" Padding="8" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="{loc:Loc Settings.GroupColorTintHint}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                               TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorTint}"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Slider x:Name="GroupColorTintSlider" Grid.Column="1"
+                                                Minimum="0" Maximum="100" TickFrequency="1"
+                                                IsSnapToTickEnabled="True" Margin="8,0"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="OnGroupColorTintChanged"/>
+                                        <TextBlock x:Name="GroupColorTintValueText" Grid.Column="2"
+                                                   MinWidth="48" TextAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorHoverTint}"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Slider x:Name="GroupColorHoverTintSlider" Grid.Column="1"
+                                                Minimum="0" Maximum="100" TickFrequency="1"
+                                                IsSnapToTickEnabled="True" Margin="8,0"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="OnGroupColorHoverTintChanged"/>
+                                        <TextBlock x:Name="GroupColorHoverTintValueText" Grid.Column="2"
+                                                   MinWidth="48" TextAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
                         </StackPanel>
                     </ScrollViewer>
 

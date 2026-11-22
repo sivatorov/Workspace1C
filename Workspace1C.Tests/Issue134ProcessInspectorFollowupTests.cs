@@ -28,11 +28,20 @@ public sealed class Issue134ProcessInspectorFollowupTests
     private static string ReadProjectFile(params string[] parts)
         => File.ReadAllText(Path.Combine(RepoRoot(), Path.Combine(parts)));
 
+    /// <summary>
+    /// issue #134 (1.0.1.102, замечание 7OH): фокус ставится отложенно — после
+    /// загрузки данных и первого прохода разметки, с повтором при неактивированном
+    /// окне. Синхронного Focus() в Loaded больше нет: он не передавал фокус таблице.
+    /// </summary>
     [Fact]
     public void Wpf_Inspector_FocusesGridOnOpen()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
-        Assert.Contains("Loaded += (_, _) => ProcessesGrid.Focus();", code, StringComparison.Ordinal);
+        Assert.Contains("ContentRendered += (_, _) => QueueGridFocus();", code, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.BeginInvoke(new Action(FocusProcessesGrid), DispatcherPriority.Input)", code, StringComparison.Ordinal);
+        Assert.Contains("Keyboard.Focus(ProcessesGrid)", code, StringComparison.Ordinal);
+        Assert.Contains("NotifyCollectionChangedAction.Add", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Loaded += (_, _) => ProcessesGrid.Focus();", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -49,11 +58,19 @@ public sealed class Issue134ProcessInspectorFollowupTests
         Assert.DoesNotContain("_vm.OpenBase(", code, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// issue #134 (1.0.1.102, замечание 7OH): в Avalonia фокус ставится через
+    /// <c>Dispatcher.UIThread.Post</c> после загрузки данных и разметки, с повтором.
+    /// </summary>
     [Fact]
     public void Avalonia_Inspector_FocusesGridOnOpen()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
-        Assert.Contains("Opened += (_, _) => _grid.Focus();", code, StringComparison.Ordinal);
+        Assert.Contains("FocusGridAttempt(0)", code, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.UIThread.Post(", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.Focus()", code, StringComparison.Ordinal);
+        Assert.Contains("NotifyCollectionChangedAction.Add", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Opened += (_, _) => _grid.Focus();", code, StringComparison.Ordinal);
     }
 
     [Fact]

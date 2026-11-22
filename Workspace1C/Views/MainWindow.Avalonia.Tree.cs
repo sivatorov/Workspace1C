@@ -79,7 +79,11 @@ namespace Workspace1C
             var header = new Border
             {
                 CornerRadius = new CornerRadius(UiMetrics.RadiusLg),
-                Padding = new Thickness(UiMetrics.Compact ? 6 : 8, UiMetrics.GroupHeaderPadV),
+                // Issue #145: слева — общий зазор GroupRowStripeLayout.Gap до цветной
+                // полосы (раньше было 8/6 и полоса прилипала к иконке свёртки),
+                // справа — прежние 8/6.
+                Padding = new Thickness(GroupRowStripeLayout.Gap, UiMetrics.GroupHeaderPadV,
+                    UiMetrics.Compact ? 6 : 8, UiMetrics.GroupHeaderPadV),
                 Margin = new Thickness(0, UiMetrics.GroupHeaderMarginV, 0, UiMetrics.GroupHeaderMarginV),
                 BorderThickness = new Thickness(2),
                 BorderBrush = Brushes.Transparent
@@ -102,11 +106,13 @@ namespace Workspace1C
                 };
             }
 
-            // Аудит UI P1-2: фон строки группы — пастель (цвет группы, смешанный
-            // с ContentBackground темы на 14 %), при наведении — та же пастель с
-            // долей 24 %. Кисти считает ThemeManager из цвета группы и темы; узел
-            // уведомляет о смене темы (HeaderBrush), поэтому строка перекрашивается
-            // сразу, без перезапуска. Насыщенная заливка не используется.
+            // Аудит UI P1-2 / issue #145: фон строки группы — пастель (цвет группы,
+            // смешанный с ContentBackground темы в доле из настройки «Доля цвета
+            // папки», по умолчанию 30 %), при наведении — доля из настройки «Доля
+            // цвета папки при наведении» (по умолчанию 45 %). Кисти считает
+            // ThemeManager из цвета группы и темы; узел уведомляет о смене темы и
+            // долей (HeaderBrush), поэтому строка перекрашивается сразу, без
+            // перезапуска. Насыщенная заливка не используется.
             void ApplyGroupBackground()
                 => header.Background = header.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush;
             ApplyGroupBackground();
@@ -139,7 +145,13 @@ namespace Workspace1C
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 6,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Issue #145: содержимое сдвигается на ContentOffset от края строки,
+                // полоса стоит внутри с одинаковыми зазорами Gap слева и справа.
+                // Внутри header уже есть левый Padding = Gap, поэтому добавляем
+                // только оставшуюся часть ContentOffset − Gap.
+                Margin = new Thickness(
+                    GroupRowStripeLayout.ContentOffset - GroupRowStripeLayout.Gap, 0, 0, 0)
             };
 
             // Имя группы наследует применяемый к интерфейсу шрифт; в компактном режиме
@@ -226,20 +238,22 @@ namespace Workspace1C
             Grid.SetColumnSpan(caption, actionsIndex);
             row.Children.Add(caption);
 
-            // Аудит UI P1-2 / issue #145: вертикальная полоса 3 px исходным цветом
-            // группы — сохраняет идентичность цвета, пока фон строки остаётся
-            // пастельным. Привязка к HeaderStripeBrush обновляет её при смене темы.
-            // Вертикальный отступ 4 не даёт торцам полосы выходить за скруглённые
+            // Аудит UI P1-2 / issue #145: вертикальная полоса исходным цветом группы —
+            // сохраняет идентичность цвета, пока фон строки остаётся пастельным.
+            // Привязка к HeaderStripeBrush обновляет её при смене темы.
+            // Левый край полосы = край содержимого header (Padding = Gap), поэтому
+            // Margin слева 0, а одинаковый зазор справа даёт Margin у caption.
+            // Вертикальный отступ не даёт торцам полосы выходить за скруглённые
             // углы рамки (issue #145).
             var stripe = new Border
             {
-                Width = 3,
-                CornerRadius = new CornerRadius(1.5),
+                Width = GroupRowStripeLayout.StripeWidth,
+                CornerRadius = new CornerRadius(GroupRowStripeLayout.StripeWidth / 2),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 IsHitTestVisible = false,
-                // Внутри рамки толщиной 2 (акцентной у выбранной группы).
-                Margin = new Thickness(2, 4, 0, 4)
+                Margin = new Thickness(0, GroupRowStripeLayout.VerticalInset, 0,
+                    GroupRowStripeLayout.VerticalInset)
             };
             stripe.Bind(Border.BackgroundProperty, new Binding("HeaderStripeBrush") { Source = group });
 
@@ -251,8 +265,9 @@ namespace Workspace1C
 
             // Issue #130: горизонтальная линия строки группы — та же толщина/цвет,
             // что у строк баз; вертикальные линии ведёт единый оверлей. Отрицательный
-            // отступ компенсирует Padding 8/6 и рамку 2 контейнера строки группы.
-            ApplyHorizontalGridLine(row, 2 + (UiMetrics.Compact ? 6 : 8));
+            // отступ компенсирует левый Padding = Gap и рамку 2 контейнера строки
+            // группы (issue #145).
+            ApplyHorizontalGridLine(row, 2 + GroupRowStripeLayout.Gap);
 
             return header;
         }
@@ -2705,8 +2720,11 @@ namespace Workspace1C
                 return menu;
 
             // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
+            // Issue #146: кнопка «Утилиты» (пользовательская компоновка без разделов)
+            // открывает полную компоновку; скрытый раздел не открывается (ExtractSection → null).
             UtilitiesMenuLayout? layout = fullLayout;
-            if (sectionGroupId is not null)
+            if (sectionGroupId is not null
+                && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
             {
                 layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
                 if (layout is null)

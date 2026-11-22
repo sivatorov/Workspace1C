@@ -53,6 +53,25 @@ public sealed class SettingsViewModel
     /// <summary>Текущая редактируемая цветовая схема вкладки «Цветовое оформление».</summary>
     public ColorScheme CurrentColorScheme { get; private set; }
 
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки, проценты 0–100 (issue #145).
+    /// Проксирует главную модель: изменение сразу применяется к ThemeManager.
+    /// </summary>
+    public int GroupColorTintPercent
+    {
+        get => _viewModel.GroupColorTintPercent;
+        set => _viewModel.GroupColorTintPercent = value;
+    }
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки при наведении, проценты 0–100 (issue #145).
+    /// </summary>
+    public int GroupColorHoverTintPercent
+    {
+        get => _viewModel.GroupColorHoverTintPercent;
+        set => _viewModel.GroupColorHoverTintPercent = value;
+    }
+
     /// <summary>Режим редактора: true — редактируется тёмная палитра, false — светлая.</summary>
     public bool EditingDarkPalette { get; private set; }
 

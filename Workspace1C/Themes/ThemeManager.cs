@@ -974,37 +974,75 @@ namespace Workspace1C.Themes
         private static readonly ConcurrentDictionary<string, SolidColorBrush> GroupRowBrushCache =
             new(StringComparer.OrdinalIgnoreCase);
 
+        /// <summary>
+        /// Текущая доля цвета группы в фоне строки-папки (issue #145): 0..1.
+        /// Задаётся настройкой «Доля цвета папки» (0–100 %) через
+        /// <see cref="ConfigureGroupRowTint"/>; по умолчанию —
+        /// <see cref="ColorScheme.GroupRowTintWeight"/> (30 %).
+        /// </summary>
+        public static double GroupRowTintWeight { get; private set; } = ColorScheme.GroupRowTintWeight;
+
+        /// <summary>
+        /// Текущая доля цвета группы в фоне строки-папки при наведении (issue #145): 0..1.
+        /// Задаётся настройкой «Доля цвета папки при наведении»; по умолчанию —
+        /// <see cref="ColorScheme.GroupRowHoverTintWeight"/> (45 %).
+        /// </summary>
+        public static double GroupRowHoverTintWeight { get; private set; } = ColorScheme.GroupRowHoverTintWeight;
+
+        /// <summary>
+        /// Доли цвета строки-папки изменились (issue #145): уже построенные узлы дерева
+        /// уведомляют привязки о пересчёте кистей без перезапуска.
+        /// </summary>
+        public static event EventHandler? GroupRowTintChanged;
+
+        /// <summary>
+        /// Применяет доли цвета строки-папки из настроек (issue #145): проценты 0–100
+        /// клампятся, кэш кистей сбрасывается, подписчики получают
+        /// <see cref="GroupRowTintChanged"/>. Значение 0 — цвет группы не подмешивается,
+        /// 100 — строка окрашена чистым цветом группы.
+        /// </summary>
+        public static void ConfigureGroupRowTint(int idlePercent, int hoverPercent)
+        {
+            var idle = Math.Clamp(idlePercent, 0, 100) / 100.0;
+            var hover = Math.Clamp(hoverPercent, 0, 100) / 100.0;
+            var changed = Math.Abs(GroupRowTintWeight - idle) > 0.0001
+                || Math.Abs(GroupRowHoverTintWeight - hover) > 0.0001;
+            GroupRowTintWeight = idle;
+            GroupRowHoverTintWeight = hover;
+            InvalidateGroupRowBrushCache();
+            if (changed)
+                GroupRowTintChanged?.Invoke(null, EventArgs.Empty);
+        }
+
         /// <summary>Сбрасывает кэш кистей строк групп (после смены темы/схемы).</summary>
         internal static void InvalidateGroupRowBrushCache() => GroupRowBrushCache.Clear();
 
         /// <summary>
-        /// Фон строки группы (аудит UI P1-2): цвет группы, подмешанный к фону
+        /// Фон строки группы (аудит UI P1-2, issue #145): цвет группы, подмешанный к фону
         /// содержимого темы (ContentBackground, при отсутствии — CardBackground)
-        /// в пропорции <see cref="ColorScheme.GroupRowTintWeight"/> (14 %). Сплошная
-        /// насыщенная заливка больше не используется — красная строка группы не
-        /// конкурирует с семантическим «ошибка/опасность».
+        /// в пропорции <see cref="GroupRowTintWeight"/> (по умолчанию 30 %).
         /// </summary>
         public static SolidColorBrush GetGroupRowBackgroundBrush(string groupHex)
-            => GetGroupRowBrush("bg", groupHex, ColorScheme.GroupRowTintWeight);
+            => GetGroupRowBrush("bg", groupHex, GroupRowTintWeight);
 
         /// <summary>
-        /// Фон строки группы при наведении: та же смесь с большей долей цвета группы
-        /// (<see cref="ColorScheme.GroupRowHoverTintWeight"/>). Hover остаётся мягким
-        /// и не превращается в сплошную заливку.
+        /// Фон строки группы при наведении: та же смесь с долей
+        /// <see cref="GroupRowHoverTintWeight"/> (по умолчанию 45 %).
         /// </summary>
         public static SolidColorBrush GetGroupRowHoverBrush(string groupHex)
-            => GetGroupRowBrush("hover", groupHex, ColorScheme.GroupRowHoverTintWeight);
+            => GetGroupRowBrush("hover", groupHex, GroupRowHoverTintWeight);
 
         /// <summary>
         /// Текст строки группы: TextPrimary темы, если он даёт ≥ 4.5:1 к фактическому
-        /// фону строки; иначе — чёрный/белый с максимальным контрастом (WCAG).
+        /// фону строки при текущей доле цвета; иначе — чёрный/белый с максимальным
+        /// контрастом (WCAG). При 100 % цвета фолбэк гарантирует читаемость.
         /// </summary>
         public static SolidColorBrush GetGroupRowTextBrush(string groupHex)
         {
             var (surface, textPrimary) = GroupRowThemeColors();
-            var hex = ColorScheme.GroupRowTextHex(groupHex, surface, textPrimary);
+            var hex = ColorScheme.GroupRowTextHex(groupHex, surface, textPrimary, GroupRowTintWeight);
             return GroupRowBrushCache.GetOrAdd(
-                $"text|{CurrentTheme}|{surface}|{textPrimary}|{groupHex}",
+                $"text|{CurrentTheme}|{surface}|{textPrimary}|{GroupRowTintWeight}|{groupHex}",
                 _ => CreateFrozenBrush(hex));
         }
 

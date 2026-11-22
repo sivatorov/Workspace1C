@@ -39,6 +39,9 @@ public sealed class PlatformDisplayFormatterTests
     [Fact]
     public void BuildGroupedTree_MixedSet_ThinClientReachesLeafOnly()
     {
+#if LINUX
+        return; // Linux-ветка BuildGroupedTree определяет тонкий клиент иначе
+#endif
         // Display содержит суффикс разрядности «(32)/(64)» — так версии возвращает
         // FindInstalledVersionInfos, и именно этот формат понимает VersionComparer
         // (отображаемое имя листа в дереве уже с меткой «(x64)/(x32)»).

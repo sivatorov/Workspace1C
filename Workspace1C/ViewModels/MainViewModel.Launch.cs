@@ -728,8 +728,10 @@ public partial class MainViewModel : ViewModelBase
         s.DefaultDbmsKind = _defaultDbmsKind;
         s.EscapeToTray = _escapeToTray;
         s.ConfirmCustomActions = _confirmCustomActions;
-        // Правка структуры меню «Утилиты» (issue #374).
+        // Правка структуры меню «Утилиты» (issue #374). Флаг инициализации (issue #146)
+        // отличает явное решение пользователя от «настройка ещё не сохранялась».
         s.UtilitiesMenuEditingEnabled = _utilitiesMenuEditingEnabled;
+        s.UtilitiesMenuEditingEnabledInitialized = true;
         // Правка структуры меню трея (issue #62).
         s.TrayMenuEditingEnabled = _trayMenuEditingEnabled;
         // Правка структуры контекстного меню базы (issue #56).
@@ -806,6 +808,10 @@ public partial class MainViewModel : ViewModelBase
         s.NoGroupIcon = _noGroupIcon;
         s.PinnedColor = _pinnedColor;
         s.PinnedIconColor = _pinnedIconColor;
+        // Доли цвета строки-папки (issue #145) сохраняются вместе с остальными
+        // настройками и применяются сразу при изменении.
+        s.GroupColorTintPercent = AppSettings.NormalizeGroupColorTintPercent(_groupColorTintPercent);
+        s.GroupColorHoverTintPercent = AppSettings.NormalizeGroupColorTintPercent(_groupColorHoverTintPercent);
         s.PinnedIcon = _pinnedIcon;
         s.FontFamily = _fontFamily;
         s.FontSize = _fontSize;

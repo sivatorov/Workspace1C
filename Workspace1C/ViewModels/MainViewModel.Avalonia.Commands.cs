@@ -58,6 +58,8 @@ public partial class MainViewModel : ViewModelBase
     public ICommand SortGroupsDescendingCommand { get; private set; } = null!;
     public ICommand SynchronizeWithIbasesCommand { get; private set; } = null!;
     public ICommand ToggleThemeCommand { get; private set; } = null!;
+    /// <summary>Переключить компактный режим (issue #146: быстрая кнопка на панели).</summary>
+    public ICommand ToggleCompactCommand { get; private set; } = null!;
     public ICommand ToggleRightPanelDetailsCommand { get; private set; } = null!;
     public ICommand ToggleSessionLaunchPanelCommand { get; private set; } = null!;
     public ICommand ExitCommand { get; private set; } = null!;
@@ -164,6 +166,7 @@ public partial class MainViewModel : ViewModelBase
         SortGroupsDescendingCommand = new RelayCommand(() => SortGroups(false));
         SynchronizeWithIbasesCommand = new RelayCommand(SynchronizeWithIbases);
         ToggleThemeCommand = new RelayCommand(ToggleTheme);
+        ToggleCompactCommand = new RelayCommand(() => ApplyCompactMode(!CompactMode));
         ToggleRightPanelDetailsCommand = new RelayCommand(() => ShowRightPanelDetails = !ShowRightPanelDetails);
         ToggleSessionLaunchPanelCommand = new RelayCommand(() => ShowSessionLaunchPanel = !ShowSessionLaunchPanel);
         ExitCommand = new RelayCommand(ExitApplication);

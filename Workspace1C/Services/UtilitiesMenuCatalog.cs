@@ -523,6 +523,14 @@ public static class UtilitiesMenuCatalog
         ExternalItems.Count == 0 ? BuiltIn : BuiltIn.Concat(ExternalItems).ToList();
 
     /// <summary>
+    /// Только встроенные пункты публичного каталога (без зарегистрированных модулями ПРО).
+    /// Нужен тестам и стандартной компоновке: внешние пункты добавляются в «Новинки
+    /// программы», а их иконки могут отсутствовать в публичных словарях (issue #146 —
+    /// нестабильность полного прогона из-за глобальной регистрации PRO-модулей).
+    /// </summary>
+    public static IReadOnlyList<UtilitiesMenuItem> BuiltInItems => BuiltIn;
+
+    /// <summary>
     /// Регистрирует пункт меню модуля ПРО (2.0): <paramref name="item"/> с
     /// <see cref="UtilitiesMenuCommandKind.External"/>, действие вызывается построителем
     /// меню WPF/Avalonia. Пункт помечается новинкой и попадает в «Новинки программы»,
@@ -542,6 +550,19 @@ public static class UtilitiesMenuCatalog
     {
         ExternalItems.RemoveAll(i => string.Equals(i.Id, itemId, StringComparison.Ordinal));
         ExternalActions.Remove(itemId);
+    }
+
+    /// <summary>
+    /// Полностью сбрасывает глобальную регистрацию внешних пунктов (issue #146).
+    /// Нужен тестам для изоляции: инициализация <c>AppServices</c> регистрирует модули
+    /// ПРО в общий каталог, и без сброса состояние протекает между тестами полного
+    /// прогона (иконки PRO-модулей отсутствуют в публичных словарях, состав каталога
+    /// перестаёт совпадать со стандартной компоновкой). В продакшн-коде не вызывается.
+    /// </summary>
+    public static void ResetExternal()
+    {
+        ExternalItems.Clear();
+        ExternalActions.Clear();
     }
 
     /// <summary>Выполняет действие внешнего пункта; false — пункт не зарегистрирован.</summary>
@@ -1048,39 +1069,203 @@ public static class UtilitiesMenuLayouts
 
     /// <summary>
     /// Мигрирует сохранённую компоновку версии 1 (плоское меню 1.0.1.98 и ранее)
-    /// в актуальную структуру разделов. Пользовательские настройки пунктов сохраняются:
-    /// видимость, иконка, цвет и внешний файл иконки переносятся по <c>ItemId</c>.
-    /// Пункты, удалённые пользователем из меню, не возвращаются; новые пункты каталога
-    /// остаются на своих местах. Пользовательские группы не переносятся — структура
-    /// навигации изменилась, а группы были лишь оформлением.
+    /// в актуальную схему. Пользовательское дерево НЕ заменяется на <see cref="Default"/>:
+    /// группы, их названия, порядок, видимость, иконки и цвета сохраняются по узлам
+    /// (issue #146 — «обновление удалило пользовательские настройки компоновки»).
+    /// Отсутствующие в компоновке пункты каталога не теряются: новинки попадают
+    /// в «Новинки программы», остальные — в подходящую существующую группу (по
+    /// <see cref="UtilitiesMenuItem.DefaultGroup"/>) либо в «Новинки программы».
+    /// Повторяющиеся <c>ItemId</c> дедуплицируются (остаётся первое вхождение).
     /// </summary>
     public static UtilitiesMenuLayout Migrate(UtilitiesMenuLayout? layout)
     {
-        if (layout is null)
+        if (layout?.Root is null || layout.Root.Count == 0)
             return Default();
 
-        var isCurrent = layout.SchemaVersion >= CurrentSchemaVersion
-            || (layout.Root?.Any(n => string.Equals(n.Kind, "group", StringComparison.Ordinal)
-                && UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId)) ?? false);
-        if (isCurrent)
+        if (!NeedsMigration(layout))
         {
             layout.SchemaVersion = CurrentSchemaVersion;
             return layout;
         }
 
-        var saved = new Dictionary<string, UtilitiesMenuNode>(StringComparer.Ordinal);
-        CollectItemSettings(layout.Root, saved);
+        // Сохраняем пользовательское дерево как есть и переносим только недостающие
+        // функции каталога. Никакого «Default() + настройки пунктов» — это и теряло
+        // аккуратно настроенные группы и порядок (issue #146).
+        layout.Root ??= new List<UtilitiesMenuNode>();
+        DeduplicateItems(layout.Root, new HashSet<string>(StringComparer.Ordinal));
 
-        // Пустой/нечитаемый файл — безопаснее вернуть стандартную компоновку.
-        if (saved.Count == 0)
+        AddMissingCatalogItems(layout);
+
+        // Пустая после миграции компоновка (нет ни одного пункта) — безопаснее
+        // вернуть стандартную, чтобы у пользователя осталась рабочая точка входа.
+        if (!ContainsAnyItem(layout.Root))
             return Default();
 
-        var migrated = Default();
-        ApplyItemSettings(migrated.Root, saved);
-        RemoveAbsentItems(migrated.Root, saved.Keys);
-        RemoveEmptyGroups(migrated.Root);
-        migrated.SchemaVersion = CurrentSchemaVersion;
-        return migrated;
+        layout.SchemaVersion = CurrentSchemaVersion;
+        return layout;
+    }
+
+    /// <summary>
+    /// Нужна ли миграция компоновки: схема меньше актуальной и в корне нет разделов
+    /// первого уровня (навигация 1.0.1.99). Для актуальных/уже разделённых компоновок
+    /// миграция не требуется.
+    /// </summary>
+    public static bool NeedsMigration(UtilitiesMenuLayout? layout)
+    {
+        if (layout is null)
+            return false;
+        if (layout.SchemaVersion >= CurrentSchemaVersion)
+            return false;
+        if (HasSectionStructure(layout))
+            return false;
+        return layout.Root is { Count: > 0 };
+    }
+
+    /// <summary>
+    /// True — компоновка содержит хотя бы один раздел первого уровня
+    /// (<see cref="UtilitiesMenuCatalog.RootSections"/>) в корне. Если разделов нет
+    /// (пользовательская плоская структура), панель показывает одну кнопку «Утилиты».
+    /// </summary>
+    public static bool HasSectionStructure(UtilitiesMenuLayout? layout) =>
+        layout?.Root is not null
+        && layout.Root.Any(n => n is not null
+            && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+            && UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId));
+
+    /// <summary>Видимые разделы первого уровня в порядке компоновки (скрытые не возвращаются).</summary>
+    public static IReadOnlyList<UtilitiesMenuNode> VisibleRootSections(UtilitiesMenuLayout? layout)
+    {
+        if (layout?.Root is null)
+            return Array.Empty<UtilitiesMenuNode>();
+        return layout.Root
+            .Where(n => n is not null
+                && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                && UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId)
+                && n.Visible)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Дедупликация пунктов по <c>ItemId</c>: остаётся первое вхождение, последующие
+    /// удаляются (issue #146 — миграция не должна дублировать пункты).
+    /// </summary>
+    private static void DeduplicateItems(List<UtilitiesMenuNode>? nodes, HashSet<string> seen)
+    {
+        if (nodes is null)
+            return;
+        for (var i = 0; i < nodes.Count;)
+        {
+            var node = nodes[i];
+            if (node is null)
+            {
+                nodes.RemoveAt(i);
+                continue;
+            }
+            if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(node.ItemId))
+            {
+                if (!seen.Add(node.ItemId!))
+                {
+                    nodes.RemoveAt(i);
+                    continue;
+                }
+            }
+            else if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+            {
+                DeduplicateItems(node.Children, seen);
+            }
+            i++;
+        }
+    }
+
+    /// <summary>True — в дереве есть хотя бы один узел-пункт.</summary>
+    private static bool ContainsAnyItem(IEnumerable<UtilitiesMenuNode>? nodes)
+    {
+        if (nodes is null)
+            return false;
+        foreach (var node in nodes)
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
+                && !string.IsNullOrWhiteSpace(node.ItemId))
+                return true;
+            if (ContainsAnyItem(node.Children))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Добавляет в пользовательское дерево пункты каталога, которых в нём нет.
+    /// Новинки и пункты без подходящей существующей группы попадают в «Новинки
+    /// программы»; остальные — в конец группы с совпадающим <c>GroupId</c>
+    /// (<see cref="UtilitiesMenuItem.DefaultGroup"/>), если она есть в дереве.
+    /// </summary>
+    private static void AddMissingCatalogItems(UtilitiesMenuLayout layout)
+    {
+        var present = new HashSet<string>(StringComparer.Ordinal);
+        UtilitiesMenuResolver.CollectItemIds(layout.Root, present);
+
+        var missing = new List<UtilitiesMenuItem>();
+        foreach (var item in UtilitiesMenuCatalog.All)
+        {
+            if (!present.Contains(item.Id))
+                missing.Add(item);
+        }
+        if (missing.Count == 0)
+            return;
+
+        UtilitiesMenuNode? newItemsGroup = null;
+        foreach (var item in missing)
+        {
+            var target = item.IsNew ? null : FindGroup(layout.Root, item.DefaultGroup);
+            if (target is null)
+            {
+                newItemsGroup ??= EnsureNewItemsGroup(layout);
+                target = newItemsGroup;
+            }
+            target.Children.Add(new UtilitiesMenuNode { Kind = "item", ItemId = item.Id });
+        }
+    }
+
+    /// <summary>Ищет группу по <c>GroupId</c> во всём дереве (рекурсивно).</summary>
+    private static UtilitiesMenuNode? FindGroup(IEnumerable<UtilitiesMenuNode>? nodes, string? groupId)
+    {
+        if (nodes is null || string.IsNullOrWhiteSpace(groupId))
+            return null;
+        foreach (var node in nodes)
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal)
+                && string.Equals(node.GroupId, groupId, StringComparison.Ordinal))
+                return node;
+            var found = FindGroup(node.Children, groupId);
+            if (found is not null)
+                return found;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Гарантирует группу «Новинки программы» в конце корня (создаёт при отсутствии).
+    /// Видимость группы — true: в неё складываются недостающие функции.
+    /// </summary>
+    private static UtilitiesMenuNode EnsureNewItemsGroup(UtilitiesMenuLayout layout)
+    {
+        var existing = FindGroup(layout.Root, UtilitiesMenuCatalog.GroupNewItems);
+        if (existing is not null)
+            return existing;
+        var group = new UtilitiesMenuNode
+        {
+            Kind = "group",
+            GroupId = UtilitiesMenuCatalog.GroupNewItems,
+            Visible = true,
+            SeparatorBefore = layout.Root.Count > 0,
+        };
+        layout.Root.Add(group);
+        return group;
     }
 
     /// <summary>
@@ -1099,7 +1284,11 @@ public static class UtilitiesMenuLayouts
         var node = layout.Root.FirstOrDefault(n =>
             string.Equals(n.Kind, "group", StringComparison.Ordinal)
             && string.Equals(n.GroupId, sectionGroupId, StringComparison.Ordinal));
-        if (node is null)
+        // Скрытый раздел не открывается: галочка видимости в редакторе реально влияет
+        // на результат (issue #146 — «отключённое меню Инструменты продолжает
+        // отображаться»). Кнопка скрытого раздела на панели тоже не создаётся
+        // (см. UtilitiesSectionMenuPlanner).
+        if (node is null || !node.Visible)
             return null;
         // Разворачиваем раздел на уровень меню: копия детей без дублирующего узла-раздела.
         var children = node.Children is null
@@ -1223,4 +1412,77 @@ public static class UtilitiesMenuLayouts
 
     /// <summary>Узел-разделитель (issue #374): самостоятельный элемент дерева компоновки.</summary>
     public static UtilitiesMenuNode Separator() => new() { Kind = "separator" };
+}
+
+/// <summary>
+/// Кнопка раздела на верхней панели (issue #146): либо реальный раздел первого уровня,
+/// либо единственная кнопка «Утилиты» для пользовательской компоновки без разделов.
+/// </summary>
+/// <param name="SectionId">Идентификатор раздела или <see cref="UtilitiesSectionMenuPlanner.UtilitiesSectionId"/>.</param>
+/// <param name="TitleKey">Ключ локализации заголовка.</param>
+/// <param name="IsCustom">True — кнопка «Утилиты» открывает полную пользовательскую компоновку.</param>
+public sealed record UtilitiesSectionButton(string SectionId, string TitleKey, bool IsCustom);
+
+/// <summary>
+/// Планировщик кнопок разделов верхней панели (issue #146), общий для WPF и Avalonia.
+/// Скрытые разделы не дают кнопок; если пользовательская компоновка не содержит
+/// разделов (плоское дерево), возвращается одна кнопка «Утилиты» — рабочая точка входа.
+/// </summary>
+public static class UtilitiesSectionMenuPlanner
+{
+    /// <summary>Служебный идентификатор кнопки «Утилиты» (полная компоновка).</summary>
+    public const string UtilitiesSectionId = "Utilities";
+
+    /// <summary>Ключ локализации заголовка кнопки «Утилиты».</summary>
+    public const string UtilitiesTitleKey = "Utilities.Submenu.Utilities";
+
+    /// <summary>True — идентификатор относится к кнопке «Утилиты» (полная компоновка).</summary>
+    public static bool IsUtilitiesSection(string? sectionId) =>
+        string.Equals(sectionId, UtilitiesSectionId, StringComparison.Ordinal);
+
+    /// <summary>
+    /// Строит список кнопок разделов: только видимые разделы; если разделов в компоновке
+    /// нет ИЛИ все они скрыты — одна кнопка «Утилиты», чтобы пользователь не остался
+    /// без точки входа в меню.
+    /// </summary>
+    public static IReadOnlyList<UtilitiesSectionButton> Build(UtilitiesMenuLayout? layout)
+    {
+        if (layout is null)
+            return Array.Empty<UtilitiesSectionButton>();
+
+        if (!UtilitiesMenuLayouts.HasSectionStructure(layout))
+            return new[] { new UtilitiesSectionButton(UtilitiesSectionId, UtilitiesTitleKey, true) };
+
+        var result = new List<UtilitiesSectionButton>();
+        foreach (var sectionId in UtilitiesMenuCatalog.RootSections)
+        {
+            var node = layout.Root.FirstOrDefault(n =>
+                n is not null
+                && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                && string.Equals(n.GroupId, sectionId, StringComparison.Ordinal));
+            if (node is null || !node.Visible)
+                continue;
+            result.Add(new UtilitiesSectionButton(
+                sectionId, UtilitiesMenuCatalog.GroupTitleKey(sectionId), false));
+        }
+
+        if (result.Count == 0)
+            result.Add(new UtilitiesSectionButton(UtilitiesSectionId, UtilitiesTitleKey, true));
+        return result;
+    }
+}
+
+/// <summary>
+/// Глобальное событие изменения компоновки меню «Утилиты» (issue #146): редактор и
+/// окно настроек сообщают главному окну, что меню и кнопки разделов нужно перестроить
+/// сразу, без перезапуска. Статическое, потому что редактор не знает конкретный
+/// экземпляр <c>MainViewModel</c>; подписчики обязаны отписываться при закрытии окна.
+/// </summary>
+public static class UtilitiesMenuEvents
+{
+    /// <summary>Компоновка меню изменилась (сохранена в редакторе или настройках).</summary>
+    public static event EventHandler? LayoutChanged;
+
+    /// <summary>Сообщает подписчикам о необходимости перестроить меню и кнопки разделов.</summary>
+    public static void RaiseLayoutChanged() => LayoutChanged?.Invoke(null, EventArgs.Empty);
 }

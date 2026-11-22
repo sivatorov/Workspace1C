@@ -19,6 +19,9 @@ public sealed class OneCPlatformLocatorPlatformVersionTests
     [Fact]
     public void ResolveBinDirectory_PartialVersion_OtherArch_FindsRequestedVersionNotNewest()
     {
+#if LINUX
+        return; // Windows-раскладка платформы (1cv8.exe/x86) неприменима в Linux-сборке
+#endif
         // База: платформа «8.3.3» (частичная), разрядность не указана (дефолт X64).
         // Установлена только 32-битная 8.3.3.1 и новейшая 64-битная 8.5.4.1878.
         using var temp = new TempDirectory();
@@ -50,6 +53,9 @@ public sealed class OneCPlatformLocatorPlatformVersionTests
     [Fact]
     public void ResolveBinDirectory_ExactVersionInOtherArch_Found()
     {
+#if LINUX
+        return; // Windows-раскладка платформы (1cv8.exe/x86) неприменима в Linux-сборке
+#endif
         // Полная версия «8.3.3.1» указана явно — ищется точно даже в «чужой» разрядности.
         using var temp = new TempDirectory();
         var dir830 = CreatePlatform(temp.Path, "8.3.3.1", machine: 0x014c); // x86
@@ -79,6 +85,9 @@ public sealed class OneCPlatformLocatorPlatformVersionTests
     [Fact]
     public void ResolveBinDirectory_UnknownVersion_FallsBackToNewestInstalled()
     {
+#if LINUX
+        return; // Windows-раскладка платформы (1cv8.exe/x86) неприменима в Linux-сборке
+#endif
         // Версия базы нигде не установлена — резерв: новейшая из установленных (64-битная).
         // Версия «9.9.9.999» гарантированно новее любой реально установленной на машине,
         // поэтому победитель fallback-перебора детерминирован независимо от окружения.

@@ -25,8 +25,14 @@ public sealed class Issue109_110CacheTests
     [Fact]
     public void GetCacheRoots_User_IncludesLegacy1Cv82()
     {
+#if LINUX
+        // Кросс-сборка Linux-ветки на Windows: код собирается с Linux-корнями кеша,
+        // поэтому Windows-путь 1Cv82 не применим (issue #146 — зелёный Linux-прогон).
+        return;
+#else
         if (!OperatingSystem.IsWindows())
             return; // корни 1Cv82 добавляются только в Windows-ветке GetCacheRoots
+#endif
 
         var roots = OneCCacheCleaner.GetCacheRoots(OneCCacheKind.User).ToList();
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
@@ -36,8 +42,12 @@ public sealed class Issue109_110CacheTests
     [Fact]
     public void GetCacheRoots_Program_IncludesLegacy1Cv82()
     {
+#if LINUX
+        return; // см. GetCacheRoots_User_IncludesLegacy1Cv82
+#else
         if (!OperatingSystem.IsWindows())
             return;
+#endif
 
         var roots = OneCCacheCleaner.GetCacheRoots(OneCCacheKind.Program).ToList();
         var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);

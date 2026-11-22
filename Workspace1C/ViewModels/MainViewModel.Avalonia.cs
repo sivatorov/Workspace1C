@@ -76,7 +76,13 @@ public partial class MainViewModel : ViewModelBase
     public bool UtilitiesMenuEditingEnabled
     {
         get => _settings.UtilitiesMenuEditingEnabled;
-        set => _settings.UtilitiesMenuEditingEnabled = value;
+        set
+        {
+            _settings.UtilitiesMenuEditingEnabled = value;
+            // Явное сохранение настройки: флаг инициализации (issue #146) больше не даёт
+            // автоматически включать правку при следующем запуске.
+            _settings.UtilitiesMenuEditingEnabledInitialized = true;
+        }
     }
 
     /// <summary>
@@ -878,6 +884,11 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             _settings = _repository.LoadSettings();
+            // issue #145: доли цвета строки-папки применяются к ThemeManager до
+            // построения дерева, чтобы строки сразу получили правильные кисти.
+            Themes.ThemeManager.ConfigureGroupRowTint(
+                AppSettings.NormalizeGroupColorTintPercent(_settings.GroupColorTintPercent),
+                AppSettings.NormalizeGroupColorTintPercent(_settings.GroupColorHoverTintPercent));
             _customLaunchParameters = new List<string>(_settings.CustomLaunchParameters ?? new List<string>());
             _allInfobases = _repository.Load();
             _groups = _repository.LoadGroups();
@@ -2696,6 +2707,46 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Доля цвета группы в фоне строки-папки, проценты 0–100 (issue #145).
+    /// 0 — цвет не подмешивается, 100 — чистый цвет группы. Изменение применяется
+    /// сразу, без перезапуска: пересчитываются кисти уже построенных строк.
+    /// </summary>
+    public int GroupColorTintPercent
+    {
+        get => AppSettings.NormalizeGroupColorTintPercent(_settings.GroupColorTintPercent);
+        set
+        {
+            var clamped = AppSettings.NormalizeGroupColorTintPercent(value);
+            if (_settings.GroupColorTintPercent == clamped) return;
+            _settings.GroupColorTintPercent = clamped;
+            // Применяем сразу; запись в settings.json выполняет окно настроек
+            // по «ОК», поэтому «Отмена» не сохраняет изменения.
+            Themes.ThemeManager.ConfigureGroupRowTint(
+                GroupColorTintPercent, GroupColorHoverTintPercent);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки при наведении, проценты 0–100 (issue #145).
+    /// 0 — цвет не подмешивается, 100 — чистый цвет группы.
+    /// </summary>
+    public int GroupColorHoverTintPercent
+    {
+        get => AppSettings.NormalizeGroupColorTintPercent(_settings.GroupColorHoverTintPercent);
+        set
+        {
+            var clamped = AppSettings.NormalizeGroupColorTintPercent(value);
+            if (_settings.GroupColorHoverTintPercent == clamped) return;
+            _settings.GroupColorHoverTintPercent = clamped;
+            // Применяем сразу; сохранение — по «ОК» окна настроек.
+            Themes.ThemeManager.ConfigureGroupRowTint(
+                GroupColorTintPercent, GroupColorHoverTintPercent);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
     /// Сохраняет текущие настройки (включая язык интерфейса) на диск.
     /// Вызывается при закрытии окна в трей и при полном выходе, чтобы
     /// выбранный язык не терялся между запусками.
@@ -2731,6 +2782,9 @@ public partial class MainViewModel : ViewModelBase
     {
         try
         {
+            // Issue #146: любое сохранение настроек фиксирует явное решение по правке
+            // структуры меню «Утилиты» (автовключение при наличии файла больше не сработает).
+            _settings.UtilitiesMenuEditingEnabledInitialized = true;
             // issue #71 (запоминание размеров окон настроек): размеры окон «Настройки»
             // и «Настройка информационной базы» окна пишут напрямую в файл настроек
             // (репозиторий) — кэш главного VM их не видит. Подхватываем сохранённые

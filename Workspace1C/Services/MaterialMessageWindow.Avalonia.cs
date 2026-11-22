@@ -37,6 +37,17 @@ internal sealed class MaterialMessageWindowAvalonia : Window
     /// </summary>
     private readonly bool _fitContent;
 
+    // Issue #139 (1.0.1.102): элементы диалога с явным размером, по которым
+    // считается видимость вертикальной полосы прокрутки (только для _fitContent).
+    private ScrollViewer? _bodyScroll;
+    private Control? _bodyContent;
+    private Control? _buttonsPanel;
+
+    // Отступы тела и зазор над панелью кнопок из компоновки (DockPanel Margin=16,
+    // buttonsPanel.Margin = 0,16,0,0), DIP.
+    private const double FitContentPadding = 16;
+    private const double FitContentButtonGap = 16;
+
     // Оценка неклиентской области до первого показа (рамка + заголовок), DIP.
     // После открытия окна заменяется точной разницей Bounds/ClientSize; здесь
     // только начальное приближение, чтобы первый кадр не был нулевым. Значения
@@ -277,19 +288,24 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             // Issue #139 (1.0.1.95): тело прокручивается, панель кнопок закреплена
             // снизу и не обрезается. Высота окна считается явно, а не авторазмером
             // по обеим осям (тот не учитывал перенос кнопок WrapPanel).
+            // Issue #139 (1.0.1.102): по умолчанию прокрутка отключена — полоса
+            // включается в ApplyFitContentSize только при реальном переполнении.
             var bodyScroll = new ScrollViewer
             {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Content = bodyContent
             };
+            _bodyScroll = bodyScroll;
+            _bodyContent = bodyContent;
+            _buttonsPanel = buttonsPanel;
 
             var dock = new DockPanel
             {
                 LastChildFill = true,
-                Margin = new Thickness(16)
+                Margin = new Thickness(FitContentPadding)
             };
-            buttonsPanel.Margin = new Thickness(0, 16, 0, 0);
+            buttonsPanel.Margin = new Thickness(0, FitContentButtonGap, 0, 0);
             DockPanel.SetDock(buttonsPanel, Dock.Bottom);
             dock.Children.Add(buttonsPanel);
             dock.Children.Add(bodyScroll);
@@ -382,8 +398,68 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             MinHeight = Math.Min(UpdateDialogSizePolicy.MinHeight, maxHeight);
             MaxHeight = maxHeight;
 
+            // Issue #139 (1.0.1.102): сначала решение о полосе при итоговой ширине,
+            // затем установка размера — полоса не появляется в обычном состоянии.
+            ApplyVerticalScrollBarPolicy(width, height);
+
             Width = width;
             Height = height;
+        }
+        catch
+        {
+            // Сбой измерения не должен мешать показу диалога.
+        }
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.102): вертикальная полоса прокрутки тела включается только
+    /// при реальном переполнении по высоте. Тело измеряется при ширине, уже
+    /// уменьшенной на ширину полосы, поэтому после её появления текст не начинает
+    /// переноситься заново и высота не растёт (нет обратной связи
+    /// «полоса → уменьшение ширины → перенос → рост высоты → полоса»).
+    /// Панель кнопок закреплена в <see cref="DockPanel"/> снизу и всегда видна.
+    /// </summary>
+    private void ApplyVerticalScrollBarPolicy(double windowWidth, double windowHeight)
+    {
+        if (_bodyScroll is null || _bodyContent is null || _buttonsPanel is null)
+            return;
+
+        try
+        {
+            var scrollBarWidth = UpdateDialogSizePolicy.DefaultScrollBarWidth;
+
+            var clientWidth = Math.Max(0, windowWidth - ChromeWidth());
+            var clientHeight = Math.Max(0, windowHeight - ChromeHeight());
+            var bodyWidth = Math.Max(0, clientWidth - 2 * FitContentPadding);
+
+            // Панель кнопок измеряется тем же WrapPanel: учитывается перенос кнопок.
+            _buttonsPanel.Measure(new Size(bodyWidth, double.PositiveInfinity));
+            var buttonsHeight = _buttonsPanel.DesiredSize.Height;
+
+            var viewport = UpdateDialogSizePolicy.MeasureContentHeight(
+                clientHeight,
+                verticalPadding: 2 * FitContentPadding,
+                buttonPanelHeight: buttonsHeight,
+                buttonGap: FitContentButtonGap);
+
+            // Сначала полная ширина: если содержимое помещается — полосы нет.
+            _bodyContent.Measure(new Size(bodyWidth, double.PositiveInfinity));
+            var show = UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(
+                _bodyContent.DesiredSize.Height, viewport);
+
+            if (show)
+            {
+                // Переполнение подтверждаем при ширине с учётом полосы — решение
+                // устойчиво, повторный проход раскладки не добавляет новую полосу.
+                var measureWidth = UpdateDialogSizePolicy.MeasureContentWidth(
+                    bodyWidth, scrollBarVisible: true, scrollBarWidth);
+                _bodyContent.Measure(new Size(measureWidth, double.PositiveInfinity));
+                show = UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(
+                    _bodyContent.DesiredSize.Height, viewport);
+            }
+
+            _bodyScroll.VerticalScrollBarVisibility =
+                show ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
         }
         catch
         {

@@ -794,7 +794,9 @@ public sealed class Issue130GridLinesTests
 
         // Строка базы и строка группы — только с горизонтальной линией.
         Assert.Contains("ApplyHorizontalGridLine(grid);", tree, StringComparison.Ordinal);
-        Assert.Contains("ApplyHorizontalGridLine(row, 2 + (UiMetrics.Compact ? 6 : 8));", tree, StringComparison.Ordinal);
+        // Issue #145: левое поле строки группы теперь равно GroupRowStripeLayout.Gap,
+        // поэтому отступ линии сетки считается от общего helper.
+        Assert.Contains("ApplyHorizontalGridLine(row, 2 + GroupRowStripeLayout.Gap);", tree, StringComparison.Ordinal);
 
         // Единый оверлей создаётся в контейнере списка поверх заголовка и строк.
         Assert.Contains("_gridLinesOverlay = new Canvas", view, StringComparison.Ordinal);

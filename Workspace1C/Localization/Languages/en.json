@@ -836,6 +836,12 @@
     "Settings.GenerateScheme": "Create scheme from color…",
     "Settings.GenerateSchemeTooltip": "Automatically build light and dark palettes from a single chosen color",
     "Settings.Colors.Description": "Change the colors of the selected theme. Apply applies immediately (preview), Save saves the settings.",
+    "Settings.GroupColorTintGroup": "Folder color tint",
+    "Settings.GroupColorTint": "Folder color tint",
+    "Settings.GroupColorTintHint": "0% — the group color is not blended into the row background, 100% — the row is painted with the pure group color.",
+    "Settings.GroupColorHoverTint": "Folder color tint on hover",
+    "Settings.GroupColorHoverTintHint": "0% — the color is not blended on hover, 100% — the pure group color.",
+    "Settings.GroupColorTintPercentFormat": "{0}%",
 
     "Hotkey.Tooltip": "Set cursor and press a key combination. Backspace/Delete — reset, Esc — cancel.",
     "Settings.Hotkeys.Title": "Action hotkeys",
@@ -2223,6 +2229,7 @@
     "Main.ErrExportFailed": "Export failed.\n{0}",
     "Main.ExportErrorTitle": "Export error",
 
+    "Utilities.Submenu.Utilities": "Utilities",
     "Utilities.Submenu.Servers": "Servers",
     "Utilities.Submenu.Maintenance": "Maintenance",
     "Utilities.Submenu.Tools": "Tools",

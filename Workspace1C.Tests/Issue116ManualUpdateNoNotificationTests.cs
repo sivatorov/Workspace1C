@@ -226,12 +226,16 @@ public sealed class Issue116ManualUpdateNoNotificationTests
         var xaml = ReadProjectFile("Workspace1C", "Services", "UpdateAvailableWindow.xaml");
         Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
         Assert.Contains("<ScrollViewer", xaml, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.102): полоса прокрутки включается политикой только при
+        // реальном переполнении; по умолчанию прокрутка отключена.
+        Assert.Contains("x:Name=\"ContentScroller\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
         Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
 
         var code = ReadProjectFile("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs");
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", code, StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ShouldShowVerticalScrollBar", code, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent = SizeToContent.Manual", code, StringComparison.Ordinal);
         Assert.DoesNotContain("WndProc", code, StringComparison.Ordinal);
         Assert.DoesNotContain("CaptureFixedSize", code, StringComparison.Ordinal);

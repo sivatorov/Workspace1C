@@ -836,6 +836,12 @@
     "Settings.GenerateScheme": "Создать схему из цвета…",
     "Settings.GenerateSchemeTooltip": "Автоматически построить светлую и тёмную палитры из одного выбранного цвета",
     "Settings.Colors.Description": "Измените цвета выбранной темы. «Применить» — сразу применить (предпросмотр), «Сохранить» — сохранить настройки.",
+    "Settings.GroupColorTintGroup": "Доля цвета папки",
+    "Settings.GroupColorTint": "Доля цвета папки",
+    "Settings.GroupColorTintHint": "0 % — цвет группы не подмешивается в фон строки, 100 % — строка окрашена чистым цветом группы.",
+    "Settings.GroupColorHoverTint": "Доля цвета папки при наведении",
+    "Settings.GroupColorHoverTintHint": "0 % — цвет не подмешивается при наведении, 100 % — чистый цвет группы.",
+    "Settings.GroupColorTintPercentFormat": "{0} %",
 
     "Hotkey.Tooltip": "Установите курсор и нажмите сочетание клавиш. Backspace/Delete — сбросить, Esc — отмена.",
     "Settings.Hotkeys.Title": "Горячие клавиши действий",
@@ -2223,6 +2229,7 @@
     "Main.ErrExportFailed": "Не удалось выполнить экспорт.\n{0}",
     "Main.ExportErrorTitle": "Ошибка экспорта",
 
+    "Utilities.Submenu.Utilities": "Утилиты",
     "Utilities.Submenu.Servers": "Серверы",
     "Utilities.Submenu.Maintenance": "Обслуживание",
     "Utilities.Submenu.Tools": "Инструменты",

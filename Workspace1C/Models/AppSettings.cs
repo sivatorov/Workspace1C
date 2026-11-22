@@ -59,6 +59,21 @@ public class AppSettings
     /// <summary>Ключ иконки узла «Закреплённые» (имя Geometry из Icons.xaml, пусто — по умолчанию).</summary>
     public string PinnedIcon { get; set; } = string.Empty;
 
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки (issue #145), проценты 0–100.
+    /// 0 — цвет группы не подмешивается в фон строки (обычный фон строки),
+    /// 100 — строка окрашена чистым цветом группы. Значение по умолчанию 30
+    /// сохраняет прежнее поведение, поэтому старые файлы настроек читаются без миграции.
+    /// </summary>
+    public int GroupColorTintPercent { get; set; } = 30;
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки при наведении (issue #145), проценты 0–100.
+    /// 0 — цвет не подмешивается, 100 — чистый цвет группы. Значение по умолчанию 45
+    /// сохраняет прежнее поведение.
+    /// </summary>
+    public int GroupColorHoverTintPercent { get; set; } = 45;
+
     /// <summary>Название выбранной темы оформления.</summary>
     public string Theme { get; set; } = string.Empty;
 
@@ -256,6 +271,15 @@ public class AppSettings
     /// по стандартной компоновке — поведение не меняется (обратная совместимость).
     /// </summary>
     public bool UtilitiesMenuEditingEnabled { get; set; }
+
+    /// <summary>
+    /// Флаг «настройка правки меню «Утилиты» уже инициализирована» (issue #146).
+    /// Нужен, чтобы отличить «пользователь ещё не сохранял этот флаг» от «пользователь
+    /// явно выключил правку»: при первом запуске новой версии, если рядом лежит
+    /// пользовательская компоновка <c>utilities_menu_layout.json</c>, правка включается
+    /// автоматически и флаг сохраняется; после этого явное выключение уважается.
+    /// </summary>
+    public bool UtilitiesMenuEditingEnabledInitialized { get; set; }
 
     /// <summary>
     /// Разрешить правку структуры меню трея (issue #62): при включении меню трея
@@ -1400,7 +1424,20 @@ public class AppSettings
         // issue #116 п.2 (v1.0.1.49): периодичность фоновой проверки обновлений —
         // некорректное значение (не из списка интервалов) сбрасывается в 0.
         UpdateCheckIntervalMinutes = NormalizeUpdateInterval(UpdateCheckIntervalMinutes);
+
+        // issue #145: доли цвета строки-папки — старые файлы без полей получают
+        // значения по умолчанию (30/45), некорректные значения клампятся в 0–100.
+        GroupColorTintPercent = NormalizeGroupColorTintPercent(GroupColorTintPercent);
+        GroupColorHoverTintPercent = NormalizeGroupColorTintPercent(GroupColorHoverTintPercent);
     }
+
+    /// <summary>
+    /// Нормализует долю цвета группы (issue #145) к диапазону 0–100 процентов.
+    /// Используется при загрузке настроек, при сохранении и в UI настроек,
+    /// чтобы любое значение (отрицательное, больше 100) не ломало расчёт фона.
+    /// </summary>
+    public static int NormalizeGroupColorTintPercent(int percent)
+        => Math.Clamp(percent, 0, 100);
 
     /// <summary>Допустимые интервалы фоновой проверки обновлений в минутах
     /// (issue #116 п.2, v1.0.1.49): только при запуске (0), час, 6 часов, сутки.

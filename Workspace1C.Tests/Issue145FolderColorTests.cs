@@ -72,20 +72,23 @@ public sealed class Issue145FolderColorTests
     }
 
     [Fact]
-    public void Wpf_GroupStripeConverter_HasVerticalInset()
+    public void Wpf_GroupStripeConverter_UsesSharedSymmetricLayout()
     {
         var converter = ReadProjectFile("Workspace1C", "Converters", "LevelToThicknessConverter.cs");
-        Assert.Contains("GroupStripeVerticalInset = 4.0", converter, StringComparison.Ordinal);
-        Assert.Contains(
-            "Thickness(offset, GroupStripeVerticalInset, 0, GroupStripeVerticalInset)",
-            converter, StringComparison.Ordinal);
+        // Issue #145: полоса и содержимое считаются от общего helper, поэтому
+        // зазоры слева (от кнопки свёртки) и справа (до иконки папки) одинаковы.
+        Assert.Contains("GroupRowStripeLayout.Gap", converter, StringComparison.Ordinal);
+        Assert.Contains("GroupRowStripeLayout.ContentOffset", converter, StringComparison.Ordinal);
+        Assert.Contains("GroupRowStripeLayout.VerticalInset", converter, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Avalonia_GroupStripe_HasVerticalInset()
+    public void Avalonia_GroupStripe_UsesSharedSymmetricLayout()
     {
         var tree = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
-        Assert.Contains("new Thickness(2, 4, 0, 4)", tree, StringComparison.Ordinal);
+        Assert.Contains("GroupRowStripeLayout.Gap", tree, StringComparison.Ordinal);
+        Assert.Contains("GroupRowStripeLayout.ContentOffset", tree, StringComparison.Ordinal);
+        Assert.Contains("GroupRowStripeLayout.VerticalInset", tree, StringComparison.Ordinal);
     }
 
     [Fact]

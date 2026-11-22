@@ -57,8 +57,11 @@ public partial class MainWindow
             return menu;
 
         // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
+        // Issue #146: кнопка «Утилиты» (пользовательская компоновка без разделов)
+        // открывает полную компоновку; скрытый раздел не открывается (ExtractSection → null).
         UtilitiesMenuLayout? layout = fullLayout;
-        if (sectionGroupId is not null)
+        if (sectionGroupId is not null
+            && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
         {
             layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
             if (layout is null)
@@ -437,6 +440,69 @@ public partial class MainWindow
                 LocalizationManager.T("Settings.About.DiagnosticsFailed") + "\n" + ex.Message,
                 LocalizationManager.T("Common.Error"));
         }
+    }
+
+    /// <summary>
+    /// Issue #146: перестраивает видимость кнопок разделов верхней панели по текущей
+    /// компоновке (скрытый раздел не показывает кнопку; пользовательская компоновка
+    /// без разделов показывает одну кнопку «Утилиты»). Вызывается при загрузке окна
+    /// и по событию <see cref="UtilitiesMenuEvents.LayoutChanged"/> — без перезапуска.
+    /// </summary>
+    private void UpdateSectionButtonsVisibility()
+    {
+        if (_viewModel is null)
+            return;
+        var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
+        var settings = new AppSettings
+        {
+            UtilitiesMenuEditingEnabled = _viewModel.UtilitiesMenuEditingEnabled
+        };
+        var layout = UtilitiesMenuResolver.EnsureNewItemsGroup(
+            UtilitiesMenuResolver.Resolve(settings, store));
+        var plan = UtilitiesSectionMenuPlanner.Build(layout);
+
+        bool Visible(string sectionId) => plan.Any(b =>
+            string.Equals(b.SectionId, sectionId, StringComparison.Ordinal));
+
+        SetSectionButtonVisibility(ServersSectionButton, Visible(UtilitiesMenuCatalog.GroupServers));
+        SetSectionButtonVisibility(MaintenanceSectionButton, Visible(UtilitiesMenuCatalog.GroupMaintenance));
+        SetSectionButtonVisibility(ToolsSectionButton, Visible(UtilitiesMenuCatalog.GroupTools));
+        SetSectionButtonVisibility(MoreSectionButton, Visible(UtilitiesMenuCatalog.GroupMore));
+        SetSectionButtonVisibility(UtilitiesFallbackButton,
+            plan.Any(b => UtilitiesSectionMenuPlanner.IsUtilitiesSection(b.SectionId)));
+    }
+
+    /// <summary>Показывает/скрывает кнопку раздела; null-кнопка игнорируется.</summary>
+    private static void SetSectionButtonVisibility(System.Windows.Controls.Button? button, bool visible)
+    {
+        if (button is null)
+            return;
+        button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>Событие изменения компоновки: обновляем кнопки разделов в UI-потоке.</summary>
+    private void OnUtilitiesMenuLayoutChanged(object? sender, EventArgs e)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.BeginInvoke(new Action(UpdateSectionButtonsVisibility));
+            return;
+        }
+        UpdateSectionButtonsVisibility();
+    }
+
+    /// <summary>Быстрая кнопка «Тема» на панели (issue #146): возвращена из «Ещё».</summary>
+    private void OnQuickThemeButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel?.ToggleTheme();
+        UpdateThemeButton();
+    }
+
+    /// <summary>Быстрая кнопка «Компактный режим» на панели (issue #146).</summary>
+    private void OnQuickCompactButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel is not null)
+            _viewModel.ApplyCompactMode(!_viewModel.CompactMode);
     }
 
     /// <summary>Активная цветовая схема для построения меню «Утилиты» (Задача 6).</summary>

@@ -359,15 +359,22 @@ public sealed class Issue139UpdateDialogSizeTests
     }
 
     [Fact]
-    public void Wpf_Xaml_UsesVerticalScrollViewerForOverflow()
+    public void Wpf_Xaml_ContentScrollerStartsWithoutVerticalScrollBar()
     {
         var xaml = ReadProjectFile(Path.Combine(
             "Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
 
-        // Длинный текст/кнопки прокручиваются, горизонтальной прокрутки нет.
-        Assert.Contains("<ScrollViewer", xaml, StringComparison.Ordinal);
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.102): прокрутка тела по умолчанию выключена — полоса
+        // включается кодом только при реальном переполнении. Безусловной Visible нет.
+        var start = xaml.IndexOf("x:Name=\"ContentScroller\"", StringComparison.Ordinal);
+        Assert.True(start > 0, "ContentScroller не найден");
+        var end = xaml.IndexOf('>', start);
+        var tag = xaml.Substring(start, end - start);
+
+        Assert.Contains("VerticalScrollBarVisibility=\"Disabled\"", tag, StringComparison.Ordinal);
+        Assert.DoesNotContain("VerticalScrollBarVisibility=\"Visible\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", tag, StringComparison.Ordinal);
+        Assert.Contains("Focusable=\"False\"", tag, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -402,6 +409,29 @@ public sealed class Issue139UpdateDialogSizeTests
     }
 
     // ===================== WPF: код-бихайнд =====================
+
+    [Fact]
+    public void Wpf_Code_UsesScrollBarPolicy()
+    {
+        var source = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+
+        // Issue #139 (1.0.1.102): решение о полосе — только через чистую политику,
+        // при отсутствии переполнения выставляется Disabled.
+        Assert.Contains("UpdateDialogSizePolicy.ShouldShowVerticalScrollBar", source,
+            StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.MeasureContentWidth", source,
+            StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.MeasureContentHeight", source,
+            StringComparison.Ordinal);
+        Assert.Contains("ScrollBarVisibility.Disabled", source, StringComparison.Ordinal);
+        Assert.Contains("SystemParameters.VerticalScrollBarWidth", source,
+            StringComparison.Ordinal);
+
+        // Повторное измерение после прохода раскладки — защита от обратной связи.
+        Assert.Contains("UpdateLayout();", source, StringComparison.Ordinal);
+        Assert.Contains("StabilizeVerticalScrollBar", source, StringComparison.Ordinal);
+    }
 
     [Fact]
     public void Wpf_Code_BlocksBorderResizeWithoutForbiddenIdentifiers()
@@ -537,6 +567,18 @@ public sealed class Issue139UpdateDialogSizeTests
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
         Assert.Contains("ScrollBarVisibility.Auto", window, StringComparison.Ordinal);
         Assert.Contains("DockPanel.SetDock(buttonsPanel, Dock.Bottom)", window, StringComparison.Ordinal);
+
+        // Issue #139 (1.0.1.102): по умолчанию тело без полосы, решение о ней —
+        // через общую политику (паритет с WPF).
+        Assert.Contains("VerticalScrollBarVisibility = ScrollBarVisibility.Disabled", window,
+            StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.ShouldShowVerticalScrollBar", window,
+            StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.MeasureContentWidth", window,
+            StringComparison.Ordinal);
+        Assert.Contains("UpdateDialogSizePolicy.MeasureContentHeight", window,
+            StringComparison.Ordinal);
+        Assert.Contains("ApplyVerticalScrollBarPolicy", window, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -552,6 +594,117 @@ public sealed class Issue139UpdateDialogSizeTests
         Assert.Contains("public bool ConfirmFitContent(", service, StringComparison.Ordinal);
         var restart = ExtractMethod(service, "public bool ConfirmFitContent(");
         Assert.Contains("fitContent: true", restart, StringComparison.Ordinal);
+    }
+
+    // ===================== Политика вертикальной полосы (1.0.1.102) =====================
+
+    [Fact]
+    public void ShouldShowVerticalScrollBar_WhenContentFits_ReturnsFalse()
+    {
+        // Issue #139 (1.0.1.102): в обычном состоянии полосы быть не должно.
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(300, 300));
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(250, 300));
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(0, 300));
+    }
+
+    [Fact]
+    public void ShouldShowVerticalScrollBar_WhenContentOverflows_ReturnsTrue()
+    {
+        Assert.True(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(301, 300));
+        Assert.True(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(600, 300));
+    }
+
+    [Fact]
+    public void ShouldShowVerticalScrollBar_EpsilonHandlesRounding()
+    {
+        // Разница в пределах epsilon — округление раскладки/DPI, полоса не нужна.
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(300.4, 300));
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(300.5, 300));
+        // Больше epsilon — уже реальное переполнение.
+        Assert.True(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(300.6, 300));
+        // Явно заданный epsilon соблюдается.
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(301, 300, epsilon: 2));
+    }
+
+    [Fact]
+    public void ShouldShowVerticalScrollBar_NaN_ReturnsFalse()
+    {
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(double.NaN, 300));
+        Assert.False(UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(300, double.NaN));
+    }
+
+    [Fact]
+    public void ScrollBarWidth_ReturnsZeroWhenHidden()
+    {
+        Assert.Equal(0, UpdateDialogSizePolicy.ScrollBarWidth(false, 17));
+        Assert.Equal(0, UpdateDialogSizePolicy.ScrollBarWidth(true, 0));
+        Assert.Equal(0, UpdateDialogSizePolicy.ScrollBarWidth(true, -5));
+    }
+
+    [Fact]
+    public void ScrollBarWidth_ReturnsWidthWhenVisible()
+    {
+        Assert.Equal(17, UpdateDialogSizePolicy.ScrollBarWidth(true, 17));
+        Assert.Equal(UpdateDialogSizePolicy.DefaultScrollBarWidth,
+            UpdateDialogSizePolicy.ScrollBarWidth(true, UpdateDialogSizePolicy.DefaultScrollBarWidth));
+    }
+
+    [Fact]
+    public void MeasureContentWidth_ReservesScrollBarWidthOnlyWhenVisible()
+    {
+        // Issue #139 (1.0.1.102): при измерении под полосу ширина уменьшается на
+        // её ширину — текст переносится так же, как при реально видимой полосе.
+        Assert.Equal(700, UpdateDialogSizePolicy.MeasureContentWidth(700, false, 17));
+        Assert.Equal(683, UpdateDialogSizePolicy.MeasureContentWidth(700, true, 17));
+        // Ширина не уходит в минус на узком теле.
+        Assert.Equal(0, UpdateDialogSizePolicy.MeasureContentWidth(10, true, 17));
+    }
+
+    [Fact]
+    public void MeasureContentHeight_SubtractsPaddingButtonsAndGap()
+    {
+        // Высота тела = клиентская высота − отступы − панель кнопок − зазор.
+        Assert.Equal(
+            506,
+            UpdateDialogSizePolicy.MeasureContentHeight(
+                clientHeight: 600, verticalPadding: 40, buttonPanelHeight: 34, buttonGap: 20));
+    }
+
+    [Fact]
+    public void MeasureContentHeight_NeverNegative()
+    {
+        Assert.Equal(0, UpdateDialogSizePolicy.MeasureContentHeight(
+            clientHeight: 30, verticalPadding: 40, buttonPanelHeight: 34, buttonGap: 20));
+        Assert.Equal(0, UpdateDialogSizePolicy.MeasureContentHeight(
+            clientHeight: double.NaN, verticalPadding: 40, buttonPanelHeight: 34, buttonGap: 20));
+    }
+
+    [Fact]
+    public void ScrollBarPolicy_IsSharedByWpfAndAvalonia()
+    {
+        // Паритет: обе оболочки принимают решение о полосе через одну политику,
+        // а не собственные пороги.
+        var wpf = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+        var avalonia = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "MaterialMessageWindow.Avalonia.cs"));
+
+        foreach (var source in new[] { wpf, avalonia })
+        {
+            Assert.Contains("UpdateDialogSizePolicy.ShouldShowVerticalScrollBar", source,
+                StringComparison.Ordinal);
+            Assert.Contains("UpdateDialogSizePolicy.MeasureContentWidth", source,
+                StringComparison.Ordinal);
+            Assert.Contains("UpdateDialogSizePolicy.MeasureContentHeight", source,
+                StringComparison.Ordinal);
+            Assert.Contains("ScrollBarVisibility.Disabled", source, StringComparison.Ordinal);
+        }
+
+        // Диалог подтверждения перезапуска использует тот же режим fitContent.
+        var dialogs = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Services", "AvaloniaDialogService.cs"));
+        Assert.Contains("fitContent: true", ExtractMethod(
+            dialogs, "public bool ConfirmFitContent("), StringComparison.Ordinal);
     }
 
     [Fact]

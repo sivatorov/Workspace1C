@@ -38,6 +38,9 @@ public partial class MainViewModel : ViewModelBase
     private string _noGroupIconColor = "#FFFFFF";
     private string _noGroupIcon = string.Empty;
     private string _pinnedColor = "#8B5CF6";
+    // Доли цвета строки-папки (issue #145): 0–100 %, по умолчанию прежние 30/45.
+    private int _groupColorTintPercent = Models.ColorScheme.DefaultGroupRowTintPercent;
+    private int _groupColorHoverTintPercent = Models.ColorScheme.DefaultGroupRowHoverTintPercent;
     private string _pinnedIconColor = "#FFFFFF";
     private string _pinnedIcon = string.Empty;
     private string _savedTheme = string.Empty;
@@ -480,6 +483,12 @@ public partial class MainViewModel : ViewModelBase
         _pinnedColor = string.IsNullOrWhiteSpace(settings.PinnedColor) ? "#8B5CF6" : settings.PinnedColor;
         _pinnedIconColor = string.IsNullOrWhiteSpace(settings.PinnedIconColor) ? "#FFFFFF" : settings.PinnedIconColor;
         _pinnedIcon = settings.PinnedIcon ?? string.Empty;
+        // Доли цвета строки-папки (issue #145): старые файлы без полей получают
+        // 30/45, некорректные значения клампятся в 0–100. Значения применяются
+        // сразу к ThemeManager, чтобы дерево строилось с правильными кистями.
+        _groupColorTintPercent = AppSettings.NormalizeGroupColorTintPercent(settings.GroupColorTintPercent);
+        _groupColorHoverTintPercent = AppSettings.NormalizeGroupColorTintPercent(settings.GroupColorHoverTintPercent);
+        Themes.ThemeManager.ConfigureGroupRowTint(_groupColorTintPercent, _groupColorHoverTintPercent);
         _savedTheme = settings.Theme;
         // Полноценная тема: к старту главного окна ApplyFullTheme уже применил тему
         // (App.OnStartup), поэтому берём актуальный идентификатор из ThemeManager;
@@ -1383,6 +1392,44 @@ public partial class MainViewModel : ViewModelBase
             OnPropertyChanged();
             RebuildGroupTree();
             ScheduleSaveSettings();
+        }
+    }
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки, проценты 0–100 (issue #145).
+    /// 0 — цвет не подмешивается, 100 — чистый цвет группы. Изменение применяется
+    /// сразу, без перезапуска: пересчитываются кисти уже построенных строк.
+    /// </summary>
+    public int GroupColorTintPercent
+    {
+        get => _groupColorTintPercent;
+        set
+        {
+            var clamped = AppSettings.NormalizeGroupColorTintPercent(value);
+            if (_groupColorTintPercent == clamped) return;
+            _groupColorTintPercent = clamped;
+            OnPropertyChanged();
+            // Применяем сразу; запись в settings.json выполняет окно настроек
+            // по «ОК» (как и для остальных настроек), поэтому «Отмена» не сохраняет.
+            Themes.ThemeManager.ConfigureGroupRowTint(_groupColorTintPercent, _groupColorHoverTintPercent);
+        }
+    }
+
+    /// <summary>
+    /// Доля цвета группы в фоне строки-папки при наведении, проценты 0–100 (issue #145).
+    /// 0 — цвет не подмешивается, 100 — чистый цвет группы.
+    /// </summary>
+    public int GroupColorHoverTintPercent
+    {
+        get => _groupColorHoverTintPercent;
+        set
+        {
+            var clamped = AppSettings.NormalizeGroupColorTintPercent(value);
+            if (_groupColorHoverTintPercent == clamped) return;
+            _groupColorHoverTintPercent = clamped;
+            OnPropertyChanged();
+            // Применяем сразу; сохранение — по «ОК» окна настроек.
+            Themes.ThemeManager.ConfigureGroupRowTint(_groupColorTintPercent, _groupColorHoverTintPercent);
         }
     }
 

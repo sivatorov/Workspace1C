@@ -67,6 +67,15 @@ namespace Workspace1C
         // событие Checked/Unchecked не должно вызывать повторную запись в реестр.
         private bool _suppressAutoStartEvent;
 
+        // ---- Доли цвета строки-папки (issue #145) ----
+        // Признак «идёт начальная установка значений слайдеров»: пока он стоит,
+        // ValueChanged не должен применять настройки и сохранять их.
+        private bool _suppressGroupTintEvent;
+        // Исходные доли на момент открытия окна: «Отмена» возвращает их,
+        // «ОК» сохраняет текущие значения.
+        private int _originalGroupColorTintPercent = Models.ColorScheme.DefaultGroupRowTintPercent;
+        private int _originalGroupColorHoverTintPercent = Models.ColorScheme.DefaultGroupRowHoverTintPercent;
+
         /// <summary>
         /// Создаёт диалог настроек приложения.
         /// </summary>
@@ -93,6 +102,8 @@ namespace Workspace1C
                     Height = MinHeight;
             };
             _viewModel = viewModel;
+            // Issue #145: начальные значения слайдеров долей цвета строки-папки.
+            InitializeGroupColorTintUi();
             // issue #71 (последний комментарий RizvanShikhammatov «нельзя ли запоминать
             // размеры этого окна?»): восстановление сохранённых размеров окна (до показа,
             // чтобы не «мигало») и сохранение фактические размеров при закрытии. Размер
@@ -955,6 +966,9 @@ namespace Workspace1C
                 Password = CommonConfiguratorPasswordBox?.Password ?? string.Empty
             };
             _viewModel.SaveSettings();
+            // Issue #146: галочка правки структуры меню «Утилиты» применена — главное
+            // окно сразу перестраивает кнопки разделов и меню, без перезапуска.
+            UtilitiesMenuEvents.RaiseLayoutChanged();
 
             var templatePaths = TemplatePathsList?.Items.Cast<string>().Where(s => !string.IsNullOrWhiteSpace(s)).ToList()
                 ?? new System.Collections.Generic.List<string>();
@@ -1011,6 +1025,10 @@ namespace Workspace1C
         {
             // Отмена возвращает прежнюю тему без сохранения (issue #378).
             _viewModel.RevertFullThemePreview();
+            // Issue #145: слайдеры долей цвета применяются сразу, поэтому «Отмена»
+            // возвращает исходные значения (в settings.json они не попали).
+            _viewModel.GroupColorTintPercent = _originalGroupColorTintPercent;
+            _viewModel.GroupColorHoverTintPercent = _originalGroupColorHoverTintPercent;
             DialogResult = false;
         }
 
@@ -1240,6 +1258,54 @@ namespace Workspace1C
             ReloadItsAccountsCombo();
         }
 
+        // ---- Доли цвета строки-папки (issue #145) ----
+
+        /// <summary>
+        /// Заполняет слайдеры «Доля цвета папки» и «Доля цвета папки при наведении»
+        /// текущими значениями главной модели. Значения по умолчанию — 30/45 %;
+        /// изменение применяется сразу, без перезапуска.
+        /// </summary>
+        private void InitializeGroupColorTintUi()
+        {
+            if (GroupColorTintSlider is null || GroupColorHoverTintSlider is null)
+                return;
+
+            _originalGroupColorTintPercent = _viewModel.GroupColorTintPercent;
+            _originalGroupColorHoverTintPercent = _viewModel.GroupColorHoverTintPercent;
+            _suppressGroupTintEvent = true;
+            GroupColorTintSlider.Value = _originalGroupColorTintPercent;
+            GroupColorHoverTintSlider.Value = _originalGroupColorHoverTintPercent;
+            _suppressGroupTintEvent = false;
+            UpdateGroupColorTintLabels();
+        }
+
+        /// <summary>Слайдер «Доля цвета папки»: применяет значение сразу.</summary>
+        private void OnGroupColorTintChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressGroupTintEvent)
+                return;
+            _viewModel.GroupColorTintPercent = (int)Math.Round(e.NewValue);
+            UpdateGroupColorTintLabels();
+        }
+
+        /// <summary>Слайдер «Доля цвета папки при наведении»: применяет значение сразу.</summary>
+        private void OnGroupColorHoverTintChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressGroupTintEvent)
+                return;
+            _viewModel.GroupColorHoverTintPercent = (int)Math.Round(e.NewValue);
+            UpdateGroupColorTintLabels();
+        }
+
+        /// <summary>Обновляет подписи-проценты рядом со слайдерами долей цвета.</summary>
+        private void UpdateGroupColorTintLabels()
+        {
+            var format = LocalizationManager.T("Settings.GroupColorTintPercentFormat");
+            if (GroupColorTintValueText is not null)
+                GroupColorTintValueText.Text = string.Format(format, _viewModel.GroupColorTintPercent);
+            if (GroupColorHoverTintValueText is not null)
+                GroupColorHoverTintValueText.Text = string.Format(format, _viewModel.GroupColorHoverTintPercent);
+        }
 
     }
 }

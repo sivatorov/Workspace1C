@@ -56,14 +56,22 @@ public sealed class TrayMenuIconCatalogTests
 
         Assert.True(catalog.Count > 5, $"Каталог иконок должен быть больше прежних 5 (реально: {catalog.Count})");
 
-        foreach (var option in catalog)
+        // Issue #146: глобальная регистрация модулей ПРО (AppServices.Configure в
+        // Issue79TestDeployWindowConstructionTests) добавляет внешние пункты с иконками,
+        // которых может не быть в публичных словарях. Проверяем ТОЛЬКО встроенный
+        // каталог — это и есть контракт публичных словарей; иконки внешних пунктов
+        // поставляет соответствующий модуль ПРО. Так тест не зависит от порядка
+        // выполнения тестов в полном прогоне.
+        foreach (var item in UtilitiesMenuCatalog.BuiltInItems)
         {
-            var geometryKey = UtilitiesMenuCatalog.WpfIconGeometryKey(option.Key);
+            if (string.IsNullOrWhiteSpace(item.WpfIconKind) || string.IsNullOrWhiteSpace(item.IconColor))
+                continue;
+            var geometryKey = UtilitiesMenuCatalog.WpfIconGeometryKey(item.WpfIconKind);
             Assert.False(string.IsNullOrEmpty(geometryKey),
-                $"Ключ каталога {option.Key} не отображается на ключ геометрии Icon*");
+                $"Ключ каталога {item.WpfIconKind} не отображается на ключ геометрии Icon*");
             Assert.Contains("x:Key=\"" + geometryKey + "\"", xaml, StringComparison.Ordinal);
             Assert.Contains("x:Key=\"" + geometryKey + "\"", axaml, StringComparison.Ordinal);
-            Assert.StartsWith("#", option.Color);
+            Assert.StartsWith("#", item.IconColor);
         }
     }
 

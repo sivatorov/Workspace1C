@@ -444,6 +444,9 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         {
             // Не удалось сохранить — редактор остаётся открытым; ошибку покажет вызывающий код.
         }
+        // Issue #146: главное окно перестраивает меню и кнопки разделов сразу,
+        // без перезапуска (WPF — видимость кнопок, Avalonia — панель команд).
+        UtilitiesMenuEvents.RaiseLayoutChanged();
     }
 
     private static UtilitiesMenuNode ToNode(UtilitiesMenuNodeItem item)

@@ -350,6 +350,18 @@ public class InfobaseRepository : IInfobaseRepository
                 return new AppSettings();
             }
 
+            // Issue #146: если рядом лежит пользовательская компоновка меню «Утилиты»,
+            // а флаг правки ещё ни разу не сохранялся (обновление с версии без него),
+            // включаем правку автоматически и запоминаем это. После явного выключения
+            // пользователем флаг уже стоит — значение false уважается.
+            if (!loaded.UtilitiesMenuEditingEnabledInitialized)
+            {
+                loaded.UtilitiesMenuEditingEnabledInitialized = true;
+                if (UtilitiesMenuLayoutStore.HasValidLayoutFile(Path.GetDirectoryName(SettingsPath)))
+                    loaded.UtilitiesMenuEditingEnabled = true;
+                SaveSettings(loaded);
+            }
+
 #if DEBUG
             Console.Error.WriteLine("[l10n-debug] LoadSettings: Language=" + loaded.Language + ", file=" + SettingsPath);
 #endif

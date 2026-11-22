@@ -179,7 +179,10 @@ public sealed class UtilitiesMenuSectionExtractionTests
         var ids = new HashSet<string>(StringComparer.Ordinal);
         CollectItemIds(layout.Root, ids);
 
-        var missing = UtilitiesMenuCatalog.All
+        // Issue #146: стандартная компоновка содержит только встроенные пункты;
+        // внешние пункты модулей ПРО добавляются в «Новинки программы» и не должны
+        // делать тест зависимым от порядка выполнения/наличия PRO-модулей.
+        var missing = UtilitiesMenuCatalog.BuiltInItems
             .Where(item => !item.LinuxOnly)
             .Select(item => item.Id)
             .Where(id => !ids.Contains(id))

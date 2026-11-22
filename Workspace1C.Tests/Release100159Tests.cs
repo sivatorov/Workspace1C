@@ -325,6 +325,9 @@ public sealed class Release100159Tests
     [Fact]
     public void LicenseFolderOpener_StartInfo_UsesExplorerSelect_OnWindows()
     {
+#if LINUX
+        return; // Windows-специфичный сценарий (explorer.exe /select)
+#endif
 #if WINDOWS
         System.Diagnostics.ProcessStartInfo? captured = null;
         LicenseFolderOpener.ProcessStarter = psi =>

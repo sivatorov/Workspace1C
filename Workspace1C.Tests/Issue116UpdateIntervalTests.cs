@@ -464,10 +464,12 @@ public sealed class Issue116UpdateIntervalTests
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml"));
         Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml);
-        // Вертикальная прокрутка содержимого внутри окна сохранена (разметка окна).
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml);
+        // Issue #139 (1.0.1.102): прокрутка тела включается только при реальном
+        // переполнении — решение принимает общая политика, а не разметка.
+        Assert.Contains("x:Name=\"ContentScroller\"", xaml);
 
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs"));
+        Assert.Contains("UpdateDialogSizePolicy.ShouldShowVerticalScrollBar", code);
         Assert.DoesNotContain("FixedHeightDips", code);
         Assert.DoesNotContain("FixedHeightPx", code);
         Assert.DoesNotContain("WndProc", code);

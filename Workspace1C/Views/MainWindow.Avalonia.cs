@@ -430,6 +430,24 @@ namespace Workspace1C
             // закрытии окна (Closed), тем же паттерном, что и для ThemeChanged выше.
             Services.Licensing.EditionService.Changed += OnEditionChanged;
             Closed += (_, _) => Services.Licensing.EditionService.Changed -= OnEditionChanged;
+
+            // Issue #146: сохранение компоновки меню «Утилиты» (редактор/настройки)
+            // сразу пересобирает панель команд и кнопки разделов, без перезапуска.
+            UtilitiesMenuEvents.LayoutChanged += OnUtilitiesMenuLayoutChanged;
+            Closed += (_, _) => UtilitiesMenuEvents.LayoutChanged -= OnUtilitiesMenuLayoutChanged;
+        }
+
+        /// <summary>
+        /// Issue #146: изменение компоновки меню «Утилиты» — пересобираем панель команд
+        /// (кнопки разделов и быстрые кнопки) в UI-потоке. Меню разделов строится при
+        /// каждом открытии, поэтому отдельно его пересобирать не нужно.
+        /// </summary>
+        private void OnUtilitiesMenuLayoutChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+                RebuildUtilitiesMenu();
+            else
+                Dispatcher.UIThread.Post(RebuildUtilitiesMenu);
         }
 
         /// <summary>
@@ -1089,40 +1107,41 @@ namespace Workspace1C
             // перенесены в разделы «Обслуживание» и «Инструменты» (навигация 1.0.1.99).
             panel.Children.Add(CommandPanelSeparator());
 
-            // Четыре сценарных раздела вместо одной кнопки «Утилиты» (навигация 1.0.1.99):
-            // «Серверы», «Обслуживание», «Инструменты», «Ещё». Каждая кнопка открывает
-            // только свой раздел — нужная функция в 2–3 кликах.
-            foreach (var (sectionId, sectionIcon, sectionTitleKey) in new[]
-                     {
-                         (UtilitiesMenuCatalog.GroupServers, "IconServer", "Utilities.Submenu.Servers"),
-                         (UtilitiesMenuCatalog.GroupMaintenance, "IconSettings", "Utilities.Submenu.Maintenance"),
-                         (UtilitiesMenuCatalog.GroupTools, "IconTune", "Utilities.Submenu.Tools"),
-                         (UtilitiesMenuCatalog.GroupMore, "IconMenu", "Utilities.Submenu.More")
-                     })
+            // Issue #146: кнопки разделов строятся по компоновке через общий планировщик.
+            // Скрытый раздел не даёт кнопку; пользовательская компоновка без разделов
+            // показывает одну кнопку «Утилиты» (рабочая точка входа). ПКМ по любой
+            // кнопке раздела открывает редактор структуры меню.
+            var sectionStore = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
+            var sectionLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(
+                UtilitiesMenuResolver.Resolve(_vm?.Settings, sectionStore));
+            foreach (var section in UtilitiesSectionMenuPlanner.Build(sectionLayout))
             {
+                var sectionIcon = section.IsCustom
+                    ? "IconMenu"
+                    : UtilitiesMenuCatalog.GroupAvaloniaIconKey(section.SectionId);
+                if (string.IsNullOrWhiteSpace(sectionIcon))
+                    sectionIcon = "IconMenu";
+                var sectionTitle = LocalizationManager.T(section.TitleKey);
+
                 var sectionBtn = new Button
                 {
-                    Content = ThemedIconAndText(sectionIcon,
-                        LocalizationManager.T(sectionTitleKey), "TextSecondaryColorBrush",
+                    Content = ThemedIconAndText(sectionIcon, sectionTitle, "TextSecondaryColorBrush",
                         UiMetrics.ScaledFont(13), centered: false),
                     Padding = new Thickness(UiMetrics.ButtonPadH, UiMetrics.ButtonPadV),
                     HorizontalContentAlignment = HorizontalAlignment.Center
                 };
                 sectionBtn.Styled(Themes.ControlThemes.IconButton);
-                ToolTip.SetTip(sectionBtn, LocalizationManager.T(sectionTitleKey));
+                ToolTip.SetTip(sectionBtn, sectionTitle);
                 UiAutomation.SetNameFromTip(sectionBtn);
-                var id = sectionId;
-                if (string.Equals(id, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+                var id = section.SectionId;
+                // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
+                sectionBtn.PointerPressed += (_, e) =>
                 {
-                    // ПКМ по «Ещё» — редактор структуры меню (как раньше по «Утилитам»).
-                    sectionBtn.PointerPressed += (_, e) =>
-                    {
-                        if (!e.GetCurrentPoint(sectionBtn).Properties.IsRightButtonPressed)
-                            return;
-                        e.Handled = true;
-                        OpenUtilitiesMenuEditorDirectly();
-                    };
-                }
+                    if (!e.GetCurrentPoint(sectionBtn).Properties.IsRightButtonPressed)
+                        return;
+                    e.Handled = true;
+                    OpenUtilitiesMenuEditorDirectly();
+                };
                 // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
                 // Ранее открытое меню раздела закрывается (навигация 1.0.1.99).
                 sectionBtn.Click += (_, _) => OpenSectionMenu(id, sectionBtn);
@@ -1131,8 +1150,17 @@ namespace Workspace1C
 
             panel.Children.Add(CommandPanelSeparator());
 
-            // Тема, компактный режим и смена пользователя перенесены в «Ещё» → «Блокировка»
-            // (навигация 1.0.1.99): на панели остаются настройки и справка.
+            // Issue #146: быстрые кнопки темы и компактного режима возвращены на панель
+            // (ранее были только в «Ещё» → «Блокировка»). Команды общие с меню.
+            var themeBtn = TopBarIconButton("IconMoon", LocalizationManager.T("Main.Theme"),
+                themeBrushKey: "TextSecondaryColorBrush");
+            themeBtn.Bind(Button.CommandProperty, new Binding("ToggleThemeCommand"));
+            panel.Children.Add(themeBtn);
+
+            var compactBtn = TopBarIconButton("IconCompress", LocalizationManager.T("Main.CompactModeTooltip"),
+                themeBrushKey: "TextSecondaryColorBrush");
+            compactBtn.Bind(Button.CommandProperty, new Binding("ToggleCompactCommand"));
+            panel.Children.Add(compactBtn);
 
             var settingsBtn = TopBarIconButton("IconSettings", LocalizationManager.T("Main.SettingsTooltip"),
                 themeBrushKey: "TextSecondaryColorBrush");

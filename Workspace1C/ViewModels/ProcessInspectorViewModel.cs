@@ -67,11 +67,24 @@ public sealed record ProcessInspectorColumnMenuItem(
 /// колонок с сохранением в настройках. Выделение после автообновления (issue #342)
 /// восстанавливается для ВСЕХ выбранных строк, а не только для одной.
 /// </para>
+/// <para>
+/// issue #134 (1.0.1.102, замечание 7OH): автообновление стало инкрементальным —
+/// строки переиспользуются по устойчивому ключу (PID + командная строка + время
+/// старта), поэтому навигация клавиатурой не «умирает» через несколько секунд.
+/// Пока идёт серия клавиатурных событий, тик таймера откладывается (короткий
+/// debounce), но данные всё равно обновляются после паузы.
+/// </para>
 /// </summary>
 public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
 {
     /// <summary>Период автообновления списка процессов, миллисекунды (~5 секунд).</summary>
     public const int AutoRefreshIntervalMs = 5000;
+
+    /// <summary>
+    /// Короткая пауза автообновления после клавиатурной навигации по таблице,
+    /// миллисекунды (issue #134, 1.0.1.102).
+    /// </summary>
+    public const int NavigationDebounceMs = 1500;
 
     /// <summary>Все колонки инспектора в порядке отображения (issue #134).</summary>
     public static IReadOnlyList<ProcessInspectorColumnInfo> AllColumns { get; } = new[]
@@ -97,6 +110,21 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
     private Timer? _timer;
     private int _refreshBusy;
     private ProcessRowViewModel? _selectedRow;
+
+    /// <summary>Запрошен ещё один опрос, пока текущий выполняется (запрос не теряется).</summary>
+    private int _refreshRequested;
+
+    /// <summary>ViewModel освобождён: отложенные таймеры больше не запускают опрос.</summary>
+    private int _disposed;
+
+    /// <summary>Момент последнего клавиатурного события навигации (<see cref="Environment.TickCount64"/>).</summary>
+    private long _lastNavigationTick;
+
+    /// <summary>Отложенный опрос после серии клавиатурных событий (issue #134, 1.0.1.102).</summary>
+    private Timer? _deferredRefreshTimer;
+
+    /// <summary>Отложенный опрос уже запланирован (не плодим таймеры на каждый тик).</summary>
+    private int _deferredRefreshScheduled;
 
     /// <summary>
     /// Ключи строк, восстановленных последним обновлением (issue #342). Хранятся для
@@ -151,10 +179,14 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
         LoadHiddenColumns();
 
         Refresh();
-        _timer = new Timer(_ => Refresh(), null, AutoRefreshIntervalMs, AutoRefreshIntervalMs);
+        _timer = new Timer(_ => Refresh(fromTimer: true), null, AutoRefreshIntervalMs, AutoRefreshIntervalMs);
     }
 
-    /// <summary>Строки таблицы (пересоздаются при каждом обновлении).</summary>
+    /// <summary>
+    /// Строки таблицы. При автообновлении изменяются инкрементально (issue #134,
+    /// 1.0.1.102): неизменившиеся процессы сохраняют свои экземпляры, поэтому
+    /// контейнеры таблицы не пересоздаются и фокус/выделение не теряются.
+    /// </summary>
     public ObservableCollection<ProcessRowViewModel> Processes { get; } = new();
 
     /// <summary>
@@ -165,16 +197,21 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
     public ObservableCollection<ProcessRowViewModel> SelectedRows { get; } = new();
 
     /// <summary>
-    /// Составной ключ строки для восстановления выделения (issue #342): PID + полная
-    /// командная строка. PID может быть переиспользован ОС после перезапуска процесса —
-    /// одна только проверка по PID перескочила бы выделение на другой процесс; командная
-    /// строка (строка подключения) остаётся стабильной для одного и того же запуска.
+    /// Составной ключ строки для восстановления выделения и инкрементального
+    /// обновления (issue #342, #134): PID + полная командная строка + токен времени
+    /// старта. PID может быть переиспользован ОС после перезапуска процесса — одна
+    /// только проверка по PID перескочила бы выделение на другой процесс; командная
+    /// строка и токен времени старта остаются стабильными для одного и того же запуска.
     /// </summary>
-    private readonly record struct RowSelectionKey(int Pid, string CommandLine);
+    private readonly record struct RowSelectionKey(int Pid, string CommandLine, string StartTimeToken);
 
-    /// <summary>Ключ строки для восстановления выделения (issue #342).</summary>
+    /// <summary>Ключ строки для восстановления выделения и переиспользования строк.</summary>
     private static RowSelectionKey KeyOf(ProcessRowViewModel row) =>
-        new(row.Pid, row.FullCommandLine ?? string.Empty);
+        new(row.Pid, row.FullCommandLine ?? string.Empty, row.StartTimeToken);
+
+    /// <summary>Ключ нового кандидата строки (из очередного опроса).</summary>
+    private static RowSelectionKey KeyOf(RunningOneCProcessDetails details) =>
+        new(details.Pid, details.CommandLine ?? string.Empty, details.StartTimeToken ?? string.Empty);
 
     /// <summary>
     /// Основная выбранная строка (для привязки <c>SelectedItem</c> и двойного клика);
@@ -271,10 +308,60 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// «Обновить» — внеплановый опрос (первый опрос выполняется в конструкторе).
+    /// Явный запрос никогда не откладывается: пользователь ждёт результат.
     /// </summary>
-    public void Refresh()
+    public void Refresh() => Refresh(fromTimer: false);
+
+    /// <summary>
+    /// Отмечает клавиатурное событие навигации по таблице (окна вызывают из
+    /// обработчиков стрелок/Home/End/PageUp/PageDown/Ctrl+A). Пока серия таких
+    /// событий продолжается, тик автообновления откладывается (issue #134, 1.0.1.102).
+    /// </summary>
+    public void NotifyKeyboardNavigation() =>
+        Interlocked.Exchange(ref _lastNavigationTick, Environment.TickCount64);
+
+    /// <summary>
+    /// Автообновление сейчас приостановлено из-за активной клавиатурной навигации
+    /// (диагностика/тесты). Данные при этом не теряются — опрос выполнится после паузы.
+    /// </summary>
+    public bool IsAutoRefreshPaused =>
+        ShouldDeferTimerRefresh(
+            Volatile.Read(ref _lastNavigationTick), Environment.TickCount64, NavigationDebounceMs);
+
+    /// <summary>
+    /// Чистая функция решения «отложить ли тик автообновления» (issue #134, 1.0.1.102):
+    /// откладываем, только если клавиатурное событие было меньше <paramref name="debounceMs"/>
+    /// назад. Отрицательная разница (часы/переполнение) не считается активной навигацией.
+    /// </summary>
+    public static bool ShouldDeferTimerRefresh(long lastNavigationTick, long nowTick, int debounceMs)
     {
-        // Один опрос за раз: длительный WMI/обход /proc не должен копить очередь задач.
+        if (debounceMs <= 0 || lastNavigationTick <= 0)
+            return false;
+
+        var elapsed = nowTick - lastNavigationTick;
+        return elapsed >= 0 && elapsed < debounceMs;
+    }
+
+    /// <param name="fromTimer">
+    /// true — тик таймера автообновления: может быть отложен на время клавиатурной
+    /// навигации. false — явный запрос («Обновить», завершение процесса) — выполняется сразу.
+    /// </param>
+    private void Refresh(bool fromTimer)
+    {
+        if (Volatile.Read(ref _disposed) == 1)
+            return;
+
+        if (fromTimer && IsAutoRefreshPaused)
+        {
+            // Пользователь навигирует клавиатурой: не «выдёргиваем» таблицу из-под него.
+            // Опрос не отменяется — он выполнится после паузы (данные остаются свежими).
+            ScheduleDeferredRefresh();
+            return;
+        }
+
+        // Один опрос за раз, но запрос не теряется: если опрос уже идёт, он повторится
+        // после завершения (кнопка «Обновить» и kill не «проглатываются»).
+        Interlocked.Exchange(ref _refreshRequested, 1);
         if (Interlocked.Exchange(ref _refreshBusy, 1) == 1)
             return;
 
@@ -282,12 +369,15 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                var processes = _service.GetRunningDetails();
-                var rows = BuildRows(processes);
-                if (_dispatchToUi is null)
-                    ApplyRows(rows);
-                else
-                    _dispatchToUi(() => ApplyRows(rows));
+                while (Interlocked.Exchange(ref _refreshRequested, 0) == 1)
+                {
+                    var processes = _service.GetRunningDetails();
+                    var rows = BuildRows(processes);
+                    if (_dispatchToUi is null)
+                        ApplyRows(rows);
+                    else
+                        _dispatchToUi(() => ApplyRows(rows));
+                }
             }
             catch
             {
@@ -298,6 +388,28 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
                 Interlocked.Exchange(ref _refreshBusy, 0);
             }
         });
+    }
+
+    /// <summary>
+    /// Планирует один отложенный опрос после серии клавиатурных событий (issue #134,
+    /// 1.0.1.102). Повторная проверка паузы при срабатывании: если пользователь ещё
+    /// навигирует, опрос переносится дальше, но после паузы данные обязательно обновятся.
+    /// </summary>
+    private void ScheduleDeferredRefresh()
+    {
+        if (Interlocked.Exchange(ref _deferredRefreshScheduled, 1) == 1)
+            return;
+
+        _deferredRefreshTimer?.Dispose();
+        _deferredRefreshTimer = new Timer(
+            _ =>
+            {
+                Interlocked.Exchange(ref _deferredRefreshScheduled, 0);
+                Refresh(fromTimer: true);
+            },
+            null,
+            NavigationDebounceMs,
+            Timeout.Infinite);
     }
 
     /// <summary>
@@ -394,8 +506,11 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
+        Interlocked.Exchange(ref _disposed, 1);
         _timer?.Dispose();
         _timer = null;
+        _deferredRefreshTimer?.Dispose();
+        _deferredRefreshTimer = null;
     }
 
     /// <summary>Выделение для действия: весь набор, иначе одиночная основная строка.</summary>
@@ -483,48 +598,89 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
         return rows;
     }
 
-    private void ApplyRows(List<ProcessRowViewModel> rows)
+    /// <summary>
+    /// Применяет результат опроса инкрементально (issue #134, 1.0.1.102): строки с тем же
+    /// устойчивым ключом (PID + командная строка + время старта) переиспользуются,
+    /// добавляются только новые, удаляются только исчезнувшие. <c>Clear()</c> не
+    /// вызывается, поэтому WPF <c>DataGrid</c> и Avalonia <c>ListBox</c> не пересоздают
+    /// контейнеры и не теряют фокус, текущую ячейку и выделение. При реальных
+    /// изменениях выделение восстанавливается по ключам.
+    /// </summary>
+    private void ApplyRows(List<ProcessRowViewModel> candidates)
     {
-        // Строки пересоздаются при каждом опросе, поэтому выделение сохраняется
-        // по составному ключу (PID + командная строка), а не по ссылке на старую
-        // строку (issue #342). Командная строка в ключе защищает от переиспользования
-        // PID ОС: если процесс перезапустился с другим аргументом, тот же PID — это
-        // уже другой процесс, выделение на него не переносится.
-        // issue #134: восстанавливаются ВСЕ выбранные ключи, а не один.
-        var selectedKeys = SelectedRows
-            .Select(KeyOf)
-            .Concat(SelectedRow is { } primary ? new[] { KeyOf(primary) } : Array.Empty<RowSelectionKey>())
-            .Distinct()
-            .ToList();
+        var selectedKeys = CollectSelectedKeys();
+        var reused = 0;
+        var added = 0;
+        var removed = 0;
 
         _applyingRows = true;
         try
         {
-            Processes.Clear();
-            foreach (var row in rows)
-                Processes.Add(row);
+            // Индекс текущих строк по ключу: тот же запуск процесса → тот же экземпляр.
+            var existingByKey = new Dictionary<RowSelectionKey, ProcessRowViewModel>(Processes.Count);
+            foreach (var row in Processes)
+                existingByKey.TryAdd(KeyOf(row), row);
 
-            var restored = new List<ProcessRowViewModel>(selectedKeys.Count);
-            foreach (var key in selectedKeys)
+            var desired = new List<ProcessRowViewModel>(candidates.Count);
+            var used = new HashSet<ProcessRowViewModel>();
+
+            foreach (var candidate in candidates)
             {
-                // Точное совпадение по составному ключу; при пустой командной строке у
-                // старой строки (идентичность неизвестна) — fallback на единственный PID.
-                var match = rows.FirstOrDefault(r => KeyOf(r) == key)
-                    ?? (key.CommandLine.Length == 0 ? rows.FirstOrDefault(r => r.Pid == key.Pid) : null);
-                if (match is not null && !restored.Contains(match))
-                    restored.Add(match);
+                var key = KeyOf(candidate);
+                if (existingByKey.TryGetValue(key, out var existing) && used.Add(existing))
+                {
+                    // Обновляем данные в существующей строке — контейнер не пересоздаётся.
+                    existing.UpdateFrom(candidate.Details, candidate.Infobase);
+                    desired.Add(existing);
+                    reused++;
+                }
+                else
+                {
+                    used.Add(candidate);
+                    desired.Add(candidate);
+                    added++;
+                }
             }
 
-            SelectedRows.Clear();
-            foreach (var row in restored)
-                SelectedRows.Add(row);
-            SelectedRow = restored.FirstOrDefault();
+            // Удаляем исчезнувшие процессы с конца, чтобы не сдвигать индексы.
+            for (var i = Processes.Count - 1; i >= 0; i--)
+            {
+                if (used.Contains(Processes[i]))
+                    continue;
+                Processes.RemoveAt(i);
+                removed++;
+            }
 
-            _lastRestoredKeys = new HashSet<RowSelectionKey>(restored.Select(KeyOf));
+            // Приводим порядок к новому минимальными перемещениями/вставками.
+            for (var i = 0; i < desired.Count; i++)
+            {
+                var row = desired[i];
+                if (i < Processes.Count && ReferenceEquals(Processes[i], row))
+                    continue;
+
+                var currentIndex = Processes.IndexOf(row);
+                if (currentIndex >= 0)
+                    Processes.Move(currentIndex, i);
+                else
+                    Processes.Insert(i, row);
+            }
+
+            while (Processes.Count > desired.Count)
+                Processes.RemoveAt(Processes.Count - 1);
+
+            RestoreSelection(selectedKeys);
         }
         finally
         {
             _applyingRows = false;
+        }
+
+        if (RunningMatchDebug.IsEnabled)
+        {
+            // Диагностика (issue #134): видно, было ли пересоздание строк и сколько
+            // процессов обновилось «на месте». Помогает, если навигация снова «умрёт».
+            RunningMatchDebug.Log(
+                $"inspector: apply rows total={Processes.Count} reused={reused} added={added} removed={removed}");
         }
 
         // Двухфазное восстановление (issue #342): часть контролов (виртуализация,
@@ -542,6 +698,59 @@ public sealed class ProcessInspectorViewModel : ViewModelBase, IDisposable
 
         // Форма переставляет SelectedItems по восстановленному набору.
         SelectionRestored?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Ключи текущего выделения: все выбранные строки плюс основная строка.</summary>
+    private List<RowSelectionKey> CollectSelectedKeys()
+    {
+        var keys = new List<RowSelectionKey>(SelectedRows.Count + 1);
+
+        void Add(ProcessRowViewModel row)
+        {
+            var key = KeyOf(row);
+            if (!keys.Contains(key))
+                keys.Add(key);
+        }
+
+        foreach (var row in SelectedRows)
+            Add(row);
+        if (SelectedRow is { } primary)
+            Add(primary);
+
+        return keys;
+    }
+
+    /// <summary>
+    /// Восстанавливает выделение по устойчивым ключам после инкрементального применения
+    /// (issue #134, #342). Если выделение не изменилось (штатное автообновление без
+    /// реальных изменений), коллекции не трогаются вовсе — контрол сохраняет и
+    /// выделение, и текущую ячейку, и фокус.
+    /// </summary>
+    private void RestoreSelection(IReadOnlyList<RowSelectionKey> selectedKeys)
+    {
+        var restored = new List<ProcessRowViewModel>(selectedKeys.Count);
+        foreach (var key in selectedKeys)
+        {
+            // Точное совпадение по составному ключу; при пустой командной строке у
+            // старой строки (идентичность неизвестна) — fallback на единственный PID.
+            var match = Processes.FirstOrDefault(r => KeyOf(r) == key)
+                ?? (key.CommandLine.Length == 0 ? Processes.FirstOrDefault(r => r.Pid == key.Pid) : null);
+            if (match is not null && !restored.Contains(match))
+                restored.Add(match);
+        }
+
+        var unchanged = restored.Count == SelectedRows.Count &&
+                        restored.SequenceEqual(SelectedRows) &&
+                        ReferenceEquals(SelectedRow, restored.FirstOrDefault());
+
+        _lastRestoredKeys = new HashSet<RowSelectionKey>(restored.Select(KeyOf));
+        if (unchanged)
+            return;
+
+        SelectedRows.Clear();
+        foreach (var row in restored)
+            SelectedRows.Add(row);
+        SelectedRow = restored.FirstOrDefault();
     }
 
     /// <summary>

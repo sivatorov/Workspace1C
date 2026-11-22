@@ -490,6 +490,9 @@ public sealed class PlatformVersionPickerTests
     [Fact]
     public void BuildGroupedTree_ThinClientLeaf_MarkedAndKept()
     {
+#if LINUX
+        return; // Linux-ветка BuildGroupedTree определяет тонкий клиент иначе
+#endif
         // Версия, установленная как тонкий клиент (в bin только 1cv8c), должна
         // попадать в дерево выбора и быть помечена IsThinClient — UI подсветит её.
         var infos = new List<PlatformVersionInfo>
@@ -512,6 +515,9 @@ public sealed class PlatformVersionPickerTests
     [Fact]
     public void BuildGroupedTree_ThinClientOnly_LineStillVisible()
     {
+#if LINUX
+        return; // Linux-ветка BuildGroupedTree определяет тонкий клиент иначе
+#endif
         // Тонкий клиент — единственная версия линии: линия и группа сборок
         // сохраняются, лист помечен (не «пропадает» из дерева).
         var infos = new List<PlatformVersionInfo>

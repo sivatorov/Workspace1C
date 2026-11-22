@@ -44,6 +44,11 @@ namespace Workspace1C
         /// <summary>Чекбокс «Правка структуры меню трея» (issue #62): читается в «Сохранить».</summary>
         private ToggleButton? _trayMenuEditingCheck;
 
+        // Issue #145: исходные доли цвета строки-папки на момент открытия окна.
+        // Слайдеры применяют значения сразу, а «Отмена» возвращает исходные.
+        private int _originalGroupColorTintPercent = Models.ColorScheme.DefaultGroupRowTintPercent;
+        private int _originalGroupColorHoverTintPercent = Models.ColorScheme.DefaultGroupRowHoverTintPercent;
+
         /// <summary>Чекбокс «Правка структуры контекстного меню» (issue #56): читается в «Сохранить».</summary>
         private ToggleButton? _contextMenuEditingCheck;
 
@@ -2503,6 +2508,78 @@ namespace Workspace1C
 
             schemeColumn.Children.Add(schemeButtons);
 
+            // Issue #145: доли цвета строки-папки (0–100 %).
+            // 0 — цвет группы не подмешивается, 100 — чистый цвет группы.
+            schemeColumn.Children.Add(GroupTitle(LocalizationManager.T("Settings.GroupColorTintGroup")));
+            schemeColumn.Children.Add(Hint(LocalizationManager.T("Settings.GroupColorTintHint"), bottom: 6));
+            _originalGroupColorTintPercent = _viewModel.GroupColorTintPercent;
+            _originalGroupColorHoverTintPercent = _viewModel.GroupColorHoverTintPercent;
+
+            var tintIdleValue = new TextBlock
+            {
+                MinWidth = 48,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var tintHoverValue = new TextBlock
+            {
+                MinWidth = 48,
+                TextAlignment = TextAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var suppressTint = false;
+            string FormatTint(int value) => string.Format(
+                LocalizationManager.T("Settings.GroupColorTintPercentFormat"), value);
+            void UpdateTintLabels()
+            {
+                tintIdleValue.Text = FormatTint(_viewModel.GroupColorTintPercent);
+                tintHoverValue.Text = FormatTint(_viewModel.GroupColorHoverTintPercent);
+            }
+
+            Slider AddTintSlider(string labelKey, int value, Action<int> apply, TextBlock valueText)
+            {
+                var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(220)));
+                row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
+                row.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+                var label = new TextBlock
+                {
+                    Text = LocalizationManager.T(labelKey),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                var slider = new Slider
+                {
+                    Minimum = 0,
+                    Maximum = 100,
+                    TickFrequency = 1,
+                    IsSnapToTickEnabled = true,
+                    Value = value,
+                    Margin = new Thickness(8, 0, 8, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                slider.PropertyChanged += (_, e) =>
+                {
+                    if (e.Property == Slider.ValueProperty && !suppressTint)
+                        apply((int)Math.Round(slider.Value));
+                };
+                Grid.SetColumn(label, 0);
+                Grid.SetColumn(slider, 1);
+                Grid.SetColumn(valueText, 2);
+                row.Children.Add(label);
+                row.Children.Add(slider);
+                row.Children.Add(valueText);
+                schemeColumn.Children.Add(row);
+                return slider;
+            }
+
+            suppressTint = true;
+            AddTintSlider("Settings.GroupColorTint", _viewModel.GroupColorTintPercent,
+                v => { _viewModel.GroupColorTintPercent = v; UpdateTintLabels(); }, tintIdleValue);
+            AddTintSlider("Settings.GroupColorHoverTint", _viewModel.GroupColorHoverTintPercent,
+                v => { _viewModel.GroupColorHoverTintPercent = v; UpdateTintLabels(); }, tintHoverValue);
+            suppressTint = false;
+            UpdateTintLabels();
+
             // Редактор цветов выбранной палитры — в левой колонке, под блоком схемы.
             schemeColumn.Children.Add(GroupTitle(LocalizationManager.T("Settings.Colors")));
             schemeColumn.Children.Add(Hint(LocalizationManager.T("Settings.Colors.Description"), bottom: 8));
@@ -4104,6 +4181,10 @@ namespace Workspace1C
 
                 _viewModel.SaveElementFonts(editedFonts);
 
+                // Issue #146: галочка правки структуры меню «Утилиты» применена —
+                // главное окно сразу перестраивает панель команд и меню.
+                UtilitiesMenuEvents.RaiseLayoutChanged();
+
                 // Предпросмотр темы фиксируется при «ОК» (issue #378): если пользователь
                 // предпросмотрел тему, но не нажал «Применить», выбор всё равно сохраняется.
                 if (_viewModel.HasThemePreview)
@@ -4143,6 +4224,10 @@ namespace Workspace1C
             cancel.Click += (_, _) =>
             {
                 _viewModel.RevertFullThemePreview();
+                // Issue #145: слайдеры долей цвета применяются сразу, поэтому
+                // «Отмена» возвращает исходные значения (в settings.json они не попали).
+                _viewModel.GroupColorTintPercent = _originalGroupColorTintPercent;
+                _viewModel.GroupColorHoverTintPercent = _originalGroupColorHoverTintPercent;
                 Close();
             };
 

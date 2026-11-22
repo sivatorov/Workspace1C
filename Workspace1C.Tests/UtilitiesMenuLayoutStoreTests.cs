@@ -83,16 +83,22 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         var result = store.Load();
         Assert.NotNull(result);
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, result!.SchemaVersion);
-        Assert.Equal(4, result.Root.Count);
-        Assert.Equal(UtilitiesMenuCatalog.GroupServers, result.Root[0].GroupId);
+
+        // Issue #146: пользовательское дерево НЕ заменяется стандартными разделами —
+        // сохраняются исходные узлы и их порядок, а недостающие функции каталога
+        // добавляются отдельно (в «Новинки программы» или подходящую группу).
+        Assert.True(result.Root.Count >= 2);
+        Assert.Equal("item", result.Root[0].Kind);
+        Assert.Equal("CommandPalette", result.Root[0].ItemId);
+        Assert.Equal("group", result.Root[1].Kind);
+        Assert.Equal("Operations", result.Root[1].GroupId);
 
         var ids = new System.Collections.Generic.HashSet<string>();
         UtilitiesMenuResolver.CollectItemIds(result.Root, ids);
         Assert.Contains("CommandPalette", ids);
         Assert.Contains("ExportCsv", ids);
-        // Пункт, которого не было в старой компоновке и который не является новинкой,
-        // не возвращается (пользователь его убрал).
-        Assert.DoesNotContain("MetadataExplorer", ids);
+        // Отсутствовавшие функции каталога не теряются при миграции (issue #146).
+        Assert.Contains("MetadataExplorer", ids);
         // Новинки каталога остаются доступными.
         Assert.Contains("TelegramBot", ids);
 

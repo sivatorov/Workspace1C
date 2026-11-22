@@ -668,8 +668,13 @@
                                     Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
                             <!-- Навигация 1.0.1.99: четыре сценарных раздела вместо одной кнопки
                                  «Утилиты». Каждая кнопка открывает только свой раздел, меню
-                                 строится динамически (BuildUtilitiesMenu) по компоновке. -->
-                            <Button Tag="Servers" Click="OnSectionMenuButton_Click"
+                                 строится динамически (BuildUtilitiesMenu) по компоновке.
+                                 Issue #146: видимость кнопок управляется компоновкой (скрытый
+                                 раздел не показывается), ПКМ по любой кнопке открывает редактор,
+                                 а при пользовательской компоновке без разделов показывается
+                                 одна кнопка «Утилиты». -->
+                            <Button x:Name="ServersSectionButton" Tag="Servers" Click="OnSectionMenuButton_Click"
+                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Servers}">
                                 <StackPanel Orientation="Horizontal">
@@ -680,7 +685,8 @@
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                            <Button Tag="Maintenance" Click="OnSectionMenuButton_Click"
+                            <Button x:Name="MaintenanceSectionButton" Tag="Maintenance" Click="OnSectionMenuButton_Click"
+                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Maintenance}">
                                 <StackPanel Orientation="Horizontal">
@@ -691,7 +697,8 @@
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                            <Button Tag="Tools" Click="OnSectionMenuButton_Click"
+                            <Button x:Name="ToolsSectionButton" Tag="Tools" Click="OnSectionMenuButton_Click"
+                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Tools}">
                                 <StackPanel Orientation="Horizontal">
@@ -702,7 +709,7 @@
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                            <Button Tag="More" Click="OnSectionMenuButton_Click"
+                            <Button x:Name="MoreSectionButton" Tag="More" Click="OnSectionMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.More}">
@@ -714,8 +721,33 @@
                                         VerticalAlignment="Center" Margin="5,0,0,0"/>
                                 </StackPanel>
                             </Button>
-                            <!-- Тема, компактный режим и смена пользователя перенесены
-                                 в «Ещё» → «Блокировка» (навигация 1.0.1.99). -->
+                            <!-- Issue #146: пользовательская компоновка без разделов — одна
+                                 рабочая кнопка «Утилиты» (показывается вместо четырёх). -->
+                            <Button x:Name="UtilitiesFallbackButton" Tag="Utilities" Click="OnSectionMenuButton_Click"
+                                    PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
+                                    Visibility="Collapsed"
+                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
+                                    Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Utilities}">
+                                <StackPanel Orientation="Horizontal">
+                                    <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
+                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Utilities}" FontSize="13"
+                                        Foreground="{DynamicResource TextSecondaryBrush}"
+                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- Issue #146: быстрые кнопки темы и компактного режима возвращены
+                                 на панель (ранее были только в «Ещё» → «Блокировка»). -->
+                            <Button Click="OnQuickThemeButton_Click" Style="{DynamicResource IconButton}"
+                                    Margin="0,0,2,0" Padding="6" ToolTip="{loc:Loc Main.Theme}">
+                                <materialDesign:PackIcon Kind="ThemeLightDark" Width="18" Height="18"
+                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
+                            <Button Click="OnQuickCompactButton_Click" Style="{DynamicResource IconButton}"
+                                    Margin="0,0,2,0" Padding="6" ToolTip="{loc:Loc Main.CompactModeTooltip}">
+                                <materialDesign:PackIcon Kind="Compress" Width="18" Height="18"
+                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            </Button>
                             <Button Command="{Binding OpenSettingsCommand}" Style="{DynamicResource IconButton}" Padding="6"
                                     ToolTip="{loc:Loc Main.SettingsTooltip}">
                                 <materialDesign:PackIcon Kind="Cog" Width="18" Height="18" Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -1422,10 +1454,12 @@
                                             </Border.Margin>
                                             <Border.Style>
                                                 <Style TargetType="Border">
-                                                    <!-- Аудит UI P1-2: фон строки группы — пастель (цвет группы,
-                                                         смешанный с ContentBackground темы на 14 %), а не сплошная
-                                                         насыщенная заливка. Кисть считает ThemeManager из цвета группы
-                                                         и темы, поэтому смена темы перекрашивает строку сразу. -->
+                                                    <!-- Аудит UI P1-2 / issue #145: фон строки группы — пастель
+                                                         (цвет группы, смешанный с ContentBackground темы в доле из
+                                                         настройки «Доля цвета папки», по умолчанию 30 %), а не
+                                                         сплошная насыщенная заливка. Кисть считает ThemeManager из
+                                                         цвета группы и темы, поэтому смена темы перекрашивает строку
+                                                         сразу. -->
                                                     <Setter Property="Background" Value="{Binding HeaderBrush}"/>
                                                     <Setter Property="BorderBrush" Value="Transparent"/>
                                                     <Setter Property="BorderThickness" Value="2"/>
@@ -1433,8 +1467,9 @@
                                                         <DataTrigger Binding="{Binding IsSelected}" Value="True">
                                                             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                         </DataTrigger>
-                                                        <!-- Hover: та же пастель с долей 24 % — заметнее, но без
-                                                             сплошной заливки; выделение остаётся акцентной рамкой. -->
+                                                        <!-- Hover: та же пастель с долей из настройки «Доля цвета
+                                                             папки при наведении» (по умолчанию 45 %) — заметнее, но
+                                                             без сплошной заливки; выделение остаётся акцентной рамкой. -->
                                                         <DataTrigger Binding="{Binding IsMouseOver, ElementName=GroupRowBorder}" Value="True">
                                                             <Setter Property="Background" Value="{Binding HeaderHoverBrush}"/>
                                                         </DataTrigger>

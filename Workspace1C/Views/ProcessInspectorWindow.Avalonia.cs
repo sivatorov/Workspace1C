@@ -1,6 +1,7 @@
 #if LINUX
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
@@ -39,6 +40,18 @@ namespace Workspace1C
         private readonly ProcessInspectorViewModel _vm;
         private readonly ListBox _grid = new();
         private readonly Grid _header = new() { Margin = new Thickness(0, 0, 0, 4) };
+
+        /// <summary>
+        /// Фокус был внутри таблицы (issue #134, 1.0.1.102): после реального изменения
+        /// строк его нужно вернуть, а при клике по кнопке — нет.
+        /// </summary>
+        private bool _gridHadFocus;
+
+        /// <summary>Фокус уже успешно установлен при открытии — повторные попытки не нужны.</summary>
+        private bool _focusApplied;
+
+        /// <summary>Окно открыто (Opened уже наступил) — можно ставить фокус.</summary>
+        private bool _opened;
 
         /// <summary>Ключи локализации заголовков колонок по значению перечисления.</summary>
         private static readonly Dictionary<ProcessInspectorColumn, string> ColumnTitleKeys =
@@ -185,9 +198,79 @@ namespace Workspace1C
             Place(grid, hint, 4);
             Content = grid;
 
-            // issue #134 (1.0.1.100, замечание 7OH): список получает фокус при
-            // открытии окна, поэтому Ctrl+A выделяет все процессы без клика мышью.
-            Opened += (_, _) => _grid.Focus();
+            // issue #134 (1.0.1.102, замечание 7OH): фокус ставится после загрузки
+            // данных и первого прохода разметки (Dispatcher.UIThread.Post + повтор,
+            // если окно ещё не активировано). Прежний синхронный Focus() в Opened
+            // не доходил до списка — Ctrl+A не работал без клика мышью.
+            _grid.GotFocus += (_, _) =>
+            {
+                _gridHadFocus = true;
+                _focusApplied = true;
+            };
+            // Фокус ушёл из таблицы (например, клик по кнопке) — не возвращаем его
+            // принудительно при автообновлении.
+            _grid.LostFocus += (_, _) => Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (!_grid.IsKeyboardFocusWithin)
+                        _gridHadFocus = false;
+                },
+                DispatcherPriority.Background);
+            Deactivated += (_, _) => _gridHadFocus = false;
+            Activated += (_, _) =>
+            {
+                if (_grid.IsKeyboardFocusWithin)
+                    _gridHadFocus = true;
+                if (!_focusApplied)
+                    FocusGridAttempt(0);
+            };
+            Opened += (_, _) =>
+            {
+                _opened = true;
+                FocusGridAttempt(0);
+            };
+            // Данные приходят асинхронно (/proc): ставим фокус и по первому заполнению.
+            _vm.Processes.CollectionChanged += (_, e) =>
+            {
+                if (!_focusApplied && e.Action == NotifyCollectionChangedAction.Add)
+                    FocusGridAttempt(0);
+            };
+        }
+
+        /// <summary>
+        /// Отложенная установка фокуса в список процессов (issue #134, 1.0.1.102):
+        /// после загрузки данных и первого прохода разметки. Если окно ещё не
+        /// активировано/компоновка не завершена — повторяем (до 6 попыток).
+        /// </summary>
+        private void FocusGridAttempt(int attempt)
+        {
+            if (!_opened)
+                return;
+
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (!_opened)
+                        return;
+
+                    var focused = _grid.Focus();
+
+                    // Первая строка становится выбранной, чтобы стрелки и Enter
+                    // работали сразу после открытия окна.
+                    if ((_grid.SelectedItems?.Count ?? 0) == 0 && _grid.ItemCount > 0)
+                        _grid.SelectedIndex = 0;
+
+                    if (focused || _grid.IsKeyboardFocusWithin)
+                    {
+                        _gridHadFocus = true;
+                        _focusApplied = true;
+                        return;
+                    }
+
+                    if (attempt < 5)
+                        FocusGridAttempt(attempt + 1);
+                },
+                DispatcherPriority.Background);
         }
 
         private static void Place(Grid grid, Control control, int row)
@@ -518,6 +601,12 @@ namespace Workspace1C
         /// <summary>
         /// Переставляет выделение ListBox по восстановленному набору ViewModel
         /// (issue #134: восстанавливаются все ранее выбранные строки).
+        /// <para>
+        /// 1.0.1.102: инкрементальное обновление переиспользует экземпляры строк,
+        /// поэтому при штатном автообновлении контрол не трогается вовсе — фокус
+        /// и мультивыделение сохраняются. При реальных изменениях выделение
+        /// восстанавливается и фокус возвращается в таблицу.
+        /// </para>
         /// </summary>
         private void RestoreSelectedRows()
         {
@@ -525,17 +614,34 @@ namespace Workspace1C
             if (selected is null)
                 return;
 
+            var hadFocus = _gridHadFocus || _grid.IsKeyboardFocusWithin;
+
             var desired = _vm.SelectedRows.ToList();
             var current = selected.Cast<ProcessRowViewModel>().ToList();
-            if (current.Count == desired.Count && current.All(desired.Contains))
+            if (!(current.Count == desired.Count && current.All(desired.Contains)))
+            {
+                selected.Clear();
+                foreach (var row in desired)
+                {
+                    if (_vm.Processes.Contains(row))
+                        selected.Add(row);
+                }
+            }
+
+            if (!hadFocus || _grid.IsKeyboardFocusWithin)
                 return;
 
-            selected.Clear();
-            foreach (var row in desired)
-            {
-                if (_vm.Processes.Contains(row))
-                    selected.Add(row);
-            }
+            // Реальные изменения пересоздали контейнеры — возвращаем фокус и прокрутку.
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    if (!_gridHadFocus && !_grid.IsKeyboardFocusWithin)
+                        return;
+                    _grid.Focus();
+                    if (_vm.SelectedRow is { } row)
+                        _grid.ScrollIntoView(row);
+                },
+                DispatcherPriority.Input);
         }
 
         private void OnGrid_DoubleTapped(object? sender, TappedEventArgs e)
@@ -549,10 +655,18 @@ namespace Workspace1C
 
         /// <summary>
         /// issue #134 (1.0.1.100, замечание 7OH): Enter завершает выбранные
-        /// процессы — то же действие, что и двойной клик по строке.
+        /// процессы — то же действие, что и двойной клик по строке. С 1.0.1.102
+        /// навигационные клавиши дополнительно приостанавливают автообновление
+        /// (короткий debounce), чтобы таблица не «выдёргивалась» из-под пользователя.
         /// </summary>
         private void OnGrid_KeyDown(object? sender, KeyEventArgs e)
         {
+            if (IsNavigationKey(e.Key) ||
+                (e.Key == Key.A && e.KeyModifiers.HasFlag(KeyModifiers.Control)))
+            {
+                _vm.NotifyKeyboardNavigation();
+            }
+
             if (e.Key != Key.Enter)
                 return;
             if (_grid.SelectedItem is not ProcessRowViewModel)
@@ -560,6 +674,11 @@ namespace Workspace1C
             e.Handled = true;
             _vm.KillSelectedMany();
         }
+
+        /// <summary>Клавиши навигации по таблице (issue #134, 1.0.1.102).</summary>
+        private static bool IsNavigationKey(Key key) => key is
+            Key.Up or Key.Down or Key.Left or Key.Right or
+            Key.PageUp or Key.PageDown or Key.Home or Key.End;
     }
 }
 #endif

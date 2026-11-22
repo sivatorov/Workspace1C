@@ -27,13 +27,14 @@ public sealed class ProcessInspectorSelectionTests
         var target = vm.Processes.First(r => r.Pid == 2000);
         vm.SelectedRow = target;
 
-        // Автообновление: источник возвращает те же процессы, но строки пересоздаются
-        // (BuildRows создаёт новые экземпляры) — выделение должно восстановиться по PID.
+        // Автообновление (issue #134, 1.0.1.102): при том же наборе процессов строки
+        // переиспользуются — выделение остаётся на том же экземпляре, а не только по PID.
         service.Set(Proc(1000, "Первый"), Proc(2000, "Второй"));
         vm.Refresh();
 
-        WaitFor(() => vm.SelectedRow is not null && !ReferenceEquals(vm.SelectedRow, target));
+        WaitFor(() => vm.Processes.Count == 2 && ReferenceEquals(vm.Processes.First(r => r.Pid == 2000), target));
         Assert.Equal(2000, vm.SelectedRow!.Pid);
+        Assert.Same(target, vm.SelectedRow);
     }
 
     [Fact]

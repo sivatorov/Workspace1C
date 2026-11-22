@@ -311,6 +311,13 @@ namespace Workspace1C
             _viewModel = viewModel ?? new ViewModels.MainViewModel();
             DataContext = _viewModel;
 
+            // Issue #146: изменение компоновки меню «Утилиты» (сохранение в редакторе
+            // или галочка в настройках) сразу перестраивает видимость кнопок разделов,
+            // без перезапуска. Первичное состояние выставляется при загрузке окна.
+            UtilitiesMenuEvents.LayoutChanged += OnUtilitiesMenuLayoutChanged;
+            Loaded += (_, _) => UpdateSectionButtonsVisibility();
+            Closed += (_, _) => UtilitiesMenuEvents.LayoutChanged -= OnUtilitiesMenuLayoutChanged;
+
             // Контекстное меню строки базы (issue #56): строится кодом (см.
             // MainWindow.ContextMenu.cs) вместо статического XAML-блока и пересобирается
             // при смене темы/языка/настроек (см. RebuildRowContextMenu).

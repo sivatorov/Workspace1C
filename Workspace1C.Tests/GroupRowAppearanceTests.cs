@@ -266,7 +266,8 @@ public sealed class GroupRowAppearanceTests
         var tree = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
         Assert.Contains("header.IsPointerOver ? group.HeaderHoverBrush : group.HeaderBrush", tree, StringComparison.Ordinal);
         Assert.Contains("stripe.Bind(Border.BackgroundProperty, new Binding(\"HeaderStripeBrush\")", tree, StringComparison.Ordinal);
-        Assert.Contains("Width = 3", tree, StringComparison.Ordinal);
+        // Issue #145: ширина полосы берётся из общего GroupRowStripeLayout.
+        Assert.Contains("GroupRowStripeLayout.StripeWidth", tree, StringComparison.Ordinal);
     }
 
     [Theory]

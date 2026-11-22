@@ -44,6 +44,20 @@ public static class UpdateDialogSizePolicy
     public const double WorkAreaMargin = 24;
 
     /// <summary>
+    /// Ширина вертикальной полосы прокрутки по умолчанию, DIP. Используется,
+    /// когда платформа не сообщила собственную ширину (WPF:
+    /// <c>SystemParameters.VerticalScrollBarWidth</c>, Avalonia — оценка).
+    /// Issue #139 (1.0.1.102).
+    /// </summary>
+    public const double DefaultScrollBarWidth = 17;
+
+    /// <summary>
+    /// Допуск сравнения высот, DIP. Разница в пределах этого значения считается
+    /// округлением раскладки/DPI и не должна включать полосу прокрутки.
+    /// </summary>
+    public const double ScrollBarEpsilon = 0.5;
+
+    /// <summary>
     /// Высота строки кнопок диалога, DIP (совпадает с Height=34 у кнопок в разметке).
     /// </summary>
     public const double ButtonHeight = 34;
@@ -222,5 +236,73 @@ public static class UpdateDialogSizePolicy
         }
 
         return total + spacing * Math.Max(0, count - 1) + chrome;
+    }
+
+    // ===================== Вертикальная полоса прокрутки (issue #139, 1.0.1.102) =====================
+
+    /// <summary>
+    /// Нужна ли вертикальная полоса прокрутки телу диалога. Полоса появляется
+    /// только при реальном переполнении: разница высот в пределах
+    /// <paramref name="epsilon"/> считается округлением раскладки/DPI и полосу не
+    /// включает. Единое решение для WPF и Avalonia.
+    /// </summary>
+    /// <param name="contentHeight">Измеренная высота содержимого тела, DIP.</param>
+    /// <param name="viewportHeight">Доступная высота тела (viewport), DIP.</param>
+    /// <param name="epsilon">Допуск сравнения, DIP.</param>
+    public static bool ShouldShowVerticalScrollBar(
+        double contentHeight, double viewportHeight, double epsilon = ScrollBarEpsilon)
+    {
+        if (double.IsNaN(contentHeight) || double.IsNaN(viewportHeight))
+            return false;
+
+        var tolerance = epsilon > 0 ? epsilon : 0;
+        return contentHeight > viewportHeight + tolerance;
+    }
+
+    /// <summary>
+    /// Ширина, которую полоса прокрутки реально занимает у тела диалога:
+    /// 0, пока полоса скрыта; ширина полосы, когда она видима. Отрицательная
+    /// или неизвестная ширина трактуется как 0.
+    /// </summary>
+    public static double ScrollBarWidth(bool visible, double scrollBarWidth)
+        => visible && scrollBarWidth > 0 ? scrollBarWidth : 0;
+
+    /// <summary>
+    /// Ширина, по которой нужно измерять тело при решении о полосе. Если полоса
+    /// учитывается, из доступной ширины вычитается её ширина — тогда перенос
+    /// текста уже соответствует состоянию «полоса видима» и после её появления
+    /// высота не растёт (нет обратной связи «полоса → перенос → полоса»).
+    /// </summary>
+    /// <param name="bodyWidth">Доступная ширина тела без полосы, DIP.</param>
+    /// <param name="scrollBarVisible">Резервировать ли ширину полосы при измерении.</param>
+    /// <param name="scrollBarWidth">Ширина полосы, DIP.</param>
+    public static double MeasureContentWidth(
+        double bodyWidth, bool scrollBarVisible, double scrollBarWidth = DefaultScrollBarWidth)
+    {
+        var width = bodyWidth > 0 ? bodyWidth : 0;
+        return Math.Max(0, width - ScrollBarWidth(scrollBarVisible, scrollBarWidth));
+    }
+
+    /// <summary>
+    /// Высота, доступная телу диалога для прокрутки (viewport): высота клиентской
+    /// области минус внешние отступы, высота панели кнопок и зазор над ней.
+    /// Панель кнопок всегда закреплена снизу и в прокрутке не участвует.
+    /// </summary>
+    /// <param name="clientHeight">Высота клиентской области окна, DIP.</param>
+    /// <param name="verticalPadding">Суммарные внешние отступы тела по вертикали, DIP.</param>
+    /// <param name="buttonPanelHeight">Высота панели кнопок, DIP.</param>
+    /// <param name="buttonGap">Зазор между телом и панелью кнопок, DIP.</param>
+    public static double MeasureContentHeight(
+        double clientHeight,
+        double verticalPadding,
+        double buttonPanelHeight,
+        double buttonGap)
+    {
+        var height = clientHeight > 0 ? clientHeight : 0;
+        return Math.Max(0,
+            height
+            - (verticalPadding > 0 ? verticalPadding : 0)
+            - (buttonPanelHeight > 0 ? buttonPanelHeight : 0)
+            - (buttonGap > 0 ? buttonGap : 0));
     }
 }

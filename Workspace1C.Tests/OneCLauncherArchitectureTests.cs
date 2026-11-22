@@ -151,6 +151,9 @@ public sealed class OneCLauncherArchitectureTests
     [Fact]
     public void ResolveBinDirectory_Explicit32_CustomPath_FindsX86Platform()
     {
+#if LINUX
+        return; // Windows-раскладка платформы (1cv8.exe/x86) неприменима в Linux-сборке
+#endif
         // Пользовательский каталог участвует в поиске 32-битной платформы:
         // база с явной «32» и глобальным X64 должна найти x86-платформу из доп. пути.
         using var temp = new TempDirectory();

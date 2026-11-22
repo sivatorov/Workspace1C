@@ -26,6 +26,12 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
     /// <summary>Имя файла компоновки меню (рядом с настройками приложения).</summary>
     public const string FileName = "utilities_menu_layout.json";
 
+    /// <summary>
+    /// Имя резервной копии исходного файла перед миграцией схемы 1 → 2 (issue #146):
+    /// пользователь может вернуть старую структуру вручную.
+    /// </summary>
+    public const string BackupFileName = "utilities_menu_layout.v1.backup.json";
+
     /// <param name="profileService">Профиль для определения каталога данных (может быть null).</param>
     /// <param name="directoryOverride">Явный каталог хранения вместо каталога данных
     /// (используется в юнит-тестах для изоляции от реальных данных профиля).</param>
@@ -62,9 +68,15 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
         {
             var json = File.ReadAllText(FilePath);
             var layout = JsonSerializer.Deserialize<UtilitiesMenuLayout>(json, _jsonOptions);
-            // Миграция компоновок версии 1 (плоское меню до 1.0.1.99) в разделы:
-            // настройки видимости/иконок переносятся по ItemId, функции не теряются.
-            return UtilitiesMenuLayouts.Migrate(Normalize(layout));
+            var normalized = Normalize(layout);
+            // Issue #146: перед миграцией схемы 1 → 2 сохраняем исходный файл рядом,
+            // чтобы пользователь мог вернуть прежнюю структуру. Резервная копия
+            // создаётся один раз и не перезаписывает более раннюю.
+            if (UtilitiesMenuLayouts.NeedsMigration(normalized))
+                WriteBackup(json);
+            // Миграция сохраняет пользовательское дерево (группы, порядок, видимость,
+            // иконки и цвета), добавляя только недостающие функции каталога.
+            return UtilitiesMenuLayouts.Migrate(normalized);
         }
         catch
         {
@@ -72,6 +84,50 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
             // построитель меню использует стандартную компоновку. Сам файл на диске
             // не трогаем (пользователь сможет его поправить вручную).
             return null;
+        }
+    }
+
+    /// <summary>
+    /// True — по указанному каталогу лежит читаемый файл компоновки (issue #146).
+    /// Используется миграцией настроек: наличие пользовательской компоновки включает
+    /// правку структуры меню, если пользователь ещё не сохранял этот флаг.
+    /// </summary>
+    public static bool HasValidLayoutFile(string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            return false;
+        var path = Path.Combine(directory!, FileName);
+        if (!File.Exists(path))
+            return false;
+        try
+        {
+            using var _ = JsonDocument.Parse(File.ReadAllText(path));
+            return true;
+        }
+        catch
+        {
+            // Битый/пустой файл не включает правку: стандартная компоновка надёжнее.
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Записывает резервную копию исходного JSON перед миграцией (issue #146).
+    /// Ошибки записи не мешают загрузке: миграция продолжится, а файл на диске
+    /// останется нетронутым (пользователь сможет поправить его вручную).
+    /// </summary>
+    private void WriteBackup(string json)
+    {
+        try
+        {
+            Directory.CreateDirectory(DataDirectory);
+            var backupPath = Path.Combine(DataDirectory, BackupFileName);
+            if (!File.Exists(backupPath))
+                File.WriteAllText(backupPath, json);
+        }
+        catch
+        {
+            // Резервная копия — вспомогательная операция, не роняем загрузку меню.
         }
     }
 

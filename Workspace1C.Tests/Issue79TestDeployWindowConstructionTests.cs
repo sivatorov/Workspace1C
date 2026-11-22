@@ -28,8 +28,20 @@ namespace Workspace1C.Tests;
 /// Avalonia-версия окна собирается только под #if LINUX и покрывается source-гвардами
 /// в <see cref="Issue79TestDeployWindowTests"/>.
 /// </summary>
-public sealed class Issue79TestDeployWindowConstructionTests
+public sealed class Issue79TestDeployWindowConstructionTests : IDisposable
 {
+    /// <summary>
+    /// Issue #146: <see cref="AppServices.Configure"/> регистрирует модули ПРО в глобальный
+    /// каталог «Утилит» (внешние пункты и иконки, которых может не быть в публичных
+    /// словарях). Сбрасываем это состояние после тестов класса, чтобы полный прогон
+    /// не зависел от порядка выполнения (падали TrayMenuIconCatalogTests/секции).
+    /// </summary>
+    public void Dispose()
+    {
+        Workspace1C.Services.UtilitiesMenuCatalog.ResetExternal();
+        Workspace1C.Services.Licensing.ProFeatures.ResetImplemented();
+    }
+
     private static Infobase MakeSource()
     {
         return new Infobase

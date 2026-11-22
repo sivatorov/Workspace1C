@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -21,6 +22,11 @@ public partial class UpdateAvailableWindow : Window
 {
     // Issue #139 (1.0.1.84): WM_NCHITTEST — попадание мыши в неклиентскую область окна.
     private const int WmNcHitTest = 0x0084;
+
+    // Issue #139 (1.0.1.102): отступ DockPanel (Margin="20") и зазор над панелью
+    // кнопок (Margin="0,20,0,0") из разметки — по ним считается доступная высота тела.
+    private const double BodyMargin = 20;
+    private const double ButtonGap = 20;
 
     private readonly UpdateService _service;
     private readonly ReleaseInfo _release;
@@ -290,10 +296,126 @@ public partial class UpdateAvailableWindow : Window
                 Height = height;
 
             UpdateLayout();
+
+            // Issue #139 (1.0.1.102): полоса прокрутки — только при реальном
+            // переполнении. Решение принимается после прохода раскладки и повторно
+            // проверяется, когда ширина тела уже учитывает ширину полосы.
+            UpdateVerticalScrollBarPolicy();
+            UpdateLayout();
+            StabilizeVerticalScrollBar();
         }
         catch
         {
             // Сбой измерения не должен ломать диалог: окно останется в текущем размере.
+        }
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.102): включает вертикальную полосу прокрутки тела диалога
+    /// только тогда, когда содержимое реально не помещается в доступную высоту.
+    /// Ширина измеряется с резервом под полосу
+    /// (<see cref="UpdateDialogSizePolicy.MeasureContentWidth"/>), поэтому после её
+    /// появления текст не начинает переноситься заново и высота не растёт
+    /// (нет обратной связи «полоса → уменьшение ширины → перенос → рост высоты»).
+    /// Панель кнопок закреплена в <see cref="DockPanel"/> снизу и в прокрутке не
+    /// участвует — она всегда видна.
+    /// </summary>
+    private void UpdateVerticalScrollBarPolicy()
+    {
+        if (ContentScroller.Content is not FrameworkElement body)
+            return;
+
+        try
+        {
+            var scrollBarWidth = SystemParameters.VerticalScrollBarWidth > 0
+                ? SystemParameters.VerticalScrollBarWidth
+                : UpdateDialogSizePolicy.DefaultScrollBarWidth;
+
+            // Ширина тела без полосы: после раскладки — фактическая, до показа —
+            // из рассчитанной ширины окна и отступов DockPanel.
+            var bodyWidth = ContentScroller.ActualWidth;
+            if (bodyWidth <= 0 && Content is FrameworkElement root && root.ActualWidth > 0)
+                bodyWidth = root.ActualWidth - 2 * BodyMargin;
+            if (bodyWidth <= 0 && !double.IsNaN(Width) && Width > 0)
+                bodyWidth = Width - ChromeWidth() - 2 * BodyMargin;
+            if (bodyWidth <= 0)
+                return;
+
+            var viewportHeight = ContentScroller.ViewportHeight;
+            if (viewportHeight <= 0)
+            {
+                var windowHeight = !double.IsNaN(Height) && Height > 0 ? Height : MaxHeight;
+                var clientHeight = Math.Max(0, windowHeight - ChromeHeight());
+                viewportHeight = UpdateDialogSizePolicy.MeasureContentHeight(
+                    clientHeight,
+                    verticalPadding: 2 * BodyMargin,
+                    buttonPanelHeight: VisibleButtonPanelHeight(bodyWidth),
+                    buttonGap: ButtonGap);
+            }
+
+            // Сначала измеряем при полной ширине: если помещается — полосы нет.
+            body.Measure(new Size(bodyWidth, double.PositiveInfinity));
+            var contentHeight = body.DesiredSize.Height;
+
+            var show = UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(
+                contentHeight, viewportHeight);
+
+            if (show)
+            {
+                // Полоса нужна — повторно измеряем уже с её шириной, чтобы перенос
+                // текста соответствовал реальной ширине и решение было устойчивым.
+                var measureWidth = UpdateDialogSizePolicy.MeasureContentWidth(
+                    bodyWidth, scrollBarVisible: true, scrollBarWidth);
+                body.Measure(new Size(measureWidth, double.PositiveInfinity));
+                show = UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(
+                    body.DesiredSize.Height, viewportHeight);
+            }
+
+            ContentScroller.VerticalScrollBarVisibility =
+                show ? ScrollBarVisibility.Auto : ScrollBarVisibility.Disabled;
+        }
+        catch
+        {
+            // Сбой измерения не должен скрывать содержимое: оставляем текущую политику.
+        }
+    }
+
+    /// <summary>
+    /// Высота видимой нижней панели кнопок при заданной ширине, DIP. Панель
+    /// измеряется тем же <c>WrapPanel</c>, поэтому учитывается перенос кнопок.
+    /// </summary>
+    private double VisibleButtonPanelHeight(double availableWidth)
+    {
+        FrameworkElement? panel =
+            OfferPanel.Visibility == Visibility.Visible ? OfferButtonsPanel :
+            RestartPanel.Visibility == Visibility.Visible ? RestartButtonsPanel :
+            null;
+
+        if (panel is null || panel.Visibility != Visibility.Visible)
+            return 0;
+
+        panel.Measure(new Size(Math.Max(0, availableWidth), double.PositiveInfinity));
+        return panel.DesiredSize.Height;
+    }
+
+    /// <summary>
+    /// Issue #139 (1.0.1.102): финальная проверка после прохода раскладки. Если
+    /// полоса включена, но фактическая высота содержимого уже помещается в viewport
+    /// (например, полоса сама спровоцировала лишний перенос), она выключается —
+    /// это разрывает обратную связь и не оставляет «пустую» полосу в обычном окне.
+    /// </summary>
+    private void StabilizeVerticalScrollBar()
+    {
+        if (ContentScroller.VerticalScrollBarVisibility != ScrollBarVisibility.Auto)
+            return;
+
+        if (ContentScroller.ExtentHeight <= 0 || ContentScroller.ViewportHeight <= 0)
+            return;
+
+        if (!UpdateDialogSizePolicy.ShouldShowVerticalScrollBar(
+                ContentScroller.ExtentHeight, ContentScroller.ViewportHeight))
+        {
+            ContentScroller.VerticalScrollBarVisibility = ScrollBarVisibility.Disabled;
         }
     }
 

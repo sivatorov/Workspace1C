@@ -24,7 +24,7 @@
 
     <Border Padding="0" CornerRadius="12" Background="{DynamicResource CardBackgroundBrush}">
         <DockPanel Margin="20">
-            <WrapPanel DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=OfferPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <WrapPanel x:Name="OfferButtonsPanel" DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=OfferPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                 <!-- Issue #116 (v1.0.1.58): когда файл обновления уже скачан в фоне
                      (режим «Загружать с предложением установки»), вместо «Скачать»
                      показывается «Установить» — она применяет готовый файл по
@@ -64,7 +64,7 @@
                     <TextBlock x:Name="CancelText" Text="{loc:Loc Update.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </Button>
             </WrapPanel>
-            <WrapPanel DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=RestartPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <WrapPanel x:Name="RestartButtonsPanel" DockPanel.Dock="Bottom" Visibility="{Binding Visibility, ElementName=RestartPanel}" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
                 <Button x:Name="RestartNowButton" Width="230" Height="34" Padding="0" IsDefault="True"
                         Style="{DynamicResource ModernButton}" Margin="0,0,10,0"
                         Click="OnRestartNowClick">
@@ -78,8 +78,12 @@
                                VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </Button>
             </WrapPanel>
+        <!-- Issue #139 (1.0.1.102): по умолчанию прокрутка отключена. Код-бихайнд
+             включает Auto только при реальном переполнении по высоте
+             (UpdateDialogSizePolicy.ShouldShowVerticalScrollBar), поэтому в обычном
+             состоянии справа нет полосы, а панель кнопок всегда видна. -->
         <ScrollViewer x:Name="ContentScroller"
-                      VerticalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
                       HorizontalScrollBarVisibility="Disabled"
                       Focusable="False">
             <Grid>

@@ -51,8 +51,12 @@
                    Foreground="{DynamicResource TextSecondaryBrush}" Text="{Binding SummaryText}"/>
 
         <!-- Таблица процессов 1С -->
+        <!-- issue #134 (1.0.1.102): таблица явно фокусируемая — окно ставит в неё
+             клавиатурный фокус после загрузки данных и первого прохода разметки,
+             поэтому Ctrl+A/стрелки/Enter работают без клика мышью. -->
         <DataGrid x:Name="ProcessesGrid" Grid.Row="2"
                   Style="{StaticResource ProcessesGridStyle}"
+                  Focusable="True"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                   SelectionMode="Extended" SelectionUnit="FullRow"

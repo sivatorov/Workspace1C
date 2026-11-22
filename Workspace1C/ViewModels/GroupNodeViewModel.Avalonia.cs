@@ -102,14 +102,17 @@ public class GroupNodeViewModel : ViewModelBase
             ? (!string.IsNullOrWhiteSpace(group.IconColor) ? group.IconColor : "#FFFFFF")
             : (defaultIconColor ?? "#FFFFFF");
         _icon = group?.Icon ?? defaultIcon ?? string.Empty;
-        // Аудит UI P1-2: строка группы больше не заливается насыщенным цветом —
-        // фон/текст/полоса вычисляются в ThemeManager из цвета группы и темы
-        // (пастель 14 %, полоса исходным цветом, текст по WCAG ≥ 4.5:1).
-        // Цвет иконки не адаптируется и остаётся исходным.
+        // Аудит UI P1-2 / issue #145: строка группы больше не заливается насыщенным
+        // цветом — фон/текст/полоса вычисляются в ThemeManager из цвета группы, темы
+        // и настраиваемой доли цвета (по умолчанию 30/45 %), полоса — исходным цветом,
+        // текст — по WCAG ≥ 4.5:1. Цвет иконки не адаптируется и остаётся исходным.
         IconBrush = GroupColorConverter.GetBrush(_iconColor);
         // Смена темы перекрашивает уже построенные строки сразу, без перезапуска:
         // узел уведомляет привязки о новых кистях (отписка — в Detach).
         Themes.ThemeManager.ThemeChanged += OnThemeChangedBrushes;
+        // Изменение долей цвета папки в настройках (issue #145) пересчитывает кисти
+        // уже построенных строк без перезапуска (отписка — в Detach).
+        Themes.ThemeManager.GroupRowTintChanged += OnThemeChangedBrushes;
         // Обработчики вынесены в поля-делегаты — Detach() (эксперимент A, 1.0.0.34)
         // должен иметь возможность отписаться при удалении узла из дерева.
         _onInfobasesChanged = (_, _) =>
@@ -141,8 +144,10 @@ public class GroupNodeViewModel : ViewModelBase
         _detached = true;
         Interlocked.Increment(ref s_totalDetachCount);
         // Аудит UI P1-2: узел больше не нужен дереву — снимаем подписку на смену
-        // темы, иначе статические узлы удерживали бы отрисованные строки.
+        // темы и на изменение долей цвета, иначе статические узлы удерживали бы
+        // отрисованные строки.
         Themes.ThemeManager.ThemeChanged -= OnThemeChangedBrushes;
+        Themes.ThemeManager.GroupRowTintChanged -= OnThemeChangedBrushes;
         // Поддерево узла не переиспользуется (дерево строгое, без общих поддеревьев) —
         // отписываем и дочерние узлы, чтобы коллекции не удерживали ни одного
         // обработчика узлов, ставших мусором после удаления корня.
@@ -195,15 +200,17 @@ public class GroupNodeViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Пастельный фон строки группы (аудит UI P1-2): цвет группы, смешанный с
-    /// ContentBackground темы в пропорции 14 %. Сплошная насыщенная заливка не
-    /// используется — красная строка группы не конкурирует с семантическим
-    /// «ошибка/опасность», зелёная — с акцентом темы.
+    /// Пастельный фон строки группы (аудит UI P1-2, issue #145): цвет группы,
+    /// смешанный с ContentBackground темы в настраиваемой доле «Доля цвета папки»
+    /// (по умолчанию 30 %). Сплошная насыщенная заливка не используется — красная
+    /// строка группы не конкурирует с семантическим «ошибка/опасность», зелёная —
+    /// с акцентом темы.
     /// </summary>
     public IBrush HeaderBrush => Themes.ThemeManager.GetGroupRowBackgroundBrush(_color);
 
-    /// <summary>Фон строки группы при наведении: та же пастель с долей 24 % —
-    /// hover заметен, но не превращается в сплошную заливку.</summary>
+    /// <summary>Фон строки группы при наведении: та же пастель с долей из настройки
+    /// «Доля цвета папки при наведении» (по умолчанию 45 %) — hover заметен, но не
+    /// превращается в сплошную заливку.</summary>
     public IBrush HeaderHoverBrush => Themes.ThemeManager.GetGroupRowHoverBrush(_color);
 
     /// <summary>Текст строки группы: TextPrimary темы или WCAG-контраст ≥ 4.5:1
@@ -472,6 +479,29 @@ public class GroupNodeViewModel : ViewModelBase
         string? displayName = null,
         string? marker = null)
     {
+        // Ранний выход (issue #21, 1.0.0.41; паритет с WPF-версией, issue #146):
+        // узел УЖЕ показывает ровно этот состав (тот же маркер/имя и те же экземпляры
+        // баз в том же порядке) — ничего не мутируем: ни Infobases, ни Items.
+        // Без этого повторный переход на плоскую вкладку давал Clear+Add и лавину
+        // CollectionChanged в Linux-сборке.
+        var sameMarker = string.Equals(_marker, marker, StringComparison.Ordinal);
+        var sameName = marker is not null
+            || string.Equals(_displayName, displayName, StringComparison.Ordinal);
+        if (sameMarker && sameName && Infobases.Count == infobases.Count)
+        {
+            var sameContent = true;
+            for (var i = 0; i < Infobases.Count; i++)
+            {
+                if (!ReferenceEquals(Infobases[i], infobases[i]))
+                {
+                    sameContent = false;
+                    break;
+                }
+            }
+            if (sameContent)
+                return;
+        }
+
         // Обновляем маркер и имя: для специальных узлов DisplayName вычисляется на лету
         // из ключа локализации, для фильтра — из переданного текста.
         _marker = marker;

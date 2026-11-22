@@ -117,6 +117,11 @@ public sealed class Issue83RingPathRegistryTests
     [Fact]
     public void FindRingInDirectories_FindsRingExe_InProvidedDirectory()
     {
+#if LINUX
+        // Windows-реестр/PATH: в Linux-сборке (в т.ч. кросс-сборке на Windows)
+        // сценарий неприменим.
+        return;
+#endif
         var existing = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             @"C:\Program Files\1cv8\8.3.27\bin\ring.exe"
@@ -196,6 +201,9 @@ public sealed class Issue83RingPathRegistryTests
     [Fact]
     public void UnavailableMessage_MentionsRegistryPathSources()
     {
+#if LINUX
+        return; // Windows-реестр, см. FindRingInDirectories_FindsRingExe_InProvidedDirectory
+#endif
         // issue #83: сообщение вкладки «Лицензии» перечисляет проверенные источники PATH.
         var message = RingLicenseService.BuildUnavailableMessage();
 

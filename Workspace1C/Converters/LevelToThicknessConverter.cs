@@ -29,9 +29,10 @@ public class LevelToThicknessConverter : IMultiValueConverter
     /// <summary>
     /// Вертикальный отступ полосы-идентификатора группы (px). Полоса рисуется внутри
     /// скруглённой рамки строки; без отступа её прямые торцы выходили за скруглённые
-    /// углы и «торчали» из рамки (issue #145).
+    /// углы и «торчали» из рамки (issue #145). Оставлен как публичный алиас
+    /// <see cref="GroupRowStripeLayout.VerticalInset"/> для обратной совместимости.
     /// </summary>
-    public const double GroupStripeVerticalInset = 4.0;
+    public const double GroupStripeVerticalInset = GroupRowStripeLayout.VerticalInset;
 
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
     {
@@ -57,25 +58,30 @@ public class LevelToThicknessConverter : IMultiValueConverter
         }
         else if (string.Equals(param, "group-hl", StringComparison.OrdinalIgnoreCase))
         {
-            // Подсветка/фон заголовка группы: тот же сдвиг, что у названия ("group"), но с зазором
-            // HighlightGap, чтобы карточка группы начиналась сразу после кнопки свернуть/развернуть
-            // (оформление 0.3.5.1) и не заходила под кнопку и левее неё.
-            offset = level * IndentStep + ExpanderWidth - HighlightGap;
+            // Фон/подсветка заголовка группы (issue #145): начинается сразу после
+            // кнопки свернуть/развернуть. Вычитаем левое поле рамки строки
+            // (WpfRowPadding), т.к. смещение задаётся внутри её содержимого.
+            offset = level * IndentStep + ExpanderWidth - GroupRowStripeLayout.WpfRowPadding;
         }
         else if (string.Equals(param, "group-stripe", StringComparison.OrdinalIgnoreCase))
         {
             // Аудит UI P1-2 / issue #145: вертикальная полоса 3 px исходным цветом
-            // группы. Тот же сдвиг, что у фона строки ("group-hl"), плюс 2 px —
-            // полоса рисуется внутри рамки толщиной 2. Вертикальный отступ не даёт
-            // торцам полосы выходить за скруглённые углы рамки.
-            offset = level * IndentStep + ExpanderWidth - HighlightGap + 2;
-            return new Thickness(offset, GroupStripeVerticalInset, 0, GroupStripeVerticalInset);
+            // группы. Левый край = правый край кнопки разворота + Gap; содержимое
+            // строки сдвинуто на ContentOffset = StripeWidth + 2*Gap, поэтому зазоры
+            // слева и справа одинаковы (GroupRowStripeLayout). Вертикальный отступ
+            // не даёт торцам полосы выходить за скруглённые углы рамки.
+            offset = level * IndentStep + ExpanderWidth - GroupRowStripeLayout.WpfRowPadding
+                + GroupRowStripeLayout.Gap;
+            return new Thickness(offset, GroupRowStripeLayout.VerticalInset, 0,
+                GroupRowStripeLayout.VerticalInset);
         }
         else if (string.Equals(param, "group", StringComparison.OrdinalIgnoreCase))
         {
-            // Заголовок группы: сдвиг названия по уровню + ширина расширителя,
-            // чтобы название начиналось сразу после кнопки разворота.
-            offset = level * IndentStep + ExpanderWidth;
+            // Заголовок группы: сдвиг названия по уровню + ширина расширителя +
+            // ContentOffset (полоса и одинаковые зазоры слева/справа), чтобы иконка
+            // папки начиналась после цветного разделителя (issue #145).
+            offset = level * IndentStep + ExpanderWidth - GroupRowStripeLayout.WpfRowPadding
+                + GroupRowStripeLayout.ContentOffset;
         }
         else
         {
