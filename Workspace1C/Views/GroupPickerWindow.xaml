@@ -177,8 +177,7 @@
                     <Button x:Name="ClearSearch" Grid.Column="2" Background="Transparent" BorderThickness="0"
                             Padding="4,0" Cursor="Hand" Visibility="Collapsed" Click="OnClearSearch_Click"
                             ToolTip="{loc:Loc Main.ClearSearch}">
-                        <materialDesign:PackIcon Kind="Close" Width="13" Height="13"
-                                                 Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="13" Height="13"/>
                     </Button>
                 </Grid>
             </Border>
@@ -264,9 +263,7 @@
                         Height="38" MinWidth="116"
                         IsEnabled="False" Click="OnSelect_Click" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
-                                                 Margin="0,0,6,0"
-                                                 VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Select}" VerticalAlignment="Center"
                                    FontWeight="SemiBold"/>
                     </StackPanel>
@@ -274,9 +271,7 @@
                 <Button Style="{StaticResource SecondaryButton}" Height="38" MinWidth="116"
                         IsCancel="True" Click="OnCancel_Click">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Close" Width="15" Height="15"
-                                                 Margin="0,0,6,0"
-                                                 VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="15" Height="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"
                                    FontWeight="SemiBold"/>
                     </StackPanel>

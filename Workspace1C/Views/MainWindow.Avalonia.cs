@@ -1123,16 +1123,11 @@ namespace Workspace1C
                     sectionIcon = "IconMenu";
                 var sectionTitle = LocalizationManager.T(section.TitleKey);
 
-                var sectionBtn = new Button
-                {
-                    Content = ThemedIconAndText(sectionIcon, sectionTitle, "TextSecondaryColorBrush",
-                        UiMetrics.ScaledFont(13), centered: false),
-                    Padding = new Thickness(UiMetrics.ButtonPadH, UiMetrics.ButtonPadV),
-                    HorizontalContentAlignment = HorizontalAlignment.Center
-                };
-                sectionBtn.Styled(Themes.ControlThemes.IconButton);
-                ToolTip.SetTip(sectionBtn, sectionTitle);
-                UiAutomation.SetNameFromTip(sectionBtn);
+                // issue #146 (1.0.1.103): кнопки разделов — только иконка с подсказкой,
+                // без текста, чтобы панель не переносилась на вторую строку при
+                // минимальной ширине окна (как в WPF).
+                var sectionBtn = TopBarIconButton(sectionIcon, sectionTitle,
+                    themeBrushKey: "TextSecondaryColorBrush");
                 var id = section.SectionId;
                 // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
                 sectionBtn.PointerPressed += (_, e) =>

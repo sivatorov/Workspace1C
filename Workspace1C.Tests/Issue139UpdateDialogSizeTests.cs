@@ -28,17 +28,19 @@ public sealed class Issue139UpdateDialogSizeTests
     [Fact]
     public void Clamp_RespectsSmallWorkArea()
     {
-        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 700, 500);
+        // Рабочая область уже максимальной ширины окна, но шире MinWidth (680),
+        // поэтому клампинг по рабочей области остаётся заметным.
+        var size = UpdateDialogSizePolicy.Clamp(1000, 900, 900, 500);
 
-        var expectedWidth = 700 - 2 * UpdateDialogSizePolicy.WorkAreaMargin;
+        var expectedWidth = 900 - 2 * UpdateDialogSizePolicy.WorkAreaMargin;
         var expectedHeight = 500 - 2 * UpdateDialogSizePolicy.WorkAreaMargin;
         Assert.Equal(expectedWidth, size.Width);
         Assert.Equal(expectedHeight, size.Height);
+
         // Окно целиком помещается в рабочую область с отступами по краям.
-        Assert.True(size.Width <= 700 - 2 * UpdateDialogSizePolicy.WorkAreaMargin);
+        Assert.True(size.Width <= 900 - 2 * UpdateDialogSizePolicy.WorkAreaMargin);
         Assert.True(size.Height <= 500 - 2 * UpdateDialogSizePolicy.WorkAreaMargin);
     }
-
     [Fact]
     public void Clamp_NeverBelowMinWidth()
     {
@@ -326,11 +328,12 @@ public sealed class Issue139UpdateDialogSizeTests
         // обрезание снизу после переноса кнопок.
         Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
-        // Issue #139 (1.0.1.97): 600 DIP — строка кнопок перезапуска без переноса.
-        Assert.Contains("MinWidth=\"600\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth=\"760\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"140\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.103): окно увеличено, чтобы описание релиза читалось
+        // без полосы прокрутки; строка кнопок по-прежнему без переноса.
+        Assert.Contains("MinWidth=\"680\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth=\"900\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"760\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MinHeight=\"160\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -529,12 +532,12 @@ public sealed class Issue139UpdateDialogSizeTests
         // Кнопки диалога — в WrapPanel, а не в горизонтальном StackPanel.
         Assert.Contains("new WrapPanel", window, StringComparison.Ordinal);
 
-        // Issue #139 (1.0.1.97): ширина согласована с политикой (600 DIP).
-        Assert.Contains("MinWidth = 600;", window, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.103): ширина согласована с политикой (680 DIP).
+        Assert.Contains("MinWidth = 680;", window, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth = 900;", window, StringComparison.Ordinal);
         // Issue #139 (1.0.1.95): высота ограничена и считается явно, авторазмер
         // по обеим осям убран (он не учитывал перенос кнопок WrapPanel).
-        Assert.Contains("MaxHeight = 640;", window, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight = 760;", window, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
         Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);

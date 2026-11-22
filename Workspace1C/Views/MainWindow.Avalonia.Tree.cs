@@ -2742,16 +2742,9 @@ namespace Workspace1C
 
             AppendAvaloniaNodes(menu.Items, layout.Root);
 
-            // Сноска к пометке PRO (навигация 1.0.1.99): звёздочка рядом с названием
-            // означает функцию редакции PRO. Пункт отключён и не мешает навигации.
-            menu.Items.Add(MenuSeparator());
-            var footnote = new MenuItem
-            {
-                Header = LocalizationManager.T("Pro.Footnote"),
-                IsEnabled = false
-            };
-            footnote.Styled(Themes.ControlThemes.ModernMenuItem);
-            menu.Items.Add(footnote);
+            // issue #146 (1.0.1.103): сноска «* — доступно в версии PRO» убрана
+            // (непонятно, к какому пункту относится); у закрытых функций остаётся
+            // подсказка о редакции PRO.
 
             // Меню строится один раз при старте (в отличие от WPF, где оно пересобирается
             // при каждом открытии), поэтому динамическую доступность «Отменить последнюю

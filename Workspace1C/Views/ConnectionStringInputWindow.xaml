@@ -72,16 +72,14 @@
                         IsDefault="True" Click="OnOk_Click"
                         Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Check" Width="16" Height="16"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Apply}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
                 <Button Width="140" Height="38" IsCancel="True"
                         Style="{DynamicResource SecondaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Close" Width="16" Height="16"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>

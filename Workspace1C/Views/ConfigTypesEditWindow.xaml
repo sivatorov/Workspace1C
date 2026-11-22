@@ -102,7 +102,7 @@
             <Button Grid.Column="1" Margin="8,0,0,0" Height="32" Style="{StaticResource SecondaryButton}" FontWeight="SemiBold"
                     Click="OnClearSearchClick" ToolTip="{loc:Loc Updates.ClearSearch}">
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Close" Width="14" Height="14"/>
+                    <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="14" Height="14"/>
                     <TextBlock Text="{loc:Loc Updates.ClearSearch}" Margin="4,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

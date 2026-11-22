@@ -829,6 +829,16 @@
         <Style Selector="^:pointerover:not(:selected) /template/ Border#PART_GroupSurface">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
+        <!-- issue #149: текущий раздел «Настройки» тоже подсвечивается — мягкий фон
+             и акцентная полоса слева; плотная плашка остаётся у выбранной подвкладки. -->
+        <Style Selector="^:selected /template/ Border#PART_GroupSurface">
+            <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="BorderThickness" Value="3,0,0,0"/>
+        </Style>
+        <Style Selector="^:selected">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+        </Style>
         <Style Selector="^:disabled">
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
         </Style>

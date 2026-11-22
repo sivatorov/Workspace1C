@@ -120,9 +120,7 @@
                     IsCancel="True"
                     Click="OnClose_Click">
                 <StackPanel Orientation="Horizontal">
-                    <materialDesign:PackIcon Kind="Close" Width="14" Height="14"
-                        Foreground="{DynamicResource TextPrimaryBrush}"
-                        VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="14" Height="14" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Close}" Margin="6,0,0,0"
                                VerticalAlignment="Center"/>
                 </StackPanel>

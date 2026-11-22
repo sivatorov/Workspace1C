@@ -38,6 +38,14 @@ namespace Workspace1C
         /// </summary>
         private bool _gridHadKeyboardFocus;
 
+        /// <summary>
+        /// После завершения процесса фокус нужно вернуть в таблицу даже тогда, когда
+        /// она опустела или диалог подтверждения сбросил <see cref="_gridHadKeyboardFocus"/>
+        /// (issue #134, замечание 7OH от 22.11.2026). Сбрасывается после восстановления
+        /// строк или по таймеру-страховке.
+        /// </summary>
+        private bool _restoreFocusAfterKill;
+
         /// <summary>Фокус уже успешно установлен при открытии — повторные попытки не нужны.</summary>
         private bool _focusApplied;
 
@@ -180,7 +188,46 @@ namespace Workspace1C
 
         private void OnRefresh_Click(object sender, RoutedEventArgs e) => _vm.Refresh();
 
-        private void OnKillProcess_Click(object sender, RoutedEventArgs e) => _vm.KillSelectedMany();
+        private void OnKillProcess_Click(object sender, RoutedEventArgs e) => KillSelectedAndRestoreFocus();
+
+        /// <summary>
+        /// Завершает выбранные процессы и гарантированно возвращает фокус в таблицу
+        /// (issue #134, 1.0.1.103). Диалог подтверждения на время забирает фокус,
+        /// а при удалении последней строки DataGrid теряет его совсем — из-за этого
+        /// клавиатурная навигация «умирала» до следующего клика мышью.
+        /// </summary>
+        private void KillSelectedAndRestoreFocus()
+        {
+            _restoreFocusAfterKill = true;
+            _gridHadKeyboardFocus = true;
+            _vm.KillSelectedMany();
+            QueueGridFocusAfterKill();
+        }
+
+        /// <summary>
+        /// Немедленная и отложенная установка фокуса после завершения процесса:
+        /// таблица может быть пустой, но фокус всё равно должен остаться в ней.
+        /// </summary>
+        private void QueueGridFocusAfterKill()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!IsLoaded)
+                    return;
+                ProcessesGrid.Focus();
+                Keyboard.Focus(ProcessesGrid);
+            }), DispatcherPriority.Input);
+
+            // Страховка: если автообновление не изменило набор строк и событие
+            // SelectionRestored не придёт, флаг не должен влиять на будущие обновления.
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                _restoreFocusAfterKill = false;
+            };
+            timer.Start();
+        }
 
         private void OnClose_Click(object sender, RoutedEventArgs e) => Close();
 
@@ -196,7 +243,7 @@ namespace Workspace1C
             // выбранные процессы (с подтверждением), а не активирует базу в
             // главном списке, до которого из модального окна не добраться.
             if (ProcessesGrid.SelectedItem is ProcessRowViewModel)
-                _vm.KillSelectedMany();
+                KillSelectedAndRestoreFocus();
         }
 
         /// <summary>
@@ -218,7 +265,7 @@ namespace Workspace1C
             if (ProcessesGrid.SelectedItem is not ProcessRowViewModel)
                 return;
             e.Handled = true;
-            _vm.KillSelectedMany();
+            KillSelectedAndRestoreFocus();
         }
 
         /// <summary>Клавиши навигации по таблице (issue #134, 1.0.1.102).</summary>
@@ -376,7 +423,11 @@ namespace Workspace1C
             if (ProcessesGrid.SelectedItems is null)
                 return;
 
-            var hadFocus = _gridHadKeyboardFocus || ProcessesGrid.IsKeyboardFocusWithin;
+            // issue #134 (1.0.1.103): после завершения процесса фокус возвращаем
+            // принудительно, даже если таблица опустела и _gridHadKeyboardFocus
+            // был сброшен диалогом подтверждения.
+            var forceFocus = _restoreFocusAfterKill;
+            var hadFocus = forceFocus || _gridHadKeyboardFocus || ProcessesGrid.IsKeyboardFocusWithin;
 
             var desired = _vm.SelectedRows.ToList();
             var current = ProcessesGrid.SelectedItems.OfType<ProcessRowViewModel>().ToList();
@@ -391,16 +442,21 @@ namespace Workspace1C
             }
 
             if (!hadFocus || ProcessesGrid.IsKeyboardFocusWithin)
+            {
+                if (ProcessesGrid.IsKeyboardFocusWithin)
+                    _restoreFocusAfterKill = false;
                 return;
+            }
 
             // Реальные изменения пересоздали контейнеры — возвращаем фокус и текущую строку.
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (!_gridHadKeyboardFocus && !ProcessesGrid.IsKeyboardFocusWithin)
+                if (!_gridHadKeyboardFocus && !ProcessesGrid.IsKeyboardFocusWithin && !forceFocus)
                     return;
                 ProcessesGrid.Focus();
                 Keyboard.Focus(ProcessesGrid);
-                SetCurrentRow(_vm.SelectedRow);
+                SetCurrentRow(_vm.SelectedRow ?? ProcessesGrid.Items.OfType<ProcessRowViewModel>().FirstOrDefault());
+                _restoreFocusAfterKill = false;
             }), DispatcherPriority.Input);
         }
     }

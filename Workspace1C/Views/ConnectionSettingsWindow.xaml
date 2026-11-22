@@ -1513,7 +1513,7 @@
                         IsEnabled="{Binding HasChanges}"
                         Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ContentSave" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
@@ -1521,7 +1521,7 @@
                         KeyboardNavigation.TabIndex="1000"
                         Style="{DynamicResource SecondaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>

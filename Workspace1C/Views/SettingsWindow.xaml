@@ -246,6 +246,16 @@
                                 </MultiTrigger.Conditions>
                                 <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
                             </MultiTrigger>
+                            <!-- issue #149: у первой вкладки-раздела «Настройки» тоже должна
+                                 быть видна подсветка текущего раздела. Используем мягкий фон
+                                 ItemHoverBrush и акцентную полосу слева — подвкладка внутри
+                                 остаётся единственным «плотно» выбранным пунктом. -->
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="3,0,0,0"/>
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                            </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                             </Trigger>
@@ -1372,17 +1382,13 @@
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                                         <Button Style="{DynamicResource ModernButton}" Padding="12,5" Margin="0,0,8,0">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Check" Width="14" Height="14"
-                                                                         Foreground="{DynamicResource TextOnAccentBrush}"
-                                                                         Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource TextOnAccentBrush}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Common.Apply}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
                                         <Button Style="{DynamicResource SecondaryButton}" Padding="12,5">
                                             <StackPanel Orientation="Horizontal">
-                                                <materialDesign:PackIcon Kind="Close" Width="14" Height="14"
-                                                                         Foreground="{DynamicResource TextPrimaryBrush}"
-                                                                         Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="14" Height="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
@@ -3291,7 +3297,7 @@
                         KeyboardNavigation.TabIndex="900"
                         Style="{DynamicResource PrimaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="ContentSave" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>
@@ -3299,7 +3305,7 @@
                         KeyboardNavigation.TabIndex="1000"
                         Style="{DynamicResource SecondaryButton}">
                     <StackPanel Orientation="Horizontal">
-                        <materialDesign:PackIcon Kind="Close" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                     </StackPanel>
                 </Button>

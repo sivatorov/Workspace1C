@@ -89,12 +89,12 @@ public sealed class ContextMenuProBadgeTests : IDisposable
     }
 
     /// <summary>
-    /// Бейдж «· ПРО» на TestDeploy/MassLoadCf — только в сценарии 2.x
-    /// (<see cref="VersionInfo.MajorOverride"/> = 2): в ветке 1.x функции публичного
-    /// ядра бесплатны и бейдж не показывается (issue #106).
+    /// С issue #146 (1.0.1.103) бейдж «*» больше не добавляется ни в одной ветке:
+    /// он не объяснял, к какому пункту относится, и оставался в меню даже при
+    /// действующей лицензии. Доступность функции проверяет сама команда.
     /// </summary>
     [Fact]
-    public void DisplayText_WithoutLicense_ShowsProBadge()
+    public void DisplayText_WithoutLicense_HasNoProBadge()
     {
         Assert.False(EditionService.IsPro);
         VersionInfo.MajorOverride = 2; // поведение 2.x: public core снова требует ключ
@@ -105,9 +105,8 @@ public sealed class ContextMenuProBadgeTests : IDisposable
             var testDeploy = ContextMenuCatalog.Find("TestDeploy")!;
             var massLoadCf = ContextMenuCatalog.Find("MassLoadCf")!;
 
-            // Тот же формат суффикса, что в UtilitiesMenuItem.DisplayText: « *».
-            Assert.EndsWith(" " + badge, testDeploy.DisplayText(), StringComparison.Ordinal);
-            Assert.EndsWith(" " + badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
+            Assert.DoesNotContain(badge, testDeploy.DisplayText(), StringComparison.Ordinal);
+            Assert.DoesNotContain(badge, massLoadCf.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {

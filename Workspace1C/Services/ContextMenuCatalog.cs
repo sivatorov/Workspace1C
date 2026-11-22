@@ -209,14 +209,11 @@ public sealed class ContextMenuItem
     /// </summary>
     public Licensing.ProFeature? RequiredFeature { get; }
 
-    /// <summary>Заголовок пункта с отметкой «*», если функция закрыта лицензией.</summary>
-    public string DisplayText()
-    {
-        var text = Localization.LocalizationManager.T(TextKey);
-        if (RequiredFeature is { } feature && !Licensing.EditionService.Has(feature))
-            text += " " + Localization.LocalizationManager.T("Pro.Badge");
-        return text;
-    }
+    /// <summary>
+    /// Заголовок пункта. С issue #146 (1.0.1.103) без отметки «*»: она не объясняла,
+    /// к какому пункту относится. Доступность функции проверяет сама команда.
+    /// </summary>
+    public string DisplayText() => Localization.LocalizationManager.T(TextKey);
 }
 
 /// <summary>

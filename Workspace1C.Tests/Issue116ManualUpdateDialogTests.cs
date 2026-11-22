@@ -43,8 +43,8 @@ public sealed class Issue116ManualUpdateDialogTests
         // высота 320 больше не держит пустое место. Issue #139 (1.0.1.95):
         // авторазмер по обеим осям заменён явным расчётом высоты (см. код-бихайнд).
         Assert.DoesNotContain("SizeToContent=\"WidthAndHeight\"", xaml, StringComparison.Ordinal);
-        // Issue #139 (1.0.1.97): 600 DIP — строка кнопок без переноса.
-        Assert.Contains("MinWidth=\"600\"", xaml, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.103): 680 DIP — окно шире, строка кнопок без переноса.
+        Assert.Contains("MinWidth=\"680\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("MinHeight=\"320\"", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent=\"Height\"", xaml, StringComparison.Ordinal);
     }

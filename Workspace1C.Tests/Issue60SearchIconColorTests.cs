@@ -78,13 +78,13 @@ public sealed class Issue60SearchIconColorTests
         var region = xaml.Substring(tagStart, regionEnd - tagStart);
 
         var searchTag = ExtractPackIconTag(region, region.IndexOf("Kind=\"Magnify\"", StringComparison.Ordinal));
-        var closeIdx = region.IndexOf("Kind=\"Close\"", StringComparison.Ordinal);
-        Assert.True(closeIdx >= 0, "Крестик очистки Close не найден в области поля поиска.");
-        var closeTag = ExtractPackIconTag(region, closeIdx);
 
         // Инвариант issue #60: обе иконки используют одну и ту же кисть темы.
+        // Issue #147 (1.0.1.103): крестик очистки — векторный Path с IconClose,
+        // а не шрифтовой PackIcon; кисть задаётся через Fill.
         Assert.Contains("TextSecondaryBrush", searchTag, StringComparison.Ordinal);
-        Assert.Contains("TextSecondaryBrush", closeTag, StringComparison.Ordinal);
+        Assert.Contains("Data=\"{DynamicResource IconClose}\"", region, StringComparison.Ordinal);
+        Assert.Contains("Fill=\"{DynamicResource TextSecondaryBrush}\"", region, StringComparison.Ordinal);
     }
 
     [Fact]

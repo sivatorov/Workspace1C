@@ -260,14 +260,12 @@ public sealed class UtilitiesMenuItem
     /// </summary>
     public Licensing.ProFeature? RequiredFeature { get; }
 
-    /// <summary>Заголовок пункта с отметкой «*», если функция закрыта лицензией.</summary>
-    public string DisplayText()
-    {
-        var text = Localization.LocalizationManager.T(TextKey);
-        if (RequiredFeature is { } feature && !Licensing.EditionService.Has(feature))
-            text += " " + Localization.LocalizationManager.T("Pro.Badge");
-        return text;
-    }
+    /// <summary>
+    /// Заголовок пункта. С issue #146 (1.0.1.103) без отметки «*»: она не объясняла,
+    /// к какому пункту относится, и оставалась в меню даже при действующей лицензии.
+    /// Доступность функции проверяется самой командой (ProGate) и подсказкой пункта.
+    /// </summary>
+    public string DisplayText() => Localization.LocalizationManager.T(TextKey);
 }
 
 /// <summary>
@@ -889,7 +887,9 @@ public static class UtilitiesMenuCatalog
                 "Broom", "IconBroom", "#F59E0B", UtilitiesMenuCommandKind.ClearCache),
             new("SyncIbases", "Main.SyncDetailedTooltip", GroupBaseLists,
                 "Sync", "IconSync", "#06B6D4", UtilitiesMenuCommandKind.SyncIbases),
-            new("CheckAvailability", "Main.CheckAvailabilityTooltip", GroupProcesses,
+            // issue #148: в меню — только название действия, без длинного пояснения
+            // (оно остаётся в подсказке кнопки панели).
+            new("CheckAvailability", "Main.CheckAvailabilityMenu", GroupProcesses,
                 "Sonar", "IconSonar", "#22C55E", UtilitiesMenuCommandKind.CheckAvailability),
             new("ToggleTheme", "Main.Theme", GroupApp,
                 "WeatherNight", "IconMoon", "#64748B", UtilitiesMenuCommandKind.ToggleTheme),

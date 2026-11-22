@@ -5,10 +5,10 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Title="{loc:Loc Update.NewVersionAvailable}"
         Icon="{StaticResource AppIcon}"
-        MaxWidth="760"
-        MaxHeight="640"
-        MinWidth="600"
-        MinHeight="140"
+        MaxWidth="900"
+        MaxHeight="760"
+        MinWidth="680"
+        MinHeight="160"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontFamily="Segoe UI"
@@ -117,12 +117,21 @@
                         </Hyperlink>
                     </TextBlock>
                     <TextBlock x:Name="WhatsNewLabel" Margin="0,14,0,4" FontWeight="SemiBold"/>
-                    <FlowDocumentScrollViewer x:Name="BodyViewer" MaxHeight="180"
-                                              VerticalScrollBarVisibility="Auto"
-                                              HorizontalScrollBarVisibility="Disabled"
-                                              IsToolBarVisible="False"
-                                              FontSize="12"
-                                              Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <!-- Issue #139 (1.0.1.103): описание релиза — в рамке-карточке, как
+                         в окне «Что нового». Высота тела увеличена: при прежних 180 DIP
+                         полоса прокрутки появлялась почти всегда, хотя текст почти
+                         помещался. Теперь окно больше (до 900×760), и обычное описание
+                         читается целиком без прокрутки. -->
+                    <Border Background="{DynamicResource CardBackgroundBrush}"
+                            BorderBrush="{DynamicResource BorderBrushColor}"
+                            BorderThickness="1" CornerRadius="6" Padding="10">
+                        <FlowDocumentScrollViewer x:Name="BodyViewer" MaxHeight="420"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled"
+                                                  IsToolBarVisible="False"
+                                                  FontSize="12"
+                                                  Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </Border>
 
                     <!-- Кнопки: «Скачать» слева, «Отмена» справа; между ними —
                          «Пропустить эту версию» (issue #116): версия не будет

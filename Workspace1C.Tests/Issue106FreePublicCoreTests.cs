@@ -158,8 +158,8 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
                 Assert.DoesNotContain(" " + badge, item!.DisplayText(), StringComparison.Ordinal);
             }
 
-            // Public core в 1.x бесплатен — бейдж исчезает; функции вне ядра
-            // (например AuditLog) остаются закрытыми и с бейджем.
+            // Public core в 1.x бесплатен; с 1.0.1.103 (issue #146) бейдж «*»
+            // не добавляется ни к одному пункту — ни public core, ни AuditLog.
             var utilityCoreItems = UtilitiesMenuCatalog.All
                 .Where(i => i.RequiredFeature is { } f && ProFeatures.IsInPublicCore(f)).ToList();
             Assert.NotEmpty(utilityCoreItems); // в каталоге есть пункты public core
@@ -169,7 +169,7 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
             var auditLogItem = UtilitiesMenuCatalog.All
                 .FirstOrDefault(i => i.RequiredFeature == ProFeature.AuditLog);
             if (auditLogItem is not null)
-                Assert.Contains(" " + badge, auditLogItem.DisplayText(), StringComparison.Ordinal);
+                Assert.DoesNotContain(" " + badge, auditLogItem.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {
@@ -235,9 +235,12 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
         }
     }
 
-    /// <summary>В сценарии 2.x бейдж «· ПРО» возвращается на пункты public core.</summary>
+    /// <summary>
+    /// В сценарии 2.x бейдж «*» тоже не показывается: с 1.0.1.103 он убран из меню
+    /// (issue #146), а закрытость функции определяется её командой и подсказкой.
+    /// </summary>
     [Fact]
-    public void Major2_Menus_ShowProBadgeOnPublicCoreItems()
+    public void Major2_Menus_HaveNoProBadgeOnAnyItems()
     {
         VersionInfo.MajorOverride = 2;
         EditionService.Reset();
@@ -250,14 +253,13 @@ public sealed class Issue106FreePublicCoreTests : IDisposable
             {
                 var item = ContextMenuCatalog.Find(id);
                 Assert.NotNull(item);
-                Assert.Contains(" " + badge, item!.DisplayText(), StringComparison.Ordinal);
+                Assert.DoesNotContain(" " + badge, item!.DisplayText(), StringComparison.Ordinal);
             }
 
-            // В 2.x бейдж возвращается на все ПРО-пункты, включая функции вне ядра.
             var utilityProItems = UtilitiesMenuCatalog.All.Where(i => i.RequiredFeature is not null).ToList();
             Assert.NotEmpty(utilityProItems);
             foreach (var item in utilityProItems)
-                Assert.Contains(" " + badge, item.DisplayText(), StringComparison.Ordinal);
+                Assert.DoesNotContain(" " + badge, item.DisplayText(), StringComparison.Ordinal);
         }
         finally
         {

@@ -78,16 +78,9 @@ public partial class MainWindow
 
         AppendNodes(menu.Items, layout.Root);
 
-        // Сноска к пометке PRO (навигация 1.0.1.99): звёздочка рядом с названием
-        // означает функцию редакции PRO. Пункт отключён и не мешает навигации.
-        menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem
-        {
-            Header = LocalizationManager.T("Pro.Footnote"),
-            IsEnabled = false,
-            Style = TryFindResource("ModernMenuItem") as Style
-        });
-
+        // issue #146 (1.0.1.103): сноска «* — доступно в версии PRO» убрана.
+        // Она не объясняла, к какому пункту относится, и путала пользователей;
+        // закрытые функции по-прежнему показывают подсказку о редакции PRO.
         return menu;
     }
 

@@ -395,8 +395,7 @@
                                     <Button Grid.Column="2" Command="{Binding ClearSearchCommand}"
                                             Background="Transparent" BorderThickness="0" Padding="6,0" Cursor="Hand"
                                             ToolTip="{loc:Loc Main.ClearSearch}" VerticalAlignment="Center">
-                                        <materialDesign:PackIcon Kind="Close" Width="12" Height="12"
-                                                                 Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="12" Height="12"/>
                                     </Button>
                                 </Grid>
                             </Border>
@@ -492,9 +491,7 @@
                                         ToolTip="{loc:Loc Main.ClearTagFilters}"
                                         Visibility="{Binding HasActiveTagFilter, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Close" Width="12" Height="12"
-                                                                 Foreground="{DynamicResource TextSecondaryBrush}"
-                                                                 Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Common.Clear}" FontSize="11"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
@@ -673,53 +670,36 @@
                                  раздел не показывается), ПКМ по любой кнопке открывает редактор,
                                  а при пользовательской компоновке без разделов показывается
                                  одна кнопка «Утилиты». -->
+                            <!-- Issue #146 (1.0.1.103): кнопки разделов — только иконка с подсказкой,
+                                 без текста. Иначе при минимальной ширине окна панель переносилась
+                                 на вторую строку. Название раздела доступно в ToolTip и в меню. -->
                             <Button x:Name="ServersSectionButton" Tag="Servers" Click="OnSectionMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Servers}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="ServerNetwork" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Servers}" FontSize="13"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                                <materialDesign:PackIcon Kind="ServerNetwork" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             </Button>
                             <Button x:Name="MaintenanceSectionButton" Tag="Maintenance" Click="OnSectionMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Maintenance}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Cog" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Maintenance}" FontSize="13"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                                <materialDesign:PackIcon Kind="Cog" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             </Button>
                             <Button x:Name="ToolsSectionButton" Tag="Tools" Click="OnSectionMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Tools}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Tune" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Tools}" FontSize="13"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                                <materialDesign:PackIcon Kind="Tune" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             </Button>
                             <Button x:Name="MoreSectionButton" Tag="More" Click="OnSectionMenuButton_Click"
                                     PreviewMouseRightButtonDown="OnUtilitiesButton_PreviewMouseRightButtonDown"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.More}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Utilities.Submenu.More}" FontSize="13"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                                <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             </Button>
                             <!-- Issue #146: пользовательская компоновка без разделов — одна
                                  рабочая кнопка «Утилиты» (показывается вместо четырёх). -->
@@ -728,14 +708,13 @@
                                     Visibility="Collapsed"
                                     Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
                                     Width="Auto" MinWidth="32" ToolTip="{loc:Loc Utilities.Submenu.Utilities}">
-                                <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
-                                        Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{loc:Loc Utilities.Submenu.Utilities}" FontSize="13"
-                                        Foreground="{DynamicResource TextSecondaryBrush}"
-                                        VerticalAlignment="Center" Margin="5,0,0,0"/>
-                                </StackPanel>
+                                <materialDesign:PackIcon Kind="Apps" Width="16" Height="16"
+                                    Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             </Button>
+                            <!-- Issue #146: разделитель перед быстрыми кнопками темы,
+                                 компактности и настроек — визуально отделяет их от меню. -->
+                            <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
+                                    Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
                             <!-- Issue #146: быстрые кнопки темы и компактного режима возвращены
                                  на панель (ранее были только в «Ещё» → «Блокировка»). -->
                             <Button Click="OnQuickThemeButton_Click" Style="{DynamicResource IconButton}"

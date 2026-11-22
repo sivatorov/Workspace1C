@@ -231,7 +231,7 @@ public sealed class Issue116ManualUpdateNoNotificationTests
         Assert.Contains("x:Name=\"ContentScroller\"", xaml, StringComparison.Ordinal);
         Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("MaxHeight=\"640\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight=\"760\"", xaml, StringComparison.Ordinal);
 
         var code = ReadProjectFile("Workspace1C", "Services", "UpdateAvailableWindow.xaml.cs");
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", code, StringComparison.Ordinal);
@@ -249,9 +249,9 @@ public sealed class Issue116ManualUpdateNoNotificationTests
         Assert.DoesNotContain("SizeToContent.WidthAndHeight", window, StringComparison.Ordinal);
         Assert.Contains("SizeToContent.Manual", window, StringComparison.Ordinal);
         Assert.Contains("UpdateDialogSizePolicy.ClampWindowHeight", window, StringComparison.Ordinal);
-        // Issue #139 (1.0.1.97): ширина согласована с политикой (600 DIP).
-        Assert.Contains("MinWidth = 600;", window, StringComparison.Ordinal);
-        Assert.Contains("MaxWidth = 760;", window, StringComparison.Ordinal);
+        // Issue #139 (1.0.1.103): ширина согласована с политикой (680 DIP).
+        Assert.Contains("MinWidth = 680;", window, StringComparison.Ordinal);
+        Assert.Contains("MaxWidth = 900;", window, StringComparison.Ordinal);
         Assert.Contains("CanResize = false;", window, StringComparison.Ordinal);
 
         var service = ReadProjectFile("Workspace1C", "Services", "AvaloniaDialogService.cs");
