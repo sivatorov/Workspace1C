@@ -9,10 +9,10 @@ namespace Workspace1C.Models;
 /// </summary>
 public enum UtilitiesMenuGroupDisplay
 {
-    /// <summary>Только иконка с подсказкой (значение по умолчанию).</summary>
+    /// <summary>Только иконка с подсказкой.</summary>
     Icon = 0,
 
-    /// <summary>Иконка и подпись группы.</summary>
+    /// <summary>Иконка и подпись группы (значение по умолчанию).</summary>
     IconWithLabel = 1
 }
 
@@ -60,13 +60,13 @@ public sealed class UtilitiesMenuNode
     public string? ExternalIconPath { get; set; }
 
     /// <summary>
-    /// Режим отображения группы (issue #146): «Иконка» (по умолчанию) или
-    /// «С надписью». В JSON пишется строкой (<c>"Icon"</c>/<c>"IconWithLabel"</c>),
+    /// Режим отображения группы (issue #146): «С надписью» (по умолчанию) или
+    /// «Иконка». В JSON пишется строкой (<c>"Icon"</c>/<c>"IconWithLabel"</c>),
     /// чтобы файл оставался читаемым при ручной правке; отсутствующее свойство
-    /// в старых файлах даёт значение по умолчанию.
+    /// в старых файлах даёт значение по умолчанию — с подписью.
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public UtilitiesMenuGroupDisplay DisplayMode { get; set; } = UtilitiesMenuGroupDisplay.Icon;
+    public UtilitiesMenuGroupDisplay DisplayMode { get; set; } = UtilitiesMenuGroupDisplay.IconWithLabel;
 
     /// <summary>Видимость узла (скрытые пункты не показываются в меню).</summary>
     public bool Visible { get; set; } = true;

@@ -982,7 +982,7 @@ public static class UtilitiesMenuLayouts
     /// 3 — перенос пользовательского меню в группу «Утилиты» и режим отображения
     /// группы (issue #146).
     /// </summary>
-    public const int CurrentSchemaVersion = 3;
+    public const int CurrentSchemaVersion = 4;
 
     /// <summary>
     /// Стандартная компоновка меню: четыре сценарных раздела вместо плоского списка.
@@ -1147,6 +1147,7 @@ public static class UtilitiesMenuLayouts
         if (layout?.Root is null || layout.Root.Count == 0)
             return Default();
 
+        var originalSchema = layout.SchemaVersion;
         layout.Root ??= new List<UtilitiesMenuNode>();
         if (!NeedsMigration(layout))
         {
@@ -1163,6 +1164,12 @@ public static class UtilitiesMenuLayouts
         // «подвешенными» в корне рядом с разделами — они переносятся в группу «Утилиты»,
         // которая показывается отдельной кнопкой и открывается одним уровнем.
         MoveUserRootNodesIntoUtilities(layout);
+
+        // 1.0.1.105: в 1.0.104 группы сохранялись с явным DisplayMode=Icon (дефолт),
+        // из-за чего в меню пропадали подписи. Для схем < 4 возвращаем подписи;
+        // явный выбор «Иконка», сделанный в схеме 4, сохраняется.
+        if (originalSchema < 4)
+            NormalizeGroupDisplayModes(layout.Root);
 
         AddMissingCatalogItems(layout);
 
@@ -1210,6 +1217,28 @@ public static class UtilitiesMenuLayouts
         {
             layout.Root.Remove(node);
             utilities.Children.Add(node);
+        }
+    }
+
+    /// <summary>
+    /// Возвращает группам режим «С надписью» (issue #146, регресс 1.0.104):
+    /// в 1.0.104 значение <see cref="UtilitiesMenuGroupDisplay.Icon"/> записывалось
+    /// как дефолт, поэтому реальное меню показывало только значки. Рекурсивно.
+    /// </summary>
+    private static void NormalizeGroupDisplayModes(IEnumerable<UtilitiesMenuNode>? nodes)
+    {
+        if (nodes is null)
+            return;
+        foreach (var node in nodes)
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal)
+                && node.DisplayMode == UtilitiesMenuGroupDisplay.Icon)
+            {
+                node.DisplayMode = UtilitiesMenuGroupDisplay.IconWithLabel;
+            }
+            NormalizeGroupDisplayModes(node.Children);
         }
     }
 

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.104-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.105-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.104**
-(полный прогон — **7703 юнит-теста**, включая тесты ПРО).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.105**
+(полный прогон — **7706 юнит-тестов**, включая тесты ПРО).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,12 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Подписи групп меню «Утилиты» вернулись (1.0.1.105, Windows и Linux)** —
+  режим отображения группы по умолчанию снова «С надписью»: разделы
+  «Обновления», «Приложение», «Справка» и другие группы показывают иконку и
+  текст, как в остальных меню. Компоновки, сохранённые 1.0.104 с явным `Icon`,
+  однократно мигрируются на подписи; явный выбор «Иконка» в новой схеме
+  сохраняется (#146).
 - **Веб-база: параметры `/WSN` и `/WSP` больше не теряются (1.0.1.104, Windows и
   Linux)** — ключи учётных данных веб-сервера распознаются справочником и
   автодополнением параметров запуска, а значения в кавычках привязываются к

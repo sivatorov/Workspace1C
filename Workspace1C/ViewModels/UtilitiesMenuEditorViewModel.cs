@@ -307,7 +307,9 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             Kind = "group",
             GroupId = null,
             CustomTitle = title,
-            DisplayMode = editParams?.DisplayMode ?? UtilitiesMenuGroupDisplay.Icon,
+            // По умолчанию новая группа показывается с подписью (1.0.1.105):
+            // режим «только иконка» выбирается явно в диалоге правки группы.
+            DisplayMode = editParams?.DisplayMode ?? UtilitiesMenuGroupDisplay.IconWithLabel,
         };
         ApplyIconToNode(group, editParams?.IconKey);
         var parent = IsGroup(SelectedItem) ? SelectedItem : null;

@@ -135,6 +135,79 @@ public sealed class Issue146UtilitiesMenuTests
     }
 
     /// <summary>
+    /// 1.0.1.105: группы по умолчанию показываются с подписью — исправление
+    /// регресса 1.0.104, когда в меню оставались только иконки.
+    /// </summary>
+    [Fact]
+    public void GroupDisplay_DefaultsToIconWithLabel()
+    {
+        var node = new UtilitiesMenuNode { Kind = "group", GroupId = null, CustomTitle = "Группа" };
+        Assert.Equal(UtilitiesMenuGroupDisplay.IconWithLabel, node.DisplayMode);
+
+        var layout = UtilitiesMenuGroupPresentation.Build(node, "Группа");
+        Assert.True(layout.ShowLabel);
+        Assert.Equal("Группа", layout.Header);
+    }
+
+    /// <summary>
+    /// 1.0.1.105: компоновка, сохранённая 1.0.104 с явным DisplayMode=Icon,
+    /// однократно переводится на режим «С надписью».
+    /// </summary>
+    [Fact]
+    public void Migrate_Schema3ExplicitIcon_RestoresLabels()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = 3,
+            Root = new List<UtilitiesMenuNode>
+            {
+                new()
+                {
+                    Kind = "group",
+                    GroupId = UtilitiesMenuCatalog.GroupServers,
+                    DisplayMode = UtilitiesMenuGroupDisplay.Icon,
+                    Children = new List<UtilitiesMenuNode>
+                    {
+                        new() { Kind = "item", ItemId = "ServerMonitor" }
+                    }
+                }
+            }
+        };
+
+        var migrated = UtilitiesMenuLayouts.Migrate(layout);
+        var servers = migrated.Root.First(n => n.GroupId == UtilitiesMenuCatalog.GroupServers);
+        Assert.Equal(UtilitiesMenuGroupDisplay.IconWithLabel, servers.DisplayMode);
+        Assert.True(UtilitiesMenuGroupPresentation.Build(servers, "Серверы").ShowLabel);
+    }
+
+    /// <summary>
+    /// 1.0.1.105: в актуальной схеме явный выбор «Иконка» сохраняется.
+    /// </summary>
+    [Fact]
+    public void Migrate_CurrentSchema_KeepsExplicitIcon()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = UtilitiesMenuLayouts.CurrentSchemaVersion,
+            Root = new List<UtilitiesMenuNode>
+            {
+                new()
+                {
+                    Kind = "group",
+                    GroupId = UtilitiesMenuCatalog.GroupServers,
+                    DisplayMode = UtilitiesMenuGroupDisplay.Icon,
+                    Children = new List<UtilitiesMenuNode>()
+                }
+            }
+        };
+
+        var migrated = UtilitiesMenuLayouts.Migrate(layout);
+        var servers = migrated.Root.First(n => n.GroupId == UtilitiesMenuCatalog.GroupServers);
+        Assert.Equal(UtilitiesMenuGroupDisplay.Icon, servers.DisplayMode);
+        Assert.False(UtilitiesMenuGroupPresentation.Build(servers, "Серверы").ShowLabel);
+    }
+
+    /// <summary>
     /// Хранилище делает резервную копию исходного файла перед миграцией схемы 1 → 2.
     /// </summary>
     [Fact]
