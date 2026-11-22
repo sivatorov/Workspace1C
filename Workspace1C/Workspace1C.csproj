@@ -88,9 +88,6 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(BuildLinux)' != 'true' and $([MSBuild]::IsOSPlatform('Windows'))">
-    <!-- Тестам нужны чистые функции протокола и сборки строки подключения. Публичными
-         их делать незачем: за пределами сборки они не имеют смысла. -->
-    <InternalsVisibleTo Include="Workspace1C.Tests" />
     <!-- Linux-подсистема автообновления собирается только на Linux (#if LINUX). Явно
          исключаем из Windows-сборки, чтобы она не попадала в компиляцию WPF. -->
     <Compile Remove="Services\UpdateService.Avalonia.cs" />
@@ -117,6 +114,12 @@
   <ItemGroup Condition="'$(BuildLinux)' != 'true' and $([MSBuild]::IsOSPlatform('Windows'))">
     <ApplicationDefinition Remove="App.xaml" />
     <Page Include="App.xaml" SubType="Designer" Generator="MSBuild:Compile" />
+  </ItemGroup>
+
+  <!-- Тестам нужны внутренние члены обеих сборок (Windows и Linux): правило выбора
+       версии платформы и разбор ibases.v8i проверяются на обеих платформах. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Workspace1C.Tests" />
   </ItemGroup>
 
   <!-- Пакеты: общие для обеих платформ -->
