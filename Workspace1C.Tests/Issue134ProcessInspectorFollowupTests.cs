@@ -68,7 +68,7 @@ public sealed class Issue134ProcessInspectorFollowupTests
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
         Assert.Contains("FocusGridAttempt(0)", code, StringComparison.Ordinal);
         Assert.Contains("Dispatcher.UIThread.Post(", code, StringComparison.Ordinal);
-        Assert.Contains("_grid.Focus()", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.Focus(NavigationMethod.Directional)", code, StringComparison.Ordinal);
         Assert.Contains("NotifyCollectionChangedAction.Add", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Opened += (_, _) => _grid.Focus();", code, StringComparison.Ordinal);
     }
@@ -99,7 +99,7 @@ public sealed class Issue134ProcessInspectorFollowupTests
 
         Assert.Contains("PreviewKeyDown += OnWindow_PreviewKeyDown;", code, StringComparison.Ordinal);
         Assert.Contains("OnWindow_PreviewKeyDown", code, StringComparison.Ordinal);
-        Assert.Contains("NavigateGridFromButton(e.Key)", code, StringComparison.Ordinal);
+        Assert.Contains("NavigateGridFromButton(navigation)", code, StringComparison.Ordinal);
         Assert.Contains("Key.Down", code, StringComparison.Ordinal);
         Assert.Contains("ProcessesGrid.IsKeyboardFocusWithin", code, StringComparison.Ordinal);
         Assert.Contains("if (ProcessesGrid.Items.Count > 0)", code, StringComparison.Ordinal);
@@ -116,9 +116,9 @@ public sealed class Issue134ProcessInspectorFollowupTests
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
 
-        Assert.Contains("KeyDown += OnWindow_KeyDown;", code, StringComparison.Ordinal);
+        Assert.Contains("AddHandler(KeyDownEvent, OnWindow_KeyDown, RoutingStrategies.Tunnel)", code, StringComparison.Ordinal);
         Assert.Contains("OnWindow_KeyDown", code, StringComparison.Ordinal);
-        Assert.Contains("NavigateGridFromButton(e.Key)", code, StringComparison.Ordinal);
+        Assert.Contains("NavigateGridFromButton(navigation)", code, StringComparison.Ordinal);
         Assert.Contains("Key.Down", code, StringComparison.Ordinal);
         Assert.Contains("_grid.IsKeyboardFocusWithin", code, StringComparison.Ordinal);
         Assert.Contains("if (_grid.ItemCount > 0)", code, StringComparison.Ordinal);

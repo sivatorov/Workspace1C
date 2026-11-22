@@ -28,6 +28,8 @@ namespace Workspace1C
             _vm = new TrayMenuEditorViewModel(store);
             DataContext = _vm;
             Owner = Application.Current?.MainWindow;
+            // issue #146 (1.0.1.106): высота окна не должна выходить за рабочую область.
+            ApplyWorkAreaLimits();
             Loaded += (_, _) => ExpandAll(TrayMenuTree.Items);
         }
 
@@ -101,6 +103,17 @@ namespace Workspace1C
 
         private static TrayMenuGroupEditParams ToTrayGroupParams(UtilitiesGroupEditParams source) =>
             new(source.Title, source.IconKey);
+
+        /// <summary>
+        /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
+        /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var workArea = SystemParameters.WorkArea;
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
+        }
 
         private void ExpandAll(ItemCollection items)
         {

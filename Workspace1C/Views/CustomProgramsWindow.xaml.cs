@@ -25,6 +25,19 @@ public partial class CustomProgramsWindow : Window
         _vm = new CustomProgramsViewModel(AppServices.TryGetService<ICustomProgramsStore>(), viewMode);
         DataContext = _vm;
         Owner = Application.Current?.MainWindow;
+        // issue #146 (1.0.1.106): высота окна не должна выходить за рабочую область.
+        ApplyWorkAreaLimits();
+    }
+
+    /// <summary>
+    /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
+    /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+    /// </summary>
+    private void ApplyWorkAreaLimits()
+    {
+        var workArea = SystemParameters.WorkArea;
+        MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+        Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
     }
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>

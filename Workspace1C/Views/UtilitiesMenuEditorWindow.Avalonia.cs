@@ -46,6 +46,8 @@ namespace Workspace1C
             _vm = new UtilitiesMenuEditorViewModel(store);
             DataContext = _vm;
             Content = BuildLayout();
+            // issue #146 (1.0.1.106): высота окна не должна выходить за рабочую область.
+            ApplyWorkAreaLimits();
 
             if (_vm.Groups.Count > 0)
                 _vm.SelectedGroup = _vm.Groups[0];
@@ -53,6 +55,20 @@ namespace Workspace1C
 
         /// <summary>Компоновка после редактирования (актуальна после «Готово»).</summary>
         public UtilitiesMenuLayout Layout => _vm.Layout;
+
+        /// <summary>
+        /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
+        /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null)
+                return;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
+            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
+        }
 
         private Control BuildLayout()
         {
@@ -98,9 +114,15 @@ namespace Workspace1C
             BuildTree();
             treeBorder.Child = _tree;
 
-            // Правая панель операций.
+            // Правая панель операций (issue #146, 1.0.1.106): прокручивается,
+            // чтобы пояснение и кнопки помещались на экранах с малой высотой.
             var panel = BuildOperationsPanel();
-            dock.Children.Add(panel);
+            dock.Children.Add(new ScrollViewer
+            {
+                Content = panel,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            });
 
             return dock;
         }

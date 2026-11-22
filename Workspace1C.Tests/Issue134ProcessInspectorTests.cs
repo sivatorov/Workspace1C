@@ -936,7 +936,7 @@ public sealed class Issue134ProcessInspectorTests
 
         Assert.Contains("FocusGridAttempt(0)", code, StringComparison.Ordinal);
         Assert.Contains("Dispatcher.UIThread.Post(", code, StringComparison.Ordinal);
-        Assert.Contains("_grid.Focus()", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.Focus(NavigationMethod.Directional)", code, StringComparison.Ordinal);
         Assert.Contains("_grid.SelectedIndex = 0", code, StringComparison.Ordinal);
         Assert.Contains("_vm.NotifyKeyboardNavigation();", code, StringComparison.Ordinal);
         Assert.Contains("_vm.Processes.CollectionChanged", code, StringComparison.Ordinal);

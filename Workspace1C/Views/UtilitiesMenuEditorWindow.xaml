@@ -26,6 +26,11 @@
              (PackIcon-ключ каталога разрешается через WpfIconGeometryKey в
              DisplayIconGeometryKey), поэтому настройка и рабочее меню совпадают. -->
         <conv:IconKeyToGeometryConverter x:Key="IconKeyToGeometry"/>
+        <!-- issue #146 (1.0.1.106): конвертер ключа каталога в PackIconKind для
+             выпадающего списка иконок. Объявляется ДО шаблонов — StaticResource
+             резолвится сверху вниз. Без объявления ItemTemplate падал с
+             XamlParseException «Не удается найти ресурс PackIconKindConverter». -->
+        <conv:PackIconKindConverter x:Key="PackIconKindConverter"/>
         <!-- Шаблон узла дерева: чекбокс видимости + иконка + заголовок + пометка вида -->
         <HierarchicalDataTemplate x:Key="MenuNodeTemplate" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal">
@@ -87,8 +92,11 @@
                 </DockPanel>
             </Border>
 
-            <!-- Панель операций -->
-            <StackPanel Grid.Column="2">
+            <!-- Панель операций (issue #146, 1.0.1.106): содержимое прокручивается,
+                 чтобы пояснение и кнопки помещались на экранах с малой высотой. -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
                 <!-- Перемещение -->
                 <TextBlock Text="{loc:Loc Utilities.Editor.MoveHeader}" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -220,7 +228,8 @@
                     <TextBlock Text="{loc:Loc Utilities.Editor.Hint}" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
                 </Border>
-            </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </Window>

@@ -9,6 +9,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -146,7 +147,8 @@ namespace Workspace1C
             // issue #134 (1.0.1.104, замечание 7OH): если фокус оказался на кнопке
             // («Колонки» и т.п.), стрелки должны управлять таблицей, а не переводить
             // фокус на соседний элемент. Перехватываем клавиши на уровне окна.
-            KeyDown += OnWindow_KeyDown;
+            // 1.0.1.106: туннельная фаза — кнопки не успевают «съесть» стрелки.
+            AddHandler(KeyDownEvent, OnWindow_KeyDown, RoutingStrategies.Tunnel);
             ScrollViewer.SetHorizontalScrollBarVisibility(_grid, ScrollBarVisibility.Disabled);
 
             // issue #134: набор видимых колонок изменён — перестраиваем шапку и строки,
@@ -267,7 +269,7 @@ namespace Workspace1C
                     if (!_opened)
                         return;
 
-                    var focused = _grid.Focus();
+                    var focused = _grid.Focus(NavigationMethod.Directional);
 
                     // Первая строка становится выбранной, чтобы стрелки и Enter
                     // работали сразу после открытия окна.
@@ -294,49 +296,50 @@ namespace Workspace1C
         /// </summary>
         private void OnWindow_KeyDown(object? sender, KeyEventArgs e)
         {
-            if (_grid.IsKeyboardFocusWithin)
-                return;
-            if (e.Key is not (Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End))
-                return;
-            if (_grid.ItemCount == 0)
+            var navigation = MapNavigationKey(e.Key);
+            if (!ProcessInspectorFocusPolicy.IsNavigationKey(navigation))
                 return;
             // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
-            if (e.Source is TextBox or ComboBox)
+            var focusedIsTextInput = e.Source is TextBox or ComboBox;
+            if (!ProcessInspectorFocusPolicy.ShouldRedirectNavigation(
+                    _grid.IsKeyboardFocusWithin, navigation, focusedIsTextInput))
                 return;
 
             e.Handled = true;
-            NavigateGridFromButton(e.Key);
+            NavigateGridFromButton(navigation);
         }
 
         /// <summary>
-        /// Переносит фокус в таблицу и выполняет запрошенное перемещение по строкам
-        /// (issue #134, 1.0.1.104). Если строка ещё не выбрана, «вниз»/«вверх»
-        /// выбирают первую, «End» — последнюю.
+        /// Переносит фокус в список и выполняет запрошенное перемещение по строкам
+        /// (issue #134, 1.0.1.104/1.0.1.106). Для пустого списка фокус всё равно
+        /// ставится в список — стрелка не уводит его на соседнюю кнопку.
         /// </summary>
-        private void NavigateGridFromButton(Key key)
+        private void NavigateGridFromButton(InspectorNavigationKey key)
         {
-            _grid.Focus();
+            _grid.Focus(NavigationMethod.Directional);
             _gridHadFocus = true;
 
-            var count = _grid.ItemCount;
-            if (count == 0)
+            var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
+                _grid.SelectedIndex, _grid.ItemCount, key);
+            if (target < 0)
                 return;
-
-            var current = _grid.SelectedIndex;
-            var target = key switch
-            {
-                Key.Home => 0,
-                Key.End => count - 1,
-                Key.Up => current > 0 ? current - 1 : 0,
-                Key.PageUp => Math.Max(0, (current < 0 ? 0 : current) - 10),
-                Key.PageDown => Math.Min(count - 1, (current < 0 ? 0 : current) + 10),
-                _ => current < 0 ? 0 : Math.Min(count - 1, current + 1)
-            };
 
             _grid.SelectedIndex = target;
             if (_grid.SelectedItem is ProcessRowViewModel row)
                 _grid.ScrollIntoView(row);
         }
+
+        /// <summary>Avalonia-клавиша → навигационная клавиша политики (issue #134).</summary>
+        private static InspectorNavigationKey MapNavigationKey(Key key) => key switch
+        {
+            Key.Up => InspectorNavigationKey.Up,
+            Key.Down => InspectorNavigationKey.Down,
+            Key.PageUp => InspectorNavigationKey.PageUp,
+            Key.PageDown => InspectorNavigationKey.PageDown,
+            Key.Home => InspectorNavigationKey.Home,
+            Key.End => InspectorNavigationKey.End,
+            _ => InspectorNavigationKey.None
+        };
 
         private static void Place(Grid grid, Control control, int row)
         {
@@ -709,7 +712,7 @@ namespace Workspace1C
                 {
                     if (!_gridHadFocus && !_grid.IsKeyboardFocusWithin && !forceFocus)
                         return;
-                    _grid.Focus();
+                    _grid.Focus(NavigationMethod.Directional);
                     var row = _vm.SelectedRow ?? _vm.Processes.FirstOrDefault();
                     if (row is not null)
                         _grid.ScrollIntoView(row);
@@ -744,7 +747,7 @@ namespace Workspace1C
                     // снова уводит фокус на кнопку (issue #134, 1.0.1.104).
                     if (_grid.ItemCount > 0 && _grid.SelectedIndex < 0)
                         _grid.SelectedIndex = 0;
-                    _grid.Focus();
+                    _grid.Focus(NavigationMethod.Directional);
                 },
                 DispatcherPriority.Input);
 

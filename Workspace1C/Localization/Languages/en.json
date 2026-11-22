@@ -621,6 +621,7 @@
     "Settings.Logging.CatPrevVersionDesc": "The app virtually treats itself as the previous version (from git tags, otherwise one build lower): the “What’s new” dialog shows the previous release summary immediately, before its release. The flag survives restarts and is reset after a successful update.",
     "Settings.TabAbout": "About",
     "Settings.TabUtilitiesMenu": "Edit menus",
+    "Settings.MenuEditing.Enabled": "Edit structure",
     "Settings.UtilitiesMenu.GroupTitle": "Utilities menu",
     "Settings.UtilitiesMenu.EditingEnabled": "Edit the Utilities menu structure",
     "Settings.UtilitiesMenu.EditingEnabledTooltip": "When enabled, the Utilities menu is built from the custom layout stored in the utilities_menu_layout.json file: item order, visibility, groups and icons.",

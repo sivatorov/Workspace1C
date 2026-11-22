@@ -146,6 +146,11 @@ namespace Workspace1C
             if (!IsLoaded)
                 return;
 
+            // issue #134 (1.0.1.106): пока окно не активно, Focus() не передаёт
+            // клавиатурный фокус — сначала активируем окно.
+            if (!IsActive)
+                Activate();
+
             ProcessesGrid.Focus();
             Keyboard.Focus(ProcessesGrid);
 
@@ -186,49 +191,55 @@ namespace Workspace1C
         /// </summary>
         private void OnWindow_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            if (ProcessesGrid.IsKeyboardFocusWithin)
-                return;
-            if (e.Key is not (Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End))
-                return;
-            if (ProcessesGrid.Items.Count == 0)
+            var navigation = MapNavigationKey(e.Key);
+            if (!ProcessInspectorFocusPolicy.IsNavigationKey(navigation))
                 return;
             // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
-            if (Keyboard.FocusedElement is TextBoxBase or ComboBox)
+            var focusedIsTextInput = Keyboard.FocusedElement is TextBoxBase or ComboBox;
+            if (!ProcessInspectorFocusPolicy.ShouldRedirectNavigation(
+                    ProcessesGrid.IsKeyboardFocusWithin, navigation, focusedIsTextInput))
                 return;
 
             e.Handled = true;
-            NavigateGridFromButton(e.Key);
+            // issue #134 (1.0.1.106): окно могло быть ещё не активировано (первое
+            // нажатие сразу после открытия) — без Activate() Focus() не срабатывает,
+            // и фокус оставался на кнопке «Колонки».
+            if (!IsActive)
+                Activate();
+            NavigateGridFromButton(navigation);
         }
 
         /// <summary>
         /// Переносит фокус в таблицу и выполняет запрошенное перемещение по строкам
-        /// (issue #134, 1.0.1.104). Если строка ещё не выбрана, «вниз»/«вверх»
-        /// выбирают первую, «End» — последнюю.
+        /// (issue #134, 1.0.1.104/1.0.1.106). Для пустого списка фокус всё равно
+        /// ставится в таблицу — стрелка не уводит его на соседнюю кнопку.
         /// </summary>
-        private void NavigateGridFromButton(Key key)
+        private void NavigateGridFromButton(InspectorNavigationKey key)
         {
             ProcessesGrid.Focus();
             Keyboard.Focus(ProcessesGrid);
             _gridHadKeyboardFocus = true;
 
-            var count = ProcessesGrid.Items.Count;
-            if (count == 0)
+            var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
+                ProcessesGrid.SelectedIndex, ProcessesGrid.Items.Count, key);
+            if (target < 0)
                 return;
-
-            var current = ProcessesGrid.SelectedIndex;
-            var target = key switch
-            {
-                Key.Home => 0,
-                Key.End => count - 1,
-                Key.Up => current > 0 ? current - 1 : 0,
-                Key.PageUp => Math.Max(0, (current < 0 ? 0 : current) - 10),
-                Key.PageDown => Math.Min(count - 1, (current < 0 ? 0 : current) + 10),
-                _ => current < 0 ? 0 : Math.Min(count - 1, current + 1)
-            };
 
             ProcessesGrid.SelectedIndex = target;
             SetCurrentRow(ProcessesGrid.Items[target] as ProcessRowViewModel);
         }
+
+        /// <summary>WPF-клавиша → навигационная клавиша политики (issue #134).</summary>
+        private static InspectorNavigationKey MapNavigationKey(Key key) => key switch
+        {
+            Key.Up => InspectorNavigationKey.Up,
+            Key.Down => InspectorNavigationKey.Down,
+            Key.PageUp => InspectorNavigationKey.PageUp,
+            Key.PageDown => InspectorNavigationKey.PageDown,
+            Key.Home => InspectorNavigationKey.Home,
+            Key.End => InspectorNavigationKey.End,
+            _ => InspectorNavigationKey.None
+        };
 
         /// <summary>
         /// Делает строку текущей (<c>CurrentItem</c> + <c>CurrentCell</c>), не меняя
@@ -275,6 +286,8 @@ namespace Workspace1C
             {
                 if (!IsLoaded)
                     return;
+                if (!IsActive)
+                    Activate();
                 // Если после завершения процесса строки остались, но выделение
                 // сброшено, ставим текущую строку — иначе первое нажатие «вниз»
                 // снова уводит фокус на кнопку (issue #134, 1.0.1.104).

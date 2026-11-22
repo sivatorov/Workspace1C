@@ -621,6 +621,7 @@
     "Settings.Logging.CatPrevVersionDesc": "Приложение виртуально считает себя предыдущей версией (из git-тегов, иначе на одну сборку ниже): «Что нового» показывает сводку прошлого релиза сразу, не дожидаясь выпуска. Флаг переживает перезапуск и сбрасывается после успешного обновления.",
     "Settings.TabAbout": "О программе",
     "Settings.TabUtilitiesMenu": "Правка меню",
+    "Settings.MenuEditing.Enabled": "Правка структуры",
     "Settings.UtilitiesMenu.GroupTitle": "Меню «Утилиты»",
     "Settings.UtilitiesMenu.EditingEnabled": "Правка структуры меню «Утилиты»",
     "Settings.UtilitiesMenu.EditingEnabledTooltip": "При включении меню «Утилиты» строится по пользовательской компоновке из файла utilities_menu_layout.json: порядок, видимость, группы и иконки пунктов.",

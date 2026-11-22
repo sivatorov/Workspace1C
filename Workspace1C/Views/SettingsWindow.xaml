@@ -2215,78 +2215,107 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
                                    TextWrapping="Wrap" Margin="0,0,12,12"/>
 
-                        <!-- Меню «Утилиты» (issue #374) -->
+                        <!-- Меню «Утилиты» (issue #374; компоновка — issue #152):
+                             слева галочка и кнопка, справа длинное описание. -->
                         <GroupBox Header="{loc:Loc Settings.UtilitiesMenu.GroupTitle}" Padding="8">
-                            <StackPanel>
-                                <CheckBox x:Name="UtilitiesMenuEditingCheck" Content="{loc:Loc Settings.UtilitiesMenu.EditingEnabled}"
-                                          Margin="0,0,0,8"/>
-                                <Button Click="OnUtilitiesMenuEdit_Click" Style="{StaticResource ModernButton}"
-                                        HorizontalAlignment="Left" Padding="12,7">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Tune" Width="16" Height="16" Margin="0,0,6,0"
-                                            VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.UtilitiesMenu.EditButton}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <CheckBox x:Name="UtilitiesMenuEditingCheck" Content="{loc:Loc Settings.MenuEditing.Enabled}"
+                                              ToolTip="{loc:Loc Settings.UtilitiesMenu.EditingEnabledTooltip}"
+                                              ToolTipService.ShowDuration="20000" Margin="0,0,0,8"/>
+                                    <Button Click="OnUtilitiesMenuEdit_Click" Style="{StaticResource ModernButton}"
+                                            HorizontalAlignment="Left" Padding="12,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Tune" Width="16" Height="16" Margin="0,0,6,0"
+                                                VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:Loc Settings.UtilitiesMenu.EditButton}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{loc:Loc Settings.UtilitiesMenu.EditingEnabledTooltip}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                           TextWrapping="Wrap" VerticalAlignment="Top"/>
+                            </Grid>
                         </GroupBox>
 
-                        <!-- Мои программы (issue #91): группа своих программ под кнопками запуска -->
+                        <!-- Мои программы (issue #91; компоновка — issue #152) -->
                         <GroupBox Header="{loc:Loc Launch.CustomPrograms.Header}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Launch.CustomPrograms.SettingsHint}"
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <Button x:Name="CustomProgramsEditButton" Click="OnCustomProgramsEdit_Click"
+                                            Style="{StaticResource ModernButton}"
+                                            HorizontalAlignment="Left" Padding="12,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Cog" Width="16" Height="16" Margin="0,0,6,0"
+                                                VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:Loc Launch.CustomPrograms.SettingsButton}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{loc:Loc Launch.CustomPrograms.SettingsHint}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,0,12,8"/>
-                                <Button x:Name="CustomProgramsEditButton" Click="OnCustomProgramsEdit_Click"
-                                        Style="{StaticResource ModernButton}"
-                                        HorizontalAlignment="Left" Padding="12,7">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Cog" Width="16" Height="16" Margin="0,0,6,0"
-                                            VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.SettingsButton}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
+                                           TextWrapping="Wrap" VerticalAlignment="Top"/>
+                            </Grid>
                         </GroupBox>
 
-                        <!-- Меню трея (issue #62) -->
+                        <!-- Меню трея (issue #62; компоновка — issue #152) -->
                         <GroupBox Header="{loc:Loc Settings.TrayMenu.GroupTitle}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <CheckBox x:Name="TrayMenuEditingCheck" Content="{loc:Loc Settings.TrayMenu.EditingEnabled}"
-                                          ToolTip="{loc:Loc Settings.TrayMenu.EditingEnabledTooltip}"
-                                          ToolTipService.ShowDuration="20000" Margin="0,0,0,8"/>
-                                <Button x:Name="TrayMenuEditButton" Click="OnTrayMenuEdit_Click" Style="{StaticResource ModernButton}"
-                                        HorizontalAlignment="Left" Padding="12,7" Margin="0,0,0,4">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Margin="0,0,6,0"
-                                            VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.TrayMenu.EditButton}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <TextBlock Text="{loc:Loc Settings.TrayMenu.Hint}"
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <CheckBox x:Name="TrayMenuEditingCheck" Content="{loc:Loc Settings.MenuEditing.Enabled}"
+                                              ToolTip="{loc:Loc Settings.TrayMenu.EditingEnabledTooltip}"
+                                              ToolTipService.ShowDuration="20000" Margin="0,0,0,8"/>
+                                    <Button x:Name="TrayMenuEditButton" Click="OnTrayMenuEdit_Click" Style="{StaticResource ModernButton}"
+                                            HorizontalAlignment="Left" Padding="12,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="TrayFull" Width="16" Height="16" Margin="0,0,6,0"
+                                                VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:Loc Settings.TrayMenu.EditButton}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{loc:Loc Settings.TrayMenu.Hint}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,6,12,0"/>
-                            </StackPanel>
+                                           TextWrapping="Wrap" VerticalAlignment="Top"/>
+                            </Grid>
                         </GroupBox>
 
-                        <!-- Контекстное меню базы (issue #56) -->
+                        <!-- Контекстное меню базы (issue #56; компоновка — issue #152) -->
                         <GroupBox Header="{loc:Loc Settings.ContextMenu.GroupTitle}" Padding="8" Margin="0,14,0,0">
-                            <StackPanel>
-                                <CheckBox x:Name="ContextMenuEditingCheck" Content="{loc:Loc Settings.ContextMenu.EditingEnabled}"
-                                          ToolTip="{loc:Loc Settings.ContextMenu.EditingEnabledTooltip}"
-                                          ToolTipService.ShowDuration="20000" Margin="0,0,0,8"/>
-                                <Button x:Name="ContextMenuEditButton" Click="OnContextMenuEdit_Click" Style="{StaticResource ModernButton}"
-                                        HorizontalAlignment="Left" Padding="12,7" Margin="0,0,0,4">
-                                    <StackPanel Orientation="Horizontal">
-                                        <materialDesign:PackIcon Kind="Apps" Width="16" Height="16" Margin="0,0,6,0"
-                                            VerticalAlignment="Center"/>
-                                        <TextBlock Text="{loc:Loc Settings.ContextMenu.EditButton}" VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                                <TextBlock Text="{loc:Loc Settings.ContextMenu.Hint}"
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="210"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,16,0">
+                                    <CheckBox x:Name="ContextMenuEditingCheck" Content="{loc:Loc Settings.MenuEditing.Enabled}"
+                                              ToolTip="{loc:Loc Settings.ContextMenu.EditingEnabledTooltip}"
+                                              ToolTipService.ShowDuration="20000" Margin="0,0,0,8"/>
+                                    <Button x:Name="ContextMenuEditButton" Click="OnContextMenuEdit_Click" Style="{StaticResource ModernButton}"
+                                            HorizontalAlignment="Left" Padding="12,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <materialDesign:PackIcon Kind="Apps" Width="16" Height="16" Margin="0,0,6,0"
+                                                VerticalAlignment="Center"/>
+                                            <TextBlock Text="{loc:Loc Settings.ContextMenu.EditButton}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{loc:Loc Settings.ContextMenu.Hint}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                           TextWrapping="Wrap" Margin="0,6,12,0"/>
-                            </StackPanel>
+                                           TextWrapping="Wrap" VerticalAlignment="Top"/>
+                            </Grid>
                         </GroupBox>
                     </StackPanel>
                 </ScrollViewer>

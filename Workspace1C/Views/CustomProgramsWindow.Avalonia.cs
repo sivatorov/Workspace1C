@@ -50,6 +50,22 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         _vm = new CustomProgramsViewModel(AppServices.TryGetService<ICustomProgramsStore>(), viewMode);
         DataContext = _vm;
         Content = BuildRoot();
+        // issue #146 (1.0.1.106): высота окна не должна выходить за рабочую область.
+        ApplyWorkAreaLimits();
+    }
+
+    /// <summary>
+    /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
+    /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+    /// </summary>
+    private void ApplyWorkAreaLimits()
+    {
+        var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (screen is null)
+            return;
+        var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+        MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
+        Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
     }
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>

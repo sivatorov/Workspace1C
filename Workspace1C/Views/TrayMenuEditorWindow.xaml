@@ -94,8 +94,11 @@
                 </DockPanel>
             </Border>
 
-            <!-- Панель операций -->
-            <StackPanel Grid.Column="2">
+            <!-- Панель операций (issue #146, 1.0.1.106): содержимое прокручивается,
+                 чтобы пояснение и кнопки помещались на экранах с малой высотой. -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
                 <!-- Порядок блоков -->
                 <TextBlock Text="{loc:Loc TrayMenu.MoveHeader}" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -213,7 +216,8 @@
                     <TextBlock Text="{loc:Loc TrayMenu.Hint}" TextWrapping="Wrap"
                                Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
                 </Border>
-            </StackPanel>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </Window>

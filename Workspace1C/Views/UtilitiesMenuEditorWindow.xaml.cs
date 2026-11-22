@@ -25,6 +25,8 @@ namespace Workspace1C
             _vm = new UtilitiesMenuEditorViewModel(store);
             DataContext = _vm;
             Owner = Application.Current?.MainWindow;
+            // issue #146 (1.0.1.106): высота окна не должна выходить за рабочую область.
+            ApplyWorkAreaLimits();
             // Сразу выбираем первую группу-назначение (если она есть), чтобы «В группу»
             // работал без лишнего клика.
             if (_vm.Groups.Count > 0)
@@ -117,6 +119,17 @@ namespace Workspace1C
         {
             _vm.SaveCommand.Execute(null);
             DialogResult = true;
+        }
+
+        /// <summary>
+        /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
+        /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var workArea = SystemParameters.WorkArea;
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
         }
 
         private void ExpandAll(ItemCollection items)

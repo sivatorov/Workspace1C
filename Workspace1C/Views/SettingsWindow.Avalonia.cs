@@ -5095,108 +5095,53 @@ namespace Workspace1C
             // и контекстное меню базы.
             panel.Children.Add(Hint(LocalizationManager.T("Settings.UtilitiesMenu.Hint"), bottom: 10));
 
-            // Меню «Утилиты» (issue #374).
+            // Меню «Утилиты» (issue #374; компоновка — issue #152).
             panel.Children.Add(GroupSectionHeader("Settings.UtilitiesMenu.GroupTitle"));
             _utilitiesMenuEditingCheck = SettingsSwitch(
-                "Settings.UtilitiesMenu.EditingEnabled", _viewModel.UtilitiesMenuEditingEnabled,
+                "Settings.MenuEditing.Enabled", _viewModel.UtilitiesMenuEditingEnabled,
                 "IconApps", "@InfoBrush", "Settings.UtilitiesMenu.EditingEnabledTooltip");
-            _utilitiesMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
-            panel.Children.Add(_utilitiesMenuEditingCheck);
+            var utilitiesEditButton = MenuEditButton(
+                "IconTune", "Settings.UtilitiesMenu.EditButton", OpenUtilitiesMenuEditor);
+            panel.Children.Add(MenuSettingsRow(
+                _utilitiesMenuEditingCheck, utilitiesEditButton,
+                "Settings.UtilitiesMenu.EditingEnabledTooltip"));
 
-            var editButton = new Button
-            {
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
-                    Children =
-                    {
-                        IconHelper.MakeIcon("IconTune", 16, "TextPrimaryBrush"),
-                        new TextBlock
-                        {
-                            Text = LocalizationManager.T("Settings.UtilitiesMenu.EditButton"),
-                            VerticalAlignment = VerticalAlignment.Center
-                        }
-                    }
-                },
-                Padding = new Thickness(12, 7),
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            editButton.Styled(ControlThemes.ModernButton);
-            editButton.Click += (_, _) => OpenUtilitiesMenuEditor();
-            panel.Children.Add(editButton);
-
-            // Группа «Мои программы» (issue #91): свои программы под кнопками запуска —
-            // редактор списка, иконки из файла и режим «списком / иконками».
+            // Группа «Мои программы» (issue #91; компоновка — issue #152).
             panel.Children.Add(GroupSectionHeader("Launch.CustomPrograms.Header"));
-            panel.Children.Add(Hint(LocalizationManager.T("Launch.CustomPrograms.SettingsHint"), bottom: 8));
+            var customProgramsButton = MenuEditButton(
+                "IconCog", "Launch.CustomPrograms.SettingsButton", OpenCustomProgramsEditor);
+            panel.Children.Add(MenuSettingsRow(
+                null, customProgramsButton, "Launch.CustomPrograms.SettingsHint"));
 
-            var customProgramsButton = new Button
-            {
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
-                    Children =
-                    {
-                        IconHelper.MakeIcon("IconCog", 16, "TextPrimaryBrush"),
-                        new TextBlock
-                        {
-                            Text = LocalizationManager.T("Launch.CustomPrograms.SettingsButton"),
-                            VerticalAlignment = VerticalAlignment.Center
-                        }
-                    }
-                },
-                Padding = new Thickness(12, 7),
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            customProgramsButton.Styled(ControlThemes.ModernButton);
-            customProgramsButton.Click += (_, _) => OpenCustomProgramsEditor();
-            panel.Children.Add(customProgramsButton);
-
-            // Контекстное меню базы (issue #56).
+            // Контекстное меню базы (issue #56; компоновка — issue #152).
             panel.Children.Add(GroupSectionHeader("Settings.ContextMenu.GroupTitle"));
             _contextMenuEditingCheck = SettingsSwitch(
-                "Settings.ContextMenu.EditingEnabled", _viewModel.ContextMenuEditingEnabled,
+                "Settings.MenuEditing.Enabled", _viewModel.ContextMenuEditingEnabled,
                 "IconApps", "@PurpleAccentBrush", "Settings.ContextMenu.EditingEnabledTooltip");
-            _contextMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
-            panel.Children.Add(_contextMenuEditingCheck);
+            var contextEditButton = MenuEditButton(
+                "IconApps", "Settings.ContextMenu.EditButton", OpenContextMenuEditor);
+            panel.Children.Add(MenuSettingsRow(
+                _contextMenuEditingCheck, contextEditButton, "Settings.ContextMenu.Hint"));
 
-            var contextEditButton = new Button
-            {
-                Content = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    Spacing = 6,
-                    Children =
-                    {
-                        IconHelper.MakeIcon("IconApps", 16, "TextPrimaryBrush"),
-                        new TextBlock
-                        {
-                            Text = LocalizationManager.T("Settings.ContextMenu.EditButton"),
-                            VerticalAlignment = VerticalAlignment.Center
-                        }
-                    }
-                },
-                Padding = new Thickness(12, 7),
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            contextEditButton.Styled(ControlThemes.ModernButton);
-            contextEditButton.Click += (_, _) => OpenContextMenuEditor();
-            panel.Children.Add(contextEditButton);
-
-            panel.Children.Add(Hint(LocalizationManager.T("Settings.ContextMenu.Hint"), bottom: 0));
-
-            // Меню трея (issue #62): правка структуры меню в трее. Кнопка
-            // «Настроить структуру…» открывает редактор TrayMenuEditorWindow.
+            // Меню трея (issue #62; компоновка — issue #152).
             panel.Children.Add(GroupSectionHeader("Settings.TrayMenu.GroupTitle"));
             _trayMenuEditingCheck = SettingsSwitch(
-                "Settings.TrayMenu.EditingEnabled", _viewModel.TrayMenuEditingEnabled,
+                "Settings.MenuEditing.Enabled", _viewModel.TrayMenuEditingEnabled,
                 "IconTrayFull", "@InfoBrush", "Settings.TrayMenu.EditingEnabledTooltip");
-            _trayMenuEditingCheck.Margin = new Thickness(0, 0, 0, 6);
-            panel.Children.Add(_trayMenuEditingCheck);
+            var trayEditButton = MenuEditButton(
+                "IconTrayFull", "Settings.TrayMenu.EditButton", OpenTrayMenuEditor);
+            panel.Children.Add(MenuSettingsRow(
+                _trayMenuEditingCheck, trayEditButton, "Settings.TrayMenu.Hint"));
 
-            var trayEditButton = new Button
+            return panel;
+        }
+
+        /// <summary>
+        /// Кнопка «Настроить структуру…» для строки настроек меню (issue #152).
+        /// </summary>
+        private static Button MenuEditButton(string iconKey, string textKey, Action onClick)
+        {
+            var button = new Button
             {
                 Content = new StackPanel
                 {
@@ -5204,10 +5149,10 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        IconHelper.MakeIcon("IconTrayFull", 16, "TextPrimaryBrush"),
+                        IconHelper.MakeIcon(iconKey, 16, "TextPrimaryBrush"),
                         new TextBlock
                         {
-                            Text = LocalizationManager.T("Settings.TrayMenu.EditButton"),
+                            Text = LocalizationManager.T(textKey),
                             VerticalAlignment = VerticalAlignment.Center
                         }
                     }
@@ -5215,13 +5160,45 @@ namespace Workspace1C
                 Padding = new Thickness(12, 7),
                 HorizontalAlignment = HorizontalAlignment.Left
             };
-            trayEditButton.Styled(ControlThemes.ModernButton);
-            trayEditButton.Click += (_, _) => OpenTrayMenuEditor();
-            panel.Children.Add(trayEditButton);
+            button.Styled(ControlThemes.ModernButton);
+            button.Click += (_, _) => onClick();
+            return button;
+        }
 
-            panel.Children.Add(Hint(LocalizationManager.T("Settings.TrayMenu.Hint"), bottom: 0));
+        /// <summary>
+        /// Строка настроек меню (issue #152): слева галочка (если есть) и кнопка правки,
+        /// справа длинное описание. Левая колонка чуть шире кнопки — есть отступ перед
+        /// текстом; это убирает вертикальную прокрутку вкладки.
+        /// </summary>
+        private static Control MenuSettingsRow(Control? check, Control button, string hintKey)
+        {
+            var left = new StackPanel
+            {
+                Spacing = 8,
+                Width = 210,
+                Margin = new Thickness(0, 0, 16, 0)
+            };
+            if (check is not null)
+                left.Children.Add(check);
+            left.Children.Add(button);
 
-            return panel;
+            var hint = new TextBlock
+            {
+                Text = LocalizationManager.T(hintKey),
+                TextWrapping = TextWrapping.Wrap,
+                VerticalAlignment = VerticalAlignment.Top,
+                FontSize = 12
+            };
+            ThemeBrushes.Bind(hint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+
+            var grid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("210,*"),
+                Children = { left, hint }
+            };
+            Grid.SetColumn(left, 0);
+            Grid.SetColumn(hint, 1);
+            return grid;
         }
 
         /// <summary>Заголовок раздела вкладки «Правка меню». Issue #61: вместо фиксированного
