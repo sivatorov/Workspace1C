@@ -811,10 +811,13 @@
         <Setter Property="Width" Value="235"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="TabItem">
+                <!-- issue #149: полоса 3 px слева зарезервирована всегда, как в ConnTabItem.
+                     Иначе при выделении BorderThickness менялась с 0 на 3, и надпись
+                     с иконкой смещалась вправо относительно остальных вкладок. -->
                 <Border Name="PART_GroupSurface"
                         Background="Transparent"
                         BorderBrush="Transparent"
-                        BorderThickness="0"
+                        BorderThickness="3,0,0,0"
                         CornerRadius="8"
                         Padding="{TemplateBinding Padding}">
                     <ContentPresenter Name="PART_ContentPresenter"
@@ -830,11 +833,12 @@
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
         </Style>
         <!-- issue #149: текущий раздел «Настройки» тоже подсвечивается — мягкий фон
-             и акцентная полоса слева; плотная плашка остаётся у выбранной подвкладки. -->
+             и акцентная полоса слева; плотная плашка остаётся у выбранной подвкладки.
+             Толщина рамки не меняется (зарезервирована в шаблоне), поэтому
+             геометрия контента при выделении остаётся прежней. -->
         <Style Selector="^:selected /template/ Border#PART_GroupSurface">
             <Setter Property="Background" Value="{DynamicResource ItemHoverBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderThickness" Value="3,0,0,0"/>
         </Style>
         <Style Selector="^:selected">
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>

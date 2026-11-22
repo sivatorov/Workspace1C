@@ -95,10 +95,16 @@ namespace Workspace1C
         /// </summary>
         private void OnEditionServiceChanged(object? sender, EventArgs e)
         {
-            if (Dispatcher.CheckAccess())
+            void RefreshEdition()
+            {
                 UpdateWindowTitle();
+                UpdateSectionButtonsVisibility();
+            }
+
+            if (Dispatcher.CheckAccess())
+                RefreshEdition();
             else
-                Dispatcher.BeginInvoke(new Action(UpdateWindowTitle));
+                Dispatcher.BeginInvoke(new Action(RefreshEdition));
         }
 
         /// <summary>

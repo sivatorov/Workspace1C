@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Workspace1C.Models;
 using Workspace1C.Services;
 using Xunit;
@@ -84,14 +85,15 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         Assert.NotNull(result);
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, result!.SchemaVersion);
 
-        // Issue #146: пользовательское дерево НЕ заменяется стандартными разделами —
-        // сохраняются исходные узлы и их порядок, а недостающие функции каталога
-        // добавляются отдельно (в «Новинки программы» или подходящую группу).
-        Assert.True(result.Root.Count >= 2);
-        Assert.Equal("item", result.Root[0].Kind);
-        Assert.Equal("CommandPalette", result.Root[0].ItemId);
-        Assert.Equal("group", result.Root[1].Kind);
-        Assert.Equal("Operations", result.Root[1].GroupId);
+        // Issue #146 (1.0.1.104): пользовательское дерево НЕ заменяется стандартными
+        // разделами, но его корневые узлы переносятся в группу «Утилиты» с сохранением
+        // порядка; недостающие функции каталога добавляются отдельно.
+        var utilities = UtilitiesGroup(result);
+        Assert.True(utilities.Children.Count >= 2);
+        Assert.Equal("item", utilities.Children[0].Kind);
+        Assert.Equal("CommandPalette", utilities.Children[0].ItemId);
+        Assert.Equal("group", utilities.Children[1].Kind);
+        Assert.Equal("Operations", utilities.Children[1].GroupId);
 
         var ids = new System.Collections.Generic.HashSet<string>();
         UtilitiesMenuResolver.CollectItemIds(result.Root, ids);
@@ -133,6 +135,19 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         Assert.NotNull(node);
         Assert.Equal("item", node.Kind);
         Assert.Equal(itemId, node.ItemId);
+    }
+
+    /// <summary>
+    /// Группа «Утилиты», в которую миграция 1.0.1.104 переносит пользовательские
+    /// корневые узлы (issue #146).
+    /// </summary>
+    private static UtilitiesMenuNode UtilitiesGroup(UtilitiesMenuLayout layout)
+    {
+        var node = layout.Root.FirstOrDefault(n => n is not null
+            && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+            && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal));
+        Assert.NotNull(node);
+        return node!;
     }
 
     [Fact]
@@ -191,9 +206,11 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var result = store.Load();
         Assert.NotNull(result);
-        Assert.Equal(2, result!.Root.Count);
-        Assert.Equal("CommandPalette", result.Root[0].ItemId);
-        Assert.Equal("group", result.Root[1].Kind);
+        // Неизвестный пункт отброшен, пользовательские узлы перенесены в «Утилиты».
+        var utilities = UtilitiesGroup(result!);
+        Assert.Equal(2, utilities.Children.Count);
+        Assert.Equal("CommandPalette", utilities.Children[0].ItemId);
+        Assert.Equal("group", utilities.Children[1].Kind);
     }
 
     [Fact]
@@ -212,9 +229,12 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var result = store.Load();
         Assert.NotNull(result);
-        Assert.Single(result!.Root);
-        Assert.NotNull(result.Root[0].Children);
-        Assert.Empty(result.Root[0].Children!);
+        var utilities = UtilitiesGroup(result!);
+        var operations = utilities.Children.FirstOrDefault(n =>
+            string.Equals(n.GroupId, "Operations", StringComparison.Ordinal));
+        Assert.NotNull(operations);
+        Assert.NotNull(operations!.Children);
+        Assert.Empty(operations.Children!);
     }
 
     [Fact]
@@ -235,9 +255,10 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var result = store.Load();
         Assert.NotNull(result);
-        Assert.Equal(3, result!.Root.Count);
-        Assert.Equal("separator", result.Root[1].Kind);
-        Assert.Equal("ActualReleases", result.Root[2].ItemId);
+        var utilities = UtilitiesGroup(result!);
+        Assert.True(utilities.Children.Count >= 3);
+        Assert.Equal("separator", utilities.Children[1].Kind);
+        Assert.Equal("ActualReleases", utilities.Children[2].ItemId);
     }
 
     [Fact]
@@ -257,10 +278,11 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var result = store.Load();
         Assert.NotNull(result);
-        Assert.Equal(3, result!.Root.Count);
-        Assert.Equal("separator", result.Root[1].Kind);
-        Assert.Equal("ActualReleases", result.Root[2].ItemId);
-        Assert.False(result.Root[2].SeparatorBefore);
+        var utilities = UtilitiesGroup(result!);
+        Assert.True(utilities.Children.Count >= 3);
+        Assert.Equal("separator", utilities.Children[1].Kind);
+        Assert.Equal("ActualReleases", utilities.Children[2].ItemId);
+        Assert.False(utilities.Children[2].SeparatorBefore);
     }
 
     [Fact]
@@ -281,8 +303,9 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var restored = store.Load();
         Assert.NotNull(restored);
-        Assert.Equal(3, restored!.Root.Count);
-        Assert.Equal("separator", restored.Root[1].Kind);
+        var utilities = UtilitiesGroup(restored!);
+        Assert.True(utilities.Children.Count >= 3);
+        Assert.Equal("separator", utilities.Children[1].Kind);
     }
 
     [Fact]
@@ -297,9 +320,15 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         second.Root.Add(UtilitiesMenuLayouts.Item("ActualReleases"));
         store.Save(second);
 
+        // Файл перезаписан: старый пункт исчез из JSON. При чтении миграция может
+        // снова добавить недостающие пункты каталога, поэтому проверяем сырой файл.
+        var text = File.ReadAllText(store.FilePath);
+        Assert.DoesNotContain("CommandPalette", text);
+        Assert.Contains("ActualReleases", text);
+
         var restored = store.Load();
         Assert.NotNull(restored);
-        Assert.Single(restored!.Root);
-        Assert.Equal("ActualReleases", restored.Root[0].ItemId);
+        var utilities = UtilitiesGroup(restored!);
+        Assert.Equal("ActualReleases", utilities.Children[0].ItemId);
     }
 }

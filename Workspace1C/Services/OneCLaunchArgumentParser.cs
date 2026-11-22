@@ -69,6 +69,11 @@ public static class OneCLaunchArgumentParser
         "/ConfigurationRepositoryPwd",
         "/DisplayAllFunctions",
         "/WSNamespace",
+        // Учётные данные веб-сервера (issue #150): ключи должны быть в справочнике,
+        // иначе автодополнение их не предлагает, а пересборка строки запуска
+        // может принять их за неизвестные и оставить только позиционные значения.
+        "/WSN",
+        "/WSP",
         "/IBSecurity",
         "/CPUSecurity",
         "/SaveAgent",
@@ -95,6 +100,18 @@ public static class OneCLaunchArgumentParser
         {
             var key = token;
             var value = string.Empty;
+
+            // Значение отдельным токеном в кавычках («/WSN "webuser"», «/C "текст"»)
+            // принадлежит предыдущему ключу (issue #150). Без этой привязки значение
+            // становилось самостоятельным «позиционным» аргументом: при пересборке
+            // строки запуска ключ мог потеряться, а голое значение оставалось —
+            // платформа игнорировала его и запрашивала аутентификацию веб-сервера.
+            if (IsFullyQuotedToken(token) && result.Count > 0 && !result[^1].HasValue)
+            {
+                var previous = result[^1];
+                result[^1] = new OneCLaunchArgument(previous.Key, Unquote(token));
+                continue;
+            }
 
             // Ключ может следовать со значением без пробела («/UC"код"») — отделяем его.
             if (key.StartsWith('/'))
@@ -302,6 +319,19 @@ public static class OneCLaunchArgumentParser
         }
         return current;
     }
+
+    /// <summary>
+    /// Признак токена, целиком заключённого в двойные кавычки («"webuser"»).
+    /// Такой токен — значение предыдущего ключа, а не самостоятельный аргумент.
+    /// </summary>
+    private static bool IsFullyQuotedToken(string token)
+        => token.Length >= 2 && token[0] == '"' && token[^1] == '"';
+
+    /// <summary>Снимает внешние двойные кавычки с токена.</summary>
+    private static string Unquote(string token)
+        => token.Length >= 2 && token[0] == '"' && token[^1] == '"'
+            ? token[1..^1]
+            : token;
 
     /// <summary>
     /// Разделяет строку на токены по пробелам, сохраняя содержимое двойных кавычек

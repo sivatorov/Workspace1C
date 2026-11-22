@@ -64,7 +64,7 @@
             <Button x:Name="SaveButton" Width="140" Height="34" Margin="0,0,10,0" IsDefault="True"
                     Style="{StaticResource PrimaryButton}" Click="OnSaveClick">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Width="16" Height="16"/>
+                    <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16"/>
                     <TextBlock Text="{loc:Loc Common.Save}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>

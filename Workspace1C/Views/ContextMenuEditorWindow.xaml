@@ -62,7 +62,7 @@
             <Button x:Name="OkButton" Width="130" IsDefault="True"
                     Style="{StaticResource PrimaryButton}" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc ContextMenu.Editor.Done}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -166,7 +166,7 @@
                 <StackPanel Orientation="Horizontal">
                     <Button Style="{StaticResource ModernButton}" Command="{Binding SaveCommand}" Padding="10,6" Margin="0,0,6,0">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="16" Height="16" Margin="0,0,4,0"/>
+                            <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Margin="0,0,4,0"/>
                             <TextBlock Text="{loc:Loc ContextMenu.Editor.Save}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>

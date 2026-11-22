@@ -85,4 +85,43 @@ public sealed class Issue134ProcessInspectorFollowupTests
         // Двойной клик больше не активирует базу в главном окне.
         Assert.DoesNotContain("_vm.OpenBase(", code, StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// issue #134 (1.0.1.104, замечание 7OH): если после открытия окна или завершения
+    /// процесса фокус оказался на кнопке, «вниз»/«вверх» управляют таблицей, а не
+    /// переводят фокус на «Колонки». Признак установленного фокуса не фиксируется
+    /// на пустом списке — после загрузки данных фокус ставится повторно.
+    /// </summary>
+    [Fact]
+    public void Wpf_Inspector_ArrowsWorkWhenFocusIsOnButton()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
+
+        Assert.Contains("PreviewKeyDown += OnWindow_PreviewKeyDown;", code, StringComparison.Ordinal);
+        Assert.Contains("OnWindow_PreviewKeyDown", code, StringComparison.Ordinal);
+        Assert.Contains("NavigateGridFromButton(e.Key)", code, StringComparison.Ordinal);
+        Assert.Contains("Key.Down", code, StringComparison.Ordinal);
+        Assert.Contains("ProcessesGrid.IsKeyboardFocusWithin", code, StringComparison.Ordinal);
+        Assert.Contains("if (ProcessesGrid.Items.Count > 0)", code, StringComparison.Ordinal);
+        // После завершения процесса при остатке строк ставится текущая строка.
+        Assert.Contains("ProcessesGrid.SelectedIndex < 0", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// issue #134 (1.0.1.104): паритет Avalonia — то же перенаправление стрелок
+    /// в таблицу и повторная установка фокуса после заполнения списка.
+    /// </summary>
+    [Fact]
+    public void Avalonia_Inspector_ArrowsWorkWhenFocusIsOnButton()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.Avalonia.cs");
+
+        Assert.Contains("KeyDown += OnWindow_KeyDown;", code, StringComparison.Ordinal);
+        Assert.Contains("OnWindow_KeyDown", code, StringComparison.Ordinal);
+        Assert.Contains("NavigateGridFromButton(e.Key)", code, StringComparison.Ordinal);
+        Assert.Contains("Key.Down", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.IsKeyboardFocusWithin", code, StringComparison.Ordinal);
+        Assert.Contains("if (_grid.ItemCount > 0)", code, StringComparison.Ordinal);
+        Assert.Contains("_grid.SelectedIndex < 0", code, StringComparison.Ordinal);
+    }
 }

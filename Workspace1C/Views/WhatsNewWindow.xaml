@@ -54,7 +54,7 @@
                 <Button Style="{StaticResource SecondaryButton}" IsCancel="True" Click="OnClose_Click">
                     <StackPanel Orientation="Horizontal">
                         <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Width="12" Height="12"
-                              Fill="{DynamicResource TextPrimaryBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Close}" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>

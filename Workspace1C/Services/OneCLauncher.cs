@@ -355,6 +355,10 @@ public static partial class OneCLauncher
         // База, расположенная на веб-сервере, подключается только тонким клиентом (/WS).
         // Толстый клиент 1cv8.exe не понимает /WS и при запуске открывает стандартное
         // окно со списком информационных баз вместо подключения к базе.
+        // Issue #150: явный тонкий клиент также исключает откат на общий стартер
+        // 1CEStart.exe (ветка FindExecutable при clientType == null). Стартер
+        // пересобирает команду (/WS → /IBConnectionString) и может потерять
+        // пользовательские /WSN и /WSP, оставив только их позиционные значения.
         if (infobase.Connection.Type == ConnectionType.WebServer)
         {
             clientType = OneCClientType.Thin;

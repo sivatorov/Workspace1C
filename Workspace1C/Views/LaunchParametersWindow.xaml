@@ -158,14 +158,14 @@
             <Button Width="140" Height="36" Margin="0,0,10,0" IsDefault="True" Click="OnOk_Click"
                     Style="{DynamicResource ModernButton}">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Ok}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>
             <Button Width="140" Height="36" IsCancel="True"
                     Style="{DynamicResource SecondaryButton}">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center" FontWeight="SemiBold"/>
                 </StackPanel>
             </Button>

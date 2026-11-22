@@ -1118,9 +1118,10 @@ namespace Workspace1C
                     Spacing = 6,
                     Children =
                     {
-                        // Кнопка подтверждения акцентная: значок — TextOnAccentBrush
-                        // (аудит UI P0-1; ButtonTextBrush на синем акценте давал 4.05:1).
-                        IconHelper.MakeIcon(okIconKey, UiMetrics.IconControl, "TextOnAccentBrush"),
+                        // Кнопка подтверждения акцентная: значок привязан к Foreground
+                        // кнопки (TextOnAccentBrush) — совпадает с подписью и остаётся
+                        // контрастным при наведении (issue #147, аудит UI P0-1).
+                        IconHelper.MakeIconForButton(okIconKey, UiMetrics.IconControl),
                         caption
                     }
                 },
@@ -1179,7 +1180,9 @@ namespace Workspace1C
                     Spacing = iconGap,
                     Children =
                     {
-                        IconHelper.MakeIcon(iconKey, iconSize, "TextOnAccentBrush"),
+                        // Issue #147: значок берёт Foreground кнопки (TextOnAccentBrush),
+                        // поэтому не пропадает на AccentHoverBrush при наведении.
+                        IconHelper.MakeIconForButton(iconKey, iconSize),
                         caption
                     }
                 },
@@ -1238,7 +1241,9 @@ namespace Workspace1C
                     Spacing = iconGap,
                     Children =
                     {
-                        IconHelper.MakeIcon("IconClose", iconSize, "SecondaryButtonTextBrush"),
+                        // Issue #147: значок берёт Foreground кнопки (SecondaryButtonTextBrush),
+                        // единый цвет с подписью «Отмена».
+                        IconHelper.MakeIconForButton("IconClose", iconSize),
                         caption
                     }
                 },

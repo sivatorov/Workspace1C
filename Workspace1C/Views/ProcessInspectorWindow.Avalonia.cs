@@ -143,6 +143,10 @@ namespace Workspace1C
             };
             _grid.DoubleTapped += OnGrid_DoubleTapped;
             _grid.KeyDown += OnGrid_KeyDown;
+            // issue #134 (1.0.1.104, замечание 7OH): если фокус оказался на кнопке
+            // («Колонки» и т.п.), стрелки должны управлять таблицей, а не переводить
+            // фокус на соседний элемент. Перехватываем клавиши на уровне окна.
+            KeyDown += OnWindow_KeyDown;
             ScrollViewer.SetHorizontalScrollBarVisibility(_grid, ScrollBarVisibility.Disabled);
 
             // issue #134: набор видимых колонок изменён — перестраиваем шапку и строки,
@@ -212,7 +216,10 @@ namespace Workspace1C
             _grid.GotFocus += (_, _) =>
             {
                 _gridHadFocus = true;
-                _focusApplied = true;
+                // Пустой список ещё не готов к навигации: фокус будет переставлен
+                // при первом заполнении (issue #134, 1.0.1.104).
+                if (_grid.ItemCount > 0)
+                    _focusApplied = true;
             };
             // Фокус ушёл из таблицы (например, клик по кнопке) — не возвращаем его
             // принудительно при автообновлении.
@@ -267,7 +274,7 @@ namespace Workspace1C
                     if ((_grid.SelectedItems?.Count ?? 0) == 0 && _grid.ItemCount > 0)
                         _grid.SelectedIndex = 0;
 
-                    if (focused || _grid.IsKeyboardFocusWithin)
+                    if ((focused || _grid.IsKeyboardFocusWithin) && _grid.ItemCount > 0)
                     {
                         _gridHadFocus = true;
                         _focusApplied = true;
@@ -278,6 +285,57 @@ namespace Workspace1C
                         FocusGridAttempt(attempt + 1);
                 },
                 DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// issue #134 (1.0.1.104, замечание 7OH): навигационные клавиши работают,
+        /// даже если после открытия окна или завершения процесса фокус оказался на
+        /// кнопке. Раньше первое нажатие «вниз» лишь переводило фокус на «Колонки».
+        /// </summary>
+        private void OnWindow_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (_grid.IsKeyboardFocusWithin)
+                return;
+            if (e.Key is not (Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End))
+                return;
+            if (_grid.ItemCount == 0)
+                return;
+            // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
+            if (e.Source is TextBox or ComboBox)
+                return;
+
+            e.Handled = true;
+            NavigateGridFromButton(e.Key);
+        }
+
+        /// <summary>
+        /// Переносит фокус в таблицу и выполняет запрошенное перемещение по строкам
+        /// (issue #134, 1.0.1.104). Если строка ещё не выбрана, «вниз»/«вверх»
+        /// выбирают первую, «End» — последнюю.
+        /// </summary>
+        private void NavigateGridFromButton(Key key)
+        {
+            _grid.Focus();
+            _gridHadFocus = true;
+
+            var count = _grid.ItemCount;
+            if (count == 0)
+                return;
+
+            var current = _grid.SelectedIndex;
+            var target = key switch
+            {
+                Key.Home => 0,
+                Key.End => count - 1,
+                Key.Up => current > 0 ? current - 1 : 0,
+                Key.PageUp => Math.Max(0, (current < 0 ? 0 : current) - 10),
+                Key.PageDown => Math.Min(count - 1, (current < 0 ? 0 : current) + 10),
+                _ => current < 0 ? 0 : Math.Min(count - 1, current + 1)
+            };
+
+            _grid.SelectedIndex = target;
+            if (_grid.SelectedItem is ProcessRowViewModel row)
+                _grid.ScrollIntoView(row);
         }
 
         private static void Place(Grid grid, Control control, int row)
@@ -681,6 +739,11 @@ namespace Workspace1C
                 {
                     if (!_opened)
                         return;
+                    // Если после завершения процесса строки остались, но выделение
+                    // сброшено, ставим текущую строку — иначе первое нажатие «вниз»
+                    // снова уводит фокус на кнопку (issue #134, 1.0.1.104).
+                    if (_grid.ItemCount > 0 && _grid.SelectedIndex < 0)
+                        _grid.SelectedIndex = 0;
                     _grid.Focus();
                 },
                 DispatcherPriority.Input);

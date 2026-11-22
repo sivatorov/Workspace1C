@@ -304,6 +304,20 @@ public static partial class OneCLauncher
         }
 
         var extraParameters = infobase.LaunchParameters?.Trim() ?? string.Empty;
+
+        // Issue #150: для веб-базы пользовательские ключи /WSN и /WSP должны уходить
+        // в канонической форме «/WSN "значение"». Платформа при подключении к
+        // веб-серверу пересобирает строку запуска: неизвестные ключи могут быть
+        // потеряны, а их значения останутся позиционными аргументами (и будут
+        // проигнорированы — появится окно «Доступ к веб-серверу»). Разбор и
+        // обратная сборка привязывают значение в кавычках к ключу, поэтому ключи
+        // не теряются, а склеенная форма («/WSN"user"») нормализуется.
+        if (extraParameters.Length > 0 && conn.Type == ConnectionType.WebServer)
+        {
+            extraParameters = OneCLaunchArgumentParser.FormatLaunchParameters(
+                OneCLaunchArgumentParser.ParseLaunchParameters(extraParameters)).Trim();
+        }
+
         if (forceAuthPrompt && extraParameters.Length > 0)
             extraParameters = StripAuthKeys(extraParameters).Trim();
         var extraArg = extraParameters.Length == 0 ? "" : " " + extraParameters;

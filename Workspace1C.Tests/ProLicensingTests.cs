@@ -205,6 +205,38 @@ public sealed class ProLicensingTests : IDisposable
     }
 
     [Fact]
+    public void ActivatedProModules_AppearUnderTools_WhenMoreIsHidden()
+    {
+        if (!EditionService.HasProModules)
+            return;
+
+        AppServices.Configure();
+        var settings = new AppSettings { UtilitiesMenuEditingEnabled = true };
+        var store = new UtilitiesMenuLayoutStore(directoryOverride: _dir);
+        var savedLayout = UtilitiesMenuLayouts.Default();
+        savedLayout.Root.Single(node => node.GroupId == UtilitiesMenuCatalog.GroupMore).Visible = false;
+        store.Save(savedLayout);
+
+        UtilitiesMenuLayout ResolveMenu() => UtilitiesMenuResolver.ResolveForDisplay(settings, store);
+
+        var beforeActivation = UtilitiesMenuLayouts.ExtractSection(ResolveMenu(), UtilitiesMenuCatalog.GroupTools);
+        Assert.DoesNotContain(beforeActivation!.Root, node => node.GroupId == UtilitiesMenuCatalog.GroupPro);
+
+        Assert.True(EditionService.Activate(Issue(VersionInfo.Major(), MachineIdProvider.Current)).IsValid);
+        var activeMenu = ResolveMenu();
+        Assert.Null(UtilitiesMenuLayouts.ExtractSection(activeMenu, UtilitiesMenuCatalog.GroupMore));
+        var tools = UtilitiesMenuLayouts.ExtractSection(activeMenu, UtilitiesMenuCatalog.GroupTools);
+        var pro = Assert.Single(tools!.Root.Where(node => node.GroupId == UtilitiesMenuCatalog.GroupPro));
+        var features = pro.Children.Select(node => UtilitiesMenuCatalog.Find(node.ItemId)!.RequiredFeature!.Value);
+        var expected = ProFeatures.All.Where(feature => !ProFeatures.IsInPublicCore(feature));
+        Assert.Equal(expected.OrderBy(feature => feature), features.OrderBy(feature => feature));
+
+        EditionService.Deactivate();
+        var afterDeactivation = UtilitiesMenuLayouts.ExtractSection(ResolveMenu(), UtilitiesMenuCatalog.GroupTools);
+        Assert.DoesNotContain(afterDeactivation!.Root, node => node.GroupId == UtilitiesMenuCatalog.GroupPro);
+    }
+
+    [Fact]
     public void Edition_InvalidKey_IsNotSaved()
     {
         var result = EditionService.Activate(Issue(VersionInfo.Major(), "AAAA-BBBB-CCCC-DDDD"));

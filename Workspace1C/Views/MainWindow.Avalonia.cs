@@ -1112,8 +1112,7 @@ namespace Workspace1C
             // показывает одну кнопку «Утилиты» (рабочая точка входа). ПКМ по любой
             // кнопке раздела открывает редактор структуры меню.
             var sectionStore = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
-            var sectionLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(
-                UtilitiesMenuResolver.Resolve(_vm?.Settings, sectionStore));
+            var sectionLayout = UtilitiesMenuResolver.ResolveForDisplay(_vm?.Settings, sectionStore);
             foreach (var section in UtilitiesSectionMenuPlanner.Build(sectionLayout))
             {
                 var sectionIcon = section.IsCustom

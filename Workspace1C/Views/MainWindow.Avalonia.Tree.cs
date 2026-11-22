@@ -2715,13 +2715,22 @@ namespace Workspace1C
             // «Новинки программы» (issue #4): группа автоматически добавляется в компоновку
             // (даже если её нет в файле), в неё попадают пункты, отсутствующие в файле.
             // Видимость группы зафиксирована — скрытие в редакторе не влияет на отображение.
-            var fullLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(vm.Settings, store));
+            var fullLayout = UtilitiesMenuResolver.ResolveForDisplay(vm.Settings, store);
             if (fullLayout is null)
                 return menu;
 
             // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
-            // Issue #146: кнопка «Утилиты» (пользовательская компоновка без разделов)
-            // открывает полную компоновку; скрытый раздел не открывается (ExtractSection → null).
+            // Issue #146: кнопка «Утилиты» без идентификатора раздела открывает группу
+            // «Утилиты» (куда миграция перенесла пользовательское меню); если такой группы
+            // нет — полную компоновку. Скрытый раздел не открывается (ExtractSection → null).
+            if (sectionGroupId is null
+                && fullLayout.Root.Any(n => n is not null
+                    && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                    && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal)))
+            {
+                sectionGroupId = UtilitiesMenuCatalog.GroupUtilities;
+            }
+
             UtilitiesMenuLayout? layout = fullLayout;
             if (sectionGroupId is not null
                 && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
@@ -2729,8 +2738,9 @@ namespace Workspace1C
                 layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
                 if (layout is null)
                     return menu;
-                // В «Ещё» показываем новинки программы: это служебный раздел.
-                if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+                // В «Ещё» и «Утилитах» показываем новинки программы: это служебные группы.
+                if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal)
+                    || string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal))
                 {
                     var newItems = fullLayout.Root.FirstOrDefault(n =>
                         string.Equals(n.Kind, "group", StringComparison.Ordinal)
@@ -2778,11 +2788,23 @@ namespace Workspace1C
                 }
                 if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
                 {
-                    var sub = new MenuItem
+                    var title = AvaloniaGroupTitle(node);
+                    // issue #146: режим «Иконка» / «С надписью» — единый расчёт для WPF
+                    // и Avalonia (UtilitiesMenuGroupPresentation).
+                    var presentation = UtilitiesMenuGroupPresentation.Build(node, title);
+                    var icon = AvaloniaGroupIcon(node);
+                    var sub = new MenuItem();
+                    if (presentation.ShowLabel)
                     {
-                        Header = AvaloniaGroupTitle(node),
-                        Icon = AvaloniaGroupIcon(node)
-                    };
+                        sub.Header = title;
+                        sub.Icon = icon;
+                    }
+                    else
+                    {
+                        // Только иконка с подсказкой: заголовком служит сама иконка.
+                        sub.Header = icon;
+                    }
+                    ToolTip.SetTip(sub, presentation.ToolTip);
                     sub.Styled(Themes.ControlThemes.ModernMenuItem);
                     AppendAvaloniaNodes(sub.Items, node.Children);
                     target.Add(sub);
@@ -2823,14 +2845,18 @@ namespace Workspace1C
                         UtilitiesMenuCatalog.GroupNewItems, ThemeManager.CurrentScheme,
                         ThemeManager.CurrentTheme == ThemeManager.DarkThemeName));
             }
-            var iconKey = !string.IsNullOrWhiteSpace(node.IconKey)
-                ? node.IconKey!
-                : UtilitiesMenuCatalog.GroupAvaloniaIconKey(node.GroupId ?? string.Empty);
+            // issue #146: иконка группы берётся из сохранённого узла; PackIcon-ключ
+            // каталога отображается на парную геометрию Icon* (как в WPF), иначе —
+            // стандартная иконка группы или детерминированная «папка». Раньше ключ
+            // передавался в IconHelper напрямую и в меню получалась «другая» иконка.
+            var iconKey = UtilitiesMenuCatalog.ResolveGroupIconKeyAvalonia(node.GroupId, node.IconKey);
             var color = !string.IsNullOrWhiteSpace(node.IconColor)
                 ? node.IconColor!
                 : UtilitiesMenuCatalog.ResolveGroupIconColor(
                     node.GroupId ?? string.Empty, ThemeManager.CurrentScheme,
                     ThemeManager.CurrentTheme == ThemeManager.DarkThemeName);
+            if (string.IsNullOrWhiteSpace(color))
+                color = "#6B7280";
             return MenuIcon(iconKey, color);
         }
 
@@ -2849,9 +2875,13 @@ namespace Workspace1C
             }
             else
             {
-                var iconKey = !string.IsNullOrWhiteSpace(node.IconKey)
-                    ? node.IconKey!
-                    : catalogItem.AvaloniaIconKey;
+                // issue #146: пользовательский PackIcon-ключ отображается на геометрию
+                // Icon* (иначе иконка не находилась); неизвестный — иконка каталога.
+                var iconKey = string.IsNullOrWhiteSpace(node.IconKey)
+                    ? catalogItem.AvaloniaIconKey
+                    : UtilitiesMenuCatalog.WpfIconGeometryKey(node.IconKey);
+                if (string.IsNullOrWhiteSpace(iconKey))
+                    iconKey = catalogItem.AvaloniaIconKey;
                 var color = !string.IsNullOrWhiteSpace(node.IconColor)
                     ? node.IconColor!
                     : UtilitiesMenuCatalog.ResolveItemIconColor(

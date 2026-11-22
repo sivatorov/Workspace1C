@@ -263,7 +263,7 @@
                         Height="38" MinWidth="116"
                         IsEnabled="False" Click="OnSelect_Click" Margin="0,0,8,0">
                     <StackPanel Orientation="Horizontal">
-                        <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconCheck}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Select}" VerticalAlignment="Center"
                                    FontWeight="SemiBold"/>
                     </StackPanel>
@@ -271,7 +271,7 @@
                 <Button Style="{StaticResource SecondaryButton}" Height="38" MinWidth="116"
                         IsCancel="True" Click="OnCancel_Click">
                     <StackPanel Orientation="Horizontal">
-                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="15" Height="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="15" Height="15" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock Text="{loc:Loc Common.Cancel}" VerticalAlignment="Center"
                                    FontWeight="SemiBold"/>
                     </StackPanel>

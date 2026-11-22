@@ -23,7 +23,9 @@ public sealed class Issue146UtilitiesMenuTests
 
     /// <summary>
     /// Пользовательские группы, их названия и порядок сохраняются: миграция больше
-    /// не заменяет дерево на <see cref="UtilitiesMenuLayouts.Default"/>.
+    /// не заменяет дерево на <see cref="UtilitiesMenuLayouts.Default"/>. С 1.0.1.104
+    /// (issue #146, комментарий 7OH) пользовательские узлы не остаются «подвешенными»
+    /// в корне, а переносятся в группу «Утилиты» в исходном порядке.
     /// </summary>
     [Fact]
     public void Migrate_PreservesCustomGroupsAndOrder()
@@ -33,18 +35,21 @@ public sealed class Issue146UtilitiesMenuTests
         var migrated = UtilitiesMenuLayouts.Migrate(layout);
 
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, migrated.SchemaVersion);
-        // Первые три корневых узла — ровно пользовательские, в исходном порядке.
-        Assert.Equal("item", migrated.Root[0].Kind);
-        Assert.Equal("ServerMonitor", migrated.Root[0].ItemId);
-        Assert.Equal("group", migrated.Root[1].Kind);
-        Assert.Equal("Моя папка", migrated.Root[1].CustomTitle);
-        Assert.Equal("group", migrated.Root[2].Kind);
-        Assert.Equal(UtilitiesMenuCatalog.GroupLockOptions, migrated.Root[2].GroupId);
-        Assert.Equal("Старые блокировки", migrated.Root[2].CustomTitle);
+        // Пользовательские узлы перенесены в группу «Утилиты», порядок сохранён.
+        var utilities = migrated.Root.FirstOrDefault(n =>
+            n.Kind == "group" && n.GroupId == UtilitiesMenuCatalog.GroupUtilities);
+        Assert.NotNull(utilities);
+        Assert.Equal("item", utilities!.Children[0].Kind);
+        Assert.Equal("ServerMonitor", utilities.Children[0].ItemId);
+        Assert.Equal("group", utilities.Children[1].Kind);
+        Assert.Equal("Моя папка", utilities.Children[1].CustomTitle);
+        Assert.Equal("group", utilities.Children[2].Kind);
+        Assert.Equal(UtilitiesMenuCatalog.GroupLockOptions, utilities.Children[2].GroupId);
+        Assert.Equal("Старые блокировки", utilities.Children[2].CustomTitle);
 
         // Порядок детей пользовательской группы сохранён.
         Assert.Equal(new[] { "Services", "ActualReleases" },
-            migrated.Root[1].Children.Where(n => n.Kind == "item").Select(n => n.ItemId).ToArray());
+            utilities.Children[1].Children.Where(n => n.Kind == "item").Select(n => n.ItemId).ToArray());
     }
 
     /// <summary>

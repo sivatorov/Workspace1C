@@ -22,8 +22,10 @@
             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         </Style>
         <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}"/>
-        <!-- Превью иконок каталога (issue #374): строковый ключ → PackIconKind. -->
-        <conv:PackIconKindConverter x:Key="PackIconKindConverter"/>
+        <!-- Превью иконок (issue #146): ТА ЖЕ геометрия Icon*, что рисует меню «Утилиты»
+             (PackIcon-ключ каталога разрешается через WpfIconGeometryKey в
+             DisplayIconGeometryKey), поэтому настройка и рабочее меню совпадают. -->
+        <conv:IconKeyToGeometryConverter x:Key="IconKeyToGeometry"/>
         <!-- Шаблон узла дерева: чекбокс видимости + иконка + заголовок + пометка вида -->
         <HierarchicalDataTemplate x:Key="MenuNodeTemplate" ItemsSource="{Binding Children}">
             <StackPanel Orientation="Horizontal">
@@ -33,19 +35,9 @@
                 <CheckBox IsChecked="{Binding IsVisible}" IsEnabled="{Binding CanToggleVisibility}"
                           VerticalAlignment="Center"
                           ToolTip="{loc:Loc Utilities.Editor.VisibleTooltip}"/>
-                <materialDesign:PackIcon Kind="{Binding DisplayIconKey, Converter={StaticResource PackIconKindConverter}}"
-                                         Width="16" Height="16" Margin="4,0,0,0" VerticalAlignment="Center"
-                                         Foreground="{Binding DisplayIconColor}">
-                    <materialDesign:PackIcon.Style>
-                        <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DisplayIconKey}" Value="">
-                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </materialDesign:PackIcon.Style>
-                </materialDesign:PackIcon>
+                <Path Data="{Binding DisplayIconGeometryKey, Converter={StaticResource IconKeyToGeometry}}"
+                      Width="16" Height="16" Margin="4,0,0,0" VerticalAlignment="Center"
+                      Stretch="Uniform" Fill="{Binding DisplayIconColor}"/>
                 <TextBlock Text="{Binding Title}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding KindLabel}" Margin="8,0,0,0" VerticalAlignment="Center"
                            FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -62,7 +54,7 @@
             <Button x:Name="OkButton" Width="130" IsDefault="True"
                     Style="{StaticResource PrimaryButton}" Click="OnOk_Click">
                 <StackPanel Orientation="Horizontal">
-                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{DynamicResource SuccessBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <Path Data="{DynamicResource IconCheck}" Width="16" Height="16" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{loc:Loc Utilities.Editor.Done}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
@@ -201,7 +193,7 @@
                 <StackPanel Orientation="Horizontal">
                     <Button Style="{StaticResource ModernButton}" Command="{Binding SaveCommand}" Padding="10,6" Margin="0,0,6,0">
                         <StackPanel Orientation="Horizontal">
-                            <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{DynamicResource TextPrimaryBrush}" Width="16" Height="16" Margin="0,0,4,0"/>
+                            <Path Data="{DynamicResource IconSave}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="16" Height="16" Margin="0,0,4,0"/>
                             <TextBlock Text="{loc:Loc Utilities.Editor.Save}" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>

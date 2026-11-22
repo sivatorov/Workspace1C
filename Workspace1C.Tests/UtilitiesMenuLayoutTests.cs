@@ -232,7 +232,8 @@ public sealed class UtilitiesMenuLayoutTests
 
     /// <summary>
     /// Issue #146: миграция схемы 1 → 2 сохраняет пользовательские группы и порядок,
-    /// а не заменяет дерево стандартной компоновкой.
+    /// а не заменяет дерево стандартной компоновкой. С 1.0.1.104 пользовательские
+    /// корневые узлы переносятся в группу «Утилиты» (комментарий 7OH).
     /// </summary>
     [Fact]
     public void Migrate_V1_PreservesCustomGroupsAndOrder()
@@ -258,9 +259,11 @@ public sealed class UtilitiesMenuLayoutTests
 
         var migrated = UtilitiesMenuLayouts.Migrate(layout);
 
-        Assert.Equal("ServerMonitor", migrated.Root[0].ItemId);
-        Assert.Equal("Моя папка", migrated.Root[1].CustomTitle);
-        Assert.Equal("Services", migrated.Root[1].Children[0].ItemId);
+        var utilities = FindGroupById(migrated.Root, UtilitiesMenuCatalog.GroupUtilities);
+        Assert.NotNull(utilities);
+        Assert.Equal("ServerMonitor", utilities!.Children[0].ItemId);
+        Assert.Equal("Моя папка", utilities.Children[1].CustomTitle);
+        Assert.Equal("Services", utilities.Children[1].Children[0].ItemId);
     }
 
     /// <summary>Issue #146: скрытый раздел не открывается кнопкой на панели.</summary>

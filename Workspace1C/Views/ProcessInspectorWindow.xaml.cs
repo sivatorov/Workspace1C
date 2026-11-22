@@ -88,6 +88,12 @@ namespace Workspace1C
 
             ApplyColumnVisibility();
 
+            // issue #134 (1.0.1.104, замечание 7OH): если фокус оказался на кнопке
+            // («Колонки» и т.п.), стрелки должны управлять таблицей, а не переводить
+            // фокус на соседний элемент. Перехватываем навигационные клавиши на
+            // уровне окна и передаём их списку.
+            PreviewKeyDown += OnWindow_PreviewKeyDown;
+
             // issue #134 (1.0.1.102, замечание 7OH): фокус ставится ПОСЛЕ загрузки
             // данных и первого прохода разметки, с повторной попыткой, если окно ещё
             // не активировано. Прежний синхронный Focus() в Loaded не передавал
@@ -95,7 +101,10 @@ namespace Workspace1C
             ProcessesGrid.GotKeyboardFocus += (_, _) =>
             {
                 _gridHadKeyboardFocus = true;
-                _focusApplied = true;
+                // Пустая таблица ещё не готова к навигации: фокус будет переставлен
+                // при первом заполнении (issue #134, 1.0.1.104).
+                if (ProcessesGrid.Items.Count > 0)
+                    _focusApplied = true;
             };
             // Фокус ушёл из таблицы (например, клик по кнопке) — не возвращаем его
             // принудительно при автообновлении.
@@ -140,7 +149,7 @@ namespace Workspace1C
             ProcessesGrid.Focus();
             Keyboard.Focus(ProcessesGrid);
 
-            if (ProcessesGrid.IsKeyboardFocusWithin)
+            if (ProcessesGrid.IsKeyboardFocusWithin && ProcessesGrid.Items.Count > 0)
             {
                 _gridHadKeyboardFocus = true;
                 _focusApplied = true;
@@ -167,6 +176,58 @@ namespace Workspace1C
                 };
                 timer.Start();
             }
+        }
+
+        /// <summary>
+        /// issue #134 (1.0.1.104, замечание 7OH): навигационные клавиши работают,
+        /// даже если после открытия окна или завершения процесса фокус оказался на
+        /// кнопке. Раньше первое нажатие «вниз» лишь переводило фокус на «Колонки»,
+        /// и таблица не реагировала.
+        /// </summary>
+        private void OnWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (ProcessesGrid.IsKeyboardFocusWithin)
+                return;
+            if (e.Key is not (Key.Up or Key.Down or Key.PageUp or Key.PageDown or Key.Home or Key.End))
+                return;
+            if (ProcessesGrid.Items.Count == 0)
+                return;
+            // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
+            if (Keyboard.FocusedElement is TextBoxBase or ComboBox)
+                return;
+
+            e.Handled = true;
+            NavigateGridFromButton(e.Key);
+        }
+
+        /// <summary>
+        /// Переносит фокус в таблицу и выполняет запрошенное перемещение по строкам
+        /// (issue #134, 1.0.1.104). Если строка ещё не выбрана, «вниз»/«вверх»
+        /// выбирают первую, «End» — последнюю.
+        /// </summary>
+        private void NavigateGridFromButton(Key key)
+        {
+            ProcessesGrid.Focus();
+            Keyboard.Focus(ProcessesGrid);
+            _gridHadKeyboardFocus = true;
+
+            var count = ProcessesGrid.Items.Count;
+            if (count == 0)
+                return;
+
+            var current = ProcessesGrid.SelectedIndex;
+            var target = key switch
+            {
+                Key.Home => 0,
+                Key.End => count - 1,
+                Key.Up => current > 0 ? current - 1 : 0,
+                Key.PageUp => Math.Max(0, (current < 0 ? 0 : current) - 10),
+                Key.PageDown => Math.Min(count - 1, (current < 0 ? 0 : current) + 10),
+                _ => current < 0 ? 0 : Math.Min(count - 1, current + 1)
+            };
+
+            ProcessesGrid.SelectedIndex = target;
+            SetCurrentRow(ProcessesGrid.Items[target] as ProcessRowViewModel);
         }
 
         /// <summary>
@@ -214,6 +275,14 @@ namespace Workspace1C
             {
                 if (!IsLoaded)
                     return;
+                // Если после завершения процесса строки остались, но выделение
+                // сброшено, ставим текущую строку — иначе первое нажатие «вниз»
+                // снова уводит фокус на кнопку (issue #134, 1.0.1.104).
+                if (ProcessesGrid.Items.Count > 0 && ProcessesGrid.SelectedIndex < 0)
+                {
+                    ProcessesGrid.SelectedIndex = 0;
+                    SetCurrentRow(ProcessesGrid.Items[0] as ProcessRowViewModel);
+                }
                 ProcessesGrid.Focus();
                 Keyboard.Focus(ProcessesGrid);
             }), DispatcherPriority.Input);

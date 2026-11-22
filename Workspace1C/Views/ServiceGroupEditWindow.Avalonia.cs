@@ -212,7 +212,7 @@ namespace Workspace1C
                 // а не текстовый глиф «✔»/«✖».
                 Content = iconKey is null
                     ? new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
-                    : IconHelper.IconAndText(iconKey, text, UiMetrics.IconControl, "TextPrimaryBrush"),
+                    : IconHelper.IconAndTextForButton(iconKey, text, UiMetrics.IconControl),
                 Padding = new Thickness(14, 5)
             };
             button.Styled(ControlThemes.ModernButton);

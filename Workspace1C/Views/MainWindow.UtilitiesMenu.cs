@@ -52,13 +52,23 @@ public partial class MainWindow
         // «Новинки программы» (issue #4): группа автоматически добавляется в компоновку
         // (даже если её нет в файле), в неё попадают пункты, отсутствующие в файле.
         // Видимость группы зафиксирована — скрытие в редакторе не влияет на отображение.
-        var fullLayout = UtilitiesMenuResolver.EnsureNewItemsGroup(UtilitiesMenuResolver.Resolve(settings, store));
+        var fullLayout = UtilitiesMenuResolver.ResolveForDisplay(settings, store);
         if (fullLayout is null)
             return menu;
 
         // Навигация 1.0.1.99: кнопка раздела открывает только свой раздел.
-        // Issue #146: кнопка «Утилиты» (пользовательская компоновка без разделов)
-        // открывает полную компоновку; скрытый раздел не открывается (ExtractSection → null).
+        // Issue #146: кнопка «Утилиты» без идентификатора раздела открывает группу
+        // «Утилиты» (куда миграция перенесла пользовательское меню); если такой группы
+        // нет — полную компоновку (пользовательское плоское меню). Скрытый раздел
+        // не открывается (ExtractSection → null).
+        if (sectionGroupId is null
+            && fullLayout.Root.Any(n => n is not null
+                && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal)))
+        {
+            sectionGroupId = UtilitiesMenuCatalog.GroupUtilities;
+        }
+
         UtilitiesMenuLayout? layout = fullLayout;
         if (sectionGroupId is not null
             && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
@@ -66,7 +76,8 @@ public partial class MainWindow
             layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
             if (layout is null)
                 return menu;
-            if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal))
+            if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal)
+                || string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal))
             {
                 var newItems = fullLayout.Root.FirstOrDefault(n =>
                     string.Equals(n.Kind, "group", StringComparison.Ordinal)
@@ -104,12 +115,26 @@ public partial class MainWindow
             }
             if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
             {
+                var title = GroupTitle(node);
+                // issue #146: режим «Иконка» / «С надписью» — единый расчёт для WPF
+                // и Avalonia (UtilitiesMenuGroupPresentation).
+                var presentation = UtilitiesMenuGroupPresentation.Build(node, title);
+                var icon = GroupIcon(node);
                 var sub = new MenuItem
                 {
-                    Header = GroupTitle(node),
                     Style = TryFindResource("ModernMenuItem") as Style,
+                    ToolTip = presentation.ToolTip,
                 };
-                sub.Icon = GroupIcon(node);
+                if (presentation.ShowLabel)
+                {
+                    sub.Header = title;
+                    sub.Icon = icon;
+                }
+                else
+                {
+                    // Только иконка с подсказкой: заголовком служит сама иконка.
+                    sub.Header = icon;
+                }
                 AppendNodes(sub.Items, node.Children);
                 target.Add(sub);
             }
@@ -149,12 +174,15 @@ public partial class MainWindow
                 UtilitiesMenuCatalog.GroupWpfIconKind(UtilitiesMenuCatalog.GroupNewItems),
                 UtilitiesMenuCatalog.GroupIconColor(UtilitiesMenuCatalog.GroupNewItems));
         }
-        var iconKey = !string.IsNullOrWhiteSpace(node.IconKey)
-            ? node.IconKey!
-            : UtilitiesMenuCatalog.GroupWpfIconKind(node.GroupId ?? string.Empty);
+        // issue #146: иконка группы берётся из сохранённого узла (IconKey/IconColor);
+        // при отсутствии — стандартная иконка группы или детерминированная «папка»,
+        // тот же расчёт используют дерево редактора и диалог правки группы.
+        var iconKey = UtilitiesMenuCatalog.ResolveGroupIconKeyWpf(node.GroupId, node.IconKey);
         var color = !string.IsNullOrWhiteSpace(node.IconColor)
             ? node.IconColor!
             : UtilitiesMenuCatalog.ResolveGroupIconColor(node.GroupId ?? string.Empty, ActiveScheme, IsDarkTheme);
+        if (string.IsNullOrWhiteSpace(color))
+            color = "#6B7280";
         return CreateMenuIcon(iconKey, color);
     }
 
@@ -186,9 +214,14 @@ public partial class MainWindow
     {
         if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
             return CreateExternalIcon(node.ExternalIconPath!);
-        var iconKey = !string.IsNullOrWhiteSpace(node.IconKey)
-            ? node.IconKey!
-            : catalogItem.WpfIconKind;
+        // issue #146: неизвестный пользовательский ключ не должен «терять» иконку —
+        // падаем на иконку каталога (тот же детерминированный fallback, что в редакторе).
+        var iconKey = node.IconKey;
+        if (string.IsNullOrWhiteSpace(iconKey)
+            || string.IsNullOrWhiteSpace(UtilitiesMenuCatalog.WpfIconGeometryKey(iconKey)))
+        {
+            iconKey = catalogItem.WpfIconKind;
+        }
         var color = !string.IsNullOrWhiteSpace(node.IconColor)
             ? node.IconColor!
             : UtilitiesMenuCatalog.ResolveItemIconColor(catalogItem, ActiveScheme, IsDarkTheme);
@@ -450,8 +483,7 @@ public partial class MainWindow
         {
             UtilitiesMenuEditingEnabled = _viewModel.UtilitiesMenuEditingEnabled
         };
-        var layout = UtilitiesMenuResolver.EnsureNewItemsGroup(
-            UtilitiesMenuResolver.Resolve(settings, store));
+        var layout = UtilitiesMenuResolver.ResolveForDisplay(settings, store);
         var plan = UtilitiesSectionMenuPlanner.Build(layout);
 
         bool Visible(string sectionId) => plan.Any(b =>
@@ -462,7 +494,8 @@ public partial class MainWindow
         SetSectionButtonVisibility(ToolsSectionButton, Visible(UtilitiesMenuCatalog.GroupTools));
         SetSectionButtonVisibility(MoreSectionButton, Visible(UtilitiesMenuCatalog.GroupMore));
         SetSectionButtonVisibility(UtilitiesFallbackButton,
-            plan.Any(b => UtilitiesSectionMenuPlanner.IsUtilitiesSection(b.SectionId)));
+            plan.Any(b => UtilitiesSectionMenuPlanner.IsUtilitiesSection(b.SectionId)
+                || string.Equals(b.SectionId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal)));
     }
 
     /// <summary>Показывает/скрывает кнопку раздела; null-кнопка игнорируется.</summary>

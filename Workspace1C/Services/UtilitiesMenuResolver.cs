@@ -1,5 +1,8 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Workspace1C.Models;
+using Workspace1C.Services.Licensing;
 
 namespace Workspace1C.Services;
 
@@ -25,6 +28,53 @@ public static class UtilitiesMenuResolver
             return UtilitiesMenuLayouts.Default();
         var layout = store?.Load();
         return layout ?? UtilitiesMenuLayouts.Default();
+    }
+
+    /// <summary>Готовит рабочее меню, не сохраняя служебную группу в компоновке пользователя.</summary>
+    public static UtilitiesMenuLayout ResolveForDisplay(AppSettings? settings, IUtilitiesMenuLayoutStore? store)
+    {
+        var layout = Resolve(settings, store);
+        if (EditionService.IsPro && EditionService.HasProModules)
+        {
+            var items = UtilitiesMenuCatalog.All
+                .Where(item => item.RequiredFeature is { } feature && !ProFeatures.IsInPublicCore(feature))
+                .Select(item => new UtilitiesMenuNode { ItemId = item.Id })
+                .ToList();
+
+            if (items.Count > 0)
+            {
+                var itemIds = items.Select(item => item.ItemId!).ToHashSet(StringComparer.Ordinal);
+                RemoveProItems(layout.Root, itemIds);
+
+                var tools = layout.Root.FirstOrDefault(node =>
+                    node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupTools);
+                if (tools is null)
+                {
+                    tools = new UtilitiesMenuNode { Kind = "group", GroupId = UtilitiesMenuCatalog.GroupTools };
+                    layout.Root.Add(tools);
+                }
+                if (!tools.Visible)
+                {
+                    tools.Children.Clear();
+                    tools.Visible = true;
+                }
+                tools.Children.Add(new UtilitiesMenuNode
+                {
+                    Kind = "group",
+                    GroupId = UtilitiesMenuCatalog.GroupPro,
+                    Children = items
+                });
+            }
+        }
+        EnsureNewItemsGroup(layout);
+        return layout;
+    }
+
+    private static void RemoveProItems(List<UtilitiesMenuNode> nodes, HashSet<string> itemIds)
+    {
+        nodes.RemoveAll(node => node.Kind == "item" && node.ItemId is { } id && itemIds.Contains(id));
+        foreach (var node in nodes)
+            RemoveProItems(node.Children, itemIds);
     }
 
     /// <summary>

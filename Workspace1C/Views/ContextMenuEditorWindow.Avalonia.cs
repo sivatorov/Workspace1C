@@ -238,7 +238,7 @@ namespace Workspace1C
         {
             var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             if (iconKey is not null)
-                content.Children.Add(IconHelper.MakeIcon(iconKey, 16, "TextPrimaryBrush"));
+                content.Children.Add(IconHelper.MakeIconForButton(iconKey, 16));
             if (caption is not null)
                 content.Children.Add(new TextBlock { Text = LocalizationManager.T(caption), VerticalAlignment = VerticalAlignment.Center });
             var button = new Button
@@ -260,7 +260,7 @@ namespace Workspace1C
         {
             var button = new Button
             {
-                Content = IconHelper.MakeIcon(iconKey, 16, "TextPrimaryBrush"),
+                Content = IconHelper.MakeIconForButton(iconKey, 16),
                 Padding = new Thickness(10, 6),
                 VerticalAlignment = VerticalAlignment.Center
             };

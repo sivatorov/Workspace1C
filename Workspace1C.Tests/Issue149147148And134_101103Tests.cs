@@ -23,7 +23,10 @@ public sealed class Issue149147148And134_101103Tests
         var group = Slice(xaml, "x:Key=\"SettingsGroupTabItem\"", "x:Key=\"SettingsSubTabControl\"");
 
         Assert.Contains("Property=\"IsSelected\" Value=\"True\"", group, StringComparison.Ordinal);
-        Assert.Contains("BorderThickness\" Value=\"3,0,0,0\"", group, StringComparison.Ordinal);
+        // Доработка 1.0.1.104: полоса 3 px зарезервирована в шаблоне в любом
+        // состоянии, а выделение только красит рамку — контент не смещается.
+        Assert.Contains("BorderThickness=\"3,0,0,0\"", group, StringComparison.Ordinal);
+        Assert.Contains("BorderBrush\" Value=\"{DynamicResource AccentBrush}\"", group, StringComparison.Ordinal);
         Assert.Contains("ItemHoverBrush", group, StringComparison.Ordinal);
     }
 

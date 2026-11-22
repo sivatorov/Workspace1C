@@ -294,6 +294,13 @@ public static class UtilitiesMenuCatalog
     /// <summary>Раздел первого уровня: обновления, приложение, справка.</summary>
     public const string GroupMore = "More";
 
+    /// <summary>
+    /// Стандартная группа «Утилиты» (issue #146): сюда миграция переносит все корневые
+    /// пользовательские пункты и группы старой плоской компоновки. Группа показывается
+    /// отдельной кнопкой на панели и открывает своё содержимое без лишнего уровня.
+    /// </summary>
+    public const string GroupUtilities = "Utilities";
+
     /// <summary>Подгруппа «Обслуживание» → резервные копии.</summary>
     public const string GroupBackups = "Backups";
 
@@ -320,6 +327,8 @@ public static class UtilitiesMenuCatalog
 
     /// <summary>Подгруппа «Инструменты» → сервисы редакции ПРО.</summary>
     public const string GroupProServices = "ProServices";
+
+    public const string GroupPro = "Pro";
 
     /// <summary>Подгруппа «Ещё» → обновления приложения и платформы.</summary>
     public const string GroupUpdates = "Updates";
@@ -388,6 +397,7 @@ public static class UtilitiesMenuCatalog
     /// <summary>Ключ локализации заголовка стандартной группы.</summary>
     public static string GroupTitleKey(string groupId) => groupId switch
     {
+        GroupUtilities => "Utilities.Submenu.Utilities",
         GroupServers => "Utilities.Submenu.Servers",
         GroupMaintenance => "Utilities.Submenu.Maintenance",
         GroupTools => "Utilities.Submenu.Tools",
@@ -401,6 +411,7 @@ public static class UtilitiesMenuCatalog
         GroupBaseLists => "Utilities.Submenu.BaseLists",
         GroupDevelopment => "Utilities.Submenu.Development",
         GroupProServices => "Utilities.Submenu.ProServices",
+        GroupPro => "Utilities.Submenu.Pro",
         GroupUpdates => "Utilities.Submenu.Updates",
         GroupApp => "Utilities.Submenu.App",
         GroupHelp => "Utilities.Submenu.Help",
@@ -419,9 +430,14 @@ public static class UtilitiesMenuCatalog
         GroupServers, GroupMaintenance, GroupTools, GroupMore
     };
 
-    /// <summary>True — идентификатор является разделом первого уровня.</summary>
+    /// <summary>
+    /// True — идентификатор является разделом первого уровня (включая стандартную группу
+    /// «Утилиты», в которую миграция складывает пользовательское меню — issue #146).
+    /// </summary>
     public static bool IsSectionGroupId(string? groupId) =>
-        groupId is not null && RootSections.Contains(groupId, StringComparer.Ordinal);
+        groupId is not null &&
+        (RootSections.Contains(groupId, StringComparer.Ordinal)
+         || string.Equals(groupId, GroupUtilities, StringComparison.Ordinal));
 
     /// <summary>
     /// True — идентификатор относится к легаси-группам версии 1.0.1.98 и ранее.
@@ -436,6 +452,7 @@ public static class UtilitiesMenuCatalog
     /// <summary>Ключ иконки стандартной группы для WPF (PackIcon Kind); пусто — без иконки.</summary>
     public static string GroupWpfIconKind(string groupId) => groupId switch
     {
+        GroupUtilities => "Apps",
         GroupServers => "ServerNetwork",
         GroupMaintenance => "Cog",
         GroupTools => "Tune",
@@ -449,6 +466,7 @@ public static class UtilitiesMenuCatalog
         GroupBaseLists => "Database",
         GroupDevelopment => "SourceBranch",
         GroupProServices => "Star",
+        GroupPro => "Star",
         GroupUpdates => "Update",
         GroupApp => "Lock",
         GroupHelp => "HelpCircle",
@@ -462,6 +480,7 @@ public static class UtilitiesMenuCatalog
     /// <summary>Ключ иконки стандартной группы для Avalonia (Icon*); пусто — без иконки.</summary>
     public static string GroupAvaloniaIconKey(string groupId) => groupId switch
     {
+        GroupUtilities => "IconMenu",
         GroupServers => "IconServer",
         GroupMaintenance => "IconSettings",
         GroupTools => "IconTune",
@@ -475,6 +494,7 @@ public static class UtilitiesMenuCatalog
         GroupBaseLists => "IconDatabase",
         GroupDevelopment => "IconCloudDownload",
         GroupProServices => "IconStar",
+        GroupPro => "IconStar",
         GroupUpdates => "IconUpdate",
         GroupApp => "IconExitToApp",
         GroupHelp => "IconInfo",
@@ -488,6 +508,7 @@ public static class UtilitiesMenuCatalog
     /// <summary>Цвет иконки стандартной группы (#RRGGBB).</summary>
     public static string GroupIconColor(string groupId) => groupId switch
     {
+        GroupUtilities => "#64748B",
         GroupServers => "#14B8A6",
         GroupMaintenance => "#0EA5E9",
         GroupTools => "#06B6D4",
@@ -501,6 +522,7 @@ public static class UtilitiesMenuCatalog
         GroupBaseLists => "#3B82F6",
         GroupDevelopment => "#8B5CF6",
         GroupProServices => "#F59E0B",
+        GroupPro => "#F59E0B",
         GroupUpdates => "#3B82F6",
         GroupApp => "#8B5CF6",
         GroupHelp => "#64748B",
@@ -636,6 +658,45 @@ public static class UtilitiesMenuCatalog
     public static string ResolveGroupIconColor(string groupId, ColorScheme? scheme, bool dark)
         => ResolveIconColor(GroupIconColor(groupId), scheme, dark);
 
+    /// <summary>
+    /// Эффективный ключ иконки группы для WPF (issue #146): сохранённая в узле иконка,
+    /// если она резолвится в геометрию, иначе стандартная иконка группы, иначе
+    /// детерминированная запасная «папка». Один и тот же результат используют меню,
+    /// дерево редактора и диалог правки группы — иконка в настройке и в меню совпадает.
+    /// </summary>
+    public static string ResolveGroupIconKeyWpf(string? groupId, string? iconKey)
+    {
+        if (!string.IsNullOrWhiteSpace(iconKey) &&
+            !string.IsNullOrWhiteSpace(WpfIconGeometryKey(iconKey)))
+        {
+            return iconKey!;
+        }
+        var standard = GroupWpfIconKind(groupId ?? string.Empty);
+        if (!string.IsNullOrWhiteSpace(standard) &&
+            !string.IsNullOrWhiteSpace(WpfIconGeometryKey(standard)))
+        {
+            return standard;
+        }
+        return LegacyFallbackIconKey;
+    }
+
+    /// <summary>
+    /// Эффективный ключ геометрии иконки группы для Avalonia (issue #146): ключ
+    /// <c>Icon*</c> возвращается как есть, PackIcon-имя каталога отображается на парный
+    /// ключ геометрии (как в меню WPF), иначе — стандартная иконка группы или «папка».
+    /// </summary>
+    public static string ResolveGroupIconKeyAvalonia(string? groupId, string? iconKey)
+    {
+        if (!string.IsNullOrWhiteSpace(iconKey))
+        {
+            var mapped = WpfIconGeometryKey(iconKey);
+            if (!string.IsNullOrWhiteSpace(mapped))
+                return mapped;
+        }
+        var standard = GroupAvaloniaIconKey(groupId ?? string.Empty);
+        return string.IsNullOrWhiteSpace(standard) ? LegacyFallbackIconKey : standard;
+    }
+
     /// <summary>Цвет иконки пункта меню из активной схемы (fallback — статичный каталога).</summary>
     public static string ResolveItemIconColor(UtilitiesMenuItem item, ColorScheme? scheme, bool dark)
         => ResolveIconColor(item.IconColor, scheme, dark);
@@ -674,7 +735,7 @@ public static class UtilitiesMenuCatalog
         }
         foreach (var groupId in new[]
                  {
-                     GroupServers, GroupMaintenance, GroupTools, GroupMore,
+                     GroupUtilities, GroupServers, GroupMaintenance, GroupTools, GroupMore,
                      GroupBackups, GroupSchedule, GroupDiagnostics, GroupProcesses,
                      GroupCompare, GroupJournals, GroupBaseLists, GroupDevelopment,
                      GroupProServices, GroupUpdates, GroupApp, GroupHelp,
@@ -916,8 +977,12 @@ public static class UtilitiesMenuCatalog
 /// </summary>
 public static class UtilitiesMenuLayouts
 {
-    /// <summary>Актуальная версия схемы файла компоновки (навигация 1.0.1.99 — разделы).</summary>
-    public const int CurrentSchemaVersion = 2;
+    /// <summary>
+    /// Актуальная версия схемы файла компоновки: 2 — разделы навигации 1.0.1.99,
+    /// 3 — перенос пользовательского меню в группу «Утилиты» и режим отображения
+    /// группы (issue #146).
+    /// </summary>
+    public const int CurrentSchemaVersion = 3;
 
     /// <summary>
     /// Стандартная компоновка меню: четыре сценарных раздела вместо плоского списка.
@@ -1082,6 +1147,7 @@ public static class UtilitiesMenuLayouts
         if (layout?.Root is null || layout.Root.Count == 0)
             return Default();
 
+        layout.Root ??= new List<UtilitiesMenuNode>();
         if (!NeedsMigration(layout))
         {
             layout.SchemaVersion = CurrentSchemaVersion;
@@ -1091,8 +1157,12 @@ public static class UtilitiesMenuLayouts
         // Сохраняем пользовательское дерево как есть и переносим только недостающие
         // функции каталога. Никакого «Default() + настройки пунктов» — это и теряло
         // аккуратно настроенные группы и порядок (issue #146).
-        layout.Root ??= new List<UtilitiesMenuNode>();
         DeduplicateItems(layout.Root, new HashSet<string>(StringComparer.Ordinal));
+
+        // issue #146 (комментарий 7OH): пользовательские пункты и группы не остаются
+        // «подвешенными» в корне рядом с разделами — они переносятся в группу «Утилиты»,
+        // которая показывается отдельной кнопкой и открывается одним уровнем.
+        MoveUserRootNodesIntoUtilities(layout);
 
         AddMissingCatalogItems(layout);
 
@@ -1106,19 +1176,74 @@ public static class UtilitiesMenuLayouts
     }
 
     /// <summary>
-    /// Нужна ли миграция компоновки: схема меньше актуальной и в корне нет разделов
-    /// первого уровня (навигация 1.0.1.99). Для актуальных/уже разделённых компоновок
-    /// миграция не требуется.
+    /// Переносит корневые пользовательские узлы (пункты, пользовательские и легаси-группы,
+    /// разделители) в стандартную группу «Утилиты» (issue #146). Разделы первого уровня
+    /// и служебная группа «Новинки программы» остаются в корне. Идемпотентно: после
+    /// переноса в корне не остаётся пользовательских узлов, повторный вызов ничего
+    /// не перемещает и не дублирует.
+    /// </summary>
+    private static void MoveUserRootNodesIntoUtilities(UtilitiesMenuLayout layout)
+    {
+        var utilities = layout.Root.FirstOrDefault(n => n is not null
+            && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+            && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal));
+
+        var movable = layout.Root
+            .Where(n => n is not null && IsMovableUserRootNode(n))
+            .ToList();
+        if (movable.Count == 0)
+            return;
+
+        if (utilities is null)
+        {
+            utilities = new UtilitiesMenuNode
+            {
+                Kind = "group",
+                GroupId = UtilitiesMenuCatalog.GroupUtilities,
+                Visible = true,
+            };
+            // Группа «Утилиты» добавляется после разделов — кнопка «Утилиты» последняя.
+            layout.Root.Add(utilities);
+        }
+
+        foreach (var node in movable)
+        {
+            layout.Root.Remove(node);
+            utilities.Children.Add(node);
+        }
+    }
+
+    /// <summary>
+    /// True — корневой узел относится к пользовательскому меню и переносится в «Утилиты»:
+    /// пункты, разделители, пользовательские/легаси-группы. Разделы навигации и служебная
+    /// группа «Новинки программы» остаются в корне.
+    /// </summary>
+    private static bool IsMovableUserRootNode(UtilitiesMenuNode node)
+    {
+        if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
+            || string.Equals(node.Kind, "separator", StringComparison.Ordinal))
+            return true;
+        if (!string.Equals(node.Kind, "group", StringComparison.Ordinal))
+            return true;
+        if (UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId))
+            return false;
+        if (string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal))
+            return false;
+        return true;
+    }
+
+    /// <summary>
+    /// Нужна ли миграция компоновки: схема меньше актуальной ИЛИ в корне остались
+    /// пользовательские узлы, которые должны быть внутри группы «Утилиты» (issue #146).
+    /// Для актуальной компоновки без «подвешенных» узлов миграция не требуется.
     /// </summary>
     public static bool NeedsMigration(UtilitiesMenuLayout? layout)
     {
-        if (layout is null)
+        if (layout?.Root is not { Count: > 0 })
             return false;
-        if (layout.SchemaVersion >= CurrentSchemaVersion)
-            return false;
-        if (HasSectionStructure(layout))
-            return false;
-        return layout.Root is { Count: > 0 };
+        if (layout.SchemaVersion < CurrentSchemaVersion)
+            return true;
+        return layout.Root.Any(n => n is not null && IsMovableUserRootNode(n));
     }
 
     /// <summary>
@@ -1430,8 +1555,13 @@ public sealed record UtilitiesSectionButton(string SectionId, string TitleKey, b
 /// </summary>
 public static class UtilitiesSectionMenuPlanner
 {
-    /// <summary>Служебный идентификатор кнопки «Утилиты» (полная компоновка).</summary>
-    public const string UtilitiesSectionId = "Utilities";
+    /// <summary>
+    /// Служебный идентификатор кнопки «Утилиты» для пользовательской компоновки без
+    /// разделов (полная плоская структура). Отличается от реальной группы «Утилиты»
+    /// (<see cref="UtilitiesMenuCatalog.GroupUtilities"/>), чтобы открытие кнопки не
+    /// путало полную компоновку с содержимым группы (issue #146).
+    /// </summary>
+    public const string UtilitiesSectionId = "UtilitiesCustom";
 
     /// <summary>Ключ локализации заголовка кнопки «Утилиты».</summary>
     public const string UtilitiesTitleKey = "Utilities.Submenu.Utilities";
@@ -1450,20 +1580,20 @@ public static class UtilitiesSectionMenuPlanner
         if (layout is null)
             return Array.Empty<UtilitiesSectionButton>();
 
-        if (!UtilitiesMenuLayouts.HasSectionStructure(layout))
-            return new[] { new UtilitiesSectionButton(UtilitiesSectionId, UtilitiesTitleKey, true) };
-
+        // Кнопки строятся по фактическому порядку разделов в компоновке (issue #146):
+        // так кнопка «Утилиты» появляется для перенесённого пользовательского меню,
+        // а порядок кнопок совпадает с порядком групп в редакторе.
         var result = new List<UtilitiesSectionButton>();
-        foreach (var sectionId in UtilitiesMenuCatalog.RootSections)
+        foreach (var node in layout.Root)
         {
-            var node = layout.Root.FirstOrDefault(n =>
-                n is not null
-                && string.Equals(n.Kind, "group", StringComparison.Ordinal)
-                && string.Equals(n.GroupId, sectionId, StringComparison.Ordinal));
             if (node is null || !node.Visible)
                 continue;
+            if (!string.Equals(node.Kind, "group", StringComparison.Ordinal))
+                continue;
+            if (!UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId))
+                continue;
             result.Add(new UtilitiesSectionButton(
-                sectionId, UtilitiesMenuCatalog.GroupTitleKey(sectionId), false));
+                node.GroupId!, UtilitiesMenuCatalog.GroupTitleKey(node.GroupId!), false));
         }
 
         if (result.Count == 0)

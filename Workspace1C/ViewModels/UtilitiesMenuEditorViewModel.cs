@@ -9,13 +9,15 @@ using Workspace1C.Services;
 namespace Workspace1C.ViewModels;
 
 /// <summary>Параметры создания/правки группы в редакторе меню «Утилиты» (issue #374):
-/// имя группы и ключ иконки каталога (пустой — без иконки).</summary>
+/// имя группы, ключ иконки каталога и режим отображения (issue #146).</summary>
 public sealed class UtilitiesGroupEditParams
 {
-    public UtilitiesGroupEditParams(string title, string? iconKey)
+    public UtilitiesGroupEditParams(string title, string? iconKey,
+        UtilitiesMenuGroupDisplay displayMode = UtilitiesMenuGroupDisplay.Icon)
     {
         Title = title;
         IconKey = iconKey;
+        DisplayMode = displayMode;
     }
 
     /// <summary>Имя группы.</summary>
@@ -23,6 +25,28 @@ public sealed class UtilitiesGroupEditParams
 
     /// <summary>Ключ иконки каталога (пустой — без иконки).</summary>
     public string? IconKey { get; }
+
+    /// <summary>Режим отображения группы: «Иконка» или «С надписью» (issue #146).</summary>
+    public UtilitiesMenuGroupDisplay DisplayMode { get; }
+}
+
+/// <summary>Вариант выпадающего списка «Отображение» в диалоге правки группы (issue #146).</summary>
+public sealed class UtilitiesGroupDisplayOption
+{
+    public UtilitiesGroupDisplayOption(UtilitiesMenuGroupDisplay mode, string labelKey)
+    {
+        Mode = mode;
+        LabelKey = labelKey;
+    }
+
+    /// <summary>Режим отображения.</summary>
+    public UtilitiesMenuGroupDisplay Mode { get; }
+
+    /// <summary>Ключ локализации подписи варианта.</summary>
+    public string LabelKey { get; }
+
+    /// <summary>Локализованная подпись.</summary>
+    public string Label => LocalizationManager.T(LabelKey);
 }
 
 /// <summary>
@@ -120,6 +144,13 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
 
     /// <summary>Доступные иконки из каталога для назначения (ключ → подпись).</summary>
     public IReadOnlyList<UtilitiesIconOption> CatalogIcons { get; } = BuildCatalogIcons();
+
+    /// <summary>Варианты настройки «Отображение» в диалоге правки группы (issue #146).</summary>
+    public static IReadOnlyList<UtilitiesGroupDisplayOption> GroupDisplayOptions { get; } = new[]
+    {
+        new UtilitiesGroupDisplayOption(UtilitiesMenuGroupDisplay.Icon, "Utilities.Editor.DisplayIcon"),
+        new UtilitiesGroupDisplayOption(UtilitiesMenuGroupDisplay.IconWithLabel, "Utilities.Editor.DisplayIconWithLabel"),
+    };
 
     /// <summary>Все группы дерева (для выпадающего списка «Поместить в группу»).</summary>
     public ObservableCollection<UtilitiesMenuNodeItem> Groups { get; } = new();
@@ -276,6 +307,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             Kind = "group",
             GroupId = null,
             CustomTitle = title,
+            DisplayMode = editParams?.DisplayMode ?? UtilitiesMenuGroupDisplay.Icon,
         };
         ApplyIconToNode(group, editParams?.IconKey);
         var parent = IsGroup(SelectedItem) ? SelectedItem : null;
@@ -296,6 +328,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             return;
         if (!string.IsNullOrWhiteSpace(editParams.Title))
             item.Node.CustomTitle = editParams.Title!.Trim();
+        item.Node.DisplayMode = editParams.DisplayMode;
         ApplyIconToNode(item.Node, editParams.IconKey);
         item.NotifyChanged();
     }
@@ -432,7 +465,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
     private void Save()
     {
         // Собираем дерево обратно в компоновку.
-        var layout = new UtilitiesMenuLayout { SchemaVersion = 1 };
+        var layout = new UtilitiesMenuLayout { SchemaVersion = UtilitiesMenuLayouts.CurrentSchemaVersion };
         foreach (var item in Roots)
             layout.Root.Add(ToNode(item));
         _layout = layout;
@@ -460,6 +493,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             IconKey = item.Node.IconKey,
             IconColor = item.Node.IconColor,
             ExternalIconPath = item.Node.ExternalIconPath,
+            DisplayMode = item.Node.DisplayMode,
             Visible = item.Node.Visible,
             SeparatorBefore = item.Node.SeparatorBefore,
         };
@@ -522,6 +556,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         // «Опции блокировки» (Lock), «Информация» (Information), «Операции» (Tune).
         foreach (var groupId in new[]
                  {
+                     UtilitiesMenuCatalog.GroupUtilities,
                      UtilitiesMenuCatalog.GroupNewItems,
                      UtilitiesMenuCatalog.GroupLockOptions,
                      UtilitiesMenuCatalog.GroupInformation,
@@ -537,6 +572,11 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             if (seen.Add(wpfKind + "|" + color))
                 result.Add(new UtilitiesIconOption(wpfKind, color));
         }
+        // issue #146: детерминированная запасная «папка» должна быть выбираема в диалоге —
+        // иначе группа без иконки показывала бы в настройке первый пункт каталога,
+        // а в меню — папку.
+        if (!result.Any(o => string.Equals(o.Key, UtilitiesMenuCatalog.LegacyFallbackIconKey.Replace("Icon", string.Empty), StringComparison.Ordinal)))
+            result.Add(new UtilitiesIconOption("Folder", "#6B7280"));
         return result;
     }
 }
@@ -648,12 +688,21 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
     {
         get
         {
-            if (!string.IsNullOrWhiteSpace(Node.IconKey))
-                return Node.IconKey!;
             if (string.Equals(Node.Kind, "separator", StringComparison.Ordinal))
                 return "Minus";
             if (string.Equals(Node.Kind, "group", StringComparison.Ordinal))
-                return UtilitiesMenuCatalog.GroupWpfIconKind(Node.GroupId ?? string.Empty);
+            {
+                // issue #146: тот же расчёт, что в меню — сохранённая иконка, иначе
+                // стандартная иконка группы, иначе детерминированная «папка».
+                return UtilitiesMenuCatalog.ResolveGroupIconKeyWpf(Node.GroupId, Node.IconKey);
+            }
+            // issue #146: неизвестный сохранённый ключ не должен давать «другую» иконку —
+            // падаем на иконку каталога, как и построители меню.
+            if (!string.IsNullOrWhiteSpace(Node.IconKey) &&
+                !string.IsNullOrWhiteSpace(UtilitiesMenuCatalog.WpfIconGeometryKey(Node.IconKey)))
+            {
+                return Node.IconKey!;
+            }
             return UtilitiesMenuCatalog.Find(Node.ItemId)?.WpfIconKind ?? string.Empty;
         }
     }
@@ -668,13 +717,36 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
             if (string.Equals(Node.Kind, "separator", StringComparison.Ordinal))
                 return "#9CA3AF";
             if (string.Equals(Node.Kind, "group", StringComparison.Ordinal))
-                return UtilitiesMenuCatalog.GroupIconColor(Node.GroupId ?? string.Empty);
+            {
+                var groupColor = UtilitiesMenuCatalog.GroupIconColor(Node.GroupId ?? string.Empty);
+                // issue #146: у пользовательской группы без цвета — тот же серый,
+                // что применяет меню (ParseMenuIconColor), иначе иконки различались.
+                return string.IsNullOrWhiteSpace(groupColor) ? "#6B7280" : groupColor;
+            }
             return UtilitiesMenuCatalog.Find(Node.ItemId)?.IconColor ?? string.Empty;
         }
     }
 
     /// <summary>Ключ иконки для отображения в дереве (пусто — без иконки).</summary>
     public string DisplayIconKey => EffectiveIconKey;
+
+    /// <summary>
+    /// Ключ геометрии <c>Icon*</c> для превью в дереве редактора (issue #146): то же
+    /// разрешение, что в меню, поэтому настройка и рабочее меню показывают одну иконку.
+    /// </summary>
+    public string DisplayIconGeometryKey
+    {
+        get
+        {
+            if (string.Equals(Node.Kind, "separator", StringComparison.Ordinal))
+                return "IconMinus";
+            var key = EffectiveIconKey;
+            if (string.IsNullOrWhiteSpace(key))
+                return "IconFolder";
+            var mapped = UtilitiesMenuCatalog.WpfIconGeometryKey(key);
+            return string.IsNullOrWhiteSpace(mapped) ? "IconFolder" : mapped;
+        }
+    }
 
     /// <summary>Цвет иконки (#RRGGBB) для отображения в дереве.</summary>
     public string DisplayIconColor => EffectiveIconColor;
@@ -691,6 +763,7 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
         OnPropertyChanged(nameof(EffectiveIconKey));
         OnPropertyChanged(nameof(EffectiveIconColor));
         OnPropertyChanged(nameof(DisplayIconKey));
+        OnPropertyChanged(nameof(DisplayIconGeometryKey));
         OnPropertyChanged(nameof(DisplayIconColor));
         OnPropertyChanged(nameof(HasDisplayIcon));
     }

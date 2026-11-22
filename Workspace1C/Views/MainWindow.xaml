@@ -491,7 +491,7 @@
                                         ToolTip="{loc:Loc Main.ClearTagFilters}"
                                         Visibility="{Binding HasActiveTagFilter, Converter={StaticResource BoolToVis}}">
                                     <StackPanel Orientation="Horizontal">
-                                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{DynamicResource TextSecondaryBrush}" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                        <Path Data="{DynamicResource IconClose}" Stretch="Uniform" Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                         <TextBlock Text="{loc:Loc Common.Clear}" FontSize="11"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>

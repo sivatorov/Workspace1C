@@ -86,6 +86,62 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #147: значок для кнопки — Fill привязан к Foreground ближайшей
+        /// родительской кнопки, поэтому цвет совпадает с подписью и остаётся
+        /// контрастным на акцентной заливке (AccentBrush) и при наведении
+        /// (AccentHoverBrush) в любой теме и любом наборе иконок. Фоновый слой
+        /// идёт за основным через общий observable Fill, поэтому тоже получает
+        /// цвет подписи.
+        /// </summary>
+        public static Control MakeIconForButton(string key, double size = 16)
+        {
+            var icon = BuildIcon(key, size, out var path);
+            BindFillToButtonForeground(path);
+            return icon;
+        }
+
+        /// <summary>
+        /// Issue #147: содержимое кнопки «значок + подпись», где Fill значка
+        /// привязан к Foreground самой кнопки (единый цвет с подписью).
+        /// </summary>
+        public static Control IconAndTextForButton(string iconKey, string text, double iconSize = 16)
+        {
+            return new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 6,
+                Children =
+                {
+                    MakeIconForButton(iconKey, iconSize),
+                    new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center }
+                }
+            };
+        }
+
+        /// <summary>
+        /// Issue #147: подписывает основной слой значка на Foreground кнопки-предка.
+        /// Вне кнопки привязка не разрешается — оставляем чёрный фолбэк, чтобы
+        /// значок не пропадал вовсе.
+        /// </summary>
+        private static void BindFillToButtonForeground(Avalonia.Controls.Shapes.Path path)
+        {
+            path.Fill = Brushes.Black;
+            if (Application.Current is not null)
+            {
+                path.Bind(
+                    Avalonia.Controls.Shapes.Shape.FillProperty,
+                    new Avalonia.Data.Binding(nameof(Button.Foreground))
+                    {
+                        RelativeSource = new Avalonia.Data.RelativeSource(
+                            Avalonia.Data.RelativeSourceMode.FindAncestor)
+                        {
+                            AncestorType = typeof(Button)
+                        }
+                    });
+            }
+        }
+
+        /// <summary>
         /// Контур кладётся в неизменный холст 24 на 24 и масштабируется целиком,
         /// как это делает PackIcon в версии для Windows. Без холста Stretch
         /// растягивал каждый значок по его собственным границам: значки с мелким
