@@ -56,6 +56,52 @@ public sealed class Issue134ProcessInspectorFocusTests
             focusedElementIsTextInput: true));
     }
 
+    /// <summary>
+    /// Issue #134 (1.0.1.110): фокус на оболочке DataGrid без валидной текущей
+    /// ячейки не считается рабочим — навигацию нужно перехватить и перевести в ячейку.
+    /// </summary>
+    [Theory]
+    [InlineData(InspectorNavigationKey.Up)]
+    [InlineData(InspectorNavigationKey.Down)]
+    [InlineData(InspectorNavigationKey.PageUp)]
+    [InlineData(InspectorNavigationKey.PageDown)]
+    [InlineData(InspectorNavigationKey.Home)]
+    [InlineData(InspectorNavigationKey.End)]
+    public void ShouldHandleNavigation_WhenGridShellFocused(InspectorNavigationKey key)
+    {
+        Assert.True(ProcessInspectorFocusPolicy.ShouldHandleNavigation(
+            gridItemHasFocus: false,
+            currentCellIsValid: false,
+            key));
+    }
+
+    [Fact]
+    public void ShouldHandleNavigation_WhenCellIsNotValid()
+    {
+        Assert.True(ProcessInspectorFocusPolicy.ShouldHandleNavigation(
+            gridItemHasFocus: true,
+            currentCellIsValid: false,
+            InspectorNavigationKey.Down));
+    }
+
+    [Fact]
+    public void ShouldNotHandleNavigation_WhenCellIsFocused()
+    {
+        Assert.False(ProcessInspectorFocusPolicy.ShouldHandleNavigation(
+            gridItemHasFocus: true,
+            currentCellIsValid: true,
+            InspectorNavigationKey.Down));
+    }
+
+    [Fact]
+    public void ShouldNotHandleNavigation_ForNonNavigationKey()
+    {
+        Assert.False(ProcessInspectorFocusPolicy.ShouldHandleNavigation(
+            gridItemHasFocus: false,
+            currentCellIsValid: false,
+            InspectorNavigationKey.None));
+    }
+
     [Theory]
     [InlineData(-1, 5, InspectorNavigationKey.Down, 0)]
     [InlineData(-1, 5, InspectorNavigationKey.Up, 0)]
@@ -124,6 +170,10 @@ public sealed class Issue134ProcessInspectorFocusTests
         Assert.Contains("ProcessInspectorFocusPolicy.ShouldRedirectNavigation", source, StringComparison.Ordinal);
         Assert.Contains("ProcessInspectorFocusPolicy.ResolveTargetIndex", source, StringComparison.Ordinal);
         Assert.Contains("Activate();", source, StringComparison.Ordinal);
+        // issue #134 (1.0.1.110): фокус ставится в ячейку, а не в оболочку DataGrid.
+        Assert.Contains("DataGridCell", source, StringComparison.Ordinal);
+        Assert.Contains("CurrentCell = new DataGridCellInfo", source, StringComparison.Ordinal);
+        Assert.Contains("FindCell(row, column)", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -135,6 +185,10 @@ public sealed class Issue134ProcessInspectorFocusTests
         Assert.Contains("ProcessInspectorFocusPolicy.ShouldRedirectNavigation", source, StringComparison.Ordinal);
         Assert.Contains("ProcessInspectorFocusPolicy.ResolveTargetIndex", source, StringComparison.Ordinal);
         Assert.Contains("_grid.Focus(NavigationMethod.Directional)", source, StringComparison.Ordinal);
+        // issue #134 (1.0.1.110): фокус ставится в контейнер строки ListBox.
+        Assert.Contains("ListBoxItem", source, StringComparison.Ordinal);
+        Assert.Contains("ContainerFromIndex(index)", source, StringComparison.Ordinal);
+        Assert.Contains("IsGridItemFocused()", source, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -182,7 +236,7 @@ public sealed class Issue134ProcessInspectorFocusTests
         var source = ReadView("ProcessInspectorWindow.Avalonia.cs");
 
         // Условие повтора опирается на фокус и номер попытки, а не на наличие строк.
-        Assert.Contains("_grid.IsKeyboardFocusWithin, attempt", source, StringComparison.Ordinal);
+        Assert.Contains("ShouldRetryFocus(focused, attempt)", source, StringComparison.Ordinal);
         Assert.DoesNotContain("if (_grid.ItemCount == 0)", source, StringComparison.Ordinal);
     }
 

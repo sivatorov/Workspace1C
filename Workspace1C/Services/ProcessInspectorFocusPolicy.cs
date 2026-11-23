@@ -56,6 +56,20 @@ public static class ProcessInspectorFocusPolicy
         !gridHasKeyboardFocus && attempt < MaxFocusAttempts;
 
     /// <summary>
+    /// Issue #134 (1.0.1.110): нужно ли перехватить навигационную клавишу. Фокус
+    /// считается рабочим только когда он находится в строке/ячейке таблицы, а не на
+    /// её внешней оболочке. В WPF после <c>DataGrid.Focus()</c> фокус может остаться
+    /// на самом <c>DataGrid</c> без валидной текущей ячейки — тогда первое «вниз»
+    /// уходит на соседнюю кнопку «Колонки». Поэтому перехватываем клавишу и при
+    /// невалидной текущей ячейке.
+    /// </summary>
+    public static bool ShouldHandleNavigation(
+        bool gridItemHasFocus,
+        bool currentCellIsValid,
+        InspectorNavigationKey key) =>
+        IsNavigationKey(key) && (!gridItemHasFocus || !currentCellIsValid);
+
+    /// <summary>
     /// Нужно ли перенаправить навигационную клавишу в таблицу процессов. Пока фокус
     /// в таблице, поведение не перехватывается; у полей ввода клавиши тоже не трогаем.
     /// </summary>

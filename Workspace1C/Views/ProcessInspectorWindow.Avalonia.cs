@@ -14,6 +14,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -218,9 +219,9 @@ namespace Workspace1C
             _grid.GotFocus += (_, _) =>
             {
                 _gridHadFocus = true;
-                // Пустой список ещё не готов к навигации: фокус будет переставлен
-                // при первом заполнении (issue #134, 1.0.1.104).
-                if (_grid.ItemCount > 0)
+                // issue #134 (1.0.1.110): фокус считается установленным только когда
+                // он реально в контейнере строки, а не на внешней оболочке ListBox.
+                if (IsGridItemFocused())
                     _focusApplied = true;
             };
             // Фокус ушёл из таблицы (например, клик по кнопке) — не возвращаем его
@@ -282,8 +283,6 @@ namespace Workspace1C
                     if (!IsActive)
                         Activate();
 
-                    _grid.Focus(NavigationMethod.Directional);
-
                     if (attempt == 0)
                     {
                         if (pendingKey is { } key)
@@ -301,7 +300,12 @@ namespace Workspace1C
                         }
                     }
 
-                    if (_grid.IsKeyboardFocusWithin)
+                    // issue #134 (1.0.1.110): фокусируем контейнер строки, а не
+                    // только ListBox. Иначе первое «вниз» остаётся на кнопке «Колонки».
+                    FocusFirstItem();
+
+                    var focused = IsGridItemFocused();
+                    if (focused)
                     {
                         _gridHadFocus = true;
                         // Пустой список не считается «фокус применён»: после
@@ -310,11 +314,58 @@ namespace Workspace1C
                             _focusApplied = true;
                     }
 
-                    if (ProcessInspectorFocusPolicy.ShouldRetryFocus(
-                            _grid.IsKeyboardFocusWithin, attempt))
+                    if (ProcessInspectorFocusPolicy.ShouldRetryFocus(focused, attempt))
                         FocusGridAttempt(attempt + 1, pendingKey);
                 },
                 DispatcherPriority.Input);
+        }
+
+        /// <summary>
+        /// Issue #134 (1.0.1.110): фокус находится в контейнере строки списка,
+        /// а не на внешней оболочке <see cref="ListBox"/>. Оболочка не даёт
+        /// навигации по строкам, поэтому её нельзя считать успешной установкой фокуса.
+        /// </summary>
+        private bool IsGridItemFocused()
+        {
+            if (_grid.ItemCount > 0)
+            {
+                var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Visual;
+                return focused is ListBoxItem
+                    || focused?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is not null;
+            }
+
+            return _grid.IsKeyboardFocusWithin;
+        }
+
+        /// <summary>
+        /// Issue #134 (1.0.1.110): ставит клавиатурный фокус в первый контейнер
+        /// строки. Для пустого списка фокусируется сам <see cref="ListBox"/>,
+        /// чтобы стрелка не уводила фокус на соседнюю кнопку.
+        /// </summary>
+        private void FocusFirstItem()
+        {
+            if (!_opened)
+                return;
+
+            if (_grid.ItemCount > 0)
+            {
+                if (_grid.SelectedIndex < 0)
+                    _grid.SelectedIndex = 0;
+
+                var index = Math.Max(0, _grid.SelectedIndex);
+                _grid.ScrollIntoView(_grid.SelectedItem);
+                _grid.UpdateLayout();
+
+                if (_grid.ContainerFromIndex(index) is ListBoxItem item)
+                {
+                    item.Focus(NavigationMethod.Directional);
+                    return;
+                }
+            }
+
+            // Пустой список или контейнер ещё не сгенерирован — фокусируем ListBox;
+            // повторная попытка выполнится по таймеру.
+            _grid.Focus(NavigationMethod.Directional);
         }
 
         /// <summary>
@@ -329,8 +380,10 @@ namespace Workspace1C
                 return;
             // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
             var focusedIsTextInput = e.Source is TextBox or ComboBox;
+            // issue #134 (1.0.1.110): проверяем фокус в контейнере строки, а не только
+            // внутри ListBox. Фокус на оболочке списка тоже нужно перенаправлять.
             if (!ProcessInspectorFocusPolicy.ShouldRedirectNavigation(
-                    _grid.IsKeyboardFocusWithin, navigation, focusedIsTextInput))
+                    IsGridItemFocused(), navigation, focusedIsTextInput))
                 return;
 
             e.Handled = true;
@@ -732,7 +785,7 @@ namespace Workspace1C
             // issue #134 (1.0.1.103): после завершения процесса фокус возвращаем
             // принудительно, даже если таблица опустела.
             var forceFocus = _restoreFocusAfterKill;
-            var hadFocus = forceFocus || _gridHadFocus || _grid.IsKeyboardFocusWithin;
+            var hadFocus = forceFocus || _gridHadFocus || IsGridItemFocused();
 
             var desired = _vm.SelectedRows.ToList();
             var current = selected.Cast<ProcessRowViewModel>().ToList();
@@ -746,9 +799,9 @@ namespace Workspace1C
                 }
             }
 
-            if (!hadFocus || _grid.IsKeyboardFocusWithin)
+            if (!hadFocus || IsGridItemFocused())
             {
-                if (_grid.IsKeyboardFocusWithin)
+                if (IsGridItemFocused())
                     _restoreFocusAfterKill = false;
                 return;
             }
@@ -757,7 +810,7 @@ namespace Workspace1C
             Dispatcher.UIThread.Post(
                 () =>
                 {
-                    if (!_gridHadFocus && !_grid.IsKeyboardFocusWithin && !forceFocus)
+                    if (!_gridHadFocus && !IsGridItemFocused() && !forceFocus)
                         return;
                     // issue #134 (1.0.1.107): повторяем до фактического получения фокуса.
                     FocusGridAttempt(0);
@@ -766,7 +819,7 @@ namespace Workspace1C
                         _grid.ScrollIntoView(row);
                     _restoreFocusAfterKill = false;
                 },
-                DispatcherPriority.Input);
+                DispatcherPriority.ApplicationIdle);
         }
 
         /// <summary>
@@ -791,6 +844,13 @@ namespace Workspace1C
         private void RestoreFocusAfterKill()
         {
             FocusGridAttempt(0);
+
+            // issue #134 (1.0.1.110): диалог подтверждения закрывается после
+            // возврата из KillSelectedMany; повторяем установку фокуса, когда
+            // очередь ввода/диалога уже обработана.
+            Dispatcher.UIThread.Post(
+                () => FocusGridAttempt(0),
+                DispatcherPriority.ApplicationIdle);
 
             // Страховка: если набор строк не изменился и SelectionRestored не придёт,
             // флаг не должен влиять на будущие обновления.

@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.106-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.110-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.106**
-(полный прогон — **7765 юнит-тестов**, включая тесты ПРО).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.110**
+(полный прогон — **7825 юнит-тестов**, включая тесты ПРО).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,12 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Инспектор процессов: `↓` и `Ctrl+A` работают сразу после открытия (1.0.1.110,
+  Windows и Linux)** — фокус ставится в ячейку строки, а не в оболочку таблицы:
+  в WPF через `DataGridCell`/`CurrentCell`, в Avalonia через `ListBoxItem`.
+  После завершения процесса, включая удаление последней строки, фокус возвращается
+  в таблицу уже после закрытия диалога подтверждения; кнопка «Колонки» больше не
+  перехватывает первое нажатие `↓` (issue #134).
 - **Диалог «Дублировать базу» (файловая ИБ) стал компактным (1.0.1.109, Windows
   и Linux)** — окно ввода имени больше не растягивается по ширине под длинную
   подпись: ширина фиксирована (440 DIP), подпись переносится по словам, а размеры

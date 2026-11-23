@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -98,9 +99,11 @@ namespace Workspace1C
             ProcessesGrid.GotKeyboardFocus += (_, _) =>
             {
                 _gridHadKeyboardFocus = true;
-                // Пустая таблица ещё не готова к навигации: фокус будет переставлен
-                // при первом заполнении (issue #134, 1.0.1.104).
-                if (ProcessesGrid.Items.Count > 0)
+                // issue #134 (1.0.1.110): фокус считается установленным только когда
+                // он реально в ячейке строки. Фокус на «оболочке» DataGrid без
+                // валидной CurrentCell не должен прекращать повторные попытки —
+                // иначе первое «вниз» уходит на кнопку «Колонки».
+                if (IsGridCellFocused())
                     _focusApplied = true;
             };
             // Фокус ушёл из таблицы (например, клик по кнопке) — не возвращаем его
@@ -169,9 +172,6 @@ namespace Workspace1C
             if (!IsActive)
                 Activate();
 
-            ProcessesGrid.Focus();
-            Keyboard.Focus(ProcessesGrid);
-
             if (attempt == 0)
             {
                 if (pendingKey is { } key)
@@ -193,7 +193,12 @@ namespace Workspace1C
                 }
             }
 
-            var focused = ProcessesGrid.IsKeyboardFocusWithin;
+            // issue #134 (1.0.1.110): фокусируем именно ячейку строки, а не
+            // DataGrid целиком. Иначе WPF оставляет клавиатурный фокус на оболочке,
+            // и первое «вниз» переводит его на кнопку «Колонки».
+            FocusFirstCell();
+
+            var focused = IsGridCellFocused();
             if (focused)
             {
                 _gridHadKeyboardFocus = true;
@@ -219,6 +224,84 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #134 (1.0.1.110): фокус находится именно в ячейке строки таблицы,
+        /// а не на внешней оболочке <see cref="DataGrid"/>. Оболочка не даёт
+        /// навигации по строкам, поэтому её нельзя считать успешной установкой фокуса.
+        /// </summary>
+        private bool IsGridCellFocused()
+        {
+            if (ProcessesGrid.Items.Count > 0)
+                return Keyboard.FocusedElement is DataGridCell cell
+                    && cell.DataContext is ProcessRowViewModel;
+
+            return ProcessesGrid.IsKeyboardFocusWithin;
+        }
+
+        /// <summary>
+        /// Issue #134 (1.0.1.110): ставит клавиатурный фокус в первую доступную
+        /// ячейку таблицы. Для пустого списка фокусируется сам <see cref="DataGrid"/>,
+        /// чтобы стрелка не уводила фокус на соседнюю кнопку.
+        /// </summary>
+        private void FocusFirstCell()
+        {
+            if (!IsLoaded)
+                return;
+
+            if (ProcessesGrid.Items.Count > 0)
+            {
+                if (ProcessesGrid.SelectedIndex < 0)
+                    ProcessesGrid.SelectedIndex = 0;
+
+                var index = Math.Max(0, ProcessesGrid.SelectedIndex);
+                var item = ProcessesGrid.Items[index];
+                var column = ProcessesGrid.Columns.FirstOrDefault(c => c.Visibility == Visibility.Visible);
+                if (column is not null)
+                    ProcessesGrid.CurrentCell = new DataGridCellInfo(item, column);
+
+                ProcessesGrid.ScrollIntoView(item);
+                ProcessesGrid.UpdateLayout();
+
+                var row = ProcessesGrid.ItemContainerGenerator.ContainerFromIndex(index) as DataGridRow;
+                var cell = row is null ? null : FindCell(row, column);
+                if (cell is not null)
+                {
+                    cell.Focus();
+                    Keyboard.Focus(cell);
+                    return;
+                }
+            }
+
+            // Пустой список или ячейка ещё не сгенерирована — фокусируем таблицу;
+            // повторная попытка выполнится по таймеру.
+            ProcessesGrid.Focus();
+            Keyboard.Focus(ProcessesGrid);
+        }
+
+        /// <summary>Находит ячейку строки по колонке (issue #134, 1.0.1.110).</summary>
+        private static DataGridCell? FindCell(DataGridRow row, DataGridColumn? column)
+        {
+            if (column is null)
+                return null;
+            var presenter = FindVisualChild<DataGridCellsPresenter>(row);
+            return presenter?.ItemContainerGenerator.ContainerFromIndex(column.DisplayIndex) as DataGridCell;
+        }
+
+        /// <summary>Первый визуальный потомок указанного типа.</summary>
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = VisualTreeHelper.GetChild(parent, i);
+                if (child is T match)
+                    return match;
+                var nested = FindVisualChild<T>(child);
+                if (nested is not null)
+                    return nested;
+            }
+            return null;
+        }
+
+        /// <summary>
         /// issue #134 (1.0.1.104, замечание 7OH): навигационные клавиши работают,
         /// даже если после открытия окна или завершения процесса фокус оказался на
         /// кнопке. Раньше первое нажатие «вниз» лишь переводило фокус на «Колонки»,
@@ -231,8 +314,10 @@ namespace Workspace1C
                 return;
             // Не перехватываем клавиши у полей ввода, если они когда-либо появятся.
             var focusedIsTextInput = Keyboard.FocusedElement is TextBoxBase or ComboBox;
+            // issue #134 (1.0.1.110): проверяем фокус в ячейке, а не только внутри
+            // DataGrid. Фокус на оболочке таблицы тоже нужно перенаправлять в ячейку.
             if (!ProcessInspectorFocusPolicy.ShouldRedirectNavigation(
-                    ProcessesGrid.IsKeyboardFocusWithin, navigation, focusedIsTextInput))
+                    IsGridCellFocused(), navigation, focusedIsTextInput))
                 return;
 
             e.Handled = true;
@@ -317,9 +402,12 @@ namespace Workspace1C
             // повторяем установку фокуса до фактического получения, в том числе при
             // пустом списке и после закрытия диалога подтверждения. Если строки
             // остались без выделения, помощник сделает первую строку текущей.
+            // issue #134 (1.0.1.110): после закрытия диалога WPF возвращает фокус
+            // кнопке, открывшей его. Поэтому ставим фокус в ячейку на ApplicationIdle,
+            // когда диалог уже закрыт и очередь ввода обработана.
             Dispatcher.BeginInvoke(
                 new Action(() => FocusGridWithRetry(0, null)),
-                DispatcherPriority.Input);
+                DispatcherPriority.ApplicationIdle);
 
             // Страховка: если автообновление не изменило набор строк и событие
             // SelectionRestored не придёт, флаг не должен влиять на будущие обновления.
@@ -530,7 +618,7 @@ namespace Workspace1C
             // принудительно, даже если таблица опустела и _gridHadKeyboardFocus
             // был сброшен диалогом подтверждения.
             var forceFocus = _restoreFocusAfterKill;
-            var hadFocus = forceFocus || _gridHadKeyboardFocus || ProcessesGrid.IsKeyboardFocusWithin;
+            var hadFocus = forceFocus || _gridHadKeyboardFocus || IsGridCellFocused();
 
             var desired = _vm.SelectedRows.ToList();
             var current = ProcessesGrid.SelectedItems.OfType<ProcessRowViewModel>().ToList();
@@ -544,9 +632,9 @@ namespace Workspace1C
                 }
             }
 
-            if (!hadFocus || ProcessesGrid.IsKeyboardFocusWithin)
+            if (!hadFocus || IsGridCellFocused())
             {
-                if (ProcessesGrid.IsKeyboardFocusWithin)
+                if (IsGridCellFocused())
                     _restoreFocusAfterKill = false;
                 return;
             }
@@ -554,13 +642,13 @@ namespace Workspace1C
             // Реальные изменения пересоздали контейнеры — возвращаем фокус и текущую строку.
             Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (!_gridHadKeyboardFocus && !ProcessesGrid.IsKeyboardFocusWithin && !forceFocus)
+                if (!_gridHadKeyboardFocus && !IsGridCellFocused() && !forceFocus)
                     return;
                 // issue #134 (1.0.1.107): повторяем до фактического получения фокуса.
                 FocusGridWithRetry(0, null);
                 SetCurrentRow(_vm.SelectedRow ?? ProcessesGrid.Items.OfType<ProcessRowViewModel>().FirstOrDefault());
                 _restoreFocusAfterKill = false;
-            }), DispatcherPriority.Input);
+            }), DispatcherPriority.ApplicationIdle);
         }
     }
 }
