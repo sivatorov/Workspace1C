@@ -27,10 +27,28 @@ public sealed class ComScriptResult
     /// <summary>ProgID коннектора, через который прошло подключение.</summary>
     public string? ProgId { get; init; }
 
+    /// <summary>
+    /// Описание использованного хоста PowerShell — «PowerShell 5.1 x64» или
+    /// «PowerShell 5.1 x86» (issue #154). Null, если ответ получен не от PowerShell.
+    /// Нужно для диагностики: при отказе видно, в какой разрядности искали коннектор.
+    /// </summary>
+    public string? Host { get; init; }
+
     /// <summary>Разобранный JSON-ответ скрипта (корневой объект) при успехе.</summary>
     public JsonElement Data { get; init; }
 
     public static ComScriptResult Fail(string code, string? error) => new() { Code = code, Error = error };
+
+    /// <summary>Копия результата с указанным описанием хоста (issue #154).</summary>
+    public ComScriptResult WithHost(string? host) => new()
+    {
+        Success = Success,
+        Code = Code,
+        Error = Error,
+        ProgId = ProgId,
+        Data = Data,
+        Host = host
+    };
 }
 
 /// <summary>
@@ -258,6 +276,27 @@ Out-R $r
     }
 
     /// <summary>
+    /// Описание хоста PowerShell для диагностики (issue #154): «PowerShell 5.1 x64»/«x86».
+    /// </summary>
+    public static string HostDescription(bool x86) => "PowerShell 5.1 " + (x86 ? "x86" : "x64");
+
+    /// <summary>
+    /// Аргументы процесса PowerShell. Вынесено отдельным методом, чтобы тесты могли
+    /// проверить главное свойство протокола: строка подключения и пароль передаются только
+    /// через stdin и не попадают в командную строку процесса (issue #154).
+    /// </summary>
+    public static IReadOnlyList<string> BuildArguments(string encodedCommand) => new[]
+    {
+        "-NoLogo",
+        "-NoProfile",
+        "-NonInteractive",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-EncodedCommand",
+        encodedCommand ?? string.Empty
+    };
+
+    /// <summary>
     /// Выполняет операцию: 64-битный PowerShell, при <c>noprogid</c> — 32-битный.
     /// Только Windows; на других ОС — отказ с кодом <c>platform</c>.
     /// </summary>
@@ -275,21 +314,22 @@ Out-R $r
         var request = BuildRequest(progIds, connectString, parameters);
         var secretList = secrets?.ToList() ?? new List<string?>();
 
-        var first = await RunOnceAsync(PowerShellPath(false), encoded, request, secretList, timeout, ct).ConfigureAwait(false);
+        var first = await RunOnceAsync(PowerShellPath(false), x86: false, encoded, request, secretList, timeout, ct).ConfigureAwait(false);
         if (first.Success || first.Code != "noprogid" || !Environment.Is64BitOperatingSystem)
             return first;
-        var second = await RunOnceAsync(PowerShellPath(true), encoded, request, secretList, timeout, ct).ConfigureAwait(false);
+        var second = await RunOnceAsync(PowerShellPath(true), x86: true, encoded, request, secretList, timeout, ct).ConfigureAwait(false);
         return second.Code == "noprogid"
             ? ComScriptResult.Fail("noprogid", LocalizationManager.T("ComScript.NoConnector")
-                + (string.IsNullOrWhiteSpace(second.Error) ? string.Empty : " " + second.Error))
+                + (string.IsNullOrWhiteSpace(second.Error) ? string.Empty : " " + second.Error)).WithHost(second.Host)
             : second;
     }
 
-    private static async Task<ComScriptResult> RunOnceAsync(string exe, string encoded, string request,
+    private static async Task<ComScriptResult> RunOnceAsync(string exe, bool x86, string encoded, string request,
         List<string?> secrets, TimeSpan timeout, CancellationToken ct)
     {
+        var host = HostDescription(x86);
         if (!File.Exists(exe))
-            return ComScriptResult.Fail("process", string.Format(LocalizationManager.T("ComScript.NoPowerShell"), exe));
+            return ComScriptResult.Fail("process", string.Format(LocalizationManager.T("ComScript.NoPowerShell"), exe)).WithHost(host);
 
         var psi = new ProcessStartInfo
         {
@@ -302,13 +342,8 @@ Out-R $r
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8
         };
-        psi.ArgumentList.Add("-NoLogo");
-        psi.ArgumentList.Add("-NoProfile");
-        psi.ArgumentList.Add("-NonInteractive");
-        psi.ArgumentList.Add("-ExecutionPolicy");
-        psi.ArgumentList.Add("Bypass");
-        psi.ArgumentList.Add("-EncodedCommand");
-        psi.ArgumentList.Add(encoded);
+        foreach (var argument in BuildArguments(encoded))
+            psi.ArgumentList.Add(argument);
 
         Process process;
         try
@@ -317,7 +352,7 @@ Out-R $r
         }
         catch (Exception ex)
         {
-            return ComScriptResult.Fail("process", ex.Message);
+            return ComScriptResult.Fail("process", ex.Message).WithHost(host);
         }
 
         using (process)
@@ -345,19 +380,19 @@ Out-R $r
                 try { process.Kill(entireProcessTree: true); }
                 catch { /* уже завершён */ }
                 return ct.IsCancellationRequested
-                    ? ComScriptResult.Fail("cancelled", LocalizationManager.T("ComScript.Cancelled"))
-                    : ComScriptResult.Fail("timeout", LocalizationManager.T("ComScript.Timeout"));
+                    ? ComScriptResult.Fail("cancelled", LocalizationManager.T("ComScript.Cancelled")).WithHost(host)
+                    : ComScriptResult.Fail("timeout", LocalizationManager.T("ComScript.Timeout")).WithHost(host);
             }
 
             var stdout = await stdoutTask.ConfigureAwait(false);
             var stderr = await stderrTask.ConfigureAwait(false);
-            var result = ParseOutput(stdout, secrets);
+            var result = ParseOutput(stdout, secrets).WithHost(host);
             if (result.Code == "protocol" && !string.IsNullOrWhiteSpace(stderr))
             {
                 var tail = stderr.Trim();
                 if (tail.Length > 600)
                     tail = tail.Substring(tail.Length - 600);
-                return ComScriptResult.Fail("process", MaskSecrets(tail, secrets));
+                return ComScriptResult.Fail("process", MaskSecrets(tail, secrets)).WithHost(host);
             }
             return result;
         }

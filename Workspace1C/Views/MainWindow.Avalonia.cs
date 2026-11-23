@@ -1215,14 +1215,18 @@ namespace Workspace1C
                 content.Children.Add(icon);
                 content.Children.Add(new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center });
                 button.Content = content;
-                button.Padding = new Thickness(UiMetrics.Scaled(6), UiMetrics.Scaled(4));
+                button.Padding = new Thickness(UiMetrics.Scaled(8), UiMetrics.Scaled(4));
             }
             else
             {
                 button.Content = icon;
             }
 
-            button.Styled(Themes.ControlThemes.IconButton);
+            // Issue #146: «С надписью» — отдельная тема без фиксированных 32×32,
+            // иначе подпись обрезается и кнопка выглядит как «только иконка».
+            button.Styled(showLabel
+                ? Themes.ControlThemes.SectionLabelButton
+                : Themes.ControlThemes.IconButton);
             ToolTip.SetTip(button, title);
             UiAutomation.SetNameFromTip(button);
             // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).

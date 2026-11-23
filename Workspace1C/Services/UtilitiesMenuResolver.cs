@@ -15,12 +15,15 @@ namespace Workspace1C.Services;
 public static class UtilitiesMenuResolver
 {
     /// <summary>
-    /// Возвращает компоновку для построения меню:
+    /// Возвращает компоновку для редактирования и служебных сценариев:
     /// <list type="bullet">
     /// <item>правка выключена (по умолчанию) — стандартная компоновка (обратная совместимость);</item>
     /// <item>правка включена и файл компоновки есть — пользовательская компоновка;</item>
     /// <item>правка включена, файла нет — стандартная компоновка (файл создаст редактор).</item>
     /// </list>
+    /// Для фактически отображаемого меню и кнопок панели используйте
+    /// <see cref="ResolveForDisplay"/>: он учитывает сохранённую компоновку независимо
+    /// от флага правки (issue #146).
     /// </summary>
     public static UtilitiesMenuLayout Resolve(AppSettings? settings, IUtilitiesMenuLayoutStore? store)
     {
@@ -30,10 +33,21 @@ public static class UtilitiesMenuResolver
         return layout ?? UtilitiesMenuLayouts.Default();
     }
 
-    /// <summary>Готовит рабочее меню, не сохраняя служебную группу в компоновке пользователя.</summary>
+    /// <summary>
+    /// Готовит фактически отображаемое меню и кнопки панели, не сохраняя служебную
+    /// группу в компоновке пользователя. Issue #146: сохранённая пользовательская
+    /// компоновка — источник истины для отображения, даже если режим правки выключен:
+    /// флаг <see cref="AppSettings.UtilitiesMenuEditingEnabled"/> разрешает менять
+    /// структуру, но не должен подменять уже настроенные группы стандартной
+    /// компоновкой (иначе сохранённый <c>DisplayMode</c> и группы верхнего уровня
+    /// игнорировались, и кнопки панели снова показывали только иконки).
+    /// </summary>
     public static UtilitiesMenuLayout ResolveForDisplay(AppSettings? settings, IUtilitiesMenuLayoutStore? store)
     {
-        var layout = Resolve(settings, store);
+        // Файла компоновки нет — показываем стандартную структуру (обратная совместимость).
+        // Настройка правки здесь намеренно не участвует: она влияет на возможность
+        // редактирования, а не на то, какую компоновку показывать пользователю.
+        var layout = store?.Load() ?? UtilitiesMenuLayouts.Default();
         if (EditionService.IsPro && EditionService.HasProModules)
         {
             var items = UtilitiesMenuCatalog.All

@@ -30,6 +30,13 @@ public static class ConfigurationInfoService
     public static string? LastUsedPlatformVersion { get; private set; }
 
     /// <summary>
+    /// Хост, через который выполнено последнее чтение сведений о конфигурации на Windows:
+    /// «PowerShell 5.1 x64»/«x86» (issue #154). Null — чтение шло через агент, Linux-эвристику
+    /// или ещё не выполнялось. Показывается в диагностике кнопки «Определить».
+    /// </summary>
+    public static string? LastUsedHost { get; private set; }
+
+    /// <summary>
     /// Пытается прочитать имя и версию конфигурации для информационной базы.
     /// Сначала используется COM-коннектор (только на Windows; на Linux его заменяет
     /// реализация <c>OneCComConnector.Linux</c>, которая COM не использует — эвристика
@@ -47,6 +54,7 @@ public static class ConfigurationInfoService
         LastComError = null;
         LastUsedProgId = null;
         LastUsedPlatformVersion = null;
+        LastUsedHost = null;
         try
         {
             var connector = AppServices.GetRequiredService<IOneCComConnector>();
@@ -57,6 +65,7 @@ public static class ConfigurationInfoService
             // не сработало (например, шаблон имени дал неправильный ProgID).
             LastUsedProgId = connector.LastUsedProgId;
             LastUsedPlatformVersion = connector.LastUsedPlatformVersion;
+            LastUsedHost = connector.LastUsedHost;
 
             if (viaCom is not null)
                 return viaCom;
@@ -102,17 +111,28 @@ public static class ConfigurationInfoService
         var info = TryRead(ib, mode: mode);
         if (info is null) return false;
 
+        return ApplyReadInfo(ib, info.Value, overwriteExisting);
+    }
+
+    /// <summary>
+    /// Применяет уже прочитанные сведения к базе. Вынесено из <see cref="TryApply"/>,
+    /// чтобы <see cref="ReadAndApply"/> не выполнял повторное COM-чтение: при падении
+    /// агента и fallback в PowerShell второй проход означал бы ещё одно падение и запуск
+    /// (issue #154). Политика <paramref name="overwriteExisting"/> та же, что и раньше.
+    /// </summary>
+    private static bool ApplyReadInfo(Infobase ib, OneCConfigInfo info, bool overwriteExisting)
+    {
         var changed = false;
-        if (!string.IsNullOrWhiteSpace(info.Value.Name)
+        if (!string.IsNullOrWhiteSpace(info.Name)
             && (overwriteExisting || string.IsNullOrWhiteSpace(ib.ConfigurationName)))
         {
-            ib.ConfigurationName = info.Value.Name.Trim();
+            ib.ConfigurationName = info.Name.Trim();
             changed = true;
         }
-        if (!string.IsNullOrWhiteSpace(info.Value.Version)
+        if (!string.IsNullOrWhiteSpace(info.Version)
             && (overwriteExisting || string.IsNullOrWhiteSpace(ib.ConfigurationVersion)))
         {
-            ib.ConfigurationVersion = info.Value.Version.Trim();
+            ib.ConfigurationVersion = info.Version.Trim();
             changed = true;
         }
         return changed;
@@ -164,7 +184,9 @@ public static class ConfigurationInfoService
         if (ib is null) return null;
         var info = TryRead(ib, timeoutMs, onStage, mode);
         if (info is null) return null;
-        TryApply(ib, overwriteExisting, mode);
+        // Применяем уже прочитанное значение, не вызывая TryApply: тот делает собственное
+        // чтение, и одно нажатие «Определить» давало бы два COM-прохода (issue #154).
+        ApplyReadInfo(ib, info.Value, overwriteExisting);
         return info;
     }
 

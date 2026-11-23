@@ -1763,6 +1763,16 @@ namespace Workspace1C
             if (!string.IsNullOrWhiteSpace(platformVersion))
                 sb.AppendLine().AppendLine($"Версия платформы базы: {platformVersion}");
 
+            // Хост и разрядность безопасного пути (issue #154): при отказе видно, искали ли
+            // коннектор в 64-битном или 32-битном PowerShell. Подсказка о регистрации нужна
+            // только когда COM реально использовался.
+            var host = ConfigurationInfoService.LastUsedHost;
+            if (!string.IsNullOrWhiteSpace(host))
+                sb.AppendLine().AppendLine(string.Format(
+                    LocalizationManager.T("Connection.DetectUsedHostFormat"), host));
+            if (!string.IsNullOrWhiteSpace(progId))
+                sb.AppendLine().AppendLine(LocalizationManager.T("Connection.DetectBitnessHint"));
+
             // Если имя коннектора не соответствует версии платформы базы (например, V85
             // для базы 8.3.x), поясняем причину и подсказываем решение (issue #174).
             if (!ConfigurationInfoService.ProgIdMatchesPlatform(progId, platformVersion))

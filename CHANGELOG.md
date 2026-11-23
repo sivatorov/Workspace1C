@@ -11,6 +11,74 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.114] — 2026-11-23
+
+### Исправлено
+
+- **Кнопка «Определить» в диалоге «Версия платформы и параметры» больше не падает
+  с нативным fast-fail `0xC0000409` (issue #154, Windows).** Причина: чтение
+  сведений о конфигурации шло через агент `ComReadHost` — дочерний экземпляр
+  этого же CoreCLR-приложения, поэтому изоляция не помогала: под CoreCLR вызов
+  `Connect` у `comcntr.dll` обрывал процесс, а родитель показывал код возврата.
+  - на Windows добавлен безопасный путь чтения через **Windows PowerShell 5.1**
+    (.NET Framework), где `Connect` работает штатно: новый
+    `ComConfigInfoPowerShell` с операцией `Invoke-Op`, запрос передаётся через
+    stdin в Base64 — пароль не попадает в командную строку;
+  - fallback: при коде возврата агента `0xC0000409` (и иных нативных fast-fail —
+    `0xC00000FD`, `0xC0000005`, `0x80000003`) и при `noprogid` чтение повторяется
+    через PowerShell; при `noprogid` — с перебором **64 → 32 бита (SysWOW64)**;
+  - диагностика показывает ProgID, версию платформы, использованный хост и
+    разрядность (`PowerShell 5.1 x64/x86`) и подсказку о регистрации
+    `comcntr.dll` в нужной разрядности;
+  - изменения в `ComScriptRunner`, `OneCComConnector` (Windows и Linux),
+    `IOneCComConnector`, `ConfigurationInfoService`, окнах
+    `ConnectionSettingsWindow` (WPF и Avalonia); новые ключи локализации
+    `Connection.DetectUsedHostFormat`, `Connection.DetectBitnessHint`,
+    `Com.PowerShellFallbackFailed` в `ru.json` и `en.json`;
+  - тесты `Issue154ComPowerShellFallbackTests` (25): классификация кодов
+    возврата, fallback при fast-fail и `noprogid`, сборка запроса без пароля в
+    аргументах, выбор 32-битного хоста, source-гварды на использование
+    безопасного пути командой «Определить».
+
+- **Переключатель «Иконка» / «С надписью» в меню «Утилиты» снова применяется к
+  кнопкам панели (issue #146, Windows и Linux).** Устранены две причины:
+  - `UtilitiesMenuResolver.ResolveForDisplay` при выключенном режиме правки
+    подменял пользовательскую компоновку стандартной, поэтому сохранённый
+    `DisplayMode` не доходил до кнопок панели;
+  - стили `IconButton` в WPF (`LightTheme.xaml`, `DarkTheme.xaml`) и Avalonia
+    (`Controls.axaml`) фиксировали 32×32 и обрезали подпись.
+  - `ResolveForDisplay` теперь читает сохранённый файл компоновки независимо от
+    режима правки; оба построителя кнопок используют
+    `UtilitiesMenuGroupPresentation` и сохранённую компоновку;
+  - добавлен стиль `SectionLabelButton` (`ControlThemes.Avalonia.cs` и WPF-темы),
+    кнопка раздела показывает иконку и подпись без обрезки; вложенные группы
+    всегда с подписью;
+  - тесты `Issue146GroupDisplayModeTests`:
+    `ResolveForDisplay_EditingDisabled_UsesSavedDisplayMode`,
+    `Schema5_LoadPreservesIconWithLabel_AndMigrationIsIdempotent`,
+    `SourceGuards_LabelButtonStyle_AndDisplayUsesSavedLayout`.
+
+Проверка: полный прогон `dotnet test Workspace1C.Tests/Workspace1C.Tests.csproj
+-c Release -p:RuntimeIdentifier= -p:SelfContained=false -p:PublishSingleFile=false`
+— **7884** теста, **0** падений, **0** пропущено.
+
+Собранные артефакты (single-file, self-contained, версия `1.0.1.114`):
+
+| Платформа | Файл | Размер | Версия |
+|---|---|---|---|
+| Windows x64 (WPF) | `dist/win-x64/Workspace1C.exe` | 85 648 900 Б (81,68 МБ) | `FileVersion` = `1.0.1.114` |
+| Linux x64 (Avalonia) | `dist/linux-x64/Workspace1C` | 53 941 356 Б (51,44 МБ) | `1.0.1.114` (в релизе — `Workspace1C-linux-x64`) |
+
+Windows-бинарь собран штатным `build-windows-single-file.ps1 -Configuration Release`;
+Linux-бинарь — кросс-сборкой `build-linux-single-file.ps1 -Configuration Release`
+(`-p:ForceLinux=true`, linux-x64) без ошибок компиляции. Запуск и smoke-тест
+Linux-бинаря выполняются в CI на `ubuntu-latest` (этап релиза); локально на Windows
+Linux-рантайм недоступен.
+
+Smoke-проверка Windows-бинаря: `Workspace1C.exe --list` завершился с кодом 0 и вывел
+список баз из профиля (35 записей, stderr пуст). Уже запущенный экземпляр приложения
+не помешал CLI-режиму; чужие процессы не завершались.
+
 ## [1.0.1.113] — 2026-11-23
 
 ### Исправлено

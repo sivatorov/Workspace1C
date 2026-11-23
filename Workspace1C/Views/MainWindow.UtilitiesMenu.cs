@@ -31,10 +31,11 @@ public partial class MainWindow
 
     /// <summary>
     /// Строит меню «Утилиты» верхней панели по каталогу+компоновке (issue #374).
-    /// Правка структуры выключена (по умолчанию) — стандартная компоновка;
-    /// включена — пользовательская из <c>utilities_menu_layout.json</c>. Новые пункты
-    /// программы (признак «новинка»), не размещённые в компоновке, автоматически
-    /// попадают в подменю «Новинки программы» в конце меню.
+    /// Issue #146: отображается сохранённая компоновка из
+    /// <c>utilities_menu_layout.json</c>, если она есть (независимо от флага правки);
+    /// без файла — стандартная. Новые пункты программы (признак «новинка»), не
+    /// размещённые в компоновке, автоматически попадают в подменю «Новинки программы»
+    /// в конце меню.
     /// </summary>
     private ContextMenu BuildUtilitiesMenu(string? sectionGroupId = null)
     {
@@ -522,11 +523,15 @@ public partial class MainWindow
             ? GroupIcon(node)
             : CreateMenuIcon(UtilitiesMenuCatalog.LegacyFallbackIconKey, "#64748B");
 
+        // Issue #146: для режима «С надписью» — отдельный стиль без фиксированных
+        // 32×32. Базовый IconButton задаёт Width/Height=32, из-за чего горизонтальный
+        // StackPanel с подписью обрезался, и кнопка выглядела как «только иконка»
+        // (сохранённый DisplayMode=IconWithLabel при этом был верным).
         var button = new Button
         {
-            Style = TryFindResource("IconButton") as Style,
+            Style = TryFindResource(showLabel ? "SectionLabelButton" : "IconButton") as Style,
             Margin = new Thickness(0, 0, 2, 0),
-            Padding = new Thickness(6),
+            Padding = showLabel ? new Thickness(8, 4, 8, 4) : new Thickness(6),
             MinWidth = 32,
             Tag = section.SectionId,
             ToolTip = title,

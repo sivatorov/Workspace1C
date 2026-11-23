@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.113-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.114-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,18 +8,20 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.113**
-(полный прогон — **7856 юнит-тестов**, все зелёные, 0 падений и 0 пропущенных).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.114**
+(полный прогон — **7884 юнит-теста**, все зелёные, 0 падений и 0 пропущенных).
 
 Исполняемые файлы этой версии собраны как self-contained single-file:
 
 | Платформа | Файл сборки | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 81,68 МБ | `FileVersion` = `1.0.1.113` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 51,44 МБ | `1.0.1.113` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 648 900 Б (81,68 МБ) | `FileVersion` = `1.0.1.114` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 941 356 Б (51,44 МБ) | `1.0.1.114` |
 
-Linux-бинарь собран кросс-компиляцией (`-p:ForceLinux=true`, linux-x64); его запуск и
-smoke-тест выполняются в CI на `ubuntu-latest`.
+Windows-бинарь собран штатным `build-windows-single-file.ps1 -Configuration Release`,
+smoke-проверка `Workspace1C.exe --list` завершилась с кодом 0. Linux-бинарь собран
+кросс-компиляцией (`-p:ForceLinux=true`, linux-x64); его запуск и smoke-тест
+выполняются в CI на `ubuntu-latest`.
 
 ## 📣 Telegram-канал
 
@@ -215,6 +217,20 @@ smoke-тест выполняются в CI на `ubuntu-latest`.
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Кнопка «Определить» в диалоге «Версия платформы и параметры» больше не
+  падает с ошибкой `0xC0000409` (1.0.1.114, Windows)** — чтение сведений о
+  конфигурации на Windows выполняется через Windows PowerShell 5.1 (.NET
+  Framework), где COM-вызов `Connect` работает штатно; при нативном fast-fail и
+  `noprogid` чтение повторяется с перебором разрядности 64 → 32 бита.
+  Диагностика показывает ProgID, версию платформы, использованный хост и
+  разрядность, а также подсказку о регистрации `comcntr.dll` в нужной
+  разрядности (issue #154).
+- **Режим «С надписью» снова применяется к кнопкам панели меню «Утилиты»
+  (1.0.1.114, Windows и Linux)** — панель строится по сохранённой пользовательской
+  компоновке даже при выключенном режиме правки, поэтому «Иконка» / «С надписью»
+  реально меняет вид кнопок; фиксированные 32×32 в стилях заменены стилем
+  `SectionLabelButton`, подпись не обрезается, вложенные группы всегда с
+  подписью (issue #146).
 - **Окно «Резервные копии средствами СУБД» больше не «вешается наглухо» на
   «Сохранить» и «Проверить…» (1.0.1.111, Windows и Linux)** — устранена реальная
   синхронная работа на UI-потоке, из-за которой не срабатывали таймауты 15/30 с:

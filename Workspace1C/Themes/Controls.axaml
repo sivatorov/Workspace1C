@@ -1063,6 +1063,17 @@
         </Style>
     </ControlTheme>
 
+    <!-- Кнопка раздела верхней панели «С надписью» (issue #146): иконка + подпись.
+         Наследует IconButton, но не фиксирует 32×32 — иначе горизонтальный StackPanel
+         с текстом обрезается до ширины иконки (кнопка выглядит как «только иконка»). -->
+    <ControlTheme x:Key="SectionLabelButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+        <!-- NaN = «размер по содержимому» (аналог WPF Auto в Avalonia). -->
+        <Setter Property="Width" Value="NaN"/>
+        <Setter Property="Height" Value="NaN"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Padding" Value="8,4"/>
+    </ControlTheme>
+
     <ControlTheme x:Key="HeaderIconButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
         <Setter Property="Padding" Value="5"/>
         <Setter Property="Template">

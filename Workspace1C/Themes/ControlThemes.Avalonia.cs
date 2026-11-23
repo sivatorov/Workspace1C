@@ -66,6 +66,12 @@ namespace Workspace1C.Themes
         /// <summary>Значковая кнопка: 32×32, прозрачный фон, скругление 8, подсветка ItemHoverBrush.</summary>
         public const string IconButton = "IconButton";
 
+        /// <summary>
+        /// Кнопка раздела верхней панели «С надписью» (issue #146): вид IconButton,
+        /// но контентного размера (без фиксированных 32×32), чтобы подпись не обрезалась.
+        /// </summary>
+        public const string SectionLabelButton = "SectionLabelButton";
+
         /// <summary>Кнопка-иконка колонки «Действия»: прозрачная, контент-размера (P2-2).</summary>
         public const string RowActionButton = "RowActionButton";
 

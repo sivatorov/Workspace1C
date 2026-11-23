@@ -293,6 +293,9 @@ public sealed class OneCComConnector : IOneCComConnector
     /// <inheritdoc />
     public string? LastUsedPlatformVersion { get; private set; }
 
+    /// <inheritdoc />
+    public string? LastUsedHost { get; private set; }
+
     public OneCComConnector(IAppLogger logger, IInfobaseRepository repository)
     {
         _logger = logger;
@@ -445,6 +448,9 @@ public sealed class OneCComConnector : IOneCComConnector
         // ib гарантированно ненулевой (защита выше + null-forgiving), поэтому ?. здесь
         // избыточен и вдобавок сбивает анализ состояния потока для последующих обращений.
         LastUsedPlatformVersion = usedVersion;
+        // Хост заполняется только безопасным PowerShell-путём (issue #154); при обычном
+        // чтении через агента диагностика хоста не нужна.
+        LastUsedHost = null;
 
         // Быстрый отказ по кэшу доступности — только без кастомного шаблона (см. комментарий
         // в Connect): при заданном шаблоне даже неудавшееся разворачивание версии не должно
@@ -510,6 +516,29 @@ public sealed class OneCComConnector : IOneCComConnector
 
         var result = ComReadHost.Read(connectString, timeoutMs, progIds, epoch);
         onStage?.Invoke(LocalizationManager.T("Connection.DetectStageRead"));
+
+        // Запасной путь (issue #154). Агент — дочерний экземпляр этого же CoreCLR-приложения,
+        // поэтому нативный fast-fail comcntr.dll (0xC0000409) убивает уже агента, и родитель
+        // видит только код возврата. Под .NET Framework (Windows PowerShell 5.1) Connect
+        // работает штатно, поэтому при таком отказе повторяем чтение там же; при noprogid
+        // ComScriptRunner сам повторяет запуск в 32-битном PowerShell (SysWOW64).
+        ComConfigInfoPowerShell.NoteAgentFailure(result);
+        string? agentFailureDetail = null;
+        if (result.Failure != ComFailureKind.None && ComConfigInfoPowerShell.ShouldFallback(result))
+        {
+            agentFailureDetail = DescribeFailure(result, hasSecret);
+            var fallback = ComConfigInfoPowerShell.Read(connectString, progIds, timeoutMs, out var host);
+            LastUsedHost = host;
+            if (fallback.Failure == ComFailureKind.None && fallback.Info is not null)
+            {
+                _logger.Info(
+                    $"Чтение сведений о конфигурации базы «{DisplayName(ib)}» через агент не удалось "
+                    + $"({result.Failure}: {result.Detail ?? "без подробностей"}); повторено через "
+                    + $"{host ?? "Windows PowerShell 5.1"} — успешно.");
+            }
+            result = fallback;
+        }
+
         if (result.Failure == ComFailureKind.None && result.Info is not null)
         {
             LastError = null;
@@ -524,7 +553,8 @@ public sealed class OneCComConnector : IOneCComConnector
             _logger.Info(
                 $"Подключение к базе «{DisplayName(ib)}» через COM-коннектор "
                 + $"{LastUsedProgId ?? "(не определён)"} успешно."
-                + $" Версия платформы: {LastUsedPlatformVersion ?? "(не указана)"}.");
+                + $" Версия платформы: {LastUsedPlatformVersion ?? "(не указана)"}."
+                + (LastUsedHost is null ? string.Empty : $" Хост: {LastUsedHost}."));
             return result.Info;
         }
 
@@ -539,6 +569,13 @@ public sealed class OneCComConnector : IOneCComConnector
         // то 1С его не видела и процитировать не могла — текст безопасен по построению.
         // Если есть — текст не выпускаем вовсе. Никаких догадок о том, что процитировала 1С.
         LastError = MaskCredentials(DescribeFailure(result, hasSecret));
+        if (agentFailureDetail is not null)
+        {
+            // Показываем обе причины: отказ агента и отказ повтора. Иначе пользователь видел бы
+            // только вторую и не понял, почему вообще понадобился PowerShell.
+            LastError = MaskCredentials(agentFailureDetail + " "
+                + LocalizationManager.T("Com.PowerShellFallbackFailed") + " " + LastError);
+        }
 
         // На выходе из приложения писать в журнал нечего: отказ вызван нашим же закрытием,
         // а не состоянием COM. Без этой проверки закрытие окна во время фонового дочитывания

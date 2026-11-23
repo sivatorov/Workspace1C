@@ -52,6 +52,10 @@ namespace Workspace1C.Services
         /// <inheritdoc />
         public string? LastUsedPlatformVersion { get; private set; } = null;
 
+        /// <inheritdoc />
+        /// <remarks>На Linux PowerShell-путь недоступен — всегда null.</remarks>
+        public string? LastUsedHost { get; private set; } = null;
+
         /// <summary>
         /// Доступность COM-коннектора на Linux всегда равна false (COM отсутствует).
         /// Метод добавлен для совместимости с общим кодом.

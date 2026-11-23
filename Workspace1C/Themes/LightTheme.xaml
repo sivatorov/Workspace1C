@@ -949,6 +949,17 @@
         </Setter>
     </Style>
 
+    <!-- Кнопка раздела верхней панели «С надписью» (issue #146): иконка + подпись.
+         Наследует вид IconButton, но не фиксирует 32×32 — иначе горизонтальный
+         StackPanel с текстом обрезается до ширины иконки, и кнопка выглядит как
+         «только иконка» (именно это и было причиной «переключатель не работает»). -->
+    <Style x:Key="SectionLabelButton" TargetType="Button" BasedOn="{StaticResource IconButton}">
+        <Setter Property="Width" Value="Auto"/>
+        <Setter Property="Height" Value="Auto"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="Padding" Value="8,4"/>
+    </Style>
+
     <!-- Кнопка-иконка на тёмной строке состояния: hover без светлой заливки (иначе белая иконка не видна). -->
 
     <!-- Кнопка в строке заголовков списка: развернуть/свернуть группы, hover-подсветка -->
