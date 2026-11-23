@@ -5,10 +5,9 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Title="{loc:Loc CloneServer.Title}"
         Icon="{StaticResource AppIcon}"
-        Width="620" Height="640" MinWidth="540" MinHeight="420"
+        Width="620" Height="560" MinWidth="540" MinHeight="360"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
-        MaxHeight="800"
         FontSize="13"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -16,7 +15,7 @@
     <Grid Margin="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*" MinHeight="200"/>
+            <RowDefinition Height="*" MinHeight="120"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 

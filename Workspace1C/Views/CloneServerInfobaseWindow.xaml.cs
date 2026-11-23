@@ -58,6 +58,21 @@ namespace Workspace1C
                 : _selectedGroupPath;
 
             UpdateModeHint();
+            ApplyWorkAreaLimits();
+        }
+
+        /// <summary>
+        /// Высота окна не должна выходить за рабочую область монитора: на экранах
+        /// 768 px с масштабированием фиксированные 640 DIP почти не помещались
+        /// (форма длинная — 14 полей). Ограничение общее с другими диалогами
+        /// (<see cref="DialogWorkAreaPolicy"/>), содержимое прокручивается.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var workArea = SystemParameters.WorkArea;
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
+            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
         }
 
         /// <summary>

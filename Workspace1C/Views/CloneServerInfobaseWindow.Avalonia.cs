@@ -73,7 +73,11 @@ namespace Workspace1C
 
             Title = LocalizationManager.T("CloneServer.Title");
             Width = 560;
-            SizeToContent = SizeToContent.Height;
+            // Форма длинная (14 полей). Раньше высота подстраивалась под всё
+            // содержимое, и на экранах 768 px окно почти не помещалось. Теперь
+            // высота ограничена рабочей областью, а поля прокручиваются.
+            Height = 560;
+            MinHeight = 360;
             CanResize = false;
 
             // Префилл: имя клона («— Копия»), сервер с портом, Ref с уникализацией
@@ -90,6 +94,23 @@ namespace Workspace1C
 
             Content = BuildRoot();
             UpdateModeHint();
+            ApplyWorkAreaLimits();
+        }
+
+        /// <summary>
+        /// Issue: высота окна не должна выходить за рабочую область монитора —
+        /// общая политика диалогов (<see cref="DialogWorkAreaPolicy"/>), как у
+        /// редакторов меню. Содержимое прокручивается, кнопки всегда видны.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null)
+                return;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, dipHeight);
+            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
         }
 
         /// <summary>
@@ -109,9 +130,10 @@ namespace Workspace1C
         private Control BuildRoot()
         {
             var grid = new Grid { Margin = new Thickness(16) };
+            // Заголовок (Auto), прокручиваемые поля (Star), кнопки (Auto):
+            // кнопки остаются видимыми, даже если полей больше, чем помещается.
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            grid.RowDefinitions.Add(new RowDefinition(new GridLength(1, GridUnitType.Star)));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
 
             var header = new StackPanel
@@ -207,8 +229,14 @@ namespace Workspace1C
 
             fields.Children.Add(_hintText);
 
-            Grid.SetRow(fields, 1);
-            grid.Children.Add(fields);
+            var scroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = fields
+            };
+            Grid.SetRow(scroll, 1);
+            grid.Children.Add(scroll);
 
             var buttons = new StackPanel
             {
@@ -241,7 +269,7 @@ namespace Workspace1C
             buttons.Children.Add(clone);
             buttons.Children.Add(BuildCancelActionButton(130));
 
-            Grid.SetRow(buttons, 3);
+            Grid.SetRow(buttons, 2);
             grid.Children.Add(buttons);
 
             return grid;
