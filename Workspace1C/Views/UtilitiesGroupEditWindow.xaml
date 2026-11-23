@@ -54,7 +54,9 @@
             <ComboBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
-                        <Path Data="{Binding Key, Converter={StaticResource IconKeyToGeometry}}"
+                        <!-- Issue #146: единый ключ геометрии (WpfIconGeometryKey) — та же
+                             иконка, что в дереве и в реальном меню. -->
+                        <Path Data="{Binding GeometryKey, Converter={StaticResource IconKeyToGeometry}}"
                               Width="16" Height="16" Stretch="Uniform" Margin="0,0,6,0"
                               VerticalAlignment="Center" Fill="{Binding Color}"/>
                         <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>

@@ -102,7 +102,9 @@ public sealed class TrayMenuIconCatalogTests
 
         var groupDialogXaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "UtilitiesGroupEditWindow.xaml"));
         Assert.Contains("conv:IconKeyToGeometryConverter x:Key=\"IconKeyToGeometry\"", groupDialogXaml, StringComparison.Ordinal);
-        Assert.Contains("Data=\"{Binding Key, Converter={StaticResource IconKeyToGeometry}}\"", groupDialogXaml, StringComparison.Ordinal);
+        // Issue #146: превью привязано к единому ключу геометрии (GeometryKey), а не к
+        // PackIcon-ключу — иначе в настройке была бы «вторая» иконка.
+        Assert.Contains("Data=\"{Binding GeometryKey, Converter={StaticResource IconKeyToGeometry}}\"", groupDialogXaml, StringComparison.Ordinal);
         Assert.DoesNotContain("PackIconKindConverter", groupDialogXaml);
 
         // Avalonia: ключи превью проходят тот же маппинг каталога (иначе IconHelper

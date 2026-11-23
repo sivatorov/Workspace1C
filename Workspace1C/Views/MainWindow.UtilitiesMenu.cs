@@ -73,7 +73,10 @@ public partial class MainWindow
         if (sectionGroupId is not null
             && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
         {
-            layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
+            // Issue #146: стандартный раздел открывается по GroupId, пользовательская
+            // группа верхнего уровня — по стабильному NodeId.
+            layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId)
+                     ?? UtilitiesMenuLayouts.ExtractSectionByNodeId(fullLayout, sectionGroupId);
             if (layout is null)
                 return menu;
             if (string.Equals(sectionGroupId, UtilitiesMenuCatalog.GroupMore, StringComparison.Ordinal)
@@ -164,22 +167,11 @@ public partial class MainWindow
     {
         if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
             return CreateExternalIcon(node.ExternalIconPath!);
-        var isNewItems = string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal);
-        // issue #81 (финальный фикс): у группы «Новинки программы» меню «Утилиты» — ТА ЖЕ
-        // иконка, что в контекстном меню (materialDesign PackIcon NewBox, #22C55E), всегда,
-        // независимо от сохранённых в старых layout легаси-иконок («папка», «звезда») —
-        // иначе реальное меню показывает звезду вместо NEW (комментарий 7OH). Рисуем её
-        // тем же PackIcon, что и контекстное меню (MainWindow.ContextMenu.cs → CreateRowMenuIcon),
-        // чтобы иконка была идентичной во всех наборах иконок. Внешний файл иконки сохраняется.
-        if (isNewItems)
-        {
-            return CreateRowMenuIcon(
-                UtilitiesMenuCatalog.GroupWpfIconKind(UtilitiesMenuCatalog.GroupNewItems),
-                UtilitiesMenuCatalog.GroupIconColor(UtilitiesMenuCatalog.GroupNewItems));
-        }
         // issue #146: иконка группы берётся из сохранённого узла (IconKey/IconColor);
-        // при отсутствии — стандартная иконка группы или детерминированная «папка»,
-        // тот же расчёт используют дерево редактора и диалог правки группы.
+        // при отсутствии — стандартная иконка группы или детерминированная «папка».
+        // Особый PackIcon-путь для «Новинок программы» убран: все группы (включая
+        // NewBox) рисуются одной геометрией Icon* через ResolveGroupIconKeyWpf, поэтому
+        // правка группы, дерево, поле выбора и реальное меню показывают одну иконку.
         var iconKey = UtilitiesMenuCatalog.ResolveGroupIconKeyWpf(node.GroupId, node.IconKey);
         var color = !string.IsNullOrWhiteSpace(node.IconColor)
             ? node.IconColor!
@@ -472,41 +464,101 @@ public partial class MainWindow
     }
 
     /// <summary>
-    /// Issue #146: перестраивает видимость кнопок разделов верхней панели по текущей
-    /// компоновке (скрытый раздел не показывает кнопку; пользовательская компоновка
-    /// без разделов показывает одну кнопку «Утилиты»). Вызывается при загрузке окна
-    /// и по событию <see cref="UtilitiesMenuEvents.LayoutChanged"/> — без перезапуска.
+    /// Issue #146: перестраивает кнопки разделов верхней панели по текущей компоновке
+    /// (скрытый раздел не показывает кнопку; пользовательская группа верхнего уровня
+    /// получает свою кнопку; компоновка без групп показывает одну кнопку «Утилиты»).
+    /// Вызывается при загрузке окна и по событию
+    /// <see cref="UtilitiesMenuEvents.LayoutChanged"/> — без перезапуска.
     /// </summary>
-    private void UpdateSectionButtonsVisibility()
+    private void UpdateSectionButtonsVisibility() => RebuildSectionButtons();
+
+    /// <summary>
+    /// Строит динамическую панель разделов: стандартные кнопки в порядке компоновки,
+    /// пользовательские группы верхнего уровня и запасная кнопка «Утилиты». Режим
+    /// «С надписью» берётся из <see cref="UtilitiesMenuGroupPresentation"/> — так
+    /// настройка редактора реально влияет на кнопку панели (issue #146).
+    /// </summary>
+    private void RebuildSectionButtons()
     {
-        if (_viewModel is null)
+        if (SectionButtonsPanel is null || _viewModel is null)
             return;
+
         var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
         var settings = new AppSettings
         {
             UtilitiesMenuEditingEnabled = _viewModel.UtilitiesMenuEditingEnabled
         };
         var layout = UtilitiesMenuResolver.ResolveForDisplay(settings, store);
-        var plan = UtilitiesSectionMenuPlanner.Build(layout);
 
-        bool Visible(string sectionId) => plan.Any(b =>
-            string.Equals(b.SectionId, sectionId, StringComparison.Ordinal));
-
-        SetSectionButtonVisibility(ServersSectionButton, Visible(UtilitiesMenuCatalog.GroupServers));
-        SetSectionButtonVisibility(MaintenanceSectionButton, Visible(UtilitiesMenuCatalog.GroupMaintenance));
-        SetSectionButtonVisibility(ToolsSectionButton, Visible(UtilitiesMenuCatalog.GroupTools));
-        SetSectionButtonVisibility(MoreSectionButton, Visible(UtilitiesMenuCatalog.GroupMore));
-        SetSectionButtonVisibility(UtilitiesFallbackButton,
-            plan.Any(b => UtilitiesSectionMenuPlanner.IsUtilitiesSection(b.SectionId)
-                || string.Equals(b.SectionId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal)));
+        SectionButtonsPanel.Children.Clear();
+        foreach (var section in UtilitiesSectionMenuPlanner.Build(layout))
+        {
+            var node = UtilitiesMenuLayouts.FindRootSection(layout, section.SectionId);
+            SectionButtonsPanel.Children.Add(BuildSectionButton(section, node));
+        }
     }
 
-    /// <summary>Показывает/скрывает кнопку раздела; null-кнопка игнорируется.</summary>
-    private static void SetSectionButtonVisibility(System.Windows.Controls.Button? button, bool visible)
+    /// <summary>
+    /// Кнопка раздела/пользовательской группы на верхней панели (issue #146):
+    /// «С надписью» — иконка + подпись, «Иконка» — только иконка с подсказкой.
+    /// </summary>
+    private Button BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
     {
-        if (button is null)
-            return;
-        button.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        var title = !string.IsNullOrWhiteSpace(section.Title)
+            ? section.Title!
+            : (!string.IsNullOrWhiteSpace(section.TitleKey)
+                ? LocalizationManager.T(section.TitleKey)
+                : (node is not null ? GroupTitle(node) : string.Empty));
+        if (string.IsNullOrWhiteSpace(title))
+            title = LocalizationManager.T(UtilitiesSectionMenuPlanner.UtilitiesTitleKey);
+
+        // Issue #146: стандартный раздел и пользовательская группа используют один
+        // расчёт представления — режим «С надписью» реально применяется к кнопке.
+        var presentation = node is not null
+            ? UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)
+            : null;
+        var showLabel = presentation?.ShowLabel == true;
+        var icon = node is not null
+            ? GroupIcon(node)
+            : CreateMenuIcon(UtilitiesMenuCatalog.LegacyFallbackIconKey, "#64748B");
+
+        var button = new Button
+        {
+            Style = TryFindResource("IconButton") as Style,
+            Margin = new Thickness(0, 0, 2, 0),
+            Padding = new Thickness(6),
+            MinWidth = 32,
+            Tag = section.SectionId,
+            ToolTip = title,
+        };
+
+        if (showLabel && icon is not null)
+        {
+            var content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            if (icon is FrameworkElement element)
+                content.Children.Add(element);
+            content.Children.Add(new TextBlock
+            {
+                Text = title,
+                Margin = new Thickness(6, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = TryFindResource("TextSecondaryBrush") as Brush
+            });
+            button.Content = content;
+        }
+        else
+        {
+            button.Content = icon;
+        }
+
+        button.Click += OnSectionMenuButton_Click;
+        // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
+        button.PreviewMouseRightButtonDown += OnUtilitiesButton_PreviewMouseRightButtonDown;
+        return button;
     }
 
     /// <summary>Событие изменения компоновки: обновляем кнопки разделов в UI-потоке.</summary>

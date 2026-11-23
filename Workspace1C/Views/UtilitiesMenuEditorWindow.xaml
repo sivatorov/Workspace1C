@@ -175,10 +175,15 @@
                               SelectedValuePath="Key" SelectedValue="{Binding SelectedIconKey}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
+                                <!-- Issue #146: превью — та же геометрия Icon*, что рисуют меню,
+                                     дерево и правка группы (UtilitiesIconOption.GeometryKey),
+                                     а не MaterialDesign PackIcon — иначе поле выбора показывало
+                                     «вторую» иконку. -->
                                 <StackPanel Orientation="Horizontal">
-                                    <materialDesign:PackIcon Kind="{Binding Key, Converter={StaticResource PackIconKindConverter}}"
-                                                             Width="16" Height="16" Margin="0,0,6,0"
-                                                             VerticalAlignment="Center" Foreground="{Binding Color}"/>
+                                    <Path Data="{Binding GeometryKey, Converter={StaticResource IconKeyToGeometry}}"
+                                          Width="16" Height="16" Margin="0,0,6,0"
+                                          Stretch="Uniform" VerticalAlignment="Center"
+                                          Fill="{Binding Color}"/>
                                     <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </DataTemplate>

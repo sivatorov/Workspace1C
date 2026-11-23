@@ -303,9 +303,12 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var restored = store.Load();
         Assert.NotNull(restored);
-        var utilities = UtilitiesGroup(restored!);
-        Assert.True(utilities.Children.Count >= 3);
-        Assert.Equal("separator", utilities.Children[1].Kind);
+        // Issue #146 (схема 5): сохранённые в корне пункты не переносятся в «Утилиты»;
+        // миграция может лишь добавить служебную группу «Новинки программы» в конец.
+        Assert.True(restored!.Root.Count >= 3);
+        Assert.Equal("CommandPalette", restored.Root[0].ItemId);
+        Assert.Equal("separator", restored.Root[1].Kind);
+        Assert.Equal("ActualReleases", restored.Root[2].ItemId);
     }
 
     [Fact]
@@ -328,7 +331,7 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
 
         var restored = store.Load();
         Assert.NotNull(restored);
-        var utilities = UtilitiesGroup(restored!);
-        Assert.Equal("ActualReleases", utilities.Children[0].ItemId);
+        // Issue #146 (схема 5): второй сохранённый корневой пункт — на первом месте.
+        Assert.Equal("ActualReleases", restored!.Root[0].ItemId);
     }
 }

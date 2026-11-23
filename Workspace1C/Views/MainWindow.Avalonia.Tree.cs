@@ -2735,7 +2735,10 @@ namespace Workspace1C
             if (sectionGroupId is not null
                 && !UtilitiesSectionMenuPlanner.IsUtilitiesSection(sectionGroupId))
             {
-                layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId);
+                // Issue #146: стандартный раздел — по GroupId, пользовательская группа
+                // верхнего уровня — по стабильному NodeId.
+                layout = UtilitiesMenuLayouts.ExtractSection(fullLayout, sectionGroupId)
+                         ?? UtilitiesMenuLayouts.ExtractSectionByNodeId(fullLayout, sectionGroupId);
                 if (layout is null)
                     return menu;
                 // В «Ещё» и «Утилитах» показываем новинки программы: это служебные группы.
@@ -2835,23 +2838,11 @@ namespace Workspace1C
         {
             if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
                 return CreateAvaloniaExternalIcon(node.ExternalIconPath!);
-            var isNewItems = string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal);
-            // issue #81 (финальный фикс): у группы «Новинки программы» меню «Утилиты» — ТА ЖЕ
-            // иконка, что в контекстном меню (IconNewBox, #22C55E), всегда, независимо от
-            // сохранённых в старых layout легаси-иконок («папка», «звезда») — иначе реальное
-            // меню показывает звезду вместо NEW (комментарий 7OH). Внешний файл сохраняется.
-            if (isNewItems)
-            {
-                return MenuIcon(
-                    UtilitiesMenuCatalog.GroupAvaloniaIconKey(UtilitiesMenuCatalog.GroupNewItems),
-                    UtilitiesMenuCatalog.ResolveGroupIconColor(
-                        UtilitiesMenuCatalog.GroupNewItems, ThemeManager.CurrentScheme,
-                        ThemeManager.CurrentTheme == ThemeManager.DarkThemeName));
-            }
             // issue #146: иконка группы берётся из сохранённого узла; PackIcon-ключ
             // каталога отображается на парную геометрию Icon* (как в WPF), иначе —
-            // стандартная иконка группы или детерминированная «папка». Раньше ключ
-            // передавался в IconHelper напрямую и в меню получалась «другая» иконка.
+            // стандартная иконка группы или детерминированная «папка». Особый путь
+            // для «Новинок программы» убран — все группы рисуются одной геометрией,
+            // поэтому дерево, правка группы, поле выбора и меню совпадают.
             var iconKey = UtilitiesMenuCatalog.ResolveGroupIconKeyAvalonia(node.GroupId, node.IconKey);
             var color = !string.IsNullOrWhiteSpace(node.IconColor)
                 ? node.IconColor!

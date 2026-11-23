@@ -107,21 +107,28 @@ public sealed class Issue149147148And134_101103Tests
     }
 
     [Fact]
-    public void Issue146_SectionButtonsAreIconOnlyInBothShells()
+    public void Issue146_SectionButtonsUsePresentationInBothShells()
     {
+        // Issue #146 (схема 5): стандартные разделы по умолчанию компактны (Icon),
+        // пользовательские группы — «С надписью»; обе платформы применяют общий
+        // UtilitiesMenuGroupPresentation к кнопкам панели.
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        var servers = Slice(xaml, "x:Name=\"ServersSectionButton\"", "</Button>");
-        Assert.DoesNotContain("<TextBlock", servers, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SectionButtonsPanel\"", xaml, StringComparison.Ordinal);
+
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
+        Assert.Contains("UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)", wpf, StringComparison.Ordinal);
+        Assert.Contains("showLabel", wpf, StringComparison.Ordinal);
 
         var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        Assert.Contains("TopBarIconButton(sectionIcon, sectionTitle", avalonia, StringComparison.Ordinal);
+        Assert.Contains("BuildSectionButtons", avalonia, StringComparison.Ordinal);
+        Assert.Contains("UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)", avalonia, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Issue146_SeparatorBeforeQuickButtons()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        var tail = Slice(xaml, "x:Name=\"UtilitiesFallbackButton\"", "OnQuickThemeButton_Click");
+        var tail = Slice(xaml, "x:Name=\"SectionButtonsPanel\"", "OnQuickThemeButton_Click");
         Assert.Contains("<Border Width=\"1\"", tail, StringComparison.Ordinal);
     }
 

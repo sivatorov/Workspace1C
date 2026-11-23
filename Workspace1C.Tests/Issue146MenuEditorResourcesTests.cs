@@ -44,35 +44,41 @@ public sealed class Issue146MenuEditorResourcesTests
         }
     }
 
+    /// <summary>
+    /// Issue #146: поле выбора иконки показывает ту же геометрию Icon*, что дерево и
+    /// меню (UtilitiesIconOption.GeometryKey), а не MaterialDesign PackIcon — иначе
+    /// в настройке была «вторая» иконка.
+    /// </summary>
     [Fact]
-    public void UtilitiesEditor_DeclaresPackIconKindConverter()
+    public void UtilitiesEditor_UsesGeometryPreviewInsteadOfPackIcon()
     {
         var xaml = ReadView("UtilitiesMenuEditorWindow.xaml");
 
         Assert.Contains(
-            "Converter={StaticResource PackIconKindConverter}",
+            "Converter={StaticResource IconKeyToGeometry}",
             xaml,
             StringComparison.Ordinal);
         Assert.Contains(
-            "x:Key=\"PackIconKindConverter\"",
+            "x:Key=\"IconKeyToGeometry\"",
             xaml,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("PackIcon Kind=\"{Binding Key", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void UtilitiesEditor_DeclaresConverterBeforeUse()
+    public void UtilitiesEditor_DeclaresGeometryConverterBeforeUse()
     {
         var xaml = ReadView("UtilitiesMenuEditorWindow.xaml");
 
-        var declaration = xaml.IndexOf("x:Key=\"PackIconKindConverter\"", StringComparison.Ordinal);
+        var declaration = xaml.IndexOf("x:Key=\"IconKeyToGeometry\"", StringComparison.Ordinal);
         var usage = xaml.IndexOf(
-            "Converter={StaticResource PackIconKindConverter}",
+            "Converter={StaticResource IconKeyToGeometry}",
             StringComparison.Ordinal);
 
         Assert.True(declaration >= 0 && usage >= 0,
-            "Объявление и/или использование PackIconKindConverter не найдены в UtilitiesMenuEditorWindow.xaml.");
+            "Объявление и/или использование IconKeyToGeometry не найдены в UtilitiesMenuEditorWindow.xaml.");
         Assert.True(declaration < usage,
-            "PackIconKindConverter должен быть объявлен ДО использования: " +
+            "IconKeyToGeometry должен быть объявлен ДО использования: " +
             "StaticResource в WPF резолвится сверху вниз.");
     }
 

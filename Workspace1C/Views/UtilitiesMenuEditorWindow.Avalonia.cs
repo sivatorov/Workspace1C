@@ -356,7 +356,13 @@ namespace Workspace1C
         private Control BuildIconRow(UtilitiesIconOption option)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            var icon = IconHelper.MakeIcon(option.Key, 16, "TextPrimaryBrush");
+            // Issue #146: превью — та же геометрия Icon*, что рисуют меню, дерево и
+            // правка группы (единый резолвер WpfIconGeometryKey). Раньше PackIcon-ключ
+            // передавался в IconHelper напрямую, и в поле выбора была «другая» иконка.
+            var geometryKey = option.GeometryKey;
+            if (string.IsNullOrWhiteSpace(geometryKey))
+                geometryKey = option.Key;
+            var icon = IconHelper.MakeIcon(geometryKey, 16, "TextPrimaryBrush");
             if (icon is not null)
                 row.Children.Add(icon);
             row.Children.Add(new TextBlock { Text = option.Label, VerticalAlignment = VerticalAlignment.Center });

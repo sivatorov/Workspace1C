@@ -324,11 +324,11 @@ public sealed class Issue134ProcessInspectorTests
         var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
 
         var inspector = xaml.IndexOf("x:Name=\"ProcessInspectorButton\"", StringComparison.Ordinal);
-        // После действий панели идут кнопки разделов («Серверы» — первая).
-        var sections = xaml.IndexOf("Tag=\"Servers\"", StringComparison.Ordinal);
+        // Issue #146: после действий панели идёт динамический контейнер кнопок разделов.
+        var sections = xaml.IndexOf("x:Name=\"SectionButtonsPanel\"", StringComparison.Ordinal);
 
         Assert.True(inspector >= 0, "Не найдена кнопка инспектора процессов.");
-        Assert.True(sections >= 0, "Не найдены кнопки сценарных разделов.");
+        Assert.True(sections >= 0, "Не найден контейнер кнопок сценарных разделов.");
         Assert.True(inspector < sections, "Инспектор должен стоять до кнопок разделов.");
         // На панели кнопки проверки доступности больше нет — она в меню раздела.
         Assert.DoesNotContain("CheckAvailabilityCommand", xaml, StringComparison.Ordinal);

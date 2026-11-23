@@ -322,6 +322,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         siblings.Remove(item);
         item.Parent = group;
         group.Children.Add(item);
+        UpdateTopLevelState(item);
         SelectedItem = item;
         RaiseCommandsCanExecuteChanged();
     }
@@ -335,6 +336,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         item.Parent.Children.Remove(item);
         item.Parent = null;
         Roots.Add(item);
+        UpdateTopLevelState(item);
         SelectedItem = item;
         RaiseCommandsCanExecuteChanged();
     }
@@ -366,10 +368,16 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             ? editParams.Title!.Trim()
             : LocalizationManager.T("Utilities.Editor.NewGroup");
         var parent = IsGroup(SelectedItem) ? SelectedItem : null;
+        // Issue #146: группа, созданная в корне, — самостоятельная кнопка панели.
+        // Ей выдаётся стабильный NodeId (кнопка открывает группу по нему) и
+        // IsTopLevel=true, поэтому миграция не перенесёт её в «Утилиты».
+        var isTopLevel = parent is null;
         var group = new UtilitiesMenuNode
         {
             Kind = "group",
             GroupId = null,
+            NodeId = isTopLevel ? UtilitiesMenuLayouts.NewNodeId() : null,
+            IsTopLevel = isTopLevel,
             CustomTitle = title,
             // По умолчанию новая группа показывается с подписью (1.0.1.105):
             // режим «только иконка» выбирается явно в диалоге правки группы.
@@ -435,6 +443,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             foreach (var child in children)
             {
                 child.Parent = null;
+                UpdateTopLevelState(child);
                 siblings.Insert(index++, child);
             }
             siblings.Remove(item);
@@ -562,6 +571,8 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             Kind = item.Node.Kind,
             ItemId = item.Node.ItemId,
             GroupId = item.Node.GroupId,
+            NodeId = item.Node.NodeId,
+            IsTopLevel = item.Node.IsTopLevel,
             CustomTitle = item.Node.CustomTitle,
             IconKey = item.Node.IconKey,
             IconColor = item.Node.IconColor,
@@ -570,9 +581,36 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             Visible = item.Node.Visible,
             SeparatorBefore = item.Node.SeparatorBefore,
         };
+        // Issue #146: положение в дереве — источник истины для признака верхнего уровня.
+        // Группа, оказавшаяся в корне, становится отдельной кнопкой панели и получает
+        // стабильный NodeId, даже если создана до появления схемы 5.
+        if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+        {
+            node.IsTopLevel = item.Parent is null;
+            if (node.IsTopLevel && string.IsNullOrWhiteSpace(node.GroupId)
+                && string.IsNullOrWhiteSpace(node.NodeId))
+            {
+                node.NodeId = UtilitiesMenuLayouts.NewNodeId();
+            }
+        }
         foreach (var child in item.Children)
             node.Children.Add(ToNode(child));
         return node;
+    }
+
+    /// <summary>
+    /// Issue #146: синхронизирует признак верхнего уровня после перемещения узла.
+    /// Группа в корне получает <see cref="UtilitiesMenuNode.IsTopLevel"/> = true и
+    /// стабильный <see cref="UtilitiesMenuNode.NodeId"/>, вложенная — false.
+    /// </summary>
+    private static void UpdateTopLevelState(UtilitiesMenuNodeItem item)
+    {
+        if (!IsGroup(item))
+            return;
+        var topLevel = item.Parent is null;
+        item.Node.IsTopLevel = topLevel;
+        if (topLevel && string.IsNullOrWhiteSpace(item.Node.NodeId))
+            item.Node.NodeId = UtilitiesMenuLayouts.NewNodeId();
     }
 
     private void Load()
@@ -668,6 +706,13 @@ public sealed class UtilitiesIconOption
 
     /// <summary>Цвет иконки #RRGGBB.</summary>
     public string Color { get; }
+
+    /// <summary>
+    /// Issue #146: ключ геометрии <c>Icon*</c>, которую рисуют меню «Утилиты», трей и
+    /// превью редакторов. Единый резолвер <see cref="UtilitiesMenuCatalog.WpfIconGeometryKey"/>
+    /// — все поверхности показывают одну и ту же иконку (не MaterialDesign PackIcon).
+    /// </summary>
+    public string GeometryKey => UtilitiesMenuCatalog.WpfIconGeometryKey(Key);
 
     /// <summary>Подпись для выпадающего списка: «Ключ (цвет)».</summary>
     public string Label => $"{Key} ({Color})";
@@ -767,16 +812,21 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
             {
                 // issue #146: тот же расчёт, что в меню — сохранённая иконка, иначе
                 // стандартная иконка группы, иначе детерминированная «папка».
+                // Все поверхности (дерево, правка группы, поле выбора, меню) получают
+                // один и тот же резолвимый ключ.
                 return UtilitiesMenuCatalog.ResolveGroupIconKeyWpf(Node.GroupId, Node.IconKey);
             }
             // issue #146: неизвестный сохранённый ключ не должен давать «другую» иконку —
             // падаем на иконку каталога, как и построители меню.
-            if (!string.IsNullOrWhiteSpace(Node.IconKey) &&
-                !string.IsNullOrWhiteSpace(UtilitiesMenuCatalog.WpfIconGeometryKey(Node.IconKey)))
-            {
-                return Node.IconKey!;
-            }
-            return UtilitiesMenuCatalog.Find(Node.ItemId)?.WpfIconKind ?? string.Empty;
+            var key = !string.IsNullOrWhiteSpace(Node.IconKey) &&
+                      !string.IsNullOrWhiteSpace(UtilitiesMenuCatalog.WpfIconGeometryKey(Node.IconKey))
+                ? Node.IconKey!
+                : UtilitiesMenuCatalog.Find(Node.ItemId)?.WpfIconKind ?? string.Empty;
+            // Нерезолвимый ключ каталога (например, внешний пункт ПРО без геометрии)
+            // нормализуется к пустому — дерево не рисует «чужую» папку.
+            return string.IsNullOrWhiteSpace(UtilitiesMenuCatalog.WpfIconGeometryKey(key))
+                ? string.Empty
+                : key;
         }
     }
 
@@ -813,11 +863,14 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
         {
             if (string.Equals(Node.Kind, "separator", StringComparison.Ordinal))
                 return "IconMinus";
+            // issue #146: дерево, поле выбора и правка группы рисуют одну и ту же
+            // геометрию Icon*, что и реальное меню (WpfIconGeometryKey). Группы
+            // всегда имеют резолвимый ключ (стандартная иконка или «папка»).
             var key = EffectiveIconKey;
             if (string.IsNullOrWhiteSpace(key))
-                return "IconFolder";
+                return string.Empty;
             var mapped = UtilitiesMenuCatalog.WpfIconGeometryKey(key);
-            return string.IsNullOrWhiteSpace(mapped) ? "IconFolder" : mapped;
+            return string.IsNullOrWhiteSpace(mapped) ? string.Empty : mapped;
         }
     }
 
@@ -825,7 +878,7 @@ public sealed class UtilitiesMenuNodeItem : ViewModelBase
     public string DisplayIconColor => EffectiveIconColor;
 
     /// <summary>Есть ли иконка для отображения в дереве (видимость превью).</summary>
-    public bool HasDisplayIcon => !string.IsNullOrWhiteSpace(EffectiveIconKey);
+    public bool HasDisplayIcon => !string.IsNullOrWhiteSpace(DisplayIconGeometryKey);
 
     /// <summary>Оповещает UI об изменении внешних свойств узла (иконка, заголовок).</summary>
     public void NotifyChanged()

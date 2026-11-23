@@ -154,7 +154,7 @@ public sealed class Issue146UtilitiesMenuTests
     /// однократно переводится на режим «С надписью».
     /// </summary>
     [Fact]
-    public void Migrate_Schema3ExplicitIcon_RestoresLabels()
+    public void Migrate_Schema3ExplicitIcon_RestoresNestedLabels()
     {
         var layout = new UtilitiesMenuLayout
         {
@@ -165,19 +165,34 @@ public sealed class Issue146UtilitiesMenuTests
                 {
                     Kind = "group",
                     GroupId = UtilitiesMenuCatalog.GroupServers,
-                    DisplayMode = UtilitiesMenuGroupDisplay.Icon,
                     Children = new List<UtilitiesMenuNode>
                     {
-                        new() { Kind = "item", ItemId = "ServerMonitor" }
+                        new()
+                        {
+                            Kind = "group",
+                            GroupId = UtilitiesMenuCatalog.GroupBackups,
+                            DisplayMode = UtilitiesMenuGroupDisplay.Icon,
+                            Children = new List<UtilitiesMenuNode>
+                            {
+                                new() { Kind = "item", ItemId = "DbmsBackup" }
+                            }
+                        }
                     }
                 }
             }
         };
 
         var migrated = UtilitiesMenuLayouts.Migrate(layout);
+        var backups = migrated.Root
+            .First(n => n.GroupId == UtilitiesMenuCatalog.GroupServers)
+            .Children.First(n => n.GroupId == UtilitiesMenuCatalog.GroupBackups);
+        // Вложенные группы из схем < 4 снова показываются с подписью.
+        Assert.Equal(UtilitiesMenuGroupDisplay.IconWithLabel, backups.DisplayMode);
+        Assert.True(UtilitiesMenuGroupPresentation.Build(backups, "Копии", isTopLevel: false).ShowLabel);
+        // Стандартный раздел панели остаётся компактным (только иконка).
         var servers = migrated.Root.First(n => n.GroupId == UtilitiesMenuCatalog.GroupServers);
-        Assert.Equal(UtilitiesMenuGroupDisplay.IconWithLabel, servers.DisplayMode);
-        Assert.True(UtilitiesMenuGroupPresentation.Build(servers, "Серверы").ShowLabel);
+        Assert.Equal(UtilitiesMenuGroupDisplay.Icon, servers.DisplayMode);
+        Assert.False(UtilitiesMenuGroupPresentation.Build(servers, "Серверы", isTopLevel: true).ShowLabel);
     }
 
     /// <summary>
@@ -282,23 +297,18 @@ public sealed class Issue146UtilitiesMenuTests
         Assert.All(plan, b => Assert.False(b.IsCustom));
     }
 
-    /// <summary>Пользовательская компоновка без разделов даёт одну кнопку «Утилиты».</summary>
+    /// <summary>Плоская компоновка без групп даёт одну кнопку «Утилиты».</summary>
     [Fact]
-    public void SectionMenuPlanner_CustomRoot_ReturnsUtilitiesButton()
+    public void SectionMenuPlanner_FlatRoot_ReturnsUtilitiesButton()
     {
         var layout = new UtilitiesMenuLayout
         {
             Root = new List<UtilitiesMenuNode>
             {
                 new() { Kind = "item", ItemId = "ServerMonitor" },
-                UtilitiesMenuLayouts.Group(null!, new List<UtilitiesMenuNode>
-                {
-                    new() { Kind = "item", ItemId = "Services" }
-                })
+                new() { Kind = "item", ItemId = "Services" }
             }
         };
-        layout.Root[1].GroupId = null;
-        layout.Root[1].CustomTitle = "Моя папка";
 
         var plan = UtilitiesSectionMenuPlanner.Build(layout);
 
@@ -306,6 +316,47 @@ public sealed class Issue146UtilitiesMenuTests
         Assert.True(plan[0].IsCustom);
         Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesSectionId, plan[0].SectionId);
         Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesTitleKey, plan[0].TitleKey);
+    }
+
+    /// <summary>
+    /// Issue #146: видимая пользовательская группа верхнего уровня даёт собственную
+    /// кнопку (по NodeId/заголовку), а не запасную «Утилиты».
+    /// </summary>
+    [Fact]
+    public void SectionMenuPlanner_UserTopLevelGroup_ReturnsOwnButton()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = UtilitiesMenuLayouts.CurrentSchemaVersion,
+            Root = new List<UtilitiesMenuNode>
+            {
+                UtilitiesMenuLayouts.Section(UtilitiesMenuCatalog.GroupServers, new List<UtilitiesMenuNode>
+                {
+                    new() { Kind = "item", ItemId = "ServerMonitor" }
+                }),
+                new()
+                {
+                    Kind = "group",
+                    GroupId = null,
+                    NodeId = "node-146",
+                    IsTopLevel = true,
+                    CustomTitle = "Моя папка",
+                    Children = new List<UtilitiesMenuNode>
+                    {
+                        new() { Kind = "item", ItemId = "Services" }
+                    }
+                }
+            }
+        };
+
+        var plan = UtilitiesSectionMenuPlanner.Build(layout);
+
+        Assert.Equal(2, plan.Count);
+        Assert.Contains(plan, b => b.SectionId == UtilitiesMenuCatalog.GroupServers && !b.IsCustom);
+        var custom = Assert.Single(plan, b => b.IsCustom);
+        Assert.Equal("node-146", custom.NodeId);
+        Assert.Equal("Моя папка", custom.Title);
+        Assert.Equal("node-146", custom.SectionId);
     }
 
     /// <summary>Все разделы скрыты — остаётся рабочая кнопка «Утилиты».</summary>
@@ -416,20 +467,21 @@ public sealed class Issue146UtilitiesMenuTests
     // ===================== 5. Source-гварды (паритет WPF/Avalonia) =====================
 
     [Fact]
-    public void WpfPanel_UsesPlannerAndHasQuickAppearanceButtons()
+    public void WpfPanel_UsesDynamicSectionButtonsAndQuickAppearanceButtons()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        Assert.Contains("x:Name=\"ServersSectionButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"MaintenanceSectionButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"ToolsSectionButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"MoreSectionButton\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("x:Name=\"UtilitiesFallbackButton\"", xaml, StringComparison.Ordinal);
+        // Issue #146: статический набор кнопок заменён динамической панелью.
+        Assert.Contains("x:Name=\"SectionButtonsPanel\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"ServersSectionButton\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Click=\"OnQuickThemeButton_Click\"", xaml, StringComparison.Ordinal);
         Assert.Contains("Click=\"OnQuickCompactButton_Click\"", xaml, StringComparison.Ordinal);
 
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
         Assert.Contains("UtilitiesSectionMenuPlanner.Build", code, StringComparison.Ordinal);
         Assert.Contains("UtilitiesMenuLayouts.ExtractSection", code, StringComparison.Ordinal);
+        Assert.Contains("UtilitiesMenuLayouts.ExtractSectionByNodeId", code, StringComparison.Ordinal);
+        // Режим «С надписью» применяется к кнопке панели через общий презентер.
+        Assert.Contains("UtilitiesMenuGroupPresentation.Build", code, StringComparison.Ordinal);
 
         // Обработчик ПКМ объявлен рядом с меню разделов (MainWindow.Updates.cs).
         var updates = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Updates.cs"));
@@ -437,13 +489,11 @@ public sealed class Issue146UtilitiesMenuTests
     }
 
     [Fact]
-    public void WpfSectionButtons_AllHaveRightClickEditor()
+    public void WpfSectionButtons_AreBuiltDynamicallyWithRightClickEditor()
     {
-        var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
-        // ПКМ-редактор привязан к каждой из четырёх кнопок разделов и к «Утилитам».
-        var count = CountOccurrences(xaml,
-            "PreviewMouseRightButtonDown=\"OnUtilitiesButton_PreviewMouseRightButtonDown\"");
-        Assert.True(count >= 5, $"Ожидалось ≥5 кнопок с ПКМ-редактором, найдено: {count}");
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
+        Assert.Contains("button.PreviewMouseRightButtonDown += OnUtilitiesButton_PreviewMouseRightButtonDown", code, StringComparison.Ordinal);
+        Assert.Contains("SectionButtonsPanel.Children.Clear()", code, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -600,6 +650,211 @@ public sealed class Issue146UtilitiesMenuTests
         Assert.Contains("new UtilitiesIconOption(", code, StringComparison.Ordinal);
         Assert.Contains("options.Any(", code, StringComparison.Ordinal);
         Assert.Contains("options.FirstOrDefault(", code, StringComparison.Ordinal);
+    }
+
+    // ===================== 7. Группы верхнего уровня (issue #146, схема 5) =====================
+
+    /// <summary>
+    /// Новая группа в корне получает стабильный NodeId и IsTopLevel=true; сохранение
+    /// переносит оба поля в компоновку без изменений.
+    /// </summary>
+    [Fact]
+    public void AddGroup_TopLevel_SetsNodeIdAndIsTopLevel()
+    {
+        var vm = new UtilitiesMenuEditorViewModel(store: null);
+
+        vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Верхняя", null));
+        var group = vm.SelectedItem!;
+
+        Assert.True(group.Node.IsTopLevel);
+        Assert.False(string.IsNullOrWhiteSpace(group.Node.NodeId));
+
+        vm.SaveCommand.Execute(null);
+        var saved = Assert.Single(vm.Layout.Root, n => n.CustomTitle == "Верхняя");
+        Assert.True(saved.IsTopLevel);
+        Assert.Equal(group.Node.NodeId, saved.NodeId);
+    }
+
+    /// <summary>Вложенная группа не становится группой верхнего уровня и не получает NodeId.</summary>
+    [Fact]
+    public void AddGroup_Nested_IsNotTopLevel()
+    {
+        var vm = new UtilitiesMenuEditorViewModel(store: null);
+        vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Внешняя", null));
+
+        vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Внутренняя", null));
+        var inner = vm.SelectedItem!;
+
+        Assert.False(inner.Node.IsTopLevel);
+        Assert.True(string.IsNullOrWhiteSpace(inner.Node.NodeId));
+    }
+
+    /// <summary>
+    /// Группа верхнего уровня после Save → Load → Migrate остаётся в корне и не
+    /// переносится в «Утилиты» (основная причина issue #146).
+    /// </summary>
+    [Fact]
+    public void TopLevelGroup_SaveLoadMigrate_StaysInRoot()
+    {
+        var dir = CreateTempDirectory();
+        try
+        {
+            var store = new UtilitiesMenuLayoutStore(directoryOverride: dir);
+            var vm = new UtilitiesMenuEditorViewModel(store);
+            vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Моя верхняя", null));
+            var nodeId = vm.SelectedItem!.Node.NodeId;
+            vm.SaveCommand.Execute(null);
+
+            var loaded = store.Load();
+            Assert.NotNull(loaded);
+            var top = Assert.Single(loaded!.Root,
+                n => string.Equals(n.NodeId, nodeId, StringComparison.Ordinal));
+            Assert.True(top.IsTopLevel);
+            Assert.Equal("Моя верхняя", top.CustomTitle);
+
+            // Повторная миграция ничего не переносит.
+            var migrated = UtilitiesMenuLayouts.Migrate(loaded);
+            Assert.Contains(migrated.Root, n => string.Equals(n.NodeId, nodeId, StringComparison.Ordinal));
+            Assert.DoesNotContain(migrated.Root, n =>
+                string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal)
+                && n.Children.Any(c => string.Equals(c.NodeId, nodeId, StringComparison.Ordinal)));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>Несколько групп верхнего уровня сохраняются и остаются отдельными.</summary>
+    [Fact]
+    public void MultipleTopLevelGroups_SurviveRoundTrip()
+    {
+        var dir = CreateTempDirectory();
+        try
+        {
+            var store = new UtilitiesMenuLayoutStore(directoryOverride: dir);
+            var vm = new UtilitiesMenuEditorViewModel(store);
+            vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Первая", null));
+            var first = vm.SelectedItem!.Node.NodeId;
+            vm.AddGroupCommand.Execute(new UtilitiesGroupEditParams("Вторая", null));
+            var second = vm.SelectedItem!.Node.NodeId;
+            vm.SaveCommand.Execute(null);
+
+            var loaded = store.Load();
+            Assert.NotNull(loaded);
+            var ids = loaded!.Root
+                .Where(n => n.Kind == "group" && n.IsTopLevel)
+                .Select(n => n.NodeId)
+                .ToList();
+            Assert.Contains(first, ids);
+            Assert.Contains(second, ids);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    /// <summary>
+    /// Легаси-схема (до 5) по-прежнему переносит пользовательские корневые группы в
+    /// «Утилиты», но только один раз — повторная миграция не дублирует и не двигает.
+    /// </summary>
+    [Fact]
+    public void LegacyLayout_MigratesUserRootIntoUtilitiesOnce()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = 4,
+            Root = new List<UtilitiesMenuNode>
+            {
+                UtilitiesMenuLayouts.Group(UtilitiesMenuCatalog.GroupServers, new List<UtilitiesMenuNode>
+                {
+                    new() { Kind = "item", ItemId = "ServerMonitor" }
+                }),
+                new()
+                {
+                    Kind = "group",
+                    GroupId = null,
+                    CustomTitle = "Моя папка",
+                    Children = new List<UtilitiesMenuNode>
+                    {
+                        new() { Kind = "item", ItemId = "Services" }
+                    }
+                }
+            }
+        };
+
+        var migrated = UtilitiesMenuLayouts.Migrate(layout);
+        Assert.DoesNotContain(migrated.Root,
+            n => n.Kind == "group" && n.CustomTitle == "Моя папка");
+        var utilities = Assert.Single(migrated.Root,
+            n => n.Kind == "group" && n.GroupId == UtilitiesMenuCatalog.GroupUtilities);
+        Assert.Single(utilities.Children, n => n.CustomTitle == "Моя папка");
+
+        var second = UtilitiesMenuLayouts.Migrate(migrated);
+        var utilities2 = Assert.Single(second.Root,
+            n => n.Kind == "group" && n.GroupId == UtilitiesMenuCatalog.GroupUtilities);
+        Assert.Single(utilities2.Children, n => n.CustomTitle == "Моя папка");
+    }
+
+    /// <summary>
+    /// <see cref="UtilitiesMenuLayouts.ExtractSectionByNodeId"/> открывает пользовательскую
+    /// группу по NodeId; скрытая группа не открывается.
+    /// </summary>
+    [Fact]
+    public void ExtractSectionByNodeId_OpensUserGroup()
+    {
+        var layout = new UtilitiesMenuLayout
+        {
+            SchemaVersion = UtilitiesMenuLayouts.CurrentSchemaVersion,
+            Root = new List<UtilitiesMenuNode>
+            {
+                new()
+                {
+                    Kind = "group",
+                    NodeId = "node-open",
+                    IsTopLevel = true,
+                    CustomTitle = "Моя папка",
+                    Children = new List<UtilitiesMenuNode>
+                    {
+                        new() { Kind = "item", ItemId = "ServerMonitor" }
+                    }
+                }
+            }
+        };
+
+        var extracted = UtilitiesMenuLayouts.ExtractSectionByNodeId(layout, "node-open");
+        Assert.NotNull(extracted);
+        Assert.Equal("ServerMonitor", Assert.Single(extracted!.Root).ItemId);
+
+        layout.Root[0].Visible = false;
+        Assert.Null(UtilitiesMenuLayouts.ExtractSectionByNodeId(layout, "node-open"));
+        Assert.Null(UtilitiesMenuLayouts.ExtractSectionByNodeId(layout, "no-such-node"));
+    }
+
+    /// <summary>
+    /// Source-страж: AddGroup выставляет IsTopLevel/NodeId, миграция не трогает
+    /// IsTopLevel, а обе платформы применяют UtilitiesMenuGroupPresentation к кнопкам.
+    /// </summary>
+    [Fact]
+    public void SourceGuards_TopLevelGroupsAndPresentation()
+    {
+        var editor = ReadProjectFile(Path.Combine(
+            "Workspace1C", "ViewModels", "UtilitiesMenuEditorViewModel.cs"));
+        Assert.Contains("NodeId = isTopLevel ? UtilitiesMenuLayouts.NewNodeId() : null", editor, StringComparison.Ordinal);
+        Assert.Contains("IsTopLevel = isTopLevel", editor, StringComparison.Ordinal);
+        Assert.Contains("item.Parent is null", editor, StringComparison.Ordinal);
+
+        var catalog = ReadProjectFile(Path.Combine("Workspace1C", "Services", "UtilitiesMenuCatalog.cs"));
+        Assert.Contains("if (node.IsTopLevel)", catalog, StringComparison.Ordinal);
+        Assert.Contains("if (layout.SchemaVersion >= CurrentSchemaVersion)", catalog, StringComparison.Ordinal);
+
+        var wpf = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
+        Assert.Contains("UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)", wpf, StringComparison.Ordinal);
+
+        var avalonia = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
+        Assert.Contains("BuildSectionButtons", avalonia, StringComparison.Ordinal);
+        Assert.Contains("UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)", avalonia, StringComparison.Ordinal);
     }
 
     // ===================== Вспомогательные методы =====================

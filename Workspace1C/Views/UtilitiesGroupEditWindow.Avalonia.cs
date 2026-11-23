@@ -177,7 +177,8 @@ namespace Workspace1C
         private Control BuildIconRow(UtilitiesIconOption option)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
-            var geometryKey = Services.UtilitiesMenuCatalog.WpfIconGeometryKey(option.Key);
+            // Issue #146: единый ключ геометрии варианта — одна иконка везде.
+            var geometryKey = option.GeometryKey;
             if (string.IsNullOrEmpty(geometryKey))
                 geometryKey = option.Key;
             Control icon;

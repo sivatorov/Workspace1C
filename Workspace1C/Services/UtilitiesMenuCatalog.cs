@@ -980,9 +980,12 @@ public static class UtilitiesMenuLayouts
     /// <summary>
     /// Актуальная версия схемы файла компоновки: 2 — разделы навигации 1.0.1.99,
     /// 3 — перенос пользовательского меню в группу «Утилиты» и режим отображения
-    /// группы (issue #146).
+    /// группы (issue #146), 4 — восстановление подписей групп, 5 — стабильный
+    /// <see cref="UtilitiesMenuNode.NodeId"/> и признак группы верхнего уровня
+    /// <see cref="UtilitiesMenuNode.IsTopLevel"/> (issue #146: отдельные кнопки
+    /// пользовательских групп и запрет их автоматического переноса в «Утилиты»).
     /// </summary>
-    public const int CurrentSchemaVersion = 4;
+    public const int CurrentSchemaVersion = 5;
 
     /// <summary>
     /// Стандартная компоновка меню: четыре сценарных раздела вместо плоского списка.
@@ -997,7 +1000,7 @@ public static class UtilitiesMenuLayouts
         layout.Root = new List<UtilitiesMenuNode>
         {
             // ---- 1. Серверы ----
-            Group(UtilitiesMenuCatalog.GroupServers, new List<UtilitiesMenuNode>
+            Section(UtilitiesMenuCatalog.GroupServers, new List<UtilitiesMenuNode>
             {
                 Item("ServerMonitor"),
                 Item("Services"),
@@ -1010,7 +1013,7 @@ public static class UtilitiesMenuLayouts
             }),
 
             // ---- 2. Обслуживание ----
-            Group(UtilitiesMenuCatalog.GroupMaintenance, new List<UtilitiesMenuNode>
+            Section(UtilitiesMenuCatalog.GroupMaintenance, new List<UtilitiesMenuNode>
             {
                 Group(UtilitiesMenuCatalog.GroupBackups, new List<UtilitiesMenuNode>
                 {
@@ -1045,7 +1048,7 @@ public static class UtilitiesMenuLayouts
             }),
 
             // ---- 3. Инструменты ----
-            Group(UtilitiesMenuCatalog.GroupTools, new List<UtilitiesMenuNode>
+            Section(UtilitiesMenuCatalog.GroupTools, new List<UtilitiesMenuNode>
             {
                 Group(UtilitiesMenuCatalog.GroupCompare, new List<UtilitiesMenuNode>
                 {
@@ -1100,7 +1103,7 @@ public static class UtilitiesMenuLayouts
             }),
 
             // ---- 4. Ещё ----
-            Group(UtilitiesMenuCatalog.GroupMore, new List<UtilitiesMenuNode>
+            Section(UtilitiesMenuCatalog.GroupMore, new List<UtilitiesMenuNode>
             {
                 Group(UtilitiesMenuCatalog.GroupUpdates, new List<UtilitiesMenuNode>
                 {
@@ -1149,6 +1152,12 @@ public static class UtilitiesMenuLayouts
 
         var originalSchema = layout.SchemaVersion;
         layout.Root ??= new List<UtilitiesMenuNode>();
+        // Issue #146: в актуальной схеме корневые группы — это группы верхнего уровня
+        // (стандартные разделы и пользовательские папки). Признак восстанавливается,
+        // а пользовательская группа без NodeId получает стабильный идентификатор,
+        // чтобы кнопка панели открывала её после перезапуска.
+        if (originalSchema >= CurrentSchemaVersion)
+            NormalizeTopLevelGroups(layout.Root);
         if (!NeedsMigration(layout))
         {
             layout.SchemaVersion = CurrentSchemaVersion;
@@ -1163,13 +1172,22 @@ public static class UtilitiesMenuLayouts
         // issue #146 (комментарий 7OH): пользовательские пункты и группы не остаются
         // «подвешенными» в корне рядом с разделами — они переносятся в группу «Утилиты»,
         // которая показывается отдельной кнопкой и открывается одним уровнем.
-        MoveUserRootNodesIntoUtilities(layout);
+        // Перенос выполняется только для легаси-схем (< 5): группы с IsTopLevel=true
+        // остаются отдельными кнопками верхней панели.
+        if (originalSchema < CurrentSchemaVersion)
+            MoveUserRootNodesIntoUtilities(layout);
 
         // 1.0.1.105: в 1.0.104 группы сохранялись с явным DisplayMode=Icon (дефолт),
         // из-за чего в меню пропадали подписи. Для схем < 4 возвращаем подписи;
         // явный выбор «Иконка», сделанный в схеме 4, сохраняется.
         if (originalSchema < 4)
             NormalizeGroupDisplayModes(layout.Root);
+
+        // Issue #146: кнопки стандартных разделов на панели остаются компактными
+        // (только иконка), как и до появления выбора «С надписью». Пользователь
+        // может явно выбрать подпись в редакторе уже в схеме 5.
+        if (originalSchema < CurrentSchemaVersion)
+            NormalizeRootSectionsCompact(layout.Root);
 
         AddMissingCatalogItems(layout);
 
@@ -1191,6 +1209,11 @@ public static class UtilitiesMenuLayouts
     /// </summary>
     private static void MoveUserRootNodesIntoUtilities(UtilitiesMenuLayout layout)
     {
+        // Только легаси-схемы: в схеме 5 пользовательская группа верхнего уровня
+        // (IsTopLevel=true) — самостоятельная кнопка панели, а не содержимое «Утилит».
+        if (layout.SchemaVersion >= CurrentSchemaVersion)
+            return;
+
         var utilities = layout.Root.FirstOrDefault(n => n is not null
             && string.Equals(n.Kind, "group", StringComparison.Ordinal)
             && string.Equals(n.GroupId, UtilitiesMenuCatalog.GroupUtilities, StringComparison.Ordinal));
@@ -1243,12 +1266,76 @@ public static class UtilitiesMenuLayouts
     }
 
     /// <summary>
+    /// Issue #146: восстанавливает признак группы верхнего уровня для актуальной схемы.
+    /// Все группы корня получают <see cref="UtilitiesMenuNode.IsTopLevel"/> = true,
+    /// вложенные — false. Пользовательская группа (не стандартный раздел и не служебная
+    /// «Новинки программы») без <see cref="UtilitiesMenuNode.NodeId"/> получает стабильный
+    /// идентификатор, чтобы кнопка панели могла её открыть.
+    /// </summary>
+    private static void NormalizeTopLevelGroups(
+        IEnumerable<UtilitiesMenuNode>? nodes, bool topLevel = true)
+    {
+        if (nodes is null)
+            return;
+        foreach (var node in nodes)
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+            {
+                node.IsTopLevel = topLevel;
+                if (topLevel && IsUserGroup(node) && string.IsNullOrWhiteSpace(node.NodeId))
+                    node.NodeId = NewNodeId();
+            }
+            NormalizeTopLevelGroups(node.Children, topLevel: false);
+        }
+    }
+
+    /// <summary>
+    /// Issue #146: стандартные разделы на панели остаются компактными (только иконка),
+    /// как до появления настройки «С надписью». Вложенные группы это не затрагивает —
+    /// в подменю они всегда показываются с подписью.
+    /// </summary>
+    private static void NormalizeRootSectionsCompact(IEnumerable<UtilitiesMenuNode>? nodes)
+    {
+        if (nodes is null)
+            return;
+        foreach (var node in nodes)
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal)
+                && UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId))
+            {
+                node.IsTopLevel = true;
+                node.DisplayMode = UtilitiesMenuGroupDisplay.Icon;
+            }
+        }
+    }
+
+    /// <summary>
+    /// True — группа является пользовательской (не стандартный раздел каталога и не
+    /// служебная группа «Новинки программы»), то есть может быть отдельной кнопкой панели.
+    /// </summary>
+    public static bool IsUserGroup(UtilitiesMenuNode? node) =>
+        node is not null
+        && string.Equals(node.Kind, "group", StringComparison.Ordinal)
+        && !UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId)
+        && !string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal);
+
+    /// <summary>Новый стабильный идентификатор пользовательской группы (issue #146).</summary>
+    public static string NewNodeId() => "node-" + Guid.NewGuid().ToString("N");
+
+    /// <summary>
     /// True — корневой узел относится к пользовательскому меню и переносится в «Утилиты»:
     /// пункты, разделители, пользовательские/легаси-группы. Разделы навигации и служебная
     /// группа «Новинки программы» остаются в корне.
     /// </summary>
     private static bool IsMovableUserRootNode(UtilitiesMenuNode node)
     {
+        // Issue #146: явная группа верхнего уровня не переносится в «Утилиты».
+        if (node.IsTopLevel)
+            return false;
         if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
             || string.Equals(node.Kind, "separator", StringComparison.Ordinal))
             return true;
@@ -1277,16 +1364,17 @@ public static class UtilitiesMenuLayouts
 
     /// <summary>
     /// True — компоновка содержит хотя бы один раздел первого уровня
-    /// (<see cref="UtilitiesMenuCatalog.RootSections"/>) в корне. Если разделов нет
-    /// (пользовательская плоская структура), панель показывает одну кнопку «Утилиты».
+    /// (<see cref="UtilitiesMenuCatalog.RootSections"/>) или пользовательскую группу
+    /// верхнего уровня в корне. Если таких групп нет (пользовательская плоская
+    /// структура), панель показывает одну кнопку «Утилиты».
     /// </summary>
     public static bool HasSectionStructure(UtilitiesMenuLayout? layout) =>
         layout?.Root is not null
         && layout.Root.Any(n => n is not null
             && string.Equals(n.Kind, "group", StringComparison.Ordinal)
-            && UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId));
+            && (UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId) || IsUserGroup(n)));
 
-    /// <summary>Видимые разделы первого уровня в порядке компоновки (скрытые не возвращаются).</summary>
+    /// <summary>Видимые разделы/группы первого уровня в порядке компоновки (скрытые не возвращаются).</summary>
     public static IReadOnlyList<UtilitiesMenuNode> VisibleRootSections(UtilitiesMenuLayout? layout)
     {
         if (layout?.Root is null)
@@ -1294,7 +1382,7 @@ public static class UtilitiesMenuLayouts
         return layout.Root
             .Where(n => n is not null
                 && string.Equals(n.Kind, "group", StringComparison.Ordinal)
-                && UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId)
+                && (UtilitiesMenuCatalog.IsSectionGroupId(n.GroupId) || IsUserGroup(n))
                 && n.Visible)
             .ToList();
     }
@@ -1438,13 +1526,50 @@ public static class UtilitiesMenuLayouts
         var node = layout.Root.FirstOrDefault(n =>
             string.Equals(n.Kind, "group", StringComparison.Ordinal)
             && string.Equals(n.GroupId, sectionGroupId, StringComparison.Ordinal));
-        // Скрытый раздел не открывается: галочка видимости в редакторе реально влияет
-        // на результат (issue #146 — «отключённое меню Инструменты продолжает
-        // отображаться»). Кнопка скрытого раздела на панели тоже не создаётся
-        // (см. UtilitiesSectionMenuPlanner).
+        return ExtractSectionCore(node);
+    }
+
+    /// <summary>
+    /// Issue #146: извлекает содержимое пользовательской группы верхнего уровня по её
+    /// стабильному <see cref="UtilitiesMenuNode.NodeId"/>. Кнопка панели, созданная для
+    /// пользовательской группы, открывает именно её, а не полную компоновку.
+    /// null — группы нет, она скрыта или идентификатор пуст.
+    /// </summary>
+    public static UtilitiesMenuLayout? ExtractSectionByNodeId(UtilitiesMenuLayout? layout, string? nodeId)
+    {
+        if (layout?.Root is null || string.IsNullOrWhiteSpace(nodeId))
+            return null;
+        var node = layout.Root.FirstOrDefault(n =>
+            string.Equals(n.Kind, "group", StringComparison.Ordinal)
+            && string.Equals(n.NodeId, nodeId, StringComparison.Ordinal));
+        return ExtractSectionCore(node);
+    }
+
+    /// <summary>
+    /// Ищет корневую группу по идентификатору раздела: стандартный раздел — по
+    /// <see cref="UtilitiesMenuNode.GroupId"/>, пользовательская группа — по
+    /// <see cref="UtilitiesMenuNode.NodeId"/> (issue #146). null — не найдена.
+    /// </summary>
+    public static UtilitiesMenuNode? FindRootSection(UtilitiesMenuLayout? layout, string? sectionId)
+    {
+        if (layout?.Root is null || string.IsNullOrWhiteSpace(sectionId))
+            return null;
+        return layout.Root.FirstOrDefault(n =>
+            n is not null
+            && string.Equals(n.Kind, "group", StringComparison.Ordinal)
+            && (string.Equals(n.GroupId, sectionId, StringComparison.Ordinal)
+                || string.Equals(n.NodeId, sectionId, StringComparison.Ordinal)));
+    }
+
+    /// <summary>
+    /// Общая часть извлечения: скрытый раздел не открывается (галочка видимости в
+    /// редакторе реально влияет на результат), возвращается копия детей без
+    /// дублирующего узла-раздела.
+    /// </summary>
+    private static UtilitiesMenuLayout? ExtractSectionCore(UtilitiesMenuNode? node)
+    {
         if (node is null || !node.Visible)
             return null;
-        // Разворачиваем раздел на уровень меню: копия детей без дублирующего узла-раздела.
         var children = node.Children is null
             ? new List<UtilitiesMenuNode>()
             : new List<UtilitiesMenuNode>(node.Children);
@@ -1564,18 +1689,41 @@ public static class UtilitiesMenuLayouts
         return node;
     }
 
+    /// <summary>
+    /// Узел-раздел первого уровня (issue #146): компактная кнопка на панели (только
+    /// иконка, как до появления настройки «С надписью»).
+    /// </summary>
+    public static UtilitiesMenuNode Section(string groupId, List<UtilitiesMenuNode> children,
+        bool separatorBefore = false)
+    {
+        var node = Group(groupId, children, separatorBefore);
+        node.IsTopLevel = true;
+        node.DisplayMode = UtilitiesMenuGroupDisplay.Icon;
+        return node;
+    }
+
     /// <summary>Узел-разделитель (issue #374): самостоятельный элемент дерева компоновки.</summary>
     public static UtilitiesMenuNode Separator() => new() { Kind = "separator" };
 }
 
 /// <summary>
 /// Кнопка раздела на верхней панели (issue #146): либо реальный раздел первого уровня,
-/// либо единственная кнопка «Утилиты» для пользовательской компоновки без разделов.
+/// либо пользовательская группа верхнего уровня, либо единственная кнопка «Утилиты»
+/// для пользовательской компоновки без групп.
 /// </summary>
-/// <param name="SectionId">Идентификатор раздела или <see cref="UtilitiesSectionMenuPlanner.UtilitiesSectionId"/>.</param>
-/// <param name="TitleKey">Ключ локализации заголовка.</param>
-/// <param name="IsCustom">True — кнопка «Утилиты» открывает полную пользовательскую компоновку.</param>
-public sealed record UtilitiesSectionButton(string SectionId, string TitleKey, bool IsCustom);
+/// <param name="SectionId">Идентификатор раздела: <c>GroupId</c> стандартного раздела,
+/// <c>NodeId</c> пользовательской группы или
+/// <see cref="UtilitiesSectionMenuPlanner.UtilitiesSectionId"/> для полной компоновки.</param>
+/// <param name="TitleKey">Ключ локализации заголовка (пусто у пользовательской группы).</param>
+/// <param name="IsCustom">True — пользовательская группа или кнопка «Утилиты» (полная компоновка).</param>
+/// <param name="NodeId">Стабильный идентификатор пользовательской группы (null — стандартный раздел).</param>
+/// <param name="Title">Пользовательский заголовок группы (null — брать локализованный по <paramref name="TitleKey"/>).</param>
+public sealed record UtilitiesSectionButton(
+    string SectionId,
+    string TitleKey,
+    bool IsCustom,
+    string? NodeId = null,
+    string? Title = null);
 
 /// <summary>
 /// Планировщик кнопок разделов верхней панели (issue #146), общий для WPF и Avalonia.
@@ -1600,18 +1748,20 @@ public static class UtilitiesSectionMenuPlanner
         string.Equals(sectionId, UtilitiesSectionId, StringComparison.Ordinal);
 
     /// <summary>
-    /// Строит список кнопок разделов: только видимые разделы; если разделов в компоновке
-    /// нет ИЛИ все они скрыты — одна кнопка «Утилиты», чтобы пользователь не остался
-    /// без точки входа в меню.
+    /// Строит список кнопок разделов: для каждого видимого корневого узла-группы —
+    /// стандартный раздел (по <c>GroupId</c>) или пользовательская группа верхнего
+    /// уровня (по <c>NodeId</c>/<c>CustomTitle</c>). Скрытые группы кнопок не дают;
+    /// если групп нет ИЛИ все они скрыты — одна кнопка «Утилиты», чтобы пользователь
+    /// не остался без точки входа в меню.
     /// </summary>
     public static IReadOnlyList<UtilitiesSectionButton> Build(UtilitiesMenuLayout? layout)
     {
         if (layout is null)
             return Array.Empty<UtilitiesSectionButton>();
 
-        // Кнопки строятся по фактическому порядку разделов в компоновке (issue #146):
-        // так кнопка «Утилиты» появляется для перенесённого пользовательского меню,
-        // а порядок кнопок совпадает с порядком групп в редакторе.
+        // Кнопки строятся по фактическому порядку групп в компоновке (issue #146):
+        // так порядок кнопок совпадает с порядком групп в редакторе, а пользовательская
+        // группа верхнего уровня получает собственную кнопку.
         var result = new List<UtilitiesSectionButton>();
         foreach (var node in layout.Root)
         {
@@ -1619,15 +1769,42 @@ public static class UtilitiesSectionMenuPlanner
                 continue;
             if (!string.Equals(node.Kind, "group", StringComparison.Ordinal))
                 continue;
-            if (!UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId))
+
+            if (UtilitiesMenuCatalog.IsSectionGroupId(node.GroupId))
+            {
+                result.Add(new UtilitiesSectionButton(
+                    node.GroupId!, UtilitiesMenuCatalog.GroupTitleKey(node.GroupId!), false,
+                    NodeId: null, Title: null));
                 continue;
+            }
+
+            if (!UtilitiesMenuLayouts.IsUserGroup(node))
+                continue;
+
+            var nodeId = !string.IsNullOrWhiteSpace(node.NodeId)
+                ? node.NodeId!
+                : (!string.IsNullOrWhiteSpace(node.CustomTitle) ? node.CustomTitle! : NewUserSectionId(result));
             result.Add(new UtilitiesSectionButton(
-                node.GroupId!, UtilitiesMenuCatalog.GroupTitleKey(node.GroupId!), false));
+                nodeId, string.Empty, true, nodeId,
+                string.IsNullOrWhiteSpace(node.CustomTitle) ? null : node.CustomTitle));
         }
 
         if (result.Count == 0)
             result.Add(new UtilitiesSectionButton(UtilitiesSectionId, UtilitiesTitleKey, true));
         return result;
+    }
+
+    /// <summary>Резервный идентификатор для пользовательской группы без NodeId/заголовка.</summary>
+    private static string NewUserSectionId(IReadOnlyCollection<UtilitiesSectionButton> existing)
+    {
+        var index = existing.Count + 1;
+        string id;
+        do
+        {
+            id = "custom-group-" + index;
+            index++;
+        } while (existing.Any(b => string.Equals(b.SectionId, id, StringComparison.Ordinal)));
+        return id;
     }
 }
 

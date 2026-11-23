@@ -225,21 +225,24 @@ public sealed class UtilitiesMenuSectionExtractionTests
     // ===================== 6. UI-стражи (исходники) =====================
 
     /// <summary>
-    /// WPF: в разметке ровно по одной кнопке на каждый раздел
-    /// (<c>Tag="Servers"</c>, <c>Tag="Maintenance"</c>, <c>Tag="Tools"</c>, <c>Tag="More"</c>).
-    /// Дубли кнопок приводили бы к двум одинаковым меню на панели.
+    /// WPF (issue #146): кнопки разделов строятся динамически — в разметке один
+    /// контейнер <c>SectionButtonsPanel</c>, а не статический набор кнопок.
+    /// Дубли приводили бы к двум одинаковым меню на панели.
     /// </summary>
     [Fact]
-    public void WpfMainWindow_HasExactlyOneButtonPerSection()
+    public void WpfMainWindow_HasSingleDynamicSectionButtonsPanel()
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.xaml"));
 
+        Assert.Equal(1, CountOccurrences(xaml, "x:Name=\"SectionButtonsPanel\""));
         foreach (var sectionId in UtilitiesMenuCatalog.RootSections)
         {
-            var count = CountOccurrences(xaml, $"Tag=\"{sectionId}\"");
-            Assert.True(count == 1,
-                $"Кнопок раздела Tag=\"{sectionId}\" должно быть ровно 1, найдено: {count}");
+            Assert.Equal(0, CountOccurrences(xaml, $"Tag=\"{sectionId}\""));
         }
+
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs"));
+        Assert.Contains("UtilitiesSectionMenuPlanner.Build", code, StringComparison.Ordinal);
+        Assert.Contains("SectionButtonsPanel.Children.Clear()", code, StringComparison.Ordinal);
     }
 
     /// <summary>

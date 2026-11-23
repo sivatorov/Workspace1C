@@ -1108,39 +1108,9 @@ namespace Workspace1C
             panel.Children.Add(CommandPanelSeparator());
 
             // Issue #146: кнопки разделов строятся по компоновке через общий планировщик.
-            // Скрытый раздел не даёт кнопку; пользовательская компоновка без разделов
-            // показывает одну кнопку «Утилиты» (рабочая точка входа). ПКМ по любой
-            // кнопке раздела открывает редактор структуры меню.
-            var sectionStore = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
-            var sectionLayout = UtilitiesMenuResolver.ResolveForDisplay(_vm?.Settings, sectionStore);
-            foreach (var section in UtilitiesSectionMenuPlanner.Build(sectionLayout))
-            {
-                var sectionIcon = section.IsCustom
-                    ? "IconMenu"
-                    : UtilitiesMenuCatalog.GroupAvaloniaIconKey(section.SectionId);
-                if (string.IsNullOrWhiteSpace(sectionIcon))
-                    sectionIcon = "IconMenu";
-                var sectionTitle = LocalizationManager.T(section.TitleKey);
-
-                // issue #146 (1.0.1.103): кнопки разделов — только иконка с подсказкой,
-                // без текста, чтобы панель не переносилась на вторую строку при
-                // минимальной ширине окна (как в WPF).
-                var sectionBtn = TopBarIconButton(sectionIcon, sectionTitle,
-                    themeBrushKey: "TextSecondaryColorBrush");
-                var id = section.SectionId;
-                // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
-                sectionBtn.PointerPressed += (_, e) =>
-                {
-                    if (!e.GetCurrentPoint(sectionBtn).Properties.IsRightButtonPressed)
-                        return;
-                    e.Handled = true;
-                    OpenUtilitiesMenuEditorDirectly();
-                };
-                // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
-                // Ранее открытое меню раздела закрывается (навигация 1.0.1.99).
-                sectionBtn.Click += (_, _) => OpenSectionMenu(id, sectionBtn);
-                panel.Children.Add(sectionBtn);
-            }
+            // Скрытый раздел не даёт кнопку; пользовательская группа верхнего уровня
+            // получает свою кнопку; компоновка без групп — одну кнопку «Утилиты».
+            panel.Children.Add(BuildSectionButtons());
 
             panel.Children.Add(CommandPanelSeparator());
 
@@ -1168,6 +1138,104 @@ namespace Workspace1C
             });
 
             return panel;
+        }
+
+        /// <summary>
+        /// Issue #146: кнопки разделов верхней панели по текущей компоновке.
+        /// Стандартные разделы — в порядке компоновки, пользовательские группы верхнего
+        /// уровня — по стабильному <see cref="UtilitiesMenuNode.NodeId"/>, запасная
+        /// кнопка «Утилиты» — для плоской структуры.
+        /// </summary>
+        private Control BuildSectionButtons()
+        {
+            var container = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Spacing = 2
+            };
+
+            var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
+            var layout = UtilitiesMenuResolver.ResolveForDisplay(_vm?.Settings, store);
+            foreach (var section in UtilitiesSectionMenuPlanner.Build(layout))
+            {
+                var node = UtilitiesMenuLayouts.FindRootSection(layout, section.SectionId);
+                container.Children.Add(BuildSectionButton(section, node));
+            }
+            return container;
+        }
+
+        /// <summary>
+        /// Кнопка раздела/пользовательской группы (issue #146): режим «С надписью» из
+        /// <see cref="UtilitiesMenuGroupPresentation"/> — иконка + подпись, иначе только
+        /// иконка с подсказкой. ПКМ по кнопке открывает редактор структуры меню.
+        /// </summary>
+        private Button BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
+        {
+            var title = !string.IsNullOrWhiteSpace(section.Title)
+                ? section.Title!
+                : (!string.IsNullOrWhiteSpace(section.TitleKey)
+                    ? LocalizationManager.T(section.TitleKey)
+                    : (node is not null ? AvaloniaGroupTitle(node) : string.Empty));
+            if (string.IsNullOrWhiteSpace(title))
+                title = LocalizationManager.T(UtilitiesSectionMenuPlanner.UtilitiesTitleKey);
+
+            var presentation = node is not null
+                ? UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel: true)
+                : null;
+            var showLabel = presentation?.ShowLabel == true;
+
+            var iconKey = presentation?.AvaloniaIconKey;
+            if (string.IsNullOrWhiteSpace(iconKey))
+                iconKey = "IconMenu";
+            var colorHex = !string.IsNullOrWhiteSpace(node?.IconColor)
+                ? node!.IconColor
+                : UtilitiesMenuCatalog.ResolveGroupIconColor(
+                    node?.GroupId ?? string.Empty, ThemeManager.CurrentScheme,
+                    ThemeManager.CurrentTheme == ThemeManager.DarkThemeName);
+            Control icon = string.IsNullOrWhiteSpace(colorHex)
+                ? IconHelper.MakeIcon(iconKey!, UiMetrics.Scaled(UiMetrics.IconToolbar), "TextSecondaryColorBrush")
+                : IconHelper.MakeIcon(iconKey!, UiMetrics.Scaled(UiMetrics.IconToolbar),
+                    Themes.ThemeBrushes.FromSpec(colorHex!));
+
+            var button = new Button
+            {
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(UiMetrics.Scaled(8))
+            };
+            if (showLabel)
+            {
+                var content = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    Spacing = 6,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                content.Children.Add(icon);
+                content.Children.Add(new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center });
+                button.Content = content;
+                button.Padding = new Thickness(UiMetrics.Scaled(6), UiMetrics.Scaled(4));
+            }
+            else
+            {
+                button.Content = icon;
+            }
+
+            button.Styled(Themes.ControlThemes.IconButton);
+            ToolTip.SetTip(button, title);
+            UiAutomation.SetNameFromTip(button);
+            // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
+            button.PointerPressed += (_, e) =>
+            {
+                if (!e.GetCurrentPoint(button).Properties.IsRightButtonPressed)
+                    return;
+                e.Handled = true;
+                OpenUtilitiesMenuEditorDirectly();
+            };
+            // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
+            button.Click += (_, _) => OpenSectionMenu(section.SectionId, button);
+            return button;
         }
 
         /// <summary>
