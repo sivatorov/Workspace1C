@@ -150,26 +150,38 @@ public static class RunningInfobaseMatcher
 
     /// <summary>
     /// Все базы списка, чьё подключение совпадает с командной строкой процесса
-    /// (issue #153). Одна и та же база может быть заведена в списке несколько раз
-    /// под разными учётными записями (например, «РАБОЧАЯ БАЗА» с авторизацией ОС и
-    /// «РАБОЧАЯ БАЗА - АДМИН» с именем/паролем). Раньше <see cref="FindOwner"/>
-    /// возвращал только первую такую запись, поэтому у второй не появлялся индикатор
-    /// запуска, а двойной щелчок открывал новый экземпляр вместо активации окна.
-    /// Проверяются прямые ключи <c>/F</c>, <c>/S</c>, <c>/IBConnectionString</c> и
-    /// веб-ключ <c>/WS</c>; fallback <c>/IBName</c> и файловый хвост пути выполняет
-    /// вызывающий через <see cref="FindOwner"/>.
+    /// (issue #153). Функция оставлена ТОЛЬКО ДЛЯ ДИАГНОСТИКИ (инспектор процессов,
+    /// журнал CM_DEBUG_RUNNING_MATCH): индикатор запуска больше не использует её
+    /// напрямую — один процесс 1С не может быть запущен под несколькими учётными
+    /// записями одновременно, поэтому <see cref="MatchProcesses"/> выбирает ровно
+    /// одну запись через <see cref="SelectOwnerForProcess"/>.
+    /// Одна и та же база может быть заведена в списке несколько раз под разными
+    /// учётными записями (например, «РАБОЧАЯ БАЗА» с авторизацией ОС и
+    /// «РАБОЧАЯ БАЗА - АДМИН» с именем/паролем). Проверяются прямые ключи
+    /// <c>/F</c>, <c>/S</c>, <c>/IBConnectionString</c> и веб-ключ <c>/WS</c>;
+    /// fallback <c>/IBName</c> и файловый хвост пути выполняет вызывающий через
+    /// <see cref="FindOwner"/>.
     /// </summary>
     public static IReadOnlyList<Infobase> FindDirectOwners(
+        IEnumerable<Infobase> infobases, string? commandLine) =>
+        FindDirectOwnerCandidates(infobases, commandLine);
+
+    /// <summary>
+    /// Кандидаты прямого сопоставления (issue #153): все записи с тем же подключением,
+    /// без выбора владельца. Внутренний список для <see cref="SelectOwnerForProcess"/>;
+    /// дубликаты по ключу базы отбрасываются.
+    /// </summary>
+    private static List<Infobase> FindDirectOwnerCandidates(
         IEnumerable<Infobase> infobases, string? commandLine)
     {
         if (string.IsNullOrWhiteSpace(commandLine))
-            return Array.Empty<Infobase>();
+            return new List<Infobase>();
 
         var bases = (infobases ?? Enumerable.Empty<Infobase>())
             .Where(ib => ib?.Connection is not null)
             .ToList();
         if (bases.Count == 0)
-            return Array.Empty<Infobase>();
+            return new List<Infobase>();
 
         var owners = bases.Where(ib => MatchesCommandLine(ib, commandLine)).ToList();
         if (owners.Count == 0)
@@ -182,6 +194,113 @@ public static class RunningInfobaseMatcher
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         return owners.Where(ib => seen.Add(GetBaseKey(ib))).ToList();
     }
+
+    /// <summary>
+    /// Issue #153: выбирает РОВНО ОДНУ запись списка, под учётными данными которой
+    /// запущен процесс 1С. Один процесс не может одновременно работать под разными
+    /// пользователями, поэтому возвращать несколько владельцев нельзя: иначе
+    /// индикатор запуска появляется у всех записей с общим подключением, двойной
+    /// щелчок активирует чужое окно, а вкладка «Запущенные» показывает дубли.
+    /// <para>Правила:</para>
+    /// <list type="number">
+    /// <item>параметр <c>/N</c> задан — выбираются записи, у которых эффективный
+    /// пользователь Предприятия совпадает без учёта регистра (trim/кавычки);
+    /// если совпала одна — она, если несколько — первая по ключу базы;</item>
+    /// <item><c>/N</c> нет — выбираются записи с авторизацией ОС
+    /// (<see cref="AuthenticationMode.Windows"/>/<see cref="ConnectionSettings.UseOsAuthentication"/>)
+    /// или без явных учётных данных; если одна — она, иначе первая по ключу;</item>
+    /// <item>если <c>/N</c> есть, но ни одна запись не задаёт такого пользователя
+    /// явно (сценарий «Запрос»), детерминированно предпочитается запись без явных
+    /// учётных данных, иначе первая по ключу базы.</item>
+    /// </list>
+    /// <paramref name="resolveEnterpriseUser"/> позволяет подставить общую
+    /// авторизацию из настроек (делегат передаёт <see cref="ViewModels.MainViewModel"/>);
+    /// без делегата используется чистый <see cref="InfobaseAuthResolver"/>.
+    /// </summary>
+    public static Infobase? SelectOwnerForProcess(
+        IReadOnlyList<Infobase> candidates,
+        string? commandLine,
+        Func<Infobase, string?>? resolveEnterpriseUser = null)
+    {
+        if (candidates is null || candidates.Count == 0)
+            return null;
+
+        var resolveUser = resolveEnterpriseUser ?? ResolveEnterpriseUserDefault;
+
+        // Детерминированный порядок: ключ базы. Дубликаты одной записи не дают
+        // неоднозначности выбора.
+        var ordered = candidates
+            .Where(ib => ib?.Connection is not null)
+            .GroupBy(GetBaseKey, StringComparer.OrdinalIgnoreCase)
+            .Select(g => g.First())
+            .OrderBy(GetBaseKey, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (ordered.Count == 0)
+            return null;
+        if (ordered.Count == 1)
+            return ordered[0];
+
+        var processUser = NormalizeAuthUser(ProcessCommandLineUserParser.ExtractUserName(commandLine));
+
+        if (processUser.Length > 0)
+        {
+            var explicitMatches = ordered
+                .Where(ib => string.Equals(
+                    NormalizeAuthUser(resolveUser(ib)), processUser, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (explicitMatches.Count > 0)
+                return explicitMatches[0];
+
+            // /N есть, но запись не задаёт этого пользователя явно — значит, имя
+            // введено в окне «Запрос». Предпочитаем запись без явных учётных данных.
+            var promptCandidates = ordered
+                .Where(ib => NormalizeAuthUser(resolveUser(ib)).Length == 0)
+                .ToList();
+            return promptCandidates.Count > 0 ? promptCandidates[0] : ordered[0];
+        }
+
+        // /N нет — вход по авторизации ОС либо запрос без явных учётных данных.
+        var osCandidates = ordered
+            .Where(ib => NormalizeAuthUser(resolveUser(ib)).Length == 0)
+            .ToList();
+        return osCandidates.Count > 0 ? osCandidates[0] : ordered[0];
+    }
+
+    /// <summary>
+    /// Совпадает ли учётная запись процесса с учётной записью записи списка
+    /// (issue #153): используется при перечислении окон, чтобы окно второй записи
+    /// с тем же подключением не активировалось по первой. Пустой <c>/N</c>
+    /// сопоставляется только с записью без явных учётных данных (ОС/«Запрос»).
+    /// </summary>
+    public static bool MatchesProcessAccount(
+        Infobase infobase,
+        string? commandLine,
+        Func<Infobase, string?>? resolveEnterpriseUser = null)
+    {
+        if (infobase?.Connection is null)
+            return false;
+
+        var resolveUser = resolveEnterpriseUser ?? ResolveEnterpriseUserDefault;
+        var processUser = NormalizeAuthUser(ProcessCommandLineUserParser.ExtractUserName(commandLine));
+        var baseUser = NormalizeAuthUser(resolveUser(infobase));
+        return string.Equals(processUser, baseUser, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Эффективный пользователь «1С:Предприятия» без обращения к статическим
+    /// настройкам приложения: только собственная авторизация базы/режима.
+    /// Вызывающий с общими настройками передаёт делегат (issue #153).
+    /// </summary>
+    private static string? ResolveEnterpriseUserDefault(Infobase infobase)
+    {
+        InfobaseAuthResolver.Resolve(infobase, OneCLaunchMode.Enterprise,
+            out _, out var user, out _, null);
+        return user;
+    }
+
+    /// <summary>Нормализация логина: trim, без обрамляющих кавычек.</summary>
+    private static string NormalizeAuthUser(string? user) =>
+        (user ?? string.Empty).Trim().Trim('"').Trim();
 
     /// <summary>
     /// Путь из командной строки для файлового fallback (issue #140): прямой ключ
@@ -521,7 +640,9 @@ public static class RunningInfobaseMatcher
     /// ложных срабатываний). Возвращает словарь «Id базы → сопоставленные процессы».
     /// </summary>
     public static IReadOnlyDictionary<string, List<RunningOneCProcess>> MatchProcesses(
-        IEnumerable<Infobase> infobases, IReadOnlyList<RunningOneCProcess> processes)
+        IEnumerable<Infobase> infobases,
+        IReadOnlyList<RunningOneCProcess> processes,
+        Func<Infobase, string?>? resolveEnterpriseUser = null)
     {
         // issue #134 (1.0.1.80): Id больше не обязателен — ключ базы строит GetBaseKey,
         // иначе базы из кластера (Id = "") выпадали из сопоставления целиком.
@@ -553,32 +674,28 @@ public static class RunningInfobaseMatcher
         // /IBName (только при уникальном имени) и файловый fallback по уникальному
         // последнему сегменту пути. Issue #153: если подключению соответствуют
         // НЕСКОЛЬКО записей списка (одна база заведена под разными учётками),
-        // процесс привязывается ко всем ним — иначе вторая запись не считалась
-        // запущенной. Веб-базы сюда не передаются (см. фильтр выше).
+        // процесс привязывается РОВНО К ОДНОЙ записи — под чьими учётными данными
+        // он запущен (SelectOwnerForProcess). Иначе индикатор горел бы у обеих,
+        // двойной щелчок активировал чужое окно, а вкладка «Запущенные» дублировала
+        // строки. Веб-базы сюда не передаются (см. фильтр выше).
         foreach (var process in processList)
         {
-            var owners = FindDirectOwners(bases, process.CommandLine);
-            if (owners.Count == 0)
-            {
+            var candidates = FindDirectOwnerCandidates(bases, process.CommandLine);
+            var owner = candidates.Count > 0
+                ? SelectOwnerForProcess(candidates, process.CommandLine, resolveEnterpriseUser)
                 // Fallback: /IBName (уникальное имя) и файловый хвост пути.
-                var fallback = FindOwner(bases, process.CommandLine);
-                if (fallback is not null)
-                    owners = new[] { fallback };
-            }
+                : FindOwner(bases, process.CommandLine);
 
-            if (owners.Count == 0)
+            if (owner is null)
             {
                 if (RunningMatchDebug.IsEnabled)
                     RunningMatchDebug.Log($"  match: NO owner for exe=\"{process.ProcessName}\"");
                 continue;
             }
 
-            foreach (var owner in owners)
-            {
-                AddToResult(result, GetBaseKey(owner), process);
-                if (RunningMatchDebug.IsEnabled)
-                    RunningMatchDebug.Log($"  match: base id={owner.Id} name=\"{owner.Name}\"");
-            }
+            AddToResult(result, GetBaseKey(owner), process);
+            if (RunningMatchDebug.IsEnabled)
+                RunningMatchDebug.Log($"  match: base id={owner.Id} name=\"{owner.Name}\"");
         }
 
         return result;

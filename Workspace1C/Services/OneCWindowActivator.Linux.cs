@@ -19,8 +19,16 @@ public static class OneCWindowActivator
     /// <summary>На Linux активация окна 1С не поддержана — всегда false.</summary>
     public static bool Activate(Infobase infobase) => false;
 
+    /// <summary>Linux-зеркало перегрузки issue #153 — активация не поддержана.</summary>
+    public static bool Activate(Infobase infobase, Func<Infobase, string?>? resolveEnterpriseUser) => false;
+
     /// <summary>На Linux перечисление окон 1С не поддержано — всегда пустой список (issue #120).</summary>
     public static IReadOnlyList<RunningWindowInfo> GetWindows(Infobase infobase, RunningKind? kind)
+        => Array.Empty<RunningWindowInfo>();
+
+    /// <summary>Linux-зеркало перегрузки issue #153 — перечисление не поддержано.</summary>
+    public static IReadOnlyList<RunningWindowInfo> GetWindows(
+        Infobase infobase, RunningKind? kind, Func<Infobase, string?>? resolveEnterpriseUser)
         => Array.Empty<RunningWindowInfo>();
 
     /// <summary>На Linux активация окна по хэндлу не поддержана — всегда false (issue #120).</summary>

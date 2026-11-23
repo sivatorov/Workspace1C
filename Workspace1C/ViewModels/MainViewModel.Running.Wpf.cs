@@ -33,7 +33,9 @@ public partial class MainViewModel
         {
             try
             {
-                OneCWindowActivator.Activate(infobase);
+                // Issue #153: окно выбирается с учётом учётной записи записи —
+                // окно второй записи с тем же подключением не активируется.
+                OneCWindowActivator.Activate(infobase, ResolveEnterpriseUserForMatcher);
             }
             catch
             {
@@ -47,7 +49,8 @@ public partial class MainViewModel
     /// (issue #120). GetRunningDetails может занять время — вызывать вне UI-потока.
     /// </summary>
     partial void GetRunningWindows(Infobase infobase, RunningKind kind, List<RunningWindowInfo> windows)
-        => windows.AddRange(OneCWindowActivator.GetWindows(infobase, kind));
+        => windows.AddRange(OneCWindowActivator.GetWindows(
+            infobase, kind, ResolveEnterpriseUserForMatcher));
 
     /// <summary>Активация окна по хэндлу через Win32 (issue #120).</summary>
     partial void ActivateWindowHandle(long handle)

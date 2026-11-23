@@ -91,7 +91,10 @@ public partial class MainViewModel
             // /F//S, затем /IBName по имени базы. Запуск отладки из Конфигуратора
             // порождает клиентский процесс «ENTERPRISE /IBName <имя>» без /F//S —
             // значок «Предприятие» раньше не появлялся.
-            var matchedByBase = RunningInfobaseMatcher.MatchProcesses(Infobases, processes);
+            // Issue #153: делегат отдаёт эффективного пользователя «1С:Предприятия»
+            // с учётом общих настроек авторизации — так же, как при реальном запуске.
+            var matchedByBase = RunningInfobaseMatcher.MatchProcesses(
+                Infobases, processes, ResolveEnterpriseUserForMatcher);
             foreach (var ib in Infobases)
             {
                 // База считается запущенной, если хотя бы один процесс 1С подключён к ней.
@@ -162,9 +165,12 @@ public partial class MainViewModel
             // должно сразу отражаться в списке. Раньше флаги обновлялись, но список не
             // пересобирался: база, дозапустившаяся после включения отбора, не появлялась,
             // а закрытая/вылетевшая — не исчезала (до переключения режима).
+            // Issue #153: сравнение «до/после» — по ключу базы, а не по Id:
+            // у баз без Id (импорт из кластера) пустой Id склеивал разные записи
+            // и список «Только запущенные» не пересобирался.
             var after = new HashSet<string>(
-                Infobases.Where(i => i.IsRunning).Select(i => i.Id),
-                StringComparer.Ordinal);
+                Infobases.Where(i => i.IsRunning).Select(RunningInfobaseMatcher.GetBaseKey),
+                StringComparer.OrdinalIgnoreCase);
             if (IsRunningOnlyModeActive() &&
                 (before.Count != after.Count || !before.SetEquals(after)))
                 RefreshListAfterRunningFlagsChanged();
@@ -173,6 +179,22 @@ public partial class MainViewModel
         {
             // Применение результатов не должно ломать интерфейс.
         }
+    }
+
+    /// <summary>
+    /// Issue #153: эффективный пользователь «1С:Предприятия» для сопоставления
+    /// процесса с записью списка. Учитывает раздельную и общую авторизацию так же,
+    /// как запуск (<see cref="InfobaseAuthResolver"/> + статики <see cref="OneCLauncher"/>).
+    /// Чистый матчер не должен знать о настройках приложения — делегат передаётся отсюда.
+    /// </summary>
+    private static string? ResolveEnterpriseUserForMatcher(Infobase infobase)
+    {
+        InfobaseAuthResolver.Resolve(infobase, OneCLaunchMode.Enterprise,
+            out _, out var user, out _,
+            OneCLauncher.CommonEnterpriseAuthorization,
+            OneCLauncher.CommonConfiguratorAuthorization,
+            OneCLauncher.CommonAuthorization);
+        return user;
     }
 
     /// <summary>

@@ -34,11 +34,18 @@ public static class OneCWindowActivator
     private const int SwShowMinNoActive = 7;
 
     /// <summary>Активирует видимое окно процесса 1С, подключённого к базе. Возвращает true при успехе.</summary>
-    public static bool Activate(Infobase infobase)
+    public static bool Activate(Infobase infobase) => Activate(infobase, null);
+
+    /// <summary>
+    /// Issue #153: активация окна с учётом учётной записи записи списка. Делегат
+    /// позволяет отделить окно «РАБОЧАЯ БАЗА - АДМИН» от окна «РАБОЧАЯ БАЗА»
+    /// с тем же подключением.
+    /// </summary>
+    public static bool Activate(Infobase infobase, Func<Infobase, string?>? resolveEnterpriseUser)
     {
         // Issue #120: перечисление вынесено в GetWindows — единый механизм для
         // активации «Только запущенные» (issue #339) и перехода к открытым окнам.
-        var windows = GetWindows(infobase, null);
+        var windows = GetWindows(infobase, null, resolveEnterpriseUser);
         if (windows.Count == 0)
             return false;
 
@@ -57,6 +64,17 @@ public static class OneCWindowActivator
     /// </para>
     /// </summary>
     public static IReadOnlyList<RunningWindowInfo> GetWindows(Infobase infobase, RunningKind? kind)
+        => GetWindows(infobase, kind, null);
+
+    /// <summary>
+    /// Issue #153: перечисление окон с фильтром по учётной записи. Если у записи
+    /// задан явный пользователь, окна другой записи с тем же подключением не
+    /// попадают в список. Если точных совпадений по /N нет (сценарий «Запрос»),
+    /// остаются все окна подключения — активация не должна переставать работать.
+    /// </summary>
+    public static IReadOnlyList<RunningWindowInfo> GetWindows(
+        Infobase infobase, RunningKind? kind,
+        Func<Infobase, string?>? resolveEnterpriseUser)
     {
         if (infobase is null)
             return Array.Empty<RunningWindowInfo>();
@@ -65,21 +83,31 @@ public static class OneCWindowActivator
         // (для пунктов выбора окна «Предприятие/Конфигуратор + время запуска»).
         var details = AppServices.TryGetService<IRunningInfobasesService>()?.GetRunningDetails()
             ?? Array.Empty<RunningOneCProcessDetails>();
-        var pidInfo = new Dictionary<int, (RunningKind Kind, DateTime? StartedAt)>();
-        foreach (var d in details)
+        var connectionMatches = details
+            .Where(d => RunningInfobaseMatcher.MatchesCommandLine(infobase, d.CommandLine))
+            .Where(d => kind is null
+                || RunningKindClassifier.Classify(d.ProcessName, d.CommandLine) == kind)
+            .ToList();
+
+        var selected = connectionMatches;
+        if (resolveEnterpriseUser is not null)
         {
-            if (!RunningInfobaseMatcher.MatchesCommandLine(infobase, d.CommandLine))
-                continue;
-            var processKind = RunningKindClassifier.Classify(d.ProcessName, d.CommandLine);
-            if (kind is not null && processKind != kind)
-                continue;
-            pidInfo[d.Pid] = (processKind, d.StartTime);
+            var accountMatches = connectionMatches
+                .Where(d => RunningInfobaseMatcher.MatchesProcessAccount(
+                    infobase, d.CommandLine, resolveEnterpriseUser))
+                .ToList();
+            if (accountMatches.Count > 0)
+                selected = accountMatches;
+        }
+
+        var pidInfo = new Dictionary<int, (RunningKind Kind, DateTime? StartedAt)>();
+        foreach (var d in selected)
+        {
+            pidInfo[d.Pid] = (RunningKindClassifier.Classify(d.ProcessName, d.CommandLine), d.StartTime);
         }
 
         if (pidInfo.Count == 0)
             return Array.Empty<RunningWindowInfo>();
-        var pids = new int[pidInfo.Count];
-        pidInfo.Keys.CopyTo(pids, 0);
 
         var windows = new List<RunningWindowInfo>();
         EnumWindows((hWnd, _) =>
