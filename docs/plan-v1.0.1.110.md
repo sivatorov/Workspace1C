@@ -334,6 +334,7 @@ cd Workspace1C
 - Полный прогон `dotnet test Workspace1C.Tests/Workspace1C.Tests.csproj -c Release -p:RuntimeIdentifier= -p:SelfContained=false -p:PublishSingleFile=false` — **7856** тестов, **0** падений, **0** пропущено (4 м 27 с). Лог: `docs/_test_101113.log`.
 - Windows: `build-windows-single-file.ps1 -Configuration Release` → `dist/win-x64/Workspace1C.exe`, 85 646 527 Б (81,68 МБ), `FileVersion` = `1.0.1.113`, `ProductVersion` = `1.0.1.113+474dfb65…`. Лог: `docs/_build_win_101113.log`.
 - Linux: кросс-сборка `build-linux-single-file.ps1 -Configuration Release` (`-p:ForceLinux=true`, linux-x64) → `dist/linux-x64/Workspace1C`, 53 939 117 Б (51,44 МБ), ошибок компиляции нет. Лог: `docs/_build_linux_101113.log`. Запуск/smoke-тест Linux-бинаря — только в CI на `ubuntu-latest` (локально Linux-рантайма нет).
+- Smoke-проверка Windows-бинаря: `Workspace1C.exe --list` → код 0 и список баз из профиля (лог `docs/_smoke_win_101113.txt`). Открытие главного окна локально не проверялось: уже запущен экземпляр 1.0.1.109, сработал single-instance-гейт (новый процесс передал активацию и завершился с кодом 0).
 - `dist/` в `.gitignore`, поэтому артефакты в репозиторий не попадают; тег и релиз не создавались.
 
 ---
