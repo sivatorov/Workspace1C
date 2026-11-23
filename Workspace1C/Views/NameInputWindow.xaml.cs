@@ -1,6 +1,8 @@
 #if WINDOWS
+using System;
 using System.Windows;
 using System.Windows.Input;
+using Workspace1C.Services;
 
 namespace Workspace1C
 {
@@ -24,6 +26,7 @@ namespace Workspace1C
             PromptLabel.Text = label;
             OkTextBlock.Text = okText;
             NameBox.Text = initialText;
+            ApplyWorkAreaLimits();
             Loaded += (_, _) =>
             {
                 // Фокус ставим отложенно, после полного показа окна: синхронная
@@ -34,6 +37,19 @@ namespace Workspace1C
                     NameBox.SelectAll();
                 }));
             };
+        }
+
+        /// <summary>
+        /// Ширина диалога фиксирована (440 DIP), чтобы длинная подпись не растягивала
+        /// окно на весь экран; на маленьких мониторах ширина и высота дополнительно
+        /// клампятся по рабочей области. Подпись переносится по словам.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var workArea = SystemParameters.WorkArea;
+            Width = Math.Min(Width, DialogWorkAreaPolicy.MaxHeight(workArea.Width));
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
         }
 
         /// <summary>

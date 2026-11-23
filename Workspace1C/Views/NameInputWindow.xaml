@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="{loc:Loc NameInput.Title}"
         Icon="{StaticResource AppIcon}"
-        MinHeight="200" MinWidth="440" SizeToContent="Height"
+        Width="440" MinHeight="200" MinWidth="440" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontSize="13"
@@ -31,6 +31,7 @@
 
         <!-- ============ Подпись ============ -->
         <TextBlock Grid.Row="0" x:Name="PromptLabel" Text="{loc:Loc NameInput.Prompt}" Margin="0,0,0,8"
+                   TextWrapping="Wrap"
                    Foreground="{DynamicResource TextPrimaryBrush}"/>
 
         <!-- ============ Поле ввода ============ -->

@@ -1,8 +1,10 @@
 #if LINUX
+using System;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
+using Workspace1C.Services;
 
 namespace Workspace1C
 {
@@ -38,6 +40,9 @@ namespace Workspace1C
 
             Opened += (_, _) =>
             {
+                // Ширина фиксирована (440 DIP), чтобы длинная подпись не растягивала
+                // окно на весь экран; на маленьких мониторах клампим по рабочей области.
+                ApplyWorkAreaLimits();
                 // Фокус ставим отложенно (после полного показа и активации окна):
                 // синхронная установка в Opened слетает до отрисовки модального диалога.
                 Dispatcher.UIThread.Post(() =>
@@ -46,6 +51,24 @@ namespace Workspace1C
                     _nameBox.SelectAll();
                 });
             };
+        }
+
+        /// <summary>
+        /// Клампит ширину/высоту диалога по рабочей области монитора (общая политика
+        /// диалогов). Подпись переносится по словам, поэтому длинный текст не
+        /// растягивает окно по горизонтали.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null)
+                return;
+            var dipWidth = screen.WorkingArea.Width / screen.Scaling;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            MinWidth = DialogWorkAreaPolicy.ClampMinHeight(440, dipWidth);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(200, dipHeight);
+            Width = Math.Min(Width, MinWidth);
+            MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
         }
 
         /// <summary>
