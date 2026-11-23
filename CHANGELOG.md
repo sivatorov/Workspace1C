@@ -43,8 +43,22 @@
     разные подключения, регистр/кавычки/пробелы и детерминированный fallback
     для «Запроса»; добавлены source-гварды на флаг текущей записи и ключ базы.
 
-Проверка: полный прогон `dotnet test` — **7856** тестов, все зелёные; сборка
-Linux-ветки (`-p:ForceLinux=true`) без ошибок.
+Проверка: полный прогон `dotnet test Workspace1C.Tests/Workspace1C.Tests.csproj
+-c Release -p:RuntimeIdentifier= -p:SelfContained=false -p:PublishSingleFile=false`
+— **7856** тестов, **0** падений, **0** пропущено (4 м 27 с).
+
+Собранные артефакты (single-file, self-contained, версия `1.0.1.113`):
+
+| Платформа | Файл | Размер | Версия |
+|---|---|---|---|
+| Windows x64 (WPF) | `dist/win-x64/Workspace1C.exe` | 85 646 527 Б (81,68 МБ) | `FileVersion` = `1.0.1.113` |
+| Linux x64 (Avalonia) | `dist/linux-x64/Workspace1C` | 53 939 117 Б (51,44 МБ) | `1.0.1.113` (в релизе — `Workspace1C-linux-x64`) |
+
+Windows-бинарь собран штатным `build-windows-single-file.ps1 -Configuration Release`;
+Linux-бинарь — кросс-сборкой `build-linux-single-file.ps1 -Configuration Release`
+(`-p:ForceLinux=true`, linux-x64) без ошибок компиляции. Запуск и smoke-тест
+Linux-бинаря выполняются в CI на `ubuntu-latest` (этап релиза); локально на Windows
+Linux-рантайм недоступен.
 
 ## [1.0.1.112] — 2026-11-23
 

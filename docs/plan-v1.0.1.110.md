@@ -328,6 +328,14 @@ cd Workspace1C
 - Оба бинаря собраны, версии совпадают, Windows-бинарь открывает окно, Linux-бинарь проходит smoke-тест.
 - Артефакты готовы к публикации; тег ещё не создан.
 
+### 6.5. Выполнено (2026-11-23)
+
+- Версия `1.0.1.113` подтверждена во всех четырёх полях [`Workspace1C.csproj`](../Workspace1C/Workspace1C.csproj:62), в [`README.md`](../README.md:3), в верхнем разделе [`CHANGELOG.md`](../CHANGELOG.md:14) и в `rel_notes_1.0.1.113.md`; расхождений не было.
+- Полный прогон `dotnet test Workspace1C.Tests/Workspace1C.Tests.csproj -c Release -p:RuntimeIdentifier= -p:SelfContained=false -p:PublishSingleFile=false` — **7856** тестов, **0** падений, **0** пропущено (4 м 27 с). Лог: `docs/_test_101113.log`.
+- Windows: `build-windows-single-file.ps1 -Configuration Release` → `dist/win-x64/Workspace1C.exe`, 85 646 527 Б (81,68 МБ), `FileVersion` = `1.0.1.113`, `ProductVersion` = `1.0.1.113+474dfb65…`. Лог: `docs/_build_win_101113.log`.
+- Linux: кросс-сборка `build-linux-single-file.ps1 -Configuration Release` (`-p:ForceLinux=true`, linux-x64) → `dist/linux-x64/Workspace1C`, 53 939 117 Б (51,44 МБ), ошибок компиляции нет. Лог: `docs/_build_linux_101113.log`. Запуск/smoke-тест Linux-бинаря — только в CI на `ubuntu-latest` (локально Linux-рантайма нет).
+- `dist/` в `.gitignore`, поэтому артефакты в репозиторий не попадают; тег и релиз не создавались.
+
 ---
 
 ## 7. Задача 6 — GitHub Release `v1.0.1.113`
@@ -464,9 +472,9 @@ gh issue comment 153 -F docs/_comment_153_v101113.md
 - [ ] #143: окно не блокируется; «Сохранить» ≤ 15 с, проверки ≤ 30 с; старый профиль не вешает; тесты.
 - [ ] #146: единая иконка везде; «С надписью» на панели; новая группа верхнего уровня сохраняется; несколько групп; тесты.
 - [ ] #153: индикатор только у правильной записи; вторая учётка запускается; нет дублей на «Запущенных»; тесты.
-- [ ] Версия `1.0.1.113` в csproj (4 поля), README, CHANGELOG, rel_notes, Telegram-тексте.
-- [ ] Полный прогон тестов зелёный; число тестов зафиксировано.
-- [ ] Собраны `Workspace1C.exe` и `Workspace1C-linux-x64`, версии совпадают.
+- [x] Версия `1.0.1.113` в csproj (4 поля), README, CHANGELOG, rel_notes, Telegram-тексте.
+- [x] Полный прогон тестов зелёный; число тестов зафиксировано (7856, 0 падений, 0 пропущено).
+- [x] Собраны `Workspace1C.exe` и `Workspace1C-linux-x64`, версии совпадают (Linux — кросс-сборка; smoke-тест в CI).
 - [ ] GitHub Release `v1.0.1.113` с двумя asset-ами и корректным текстом.
 - [ ] Новость в Telegram `-1004425443528` (`ok:true`, без дублей).
 - [ ] Комментарии в #134/#143/#146/#153; issues открыты; #139/#136 не тронуты.
@@ -506,6 +514,10 @@ gh issue comment 153 -F docs/_comment_153_v101113.md
 **Режим:** `code`.
 **Что сделать:** выполнить раздел 6; полный `dotnet test`; собрать Windows `build-windows-single-file.ps1`; проверить Linux-сборку в CI/локально; проверить `FileVersion`; зафиксировать число тестов; при необходимости поправить тесты/документацию; коммит и push.
 **Проверка:** оба бинаря существуют, версия `1.0.1.113`, Windows открывает окно, Linux smoke-тест.
+
+**Статус: выполнено** — см. раздел 6.5. Тесты: 7856/7856 зелёные. Артефакты:
+`dist/win-x64/Workspace1C.exe` (81,68 МБ, `FileVersion` 1.0.1.113) и
+`dist/linux-x64/Workspace1C` (51,44 МБ, кросс-сборка без ошибок). Тег и релиз не создавались.
 
 ### Задача 6. GitHub Release `v1.0.1.113`
 
