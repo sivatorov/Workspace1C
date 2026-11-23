@@ -125,9 +125,82 @@ public static class DbmsBackupService
 {
     public const string FileName = "dbms_backups.json";
 
-    public static DbmsBackupData Load() => FeatureDataStore.Load<DbmsBackupData>(FileName);
+    /// <summary>
+    /// Читает профили и нормализует их (issue #143): старые файлы с
+    /// <c>TimeoutMinutes = 0</c>, путями в кавычках и лишними пробелами больше не
+    /// приводят к зависанию/странностям. Сетевых операций при нормализации нет.
+    /// </summary>
+    public static DbmsBackupData Load()
+    {
+        var data = FeatureDataStore.Load<DbmsBackupData>(FileName);
+        Normalize(data);
+        return data;
+    }
 
+    /// <summary>Асинхронное чтение профилей (issue #143) — вне UI-потока, с отменой.</summary>
+    public static async Task<DbmsBackupData> LoadAsync(CancellationToken ct = default)
+    {
+        var data = await FeatureDataStore.LoadAsync<DbmsBackupData>(FileName, ct).ConfigureAwait(false);
+        Normalize(data);
+        return data;
+    }
+
+    /// <summary>Синхронная запись профилей (оставлена для фоновых/сервисных вызовов).</summary>
     public static void Save(DbmsBackupData data) => FeatureDataStore.Save(FileName, data);
+
+    /// <summary>
+    /// Точка подмены асинхронной записи профилей (тесты). По умолчанию —
+    /// <see cref="FeatureDataStore.SaveAsync{T}"/>; формат JSON не меняется.
+    /// </summary>
+    public static Func<DbmsBackupData, CancellationToken, Task> SaveOverride { get; set; } =
+        (data, ct) => FeatureDataStore.SaveAsync(FileName, data, ct);
+
+    /// <summary>Асинхронная запись профилей (issue #143) — вне UI-потока, с отменой.</summary>
+    public static Task SaveAsync(DbmsBackupData data, CancellationToken ct = default) =>
+        SaveOverride(data, ct);
+
+    /// <summary>
+    /// Нормализует старый профиль (issue #143), не выполняя сетевых операций:
+    /// убирает пробелы/кавычки в путях, восстанавливает таймаут (0 → 360 мин) и
+    /// корректный тип СУБД, чтобы <see cref="Validate"/> не пропускал заведомо
+    /// проблемный профиль в блокирующую операцию.
+    /// </summary>
+    public static void Normalize(DbmsBackupProfile profile)
+    {
+        if (profile is null)
+            return;
+        profile.Host = (profile.Host ?? string.Empty).Trim();
+        profile.Database = (profile.Database ?? string.Empty).Trim();
+        profile.User = (profile.User ?? string.Empty).Trim();
+        profile.OutputDirectory = NormalizePath(profile.OutputDirectory);
+        profile.ToolsDirectory = NormalizePath(profile.ToolsDirectory);
+        profile.WebDavUrl = (profile.WebDavUrl ?? string.Empty).Trim();
+        profile.WebDavUser = (profile.WebDavUser ?? string.Empty).Trim();
+        if (profile.TimeoutMinutes <= 0)
+            profile.TimeoutMinutes = 360;
+        if (profile.KeepCount < 0)
+            profile.KeepCount = 7;
+        if (!Enum.IsDefined(profile.Dbms))
+            profile.Dbms = DbmsKind.PostgreSql;
+    }
+
+    /// <summary>Нормализует все профили файла (старые/частичные записи).</summary>
+    public static void Normalize(DbmsBackupData data)
+    {
+        if (data?.Profiles is null)
+            return;
+        foreach (var profile in data.Profiles)
+            Normalize(profile);
+    }
+
+    private static string NormalizePath(string? path)
+    {
+        var value = (path ?? string.Empty).Trim();
+        if (value.Length >= 2 &&
+            ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+            value = value.Substring(1, value.Length - 2).Trim();
+        return value;
+    }
 
     /// <summary>Профиль по умолчанию для клиент-серверной базы.</summary>
     public static DbmsBackupProfile SuggestProfile(Infobase infobase)
@@ -261,24 +334,39 @@ public static class DbmsBackupService
     /// Проверка каталога копий (issue #143): каталог создаётся, в него пишется и
     /// удаляется пробный файл. Так пользователь видит отсутствие прав до запуска
     /// многоминутного дампа.
+    /// <para>
+    /// Вся работа выполняется в <see cref="Task.Run(Func{Task}, CancellationToken)"/>,
+    /// а <paramref name="ct"/> проверяется до/после каждой файловой операции: недоступный
+    /// сетевой каталог не может «повесить» окно — отмена/таймаут прерывают проверку.
+    /// </para>
     /// </summary>
     public static Task<DbmsCheckResult> CheckOutputDirectoryAsync(DbmsBackupProfile profile,
         CancellationToken ct = default) =>
-        Task.Run(() => CheckOutputDirectoryCore(profile), ct);
+        Task.Run(() => CheckOutputDirectoryCore(profile, ct), ct);
 
-    private static DbmsCheckResult CheckOutputDirectoryCore(DbmsBackupProfile profile)
+    private static DbmsCheckResult CheckOutputDirectoryCore(DbmsBackupProfile profile,
+        CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         var dir = profile.OutputDirectory?.Trim();
         if (string.IsNullOrWhiteSpace(dir))
             return DbmsCheckResult.Fail("Dbms.DirRequired");
 
         try
         {
+            ct.ThrowIfCancellationRequested();
             Directory.CreateDirectory(dir);
+            ct.ThrowIfCancellationRequested();
             var probe = Path.Combine(dir, ".w1c_write_test");
             File.WriteAllText(probe, "ok");
+            ct.ThrowIfCancellationRequested();
             File.Delete(probe);
             return DbmsCheckResult.Ok(dir);
+        }
+        catch (OperationCanceledException)
+        {
+            // Отмена/таймаут — не ошибка прав каталога, пробрасываем наверх.
+            throw;
         }
         catch (UnauthorizedAccessException ex)
         {

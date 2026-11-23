@@ -62,6 +62,35 @@ public static class FeatureDataStore
         }
     }
 
+    /// <summary>
+    /// Асинхронное чтение (issue #143): файл читается потоком, не блокируя вызывающий
+    /// поток. Отмена прерывает чтение; битый/недоступный файл по-прежнему даёт
+    /// значение по умолчанию (поведение <see cref="Load{T}"/> сохранено).
+    /// </summary>
+    public static async Task<T> LoadAsync<T>(string fileName, CancellationToken ct = default)
+        where T : new()
+    {
+        var path = PathOf(fileName);
+        try
+        {
+            if (!File.Exists(path))
+                return new T();
+            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                FileShare.Read, 4096, useAsync: true);
+            var value = await JsonSerializer.DeserializeAsync<T>(stream, Options, ct)
+                .ConfigureAwait(false);
+            return value ?? new T();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            return new T();
+        }
+    }
+
     public static void Save<T>(string fileName, T value)
     {
         var path = PathOf(fileName);
@@ -70,6 +99,32 @@ public static class FeatureDataStore
             Directory.CreateDirectory(dir);
         var tmp = path + ".tmp";
         File.WriteAllText(tmp, JsonSerializer.Serialize(value, Options));
+        File.Move(tmp, path, overwrite: true);
+    }
+
+    /// <summary>
+    /// Асинхронная запись (issue #143): данные пишутся во временный файл потоком,
+    /// затем атомарно переименовываются. Отмена проверяется до/после записи и
+    /// передаётся в файловые операции — зависший сетевой профиль больше не держит
+    /// UI-поток. Формат JSON не меняется (тот же <see cref="Options"/>).
+    /// </summary>
+    public static async Task SaveAsync<T>(string fileName, T value, CancellationToken ct = default)
+    {
+        var path = PathOf(fileName);
+        var dir = Path.GetDirectoryName(path);
+        ct.ThrowIfCancellationRequested();
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+        var tmp = path + ".tmp";
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, Options);
+        ct.ThrowIfCancellationRequested();
+        await using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write,
+            FileShare.None, 4096, useAsync: true))
+        {
+            await stream.WriteAsync(bytes, ct).ConfigureAwait(false);
+            await stream.FlushAsync(ct).ConfigureAwait(false);
+        }
+        ct.ThrowIfCancellationRequested();
         File.Move(tmp, path, overwrite: true);
     }
 }

@@ -196,11 +196,25 @@ public partial class MainViewModel
     public ICommand DbmsBackupCommand =>
         _dbmsBackupCommand ??= new RelayCommand(_ => ExecuteDbmsBackup());
 
-    private void ExecuteDbmsBackup()
+    private async void ExecuteDbmsBackup()
     {
+        // issue #143: профили читаются в фоне ДО показа окна. Раньше синхронный
+        // DbmsBackupService.Load() в конструкторе VM выполнялся на UI-потоке и мог
+        // «наглухо» повесить окно на недоступном/сетевом профиле.
+        DbmsBackupData data;
+        try
+        {
+            data = await Task.Run(DbmsBackupService.Load).ConfigureAwait(true);
+        }
+        catch
+        {
+            data = new DbmsBackupData();
+        }
+
         // issue #106 (v1.0.1.73): тип СУБД берётся из профиля базы, кластера rac
         // или общей настройки; при неизвестности — явная подсказка, а не PostgreSQL.
         var vm = new DbmsBackupViewModel(Infobases.ToList(), SelectedInfobase,
+            data,
             defaultDbms: DefaultDbmsKind,
             clusterResolver: ClusterInfobaseCredentialsResolver.CreateDefault());
         var window = new DbmsBackupWindow(vm)

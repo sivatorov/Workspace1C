@@ -336,7 +336,9 @@ public sealed class Issue143DbmsBackupTests
 
         Assert.Contains("Interlocked.Exchange(ref _running", code, StringComparison.Ordinal);
         Assert.Contains("Dbms.Reentrancy", code, StringComparison.Ordinal);
-        Assert.Contains("Task.Run(Save", code, StringComparison.Ordinal);
+        // issue #143 (1.0.1.111): запись профиля — через отменяемый SaveCore в фоне.
+        Assert.Contains("Task.Run(() => SaveCore", code, StringComparison.Ordinal);
+        Assert.Contains("DbmsBackupService.SaveAsync", code, StringComparison.Ordinal);
         Assert.Contains("new Progress<DbmsBackupProgress>", code, StringComparison.Ordinal);
         Assert.Contains("TrackElapsedAsync", code, StringComparison.Ordinal);
     }

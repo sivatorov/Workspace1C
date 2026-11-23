@@ -107,13 +107,33 @@ namespace Workspace1C
 
             Content = root;
             Closed += (_, _) => _vm.Cancel();
-            // Тип СУБД уточняется по кластеру 1С в фоне (issue #106, v1.0.1.73):
-            // сохранённый профиль и выбор пользователя приоритетнее. Запуск через
-            // Task.Run (issue #143): синхронная часть резолвера не должна выполняться
-            // на UI-потоке и блокировать окно.
-            _ = Task.Run(() => _vm.ResolveDbmsFromClusterAsync());
+            // issue #143: окно открывается сразу. Профиль (если не передан) и тип
+            // СУБД по кластеру догружаются в фоне — никакой синхронной файловой
+            // работы на UI-потоке, окно не «вешается» на старом/сетевом профиле.
+            _ = InitializeVmAsync();
             if (!_vm.HasBases)
                 _vm.AppendLog(LocalizationManager.T("Dbms.NoBases"));
+        }
+
+        /// <summary>
+        /// Фоновая догрузка профиля и уточнение типа СУБД (issue #143). Ошибки не
+        /// должны ронять окно — только диагностика в журнале.
+        /// </summary>
+        private async Task InitializeVmAsync()
+        {
+            try
+            {
+                await _vm.InitializeAsync();
+                await _vm.ResolveDbmsFromClusterAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                // Окно закрыли во время загрузки — это нормально.
+            }
+            catch (Exception ex)
+            {
+                _vm.AppendLog(ex.Message);
+            }
         }
 
         /// <summary>

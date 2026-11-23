@@ -23,13 +23,16 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(30);
 
     private readonly IReadOnlyList<Infobase> _infobases;
-    private readonly DbmsBackupData _data;
+    private DbmsBackupData _data;
+    private readonly bool _needsLoad;
+    private bool _initialized;
     private readonly StringBuilder _log = new();
     private readonly SynchronizationContext? _ui = SynchronizationContext.Current;
     private readonly string _defaultDbmsKind;
     private readonly ClusterInfobaseCredentialsResolver? _clusterResolver;
     private readonly Dictionary<string, DbmsKind?> _clusterDbmsCache = new(StringComparer.Ordinal);
     private CancellationTokenSource? _cts;
+    private CancellationTokenSource? _operationCts;
     private int _selectedIndex = -1;
     private int _dbmsIndex = -1;
     private bool _applyingDbmsSelection;
@@ -68,7 +71,11 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             .Where(ib => ib is not null && ib.Connection.Type == ConnectionType.ClientServer)
             .OrderBy(ib => ib.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
-        _data = data ?? DbmsBackupService.Load();
+        // issue #143: НЕ читаем профиль синхронно в конструкторе — он вызывается на
+        // UI-потоке (команда меню), а недоступный сетевой профиль «вешал» окно ещё
+        // до показа. Если данные не переданы, их загрузит InitializeAsync в фоне.
+        _data = data ?? new DbmsBackupData();
+        _needsLoad = data is null;
         _defaultDbmsKind = DbmsDefaults.NormalizeSetting(defaultDbms);
         _clusterResolver = clusterResolver;
         InfobaseNames = _infobases.Select(ib => ib.Name).ToList();
@@ -83,6 +90,43 @@ public sealed class DbmsBackupViewModel : ViewModelBase
 
     public bool HasBases => _infobases.Count > 0;
 
+    /// <summary>
+    /// Данные профилей не переданы в конструктор и требуют фоновой загрузки
+    /// (issue #143). Окно вызывает <see cref="InitializeAsync"/> после показа.
+    /// </summary>
+    public bool NeedsLoad => _needsLoad;
+
+    /// <summary>
+    /// Фоновая загрузка профилей (issue #143). Ничего не делает, если данные уже
+    /// переданы или загрузка выполнена. После загрузки заново применяет профиль
+    /// выбранной базы, чтобы поля показали сохранённые значения.
+    /// </summary>
+    public async Task InitializeAsync(CancellationToken ct = default)
+    {
+        if (_initialized)
+            return;
+        _initialized = true;
+        if (!_needsLoad)
+            return;
+
+        try
+        {
+            var loaded = await DbmsBackupService.LoadAsync(ct).ConfigureAwait(true);
+            _data = loaded;
+            if (SelectedInfobase is not null)
+                ApplySelectedProfile();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            // Битый/недоступный профиль не должен ронять окно — только диагностика.
+            AppendLog(ex.Message);
+        }
+    }
+
     public Infobase? SelectedInfobase =>
         _selectedIndex >= 0 && _selectedIndex < _infobases.Count ? _infobases[_selectedIndex] : null;
 
@@ -93,19 +137,29 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         {
             if (!SetProperty(ref _selectedIndex, value) || SelectedInfobase is null)
                 return;
-            var profile = LoadSelectedProfile();
-            Host = profile.Host;
-            Port = profile.Port.ToString(CultureInfo.InvariantCulture);
-            Database = profile.Database;
-            User = profile.User;
-            Password = profile.Password;
-            OutputDirectory = profile.OutputDirectory;
-            ToolsDirectory = profile.ToolsDirectory;
-            KeepCount = profile.KeepCount.ToString(CultureInfo.InvariantCulture);
-            WebDavUrl = profile.WebDavUrl;
-            WebDavUser = profile.WebDavUser;
-            WebDavPassword = profile.WebDavPassword;
+            ApplySelectedProfile();
         }
+    }
+
+    /// <summary>
+    /// Переносит профиль выбранной базы в поля формы и определяет тип СУБД
+    /// (issue #106/#143). Вызывается из <see cref="SelectedIndex"/> и после фоновой
+    /// загрузки профилей — так окно не зависит от синхронного чтения файла.
+    /// </summary>
+    private void ApplySelectedProfile()
+    {
+        var profile = LoadSelectedProfile();
+        Host = profile.Host;
+        Port = profile.Port.ToString(CultureInfo.InvariantCulture);
+        Database = profile.Database;
+        User = profile.User;
+        Password = profile.Password;
+        OutputDirectory = profile.OutputDirectory;
+        ToolsDirectory = profile.ToolsDirectory;
+        KeepCount = profile.KeepCount.ToString(CultureInfo.InvariantCulture);
+        WebDavUrl = profile.WebDavUrl;
+        WebDavUser = profile.WebDavUser;
+        WebDavPassword = profile.WebDavPassword;
     }
 
     /// <summary>
@@ -338,21 +392,60 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     /// в фоновый поток и ограничена по времени. Раньше синхронный вызов
     /// <see cref="Save"/> на UI-потоке мог «наглухо» зависнуть на медленном профиле
     /// (сетевой/перенаправленный %APPDATA%), и окно переставало отвечать.
+    /// <para>
+    /// <paramref name="timeout"/> — предел операции (по умолчанию 15 с), переданный
+    /// токен отменяет запись. По таймауту показывается <c>Dbms.SaveTimeout</c>, а
+    /// <see cref="IsBusy"/> сбрасывается — кнопки снова активны.
+    /// </para>
     /// </summary>
-    public async Task<bool> SaveAsync()
+    public async Task<bool> SaveAsync(TimeSpan? timeout = null, CancellationToken ct = default)
     {
         if (IsBusy)
             return false;
 
+        var profile = CurrentProfile();
+        if (profile is null)
+        {
+            AppendLog(LocalizationManager.T("Dbms.NoBases"));
+            return false;
+        }
+        // Тип СУБД не определён — не сохраняем профиль с молчаливым PostgreSQL.
+        if (SelectedInfobase is not null && DbmsIndex < 0)
+        {
+            AppendLog(LocalizationManager.T("Dbms.DbmsRequired"));
+            return false;
+        }
+        var error = DbmsBackupService.Validate(profile);
+        if (error is not null)
+        {
+            AppendLog(LocalizationManager.T(error));
+            return false;
+        }
+
+        var limit = timeout ?? SaveTimeout;
         IsBusy = true;
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(limit);
         try
         {
             AppendLog(LocalizationManager.T("Dbms.Saving"));
-            var saved = await Task.Run(Save).WaitAsync(SaveTimeout).ConfigureAwait(true);
-            return saved;
+            // Мгновенная in-memory операция — на UI-потоке; запись на диск — в фоне.
+            _data.Upsert(profile);
+            await Task.Run(() => SaveCore(_data, cts.Token), cts.Token)
+                .WaitAsync(limit, cts.Token)
+                .ConfigureAwait(true);
+            AppendLog(LocalizationManager.T("Dbms.Saved"));
+            return true;
         }
         catch (TimeoutException)
         {
+            StatusText = LocalizationManager.T("Dbms.SaveTimeout");
+            AppendLog(StatusText);
+            return false;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Сработал внутренний таймаут (CancelAfter) — это не отмена пользователем.
             StatusText = LocalizationManager.T("Dbms.SaveTimeout");
             AppendLog(StatusText);
             return false;
@@ -369,9 +462,18 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Запись профилей (issue #143): выполняется только в фоновом потоке, не трогает
+    /// UI (никаких логов/статусов) и слушает <paramref name="ct"/>.
+    /// </summary>
+    private static void SaveCore(DbmsBackupData data, CancellationToken ct) =>
+        DbmsBackupService.SaveAsync(data, ct).GetAwaiter().GetResult();
+
     public void Cancel()
     {
         try { _cts?.Cancel(); }
+        catch (ObjectDisposedException) { }
+        try { _operationCts?.Cancel(); }
         catch (ObjectDisposedException) { }
     }
 
@@ -396,22 +498,39 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
 
-            // Запись профиля — вне UI-потока (issue #143): диск/профиль могут
-            // отвечать медленно, а окно должно оставаться отзывчивым. Ограничение
-            // по времени не даёт «зависнуть» на недоступном сетевом профиле.
-            if (!await Task.Run(Save, _cts.Token).WaitAsync(SaveTimeout, _cts.Token))
-                return;
-
             var profile = CurrentProfile();
             if (profile is null)
+            {
+                AppendLog(LocalizationManager.T("Dbms.NoBases"));
                 return;
+            }
+            if (SelectedInfobase is not null && DbmsIndex < 0)
+            {
+                AppendLog(LocalizationManager.T("Dbms.DbmsRequired"));
+                return;
+            }
+            var error = DbmsBackupService.Validate(profile);
+            if (error is not null)
+            {
+                AppendLog(LocalizationManager.T(error));
+                return;
+            }
+
+            // Запись профиля — вне UI-потока (issue #143) и с реальной отменой:
+            // диск/профиль могут отвечать медленно, а окно должно оставаться
+            // отзывчивым. Никакого синхронного Save на UI-пути.
+            _data.Upsert(profile);
+            await Task.Run(() => SaveCore(_data, _cts.Token), _cts.Token)
+                .WaitAsync(SaveTimeout, _cts.Token)
+                .ConfigureAwait(true);
 
             elapsedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
             _ = TrackElapsedAsync(elapsedCts.Token);
 
             ResetProgress();
             var progress = new Progress<DbmsBackupProgress>(OnProgress);
-            var result = await DbmsBackupService.RunAsync(profile, AppendLog, progress, _cts.Token);
+            var result = await DbmsBackupService.RunAsync(profile, AppendLog, progress, _cts.Token)
+                .ConfigureAwait(true);
             StatusText = result.Success
                 ? LocalizationManager.T("Dbms.Success")
                 : result.ErrorMessage ?? LocalizationManager.T("Dbms.Failed");
@@ -440,13 +559,16 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     }
 
     /// <summary>Проверка подключения к СУБД до запуска копии (issue #143).</summary>
-    public Task CheckConnectionAsync() => RunCheckAsync(DbmsBackupService.CheckConnectionAsync);
+    public Task CheckConnectionAsync(TimeSpan? timeout = null) =>
+        RunCheckAsync(DbmsBackupService.CheckConnectionAsync, timeout ?? CheckTimeout);
 
     /// <summary>Проверка каталога копий на запись (issue #143).</summary>
-    public Task CheckDirectoryAsync() => RunCheckAsync(DbmsBackupService.CheckOutputDirectoryAsync);
+    public Task CheckDirectoryAsync(TimeSpan? timeout = null) =>
+        RunCheckAsync(DbmsBackupService.CheckOutputDirectoryAsync, timeout ?? CheckTimeout);
 
     private async Task RunCheckAsync(
-        Func<DbmsBackupProfile, CancellationToken, Task<DbmsCheckResult>> check)
+        Func<DbmsBackupProfile, CancellationToken, Task<DbmsCheckResult>> check,
+        TimeSpan timeout)
     {
         if (IsBusy)
             return;
@@ -459,14 +581,21 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         }
 
         IsBusy = true;
+        // «Отмена» (Cancel) отменяет userCts, таймаут — timeoutCts; обе связаны в
+        // linked. Так сообщение отличается: отмена пользователем vs таймаут.
+        using var userCts = new CancellationTokenSource();
+        using var timeoutCts = new CancellationTokenSource(timeout);
+        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
+            userCts.Token, timeoutCts.Token);
+        _operationCts = userCts;
         try
         {
             AppendLog(LocalizationManager.T("Dbms.CheckRunning"));
-            // issue #143: проверка ограничена по времени. Сетевой каталог/СУБД
-            // может не ответить, а синхронная файловая операция внутри проверки
-            // не всегда слушает CancellationToken — WaitAsync гарантирует возврат.
-            var result = await check(profile, CancellationToken.None)
-                .WaitAsync(CheckTimeout)
+            // issue #143: ВСЯ проверка — в Task.Run. Синхронная часть проверки
+            // (DNS, TcpClient, Process.Start/pg_isready/sqlcmd) не должна выполняться
+            // на UI-потоке; токен реально прерывает её по таймауту/«Отмене».
+            var result = await Task.Run(() => check(profile, linked.Token), linked.Token)
+                .WaitAsync(timeout, linked.Token)
                 .ConfigureAwait(true);
             StatusText = FormatCheckResult(result);
             AppendLog(StatusText);
@@ -476,6 +605,13 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             StatusText = LocalizationManager.T("Dbms.CheckTimeout");
             AppendLog(StatusText);
         }
+        catch (OperationCanceledException)
+        {
+            StatusText = userCts.IsCancellationRequested
+                ? LocalizationManager.T("Designer.Cancelled")
+                : LocalizationManager.T("Dbms.CheckTimeout");
+            AppendLog(StatusText);
+        }
         catch (Exception ex)
         {
             StatusText = ex.Message;
@@ -483,6 +619,8 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         }
         finally
         {
+            if (ReferenceEquals(_operationCts, userCts))
+                _operationCts = null;
             IsBusy = false;
         }
     }

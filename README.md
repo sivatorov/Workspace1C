@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.110-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.111-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,8 +8,8 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.110**
-(полный прогон — **7825 юнит-тестов**, включая тесты ПРО).
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.111**
+(полный прогон — **7831 юнит-тест**, включая тесты ПРО).
 
 ## 📣 Telegram-канал
 
@@ -205,6 +205,17 @@
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
 
+- **Окно «Резервные копии средствами СУБД» больше не «вешается наглухо» на
+  «Сохранить» и «Проверить…» (1.0.1.111, Windows и Linux)** — устранена реальная
+  синхронная работа на UI-потоке, из-за которой не срабатывали таймауты 15/30 с:
+  профиль `dbms_backups.json` больше не читается в конструкторе ViewModel (данные
+  догружаются в фоне), запись идёт через асинхронный отменяемый `SaveAsync`,
+  проверки подключения/каталога целиком выполняются в `Task.Run` со связанным
+  `CancellationTokenSource` (таймаут действительно отменяет DNS/TcpClient/
+  `pg_isready`/`sqlcmd`), а недоступный UNC-каталог не висит. Старые профили
+  нормализуются (`TimeoutMinutes = 0` → 360, пути в кавычках, отрицательный
+  `KeepCount`) с диагностикой. По таймауту показываются `Dbms.SaveTimeout`/
+  `Dbms.CheckTimeout`, кнопки снова активны, «Отмена» работает (issue #143).
 - **Инспектор процессов: `↓` и `Ctrl+A` работают сразу после открытия (1.0.1.110,
   Windows и Linux)** — фокус ставится в ячейку строки, а не в оболочку таблицы:
   в WPF через `DataGridCell`/`CurrentCell`, в Avalonia через `ListBoxItem`.
