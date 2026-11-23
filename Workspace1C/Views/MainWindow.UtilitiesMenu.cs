@@ -96,7 +96,9 @@ public partial class MainWindow
     }
 
     /// <summary>Рекурсивно добавляет узлы компоновки в целевой список пунктов меню.</summary>
-    private void AppendNodes(ItemCollection target, List<UtilitiesMenuNode> nodes)
+    /// <param name="isTopLevel">true — узлы корня (группы видны на основной панели);
+    /// false — вложенные группы (issue #146: всегда с подписью).</param>
+    private void AppendNodes(ItemCollection target, List<UtilitiesMenuNode> nodes, bool isTopLevel = true)
     {
         if (nodes is null || target is null)
             return;
@@ -117,8 +119,9 @@ public partial class MainWindow
             {
                 var title = GroupTitle(node);
                 // issue #146: режим «Иконка» / «С надписью» — единый расчёт для WPF
-                // и Avalonia (UtilitiesMenuGroupPresentation).
-                var presentation = UtilitiesMenuGroupPresentation.Build(node, title);
+                // и Avalonia (UtilitiesMenuGroupPresentation). Для вложенных групп
+                // подпись показывается всегда, даже если в layout сохранён Icon.
+                var presentation = UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel);
                 var icon = GroupIcon(node);
                 var sub = new MenuItem
                 {
@@ -135,7 +138,7 @@ public partial class MainWindow
                     // Только иконка с подсказкой: заголовком служит сама иконка.
                     sub.Header = icon;
                 }
-                AppendNodes(sub.Items, node.Children);
+                AppendNodes(sub.Items, node.Children, isTopLevel: false);
                 target.Add(sub);
             }
             else
@@ -344,7 +347,7 @@ public partial class MainWindow
             case UtilitiesMenuCommandKind.OpenNotificationChannels:
                 item.Click += (_, _) => _viewModel.OpenNotificationChannels(); break;
             case UtilitiesMenuCommandKind.OpenScheduledTasks:
-                item.Click += (_, _) => OnScheduledTasksMenuClick(item, null); break;
+                item.Click += (_, _) => OnScheduledTasksMenuClick(item, new RoutedEventArgs()); break;
             case UtilitiesMenuCommandKind.ShowBackupScenarios:
                 item.Command = _viewModel.ShowBackupScenariosCommand; break;
             case UtilitiesMenuCommandKind.ShowScriptsSettings:
@@ -387,14 +390,14 @@ public partial class MainWindow
             case UtilitiesMenuCommandKind.KillOneCProcesses:
                 item.Command = _viewModel.KillOneCProcessesCommand; break;
             case UtilitiesMenuCommandKind.ConnectionReplace:
-                item.Click += (_, _) => OnUtilitiesConnectionReplace_Click(item, null); break;
+                item.Click += (_, _) => OnUtilitiesConnectionReplace_Click(item, new RoutedEventArgs()); break;
             case UtilitiesMenuCommandKind.UndoConnectionReplace:
                 item.IsEnabled = _viewModel.CanUndoConnectionReplace;
-                item.Click += (_, _) => OnUtilitiesUndoConnectionReplace_Click(item, null); break;
+                item.Click += (_, _) => OnUtilitiesUndoConnectionReplace_Click(item, new RoutedEventArgs()); break;
             case UtilitiesMenuCommandKind.RemoveMissingFileBases:
                 item.Command = _viewModel.RemoveMissingFileBasesCommand; break;
             case UtilitiesMenuCommandKind.CheckForUpdates:
-                item.Click += (_, _) => OnCheckForUpdatesMenuClick(item, null); break;
+                item.Click += (_, _) => OnCheckForUpdatesMenuClick(item, new RoutedEventArgs()); break;
             case UtilitiesMenuCommandKind.ShowLicense:
                 item.Click += (_, _) => new LicenseWindow { Owner = this }.ShowDialog(); break;
             case UtilitiesMenuCommandKind.External:

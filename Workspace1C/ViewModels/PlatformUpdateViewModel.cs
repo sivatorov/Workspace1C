@@ -474,8 +474,14 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             // issue #360: оценка оставшегося времени скачивания.
             _etaTracker = new Services.DownloadEtaTracker();
             EtaText = string.Empty;
+            // Отчёты Progress<T> асинхронны: последний Report(0.75) мог выполниться
+            // уже после завершения загрузки и перезаписать финальные 100%. Флаг
+            // отсекает запоздавшие отчёты, чтобы строка не «застревала» на 75%.
+            var downloadCompleted = 0;
             var progress = new Progress<double>(v =>
             {
+                if (System.Threading.Volatile.Read(ref downloadCompleted) == 1)
+                    return;
                 UpdateEta(v);
                 row.Progress = v;
                 Progress = v;
@@ -520,6 +526,8 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             if (downloadId is not null)
                 _backgroundDownloads!.Complete(downloadId);
 
+            // Запоздавшие Progress.Report больше не перезапишут финальный 100%.
+            System.Threading.Interlocked.Exchange(ref downloadCompleted, 1);
             row.Progress = 1;
             Progress = 1;
             // issue #360: оценка актуальна только во время скачивания.
@@ -685,8 +693,12 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             // issue #360: оценка оставшегося времени скачивания.
             _etaTracker = new Services.DownloadEtaTracker();
             EtaText = string.Empty;
+            // Запоздавший Report(0.75) не должен перезаписать финальные 100%.
+            var downloadCompleted = 0;
             var progress = new Progress<double>(v =>
             {
+                if (System.Threading.Volatile.Read(ref downloadCompleted) == 1)
+                    return;
                 UpdateEta(v);
                 row.Progress = v;
                 Progress = v;
@@ -713,6 +725,8 @@ public sealed class PlatformUpdateViewModel : ViewModelBase
             if (downloadId is not null)
                 _backgroundDownloads!.Complete(downloadId);
 
+            // Запоздавшие Progress.Report больше не перезапишут финальный 100%.
+            System.Threading.Interlocked.Exchange(ref downloadCompleted, 1);
             row.Progress = 1;
             Progress = 1;
             // issue #360: оценка актуальна только во время скачивания.

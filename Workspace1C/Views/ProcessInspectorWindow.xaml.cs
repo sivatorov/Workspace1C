@@ -49,9 +49,6 @@ namespace Workspace1C
         /// <summary>Фокус уже успешно установлен при открытии — повторные попытки не нужны.</summary>
         private bool _focusApplied;
 
-        /// <summary>Номер попытки установки фокуса при открытии (issue #134).</summary>
-        private int _focusAttempts;
-
         /// <param name="infobases">Все базы списка (для сопоставления командных строк).</param>
         /// <param name="openBase">Переход к базе в главном окне (FindInList-механика).</param>
         public ProcessInspectorWindow(IEnumerable<Infobase> infobases, Action<Infobase> openBase)
@@ -123,6 +120,14 @@ namespace Workspace1C
                 if (!_focusApplied)
                     QueueGridFocus();
             };
+            // issue #134 (1.0.1.107): после загрузки разметки явно назначаем таблицу
+            // логическим фокусом окна, чтобы первое нажатие стрелки не уходило на
+            // кнопку «Колонки» до активации окна.
+            Loaded += (_, _) =>
+            {
+                FocusManager.SetFocusedElement(this, ProcessesGrid);
+                QueueGridFocus();
+            };
             ContentRendered += (_, _) => QueueGridFocus();
             // Данные приходят асинхронно (WMI): ставим фокус и по первому заполнению.
             _vm.Processes.CollectionChanged += (_, e) =>
@@ -139,48 +144,78 @@ namespace Workspace1C
         /// после загрузки данных и первого прохода разметки, а не синхронно в Loaded.
         /// </summary>
         private void QueueGridFocus() =>
-            Dispatcher.BeginInvoke(new Action(FocusProcessesGrid), DispatcherPriority.Input);
+            Dispatcher.BeginInvoke(new Action(() => FocusGridWithRetry(0, null)), DispatcherPriority.Input);
 
-        private void FocusProcessesGrid()
+        /// <summary>
+        /// Устанавливает фокус в таблицу и при необходимости применяет навигационную
+        /// клавишу, повторяя попытки, пока клавиатурный фокус фактически не окажется
+        /// в таблице (issue #134, 1.0.1.107). Активация окна завершается асинхронно,
+        /// поэтому одного синхронного <c>Focus()</c> недостаточно; повтор нужен и
+        /// после закрытия диалога подтверждения, и при пустом списке.
+        /// </summary>
+        /// <param name="attempt">Номер попытки (0 — первая).</param>
+        /// <param name="pendingKey">
+        /// Навигационная клавиша, которую нужно применить ровно один раз (на первой
+        /// попытке), или <c>null</c>, если достаточно просто поставить фокус.
+        /// </param>
+        private void FocusGridWithRetry(int attempt, InspectorNavigationKey? pendingKey)
         {
             if (!IsLoaded)
                 return;
 
-            // issue #134 (1.0.1.106): пока окно не активно, Focus() не передаёт
-            // клавиатурный фокус — сначала активируем окно.
+            // Пока окно не активно, Focus() не передаёт клавиатурный фокус —
+            // сначала активируем окно; активация завершится позже, поэтому ниже
+            // предусмотрен повтор.
             if (!IsActive)
                 Activate();
 
             ProcessesGrid.Focus();
             Keyboard.Focus(ProcessesGrid);
 
-            if (ProcessesGrid.IsKeyboardFocusWithin && ProcessesGrid.Items.Count > 0)
+            if (attempt == 0)
+            {
+                if (pendingKey is { } key)
+                {
+                    var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
+                        ProcessesGrid.SelectedIndex, ProcessesGrid.Items.Count, key);
+                    if (target >= 0)
+                    {
+                        ProcessesGrid.SelectedIndex = target;
+                        SetCurrentRow(ProcessesGrid.Items[target] as ProcessRowViewModel);
+                    }
+                }
+                // После открытия/завершения процесса без выделения делаем первую
+                // строку текущей, чтобы стрелки и Enter работали сразу.
+                else if (ProcessesGrid.Items.Count > 0 && ProcessesGrid.SelectedIndex < 0)
+                {
+                    ProcessesGrid.SelectedIndex = 0;
+                    SetCurrentRow(ProcessesGrid.Items[0] as ProcessRowViewModel);
+                }
+            }
+
+            var focused = ProcessesGrid.IsKeyboardFocusWithin;
+            if (focused)
             {
                 _gridHadKeyboardFocus = true;
-                _focusApplied = true;
+                // Пустой список не считается «фокус применён»: после заполнения
+                // данных фокус нужно поставить заново (issue #134, 1.0.1.104).
+                if (ProcessesGrid.Items.Count > 0)
+                    _focusApplied = true;
             }
 
-            // Первая строка становится текущей, чтобы стрелки и Enter работали сразу.
-            if (_vm.SelectedRows.Count == 0 && ProcessesGrid.Items.Count > 0)
-            {
-                ProcessesGrid.SelectedIndex = 0;
-                SetCurrentRow(ProcessesGrid.Items[0] as ProcessRowViewModel);
-            }
+            if (!ProcessInspectorFocusPolicy.ShouldRetryFocus(focused, attempt))
+                return;
 
-            // Окно могло быть ещё не активировано — повторяем попытку после активации.
-            if (!_focusApplied && _focusAttempts++ < 10)
+            var timer = new DispatcherTimer(DispatcherPriority.Input)
             {
-                var timer = new DispatcherTimer(DispatcherPriority.Input)
-                {
-                    Interval = TimeSpan.FromMilliseconds(120)
-                };
-                timer.Tick += (_, _) =>
-                {
-                    timer.Stop();
-                    FocusProcessesGrid();
-                };
-                timer.Start();
-            }
+                Interval = TimeSpan.FromMilliseconds(ProcessInspectorFocusPolicy.FocusRetryDelayMs)
+            };
+            timer.Tick += (_, _) =>
+            {
+                timer.Stop();
+                FocusGridWithRetry(attempt + 1, pendingKey);
+            };
+            timer.Start();
         }
 
         /// <summary>
@@ -201,33 +236,29 @@ namespace Workspace1C
                 return;
 
             e.Handled = true;
-            // issue #134 (1.0.1.106): окно могло быть ещё не активировано (первое
-            // нажатие сразу после открытия) — без Activate() Focus() не срабатывает,
-            // и фокус оставался на кнопке «Колонки».
+            // issue #134 (1.0.1.107): окно могло быть ещё не активировано (первое
+            // нажатие сразу после открытия). Активация завершается асинхронно,
+            // поэтому навигацию выполняем отложенно, а не синхронным Focus() —
+            // иначе клавиша «съедалась», а фокус оставался на «Колонках».
             if (!IsActive)
+            {
                 Activate();
+                Dispatcher.BeginInvoke(
+                    new Action(() => NavigateGridFromButton(navigation)),
+                    DispatcherPriority.Input);
+                return;
+            }
+
             NavigateGridFromButton(navigation);
         }
 
         /// <summary>
         /// Переносит фокус в таблицу и выполняет запрошенное перемещение по строкам
-        /// (issue #134, 1.0.1.104/1.0.1.106). Для пустого списка фокус всё равно
+        /// (issue #134, 1.0.1.104/1.0.1.107). Для пустого списка фокус всё равно
         /// ставится в таблицу — стрелка не уводит его на соседнюю кнопку.
         /// </summary>
-        private void NavigateGridFromButton(InspectorNavigationKey key)
-        {
-            ProcessesGrid.Focus();
-            Keyboard.Focus(ProcessesGrid);
-            _gridHadKeyboardFocus = true;
-
-            var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
-                ProcessesGrid.SelectedIndex, ProcessesGrid.Items.Count, key);
-            if (target < 0)
-                return;
-
-            ProcessesGrid.SelectedIndex = target;
-            SetCurrentRow(ProcessesGrid.Items[target] as ProcessRowViewModel);
-        }
+        private void NavigateGridFromButton(InspectorNavigationKey key) =>
+            FocusGridWithRetry(0, key);
 
         /// <summary>WPF-клавиша → навигационная клавиша политики (issue #134).</summary>
         private static InspectorNavigationKey MapNavigationKey(Key key) => key switch
@@ -282,23 +313,13 @@ namespace Workspace1C
         /// </summary>
         private void QueueGridFocusAfterKill()
         {
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (!IsLoaded)
-                    return;
-                if (!IsActive)
-                    Activate();
-                // Если после завершения процесса строки остались, но выделение
-                // сброшено, ставим текущую строку — иначе первое нажатие «вниз»
-                // снова уводит фокус на кнопку (issue #134, 1.0.1.104).
-                if (ProcessesGrid.Items.Count > 0 && ProcessesGrid.SelectedIndex < 0)
-                {
-                    ProcessesGrid.SelectedIndex = 0;
-                    SetCurrentRow(ProcessesGrid.Items[0] as ProcessRowViewModel);
-                }
-                ProcessesGrid.Focus();
-                Keyboard.Focus(ProcessesGrid);
-            }), DispatcherPriority.Input);
+            // issue #134 (1.0.1.107): не зависим от _focusApplied и количества строк —
+            // повторяем установку фокуса до фактического получения, в том числе при
+            // пустом списке и после закрытия диалога подтверждения. Если строки
+            // остались без выделения, помощник сделает первую строку текущей.
+            Dispatcher.BeginInvoke(
+                new Action(() => FocusGridWithRetry(0, null)),
+                DispatcherPriority.Input);
 
             // Страховка: если автообновление не изменило набор строк и событие
             // SelectionRestored не придёт, флаг не должен влиять на будущие обновления.
@@ -535,8 +556,8 @@ namespace Workspace1C
             {
                 if (!_gridHadKeyboardFocus && !ProcessesGrid.IsKeyboardFocusWithin && !forceFocus)
                     return;
-                ProcessesGrid.Focus();
-                Keyboard.Focus(ProcessesGrid);
+                // issue #134 (1.0.1.107): повторяем до фактического получения фокуса.
+                FocusGridWithRetry(0, null);
                 SetCurrentRow(_vm.SelectedRow ?? ProcessesGrid.Items.OfType<ProcessRowViewModel>().FirstOrDefault());
                 _restoreFocusAfterKill = false;
             }), DispatcherPriority.Input);

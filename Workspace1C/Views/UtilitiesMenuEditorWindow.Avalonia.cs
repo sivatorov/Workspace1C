@@ -1,5 +1,6 @@
 ﻿#if LINUX
 using System;
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
@@ -67,6 +68,7 @@ namespace Workspace1C
                 return;
             var dipHeight = screen.WorkingArea.Height / screen.Scaling;
             MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, dipHeight);
             Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
         }
 
@@ -214,7 +216,9 @@ namespace Workspace1C
 
             // Иконки.
             panel.Children.Add(SectionHeader("Utilities.Editor.IconHeader", top: 14));
-            _iconCombo.ItemsSource = _vm.CatalogIcons;
+            // issue #146: список с синтетическим слотом текущей иконки узла,
+            // если её ключа нет в каталоге, — поле не показывает чужую иконку.
+            _iconCombo.ItemsSource = _vm.IconOptions;
             _iconCombo.ItemTemplate = new FuncDataTemplate<UtilitiesIconOption>(
                 (o, _) => BuildIconRow(o));
             // В Avalonia нет SelectedValuePath: ключ выбранной иконки пишем в VM вручную.
@@ -222,6 +226,18 @@ namespace Workspace1C
             {
                 if (_iconCombo.SelectedItem is UtilitiesIconOption option)
                     _vm.SelectedIconKey = option.Key;
+            };
+            // issue #146: выбранная в дереве иконка должна отображаться в поле настройки,
+            // даже если её ключа нет в каталоге (тогда это синтетический вариант).
+            _vm.PropertyChanged += (_, e) =>
+            {
+                if (!string.Equals(e.PropertyName,
+                        nameof(UtilitiesMenuEditorViewModel.SelectedIconKey), StringComparison.Ordinal))
+                    return;
+                var selected = _vm.IconOptions.FirstOrDefault(
+                    o => string.Equals(o.Key, _vm.SelectedIconKey, StringComparison.Ordinal));
+                if (!ReferenceEquals(_iconCombo.SelectedItem, selected))
+                    _iconCombo.SelectedItem = selected;
             };
             var iconRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             iconRow.Children.Add(_iconCombo);
@@ -368,7 +384,11 @@ namespace Workspace1C
         /// <summary>«Новая группа»: диалог имени/иконки → команда создания группы.</summary>
         private void OnAddGroupClick()
         {
-            var dialog = new UtilitiesGroupEditWindow(_vm.CatalogIcons);
+            // issue #146: поле «Отображение» показываем только для группы верхнего
+            // уровня; новая группа внутри выбранной всегда будет с подписью.
+            var dialog = new UtilitiesGroupEditWindow(
+                _vm.CatalogIcons,
+                showDisplayMode: !_vm.NewGroupWillBeNested);
             dialog.ShowSync(this);
             if (dialog.Result is not null)
                 _vm.AddGroupCommand.Execute(dialog.Result);
@@ -380,7 +400,11 @@ namespace Workspace1C
             var item = _vm.SelectedItem;
             if (item is null)
                 return;
-            var dialog = new UtilitiesGroupEditWindow(_vm.CatalogIcons, item.Title, item.Node.IconKey);
+            // issue #146: в диалог передаём эффективную иконку (как в дереве), а не
+            // сохранённый ключ узла — у новой верхнеуровневой группы он пуст.
+            var dialog = new UtilitiesGroupEditWindow(
+                _vm.CatalogIcons, item.Title, item.EffectiveIconKey, item.EffectiveIconColor,
+                item.Node.DisplayMode, showDisplayMode: item.Parent is null);
             dialog.ShowSync(this);
             if (dialog.Result is not null)
                 _vm.EditGroupCommand.Execute(dialog.Result);

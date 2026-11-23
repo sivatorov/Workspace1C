@@ -28,9 +28,32 @@ public enum InspectorNavigationKey
 /// </summary>
 public static class ProcessInspectorFocusPolicy
 {
+    /// <summary>
+    /// Сколько раз окно повторяет попытку установки фокуса в таблицу (issue #134,
+    /// 1.0.1.107). Активация окна завершается асинхронно, поэтому одного
+    /// синхронного <c>Focus()</c> недостаточно.
+    /// </summary>
+    public const int MaxFocusAttempts = 12;
+
+    /// <summary>
+    /// Пауза между повторными попытками установки фокуса в миллисекундах
+    /// (issue #134, 1.0.1.107). 12 × 120 мс ≈ 1,4 с — достаточно, чтобы окно
+    /// активировалось и диалог подтверждения вернул управление.
+    /// </summary>
+    public const int FocusRetryDelayMs = 120;
+
     /// <summary>Является ли клавиша навигационной (стрелки, PageUp/PageDown, Home/End).</summary>
     public static bool IsNavigationKey(InspectorNavigationKey key) =>
         key != InspectorNavigationKey.None;
+
+    /// <summary>
+    /// Нужно ли повторить попытку установки фокуса (issue #134, 1.0.1.107): повтор
+    /// продолжается, пока клавиатурный фокус не оказался в таблице и лимит попыток
+    /// не исчерпан. Не зависит от количества строк — таблица с пустым списком тоже
+    /// должна получать фокус.
+    /// </summary>
+    public static bool ShouldRetryFocus(bool gridHasKeyboardFocus, int attempt) =>
+        !gridHasKeyboardFocus && attempt < MaxFocusAttempts;
 
     /// <summary>
     /// Нужно ли перенаправить навигационную клавишу в таблицу процессов. Пока фокус

@@ -914,7 +914,7 @@ public sealed class Issue134ProcessInspectorTests
 
         Assert.Contains("ContentRendered += (_, _) => QueueGridFocus();", code, StringComparison.Ordinal);
         Assert.Contains(
-            "Dispatcher.BeginInvoke(new Action(FocusProcessesGrid), DispatcherPriority.Input)",
+            "Dispatcher.BeginInvoke(new Action(() => FocusGridWithRetry(0, null)), DispatcherPriority.Input)",
             code, StringComparison.Ordinal);
         Assert.Contains("Keyboard.Focus(ProcessesGrid)", code, StringComparison.Ordinal);
         Assert.Contains("ProcessesGrid.CurrentCell = new DataGridCellInfo(row, column)", code, StringComparison.Ordinal);

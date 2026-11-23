@@ -255,10 +255,17 @@ namespace Workspace1C
 
         /// <summary>
         /// Отложенная установка фокуса в список процессов (issue #134, 1.0.1.102):
-        /// после загрузки данных и первого прохода разметки. Если окно ещё не
-        /// активировано/компоновка не завершена — повторяем (до 6 попыток).
+        /// после загрузки данных и первого прохода разметки. Повторяем попытки, пока
+        /// клавиатурный фокус фактически не окажется в списке (1.0.1.107): активация
+        /// окна завершается асинхронно, а после диалога подтверждения фокус может
+        /// вернуться кнопке «Колонки».
         /// </summary>
-        private void FocusGridAttempt(int attempt)
+        /// <param name="attempt">Номер попытки (0 — первая).</param>
+        /// <param name="pendingKey">
+        /// Навигационная клавиша, которую нужно применить ровно один раз (на первой
+        /// попытке), или <c>null</c>, если достаточно просто поставить фокус.
+        /// </param>
+        private void FocusGridAttempt(int attempt, InspectorNavigationKey? pendingKey = null)
         {
             if (!_opened)
                 return;
@@ -269,24 +276,45 @@ namespace Workspace1C
                     if (!_opened)
                         return;
 
-                    var focused = _grid.Focus(NavigationMethod.Directional);
+                    // Пока окно не активно, Focus() не передаёт клавиатурный фокус —
+                    // активируем окно; активация завершится позже, поэтому ниже
+                    // предусмотрен повтор.
+                    if (!IsActive)
+                        Activate();
 
-                    // Первая строка становится выбранной, чтобы стрелки и Enter
-                    // работали сразу после открытия окна.
-                    if ((_grid.SelectedItems?.Count ?? 0) == 0 && _grid.ItemCount > 0)
-                        _grid.SelectedIndex = 0;
+                    _grid.Focus(NavigationMethod.Directional);
 
-                    if ((focused || _grid.IsKeyboardFocusWithin) && _grid.ItemCount > 0)
+                    if (attempt == 0)
                     {
-                        _gridHadFocus = true;
-                        _focusApplied = true;
-                        return;
+                        if (pendingKey is { } key)
+                        {
+                            var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
+                                _grid.SelectedIndex, _grid.ItemCount, key);
+                            if (target >= 0)
+                                _grid.SelectedIndex = target;
+                        }
+                        // Первая строка становится выбранной, чтобы стрелки и Enter
+                        // работали сразу после открытия окна.
+                        else if ((_grid.SelectedItems?.Count ?? 0) == 0 && _grid.ItemCount > 0)
+                        {
+                            _grid.SelectedIndex = 0;
+                        }
                     }
 
-                    if (attempt < 5)
-                        FocusGridAttempt(attempt + 1);
+                    if (_grid.IsKeyboardFocusWithin)
+                    {
+                        _gridHadFocus = true;
+                        // Пустой список не считается «фокус применён»: после
+                        // заполнения данных фокус нужно поставить заново.
+                        if (_grid.ItemCount > 0)
+                            _focusApplied = true;
+                    }
+
+                    if (ProcessInspectorFocusPolicy.ShouldRetryFocus(
+                            _grid.IsKeyboardFocusWithin, attempt))
+                        FocusGridAttempt(attempt + 1, pendingKey);
                 },
-                DispatcherPriority.Background);
+                DispatcherPriority.Input);
         }
 
         /// <summary>
@@ -306,18 +334,37 @@ namespace Workspace1C
                 return;
 
             e.Handled = true;
+            // issue #134 (1.0.1.107): если окно ещё не открыто/не активно, сначала
+            // активируем его, а навигацию выполняем отложенно — активация завершается
+            // асинхронно, синхронный Focus() не передаёт фокус.
+            if (!_opened || !IsActive)
+            {
+                Activate();
+                Dispatcher.UIThread.Post(
+                    () => NavigateGridFromButton(navigation),
+                    DispatcherPriority.Input);
+                return;
+            }
+
             NavigateGridFromButton(navigation);
         }
 
         /// <summary>
         /// Переносит фокус в список и выполняет запрошенное перемещение по строкам
-        /// (issue #134, 1.0.1.104/1.0.1.106). Для пустого списка фокус всё равно
+        /// (issue #134, 1.0.1.104/1.0.1.107). Для пустого списка фокус всё равно
         /// ставится в список — стрелка не уводит его на соседнюю кнопку.
         /// </summary>
         private void NavigateGridFromButton(InspectorNavigationKey key)
         {
-            _grid.Focus(NavigationMethod.Directional);
             _gridHadFocus = true;
+
+            // issue #134 (1.0.1.107): Focus() может вернуть false, пока окно не
+            // активировалось — тогда повторяем фокус и навигацию отложенно.
+            if (!_grid.Focus(NavigationMethod.Directional))
+            {
+                FocusGridAttempt(0, key);
+                return;
+            }
 
             var target = ProcessInspectorFocusPolicy.ResolveTargetIndex(
                 _grid.SelectedIndex, _grid.ItemCount, key);
@@ -712,7 +759,8 @@ namespace Workspace1C
                 {
                     if (!_gridHadFocus && !_grid.IsKeyboardFocusWithin && !forceFocus)
                         return;
-                    _grid.Focus(NavigationMethod.Directional);
+                    // issue #134 (1.0.1.107): повторяем до фактического получения фокуса.
+                    FocusGridAttempt(0);
                     var row = _vm.SelectedRow ?? _vm.Processes.FirstOrDefault();
                     if (row is not null)
                         _grid.ScrollIntoView(row);
@@ -734,22 +782,15 @@ namespace Workspace1C
             RestoreFocusAfterKill();
         }
 
-        /// <summary>Немедленная и отложенная установка фокуса после завершения процесса.</summary>
+        /// <summary>
+        /// Возврат фокуса в список после завершения процесса (issue #134, 1.0.1.107):
+        /// повторяем попытки до фактического получения фокуса, в том числе при пустом
+        /// списке и после закрытия диалога подтверждения. Если строки остались без
+        /// выделения, помощник сделает первую строку текущей.
+        /// </summary>
         private void RestoreFocusAfterKill()
         {
-            Dispatcher.UIThread.Post(
-                () =>
-                {
-                    if (!_opened)
-                        return;
-                    // Если после завершения процесса строки остались, но выделение
-                    // сброшено, ставим текущую строку — иначе первое нажатие «вниз»
-                    // снова уводит фокус на кнопку (issue #134, 1.0.1.104).
-                    if (_grid.ItemCount > 0 && _grid.SelectedIndex < 0)
-                        _grid.SelectedIndex = 0;
-                    _grid.Focus(NavigationMethod.Directional);
-                },
-                DispatcherPriority.Input);
+            FocusGridAttempt(0);
 
             // Страховка: если набор строк не изменился и SelectionRestored не придёт,
             // флаг не должен влиять на будущие обновления.

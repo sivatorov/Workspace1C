@@ -61,7 +61,11 @@ namespace Workspace1C
         /// <summary>«Новая группа»: диалог имени/иконки → команда создания группы.</summary>
         private void OnAddGroupClick(object sender, RoutedEventArgs e)
         {
-            var dialog = new UtilitiesGroupEditWindow(_vm.CatalogIcons) { Owner = this };
+            // issue #146: поле «Отображение» показываем только для группы верхнего
+            // уровня; новая группа внутри выбранной всегда будет с подписью.
+            var dialog = new UtilitiesGroupEditWindow(
+                _vm.CatalogIcons,
+                showDisplayMode: !_vm.NewGroupWillBeNested) { Owner = this };
             if (dialog.ShowDialog() == true && dialog.Result is not null)
                 _vm.AddGroupCommand.Execute(dialog.Result);
         }
@@ -72,10 +76,15 @@ namespace Workspace1C
             var item = _vm.SelectedItem;
             if (item is null)
                 return;
+            // issue #146: в диалог передаём эффективную иконку (как в дереве), а не
+            // сохранённый ключ узла — у новой верхнеуровневой группы он пуст.
             var dialog = new UtilitiesGroupEditWindow(
                 _vm.CatalogIcons,
                 item.Title,
-                item.Node.IconKey) { Owner = this };
+                item.EffectiveIconKey,
+                item.EffectiveIconColor,
+                item.Node.DisplayMode,
+                showDisplayMode: item.Parent is null) { Owner = this };
             if (dialog.ShowDialog() == true && dialog.Result is not null)
                 _vm.EditGroupCommand.Execute(dialog.Result);
         }
@@ -129,6 +138,7 @@ namespace Workspace1C
         {
             var workArea = SystemParameters.WorkArea;
             MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
             Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
         }
 

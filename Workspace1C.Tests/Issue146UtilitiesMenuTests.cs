@@ -490,6 +490,118 @@ public sealed class Issue146UtilitiesMenuTests
         }
     }
 
+    // ===================== 6. Иконка группы в правке структуры (T3) =====================
+
+    /// <summary>
+    /// Выбор узла, чей эффективный ключ иконки отсутствует в каталоге (новая
+    /// верхнеуровневая папка), добавляет его в <see cref="UtilitiesMenuEditorViewModel.IconOptions"/>
+    /// и выставляет <see cref="UtilitiesMenuEditorViewModel.SelectedIconKey"/> — поле
+    /// настройки показывает иконку из дерева, а не первый элемент каталога (issue #146).
+    /// </summary>
+    [Fact]
+    public void Editor_SelectNodeWithIconNotInCatalog_AddsIconOptionAndSelectsIt()
+    {
+        var vm = new UtilitiesMenuEditorViewModel(store: null);
+        var baseline = vm.IconOptions.Count;
+        var item = new UtilitiesMenuNodeItem(
+            new UtilitiesMenuNode { Kind = "group", GroupId = null, CustomTitle = "Новая папка" }, null);
+
+        vm.SelectedItem = item;
+
+        var effectiveKey = item.EffectiveIconKey;
+        Assert.False(string.IsNullOrWhiteSpace(effectiveKey));
+        // Эффективного ключа нет в каталоге — это и было причиной «чужой» иконки в поле.
+        Assert.DoesNotContain(vm.CatalogIcons,
+            o => string.Equals(o.Key, effectiveKey, StringComparison.Ordinal));
+        Assert.Contains(vm.IconOptions,
+            o => string.Equals(o.Key, effectiveKey, StringComparison.Ordinal));
+        Assert.Equal(effectiveKey, vm.SelectedIconKey);
+        Assert.Equal(baseline + 1, vm.IconOptions.Count);
+    }
+
+    /// <summary>
+    /// Повторный выбор разных узлов не раздувает <see cref="UtilitiesMenuEditorViewModel.IconOptions"/>
+    /// синтетическими вариантами: слот «текущая иконка» один, при выборе узла с
+    /// каталожной иконкой он удаляется (issue #146).
+    /// </summary>
+    [Fact]
+    public void Editor_SelectingDifferentNodes_KeepsSingleSyntheticIconOption()
+    {
+        var vm = new UtilitiesMenuEditorViewModel(store: null);
+        var baseline = vm.IconOptions.Count;
+        var itemA = new UtilitiesMenuNodeItem(
+            new UtilitiesMenuNode { Kind = "item", ItemId = "ServerMonitor", IconKey = "IconCustomA" }, null);
+        var itemB = new UtilitiesMenuNodeItem(
+            new UtilitiesMenuNode { Kind = "item", ItemId = "Services", IconKey = "IconCustomB" }, null);
+
+        vm.SelectedItem = itemA;
+        Assert.Equal(baseline + 1, vm.IconOptions.Count);
+        Assert.Equal("IconCustomA", vm.SelectedIconKey);
+
+        vm.SelectedItem = itemB;
+        Assert.Equal(baseline + 1, vm.IconOptions.Count);
+        Assert.DoesNotContain(vm.IconOptions, o => string.Equals(o.Key, "IconCustomA", StringComparison.Ordinal));
+        Assert.Contains(vm.IconOptions, o => string.Equals(o.Key, "IconCustomB", StringComparison.Ordinal));
+        Assert.Equal("IconCustomB", vm.SelectedIconKey);
+
+        // Узел с иконкой из каталога: синтетический слот удаляется, коллекция — как была.
+        var catalogItem = new UtilitiesMenuNodeItem(
+            new UtilitiesMenuNode { Kind = "item", ItemId = "ServerMonitor" }, null);
+        vm.SelectedItem = catalogItem;
+        Assert.Equal(baseline, vm.IconOptions.Count);
+        Assert.Equal(catalogItem.EffectiveIconKey, vm.SelectedIconKey);
+    }
+
+    /// <summary>
+    /// Страж: WPF-редактор «Утилиты» передаёт диалогу эффективную иконку/цвет и
+    /// привязывает список иконок к <c>IconOptions</c>, а не к статическому каталогу.
+    /// </summary>
+    [Fact]
+    public void WpfUtilitiesEditor_PassesEffectiveIconAndBindsIconOptions()
+    {
+        var code = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Views", "UtilitiesMenuEditorWindow.xaml.cs"));
+        Assert.Contains("item.EffectiveIconKey", code, StringComparison.Ordinal);
+        Assert.Contains("item.EffectiveIconColor", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("item.Node.IconKey", code, StringComparison.Ordinal);
+
+        var xaml = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Views", "UtilitiesMenuEditorWindow.xaml"));
+        Assert.Contains("ItemsSource=\"{Binding IconOptions}\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ItemsSource=\"{Binding CatalogIcons}\"", xaml, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Страж: Avalonia-редактор «Утилиты» использует <c>IconOptions</c> и передаёт
+    /// диалогу эффективную иконку/цвет (issue #146, паритет с WPF).
+    /// </summary>
+    [Fact]
+    public void AvaloniaUtilitiesEditor_PassesEffectiveIconAndUsesIconOptions()
+    {
+        var code = ReadProjectFile(Path.Combine(
+            "Workspace1C", "Views", "UtilitiesMenuEditorWindow.Avalonia.cs"));
+        Assert.Contains("_iconCombo.ItemsSource = _vm.IconOptions", code, StringComparison.Ordinal);
+        Assert.Contains("item.EffectiveIconKey", code, StringComparison.Ordinal);
+        Assert.Contains("item.EffectiveIconColor", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("item.Node.IconKey", code, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Страж: диалог правки группы умеет добавлять текущую иконку в список, если её
+    /// ключа нет в каталоге, и выбирать именно её (WPF и Avalonia).
+    /// </summary>
+    [Theory]
+    [InlineData("UtilitiesGroupEditWindow.xaml.cs")]
+    [InlineData("UtilitiesGroupEditWindow.Avalonia.cs")]
+    public void GroupDialog_AddsCurrentIconWhenMissingFromCatalog(string fileName)
+    {
+        var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
+        Assert.Contains("initialIconColor", code, StringComparison.Ordinal);
+        Assert.Contains("new UtilitiesIconOption(", code, StringComparison.Ordinal);
+        Assert.Contains("options.Any(", code, StringComparison.Ordinal);
+        Assert.Contains("options.FirstOrDefault(", code, StringComparison.Ordinal);
+    }
+
     // ===================== Вспомогательные методы =====================
 
     private static UtilitiesMenuLayout BuildV1Layout() => new()

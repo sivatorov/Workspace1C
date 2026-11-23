@@ -169,7 +169,9 @@
                             CommandParameter="{Binding SelectedIconKey}" Padding="10,6" Margin="6,0,0,0">
                         <TextBlock Text="{loc:Loc Utilities.Editor.ApplyIcon}" VerticalAlignment="Center"/>
                     </Button>
-                    <ComboBox x:Name="IconCombo" ItemsSource="{Binding CatalogIcons}"
+                    <!-- issue #146: список с синтетическим слотом текущей иконки узла,
+                         если её ключа нет в каталоге, — поле не показывает чужую иконку. -->
+                    <ComboBox x:Name="IconCombo" ItemsSource="{Binding IconOptions}"
                               SelectedValuePath="Key" SelectedValue="{Binding SelectedIconKey}">
                         <ComboBox.ItemTemplate>
                             <DataTemplate>

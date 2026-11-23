@@ -13,6 +13,15 @@ namespace Workspace1C.ViewModels;
 /// </summary>
 public sealed class DbmsBackupViewModel : ViewModelBase
 {
+    /// <summary>
+    /// Предельное время записи профиля (issue #143): медленный/недоступный сетевой
+    /// профиль не должен держать окно в состоянии «сохранение» бесконечно.
+    /// </summary>
+    private static readonly TimeSpan SaveTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Предельное время проверки подключения/каталога (issue #143).</summary>
+    private static readonly TimeSpan CheckTimeout = TimeSpan.FromSeconds(30);
+
     private readonly IReadOnlyList<Infobase> _infobases;
     private readonly DbmsBackupData _data;
     private readonly StringBuilder _log = new();
@@ -324,6 +333,42 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>
+    /// Сохранение профиля кнопкой «Сохранить» (issue #143): запись на диск уходит
+    /// в фоновый поток и ограничена по времени. Раньше синхронный вызов
+    /// <see cref="Save"/> на UI-потоке мог «наглухо» зависнуть на медленном профиле
+    /// (сетевой/перенаправленный %APPDATA%), и окно переставало отвечать.
+    /// </summary>
+    public async Task<bool> SaveAsync()
+    {
+        if (IsBusy)
+            return false;
+
+        IsBusy = true;
+        try
+        {
+            AppendLog(LocalizationManager.T("Dbms.Saving"));
+            var saved = await Task.Run(Save).WaitAsync(SaveTimeout).ConfigureAwait(true);
+            return saved;
+        }
+        catch (TimeoutException)
+        {
+            StatusText = LocalizationManager.T("Dbms.SaveTimeout");
+            AppendLog(StatusText);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            StatusText = ex.Message;
+            AppendLog(ex.Message);
+            return false;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     public void Cancel()
     {
         try { _cts?.Cancel(); }
@@ -352,8 +397,9 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             _cts = new CancellationTokenSource();
 
             // Запись профиля — вне UI-потока (issue #143): диск/профиль могут
-            // отвечать медленно, а окно должно оставаться отзывчивым.
-            if (!await Task.Run(Save, _cts.Token))
+            // отвечать медленно, а окно должно оставаться отзывчивым. Ограничение
+            // по времени не даёт «зависнуть» на недоступном сетевом профиле.
+            if (!await Task.Run(Save, _cts.Token).WaitAsync(SaveTimeout, _cts.Token))
                 return;
 
             var profile = CurrentProfile();
@@ -416,8 +462,18 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         try
         {
             AppendLog(LocalizationManager.T("Dbms.CheckRunning"));
-            var result = await check(profile, CancellationToken.None);
+            // issue #143: проверка ограничена по времени. Сетевой каталог/СУБД
+            // может не ответить, а синхронная файловая операция внутри проверки
+            // не всегда слушает CancellationToken — WaitAsync гарантирует возврат.
+            var result = await check(profile, CancellationToken.None)
+                .WaitAsync(CheckTimeout)
+                .ConfigureAwait(true);
             StatusText = FormatCheckResult(result);
+            AppendLog(StatusText);
+        }
+        catch (TimeoutException)
+        {
+            StatusText = LocalizationManager.T("Dbms.CheckTimeout");
             AppendLog(StatusText);
         }
         catch (Exception ex)

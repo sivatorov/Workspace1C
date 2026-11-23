@@ -149,6 +149,41 @@ public static class RunningInfobaseMatcher
     }
 
     /// <summary>
+    /// Все базы списка, чьё подключение совпадает с командной строкой процесса
+    /// (issue #153). Одна и та же база может быть заведена в списке несколько раз
+    /// под разными учётными записями (например, «РАБОЧАЯ БАЗА» с авторизацией ОС и
+    /// «РАБОЧАЯ БАЗА - АДМИН» с именем/паролем). Раньше <see cref="FindOwner"/>
+    /// возвращал только первую такую запись, поэтому у второй не появлялся индикатор
+    /// запуска, а двойной щелчок открывал новый экземпляр вместо активации окна.
+    /// Проверяются прямые ключи <c>/F</c>, <c>/S</c>, <c>/IBConnectionString</c> и
+    /// веб-ключ <c>/WS</c>; fallback <c>/IBName</c> и файловый хвост пути выполняет
+    /// вызывающий через <see cref="FindOwner"/>.
+    /// </summary>
+    public static IReadOnlyList<Infobase> FindDirectOwners(
+        IEnumerable<Infobase> infobases, string? commandLine)
+    {
+        if (string.IsNullOrWhiteSpace(commandLine))
+            return Array.Empty<Infobase>();
+
+        var bases = (infobases ?? Enumerable.Empty<Infobase>())
+            .Where(ib => ib?.Connection is not null)
+            .ToList();
+        if (bases.Count == 0)
+            return Array.Empty<Infobase>();
+
+        var owners = bases.Where(ib => MatchesCommandLine(ib, commandLine)).ToList();
+        if (owners.Count == 0)
+            owners = bases.Where(ib => MatchesWebBase(ib, commandLine)).ToList();
+        if (owners.Count <= 1)
+            return owners;
+
+        // Одна и та же запись, добавленная в список дважды, не должна давать два
+        // одинаковых совпадения: ключ базы (Id либо подпись подключения) уникален.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return owners.Where(ib => seen.Add(GetBaseKey(ib))).ToList();
+    }
+
+    /// <summary>
     /// Путь из командной строки для файлового fallback (issue #140): прямой ключ
     /// <c>/F</c>, затем <c>File=</c> из <c>/IBConnectionString</c>.
     /// </summary>
@@ -514,19 +549,31 @@ public static class RunningInfobaseMatcher
                 RunningMatchDebug.Log($"  process exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
         }
 
-        // issue #140 (1.0.1.84): единый проход через FindOwner — прямые ключи /F//S,
-        // /IBConnectionString, затем /IBName (только при уникальном имени) и файловый
-        // fallback по уникальному последнему сегменту пути. Поведение индикатора
-        // запуска сохранено; веб-базы сюда не передаются (см. фильтр выше).
+        // issue #140 (1.0.1.84): прямые ключи /F//S, /IBConnectionString, затем
+        // /IBName (только при уникальном имени) и файловый fallback по уникальному
+        // последнему сегменту пути. Issue #153: если подключению соответствуют
+        // НЕСКОЛЬКО записей списка (одна база заведена под разными учётками),
+        // процесс привязывается ко всем ним — иначе вторая запись не считалась
+        // запущенной. Веб-базы сюда не передаются (см. фильтр выше).
         foreach (var process in processList)
         {
-            var owner = FindOwner(bases, process.CommandLine);
-            if (owner is null)
+            var owners = FindDirectOwners(bases, process.CommandLine);
+            if (owners.Count == 0)
+            {
+                // Fallback: /IBName (уникальное имя) и файловый хвост пути.
+                var fallback = FindOwner(bases, process.CommandLine);
+                if (fallback is not null)
+                    owners = new[] { fallback };
+            }
+
+            if (owners.Count == 0)
             {
                 if (RunningMatchDebug.IsEnabled)
                     RunningMatchDebug.Log($"  match: NO owner for exe=\"{process.ProcessName}\"");
+                continue;
             }
-            else
+
+            foreach (var owner in owners)
             {
                 AddToResult(result, GetBaseKey(owner), process);
                 if (RunningMatchDebug.IsEnabled)

@@ -54,6 +54,52 @@ public sealed class Issue146DialogSizeTests
         Assert.Equal(560, DialogWorkAreaPolicy.ClampHeight(560, 480, 560, margin: -100));
     }
 
+    [Fact]
+    public void ClampMinHeight_RegularScreen_KeepsMinimum()
+    {
+        // На обычном экране минимальная высота не меняется.
+        Assert.Equal(500, DialogWorkAreaPolicy.ClampMinHeight(500, 1080));
+    }
+
+    [Fact]
+    public void ClampMinHeight_SmallScreen_LowersToMaxHeight()
+    {
+        // 768 DIP минус отступ 48 = 720: MinHeight 800 понижается до границы экрана.
+        Assert.Equal(720, DialogWorkAreaPolicy.ClampMinHeight(800, 768));
+        // MinHeight меньше границы не меняется: окно и так помещается.
+        Assert.Equal(500, DialogWorkAreaPolicy.ClampMinHeight(500, 768));
+    }
+
+    [Fact]
+    public void ClampMinHeight_TinyScreen_MatchesMaxHeight()
+    {
+        // Экран 500 DIP: верхняя граница 452 меньше MinHeight 480.
+        Assert.Equal(452, DialogWorkAreaPolicy.ClampMinHeight(480, 500));
+    }
+
+    [Fact]
+    public void ClampMinHeight_UnknownWorkArea_KeepsMinimum()
+    {
+        Assert.Equal(480, DialogWorkAreaPolicy.ClampMinHeight(480, 0));
+        Assert.Equal(480, DialogWorkAreaPolicy.ClampMinHeight(480, double.NaN));
+    }
+
+    [Fact]
+    public void ClampMinHeight_NaNOrNegative_TreatedAsZero()
+    {
+        Assert.Equal(0, DialogWorkAreaPolicy.ClampMinHeight(double.NaN, 1080));
+        Assert.Equal(0, DialogWorkAreaPolicy.ClampMinHeight(-100, 1080));
+    }
+
+    [Fact]
+    public void ClampMinHeight_ThenClampHeight_FitsTinyScreen()
+    {
+        // Порядок из редакторов: сначала MinHeight, затем Height — окно помещается.
+        var minHeight = DialogWorkAreaPolicy.ClampMinHeight(480, 500);
+        Assert.Equal(452, minHeight);
+        Assert.Equal(452, DialogWorkAreaPolicy.ClampHeight(560, minHeight, 500));
+    }
+
     [Theory]
     [InlineData("UtilitiesMenuEditorWindow.xaml.cs")]
     [InlineData("TrayMenuEditorWindow.xaml.cs")]
@@ -68,6 +114,10 @@ public sealed class Issue146DialogSizeTests
 
         Assert.Contains("DialogWorkAreaPolicy.ClampHeight", source, StringComparison.Ordinal);
         Assert.Contains("DialogWorkAreaPolicy.MaxHeight", source, StringComparison.Ordinal);
+        // Issue #146: MinHeight тоже клампится, иначе нижняя граница побеждает
+        // верхнюю и окно снова выходит за рабочую область.
+        Assert.Contains("DialogWorkAreaPolicy.ClampMinHeight", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight,", source, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -82,6 +132,35 @@ public sealed class Issue146DialogSizeTests
         // пояснение не обрезается, а прокручивается.
         Assert.Contains("ScrollViewer Grid.Column=\"2\"", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomPrograms_CentralAreaScrolls()
+    {
+        var xaml = File.ReadAllText(
+            Path.Combine(FindRepoRoot(), "Workspace1C", "Views", "CustomProgramsWindow.xaml"));
+
+        // Issue #146: центральная область (список программ и редактор) обёрнута
+        // в ScrollViewer, поэтому при малой высоте окна содержимое доступно,
+        // а нижние кнопки и переключатель режима остаются видимыми.
+        var start = xaml.IndexOf("x:Name=\"CentralScrollViewer\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "В CustomProgramsWindow.xaml нет ScrollViewer центральной области.");
+        var block = xaml.Substring(start, Math.Min(400, xaml.Length - start));
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", block, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CustomProgramsAvalonia_CentralAreaScrolls()
+    {
+        var source = File.ReadAllText(
+            Path.Combine(FindRepoRoot(), "Workspace1C", "Views", "CustomProgramsWindow.Avalonia.cs"));
+
+        // Issue #146: в Avalonia центральная область тоже в ScrollViewer.
+        Assert.Contains("var centralScroll = new ScrollViewer", source, StringComparison.Ordinal);
+        Assert.Contains("Content = BuildEditorGrid()", source, StringComparison.Ordinal);
+        Assert.Contains("ScrollBarVisibility.Auto", source, StringComparison.Ordinal);
+        Assert.Contains("ScrollBarVisibility.Disabled", source, StringComparison.Ordinal);
     }
 
     private static string FindRepoRoot()

@@ -57,10 +57,13 @@ namespace Workspace1C
             var item = _vm.SelectedItem;
             if (item is null || !_vm.CanEditGroup)
                 return;
+            // issue #146: передаём и текущий цвет — у трея нет верхнеуровневости,
+            // поэтому ключ иконки остаётся сохранённым в узле.
             var dialog = new UtilitiesGroupEditWindow(
                 _vm.CatalogIcons,
                 item.Title,
-                item.Node.IconKey) { Owner = this };
+                item.Node.IconKey,
+                item.Node.IconColor) { Owner = this };
             if (dialog.ShowDialog() == true && dialog.Result is not null)
                 _vm.EditGroupCommand.Execute(ToTrayGroupParams(dialog.Result));
         }
@@ -112,6 +115,7 @@ namespace Workspace1C
         {
             var workArea = SystemParameters.WorkArea;
             MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
             Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
         }
 

@@ -38,7 +38,7 @@ public sealed class Issue134ProcessInspectorFollowupTests
     {
         var code = ReadProjectFile("Workspace1C", "Views", "ProcessInspectorWindow.xaml.cs");
         Assert.Contains("ContentRendered += (_, _) => QueueGridFocus();", code, StringComparison.Ordinal);
-        Assert.Contains("Dispatcher.BeginInvoke(new Action(FocusProcessesGrid), DispatcherPriority.Input)", code, StringComparison.Ordinal);
+        Assert.Contains("Dispatcher.BeginInvoke(new Action(() => FocusGridWithRetry(0, null)), DispatcherPriority.Input)", code, StringComparison.Ordinal);
         Assert.Contains("Keyboard.Focus(ProcessesGrid)", code, StringComparison.Ordinal);
         Assert.Contains("NotifyCollectionChangedAction.Add", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Loaded += (_, _) => ProcessesGrid.Focus();", code, StringComparison.Ordinal);
@@ -122,6 +122,7 @@ public sealed class Issue134ProcessInspectorFollowupTests
         Assert.Contains("Key.Down", code, StringComparison.Ordinal);
         Assert.Contains("_grid.IsKeyboardFocusWithin", code, StringComparison.Ordinal);
         Assert.Contains("if (_grid.ItemCount > 0)", code, StringComparison.Ordinal);
-        Assert.Contains("_grid.SelectedIndex < 0", code, StringComparison.Ordinal);
+        // После завершения процесса при остатке строк ставится первая строка.
+        Assert.Contains("(_grid.SelectedItems?.Count ?? 0) == 0 && _grid.ItemCount > 0", code, StringComparison.Ordinal);
     }
 }

@@ -13,7 +13,7 @@ namespace Workspace1C.ViewModels;
 public sealed class UtilitiesGroupEditParams
 {
     public UtilitiesGroupEditParams(string title, string? iconKey,
-        UtilitiesMenuGroupDisplay displayMode = UtilitiesMenuGroupDisplay.Icon)
+        UtilitiesMenuGroupDisplay displayMode = UtilitiesMenuGroupDisplay.IconWithLabel)
     {
         Title = title;
         IconKey = iconKey;
@@ -72,6 +72,10 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         // даже если её нет в файле; в неё попадают пункты, отсутствующие в файле.
         _layout = UtilitiesMenuResolver.EnsureNewItemsGroup(loaded ?? UtilitiesMenuLayouts.Default())!;
         Roots = BuildTree(_layout.Root, null);
+        // issue #146: варианты выпадающего списка иконок — тот же каталог и порядок,
+        // плюс один синтетический слот для эффективной иконки выбранного узла,
+        // которой может не быть в каталоге.
+        IconOptions = new ObservableCollection<UtilitiesIconOption>(CatalogIcons);
 
         MoveUpCommand = new RelayCommand(_ => MoveSelected(-1), _ => CanMoveSelected(-1));
         MoveDownCommand = new RelayCommand(_ => MoveSelected(1), _ => CanMoveSelected(1));
@@ -105,6 +109,9 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
                 // Показываем в поле выбора иконки текущую (эффективную) иконку узла —
                 // в т.ч. для пунктов меню и типовых групп, у которых иконка берётся из
                 // каталога, а не из компоновки (issue #374).
+                // issue #146: сначала гарантируем наличие эффективного ключа в списке
+                // (иначе поле показывало бы пусто или чужую иконку), затем выбираем его.
+                EnsureIconOption(value?.EffectiveIconKey, value?.EffectiveIconColor);
                 SelectedIconKey = value?.EffectiveIconKey ?? string.Empty;
                 RaiseCommandsCanExecuteChanged();
             }
@@ -123,6 +130,16 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
 
     /// <summary>Можно ли править выбранный узел как группу (кнопка «Правка группы»).</summary>
     public bool CanEditGroup => IsGroup(SelectedItem);
+
+    /// <summary>
+    /// Будет ли новая группа вложенной (issue #146): диалог добавления открывается
+    /// при выбранной группе — новая группа попадёт внутрь неё. Для вложенных групп
+    /// режим «только иконка» недоступен, поле «Отображение» не показывается.
+    /// </summary>
+    public bool NewGroupWillBeNested => IsGroup(SelectedItem);
+
+    /// <summary>Выбранная группа верхнего уровня (видна на основной панели).</summary>
+    public bool SelectedGroupIsTopLevel => IsGroup(SelectedItem) && SelectedItem?.Parent is null;
 
     /// <summary>Можно ли удалить выбранный узел (группа или разделитель) — единая кнопка удаления.</summary>
     public bool CanDeleteGroup => IsGroup(SelectedItem) || IsSeparator(SelectedItem);
@@ -144,6 +161,52 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
 
     /// <summary>Доступные иконки из каталога для назначения (ключ → подпись).</summary>
     public IReadOnlyList<UtilitiesIconOption> CatalogIcons { get; } = BuildCatalogIcons();
+
+    /// <summary>
+    /// Варианты выпадающего списка иконок редактора (issue #146): каталог в том же
+    /// порядке плюс не более одного синтетического слота для эффективной иконки
+    /// выбранного узла, которой нет в каталоге.
+    /// </summary>
+    public ObservableCollection<UtilitiesIconOption> IconOptions { get; }
+
+    /// <summary>Синтетический вариант «текущая иконка» (не из каталога); null — нет.</summary>
+    private UtilitiesIconOption? _syntheticIconOption;
+
+    /// <summary>
+    /// Issue #146: гарантирует, что эффективный ключ иконки узла присутствует в
+    /// <see cref="IconOptions"/>. При непустом ключе, отсутствующем в каталоге,
+    /// добавляет синтетический вариант с текущим цветом (по умолчанию серый).
+    /// Синтетический слот всегда один: при смене узла он удаляется и добавляется
+    /// заново, поэтому коллекция не растёт бесконечно.
+    /// </summary>
+    public void EnsureIconOption(string? key, string? color)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            RemoveSyntheticIconOption();
+            return;
+        }
+        var existing = IconOptions.FirstOrDefault(o => string.Equals(o.Key, key, StringComparison.Ordinal));
+        if (existing is not null)
+        {
+            // Ключ есть в каталоге (или это тот же синтетический слот) — лишний не нужен.
+            if (!ReferenceEquals(existing, _syntheticIconOption))
+                RemoveSyntheticIconOption();
+            return;
+        }
+        RemoveSyntheticIconOption();
+        _syntheticIconOption = new UtilitiesIconOption(
+            key!, string.IsNullOrWhiteSpace(color) ? "#6B7280" : color!);
+        IconOptions.Add(_syntheticIconOption);
+    }
+
+    private void RemoveSyntheticIconOption()
+    {
+        if (_syntheticIconOption is null)
+            return;
+        IconOptions.Remove(_syntheticIconOption);
+        _syntheticIconOption = null;
+    }
 
     /// <summary>Варианты настройки «Отображение» в диалоге правки группы (issue #146).</summary>
     public static IReadOnlyList<UtilitiesGroupDisplayOption> GroupDisplayOptions { get; } = new[]
@@ -302,6 +365,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         var title = editParams is not null && !string.IsNullOrWhiteSpace(editParams.Title)
             ? editParams.Title!.Trim()
             : LocalizationManager.T("Utilities.Editor.NewGroup");
+        var parent = IsGroup(SelectedItem) ? SelectedItem : null;
         var group = new UtilitiesMenuNode
         {
             Kind = "group",
@@ -309,10 +373,12 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             CustomTitle = title,
             // По умолчанию новая группа показывается с подписью (1.0.1.105):
             // режим «только иконка» выбирается явно в диалоге правки группы.
-            DisplayMode = editParams?.DisplayMode ?? UtilitiesMenuGroupDisplay.IconWithLabel,
+            // Вложенная группа (issue #146) — всегда с подписью.
+            DisplayMode = parent is null
+                ? editParams?.DisplayMode ?? UtilitiesMenuGroupDisplay.IconWithLabel
+                : UtilitiesMenuGroupDisplay.IconWithLabel,
         };
         ApplyIconToNode(group, editParams?.IconKey);
-        var parent = IsGroup(SelectedItem) ? SelectedItem : null;
         var item = new UtilitiesMenuNodeItem(group, parent);
         if (parent is null)
             Roots.Add(item);
@@ -330,7 +396,12 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             return;
         if (!string.IsNullOrWhiteSpace(editParams.Title))
             item.Node.CustomTitle = editParams.Title!.Trim();
-        item.Node.DisplayMode = editParams.DisplayMode;
+        // issue #146: выбор «Иконка» / «С надписью» действует только для групп
+        // верхнего уровня (они видны на основной панели). Вложенные группы всегда
+        // показываются с подписью — даже если в старом layout был сохранён Icon.
+        item.Node.DisplayMode = item.Parent is null
+            ? editParams.DisplayMode
+            : UtilitiesMenuGroupDisplay.IconWithLabel;
         ApplyIconToNode(item.Node, editParams.IconKey);
         item.NotifyChanged();
     }
@@ -426,7 +497,7 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
         item.NotifyChanged();
     }
 
-    private void ApplyExternalIcon(string path)
+    private void ApplyExternalIcon(string? path)
     {
         var item = SelectedItem;
         if (item is null || string.IsNullOrWhiteSpace(path))

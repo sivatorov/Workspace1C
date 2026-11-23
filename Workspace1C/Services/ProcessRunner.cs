@@ -187,8 +187,8 @@ public static class ProcessRunner
                 Kill(process);
                 readCts.Cancel();
 
-                var stdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false);
-                var stdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false);
+                var stdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading, readCts).ConfigureAwait(false);
+                var stdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading, readCts).ConfigureAwait(false);
                 if (canceled)
                     ct.ThrowIfCancellationRequested();
 
@@ -206,11 +206,16 @@ public static class ProcessRunner
                     Kill(process);
             }
 
+            // issue #143 (повторное обращение): процесс уже завершился, но потомок мог
+            // унаследовать stdout/stderr и держать трубу открытой. Раньше ожидание
+            // ReadToEnd висело бесконечно — «Сделать копию сейчас» не завершалась,
+            // и кнопка «Отмена» не помогала. Ждём вывод ограниченное время, затем
+            // закрываем трубу и возвращаем то, что успели прочитать.
             return new ProcessRunResult
             {
                 ExitCode = process.ExitCode,
-                StdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading).ConfigureAwait(false),
-                StdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading).ConfigureAwait(false)
+                StdOut = await SafeReadOutput(stdoutBytesTask, stdoutText, rawReading, readCts).ConfigureAwait(false),
+                StdErr = await SafeReadOutput(stderrBytesTask, stderrText, rawReading, readCts).ConfigureAwait(false)
             };
         }
     }
@@ -245,20 +250,43 @@ public static class ProcessRunner
     }
 
     /// <summary>
-    /// Читает вывод: сырое чтение — декодирование <see cref="ConsoleOutputDecoder"/>;
-    /// при явной кодировке — готовый текст StreamReader.
+    /// Предельное ожидание вывода после завершения процесса (issue #143). Потомок,
+    /// унаследовавший stdout/stderr, может держать трубу открытой неограниченно;
+    /// без этого предела ReadToEnd/копирование потока висело бы вечно.
     /// </summary>
-    private static async Task<string> SafeReadOutput(Task<byte[]> bytesTask, Task<string> textTask, bool rawReading)
+    private static readonly TimeSpan OutputDrainTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>
+    /// Читает вывод: сырое чтение — декодирование <see cref="ConsoleOutputDecoder"/>;
+    /// при явной кодировке — готовый текст StreamReader. Ожидание ограничено
+    /// <see cref="OutputDrainTimeout"/>; по истечении труба закрывается, а задача
+    /// чтения наблюдается, чтобы не оставить необработанное исключение.
+    /// </summary>
+    private static async Task<string> SafeReadOutput(
+        Task<byte[]> bytesTask, Task<string> textTask, bool rawReading,
+        CancellationTokenSource? readCts = null)
     {
         try
         {
-            if (rawReading)
-                return ConsoleOutputDecoder.Decode(await bytesTask.ConfigureAwait(false));
-            return await textTask.ConfigureAwait(false);
+            var readTask = rawReading
+                ? DecodeAsync(bytesTask)
+                : textTask;
+            var completed = await Task.WhenAny(readTask, Task.Delay(OutputDrainTimeout)).ConfigureAwait(false);
+            if (!ReferenceEquals(completed, readTask))
+            {
+                // Потомок держит трубу — не ждём бесконечно.
+                try { readCts?.Cancel(); } catch (ObjectDisposedException) { }
+                _ = readTask.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                return string.Empty;
+            }
+            return await readTask.ConfigureAwait(false);
         }
         catch
         {
             return string.Empty;
         }
     }
+
+    private static async Task<string> DecodeAsync(Task<byte[]> bytesTask) =>
+        ConsoleOutputDecoder.Decode(await bytesTask.ConfigureAwait(false));
 }

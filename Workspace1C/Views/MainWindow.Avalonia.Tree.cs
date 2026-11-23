@@ -2769,7 +2769,9 @@ namespace Workspace1C
         }
 
         /// <summary>Рекурсивно добавляет узлы компоновки в целевой список пунктов меню (issue #374).</summary>
-        private void AppendAvaloniaNodes(ItemCollection target, List<UtilitiesMenuNode> nodes)
+        /// <param name="isTopLevel">true — узлы корня (группы видны на основной панели);
+        /// false — вложенные группы (issue #146: всегда с подписью).</param>
+        private void AppendAvaloniaNodes(ItemCollection target, List<UtilitiesMenuNode> nodes, bool isTopLevel = true)
         {
             if (nodes is null || target is null)
                 return;
@@ -2790,8 +2792,9 @@ namespace Workspace1C
                 {
                     var title = AvaloniaGroupTitle(node);
                     // issue #146: режим «Иконка» / «С надписью» — единый расчёт для WPF
-                    // и Avalonia (UtilitiesMenuGroupPresentation).
-                    var presentation = UtilitiesMenuGroupPresentation.Build(node, title);
+                    // и Avalonia (UtilitiesMenuGroupPresentation). Для вложенных групп
+                    // подпись показывается всегда, даже если в layout сохранён Icon.
+                    var presentation = UtilitiesMenuGroupPresentation.Build(node, title, isTopLevel);
                     var icon = AvaloniaGroupIcon(node);
                     var sub = new MenuItem();
                     if (presentation.ShowLabel)
@@ -2806,7 +2809,7 @@ namespace Workspace1C
                     }
                     ToolTip.SetTip(sub, presentation.ToolTip);
                     sub.Styled(Themes.ControlThemes.ModernMenuItem);
-                    AppendAvaloniaNodes(sub.Items, node.Children);
+                    AppendAvaloniaNodes(sub.Items, node.Children, isTopLevel: false);
                     target.Add(sub);
                 }
                 else

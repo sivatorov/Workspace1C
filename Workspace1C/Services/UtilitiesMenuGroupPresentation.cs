@@ -32,9 +32,16 @@ public static class UtilitiesMenuGroupPresentation
     /// <summary>Строит представление группы по сохранённому узлу компоновки.</summary>
     /// <param name="node">Узел-группа компоновки.</param>
     /// <param name="title">Локализованный или пользовательский заголовок группы.</param>
-    public static UtilitiesMenuGroupLayout Build(UtilitiesMenuNode node, string title)
+    /// <param name="isTopLevel">true — группа верхнего уровня (видна на основной панели);
+    /// false — вложенная группа. Issue #146: режим «только иконка» допустим только для
+    /// верхнего уровня, вложенные группы всегда показываются с подписью, даже если в
+    /// старом layout сохранён <see cref="UtilitiesMenuGroupDisplay.Icon"/>.</param>
+    public static UtilitiesMenuGroupLayout Build(
+        UtilitiesMenuNode node, string title, bool isTopLevel = true)
     {
-        var showLabel = node is null || node.DisplayMode != UtilitiesMenuGroupDisplay.Icon;
+        var showLabel = !isTopLevel
+            || node is null
+            || node.DisplayMode != UtilitiesMenuGroupDisplay.Icon;
         var external = string.IsNullOrWhiteSpace(node?.ExternalIconPath) ? null : node!.ExternalIconPath;
         return new UtilitiesMenuGroupLayout(
             ShowLabel: showLabel,

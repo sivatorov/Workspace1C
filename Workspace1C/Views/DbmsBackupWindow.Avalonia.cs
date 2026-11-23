@@ -90,7 +90,9 @@ namespace Workspace1C
                 async (_, _) => await _vm.CheckConnectionAsync(), 190);
             var checkDirectory = AvaloniaUi.Button("Dbms.CheckDirectory",
                 async (_, _) => await _vm.CheckDirectoryAsync(), 180);
-            var save = AvaloniaUi.Button("Common.Save", (_, _) => _vm.Save(), 120);
+            // issue #143: сохранение — асинхронно и вне UI-потока; окно не «наглухо»
+            // зависает, если профиль лежит на медленном/недоступном сетевом пути.
+            var save = AvaloniaUi.Button("Common.Save", async (_, _) => await _vm.SaveAsync(), 120);
             var run = AvaloniaUi.Button("Dbms.RunNow", async (_, _) => await _vm.RunAsync(), 190, accent: true);
             foreach (var b in new[] { checkConnection, checkDirectory, save, run })
                 b.Bind(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsIdle)));
@@ -106,8 +108,10 @@ namespace Workspace1C
             Content = root;
             Closed += (_, _) => _vm.Cancel();
             // Тип СУБД уточняется по кластеру 1С в фоне (issue #106, v1.0.1.73):
-            // сохранённый профиль и выбор пользователя приоритетнее.
-            _ = _vm.ResolveDbmsFromClusterAsync();
+            // сохранённый профиль и выбор пользователя приоритетнее. Запуск через
+            // Task.Run (issue #143): синхронная часть резолвера не должна выполняться
+            // на UI-потоке и блокировать окно.
+            _ = Task.Run(() => _vm.ResolveDbmsFromClusterAsync());
             if (!_vm.HasBases)
                 _vm.AppendLog(LocalizationManager.T("Dbms.NoBases"));
         }
@@ -140,6 +144,9 @@ namespace Workspace1C
             var panel = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
             panel.Children.Add(header);
             panel.Children.Add(bar);
+            // issue #143: в покое ряд прогресса скрыт — «бегущая жёлтая полоса»
+            // больше не анимируется постоянно и не выглядит как зависшая операция.
+            panel.Bind(Visual.IsVisibleProperty, new Binding(nameof(DbmsBackupViewModel.IsBusy)));
             return panel;
         }
 

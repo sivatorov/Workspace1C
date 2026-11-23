@@ -31,6 +31,25 @@ public static class DialogWorkAreaPolicy
     }
 
     /// <summary>
+    /// Клампит минимальную высоту окна верхней границей рабочей области: на очень
+    /// маленьком экране <c>MinHeight</c> не должен превышать <c>MaxHeight</c>, иначе
+    /// в WPF/Avalonia нижняя граница побеждает верхнюю и окно всё равно выходит за
+    /// экран (issue #146). Неизвестная рабочая область (0/NaN/бесконечность)
+    /// оставляет минимум как есть; отрицательный или NaN минимум считается нулевым.
+    /// </summary>
+    public static double ClampMinHeight(
+        double minHeight,
+        double workAreaHeight,
+        double margin = DefaultMargin)
+    {
+        if (double.IsNaN(minHeight) || minHeight < 0)
+            minHeight = 0;
+
+        var max = MaxHeight(workAreaHeight, margin);
+        return double.IsPositiveInfinity(max) ? minHeight : Math.Min(minHeight, max);
+    }
+
+    /// <summary>
     /// Клампит желаемую высоту окна в <c>[minHeight, maxHeight]</c>, где
     /// <c>maxHeight</c> — рабочая область минус отступ. На очень маленьком экране
     /// приоритет отдаётся тому, чтобы окно целиком помещалось: верхняя граница

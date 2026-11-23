@@ -65,6 +65,7 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             return;
         var dipHeight = screen.WorkingArea.Height / screen.Scaling;
         MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
+        MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, dipHeight);
         Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
     }
 
@@ -129,7 +130,16 @@ public sealed class CustomProgramsWindow : ModalWindowBase
 
         dock.Children.Add(bottom);
         dock.Children.Add(modePanel);
-        dock.Children.Add(BuildEditorGrid());
+        // issue #146: центральная область прокручивается при малой высоте окна,
+        // чтобы список программ и редактор оставались доступны, а нижние кнопки
+        // и переключатель режима — видимыми.
+        var centralScroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
+            Content = BuildEditorGrid()
+        };
+        dock.Children.Add(centralScroll);
         return dock;
     }
 

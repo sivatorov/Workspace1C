@@ -36,6 +36,8 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- ============ Имя группы ============ -->
@@ -61,9 +63,23 @@
             </ComboBox.ItemTemplate>
         </ComboBox>
 
+        <!-- ============ Отображение группы (issue #146): только для групп
+             верхнего уровня; вложенные всегда показываются с подписью. -->
+        <TextBlock x:Name="DisplayModeLabel" Grid.Row="4"
+                   Text="{loc:Loc Utilities.Editor.DisplayHeader}"
+                   Margin="0,12,0,6"/>
+        <ComboBox x:Name="DisplayCombo" Grid.Row="5" Margin="0,0,0,0"
+                  HorizontalAlignment="Left" Width="220">
+            <ComboBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Label}" VerticalAlignment="Center"/>
+                </DataTemplate>
+            </ComboBox.ItemTemplate>
+        </ComboBox>
+
         <!-- ============ Кнопки — единый контракт (issue #26): акцентная
              ModernButton и вторичная SecondaryButton. -->
-        <StackPanel Grid.Row="4" Orientation="Horizontal"
+        <StackPanel Grid.Row="6" Orientation="Horizontal"
                     HorizontalAlignment="Right" Margin="0,16,0,0">
             <Button x:Name="OkButton" Width="130" Height="38" Margin="0,0,10,0"
                     IsDefault="True" Click="OnOk_Click"

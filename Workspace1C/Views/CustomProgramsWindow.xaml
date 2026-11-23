@@ -64,149 +64,156 @@
             </StackPanel>
         </Border>
 
-        <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280"/>
-                <ColumnDefinition Width="12"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+        <!-- Центральная область (issue #146): при малой высоте окна прокручивается,
+             чтобы список программ и редактор оставались доступны, а нижние кнопки
+             и переключатель режима — видимыми. -->
+        <ScrollViewer x:Name="CentralScrollViewer"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="280"/>
+                    <ColumnDefinition Width="12"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <!-- Список программ: иконка + имя, порядок — кнопками «Вверх/Вниз». -->
-            <DockPanel Grid.Column="0">
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Command="{Binding AddCommand}" ToolTip="{loc:Loc Common.Add}"
-                            Style="{StaticResource IconButton}" Margin="0,0,6,0">
-                        <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
-                    </Button>
-                    <!-- Удаление программы — опасное действие: DangerButton (P2-1). -->
-                    <Button Command="{Binding DeleteCommand}" ToolTip="{loc:Loc Common.Delete}"
-                            Style="{DynamicResource DangerButton}" Width="32" Height="32" MinHeight="0" Padding="8" Margin="0,0,6,0">
-                        <materialDesign:PackIcon Kind="Delete" Width="16" Height="16"/>
-                    </Button>
-                    <Button Command="{Binding MoveUpCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveUp}"
-                            Style="{StaticResource IconButton}" Margin="0,0,6,0">
-                        <materialDesign:PackIcon Kind="ArrowUp" Width="16" Height="16"/>
-                    </Button>
-                    <Button Command="{Binding MoveDownCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveDown}"
-                            Style="{StaticResource IconButton}">
-                        <materialDesign:PackIcon Kind="ArrowDown" Width="16" Height="16"/>
-                    </Button>
-                </StackPanel>
+                <!-- Список программ: иконка + имя, порядок — кнопками «Вверх/Вниз». -->
+                <DockPanel Grid.Column="0">
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
+                        <Button Command="{Binding AddCommand}" ToolTip="{loc:Loc Common.Add}"
+                                Style="{StaticResource IconButton}" Margin="0,0,6,0">
+                            <materialDesign:PackIcon Kind="Plus" Width="16" Height="16"/>
+                        </Button>
+                        <!-- Удаление программы — опасное действие: DangerButton (P2-1). -->
+                        <Button Command="{Binding DeleteCommand}" ToolTip="{loc:Loc Common.Delete}"
+                                Style="{DynamicResource DangerButton}" Width="32" Height="32" MinHeight="0" Padding="8" Margin="0,0,6,0">
+                            <materialDesign:PackIcon Kind="Delete" Width="16" Height="16"/>
+                        </Button>
+                        <Button Command="{Binding MoveUpCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveUp}"
+                                Style="{StaticResource IconButton}" Margin="0,0,6,0">
+                            <materialDesign:PackIcon Kind="ArrowUp" Width="16" Height="16"/>
+                        </Button>
+                        <Button Command="{Binding MoveDownCommand}" ToolTip="{loc:Loc Launch.CustomPrograms.MoveDown}"
+                                Style="{StaticResource IconButton}">
+                            <materialDesign:PackIcon Kind="ArrowDown" Width="16" Height="16"/>
+                        </Button>
+                    </StackPanel>
 
-                <ListBox x:Name="ProgramsList" ItemsSource="{Binding Programs}"
-                         SelectedItem="{Binding SelectedProgram, Mode=TwoWay}">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Margin="2">
-                                <Grid Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <Image Width="18" Height="18" Stretch="Uniform">
-                                        <Image.Source>
-                                            <MultiBinding Converter="{StaticResource CustomProgramIcon}">
-                                                <Binding Path="UseCustomIcon"/>
-                                                <Binding Path="IconPath"/>
-                                                <Binding Path="FilePath"/>
-                                            </MultiBinding>
-                                        </Image.Source>
-                                        <Image.Visibility>
-                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}">
-                                                <Binding Path="UseCustomIcon"/>
-                                                <Binding Path="IconPath"/>
-                                                <Binding Path="FilePath"/>
-                                            </MultiBinding>
-                                        </Image.Visibility>
-                                    </Image>
-                                    <materialDesign:PackIcon Kind="Application" Width="18" Height="18"
-                                                             Foreground="{DynamicResource WarningBrush}">
-                                        <materialDesign:PackIcon.Visibility>
-                                            <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
-                                                          ConverterParameter="Invert">
-                                                <Binding Path="UseCustomIcon"/>
-                                                <Binding Path="IconPath"/>
-                                                <Binding Path="FilePath"/>
-                                            </MultiBinding>
-                                        </materialDesign:PackIcon.Visibility>
-                                    </materialDesign:PackIcon>
-                                </Grid>
-                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </DockPanel>
+                    <ListBox x:Name="ProgramsList" ItemsSource="{Binding Programs}"
+                             SelectedItem="{Binding SelectedProgram, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="2">
+                                    <Grid Width="18" Height="18" Margin="0,0,8,0" VerticalAlignment="Center">
+                                        <Image Width="18" Height="18" Stretch="Uniform">
+                                            <Image.Source>
+                                                <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                                    <Binding Path="UseCustomIcon"/>
+                                                    <Binding Path="IconPath"/>
+                                                    <Binding Path="FilePath"/>
+                                                </MultiBinding>
+                                            </Image.Source>
+                                            <Image.Visibility>
+                                                <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}">
+                                                    <Binding Path="UseCustomIcon"/>
+                                                    <Binding Path="IconPath"/>
+                                                    <Binding Path="FilePath"/>
+                                                </MultiBinding>
+                                            </Image.Visibility>
+                                        </Image>
+                                        <materialDesign:PackIcon Kind="Application" Width="18" Height="18"
+                                                                 Foreground="{DynamicResource WarningBrush}">
+                                            <materialDesign:PackIcon.Visibility>
+                                                <MultiBinding Converter="{StaticResource CustomProgramIconVisibility}"
+                                                              ConverterParameter="Invert">
+                                                    <Binding Path="UseCustomIcon"/>
+                                                    <Binding Path="IconPath"/>
+                                                    <Binding Path="FilePath"/>
+                                                </MultiBinding>
+                                            </materialDesign:PackIcon.Visibility>
+                                        </materialDesign:PackIcon>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
 
-            <!-- Поля выбранной программы. -->
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-                <StackPanel IsEnabled="{Binding HasSelection}">
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.Name}" Margin="0,0,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <TextBox Text="{Binding SelectedProgram.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,10"/>
+                <!-- Поля выбранной программы. -->
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel IsEnabled="{Binding HasSelection}">
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Name}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBox Text="{Binding SelectedProgram.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,10"/>
 
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.File}" Margin="0,0,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <DockPanel Margin="0,0,0,10">
-                        <Button DockPanel.Dock="Right" Content="{loc:Loc Common.Browse}"
-                                Padding="10,5" Margin="6,0,0,0" Click="OnBrowseFile_Click"/>
-                        <TextBox Text="{Binding SelectedProgram.FilePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </DockPanel>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.File}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="{loc:Loc Common.Browse}"
+                                    Padding="10,5" Margin="6,0,0,0" Click="OnBrowseFile_Click"/>
+                            <TextBox Text="{Binding SelectedProgram.FilePath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DockPanel>
 
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.Arguments}" Margin="0,0,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <TextBox Text="{Binding SelectedProgram.Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,10"/>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Arguments}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBox Text="{Binding SelectedProgram.Arguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 Margin="0,0,0,10"/>
 
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.WorkingDirectory}" Margin="0,0,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <DockPanel Margin="0,0,0,10">
-                        <Button DockPanel.Dock="Right" Content="{loc:Loc Common.Browse}"
-                                Padding="10,5" Margin="6,0,0,0" Click="OnBrowseWorkingDirectory_Click"/>
-                        <TextBox Text="{Binding SelectedProgram.WorkingDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                    </DockPanel>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.WorkingDirectory}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <DockPanel Margin="0,0,0,10">
+                            <Button DockPanel.Dock="Right" Content="{loc:Loc Common.Browse}"
+                                    Padding="10,5" Margin="6,0,0,0" Click="OnBrowseWorkingDirectory_Click"/>
+                            <TextBox Text="{Binding SelectedProgram.WorkingDirectory, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DockPanel>
 
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.Icon}" Margin="0,0,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <!-- Галочка «Иконка из файла» (issue #91): без неё показывается основная
-                         иконка исполняемого файла (как в проводнике), а выбор/сброс файла
-                         недоступны. -->
-                    <CheckBox Content="{loc:Loc Launch.CustomPrograms.UseCustomIcon}"
-                              IsChecked="{Binding SelectedProgram.UseCustomIcon, Mode=TwoWay}"
-                              ToolTip="{loc:Loc Launch.CustomPrograms.UseCustomIconTooltip}"
-                              Margin="0,0,0,6"/>
-                    <DockPanel Margin="0,0,0,10" IsEnabled="{Binding SelectedProgram.UseCustomIcon}">
-                        <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.ClearIcon}"
-                                Padding="10,5" Margin="6,0,0,0" Command="{Binding ClearIconCommand}"/>
-                        <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.PickIcon}"
-                                Padding="10,5" Margin="6,0,0,0" Click="OnBrowseIcon_Click"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Image Grid.Column="0" Width="20" Height="20" Margin="0,0,8,0">
-                                <Image.Source>
-                                    <MultiBinding Converter="{StaticResource CustomProgramIcon}">
-                                        <Binding Path="SelectedProgram.UseCustomIcon"/>
-                                        <Binding Path="SelectedProgram.IconPath"/>
-                                        <Binding Path="SelectedProgram.FilePath"/>
-                                    </MultiBinding>
-                                </Image.Source>
-                            </Image>
-                            <TextBox Grid.Column="1" IsReadOnly="True"
-                                     Text="{Binding SelectedProgram.IconPath, Mode=OneWay}"/>
-                        </Grid>
-                    </DockPanel>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Icon}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <!-- Галочка «Иконка из файла» (issue #91): без неё показывается основная
+                             иконка исполняемого файла (как в проводнике), а выбор/сброс файла
+                             недоступны. -->
+                        <CheckBox Content="{loc:Loc Launch.CustomPrograms.UseCustomIcon}"
+                                  IsChecked="{Binding SelectedProgram.UseCustomIcon, Mode=TwoWay}"
+                                  ToolTip="{loc:Loc Launch.CustomPrograms.UseCustomIconTooltip}"
+                                  Margin="0,0,0,6"/>
+                        <DockPanel Margin="0,0,0,10" IsEnabled="{Binding SelectedProgram.UseCustomIcon}">
+                            <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.ClearIcon}"
+                                    Padding="10,5" Margin="6,0,0,0" Command="{Binding ClearIconCommand}"/>
+                            <Button DockPanel.Dock="Right" Content="{loc:Loc Launch.CustomPrograms.PickIcon}"
+                                    Padding="10,5" Margin="6,0,0,0" Click="OnBrowseIcon_Click"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Image Grid.Column="0" Width="20" Height="20" Margin="0,0,8,0">
+                                    <Image.Source>
+                                        <MultiBinding Converter="{StaticResource CustomProgramIcon}">
+                                            <Binding Path="SelectedProgram.UseCustomIcon"/>
+                                            <Binding Path="SelectedProgram.IconPath"/>
+                                            <Binding Path="SelectedProgram.FilePath"/>
+                                        </MultiBinding>
+                                    </Image.Source>
+                                </Image>
+                                <TextBox Grid.Column="1" IsReadOnly="True"
+                                         Text="{Binding SelectedProgram.IconPath, Mode=OneWay}"/>
+                            </Grid>
+                        </DockPanel>
 
-                    <CheckBox Content="{loc:Loc Launch.CustomPrograms.Enabled}"
-                              IsChecked="{Binding SelectedProgram.Enabled, Mode=TwoWay}"
-                              Margin="0,4,0,0"/>
+                        <CheckBox Content="{loc:Loc Launch.CustomPrograms.Enabled}"
+                                  IsChecked="{Binding SelectedProgram.Enabled, Mode=TwoWay}"
+                                  Margin="0,4,0,0"/>
 
-                    <TextBlock Text="{loc:Loc Launch.CustomPrograms.Hint}" TextWrapping="Wrap"
-                               FontSize="12" Margin="0,14,0,0"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                </StackPanel>
-            </ScrollViewer>
-        </Grid>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Hint}" TextWrapping="Wrap"
+                                   FontSize="12" Margin="0,14,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </ScrollViewer>
     </DockPanel>
 </Window>

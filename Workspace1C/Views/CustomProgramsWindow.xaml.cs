@@ -37,6 +37,7 @@ public partial class CustomProgramsWindow : Window
     {
         var workArea = SystemParameters.WorkArea;
         MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
+        MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
         Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
     }
 
