@@ -9,8 +9,8 @@
         mc:Ignorable="d"
         Title="{loc:Loc ContextMenu.Editor.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="685" Width="760"
-        MinWidth="640" MinHeight="685"
+        Height="540" Width="760"
+        MinWidth="640" MinHeight="400"
         WindowStartupLocation="CenterOwner"
         FontSize="13"
         ShowInTaskbar="False"
@@ -95,20 +95,13 @@
                 </DockPanel>
             </Border>
 
-            <!-- Правая колонка (issue #146, 1.0.1.116): пояснение закреплено внизу
-                 (DockPanel.Dock="Bottom") и видно всегда; прокручивается только панель
-                 операций — и только если она не помещается (аварийный вариант для
-                 маленьких экранов). -->
-            <DockPanel Grid.Column="2">
-                <Border DockPanel.Dock="Bottom" Margin="0,14,0,0" Padding="10" CornerRadius="6"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
-                    <TextBlock Text="{loc:Loc ContextMenu.Editor.Hint}" TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
-                </Border>
-                <ScrollViewer VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel>
+            <!-- Правая колонка (issue #146, 1.0.1.118): пояснение — последний элемент
+                 прокручиваемого содержимого, сразу за панелью операций (Margin 14 DIP).
+                 Пустого места перед пояснением нет; прокрутка — только аварийный режим
+                 на маленьком экране. -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
                 <!-- Перемещение -->
                 <TextBlock Text="{loc:Loc ContextMenu.Editor.MoveHeader}" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -198,9 +191,16 @@
                     </Button>
                 </StackPanel>
 
-                    </StackPanel>
-                </ScrollViewer>
-            </DockPanel>
+                <!-- Пояснение (issue #146, 1.0.1.118): внутри прокручиваемого
+                     содержимого, вплотную за панелью операций. -->
+                <Border Margin="0,14,0,0" Padding="10" CornerRadius="6"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
+                    <TextBlock Text="{loc:Loc ContextMenu.Editor.Hint}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                </Border>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </Window>

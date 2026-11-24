@@ -79,6 +79,9 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <!-- Строка состояния расчёта (issue #157): место зарезервировано, чтобы
+                 появление/скрытие индикатора не меняло размер окна. -->
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -108,8 +111,23 @@
                        Foreground="{DynamicResource TextSecondaryBrush}" Margin="2,0,0,0" Text="…"/>
         </StackPanel>
 
+        <!-- Состояние расчёта размеров кэша (issue #157): пока идёт расчёт, видно,
+             что приложение работает, а нули не выглядят окончательным результатом. -->
+        <Grid Grid.Row="4" x:Name="SizesProgressPanel" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <ProgressBar x:Name="SizesProgressBar" Width="120" Height="6"
+                         IsIndeterminate="True" VerticalAlignment="Center"/>
+            <TextBlock Grid.Column="1" x:Name="SizesStatusText" Margin="8,0,0,0"
+                       FontSize="12" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Text="{loc:Loc CacheClean.Calculating}"/>
+        </Grid>
+
         <!-- Выбор баз -->
-        <Border Grid.Row="4" Margin="0,12,0,0"
+        <Border Grid.Row="5" Margin="0,12,0,0"
                 BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
                 CornerRadius="6" Background="{DynamicResource CardBackgroundBrush}">
             <DockPanel>
@@ -163,7 +181,7 @@
         </Border>
 
         <!-- Нижняя панель: остатки от удалённых баз + кнопки -->
-        <Grid Grid.Row="5" Margin="0,14,0,0">
+        <Grid Grid.Row="6" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>

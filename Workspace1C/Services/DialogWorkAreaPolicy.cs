@@ -18,13 +18,20 @@ public static class DialogWorkAreaPolicy
     public const double DefaultMargin = 48;
 
     /// <summary>
-    /// Issue #146 (1.0.1.116): профиль высот диалогового окна. Все три значения
-    /// совпадают (<c>Height = MinHeight = contentHeight</c>) — окно открывается на
-    /// минимально необходимой высоте, а <see cref="DialogSize.RequiresScrolling"/>
-    /// включается только после клампа по маленькой рабочей области.
+    /// Issue #146 (1.0.1.118): профиль высот диалогового окна. Семантика:
+    /// <c>MinHeight < DefaultHeight = ContentHeight</c>.
+    /// <para>
+    /// <c>DefaultHeight</c> — стартовая высота окна и одновременно высота, при которой
+    /// содержимое (панель операций + пояснение) помещается без прокрутки; запас сверх
+    /// содержимого не закладывается. <c>MinHeight</c> — нижняя граница, заметно ниже
+    /// <c>DefaultHeight</c>: окно можно уменьшать, не упираясь в «минимальный» размер,
+    /// равный стартовому (жалоба 7OH в issue #146). Прокрутка
+    /// (<see cref="DialogSize.RequiresScrolling"/>) включается только после клампа по
+    /// маленькой рабочей области.
+    /// </para>
     /// </summary>
-    /// <param name="DefaultHeight">Высота окна по умолчанию, DIP.</param>
-    /// <param name="MinHeight">Минимальная высота окна, DIP.</param>
+    /// <param name="DefaultHeight">Высота окна по умолчанию (по содержимому), DIP.</param>
+    /// <param name="MinHeight">Минимальная высота окна (нижняя граница), DIP.</param>
     /// <param name="ContentHeight">Высота, при которой содержимое помещается без прокрутки, DIP.</param>
     public readonly record struct DialogProfile(
         double DefaultHeight,
@@ -32,19 +39,29 @@ public static class DialogWorkAreaPolicy
         double ContentHeight);
 
     /// <summary>
-    /// Issue #146 (1.0.1.116): окно «Настройка меню утилиты» — 825 DIP. Общие
-    /// константы <c>Editor*</c> удалены: у «Утилит» и «Меню трея» разные высоты.
+    /// Issue #146 (1.0.1.118): окно «Настройка меню утилиты» — 680 DIP по содержимому,
+    /// минимальная высота 440 DIP. Пояснение перенесено в конец прокручиваемого
+    /// содержимого, поэтому запас перед ним не нужен.
     /// </summary>
-    public static readonly DialogProfile UtilitiesEditor = new(825, 825, 825);
+    public static readonly DialogProfile UtilitiesEditor = new(680, 440, 680);
 
-    /// <summary>Issue #146 (1.0.1.116): окно «Настройка меню трея» — 855 DIP.</summary>
-    public static readonly DialogProfile TrayEditor = new(855, 855, 855);
+    /// <summary>
+    /// Issue #146 (1.0.1.118): окно «Настройка меню трея» — 680 DIP по содержимому,
+    /// минимальная высота 440 DIP (самый длинный текст пояснения).
+    /// </summary>
+    public static readonly DialogProfile TrayEditor = new(680, 440, 680);
 
-    /// <summary>Issue #146 (1.0.1.116): окно «Контекстное меню» — 685 DIP.</summary>
-    public static readonly DialogProfile ContextMenuEditor = new(685, 685, 685);
+    /// <summary>
+    /// Issue #146 (1.0.1.118): окно «Контекстное меню» — 540 DIP по содержимому,
+    /// минимальная высота 400 DIP (панель операций короче, чем у «Утилит»).
+    /// </summary>
+    public static readonly DialogProfile ContextMenuEditor = new(540, 400, 540);
 
-    /// <summary>Issue #146 (1.0.1.116): окно «Мои программы» — 760 DIP.</summary>
-    public static readonly DialogProfile CustomPrograms = new(760, 760, 760);
+    /// <summary>
+    /// Issue #146 (1.0.1.118): окно «Мои программы» — 600 DIP по содержимому,
+    /// минимальная высота 440 DIP.
+    /// </summary>
+    public static readonly DialogProfile CustomPrograms = new(600, 440, 600);
 
     /// <summary>
     /// Issue #146 (1.0.1.115): рекомендуемые размеры диалогового окна с учётом

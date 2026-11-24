@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls.Primitives;
 using Avalonia;
@@ -9,6 +10,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Themes;
@@ -36,6 +38,14 @@ namespace Workspace1C
         private readonly TextBlock _programCacheSizeText = new();
         private readonly TextBlock _userCacheSizeText = new();
         private readonly TextBlock _orphanCacheSizeText = new();
+        // Строка состояния расчёта размеров кэша (issue #157).
+        private readonly ProgressBar _sizesProgressBar = new();
+        private readonly TextBlock _sizesStatusText = new();
+        private readonly StackPanel _sizesProgressPanel = new()
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 8, 0, 0)
+        };
         private readonly CheckBox _programCacheCheck = new();
         private readonly CheckBox _userCacheCheck = new();
         private readonly CheckBox _orphanCacheCheck = new();
@@ -88,6 +98,13 @@ namespace Workspace1C
         // Показываем сообщение об ошибке расчёта размера только один раз за время жизни
         // окна, чтобы не спамить модальными окнами при сбое сразу нескольких расчётов.
         private bool _sizeErrorReported;
+
+        // Состояние расчёта размеров кэша (issue #157): пока true — индикатор виден,
+        // кнопка «Очистить» недоступна, а размеры в ячейках не выглядят окончательными.
+        // Отмена выполняется по закрытию окна через _calculationCts.
+        private bool _isCalculating;
+        private CancellationTokenSource? _calculationCts;
+        private CacheSizeQueue? _baseQueue;
 
         // Состояние перетаскивания разделителя (как в главном окне).
         private bool _isResizing;
@@ -155,7 +172,13 @@ namespace Workspace1C
                 ScrollToDefault();
                 RefreshCacheSizes();
             };
-            Closing += (_, _) => SaveColumnWidths();
+            Closing += (_, _) =>
+            {
+                SaveColumnWidths();
+                // Issue #157: закрытие окна отменяет расчёт размеров; отмена —
+                // штатное завершение, а не ошибка.
+                CancelCalculation();
+            };
         }
 
         /// <summary>Загружает сохранённые ширины колонок из настроек приложения.</summary>
@@ -241,7 +264,9 @@ namespace Workspace1C
         {
             sizeText.VerticalAlignment = VerticalAlignment.Center;
             sizeText.FontSize = 12;
-            sizeText.Text = "…";
+            // Issue #157: до готовности — прочерк, а не «0», чтобы ноль не выглядел
+            // окончательным результатом.
+            sizeText.Text = LocalizationManager.T("CacheClean.NotCalculated");
             Themes.ThemeBrushes.Bind(sizeText, TextBlock.ForegroundProperty, "TextSecondaryBrush");
         }
 
@@ -276,22 +301,41 @@ namespace Workspace1C
         /// </summary>
         private async void RefreshCacheSizes()
         {
-            _programCacheSizeText.Text = "…";
-            _userCacheSizeText.Text = "…";
-            _orphanCacheSizeText.Text = "…";
+            // Issue #157: повторный вход игнорируется — _isCalculating служит барьером.
+            if (_isCalculating)
+                return;
+
+            _isCalculating = true;
+            _calculationCts?.Dispose();
+            _calculationCts = new CancellationTokenSource();
+            var token = _calculationCts.Token;
+
+            var notCalculated = LocalizationManager.T("CacheClean.NotCalculated");
+            _programCacheSizeText.Text = notCalculated;
+            _userCacheSizeText.Text = notCalculated;
+            _orphanCacheSizeText.Text = notCalculated;
             _rootProgramTotal = null;
             _rootUserTotal = null;
             _programBytes.Clear();
             _userBytes.Clear();
-            foreach (var t in _programSizeTexts.Values) t.Text = "…";
-            foreach (var t in _userSizeTexts.Values) t.Text = "…";
+            foreach (var t in _programSizeTexts.Values) t.Text = notCalculated;
+            foreach (var t in _userSizeTexts.Values) t.Text = notCalculated;
             UpdateSelectedTotals();
+            UpdateCalculatingState(true);
 
             // Тип кеша читается до Task.Run: CurrentKind обращается к IsChecked
             // переключателей, а свойства элементов Avalonia доступны только из
             // потока интерфейса, иначе вызов падает с «Call from invalid thread»
             // и размеры остаются незаполненными. Так же сделано в RefreshOrphanSize.
             var kind = CurrentKind();
+
+            // Issue #157: приоритетный порядок — отмеченные базы считаются первыми,
+            // внутри групп сохраняется порядок основного списка. Порядок вынесен в
+            // чистый помощник CacheSizeCalculation.Order (общий для WPF и Avalonia).
+            var ordered = CacheSizeCalculation.Order(_infobases, IsSelectedForCalculation);
+            var progress = new CacheSizeProgress(ordered.Count);
+            _baseQueue = new CacheSizeQueue(ordered);
+            UpdateProgressStatus(progress);
 
             // Обработчик Opened, который это вызывает, — async void: любое выброшенное
             // здесь исключение ушло бы в контекст синхронизации UI и уронило приложение
@@ -305,78 +349,205 @@ namespace Workspace1C
             var programTask = Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.Program));
             var userTask = Task.Run(() => OneCCacheCleaner.GetRootTotalSize(OneCCacheKind.User));
             var orphanTask = Task.Run(() => OneCCacheCleaner.GetOrphanSize(kind, _infobases));
-            var baseTasks = _infobases.Select(ib => (
-                Infobase: ib,
-                Program: Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.Program)),
-                User: Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.User))
-            )).ToList();
+
+            // Issue #157: ограниченный параллелизм. Воркеры разбирают приоритетную очередь
+            // по одному, поэтому одновременно выполняется не более MaxConcurrency расчётов,
+            // а не 2 × N задач, как раньше.
+            var workerCount = Math.Min(CacheSizeCalculation.MaxConcurrency, ordered.Count);
+            var workers = new List<Task>(workerCount);
+            for (var i = 0; i < workerCount; i++)
+                workers.Add(Task.Run(() => CalculateBaseSizesAsync(progress, token)));
 
             try
-            {
-                // Честный общий объём (issue #109а): все каталоги корней, включая
-                // несопоставленные базе, — иначе «15 ГБ» на диске показывались «15 МБ».
-                // Показывается в подсказке итога по отмеченным (issue #109 v1.0.1.56).
-                var program = await programTask;
-                _rootProgramTotal = program;
-                ToolTip.SetTip(_programCacheSizeText,
-                    string.Format(LocalizationManager.T("CacheClean.TotalRootsTooltip"), FormatSize(program)));
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("Ошибка расчёта размера программного кеша", ex);
-                ShowSizeError();
-            }
-
-            try
-            {
-                // Честный общий объём (issue #109а) — см. комментарий к блоку «программный».
-                var user = await userTask;
-                _rootUserTotal = user;
-                ToolTip.SetTip(_userCacheSizeText,
-                    string.Format(LocalizationManager.T("CacheClean.TotalRootsTooltip"), FormatSize(user)));
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("Ошибка расчёта размера пользовательского кеша", ex);
-                ShowSizeError();
-            }
-
-            try
-            {
-                var orphans = await orphanTask;
-                _orphanCacheSizeText.Text = FormatSize(orphans);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error("Ошибка расчёта размера остатков кеша", ex);
-                ShowSizeError();
-            }
-
-            foreach (var (ib, programTask2, userTask2) in baseTasks)
             {
                 try
                 {
-                    var p = await programTask2;
-                    _programBytes[ib] = p;
-                    if (_programSizeTexts.TryGetValue(ib, out var pt)) pt.Text = FormatSize(p);
-                    UpdateSelectedTotals();
+                    // Честный общий объём (issue #109а): все каталоги корней, включая
+                    // несопоставленные базе, — иначе «15 ГБ» на диске показывались «15 МБ».
+                    // Показывается в подсказке итога по отмеченным (issue #109 v1.0.1.56).
+                    var program = await programTask;
+                    _rootProgramTotal = program;
+                    ToolTip.SetTip(_programCacheSizeText,
+                        string.Format(LocalizationManager.T("CacheClean.TotalRootsTooltip"), FormatSize(program)));
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("Ошибка расчёта размера программного кеша", ex);
+                    ShowSizeError();
+                }
+
+                try
+                {
+                    // Честный общий объём (issue #109а) — см. комментарий к блоку «программный».
+                    var user = await userTask;
+                    _rootUserTotal = user;
+                    ToolTip.SetTip(_userCacheSizeText,
+                        string.Format(LocalizationManager.T("CacheClean.TotalRootsTooltip"), FormatSize(user)));
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("Ошибка расчёта размера пользовательского кеша", ex);
+                    ShowSizeError();
+                }
+
+                try
+                {
+                    var orphans = await orphanTask;
+                    _orphanCacheSizeText.Text = FormatSize(orphans);
+                }
+                catch (Exception ex)
+                {
+                    _logger.Error("Ошибка расчёта размера остатков кеша", ex);
+                    ShowSizeError();
+                }
+
+                await Task.WhenAll(workers);
+            }
+            catch (OperationCanceledException)
+            {
+                // Issue #157: закрытие окна отменяет расчёт. Отмена — штатное завершение,
+                // а не ошибка: не логируем и не показываем диалог.
+            }
+            catch (Exception ex)
+            {
+                // async void не должен ронять приложение при неожиданном сбое (issues #195, #202).
+                _logger.Error("Ошибка расчёта размеров кэша", ex);
+                ShowSizeError();
+            }
+            finally
+            {
+                _baseQueue = null;
+                _isCalculating = false;
+                _calculationCts?.Dispose();
+                _calculationCts = null;
+                // Issue #157: индикатор скрывается, статус — «Размеры кэша рассчитаны».
+                // При отмене (закрытие окна) статус не меняем — окно уже уходит.
+                if (!token.IsCancellationRequested)
+                    UpdateCalculatingState(false);
+                // В finally снимаем занятость и обновляем доступность кнопки, иначе окно
+                // «залипнет» после ошибки (риск R5).
+                UpdateCleanEnabled();
+            }
+        }
+
+        /// <summary>
+        /// Разбирает приоритетную очередь баз и считает размеры каждой. Выполняется
+        /// несколькими воркерами (не более <see cref="CacheSizeCalculation.MaxConcurrency"/>),
+        /// результаты отображаются по готовности базы, а не в порядке списка (issue #157).
+        /// Отмена проверяется между базами: внутри одной базы <c>GetSize</c> токен не
+        /// принимает — это допустимо и не блокирует закрытие окна.
+        /// </summary>
+        private async Task CalculateBaseSizesAsync(CacheSizeProgress progress, CancellationToken token)
+        {
+            var queue = _baseQueue;
+            if (queue is null)
+                return;
+
+            while (queue.TryDequeue(out var ib) && ib is not null)
+            {
+                token.ThrowIfCancellationRequested();
+
+                long? program = null;
+                long? user = null;
+
+                try
+                {
+                    program = await Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.Program), token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logger.Error("Ошибка расчёта размера программного кеша по базе", ex);
                 }
 
+                token.ThrowIfCancellationRequested();
+
                 try
                 {
-                    var u = await userTask2;
-                    _userBytes[ib] = u;
-                    if (_userSizeTexts.TryGetValue(ib, out var ut)) ut.Text = FormatSize(u);
-                    UpdateSelectedTotals();
+                    user = await Task.Run(() => OneCCacheCleaner.GetSize(ib, OneCCacheKind.User), token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
                     _logger.Error("Ошибка расчёта размера пользовательского кеша по базе", ex);
                 }
+
+                // Все обновления UI — только в потоке диспетчера (риск R2, issue #212).
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (program is long p)
+                    {
+                        _programBytes[ib] = p;
+                        if (_programSizeTexts.TryGetValue(ib, out var pt))
+                            pt.Text = FormatSize(p);
+                    }
+                    if (user is long u)
+                    {
+                        _userBytes[ib] = u;
+                        if (_userSizeTexts.TryGetValue(ib, out var ut))
+                            ut.Text = FormatSize(u);
+                    }
+                    UpdateSelectedTotals();
+                    progress.ReportCompleted();
+                    UpdateProgressStatus(progress);
+                });
+            }
+        }
+
+        /// <summary>Выбрана ли база в списке (для приоритетного порядка расчёта, issue #157).</summary>
+        private bool IsSelectedForCalculation(Infobase infobase)
+        {
+            foreach (var kv in _baseChecks)
+            {
+                if (ReferenceEquals(kv.Value, infobase))
+                    return kv.Key.IsChecked == true;
+            }
+            return false;
+        }
+
+        /// <summary>Обновляет строку состояния расчёта по текущему прогрессу (issue #157).</summary>
+        private void UpdateProgressStatus(CacheSizeProgress progress)
+        {
+            _sizesStatusText.Text = progress.IsComplete
+                ? LocalizationManager.T("CacheClean.CalculatingDone")
+                : string.Format(LocalizationManager.T("CacheClean.CalculatingProgress"),
+                    progress.Completed, progress.Total);
+        }
+
+        /// <summary>
+        /// Переключает состояние «идёт расчёт» (issue #157): индикатор и статус видны,
+        /// действия, требующие готовых размеров, недоступны.
+        /// </summary>
+        private void UpdateCalculatingState(bool calculating)
+        {
+            // На Linux с отключёнными анимациями бесконечный индикатор жжёт CPU
+            // (issue #153), поэтому там показываем статичную заполненную полосу.
+            var disableAnimations = LinuxRendering.DisableAnimations;
+            _sizesProgressBar.IsIndeterminate = calculating && !disableAnimations;
+            _sizesProgressBar.Value = calculating && disableAnimations ? 100 : 0;
+            _sizesProgressBar.IsVisible = calculating;
+            _sizesStatusText.Text = calculating
+                ? LocalizationManager.T("CacheClean.Calculating")
+                : LocalizationManager.T("CacheClean.CalculatingDone");
+            UpdateCleanEnabled();
+        }
+
+        /// <summary>Отменяет текущий расчёт размеров, если он идёт (закрытие окна, issue #157).</summary>
+        private void CancelCalculation()
+        {
+            try
+            {
+                _calculationCts?.Cancel();
+            }
+            catch (ObjectDisposedException)
+            {
+                // Расчёт уже завершился и CTS освобождён — отменять нечего.
             }
         }
 
@@ -399,7 +570,7 @@ namespace Workspace1C
                 _userCacheSizeText.Text = SumSelectedSizes(_userBytes);
         }
 
-        /// <summary>Сумма размеров отмеченных баз; «…», если хоть один размер ещё не готов.</summary>
+        /// <summary>Сумма размеров отмеченных баз; прочерк, если хоть один размер ещё не готов.</summary>
         private string SumSelectedSizes(Dictionary<Infobase, long> sizes)
         {
             long sum = 0;
@@ -408,7 +579,7 @@ namespace Workspace1C
                 if (kv.Key.IsChecked != true)
                     continue;
                 if (!sizes.TryGetValue(kv.Value, out var size))
-                    return "…";
+                    return LocalizationManager.T("CacheClean.NotCalculated");
                 sum += size;
             }
             return FormatSize(sum);
@@ -432,7 +603,7 @@ namespace Workspace1C
         private async void RefreshOrphanSize()
         {
             var kind = CurrentKind();
-            _orphanCacheSizeText.Text = "…";
+            _orphanCacheSizeText.Text = LocalizationManager.T("CacheClean.NotCalculated");
             try
             {
                 var orphans = await Task.Run(() => OneCCacheCleaner.GetOrphanSize(kind, _infobases));
@@ -481,6 +652,9 @@ namespace Workspace1C
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+            // Строка состояния расчёта (issue #157): место зарезервировано, чтобы
+            // появление/скрытие индикатора не меняло размер окна.
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             // Список растягивается на всё свободное место (CacheCleanWindow.xaml:105).
             grid.RowDefinitions.Add(new RowDefinition(new GridLength(1, GridUnitType.Star)));
@@ -539,6 +713,23 @@ namespace Workspace1C
             typePanel.Children.Add(_userCacheSizeText);
             Grid.SetRow(typePanel, 3);
             grid.Children.Add(typePanel);
+
+            // Состояние расчёта размеров кэша (issue #157): пока идёт расчёт, видно,
+            // что приложение работает, а нули не выглядят окончательным результатом.
+            // На Linux с отключёнными анимациями — статичная полоса (issue #153).
+            _sizesProgressBar.Width = 120;
+            _sizesProgressBar.Height = 6;
+            _sizesProgressBar.VerticalAlignment = VerticalAlignment.Center;
+            _sizesProgressBar.IsVisible = true;
+            _sizesStatusText.FontSize = 12;
+            _sizesStatusText.VerticalAlignment = VerticalAlignment.Center;
+            _sizesStatusText.Margin = new Thickness(8, 0, 0, 0);
+            _sizesStatusText.Text = LocalizationManager.T("CacheClean.Calculating");
+            Themes.ThemeBrushes.Bind(_sizesStatusText, TextBlock.ForegroundProperty, "TextSecondaryBrush");
+            _sizesProgressPanel.Children.Add(_sizesProgressBar);
+            _sizesProgressPanel.Children.Add(_sizesStatusText);
+            Grid.SetRow(_sizesProgressPanel, 4);
+            grid.Children.Add(_sizesProgressPanel);
 
             // Список баз
             var basesBorder = new Border
@@ -631,7 +822,7 @@ namespace Workspace1C
             dock.Children.Add(_basesScroll);
 
             basesBorder.Child = dock;
-            Grid.SetRow(basesBorder, 4);
+            Grid.SetRow(basesBorder, 5);
             grid.Children.Add(basesBorder);
 
             // Нижняя панель: счётчик + кнопки
@@ -688,7 +879,7 @@ namespace Workspace1C
             Grid.SetColumn(rightPanel, 1);
             bottom.Children.Add(rightPanel);
 
-            Grid.SetRow(bottom, 5);
+            Grid.SetRow(bottom, 6);
             grid.Children.Add(bottom);
 
             return grid;
@@ -835,7 +1026,7 @@ namespace Workspace1C
                 // стиль назначается строкам списка кодом (CacheCleanWindow.xaml.cs:232).
                 check.Styled(ControlThemes.CacheCleanCheckBox);
                 ToolTip.SetTip(check, string.IsNullOrWhiteSpace(ib.ConnectionPathDisplay) ? ib.Name : ib.ConnectionPathDisplay);
-                check.IsCheckedChanged += (_, _) => OnBaseChecked();
+                check.IsCheckedChanged += (_, _) => OnBaseChecked(check);
                 Grid.SetColumn(check, 0);
                 row.Children.Add(check);
 
@@ -1013,7 +1204,8 @@ namespace Workspace1C
         {
             var size = new TextBlock
             {
-                Text = "…",
+                // Issue #157: до готовности — прочерк, а не «0».
+                Text = LocalizationManager.T("CacheClean.NotCalculated"),
                 FontSize = 12,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -1037,13 +1229,22 @@ namespace Workspace1C
             }
         }
 
-        private void OnBaseChecked()
+        private void OnBaseChecked(CheckBox check)
         {
             UpdateCount();
             UpdateCleanEnabled();
             // Issue #109 (v1.0.1.56, 7OH): итог у галок типа кэша — сумма по
             // ОТМЕЧЕННЫМ базам, пересчитывается при каждой смене отметок.
             UpdateSelectedTotals();
+
+            // Issue #157: смена отметки не перезапускает расчёт, но поднимает приоритет
+            // ещё не посчитанной базы — она станет следующей в очереди.
+            if (_isCalculating
+                && check.IsChecked == true
+                && _baseChecks.TryGetValue(check, out var infobase))
+            {
+                _baseQueue?.Prioritize(infobase);
+            }
         }
 
         private void UpdateCount()
@@ -1058,7 +1259,13 @@ namespace Workspace1C
             var hasType = _programCacheCheck.IsChecked == true || _userCacheCheck.IsChecked == true;
             var hasBases = _baseChecks.Any(kv => kv.Key.IsChecked == true);
             var hasOrphans = _orphanCacheCheck.IsChecked == true;
-            _cleanButton.IsEnabled = hasType && (hasBases || hasOrphans);
+            // Issue #157: до окончания расчёта размеров «Очистить» недоступна, иначе
+            // очистку можно запустить по нулям/прочеркам. «Отмена» и отметки баз остаются
+            // доступными — смена отметок поднимает приоритет ещё не посчитанных баз.
+            _cleanButton.IsEnabled = !_isCalculating && hasType && (hasBases || hasOrphans);
+            ToolTip.SetTip(_cleanButton, _isCalculating
+                ? LocalizationManager.T("CacheClean.CleanBlockedTooltip")
+                : null);
         }
 
         private void OnClean_Click()

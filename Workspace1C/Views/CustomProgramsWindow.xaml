@@ -6,7 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{loc:Loc Launch.CustomPrograms.Title}"
         Icon="{StaticResource AppIcon}"
-        Width="900" Height="760" MinWidth="760" MinHeight="760"
+        Width="900" Height="600" MinWidth="760" MinHeight="440"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13"
         Background="{DynamicResource ContentBackgroundBrush}">
 
@@ -138,14 +138,12 @@
                     </ListBox>
                 </DockPanel>
 
-                <!-- Поля выбранной программы (issue #146): пояснение закреплено внизу
-                     правой колонки и видно без прокрутки; прокручиваются только поля. -->
-                <DockPanel Grid.Column="2">
-                    <TextBlock DockPanel.Dock="Bottom" Text="{loc:Loc Launch.CustomPrograms.Hint}"
-                               TextWrapping="Wrap" FontSize="12" Margin="0,14,0,0"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Disabled">
+                <!-- Поля выбранной программы (issue #146, 1.0.1.118): пояснение — последний
+                     элемент прокручиваемого содержимого, сразу за формой. Пояснение не
+                     наследует IsEnabled="{Binding HasSelection}" и не сереет без выбора. -->
+                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
                         <StackPanel IsEnabled="{Binding HasSelection}">
                         <TextBlock Text="{loc:Loc Launch.CustomPrograms.Name}" Margin="0,0,0,4"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -211,8 +209,14 @@
                                   Margin="0,4,0,0"/>
 
                         </StackPanel>
-                    </ScrollViewer>
-                </DockPanel>
+
+                        <!-- Пояснение (issue #146, 1.0.1.118): вплотную за формой, вне
+                             IsEnabled-группы полей. -->
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Hint}"
+                                   TextWrapping="Wrap" FontSize="12" Margin="0,14,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+                </ScrollViewer>
         </Grid>
     </DockPanel>
 </Window>

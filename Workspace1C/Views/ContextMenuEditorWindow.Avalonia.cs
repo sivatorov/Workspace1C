@@ -35,8 +35,9 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("ContextMenu.Editor.Title");
             Width = 760;
-            // Issue #146 (1.0.1.116): начальные размеры — из профиля ContextMenuEditor
-            // (685 DIP); окно открывается на минимально необходимой высоте.
+            // Issue #146 (1.0.1.118): начальные размеры — из профиля ContextMenuEditor
+            // (540/400 DIP): окно открывается по содержимому, но допускает уменьшение
+            // до MinHeight.
             Height = DialogWorkAreaPolicy.ContextMenuEditor.DefaultHeight;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
@@ -58,8 +59,8 @@ namespace Workspace1C
         public ContextMenuLayout Layout => _vm.Layout;
 
         /// <summary>
-        /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
-        /// <see cref="DialogWorkAreaPolicy.ContextMenuEditor"/> — высота 685 DIP
+        /// Issue #146 (1.0.1.118): рекомендованные размеры окна берутся из профиля
+        /// <see cref="DialogWorkAreaPolicy.ContextMenuEditor"/> — высота 540 DIP
         /// помещает панель операций и пояснение без прокрутки, а на маленьком экране
         /// клампится по рабочей области (прокрутка остаётся аварийным вариантом).
         /// </summary>
@@ -121,19 +122,15 @@ namespace Workspace1C
             BuildTree();
             treeBorder.Child = _tree;
 
-            // Правая колонка (issue #146, 1.0.1.116): пояснение закреплено внизу и
-            // видно всегда; прокручивается только панель операций — и только если она
-            // не помещается (аварийный вариант для маленьких экранов).
-            var right = new DockPanel();
-            var hint = BuildHint("ContextMenu.Editor.Hint");
-            DockPanel.SetDock(hint, Dock.Bottom);
-            right.Children.Add(hint);
-            right.Children.Add(new ScrollViewer
+            // Правая колонка (issue #146, 1.0.1.118): пояснение — последний элемент
+            // прокручиваемого содержимого, сразу за панелью операций (см. BuildOperationsPanel).
+            // Пустого места перед пояснением нет; прокрутка — только аварийный режим.
+            var right = new ScrollViewer
             {
                 Content = BuildOperationsPanel(),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-            });
+            };
             dock.Children.Add(right);
 
             return dock;
@@ -234,12 +231,17 @@ namespace Workspace1C
             fileRow2.Children.Add(ActionButton("IconRestore", null, _vm.ResetDefaultCommand, caption: "ContextMenu.Editor.Reset"));
             panel.Children.Add(fileRow2);
 
+            // Issue #146 (1.0.1.118): пояснение — последний элемент прокручиваемого
+            // содержимого, вплотную за панелью операций (Margin 14 DIP).
+            panel.Children.Add(BuildHint("ContextMenu.Editor.Hint"));
+
             return panel;
         }
 
         /// <summary>
-        /// Issue #146 (1.0.1.116): блок пояснения вынесен из прокручиваемой панели —
-        /// он закрепляется внизу правой колонки и виден без прокрутки.
+        /// Issue #146 (1.0.1.118): блок пояснения добавляется в конец панели операций
+        /// внутри <c>ScrollViewer</c> (без <c>Dock.Bottom</c>) — пустого места перед
+        /// пояснением нет.
         /// </summary>
         private Border BuildHint(string key)
         {

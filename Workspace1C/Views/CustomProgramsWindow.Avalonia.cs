@@ -43,7 +43,8 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     {
         Title = T("Launch.CustomPrograms.Title");
         Width = 900;
-        // Issue #146 (1.0.1.116): высота и минимум — из профиля CustomPrograms (760 DIP).
+        // Issue #146 (1.0.1.118): высота и минимум — из профиля CustomPrograms
+        // (600/440 DIP): окно открывается по содержимому и допускает уменьшение.
         Height = DialogWorkAreaPolicy.CustomPrograms.DefaultHeight;
         MinWidth = 760;
         MinHeight = DialogWorkAreaPolicy.CustomPrograms.MinHeight;
@@ -56,8 +57,8 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     }
 
     /// <summary>
-    /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
-    /// <see cref="DialogWorkAreaPolicy.CustomPrograms"/> — высота 760 DIP помещает форму
+    /// Issue #146 (1.0.1.118): рекомендованные размеры окна берутся из профиля
+    /// <see cref="DialogWorkAreaPolicy.CustomPrograms"/> — высота 600 DIP помещает форму
     /// и пояснение без прокрутки, а на маленьком экране клампится по рабочей области
     /// (прокрутка остаётся аварийным вариантом).
     /// </summary>
@@ -223,9 +224,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             new Binding("SelectedProgram.Enabled") { Mode = BindingMode.TwoWay });
         form.Children.Add(enabled);
 
-        // Правая колонка (issue #146, 1.0.1.115): пояснение закреплено внизу и видно
-        // всегда; прокручиваются только поля формы (аварийный вариант для малых экранов).
-        var right = new DockPanel();
+        // Правая колонка (issue #146, 1.0.1.118): пояснение — последний элемент
+        // прокручиваемого содержимого, сразу за формой. Оно вне IsEnabled-группы полей
+        // и не сереет без выбора (не наследует HasSelection).
         var hint = new TextBlock
         {
             Text = T("Launch.CustomPrograms.Hint"),
@@ -234,14 +235,17 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             Margin = new Thickness(0, 14, 0, 0)
         };
         ThemeBrushes.Bind(hint, TextBlock.ForegroundProperty, "TextSecondaryColorBrush");
-        DockPanel.SetDock(hint, Dock.Bottom);
-        right.Children.Add(hint);
-        right.Children.Add(new ScrollViewer
+
+        var scrollContent = new StackPanel();
+        scrollContent.Children.Add(form);
+        scrollContent.Children.Add(hint);
+
+        var right = new ScrollViewer
         {
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-            Content = form
-        });
+            Content = scrollContent
+        };
         Grid.SetColumn(right, 2);
         grid.Children.Add(right);
         return grid;

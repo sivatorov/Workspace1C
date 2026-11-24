@@ -130,9 +130,9 @@ public sealed class Issue146DialogSizeTests
         var xaml = File.ReadAllText(
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", fileName));
 
-        // Панель операций в правой колонке — DockPanel: пояснение закреплено внизу,
-        // прокручивается только сама панель (аварийный вариант для малых экранов).
-        Assert.Contains("<DockPanel Grid.Column=\"2\">", xaml, StringComparison.Ordinal);
+        // Issue #146 (1.0.1.118): правая колонка — ScrollViewer (DockPanel убран),
+        // прокручивается панель операций вместе с пояснением (аварийный режим).
+        Assert.Contains("<ScrollViewer Grid.Column=\"2\"", xaml, StringComparison.Ordinal);
         Assert.Contains("ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
     }
@@ -157,10 +157,11 @@ public sealed class Issue146DialogSizeTests
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", "CustomProgramsWindow.Avalonia.cs"));
 
         // Issue #146: в Avalonia тоже нет внешнего центрального ScrollViewer —
-        // прокручивается только правая форма.
+        // прокручивается только правая форма (вместе с пояснением в её содержимом).
         Assert.DoesNotContain("centralScroll", source, StringComparison.Ordinal);
         Assert.Contains("dock.Children.Add(BuildEditorGrid());", source, StringComparison.Ordinal);
-        Assert.Contains("right.Children.Add(new ScrollViewer", source, StringComparison.Ordinal);
+        Assert.Contains("var right = new ScrollViewer", source, StringComparison.Ordinal);
+        Assert.Contains("Content = scrollContent", source, StringComparison.Ordinal);
         Assert.Contains("ScrollBarVisibility.Auto", source, StringComparison.Ordinal);
         Assert.Contains("ScrollBarVisibility.Disabled", source, StringComparison.Ordinal);
     }

@@ -37,8 +37,9 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("Utilities.Editor.Title");
             Width = 820;
-            // Issue #146 (1.0.1.116): высота и минимум — из профиля UtilitiesEditor
-            // (825 DIP); окно открывается на минимально необходимой высоте.
+            // Issue #146 (1.0.1.118): высота и минимум — из профиля UtilitiesEditor
+            // (680/440 DIP): окно открывается по содержимому, но допускает уменьшение
+            // до MinHeight.
             Height = DialogWorkAreaPolicy.UtilitiesEditor.DefaultHeight;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
@@ -60,8 +61,8 @@ namespace Workspace1C
         public UtilitiesMenuLayout Layout => _vm.Layout;
 
         /// <summary>
-        /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
-        /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 825 DIP помещает
+        /// Issue #146 (1.0.1.118): рекомендованные размеры окна берутся из профиля
+        /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 680 DIP помещает
         /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
         /// (прокрутка остаётся аварийным вариантом).
         /// </summary>
@@ -123,19 +124,15 @@ namespace Workspace1C
             BuildTree();
             treeBorder.Child = _tree;
 
-            // Правая колонка (issue #146, 1.0.1.115): пояснение закреплено внизу и
-            // видно всегда; прокручивается только панель операций — и только если она
-            // не помещается (аварийный вариант для маленьких экранов).
-            var right = new DockPanel();
-            var hint = BuildHint("Utilities.Editor.Hint");
-            DockPanel.SetDock(hint, Dock.Bottom);
-            right.Children.Add(hint);
-            right.Children.Add(new ScrollViewer
+            // Правая колонка (issue #146, 1.0.1.118): пояснение — последний элемент
+            // прокручиваемого содержимого, сразу за панелью операций (см. BuildOperationsPanel).
+            // Пустого места перед пояснением нет; прокрутка — только аварийный режим.
+            var right = new ScrollViewer
             {
                 Content = BuildOperationsPanel(),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-            });
+            };
             dock.Children.Add(right);
 
             return dock;
@@ -273,12 +270,17 @@ namespace Workspace1C
             fileRow2.Children.Add(ActionButton("IconRestore", null, _vm.ResetDefaultCommand, caption: "Utilities.Editor.Reset"));
             panel.Children.Add(fileRow2);
 
+            // Issue #146 (1.0.1.118): пояснение — последний элемент прокручиваемого
+            // содержимого, вплотную за панелью операций (Margin 14 DIP).
+            panel.Children.Add(BuildHint("Utilities.Editor.Hint"));
+
             return panel;
         }
 
         /// <summary>
-        /// Issue #146 (1.0.1.115): блок пояснения вынесен из прокручиваемой панели —
-        /// он закрепляется внизу правой колонки и виден без прокрутки.
+        /// Issue #146 (1.0.1.118): блок пояснения добавляется в конец панели операций
+        /// внутри <c>ScrollViewer</c> (без <c>Dock.Bottom</c>) — пустого места перед
+        /// пояснением нет.
         /// </summary>
         private Border BuildHint(string key)
         {
