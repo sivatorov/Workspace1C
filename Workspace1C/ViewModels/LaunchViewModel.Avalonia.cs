@@ -42,14 +42,30 @@ public sealed class LaunchViewModel : ViewModelBase
     /// </summary>
     public Func<Infobase, LaunchOverrides?>? EnterpriseOverrides { get; set; }
 
+    /// <summary>
+    /// Вызывается после успешного запуска Предприятия, к которому были применены
+    /// переопределения «Текущей сессии» (issue #156). MainViewModel сбрасывает в нём
+    /// разовый override обратно в «Авто», если скрепка отжата. Для запусков без
+    /// переопределений (и для «Конфигуратора»/явных Thin32/… ) не вызывается (S6).
+    /// </summary>
+    public Action? EnterpriseOverridesConsumed { get; set; }
+
     /// <summary>Запуск Предприятия с учётом переопределений текущей сессии.</summary>
     private bool LaunchEnterprise(Infobase infobase)
     {
         var overrides = EnterpriseOverrides?.Invoke(infobase);
-        return overrides is null
-            ? _launcher.Launch(infobase, OneCLaunchMode.Enterprise)
-            : _launcher.Launch(infobase, OneCLaunchMode.Enterprise,
-                overrides.Client, overrides.RunMode, overrides.Architecture);
+        if (overrides is null)
+            return _launcher.Launch(infobase, OneCLaunchMode.Enterprise);
+
+        var ok = _launcher.Launch(infobase, OneCLaunchMode.Enterprise,
+            overrides.Client, overrides.RunMode, overrides.Architecture);
+
+        // Issue #156 (S1): разовый override расходуется только успешным запуском.
+        // Неудачный запуск значения не сбрасывает (S6) — их можно поправить и повторить.
+        if (ok)
+            EnterpriseOverridesConsumed?.Invoke();
+
+        return ok;
     }
 
     public void Launch(object? parameter)

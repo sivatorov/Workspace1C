@@ -54,7 +54,16 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         Assert.True(File.Exists(store.FilePath));
         var restored = store.Load();
         Assert.NotNull(restored);
-        Assert.Equal(layout.Root.Count, restored!.Root.Count);
+        // Пункты модулей ПРО регистрируются глобально (UtilitiesMenuCatalog.RegisterExternal)
+        // и могут быть активны в момент прогона из-за параллельных тестов. Тогда миграция
+        // законно добавляет служебную группу «Новинки программы» в корень, поэтому
+        // сравниваем пользовательскую часть компоновки, исключая служебную группу.
+        static bool IsServiceGroup(UtilitiesMenuNode node) =>
+            string.Equals(node.Kind, "group", StringComparison.Ordinal)
+            && string.Equals(node.GroupId, UtilitiesMenuCatalog.GroupNewItems, StringComparison.Ordinal);
+        Assert.Equal(
+            layout.Root.Count(n => !IsServiceGroup(n)),
+            restored!.Root.Count(n => !IsServiceGroup(n)));
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, restored.SchemaVersion);
         // Issue #146 (A4): первый узел корня — верхнеуровневый «Инспектор процессов»,
         // затем разделитель; разделы ищутся по GroupId, а не по индексу.

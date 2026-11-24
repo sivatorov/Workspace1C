@@ -2238,11 +2238,105 @@ namespace Workspace1C
                 archOptions);
 
             var card = SectionCard(LocalizationManager.T("Main.CurrentSession"), "Main.CurrentSessionHelp",
+                SessionPinToggle(),
                 hint,
                 options);
 
             card.Bind(Control.IsVisibleProperty, new Binding("ShowSessionLaunchPanel"));
             return card;
+        }
+
+        /// <summary>
+        /// «Скрепка» блока «Текущая сессия» (issue #156, A2): включена — выбранные
+        /// значения не сбрасываются после успешного запуска «Предприятия» (S2);
+        /// отжата — после запуска возвращается «Авто» (S1). Состояние только
+        /// runtime, в настройки не пишется и при перезапуске всегда отжато (S3).
+        /// Оформление повторяет значковые переключатели подвала: прозрачный фон,
+        /// подсветка при наведении, акцентная иконка во включённом состоянии —
+        /// паритет с WPF-стилем ToolbarToggleButton.
+        /// </summary>
+        private static Control SessionPinToggle()
+        {
+            // Две копии одной геометрии, как у колокольчика уведомлений: цвет зависит
+            // от состояния, а кисть каждой копии остаётся привязкой к ресурсу темы
+            // и меняется вместе со схемой.
+            var pinOn = IconHelper.MakeIcon("IconPin", UiMetrics.Scaled(14), "AccentBrush");
+            var pinOff = IconHelper.MakeIcon("IconPin", UiMetrics.Scaled(14), "TextSecondaryBrush");
+
+            var content = new Grid
+            {
+                Width = UiMetrics.Scaled(14),
+                Height = UiMetrics.Scaled(14),
+                Children = { pinOn, pinOff }
+            };
+
+            var toggle = new ToggleButton
+            {
+                Content = content,
+                Width = UiMetrics.Scaled(22),
+                Height = UiMetrics.Scaled(22),
+                Padding = new Thickness(0),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+
+            // В заголовке карточки не нужна «залитая» кнопка Fluent при включении:
+            // как у соседних значковых кнопок, только подсветка при наведении.
+            Border? surface = null;
+            IBrush hoverBrush = Brushes.Transparent;
+            var hovered = false;
+
+            void ApplySurface()
+                => surface?.SetValue(Border.BackgroundProperty, hovered ? hoverBrush : (IBrush)Brushes.Transparent);
+
+            toggle.Theme = new ControlTheme(typeof(ToggleButton))
+            {
+                Setters =
+                {
+                    new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<ToggleButton>((_, _) =>
+                    {
+                        surface = new Border
+                        {
+                            Background = Brushes.Transparent,
+                            BorderThickness = new Thickness(0),
+                            CornerRadius = new CornerRadius(6),
+                            Padding = new Thickness(3)
+                        };
+                        var presenter = new ContentPresenter
+                        {
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center
+                        };
+                        presenter[!ContentPresenter.ContentProperty] = new TemplateBinding(ContentControl.ContentProperty);
+                        surface.Child = presenter;
+                        return surface;
+                    }))
+                }
+            };
+
+            ThemeBrushes.Observe(toggle, "ItemHoverBrush", brush =>
+            {
+                hoverBrush = brush;
+                ApplySurface();
+            });
+            toggle.PointerEntered += (_, _) => { hovered = true; ApplySurface(); };
+            toggle.PointerExited += (_, _) => { hovered = false; ApplySurface(); };
+
+            // Состояние ведёт ViewModel: кнопка только переключает его командой,
+            // поэтому IsChecked односторонний (иначе клик переключил бы дважды).
+            toggle.Bind(ToggleButton.IsCheckedProperty,
+                new Binding("IsSessionPinned") { Mode = BindingMode.OneWay });
+            toggle.Bind(Button.CommandProperty, new Binding("ToggleSessionPinCommand"));
+            toggle.Bind(ToolTip.TipProperty, new Binding("SessionPinTooltip"));
+
+            var isOn = new FuncValueConverter<bool?, bool>(value => value == true);
+            var isOff = new FuncValueConverter<bool?, bool>(value => value != true);
+            pinOn.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOn });
+            pinOff.Bind(Visual.IsVisibleProperty, new Binding("IsChecked") { Source = toggle, Converter = isOff });
+            return toggle;
         }
 
         /// <summary>Подпись группы переключателей в блоке текущей сессии.</summary>
@@ -2387,8 +2481,10 @@ namespace Workspace1C
         /// <summary>
         /// Карточка-секция с заголовком и значком внутри рамки. Осталась только
         /// у карточки текущей сессии: у остальных секций подпись вынесена наружу.
+        /// <paramref name="headerTrailing"/> — необязательный контрол в правом углу
+        /// заголовка (скрепка «Текущей сессии», issue #156, A2).
         /// </summary>
-        private Control SectionCard(string title, string helpKey, params Control[] children)
+        private Control SectionCard(string title, string helpKey, Control? headerTrailing, params Control[] children)
         {
             // Числа из разметки (MainWindow.xaml:2101-2113): скругление 8, фон
             // ItemHover, отступ 10 на 8 и 6 на 6 в узкой панели, поле 8,0,8,10.
@@ -2407,14 +2503,17 @@ namespace Workspace1C
 
             var content = new StackPanel { Spacing = 0 };
 
-            var header = new StackPanel
+            // Заголовок — сетка «подпись + справка» / «скрепка» (issue #156, A2):
+            // trailing-контрол прижимается к правому краю и не растягивает вёрстку.
+            var header = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
+            // Значка у заголовка в разметке нет, зато есть кнопка справки
+            // рядом с подписью (MainWindow.xaml:2118-2136). Подпись основным
+            // цветом, а не вторичным.
+            var headerLeft = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 6
             };
-            // Значка у заголовка в разметке нет, зато есть кнопка справки
-            // рядом с подписью (MainWindow.xaml:2118-2136). Подпись основным
-            // цветом, а не вторичным.
             var titleBlock = new TextBlock
             {
                 Text = title,
@@ -2425,9 +2524,9 @@ namespace Workspace1C
             };
             _sessionTitleBlock = titleBlock;
             ThemeBrushes.Bind(titleBlock, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
-            header.Children.Add(titleBlock);
+            headerLeft.Children.Add(titleBlock);
             if (!string.IsNullOrEmpty(helpKey))
-                header.Children.Add(new Controls.HelpLink
+                headerLeft.Children.Add(new Controls.HelpLink
                 {
                     Margin = new Thickness(6, 0, 0, 4),
                     HelpText = LocalizationManager.T(helpKey),
@@ -2435,6 +2534,15 @@ namespace Workspace1C
                     // (/RunModeOrdinaryApplication) — подсказка шире стандартной (issue #45).
                     PopupMaxWidth = helpKey == "Main.CurrentSessionHelp" ? 616 : 460
                 });
+            Grid.SetColumn(headerLeft, 0);
+            header.Children.Add(headerLeft);
+            if (headerTrailing is not null)
+            {
+                headerTrailing.HorizontalAlignment = HorizontalAlignment.Right;
+                headerTrailing.VerticalAlignment = VerticalAlignment.Top;
+                Grid.SetColumn(headerTrailing, 1);
+                header.Children.Add(headerTrailing);
+            }
             content.Children.Add(header);
 
             foreach (var child in children)

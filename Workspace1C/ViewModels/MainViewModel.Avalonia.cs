@@ -200,6 +200,12 @@ public partial class MainViewModel : ViewModelBase
 
     private string _sessionClient = "Авто";
     private string _sessionArch = "Авто";
+    /// <summary>
+    /// Скрепка «Текущей сессии» (issue #156, S2): значения не сбрасываются после
+    /// запуска. Только runtime-состояние — в <see cref="Models.AppSettings"/> не
+    /// сохраняется (S3), после перезапуска всегда <c>false</c>.
+    /// </summary>
+    private bool _sessionPinned;
 
     private bool _isExporting;
     private string _exportIndicatorTooltip = string.Empty;
@@ -640,6 +646,8 @@ public partial class MainViewModel : ViewModelBase
         TagFilterItems = new ObservableCollection<TagFilterItem>();
 
         // Блок «Текущая сессия» действует на очередной запуск Предприятия.
+        // Issue #156: после успешного запуска с переопределениями LaunchViewModel
+        // сообщает об этом — здесь сбрасываем разовый override в «Авто» (если не закреплён).
         _launchVm = new LaunchViewModel(
             () => SelectedInfobase,
             launcher,
@@ -647,7 +655,8 @@ public partial class MainViewModel : ViewModelBase
             dialog,
             OnLaunched)
         {
-            EnterpriseOverrides = ResolveSessionOverrides
+            EnterpriseOverrides = ResolveSessionOverrides,
+            EnterpriseOverridesConsumed = ResetSessionOverridesAfterLaunch
         };
 
         InitializeCommands();
@@ -759,8 +768,8 @@ public partial class MainViewModel : ViewModelBase
                     nameof(IsSessionClientThin)))
                 return;
 
-            _settings.SessionClientMode = SessionClientMode().ToString();
-            SaveSettingsSilently();
+            // Issue #156 (S4): значения «Текущей сессии» — runtime-only, в настройки
+            // не пишутся: разовый override не должен переживать перезапуск.
         }
     }
     public bool IsSessionClientAuto { get => SessionClient == "Авто"; set { if (value) SessionClient = "Авто"; } }
@@ -778,8 +787,7 @@ public partial class MainViewModel : ViewModelBase
 
             // «Текущая сессия» учитывается лаунчером первым шагом приоритета (issue #146).
             OneCLauncher.SessionArchitecture = SessionArchitectureMode();
-            _settings.SessionArchitecture = SessionArchitectureMode().ToString();
-            SaveSettingsSilently();
+            // Issue #156 (S4): в настройки не пишем — значение runtime-only.
         }
     }
 
@@ -799,27 +807,6 @@ public partial class MainViewModel : ViewModelBase
         "64" => Models.SessionArchitectureMode.X64,
         _ => Models.SessionArchitectureMode.Auto
     };
-
-    private static string SessionClientFromSetting(string? saved) =>
-        Enum.TryParse<SessionClientMode>(saved, true, out var parsed)
-            ? parsed switch
-            {
-                Models.SessionClientMode.Ordinary => "Обычный",
-                Models.SessionClientMode.Thick => "Толстый",
-                Models.SessionClientMode.Thin => "Тонкий",
-                _ => "Авто"
-            }
-            : "Авто";
-
-    private static string SessionArchFromSetting(string? saved) =>
-        Enum.TryParse<SessionArchitectureMode>(saved, true, out var parsed)
-            ? parsed switch
-            {
-                Models.SessionArchitectureMode.X86 => "32",
-                Models.SessionArchitectureMode.X64 => "64",
-                _ => "Авто"
-            }
-            : "Авто";
 
     /// <summary>
     /// Переопределения очередного запуска Предприятия по блоку «Текущая сессия».
@@ -876,6 +863,54 @@ public partial class MainViewModel : ViewModelBase
     public bool IsSessionArch32 { get => SessionArch == "32"; set { if (value) SessionArch = "32"; } }
     public bool IsSessionArch64 { get => SessionArch == "64"; set { if (value) SessionArch = "64"; } }
 
+    /// <summary>
+    /// Скрепка «Текущей сессии» (issue #156, S2): выбранные значения не сбрасываются
+    /// после успешного запуска «Предприятия». Только runtime-состояние — в настройки
+    /// не пишется, после перезапуска всегда <c>false</c> (S3).
+    /// Кнопка-скрепка в заголовке карточки привязана к этому свойству (A2).
+    /// </summary>
+    public bool IsSessionPinned
+    {
+        get => _sessionPinned;
+        set
+        {
+            if (SetProperty(ref _sessionPinned, value))
+                OnPropertyChanged(nameof(SessionPinTooltip));
+        }
+    }
+
+    /// <summary>
+    /// Локализованная подсказка скрепки «Текущей сессии» (issue #156, A2):
+    /// меняется вместе с состоянием — закрепить или открепить значения.
+    /// </summary>
+    public string SessionPinTooltip =>
+        LocalizationManager.T(IsSessionPinned ? "Main.SessionPinOff" : "Main.SessionPinOn");
+
+    /// <summary>
+    /// Возвращает переключатели «Текущей сессии» в «Авто» после успешного запуска
+    /// «Предприятия» (issue #156, S1). Вызывается из
+    /// <see cref="LaunchViewModel.EnterpriseOverridesConsumed"/> только для запусков,
+    /// к которым применялись переопределения, поэтому «Конфигуратор» и явные
+    /// Thin32/Thick32/Thin64/Thick64 сюда не попадают (S6). Индивидуальные настройки
+    /// баз (<see cref="Infobase.LaunchMode"/>) не меняются никогда (S5).
+    /// </summary>
+    private void ResetSessionOverridesAfterLaunch()
+    {
+        if (!SessionLaunchPolicy.ShouldResetAfterLaunch(
+                _sessionPinned, SessionClientMode(), SessionArchitectureMode(),
+                OneCLaunchMode.Enterprise, launchSucceeded: true))
+        {
+            return;
+        }
+
+        SessionClient = "Авто";
+        SessionArch = "Авто";
+        // Страховка (issue #156, R3): сеттеры не срабатывают при равенстве значений,
+        // а в статике лаунчера могло остаться прежнее переопределение.
+        OneCLauncher.SessionArchitecture = Models.SessionArchitectureMode.Auto;
+        NotifySessionValues();
+    }
+
     // ======================= Загрузка данных =======================
 
     /// <summary>Загружает настройки, список баз и групп, строит дерево.</summary>
@@ -923,11 +958,16 @@ public partial class MainViewModel : ViewModelBase
             // Вид списка хранится единым полем ListMode (issue #52); старые файлы
             // мигрируются в NormalizeForLoad из флагов ShowFavoritesOnly/ShowRunningOnly.
             _listMode = ListViewModes.Normalize(_settings.ListMode);
-            _sessionClient = SessionClientFromSetting(_settings.SessionClientMode);
-            _sessionArch = SessionArchFromSetting(_settings.SessionArchitecture);
+            // Issue #156 (S4): «Текущая сессия» — runtime-only. Сохранённые ранее
+            // SessionClientMode/SessionArchitecture (устаревшие поля AppSettings)
+            // игнорируются: после старта всегда «Авто»/«Авто», скрепка отжата.
+            _sessionClient = "Авто";
+            _sessionArch = "Авто";
+            _sessionPinned = false;
             // «Текущая сессия» учитывается лаунчером первым шагом приоритета
             // выбора разрядности (issue #146), даже для запусков напрямую.
-            OneCLauncher.SessionArchitecture = SessionArchitectureMode();
+            // Явная установка Auto — страховка от значения, оставшегося в статике (R3).
+            OneCLauncher.SessionArchitecture = Models.SessionArchitectureMode.Auto;
             // Общая авторизация для всех ИБ (issue #57): fallback при незаданной
             // авторизации базы. Передаётся резолверу через статики лаунчера.
             // Раздельные по режимам (Enterprise/Configurator) при незаданности

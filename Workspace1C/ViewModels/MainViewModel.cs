@@ -121,6 +121,12 @@ public partial class MainViewModel : ViewModelBase
     private SessionClientMode _sessionClientMode = SessionClientMode.Auto;
     /// <summary>Переопределение разрядности для текущего запуска (не сохраняется в базу).</summary>
     private SessionArchitectureMode _sessionArchitecture = SessionArchitectureMode.Auto;
+    /// <summary>
+    /// Скрепка «Текущей сессии» (issue #156, S2): значения не сбрасываются после
+    /// запуска. Только runtime-состояние — в <see cref="Models.AppSettings"/> не
+    /// сохраняется (S3), после перезапуска всегда <c>false</c>.
+    /// </summary>
+    private bool _sessionPinned;
     /// <summary>Разрядность по умолчанию, если у базы она не указана (X86 / X64).</summary>
     private string _defaultArchitecture = "X64";
     /// <summary>Показывать блок «Текущая сессия» в правой панели.</summary>
@@ -592,13 +598,16 @@ public partial class MainViewModel : ViewModelBase
             : 0;
         _showRightPanelDetails = settings.ShowRightPanelDetails;
         _showSessionLaunchPanel = settings.ShowSessionLaunchPanel;
-        if (Enum.TryParse<SessionClientMode>(settings.SessionClientMode, true, out var scm))
-            _sessionClientMode = scm;
-        if (Enum.TryParse<SessionArchitectureMode>(settings.SessionArchitecture, true, out var sam))
-            _sessionArchitecture = sam;
+        // Issue #156 (S4): «Текущая сессия» — runtime-only. Сохранённые ранее
+        // SessionClientMode/SessionArchitecture (устаревшие поля AppSettings) при
+        // загрузке игнорируются: после старта всегда «Авто»/«Авто», скрепка отжата.
+        _sessionClientMode = SessionClientMode.Auto;
+        _sessionArchitecture = SessionArchitectureMode.Auto;
+        _sessionPinned = false;
         // Передаём «Текущую сессию» лаунчеру: он учитывает её первым шагом приоритета
         // выбора разрядности (issue #146), даже для запусков напрямую (без переопределений).
-        OneCLauncher.SessionArchitecture = _sessionArchitecture;
+        // Явная установка Auto — страховка от значения, оставшегося в статике (issue #156, R3).
+        OneCLauncher.SessionArchitecture = SessionArchitectureMode.Auto;
         // Режим «Разрядности по умолчанию» (X86 / X64 / Priority). Сохраняем строку
         // как есть, а лаунчер сам разрешает её; легаси «X64» остаётся X64.
         _defaultArchitecture = NormalizeDefaultArchitecture(settings.DefaultArchitecture);
@@ -893,6 +902,8 @@ public partial class MainViewModel : ViewModelBase
         SynchronizeWithIbasesCommand = new RelayCommand(SynchronizeWithIbasesManual);
         ToggleRightPanelDetailsCommand = new RelayCommand(_ => ShowRightPanelDetails = !ShowRightPanelDetails);
         ToggleSessionLaunchPanelCommand = new RelayCommand(_ => ShowSessionLaunchPanel = !ShowSessionLaunchPanel);
+        // Скрепка «Текущей сессии» (issue #156, S2): только runtime-состояние.
+        ToggleSessionPinCommand = new RelayCommand(_ => IsSessionPinned = !IsSessionPinned);
         ExportInfobasesCommand = new RelayCommand(ExportInfobases);
         ImportInfobasesCommand = new RelayCommand(ImportInfobases);
         ClearAllInfobasesCommand = new RelayCommand(ClearAllInfobases);

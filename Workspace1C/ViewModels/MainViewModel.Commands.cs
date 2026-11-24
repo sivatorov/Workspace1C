@@ -742,7 +742,15 @@ public partial class MainViewModel : ViewModelBase
         _ = LaunchFavoriteByHotkeyCoreAsync(ib, number);
     }
 
-    /// <summary>Асинхронное ядро запуска избранной базы по Alt+N: pre → запуск → post.</summary>
+    /// <summary>
+    /// Асинхронное ядро запуска избранной базы по Alt+N: pre → запуск → post.
+    /// <para>
+    /// Issue #156: запуск идёт напрямую через лаунчер, без переопределений
+    /// «Текущей сессии», — поэтому разовый override здесь не применяется и
+    /// не расходуется (сброс не нужен). Переключатели «Текущей сессии» влияют
+    /// на запуск из меню/контекстного меню/трея (см. <see cref="LaunchEnterpriseWithSessionOverrides"/>).
+    /// </para>
+    /// </summary>
     private async Task LaunchFavoriteByHotkeyCoreAsync(Infobase ib, int number)
     {
         try

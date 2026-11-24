@@ -838,10 +838,21 @@ public class AppSettings
     /// </summary>
     public bool ShowSessionLaunchPanel { get; set; } = true;
 
-    /// <summary>Сохранённый режим клиента «текущей сессии» (Auto / Ordinary / Thick / Thin).</summary>
+    /// <summary>
+    /// УСТАРЕЛО (issue #156): сохранённый режим клиента «текущей сессии»
+    /// (Auto / Ordinary / Thick / Thin). Поле оставлено только для обратной
+    /// совместимости чтения старых <c>settings.json</c>: при загрузке значение
+    /// игнорируется (всегда «Авто»), при сохранении больше не записывается —
+    /// «Текущая сессия» разовая и не переживает перезапуск (S4).
+    /// </summary>
     public string SessionClientMode { get; set; } = "Auto";
 
-    /// <summary>Сохранённая разрядность «текущей сессии» (Auto / X86 / X64).</summary>
+    /// <summary>
+    /// УСТАРЕЛО (issue #156): сохранённая разрядность «текущей сессии»
+    /// (Auto / X86 / X64). Поле оставлено только для обратной совместимости
+    /// чтения старых <c>settings.json</c>: при загрузке игнорируется (всегда
+    /// «Авто»), при сохранении больше не записывается (S4).
+    /// </summary>
     public string SessionArchitecture { get; set; } = "Auto";
 
     /// <summary>

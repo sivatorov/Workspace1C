@@ -7,6 +7,14 @@ namespace Workspace1C.ViewModels;
 /// <summary>
 /// Отвечает за запуск информационных баз в различных режимах.
 /// Вынесено из MainViewModel для разделения ответственности (чат 1 / чат 3).
+/// <para>
+/// Issue #156: WPF-версия не создаётся ни одной ViewModel (единственное
+/// <c>new LaunchViewModel(...)</c> — в Avalonia-конструкторе, файл
+/// LaunchViewModel.Avalonia.cs), поэтому переопределения «Текущей сессии» и их
+/// сброс здесь не реализуются: WPF запускает через
+/// <c>MainViewModel.LaunchEnterpriseWithSessionOverrides</c>. Рефакторинг «на всякий
+/// случай» не делался.
+/// </para>
 /// </summary>
 public sealed class LaunchViewModel : ViewModelBase
 {

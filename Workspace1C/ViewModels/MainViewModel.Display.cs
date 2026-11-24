@@ -473,7 +473,8 @@ public partial class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsSessionClientOrdinary));
                 OnPropertyChanged(nameof(IsSessionClientThick));
                 OnPropertyChanged(nameof(IsSessionClientThin));
-                ScheduleSaveSettings();
+                // Issue #156 (S4): значения «Текущей сессии» не сохраняются —
+                // разовый override живёт только в памяти (ScheduleSaveSettings убран).
             }
         }
     }
@@ -515,7 +516,7 @@ public partial class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsSessionArch64));
                 // «Текущая сессия» учитывается лаунчером первым шагом приоритета (issue #146).
                 OneCLauncher.SessionArchitecture = value;
-                ScheduleSaveSettings();
+                // Issue #156 (S4): в настройки не пишем — значение runtime-only.
             }
         }
     }
@@ -537,6 +538,29 @@ public partial class MainViewModel : ViewModelBase
         get => _sessionArchitecture == SessionArchitectureMode.X64;
         set { if (value) SessionArchitecture = SessionArchitectureMode.X64; }
     }
+
+    /// <summary>
+    /// Скрепка «Текущей сессии» (issue #156, S2): выбранные значения не сбрасываются
+    /// после успешного запуска «Предприятия». Только runtime-состояние — в настройки
+    /// не пишется и после перезапуска приложения всегда <c>false</c> (S3).
+    /// Кнопка-скрепка в заголовке карточки привязана к этому свойству (A2).
+    /// </summary>
+    public bool IsSessionPinned
+    {
+        get => _sessionPinned;
+        set
+        {
+            if (SetProperty(ref _sessionPinned, value))
+                OnPropertyChanged(nameof(SessionPinTooltip));
+        }
+    }
+
+    /// <summary>
+    /// Локализованная подсказка скрепки «Текущей сессии» (issue #156, A2):
+    /// меняется вместе с состоянием — закрепить или открепить значения.
+    /// </summary>
+    public string SessionPinTooltip =>
+        LocalizationManager.T(IsSessionPinned ? "Main.SessionPinOff" : "Main.SessionPinOn");
 
     /// <summary>Режим «Разрядности по умолчанию» (X86 / X64 / Priority).</summary>
     public string DefaultArchitecture => _defaultArchitecture;
@@ -935,6 +959,8 @@ public partial class MainViewModel : ViewModelBase
     public ICommand SynchronizeWithIbasesCommand { get; }
     public ICommand ToggleRightPanelDetailsCommand { get; }
     public ICommand ToggleSessionLaunchPanelCommand { get; }
+    /// <summary>Скрепка «Текущей сессии»: закрепить/открепить значения (issue #156, A2).</summary>
+    public ICommand ToggleSessionPinCommand { get; }
 
     /// <summary>Команда экспорта списка информационных баз в файл.</summary>
     public ICommand ExportInfobasesCommand { get; }

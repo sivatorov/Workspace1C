@@ -62,6 +62,8 @@ public partial class MainViewModel : ViewModelBase
     public ICommand ToggleCompactCommand { get; private set; } = null!;
     public ICommand ToggleRightPanelDetailsCommand { get; private set; } = null!;
     public ICommand ToggleSessionLaunchPanelCommand { get; private set; } = null!;
+    /// <summary>Скрепка «Текущей сессии»: закрепить/открепить значения (issue #156, A2).</summary>
+    public ICommand ToggleSessionPinCommand { get; private set; } = null!;
     public ICommand ExitCommand { get; private set; } = null!;
     public ICommand CopyConnectionStringCommand { get; private set; } = null!;
 
@@ -169,6 +171,8 @@ public partial class MainViewModel : ViewModelBase
         ToggleCompactCommand = new RelayCommand(() => ApplyCompactMode(!CompactMode));
         ToggleRightPanelDetailsCommand = new RelayCommand(() => ShowRightPanelDetails = !ShowRightPanelDetails);
         ToggleSessionLaunchPanelCommand = new RelayCommand(() => ShowSessionLaunchPanel = !ShowSessionLaunchPanel);
+        // Скрепка «Текущей сессии» (issue #156, S2): только runtime-состояние.
+        ToggleSessionPinCommand = new RelayCommand(() => IsSessionPinned = !IsSessionPinned);
         ExitCommand = new RelayCommand(ExitApplication);
         CopyConnectionStringCommand = new RelayCommand(_ => CopyConnectionString(), _ => SelectedInfobase is not null);
         // Экспорт видимого списка баз в CSV (0.3.9.91): команда не требует выделенной базы.

@@ -3513,28 +3513,55 @@
                                 </Style>
                             </Border.Style>
                             <StackPanel>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{loc:Loc Main.CurrentSession}" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextPrimaryBrush}">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="FontSize" Value="12"/>
-                                                <Setter Property="Margin" Value="0,0,0,6"/>
-                                                <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding DataContext.ShowRightPanelDetails, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
-                                                        <Setter Property="FontSize" Value="11"/>
-                                                        <Setter Property="Margin" Value="0,0,0,4"/>
-                                                    </DataTrigger>
-                                                </Style.Triggers>
-                                            </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
-                                    <!-- Подсказка шире стандартной: строки с ключами
-                                         /RunModeOrdinaryApplication и /RunModeManagedApplication
-                                         должны помещаться целиком (issue #45). -->
-                                    <controls:HelpLink Margin="6,0,0,4" PopupMaxWidth="640"
-                                                       HelpText="{loc:Loc Main.CurrentSessionHelp}"/>
-                                </StackPanel>
+                                <!-- Заголовок карточки: подпись со справкой слева, «скрепка»
+                                     в правом углу (issue #156, A2). Кнопка видна и в полном,
+                                     и в компактном режиме, вёрстку не растягивает. -->
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Orientation="Horizontal">
+                                        <TextBlock Text="{loc:Loc Main.CurrentSession}" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="FontSize" Value="12"/>
+                                                    <Setter Property="Margin" Value="0,0,0,6"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding DataContext.ShowRightPanelDetails, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                            <Setter Property="FontSize" Value="11"/>
+                                                            <Setter Property="Margin" Value="0,0,0,4"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <!-- Подсказка шире стандартной: строки с ключами
+                                             /RunModeOrdinaryApplication и /RunModeManagedApplication
+                                             должны помещаться целиком (issue #45). -->
+                                        <controls:HelpLink Margin="6,0,0,4" PopupMaxWidth="640"
+                                                           HelpText="{loc:Loc Main.CurrentSessionHelp}"/>
+                                    </StackPanel>
+                                    <!-- «Скрепка»: нажата — значения «Текущей сессии» не сбрасываются
+                                         после запуска (S2), отжата — сброс на «Авто» (S1). Состояние
+                                         только runtime, при перезапуске всегда отжата (S3). -->
+                                    <ToggleButton Grid.Column="1"
+                                                  Width="22" Height="22" Padding="0"
+                                                  VerticalAlignment="Top" HorizontalAlignment="Right"
+                                                  Style="{DynamicResource ToolbarToggleButton}"
+                                                  IsChecked="{Binding IsSessionPinned, Mode=OneWay}"
+                                                  Command="{Binding ToggleSessionPinCommand}"
+                                                  ToolTip="{Binding SessionPinTooltip}"
+                                                  ToolTipService.ShowOnDisabled="True">
+                                        <!-- Геометрия IconPin уже есть во всех наборах иконок; цвет
+                                             берётся из Foreground тумблера: акцент при включении
+                                             (ToolbarToggleButton), вторичный — когда отжата. -->
+                                        <Path Data="{DynamicResource IconPin}" Width="14" Height="14"
+                                              Stretch="Uniform"
+                                              Fill="{Binding Foreground, RelativeSource={RelativeSource AncestorType=ToggleButton}}"/>
+                                    </ToggleButton>
+                                </Grid>
                                 <TextBlock Text="{loc:Loc Main.SessionOnceHint}"
                                            FontSize="11" TextWrapping="Wrap" Margin="0,0,0,8"
                                            Foreground="{DynamicResource TextSecondaryBrush}"

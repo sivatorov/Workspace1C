@@ -236,6 +236,12 @@ public partial class MainViewModel : ViewModelBase
             var kind = ResolveLaunchKind(parameter);
             await RunPreLaunchScriptAsync(ib);
 
+            // Issue #156: фиксируем значения «Текущей сессии» ДО запуска — успешный
+            // запуск «Предприятия» расходует разовый override (S1), а история запуска
+            // должна показать фактически применённые клиент и разрядность.
+            var sessionClient = _sessionClientMode;
+            var sessionArch = _sessionArchitecture;
+
             bool ok;
             switch (kind)
             {
@@ -273,7 +279,7 @@ public partial class MainViewModel : ViewModelBase
                 RunPostLaunchScript(ib);
                 var sessionDetails = string.Format(
                     LocalizationManager.T("Main.LaunchHistorySessionDetails"),
-                    _sessionClientMode, _sessionArchitecture);
+                    sessionClient, sessionArch);
                 ib.AddLaunchHistory(kind.ToString(), BuildLaunchDetails(sessionDetails, ib));
                 InfobasesView.Refresh();
                 Save();
@@ -360,10 +366,23 @@ public partial class MainViewModel : ViewModelBase
 
     /// <summary>
     /// Запуск 1С:Предприятие с учётом переключателей «Текущая сессия».
+    /// <para>
+    /// Issue #156: переопределение разовое — после успешного запуска «Предприятия»
+    /// значения возвращаются в «Авто» (S1), если скрепка отжата (S2). Сброс не
+    /// выполняется для «Конфигуратора» и явных Thin32/Thick32/Thin64/Thick64:
+    /// эти ветки в <see cref="LaunchCoreAsync"/> вообще не вызывают этот метод (S6).
+    /// </para>
+    /// <para>
+    /// Пути запуска: меню/контекстное меню/трей идут через этот метод — сброс
+    /// работает для них. Alt+N (<see cref="LaunchFavoriteByHotkeyCoreAsync"/>) и
+    /// групповой запуск (<see cref="ExecuteBatchLaunchCore"/>) вызывают лаунчер
+    /// напрямую, override не применяют — поэтому и сбрасывать там нечего.
+    /// </para>
     /// </summary>
     private bool LaunchEnterpriseWithSessionOverrides(Infobase ib, bool runAsAdmin = false)
     {
-        // Полностью «Авто» — стандартная логика по настройкам базы.
+        // Полностью «Авто» — стандартная логика по настройкам базы; переопределений
+        // нет, сбрасывать нечего (S5).
         if (_sessionClientMode == SessionClientMode.Auto &&
             _sessionArchitecture == SessionArchitectureMode.Auto)
         {
@@ -396,7 +415,45 @@ public partial class MainViewModel : ViewModelBase
             _ => null
         };
 
-        return _launcher.Launch(ib, OneCLaunchMode.Enterprise, client, runMode, arch, runAsAdmin);
+        var ok = _launcher.Launch(ib, OneCLaunchMode.Enterprise, client, runMode, arch, runAsAdmin);
+
+        // Issue #156 (S1/S6): разовый override расходуется только успешным запуском
+        // «Предприятия» и только при отжатой скрепке (S2). Две быстрые команды запуска
+        // безопасны: override фиксируется в момент вызова Launch, сброс идёт после старта.
+        if (SessionLaunchPolicy.ShouldResetAfterLaunch(
+                _sessionPinned, _sessionClientMode, _sessionArchitecture,
+                OneCLaunchMode.Enterprise, ok))
+        {
+            ResetSessionOverridesAfterLaunch();
+        }
+
+        return ok;
+    }
+
+    /// <summary>
+    /// Возвращает переключатели «Текущей сессии» в «Авто» после успешного запуска
+    /// «Предприятия» (issue #156, S1). Вызывать только после проверки
+    /// <see cref="SessionLaunchPolicy.ShouldResetAfterLaunch"/>; повторная проверка
+    /// внутри защищает от вызова из будущих путей запуска.
+    /// <para>
+    /// Индивидуальные настройки баз (<see cref="Infobase.LaunchMode"/>) не меняются
+    /// никогда (S5) — сбрасывается только runtime-переопределение сессии.
+    /// </para>
+    /// </summary>
+    private void ResetSessionOverridesAfterLaunch()
+    {
+        if (!SessionLaunchPolicy.ShouldResetAfterLaunch(
+                _sessionPinned, _sessionClientMode, _sessionArchitecture,
+                OneCLaunchMode.Enterprise, launchSucceeded: true))
+        {
+            return;
+        }
+
+        SessionClientMode = SessionClientMode.Auto;
+        SessionArchitecture = SessionArchitectureMode.Auto;
+        // Страховка (issue #156, R3): сеттер разрядности не срабатывает при равенстве
+        // значений, а в статике лаунчера могло остаться прежнее переопределение.
+        OneCLauncher.SessionArchitecture = SessionArchitectureMode.Auto;
     }
 
     /// <summary>Тип клиента из настройки базы (LaunchMode).</summary>
@@ -660,8 +717,9 @@ public partial class MainViewModel : ViewModelBase
         s.ActionsColumnWidth = _actionsColumnWidth;
         s.ShowRightPanelDetails = _showRightPanelDetails;
         s.ShowSessionLaunchPanel = _showSessionLaunchPanel;
-        s.SessionClientMode = _sessionClientMode.ToString();
-        s.SessionArchitecture = _sessionArchitecture.ToString();
+        // Issue #156 (S4): значения «Текущей сессии» в настройки не пишутся —
+        // устаревшие поля SessionClientMode/SessionArchitecture остаются как были
+        // (обратная совместимость чтения старых файлов), поведение от них не зависит.
         s.DefaultArchitecture = _defaultArchitecture;
         s.StatusShowConnectionPath = _statusShowConnectionPath;
         s.StatusShowArchitecture = _statusShowArchitecture;
