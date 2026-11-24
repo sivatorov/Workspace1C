@@ -9,8 +9,8 @@
         mc:Ignorable="d"
         Title="{loc:Loc Utilities.Editor.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="560" Width="760"
-        MinWidth="640" MinHeight="480"
+        Height="760" Width="820"
+        MinWidth="640" MinHeight="600"
         WindowStartupLocation="CenterOwner"
         FontSize="13"
         ShowInTaskbar="False"
@@ -92,11 +92,20 @@
                 </DockPanel>
             </Border>
 
-            <!-- Панель операций (issue #146, 1.0.1.106): содержимое прокручивается,
-                 чтобы пояснение и кнопки помещались на экранах с малой высотой. -->
-            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
-                          HorizontalScrollBarVisibility="Disabled">
-                <StackPanel>
+            <!-- Правая колонка (issue #146, 1.0.1.115): пояснение закреплено внизу
+                 (DockPanel.Dock="Bottom") и видно всегда; прокручивается только панель
+                 операций — и только если она не помещается (аварийный вариант для
+                 маленьких экранов). -->
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Bottom" Margin="0,14,0,0" Padding="10" CornerRadius="6"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
+                    <TextBlock Text="{loc:Loc Utilities.Editor.Hint}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
                 <!-- Перемещение -->
                 <TextBlock Text="{loc:Loc Utilities.Editor.MoveHeader}" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -228,15 +237,9 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Пояснение -->
-                <Border Grid.Column="0" Margin="0,14,0,0" Padding="10" CornerRadius="6"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
-                    <TextBlock Text="{loc:Loc Utilities.Editor.Hint}" TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
-                </Border>
-                </StackPanel>
-            </ScrollViewer>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </Window>

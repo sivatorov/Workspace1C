@@ -396,6 +396,14 @@ Workflow уже содержит шаг «Новость в Telegram» ([`releas
 - В логе job `release` найти `Текст новости: docs/_telegram_msg_v1.0.1.113.txt`, `Telegram HTTP 200`, `"ok":true`.
 - Убедиться, что сообщение появилось в канале и содержит ссылку `https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.113`.
 
+**Факт прогона `v1.0.1.113` (2026-11-23):**
+
+- запуск workflow [`45223808827`](https://github.com/sivatorov/Workspace1C/actions/runs/45223808827), job `release`, attempt `1`, `conclusion: success`;
+- в логе: `Текст новости: docs/_telegram_msg_v1.0.1.113.txt`, `Telegram HTTP 200`, `"ok":true` (время `17:08:40Z`, сразу после `publishedAt` релиза `17:08:39Z`);
+- отправка выполнена ровно один раз; повторных запусков workflow для тега `v1.0.1.113` нет — дублей нет;
+- текст [`_telegram_msg_v1.0.1.113.txt`](_telegram_msg_v1.0.1.113.txt:12) содержит ссылку `https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.113`;
+- резервная отправка через `tools/publish-release.ps1` не выполнялась (не требовалась).
+
 ### 8.3. Резервный путь
 
 Если шаг пропущен/упал:
@@ -477,7 +485,7 @@ gh issue comment 153 -F docs/_comment_153_v101113.md
 - [x] Полный прогон тестов зелёный; число тестов зафиксировано (7856, 0 падений, 0 пропущено).
 - [x] Собраны `Workspace1C.exe` и `Workspace1C-linux-x64`, версии совпадают (Linux — кросс-сборка; smoke-тест в CI).
 - [ ] GitHub Release `v1.0.1.113` с двумя asset-ами и корректным текстом.
-- [ ] Новость в Telegram `-1004425443528` (`ok:true`, без дублей).
+- [x] Новость в Telegram `-1004425443528` (`ok:true`, без дублей) — workflow run [`45223808827`](https://github.com/sivatorov/Workspace1C/actions/runs/45223808827), `Telegram HTTP 200`, `"ok":true`, одна отправка, ссылка на релиз в тексте.
 - [ ] Комментарии в #134/#143/#146/#153; issues открыты; #139/#136 не тронуты.
 
 ---

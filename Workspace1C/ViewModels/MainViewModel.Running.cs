@@ -95,10 +95,25 @@ public partial class MainViewModel
             // с учётом общих настроек авторизации — так же, как при реальном запуске.
             var matchedByBase = RunningInfobaseMatcher.MatchProcesses(
                 Infobases, processes, ResolveEnterpriseUserForMatcher);
-            foreach (var ib in Infobases)
+
+            // Issue #153 (1.0.1.115): результат сопоставления ключуется идентификатором
+            // ЗАПИСИ (GetRecordKey), а не ключом подключения. Индекс берётся из того же
+            // порядка Infobases, что и в MatchProcesses, поэтому две записи с полностью
+            // одинаковыми настройками запуска получают разные ключи и индикатор
+            // достаётся ровно одной строке — первой по стабильному порядку.
+            // Одинаковый непустой Id — это одна и та же запись, добавленная дважды:
+            // индикатор выставляем только первой строке, чтобы вкладка «Запущенные»
+            // не показывала дубль одной запущенной базы.
+            var appliedRecordKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            for (var baseIndex = 0; baseIndex < Infobases.Count; baseIndex++)
             {
+                var ib = Infobases[baseIndex];
+                var recordKey = RunningInfobaseMatcher.GetRecordKey(ib, baseIndex);
+                var isFirstRowForKey = appliedRecordKeys.Add(recordKey);
+
                 // База считается запущенной, если хотя бы один процесс 1С подключён к ней.
-                var matching = matchedByBase.TryGetValue(RunningInfobaseMatcher.GetBaseKey(ib), out var list)
+                var matching = isFirstRowForKey
+                    && matchedByBase.TryGetValue(recordKey, out var list)
                     ? list
                     : (System.Collections.Generic.IReadOnlyList<RunningOneCProcess>)
                         System.Array.Empty<RunningOneCProcess>();

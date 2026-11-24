@@ -335,14 +335,15 @@ public static class DbmsBackupService
     /// удаляется пробный файл. Так пользователь видит отсутствие прав до запуска
     /// многоминутного дампа.
     /// <para>
-    /// Вся работа выполняется в <see cref="Task.Run(Func{Task}, CancellationToken)"/>,
-    /// а <paramref name="ct"/> проверяется до/после каждой файловой операции: недоступный
-    /// сетевой каталог не может «повесить» окно — отмена/таймаут прерывают проверку.
+    /// Вся работа выполняется на выделенном потоке (<see cref="BlockingIo"/>) — не на
+    /// UI-потоке и не на потоке пула, — а <paramref name="ct"/> проверяется до/после
+    /// каждой файловой операции: недоступный сетевой каталог не может «повесить» окно,
+    /// отмена/таймаут прерывают проверку.
     /// </para>
     /// </summary>
     public static Task<DbmsCheckResult> CheckOutputDirectoryAsync(DbmsBackupProfile profile,
         CancellationToken ct = default) =>
-        Task.Run(() => CheckOutputDirectoryCore(profile, ct), ct);
+        BlockingIo.Run(() => CheckOutputDirectoryCore(profile, ct), ct);
 
     private static DbmsCheckResult CheckOutputDirectoryCore(DbmsBackupProfile profile,
         CancellationToken ct)
@@ -352,6 +353,7 @@ public static class DbmsBackupService
         if (string.IsNullOrWhiteSpace(dir))
             return DbmsCheckResult.Fail("Dbms.DirRequired");
 
+        DbmsBackupTrace.Log("io-begin", $"check-directory {DbmsBackupTrace.DescribePath(dir)}");
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -375,6 +377,10 @@ public static class DbmsBackupService
         catch (Exception ex)
         {
             return DbmsCheckResult.Fail("Dbms.DirUnavailable", $"{dir}: {ex.Message}");
+        }
+        finally
+        {
+            DbmsBackupTrace.Log("io-end", "check-directory");
         }
     }
 
@@ -455,9 +461,14 @@ public static class DbmsBackupService
         }
     }
 
+    /// <summary>
+    /// Запуск утилиты на выделенном потоке (issue #143): <c>Process.Start</c> и ожидание
+    /// не выполняются ни на UI-потоке, ни на потоке пула — зависший UNC-путь к pg_dump
+    /// не «съедает» потоки пула и не мешает срабатыванию сторожевого таймаута.
+    /// </summary>
     private static Task<ProcessRunResult> RunToolAsync(string fileName, IReadOnlyList<string> args,
         TimeSpan timeout, IDictionary<string, string>? environment, CancellationToken ct) =>
-        RunToolOverride(fileName, args, timeout, environment, ct);
+        BlockingIo.RunAsync(() => RunToolOverride(fileName, args, timeout, environment, ct), ct);
 
     /// <summary>Удаляет недописанный файл копии после отмены/таймаута/ошибки.</summary>
     private static void TryDelete(string path)
@@ -506,9 +517,12 @@ public static class DbmsBackupService
         {
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Prepare));
 
-            // Создание каталога — не на UI-потоке: сетевой путь может отвечать
-            // десятки секунд, и раньше это выглядело как «наглухо зависло».
-            await Task.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+            // Создание каталога — на выделенном потоке (issue #143): сетевой путь
+            // может отвечать десятки секунд, и раньше это выглядело как «наглухо
+            // зависло», а блокировка потока пула мешала срабатыванию таймаутов.
+            DbmsBackupTrace.Log("io-begin", $"create-directory {DbmsBackupTrace.DescribePath(directory)}");
+            await BlockingIo.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+            DbmsBackupTrace.Log("io-end", "create-directory");
 
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Check));
 
@@ -530,7 +544,7 @@ public static class DbmsBackupService
                 // администратора (ошибку не показываем).
                 try
                 {
-                    await Task.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+                    await BlockingIo.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
                 }
                 catch (OperationCanceledException)
                 {
@@ -549,20 +563,20 @@ public static class DbmsBackupService
 
             if (run.Canceled)
             {
-                TryDelete(target);
+                await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
                 ct.ThrowIfCancellationRequested();
             }
 
             if (run.TimedOut)
             {
-                TryDelete(target);
+                await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
                 result.ErrorMessage = LocalizationManager.T("Dbms.TimedOut");
                 return result;
             }
 
             if (!run.Success)
             {
-                TryDelete(target);
+                await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
                 result.ErrorMessage = string.IsNullOrWhiteSpace(run.CombinedOutput)
                     ? LocalizationManager.T("Dbms.Failed")
                     : run.CombinedOutput;
@@ -576,13 +590,15 @@ public static class DbmsBackupService
             if (profile.KeepCount > 0)
             {
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Rotate));
-                var removed = await Task.Run(() => BackupRotation.Apply(directory, BuildFilePrefix(profile),
+                var removed = await BlockingIo.Run(() => BackupRotation.Apply(directory, BuildFilePrefix(profile),
                     FileExtension(profile), profile.KeepCount, 0), ct).ConfigureAwait(false);
                 if (removed.Count > 0)
                     log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogRotated"), removed.Count));
             }
 
-            if (!string.IsNullOrWhiteSpace(profile.WebDavUrl) && File.Exists(target))
+            var targetExists = string.IsNullOrWhiteSpace(profile.WebDavUrl) ||
+                await BlockingIo.Run(() => File.Exists(target), ct).ConfigureAwait(false);
+            if (!string.IsNullOrWhiteSpace(profile.WebDavUrl) && targetExists)
             {
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Upload));
                 log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogUploading"), profile.WebDavUrl));
@@ -609,10 +625,14 @@ public static class DbmsBackupService
         catch (OperationCanceledException)
         {
             // Недописанный файл не должен попасть в ротацию и выглядеть как копия.
-            TryDelete(target);
+            await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
             throw;
         }
     }
+
+    /// <summary>Удаление недописанного файла на выделенном потоке (issue #143).</summary>
+    private static Task TryDeleteAsync(string path, CancellationToken ct) =>
+        BlockingIo.Run(() => TryDelete(path), ct);
 }
 
 /// <summary>

@@ -30,15 +30,22 @@ public partial class CustomProgramsWindow : Window
     }
 
     /// <summary>
-    /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
-    /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+    /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
+    /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 780 DIP помещает форму
+    /// и пояснение без прокрутки, а на маленьком экране клампится по рабочей области
+    /// (прокрутка остаётся аварийным вариантом).
     /// </summary>
     private void ApplyWorkAreaLimits()
     {
         var workArea = SystemParameters.WorkArea;
-        MaxHeight = DialogWorkAreaPolicy.MaxHeight(workArea.Height);
-        MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, workArea.Height);
-        Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, workArea.Height);
+        var size = DialogWorkAreaPolicy.Recommend(
+            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
+            DialogWorkAreaPolicy.CustomProgramsMinHeight,
+            DialogWorkAreaPolicy.CustomProgramsContentHeight,
+            workArea.Height);
+        MaxHeight = size.MaxHeight;
+        MinHeight = size.MinHeight;
+        Height = size.Height;
     }
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>

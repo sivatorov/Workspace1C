@@ -232,18 +232,10 @@ public sealed class UpdateService : IAppUpdateService
     /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
     /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
     /// «пропущена 1.0.1.48, вышла 1.0.1.49» — обновление снова предлагается.
+    /// Issue #155: нераспознанная сохранённая версия ничего не блокирует.
     /// </summary>
     public bool IsSkipped(ReleaseInfo release)
-    {
-        if (release is null)
-            return false;
-        var skipped = LoadSkippedVersion();
-        if (string.IsNullOrWhiteSpace(skipped))
-            return false;
-        // Релиз считается пропущенным, если он НЕ новее пропущенной версии (равен
-        // или старше; нераспознанная пропущенная версия ничего не блокирует).
-        return !GitHubReleaseService.IsNewerThan(release, skipped);
-    }
+        => UpdateManualCheckLogic.IsSkipped(release, LoadSkippedVersion());
 
     /// <summary>
     /// Записывает версию релиза как «пропущенную» (issue #116) и сбрасывает состояние
@@ -268,6 +260,31 @@ public sealed class UpdateService : IAppUpdateService
             // Не удалось сохранить пропуск — обновление просто предложится снова.
         }
         SetAvailableRelease(null);
+    }
+
+    /// <summary>
+    /// Сбрасывает сохранённый пропуск версии (issue #155): вызывается, когда
+    /// пользователь в диалоге явно выбрал «Обновить» (скачивание/установку).
+    /// Последующие фоновые проверки больше не скрывают эту версию. Ошибки профиля
+    /// не пробрасываются — как и в <see cref="SkipVersion"/>.
+    /// </summary>
+    public void ClearSkippedVersion()
+    {
+        try
+        {
+            var repository = AppServices.TryGetService<IInfobaseRepository>();
+            if (repository is null)
+                return;
+            var settings = repository.LoadSettings();
+            if (string.IsNullOrWhiteSpace(settings.SkippedUpdateVersion))
+                return;
+            settings.SkippedUpdateVersion = string.Empty;
+            repository.SaveSettings(settings);
+        }
+        catch
+        {
+            // Не удалось очистить пропуск — не критично: диалог уже показан.
+        }
     }
 
     /// <summary>Читает пропущенную версию из настроек; при ошибке — «ничего не пропущено».</summary>
@@ -610,22 +627,22 @@ public sealed class UpdateService : IAppUpdateService
                 return;
             }
 
-            // Issue #129: сравнение с эффективной версией — при понижении ручная
-            // проверка должна предлагать обновление на реальную сборку.
-            if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
+            // Issue #155: «Пропустить эту версию» влияет только на фоновые проверки.
+            // Ручная проверка обязана показать диалог даже для пропущенного релиза —
+            // пользователь мог передумать. Пропуск учитывается лишь в том, что в
+            // режиме «Обновлять при запуске» такой релиз НЕ ставится молча.
+            var plan = UpdateManualCheckLogic.Plan(
+                release,
+                EffectiveVersionService.CurrentForUpdates,
+                LoadSkippedVersion(),
+                Mode);
+
+            if (!plan.HasNewerRelease)
             {
                 SetAvailableRelease(null);
                 ShowOnUi(() => _dialogs.ShowInfo(
                     LocalizationManager.T("Update.UpToDate"),
                     LocalizationManager.T(CheckResultTitleKey)));
-                return;
-            }
-
-            if (IsSkipped(release))
-            {
-                // Пропущенная версия при ручной проверке не предлагается (issue #116):
-                // состояние сбрасывается без уведомлений и диалогов.
-                SetAvailableRelease(null);
                 return;
             }
 
@@ -635,7 +652,7 @@ public sealed class UpdateService : IAppUpdateService
             SetAvailableRelease(release);
             RememberUserActionRelease(release);
 
-            if (Mode == AppUpdateMode.InstallOnStartup)
+            if (plan.InstallAutomatically)
             {
                 // issue #22 (1.0.0.28): если тот же файл уже качается (фоновая проверка,
                 // задание UpdateApp) — повторный запуск блокируется предупреждением.
@@ -656,14 +673,14 @@ public sealed class UpdateService : IAppUpdateService
                 return;
             }
 
-            // Остальные режимы (issue #116) — показываем единый диалог, который сам
-            // скачивает файл и задаёт вопрос «Перезапустить сейчас / Обновить после
-            // закрытия».
+            // Остальные режимы (issue #116), а также пропущенная версия в любом режиме
+            // (issue #155) — показываем единый диалог, который сам скачивает файл и
+            // задаёт вопрос «Перезапустить сейчас / Обновить после закрытия».
             var app = Application.Current;
             if (app is null)
                 return;
 
-            await app.Dispatcher.InvokeAsync(() => ShowUpdateDialog(release));
+            await app.Dispatcher.InvokeAsync(() => ShowUpdateDialog(release, plan.WasSkipped));
         }
         catch
         {
@@ -686,7 +703,7 @@ public sealed class UpdateService : IAppUpdateService
     /// <see cref="AppUpdateMode.NotifyOnly"/>) блок «Что нового» в диалоге скрывается —
     /// пользователь сам запросил обновление и уже знает, что ищет.</para>
     /// </summary>
-    private void ShowUpdateDialog(ReleaseInfo release)
+    private void ShowUpdateDialog(ReleaseInfo release, bool wasSkipped = false)
     {
         // Issue #116: открытие диалога — тоже действие пользователя; фоновые
         // уведомления на это время подавлены.
@@ -694,7 +711,7 @@ public sealed class UpdateService : IAppUpdateService
         try
         {
             var window = new UpdateAvailableWindow(
-                release, this, AppUpdateModeHelper.ShouldShowReleaseNotes(Mode));
+                release, this, AppUpdateModeHelper.ShouldShowReleaseNotes(Mode), wasSkipped);
             window.ShowDialog();
         }
         catch

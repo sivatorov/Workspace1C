@@ -336,9 +336,13 @@ public sealed class Issue143DbmsBackupTests
 
         Assert.Contains("Interlocked.Exchange(ref _running", code, StringComparison.Ordinal);
         Assert.Contains("Dbms.Reentrancy", code, StringComparison.Ordinal);
-        // issue #143 (1.0.1.111): запись профиля — через отменяемый SaveCore в фоне.
-        Assert.Contains("Task.Run(() => SaveCore", code, StringComparison.Ordinal);
+        // issue #143 (1.0.1.115): запись профиля — без sync-over-async, через
+        // сторожевой таймаут, не зависящий от пула потоков.
         Assert.Contains("DbmsBackupService.SaveAsync", code, StringComparison.Ordinal);
+        Assert.Contains("DbmsTimeoutGuard.RunAsync", code, StringComparison.Ordinal);
+        Assert.Contains("TryEnterOperation", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("GetAwaiter().GetResult()", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("SaveCore", code, StringComparison.Ordinal);
         Assert.Contains("new Progress<DbmsBackupProgress>", code, StringComparison.Ordinal);
         Assert.Contains("TrackElapsedAsync", code, StringComparison.Ordinal);
     }
@@ -348,11 +352,14 @@ public sealed class Issue143DbmsBackupTests
     {
         var code = ReadProjectFile("Workspace1C", "Services", "DbmsBackupService.cs");
 
-        Assert.Contains("Task.Run(() => Directory.CreateDirectory", code, StringComparison.Ordinal);
+        // issue #143 (1.0.1.115): файловые операции и запуск процессов — только на
+        // выделенном потоке (BlockingIo), не на UI-потоке и не на потоке пула.
+        Assert.Contains("BlockingIo.Run(() => Directory.CreateDirectory", code, StringComparison.Ordinal);
+        Assert.Contains("BlockingIo.RunAsync(() => RunToolOverride", code, StringComparison.Ordinal);
         Assert.Contains("RunToolAsync", code, StringComparison.Ordinal);
         Assert.Contains("DbmsBackupStage.Dump", code, StringComparison.Ordinal);
         Assert.Contains("Dbms.TimedOut", code, StringComparison.Ordinal);
-        Assert.Contains("TryDelete(target)", code, StringComparison.Ordinal);
+        Assert.Contains("TryDeleteAsync(target", code, StringComparison.Ordinal);
         // Таймаут дампа берётся из профиля, а не жёсткие 6 часов.
         Assert.Contains("profile.TimeoutMinutes", code, StringComparison.Ordinal);
         Assert.DoesNotContain("TimeSpan.FromHours(6), env", code, StringComparison.Ordinal);

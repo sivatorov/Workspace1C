@@ -36,12 +36,14 @@ namespace Workspace1C
         public UtilitiesMenuEditorWindow(IUtilitiesMenuLayoutStore? store)
         {
             Title = LocalizationManager.T("Utilities.Editor.Title");
-            Width = 760;
-            Height = 560;
+            Width = 820;
+            // Issue #146 (1.0.1.115): 560 DIP не хватало на дерево + панель операций +
+            // пояснение. 760 DIP помещает пояснение без прокрутки на обычном экране.
+            Height = DialogWorkAreaPolicy.EditorDefaultHeight;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
             MinWidth = 640;
-            MinHeight = 480;
+            MinHeight = DialogWorkAreaPolicy.EditorMinHeight;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             _vm = new UtilitiesMenuEditorViewModel(store);
@@ -58,8 +60,10 @@ namespace Workspace1C
         public UtilitiesMenuLayout Layout => _vm.Layout;
 
         /// <summary>
-        /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
-        /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+        /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
+        /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 760 DIP помещает
+        /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
+        /// (прокрутка остаётся аварийным вариантом).
         /// </summary>
         private void ApplyWorkAreaLimits()
         {
@@ -67,9 +71,14 @@ namespace Workspace1C
             if (screen is null)
                 return;
             var dipHeight = screen.WorkingArea.Height / screen.Scaling;
-            MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
-            MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, dipHeight);
-            Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
+            var size = DialogWorkAreaPolicy.Recommend(
+                DialogWorkAreaPolicy.EditorDefaultHeight,
+                DialogWorkAreaPolicy.EditorMinHeight,
+                DialogWorkAreaPolicy.EditorContentHeight,
+                dipHeight);
+            MaxHeight = size.MaxHeight;
+            MinHeight = size.MinHeight;
+            Height = size.Height;
         }
 
         private Control BuildLayout()
@@ -116,15 +125,20 @@ namespace Workspace1C
             BuildTree();
             treeBorder.Child = _tree;
 
-            // Правая панель операций (issue #146, 1.0.1.106): прокручивается,
-            // чтобы пояснение и кнопки помещались на экранах с малой высотой.
-            var panel = BuildOperationsPanel();
-            dock.Children.Add(new ScrollViewer
+            // Правая колонка (issue #146, 1.0.1.115): пояснение закреплено внизу и
+            // видно всегда; прокручивается только панель операций — и только если она
+            // не помещается (аварийный вариант для маленьких экранов).
+            var right = new DockPanel();
+            var hint = BuildHint("Utilities.Editor.Hint");
+            DockPanel.SetDock(hint, Dock.Bottom);
+            right.Children.Add(hint);
+            right.Children.Add(new ScrollViewer
             {
-                Content = panel,
+                Content = BuildOperationsPanel(),
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
             });
+            dock.Children.Add(right);
 
             return dock;
         }
@@ -261,7 +275,15 @@ namespace Workspace1C
             fileRow2.Children.Add(ActionButton("IconRestore", null, _vm.ResetDefaultCommand, caption: "Utilities.Editor.Reset"));
             panel.Children.Add(fileRow2);
 
-            // Пояснение.
+            return panel;
+        }
+
+        /// <summary>
+        /// Issue #146 (1.0.1.115): блок пояснения вынесен из прокручиваемой панели —
+        /// он закрепляется внизу правой колонки и виден без прокрутки.
+        /// </summary>
+        private Border BuildHint(string key)
+        {
             var hint = new Border
             {
                 Background = TryBrush("CardBackgroundBrush"),
@@ -273,15 +295,13 @@ namespace Workspace1C
             };
             var hintBlock = new TextBlock
             {
-                Text = LocalizationManager.T("Utilities.Editor.Hint"),
+                Text = LocalizationManager.T(key),
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 12
             };
             ThemeBrushes.Bind(hintBlock, TextBlock.ForegroundProperty, "TextSecondaryBrush");
             hint.Child = hintBlock;
-            panel.Children.Add(hint);
-
-            return panel;
+            return hint;
         }
 
         private TextBlock SectionHeader(string key, double top = 0)

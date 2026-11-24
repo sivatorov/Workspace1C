@@ -52,6 +52,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     private string _webDavPassword = string.Empty;
     private bool _isBusy;
     private int _running;
+    private int _operationGate;
     private string _statusText = string.Empty;
     private string _progressStageText = string.Empty;
     private double _progressPercent;
@@ -109,6 +110,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         if (!_needsLoad)
             return;
 
+        DbmsBackupTrace.Log("enter", "initialize");
         try
         {
             var loaded = await DbmsBackupService.LoadAsync(ct).ConfigureAwait(true);
@@ -123,7 +125,12 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         catch (Exception ex)
         {
             // Битый/недоступный профиль не должен ронять окно — только диагностика.
+            DbmsBackupTrace.Error("error", "initialize: " + ex.Message, ex);
             AppendLog(ex.Message);
+        }
+        finally
+        {
+            DbmsBackupTrace.Log("exit", "initialize");
         }
     }
 
@@ -331,9 +338,17 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     {
         if (_ui is not null && SynchronizationContext.Current != _ui)
         {
-            _ui.Post(_ => AppendLog(message), null);
+            // issue #143: не пере-постим из самого колбэка — иначе при контексте,
+            // который выполняет Post без установки Current (тестовый хост), запись
+            // зацикливается и журнал окна остаётся пустым.
+            _ui.Post(state => AppendLogCore((string)state!), message);
             return;
         }
+        AppendLogCore(message);
+    }
+
+    private void AppendLogCore(string message)
+    {
         _log.Append(DateTime.Now.ToString("HH:mm:ss")).Append("  ").AppendLine(message);
         OnPropertyChanged(nameof(LogText));
     }
@@ -388,70 +403,85 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Сохранение профиля кнопкой «Сохранить» (issue #143): запись на диск уходит
-    /// в фоновый поток и ограничена по времени. Раньше синхронный вызов
-    /// <see cref="Save"/> на UI-потоке мог «наглухо» зависнуть на медленном профиле
-    /// (сетевой/перенаправленный %APPDATA%), и окно переставало отвечать.
+    /// Сохранение профиля кнопкой «Сохранить» (issue #143): запись на диск выполняется
+    /// на выделенном потоке, ожидание ограничено сторожевым таймаутом
+    /// (<see cref="DbmsTimeoutGuard"/>), который не зависит от пула потоков. Раньше
+    /// запись блокировала поток пула синхронным ожиданием, а таймеры пула не
+    /// срабатывали при его голодании — окно «наглухо» зависало на медленном или
+    /// недоступном сетевом профиле.
     /// <para>
-    /// <paramref name="timeout"/> — предел операции (по умолчанию 15 с), переданный
-    /// токен отменяет запись. По таймауту показывается <c>Dbms.SaveTimeout</c>, а
-    /// <see cref="IsBusy"/> сбрасывается — кнопки снова активны.
+    /// <see cref="IsBusy"/> выставляется до тяжёлых вызовов (<see cref="CurrentProfile"/>,
+    /// <see cref="DbmsBackupService.Validate"/>), повторный вход отсекается
+    /// <see cref="Interlocked"/>. По таймауту показывается этап и путь профиля,
+    /// предлагается прислать <c>dbms-backup-debug.log</c>, кнопки снова активны.
     /// </para>
     /// </summary>
     public async Task<bool> SaveAsync(TimeSpan? timeout = null, CancellationToken ct = default)
     {
-        if (IsBusy)
+        if (!TryEnterOperation("save"))
             return false;
 
-        var profile = CurrentProfile();
-        if (profile is null)
-        {
-            AppendLog(LocalizationManager.T("Dbms.NoBases"));
-            return false;
-        }
-        // Тип СУБД не определён — не сохраняем профиль с молчаливым PostgreSQL.
-        if (SelectedInfobase is not null && DbmsIndex < 0)
-        {
-            AppendLog(LocalizationManager.T("Dbms.DbmsRequired"));
-            return false;
-        }
-        var error = DbmsBackupService.Validate(profile);
-        if (error is not null)
-        {
-            AppendLog(LocalizationManager.T(error));
-            return false;
-        }
-
-        var limit = timeout ?? SaveTimeout;
+        // issue #143: IsBusy — ДО CurrentProfile/Validate, чтобы второй клик,
+        // пришедший во время медленной проверки, не запустил параллельную запись.
         IsBusy = true;
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(limit);
+        var limit = timeout ?? SaveTimeout;
         try
         {
+            DbmsBackupTrace.Log("enter", "save");
+            var profile = CurrentProfile();
+            DbmsBackupTrace.Log("profile", DbmsBackupTrace.DescribeProfile(profile));
+            if (profile is null)
+            {
+                AppendLog(LocalizationManager.T("Dbms.NoBases"));
+                return false;
+            }
+            // Тип СУБД не определён — не сохраняем профиль с молчаливым PostgreSQL.
+            if (SelectedInfobase is not null && DbmsIndex < 0)
+            {
+                AppendLog(LocalizationManager.T("Dbms.DbmsRequired"));
+                return false;
+            }
+            var error = DbmsBackupService.Validate(profile);
+            DbmsBackupTrace.Log("validate", error is null ? "ok" : error);
+            if (error is not null)
+            {
+                AppendLog(LocalizationManager.T(error));
+                return false;
+            }
+
             AppendLog(LocalizationManager.T("Dbms.Saving"));
-            // Мгновенная in-memory операция — на UI-потоке; запись на диск — в фоне.
+            // Мгновенная in-memory операция; запись на диск — на выделенном потоке.
             _data.Upsert(profile);
-            await Task.Run(() => SaveCore(_data, cts.Token), cts.Token)
-                .WaitAsync(limit, cts.Token)
+            DbmsBackupTrace.Log("upsert", $"infobase={profile.InfobaseId}");
+
+            await DbmsTimeoutGuard.RunAsync(
+                token => DbmsBackupService.SaveAsync(_data, token), limit, ct, "save")
                 .ConfigureAwait(true);
+
+            DbmsBackupTrace.Log("exit", "save");
             AppendLog(LocalizationManager.T("Dbms.Saved"));
             return true;
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
-            StatusText = LocalizationManager.T("Dbms.SaveTimeout");
-            AppendLog(StatusText);
+            ReportTimeout("save", "Dbms.SaveTimeout", ex, limit);
             return false;
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            // Сработал внутренний таймаут (CancelAfter) — это не отмена пользователем.
-            StatusText = LocalizationManager.T("Dbms.SaveTimeout");
+            // Внутренний таймаут — это не отмена пользователем.
+            ReportTimeout("save", "Dbms.SaveTimeout", null, limit);
+            return false;
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = LocalizationManager.T("Designer.Cancelled");
             AppendLog(StatusText);
             return false;
         }
         catch (Exception ex)
         {
+            DbmsBackupTrace.Error("error", "save: " + ex.Message, ex);
             StatusText = ex.Message;
             AppendLog(ex.Message);
             return false;
@@ -459,15 +489,10 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+            ExitOperation();
+            DbmsBackupTrace.Log("exit", "save-finally");
         }
     }
-
-    /// <summary>
-    /// Запись профилей (issue #143): выполняется только в фоновом потоке, не трогает
-    /// UI (никаких логов/статусов) и слушает <paramref name="ct"/>.
-    /// </summary>
-    private static void SaveCore(DbmsBackupData data, CancellationToken ct) =>
-        DbmsBackupService.SaveAsync(data, ct).GetAwaiter().GetResult();
 
     public void Cancel()
     {
@@ -480,25 +505,37 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     /// <summary>
     /// Запускает копирование (issue #143): защита от повторного запуска, прогресс,
     /// отмена и очистка состояния в <c>finally</c>. Вся тяжёлая работа — в сервисе,
-    /// вне UI-потока; окно остаётся отзывчивым.
+    /// на выделенных потоках; окно остаётся отзывчивым.
     /// </summary>
     public async Task RunAsync()
     {
-        // Двойной клик/автоповтор не должен запускать второй дамп.
-        if (Interlocked.Exchange(ref _running, 1) == 1)
+        if (IsBusy)
         {
+            DbmsBackupTrace.Log("reentrancy", "run: busy");
             AppendLog(LocalizationManager.T("Dbms.Reentrancy"));
             return;
         }
 
+        // Двойной клик/автоповтор не должен запускать второй дамп.
+        if (Interlocked.Exchange(ref _running, 1) == 1)
+        {
+            DbmsBackupTrace.Log("reentrancy", "run");
+            AppendLog(LocalizationManager.T("Dbms.Reentrancy"));
+            return;
+        }
+
+        // IsBusy — до CurrentProfile/Validate (issue #143): второй клик не должен
+        // проскочить, пока идёт медленная проверка/чтение профиля.
         IsBusy = true;
         CancellationTokenSource? elapsedCts = null;
         try
         {
+            DbmsBackupTrace.Log("enter", "run");
             _cts?.Dispose();
             _cts = new CancellationTokenSource();
 
             var profile = CurrentProfile();
+            DbmsBackupTrace.Log("profile", DbmsBackupTrace.DescribeProfile(profile));
             if (profile is null)
             {
                 AppendLog(LocalizationManager.T("Dbms.NoBases"));
@@ -510,18 +547,20 @@ public sealed class DbmsBackupViewModel : ViewModelBase
                 return;
             }
             var error = DbmsBackupService.Validate(profile);
+            DbmsBackupTrace.Log("validate", error is null ? "ok" : error);
             if (error is not null)
             {
                 AppendLog(LocalizationManager.T(error));
                 return;
             }
 
-            // Запись профиля — вне UI-потока (issue #143) и с реальной отменой:
-            // диск/профиль могут отвечать медленно, а окно должно оставаться
-            // отзывчивым. Никакого синхронного Save на UI-пути.
+            // Запись профиля — на выделенном потоке (issue #143) и с реальной
+            // отменой: диск/профиль могут отвечать медленно, а окно должно
+            // оставаться отзывчивым. Никакого синхронного Save на UI-пути.
             _data.Upsert(profile);
-            await Task.Run(() => SaveCore(_data, _cts.Token), _cts.Token)
-                .WaitAsync(SaveTimeout, _cts.Token)
+            DbmsBackupTrace.Log("upsert", $"infobase={profile.InfobaseId}");
+            await DbmsTimeoutGuard.RunAsync(
+                token => DbmsBackupService.SaveAsync(_data, token), SaveTimeout, _cts.Token, "run-save")
                 .ConfigureAwait(true);
 
             elapsedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
@@ -535,6 +574,11 @@ public sealed class DbmsBackupViewModel : ViewModelBase
                 ? LocalizationManager.T("Dbms.Success")
                 : result.ErrorMessage ?? LocalizationManager.T("Dbms.Failed");
             AppendLog(StatusText);
+            DbmsBackupTrace.Log("exit", "run");
+        }
+        catch (TimeoutException ex)
+        {
+            ReportTimeout("run-save", "Dbms.SaveTimeout", ex, SaveTimeout);
         }
         catch (OperationCanceledException)
         {
@@ -543,6 +587,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            DbmsBackupTrace.Error("error", "run: " + ex.Message, ex);
             StatusText = ex.Message;
             AppendLog(ex.Message);
         }
@@ -555,6 +600,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             ElapsedText = string.Empty;
             IsBusy = false;
             Interlocked.Exchange(ref _running, 0);
+            DbmsBackupTrace.Log("exit", "run-finally");
         }
     }
 
@@ -570,40 +616,40 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         Func<DbmsBackupProfile, CancellationToken, Task<DbmsCheckResult>> check,
         TimeSpan timeout)
     {
-        if (IsBusy)
+        if (!TryEnterOperation("check"))
             return;
 
-        var profile = CurrentProfile();
-        if (profile is null)
-        {
-            AppendLog(LocalizationManager.T("Dbms.NoBases"));
-            return;
-        }
-
+        // IsBusy — до CurrentProfile (issue #143).
         IsBusy = true;
-        // «Отмена» (Cancel) отменяет userCts, таймаут — timeoutCts; обе связаны в
-        // linked. Так сообщение отличается: отмена пользователем vs таймаут.
+        // «Отмена» (Cancel) отменяет userCts; сторожевой таймаут — независимый
+        // выделенный поток (<see cref="DbmsTimeoutGuard"/>), не таймер пула.
         using var userCts = new CancellationTokenSource();
-        using var timeoutCts = new CancellationTokenSource(timeout);
-        using var linked = CancellationTokenSource.CreateLinkedTokenSource(
-            userCts.Token, timeoutCts.Token);
         _operationCts = userCts;
         try
         {
+            DbmsBackupTrace.Log("enter", "check");
+            var profile = CurrentProfile();
+            DbmsBackupTrace.Log("profile", DbmsBackupTrace.DescribeProfile(profile));
+            if (profile is null)
+            {
+                AppendLog(LocalizationManager.T("Dbms.NoBases"));
+                return;
+            }
+
             AppendLog(LocalizationManager.T("Dbms.CheckRunning"));
-            // issue #143: ВСЯ проверка — в Task.Run. Синхронная часть проверки
-            // (DNS, TcpClient, Process.Start/pg_isready/sqlcmd) не должна выполняться
-            // на UI-потоке; токен реально прерывает её по таймауту/«Отмене».
-            var result = await Task.Run(() => check(profile, linked.Token), linked.Token)
-                .WaitAsync(timeout, linked.Token)
-                .ConfigureAwait(true);
+            // issue #143: вся проверка — на выделенном потоке (DNS, TcpClient,
+            // Process.Start/pg_isready/sqlcmd). UI-поток и пул не блокируются;
+            // токен реально прерывает проверку по таймауту/«Отмене».
+            var result = await DbmsTimeoutGuard.RunAsync(
+                token => BlockingIo.RunAsync(() => check(profile, token), token),
+                timeout, userCts.Token, "check").ConfigureAwait(true);
             StatusText = FormatCheckResult(result);
             AppendLog(StatusText);
+            DbmsBackupTrace.Log("exit", "check");
         }
-        catch (TimeoutException)
+        catch (TimeoutException ex)
         {
-            StatusText = LocalizationManager.T("Dbms.CheckTimeout");
-            AppendLog(StatusText);
+            ReportTimeout("check", "Dbms.CheckTimeout", ex, timeout);
         }
         catch (OperationCanceledException)
         {
@@ -614,6 +660,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            DbmsBackupTrace.Error("error", "check: " + ex.Message, ex);
             StatusText = ex.Message;
             AppendLog(ex.Message);
         }
@@ -622,7 +669,62 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             if (ReferenceEquals(_operationCts, userCts))
                 _operationCts = null;
             IsBusy = false;
+            ExitOperation();
+            DbmsBackupTrace.Log("exit", "check-finally");
         }
+    }
+
+    /// <summary>
+    /// Захват операции (issue #143): повторный клик не проходит, пока выполняется
+    /// сохранение/проверка. <see cref="IsBusy"/> дополнительно отсекает клики во
+    /// время запуска копии (у неё свой барьер <c>_running</c>).
+    /// </summary>
+    private bool TryEnterOperation(string stage)
+    {
+        if (Interlocked.CompareExchange(ref _operationGate, 1, 0) == 1)
+        {
+            DbmsBackupTrace.Log("reentrancy", stage);
+            return false;
+        }
+        if (IsBusy)
+        {
+            Interlocked.Exchange(ref _operationGate, 0);
+            DbmsBackupTrace.Log("reentrancy", stage + ": busy");
+            return false;
+        }
+        return true;
+    }
+
+    private void ExitOperation() => Interlocked.Exchange(ref _operationGate, 0);
+
+    /// <summary>
+    /// Сообщение по таймауту (issue #143): этап, путь профиля без пароля и просьба
+    /// прислать <c>dbms-backup-debug.log</c>; кнопки снова активны (IsBusy снимается
+    /// в <c>finally</c>).
+    /// </summary>
+    private void ReportTimeout(string stage, string statusKey, Exception? exception, TimeSpan limit)
+    {
+        StatusText = LocalizationManager.T(statusKey);
+        AppendLog(StatusText);
+        var path = DbmsBackupTrace.DescribePath(OutputDirectory);
+
+        // Этап и путь должны попасть в журнал окна даже если строка локализации
+        // ещё не загружена (тогда T вернёт ключ без подстановок).
+        var template = LocalizationManager.T("Dbms.TimeoutDetails");
+        var details = template.Contains("{0}", StringComparison.Ordinal)
+            ? string.Format(System.Globalization.CultureInfo.InvariantCulture, template, stage, path)
+            : template + ": " + stage + "; " + path;
+        AppendLog(details);
+
+        // Подсказка обязательно содержит имя файла диагностики — пользователь должен
+        // знать, что прислать, даже при отсутствующей локализации.
+        var hint = LocalizationManager.T("Dbms.SendDebugLog");
+        if (hint.IndexOf(DbmsBackupTrace.FileName, StringComparison.OrdinalIgnoreCase) < 0)
+            hint = hint + " (" + DbmsBackupTrace.FileName + ")";
+        AppendLog(hint);
+
+        DbmsBackupTrace.Error("timeout",
+            $"{stage}: {limit.TotalSeconds:0.###} с; output={path}", exception);
     }
 
     private static string FormatCheckResult(DbmsCheckResult result)

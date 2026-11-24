@@ -22,6 +22,9 @@ namespace Workspace1C
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
             WpfUi.SetupWindow(this, "Dbms.Title", 960, 760);
+            // issue #143: сторож UI-потока — WARN в dbms-backup-debug.log, если
+            // UI-поток не отвечает больше 3 с (с последним этапом операции).
+            UiThreadWatchdog.EnsureStarted(Dispatcher);
 
             // issue #143: добавлен ряд прогресса (этап, таймер, полоса).
             var root = WpfUi.Rows(0, 0, 0, 0, -1, 0);
@@ -79,14 +82,50 @@ namespace Workspace1C
             WpfUi.Place(root, WpfUi.ReadOnlyText(nameof(DbmsBackupViewModel.LogText)), 4);
 
             // issue #143: проверки до запуска — подключение к СУБД и права на каталог.
-            var checkConnection = WpfUi.Button("Dbms.CheckConnection",
-                async (_, _) => await _vm.CheckConnectionAsync(), 190);
-            var checkDirectory = WpfUi.Button("Dbms.CheckDirectory",
-                async (_, _) => await _vm.CheckDirectoryAsync(), 180);
+            // Каждый клик фиксируется в журнале этапов ДО вызова VM, повторный вход
+            // (пока IsBusy ещё не обновил привязку IsEnabled) отсекается здесь.
+            var checkConnection = WpfUi.Button("Dbms.CheckConnection", async (_, _) =>
+            {
+                DbmsBackupTrace.Log("click", "check-connection");
+                if (_vm.IsBusy)
+                {
+                    DbmsBackupTrace.Log("click-ignored", "check-connection");
+                    return;
+                }
+                await _vm.CheckConnectionAsync();
+            }, 190);
+            var checkDirectory = WpfUi.Button("Dbms.CheckDirectory", async (_, _) =>
+            {
+                DbmsBackupTrace.Log("click", "check-directory");
+                if (_vm.IsBusy)
+                {
+                    DbmsBackupTrace.Log("click-ignored", "check-directory");
+                    return;
+                }
+                await _vm.CheckDirectoryAsync();
+            }, 180);
             // issue #143: сохранение — асинхронно и вне UI-потока; окно не «наглухо»
             // зависает, если профиль лежит на медленном/недоступном сетевом пути.
-            var save = WpfUi.Button("Common.Save", async (_, _) => await _vm.SaveAsync(), 120);
-            var run = WpfUi.Button("Dbms.RunNow", async (_, _) => await _vm.RunAsync(), 190, accent: true);
+            var save = WpfUi.Button("Common.Save", async (_, _) =>
+            {
+                DbmsBackupTrace.Log("click", "save");
+                if (_vm.IsBusy)
+                {
+                    DbmsBackupTrace.Log("click-ignored", "save");
+                    return;
+                }
+                await _vm.SaveAsync();
+            }, 120);
+            var run = WpfUi.Button("Dbms.RunNow", async (_, _) =>
+            {
+                DbmsBackupTrace.Log("click", "run");
+                if (_vm.IsBusy)
+                {
+                    DbmsBackupTrace.Log("click-ignored", "run");
+                    return;
+                }
+                await _vm.RunAsync();
+            }, 190, accent: true);
             foreach (var b in new[] { checkConnection, checkDirectory, save, run })
                 b.SetBinding(IsEnabledProperty, new Binding(nameof(DbmsBackupViewModel.IsIdle)));
             var cancel = WpfUi.Button("Common.Cancel", (_, _) => _vm.Cancel(), 100);

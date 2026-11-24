@@ -83,9 +83,12 @@ public sealed class Issue116SkipVersionTests
         var firstSkip = source.IndexOf("IsSkipped(release)", StringComparison.Ordinal);
         Assert.True(firstSkip > 0, "Проверка IsSkipped не найдена в UpdateService.cs (WPF)");
 
-        // Пропуск применяется и в фоновой, и в ручной проверке.
-        Assert.Equal(2, CountOccurrences(source, "IsSkipped(release)"));
-        // После проверки пропуска в ручной проверке состояние сбрасывается.
+        // Issue #155: пропуск остаётся в ФОНОВОЙ проверке (CheckForUpdatesAsync),
+        // а ручная проверка учитывает его через UpdateManualCheckLogic.Plan —
+        // поэтому прямое вхождение IsSkipped(release) теперь одно, не два.
+        Assert.Equal(1, CountOccurrences(source, "IsSkipped(release)"));
+        Assert.Contains("UpdateManualCheckLogic.Plan(", source);
+        // Состояние «доступна версия» по-прежнему сбрасывается, когда релиза нет.
         Assert.Contains("SetAvailableRelease(null);", source);
     }
 
@@ -94,7 +97,9 @@ public sealed class Issue116SkipVersionTests
     {
         var source = ReadProjectFile(
             Path.Combine("Workspace1C", "Services", "UpdateService.Avalonia.cs"));
-        Assert.Equal(2, CountOccurrences(source, "IsSkipped(release)"));
+        // Issue #155: см. комментарий в WPF-тесте — прямое вхождение одно.
+        Assert.Equal(1, CountOccurrences(source, "IsSkipped(release)"));
+        Assert.Contains("UpdateManualCheckLogic.Plan(", source);
         Assert.Contains("SkipVersion(release);", source);
     }
 

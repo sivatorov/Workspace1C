@@ -18,6 +18,73 @@ public static class DialogWorkAreaPolicy
     public const double DefaultMargin = 48;
 
     /// <summary>
+    /// Issue #146 (1.0.1.115): высота окна по умолчанию для редакторов меню
+    /// («Утилиты», «Меню трея»). 560 DIP не хватало на дерево + панель операций +
+    /// пояснение, поэтому пользователь видел прокрутку даже на обычном экране.
+    /// </summary>
+    public const double EditorDefaultHeight = 760;
+
+    /// <summary>Минимальная высота редакторов меню: пояснение и кнопки остаются видны.</summary>
+    public const double EditorMinHeight = 600;
+
+    /// <summary>
+    /// Высота, при которой содержимое редактора меню помещается без прокрутки.
+    /// Используется для признака <see cref="DialogSize.RequiresScrolling"/>:
+    /// если кламп по рабочей области урезал окно ниже этого значения, прокрутка
+    /// остаётся аварийным вариантом для маленьких экранов.
+    /// </summary>
+    public const double EditorContentHeight = 640;
+
+    /// <summary>Высота окна «Мои программы» по умолчанию (issue #146).</summary>
+    public const double CustomProgramsDefaultHeight = 780;
+
+    /// <summary>Минимальная высота окна «Мои программы».</summary>
+    public const double CustomProgramsMinHeight = 600;
+
+    /// <summary>Высота, при которой форма «Моих программ» помещается без прокрутки.</summary>
+    public const double CustomProgramsContentHeight = 660;
+
+    /// <summary>
+    /// Issue #146 (1.0.1.115): рекомендуемые размеры диалогового окна с учётом
+    /// рабочей области монитора. <see cref="RequiresScrolling"/> = true только
+    /// тогда, когда рабочая область не позволяет окну достичь высоты содержимого
+    /// (<c>contentHeight</c>), то есть на действительно маленьком экране.
+    /// </summary>
+    public readonly record struct DialogSize(
+        double Height,
+        double MinHeight,
+        double MaxHeight,
+        bool RequiresScrolling);
+
+    /// <summary>
+    /// Считает итоговые размеры окна: <c>Height</c> клампится в рабочую область,
+    /// <c>MinHeight</c> не превышает её верхнюю границу, а <c>RequiresScrolling</c>
+    /// сообщает, что содержимое не помещается и нужна прокрутка (аварийный режим).
+    /// </summary>
+    /// <param name="requestedHeight">Желаемая высота окна (дефолт из XAML/кода).</param>
+    /// <param name="preferredMinHeight">Желаемая минимальная высота окна.</param>
+    /// <param name="contentHeight">Высота, при которой содержимое помещается без прокрутки.</param>
+    /// <param name="workAreaHeight">Высота рабочей области монитора, DIP.</param>
+    /// <param name="margin">Отступ от краёв рабочей области, DIP.</param>
+    public static DialogSize Recommend(
+        double requestedHeight,
+        double preferredMinHeight,
+        double contentHeight,
+        double workAreaHeight,
+        double margin = DefaultMargin)
+    {
+        var max = MaxHeight(workAreaHeight, margin);
+        var min = ClampMinHeight(preferredMinHeight, workAreaHeight, margin);
+        var height = ClampHeight(requestedHeight, min, workAreaHeight, margin);
+
+        if (double.IsNaN(contentHeight) || contentHeight <= 0)
+            contentHeight = height;
+
+        // Допуск 0.5 DIP: округление DPI не должно включать прокрутку «на глаз».
+        return new DialogSize(height, min, max, height + 0.5 < contentHeight);
+    }
+
+    /// <summary>
     /// Максимально допустимая высота окна в рабочей области. Если рабочая область
     /// неизвестна (0/NaN/бесконечность), ограничение не накладывается.
     /// </summary>

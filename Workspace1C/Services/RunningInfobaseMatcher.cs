@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Workspace1C.Models;
@@ -68,8 +70,17 @@ public static class RunningInfobaseMatcher
     /// Возвращает null, если база не определена. В отличие от
     /// <see cref="MatchesCommandLine"/>, веб-базы сопоставляются — это нужно инспектору,
     /// но не индикатору запуска (там поведение сохранено).
+    /// <para>
+    /// Issue #153 (1.0.1.115): при нескольких подходящих записях владелец выбирается
+    /// детерминированно (<see cref="OrderDeterministically"/>), а не первым по порядку
+    /// перечисления — иначе при двух записях с одинаковым подключением инспектор и
+    /// индикатор «прыгали» между ними.
+    /// </para>
     /// </summary>
-    public static Infobase? FindOwner(IEnumerable<Infobase> infobases, string? commandLine)
+    public static Infobase? FindOwner(
+        IEnumerable<Infobase> infobases,
+        string? commandLine,
+        Func<Infobase, int>? recordIndexResolver = null)
     {
         if (string.IsNullOrWhiteSpace(commandLine))
             return null;
@@ -81,9 +92,11 @@ public static class RunningInfobaseMatcher
             return null;
 
         // Проход 1: прямые ключи. Сначала обычные подключения, затем веб-базы.
-        var owner = bases.FirstOrDefault(ib => MatchesCommandLine(ib, commandLine));
+        var owner = OrderDeterministically(
+            bases.Where(ib => MatchesCommandLine(ib, commandLine)), recordIndexResolver).FirstOrDefault();
         if (owner is null)
-            owner = bases.FirstOrDefault(ib => MatchesWebBase(ib, commandLine));
+            owner = OrderDeterministically(
+                bases.Where(ib => MatchesWebBase(ib, commandLine)), recordIndexResolver).FirstOrDefault();
         if (owner is not null)
         {
             if (RunningMatchDebug.IsEnabled)
@@ -168,8 +181,14 @@ public static class RunningInfobaseMatcher
 
     /// <summary>
     /// Кандидаты прямого сопоставления (issue #153): все записи с тем же подключением,
-    /// без выбора владельца. Внутренний список для <see cref="SelectOwnerForProcess"/>;
-    /// дубликаты по ключу базы отбрасываются.
+    /// без выбора владельца. Внутренний список для <see cref="SelectOwnerForProcess"/>.
+    /// <para>
+    /// Issue #153 (1.0.1.115): дедупликация идёт ТОЛЬКО по идентификатору записи
+    /// (<see cref="Infobase.Id"/>), а не по ключу подключения. Раньше две разные
+    /// записи с общим подключением «схлопывались» в одну, и выбор владельца зависел
+    /// от порядка перечисления. Записи без Id остаются разными — их различает
+    /// <see cref="SelectOwnerForProcess"/> по стабильному индексу в сохранённом списке.
+    /// </para>
     /// </summary>
     private static List<Infobase> FindDirectOwnerCandidates(
         IEnumerable<Infobase> infobases, string? commandLine)
@@ -189,10 +208,25 @@ public static class RunningInfobaseMatcher
         if (owners.Count <= 1)
             return owners;
 
-        // Одна и та же запись, добавленная в список дважды, не должна давать два
-        // одинаковых совпадения: ключ базы (Id либо подпись подключения) уникален.
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        return owners.Where(ib => seen.Add(GetBaseKey(ib))).ToList();
+        var seenIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<Infobase>(owners.Count);
+        foreach (var infobase in owners)
+        {
+            var id = (infobase.Id ?? string.Empty).Trim();
+            if (id.Length == 0)
+            {
+                // Разные записи без Id не склеиваем: стабильный индекс различает их.
+                result.Add(infobase);
+                continue;
+            }
+
+            // Одна и та же запись (тот же Id), добавленная дважды, не должна давать
+            // два одинаковых совпадения.
+            if (seenIds.Add(id))
+                result.Add(infobase);
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -201,40 +235,51 @@ public static class RunningInfobaseMatcher
     /// пользователями, поэтому возвращать несколько владельцев нельзя: иначе
     /// индикатор запуска появляется у всех записей с общим подключением, двойной
     /// щелчок активирует чужое окно, а вкладка «Запущенные» показывает дубли.
-    /// <para>Правила:</para>
+    /// <para>Правила (полный детерминированный порядок):</para>
     /// <list type="number">
     /// <item>параметр <c>/N</c> задан — выбираются записи, у которых эффективный
     /// пользователь Предприятия совпадает без учёта регистра (trim/кавычки);
-    /// если совпала одна — она, если несколько — первая по ключу базы;</item>
+    /// при нескольких совпадениях — первая по стабильному ключу записи;</item>
     /// <item><c>/N</c> нет — выбираются записи с авторизацией ОС
     /// (<see cref="AuthenticationMode.Windows"/>/<see cref="ConnectionSettings.UseOsAuthentication"/>)
-    /// или без явных учётных данных; если одна — она, иначе первая по ключу;</item>
+    /// или без явных учётных данных; при нескольких — первая по стабильному ключу;</item>
     /// <item>если <c>/N</c> есть, но ни одна запись не задаёт такого пользователя
     /// явно (сценарий «Запрос»), детерминированно предпочитается запись без явных
-    /// учётных данных, иначе первая по ключу базы.</item>
+    /// учётных данных, иначе первая по стабильному ключу.</item>
     /// </list>
+    /// <para>
+    /// Issue #153 (1.0.1.115): «первая» — это НЕ порядок перечисления входа.
+    /// Кандидаты сортируются полным стабильным порядком: <see cref="GetRecordKey"/>
+    /// (Id записи, иначе <c>rec#<индекс>|подключение</c>) по
+    /// <see cref="StringComparer.OrdinalIgnoreCase"/>, затем имя записи по
+    /// <see cref="StringComparer.Ordinal"/>, затем индекс записи в сохранённом списке
+    /// (<paramref name="recordIndexResolver"/>). Поэтому одинаковый набор записей
+    /// даёт одного и того же владельца независимо от порядка баз/процессов и от
+    /// хеширования в <see cref="Dictionary{TKey,TValue}"/>/<see cref="HashSet{T}"/>.
+    /// </para>
     /// <paramref name="resolveEnterpriseUser"/> позволяет подставить общую
     /// авторизацию из настроек (делегат передаёт <see cref="ViewModels.MainViewModel"/>);
     /// без делегата используется чистый <see cref="InfobaseAuthResolver"/>.
+    /// <paramref name="recordIndexResolver"/> отдаёт стабильный индекс записи в
+    /// сохранённом списке (для записей без Id); без него такие записи неразличимы,
+    /// и порядок остаётся входным — это единственный вырожденный случай.
     /// </summary>
     public static Infobase? SelectOwnerForProcess(
         IReadOnlyList<Infobase> candidates,
         string? commandLine,
-        Func<Infobase, string?>? resolveEnterpriseUser = null)
+        Func<Infobase, string?>? resolveEnterpriseUser = null,
+        Func<Infobase, int>? recordIndexResolver = null)
     {
         if (candidates is null || candidates.Count == 0)
             return null;
 
         var resolveUser = resolveEnterpriseUser ?? ResolveEnterpriseUserDefault;
 
-        // Детерминированный порядок: ключ базы. Дубликаты одной записи не дают
-        // неоднозначности выбора.
-        var ordered = candidates
-            .Where(ib => ib?.Connection is not null)
-            .GroupBy(GetBaseKey, StringComparer.OrdinalIgnoreCase)
-            .Select(g => g.First())
-            .OrderBy(GetBaseKey, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+        // Issue #153 (1.0.1.115): дедупликация — только по идентификатору записи
+        // (Id) или по ссылке, а НЕ по ключу подключения. Раньше GroupBy(GetBaseKey)
+        // с First() «схлопывал» разные записи с общим подключением, и выбор
+        // зависел от порядка перечисления. Теперь порядок задаёт стабильный ключ.
+        var ordered = OrderDeterministically(candidates, recordIndexResolver).ToList();
         if (ordered.Count == 0)
             return null;
         if (ordered.Count == 1)
@@ -264,6 +309,61 @@ public static class RunningInfobaseMatcher
             .Where(ib => NormalizeAuthUser(resolveUser(ib)).Length == 0)
             .ToList();
         return osCandidates.Count > 0 ? osCandidates[0] : ordered[0];
+    }
+
+    /// <summary>
+    /// Issue #153 (1.0.1.115): полный детерминированный порядок записей-кандидатов.
+    /// Не зависит от порядка перечисления: сортировка идёт по стабильному ключу
+    /// записи (<see cref="GetRecordKey"/>), затем по имени
+    /// (<see cref="StringComparer.Ordinal"/>), затем по индексу в сохранённом списке.
+    /// Полностью одинаковые записи без Id различаются только индексом — он и
+    /// передаётся через <paramref name="recordIndexResolver"/>.
+    /// </summary>
+    private static IEnumerable<Infobase> OrderDeterministically(
+        IEnumerable<Infobase> candidates,
+        Func<Infobase, int>? recordIndexResolver) =>
+        candidates
+            .Where(ib => ib?.Connection is not null)
+            .Distinct(RecordIdentityComparer.Instance)
+            .OrderBy(ib => GetRecordKey(ib, ResolveRecordIndex(ib, recordIndexResolver)),
+                StringComparer.OrdinalIgnoreCase)
+            .ThenBy(ib => NormalizeName(ib.Name), StringComparer.Ordinal)
+            .ThenBy(ib => ResolveRecordIndex(ib, recordIndexResolver));
+
+    /// <summary>Индекс записи в сохранённом списке; 0, если резолвер не передан.</summary>
+    private static int ResolveRecordIndex(Infobase infobase, Func<Infobase, int>? recordIndexResolver) =>
+        recordIndexResolver?.Invoke(infobase) ?? 0;
+
+    /// <summary>
+    /// Issue #153 (1.0.1.115): равенство записей для дедупликации. Одинаковый
+    /// непустой <see cref="Infobase.Id"/> — одна и та же запись; записи без Id
+    /// считаются разными (их различает стабильный индекс в сохранённом списке).
+    /// </summary>
+    private sealed class RecordIdentityComparer : IEqualityComparer<Infobase>
+    {
+        public static readonly RecordIdentityComparer Instance = new();
+
+        public bool Equals(Infobase? x, Infobase? y)
+        {
+            if (ReferenceEquals(x, y))
+                return true;
+            if (x is null || y is null)
+                return false;
+
+            var left = (x.Id ?? string.Empty).Trim();
+            var right = (y.Id ?? string.Empty).Trim();
+            return left.Length > 0
+                && right.Length > 0
+                && string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode(Infobase obj)
+        {
+            var id = (obj.Id ?? string.Empty).Trim();
+            return id.Length > 0
+                ? StringComparer.OrdinalIgnoreCase.GetHashCode(id)
+                : RuntimeHelpers.GetHashCode(obj);
+        }
     }
 
     /// <summary>
@@ -322,21 +422,16 @@ public static class RunningInfobaseMatcher
     }
 
     /// <summary>
-    /// Ключ базы для словарей сопоставления (issue #134, 1.0.1.80). Раньше матчер и план
-    /// подменю требовали непустой <see cref="Infobase.Id"/> и молча пропускали остальные
-    /// базы: у импортированных из кластера баз Id пуст, поэтому они не получали ни
-    /// индикатор запуска, ни пункты в подменю, ни имена в сводке завершения процессов.
-    /// Теперь ключ строится из Id, а при его отсутствии — из подписи подключения,
-    /// поэтому такие базы участвуют в сопоставлении на равных.
+    /// Ключ подключения записи (issue #153, 1.0.1.115): <see cref="Infobase.Id"/>
+    /// НЕ участвует. Служит для группировки записей с общим подключением (одна база
+    /// заведена несколько раз под разными учётками). Раньше эта логика была частью
+    /// <see cref="GetBaseKey"/>; разделение нужно, чтобы выбор владельца процесса
+    /// не зависел от Id, а индикатор мог выставляться ровно одной строке.
     /// </summary>
-    public static string GetBaseKey(Infobase infobase)
+    public static string GetConnectionKey(Infobase infobase)
     {
         if (infobase is null)
             throw new ArgumentNullException(nameof(infobase));
-
-        var id = (infobase.Id ?? string.Empty).Trim();
-        if (id.Length > 0)
-            return id;
 
         var connection = infobase.Connection;
         if (connection is null)
@@ -351,6 +446,52 @@ public static class RunningInfobaseMatcher
                 + "|" + NormalizeName(infobase.Name),
             _ => connection.Type + ":" + (connection.ToConnectionString() ?? string.Empty)
         };
+    }
+
+    /// <summary>
+    /// Ключ базы для словарей сопоставления (issue #134, 1.0.1.80). Раньше матчер и план
+    /// подменю требовали непустой <see cref="Infobase.Id"/> и молча пропускали остальные
+    /// базы: у импортированных из кластера баз Id пуст, поэтому они не получали ни
+    /// индикатор запуска, ни пункты в подменю, ни имена в сводке завершения процессов.
+    /// Теперь ключ строится из Id, а при его отсутствии — из ключа подключения
+    /// (<see cref="GetConnectionKey"/>), поэтому такие базы участвуют в сопоставлении
+    /// на равных.
+    /// </summary>
+    public static string GetBaseKey(Infobase infobase)
+    {
+        if (infobase is null)
+            throw new ArgumentNullException(nameof(infobase));
+
+        var id = (infobase.Id ?? string.Empty).Trim();
+        return id.Length > 0 ? id : GetConnectionKey(infobase);
+    }
+
+    /// <summary>
+    /// Issue #153 (1.0.1.115): стабильный ключ ЗАПИСИ (не подключения) — по нему
+    /// выбирается владелец процесса, и по нему <see cref="MatchProcesses"/> отдаёт
+    /// результат, чтобы индикатор запуска выставлялся ровно одной строке.
+    /// <para>Правило:</para>
+    /// <list type="bullet">
+    /// <item>непустой <see cref="Infobase.Id"/> — возвращается он (две записи с разными
+    /// Id — разные ключи, даже при полностью одинаковых настройках запуска);</item>
+    /// <item>Id пуст — <c>rec#<индекс>|<ключ подключения></c>, где индекс —
+    /// позиция записи в сохранённом списке (передаётся вызывающим). Индекс дополнен
+    /// нулями, чтобы строковая сортировка совпадала с числовой.</item>
+    /// </list>
+    /// Благодаря индексу две полностью одинаковые записи без Id получают РАЗНЫЕ
+    /// ключи: индикатор достаётся первой по порядку списка, а не «случайной».
+    /// </summary>
+    public static string GetRecordKey(Infobase infobase, int storedIndex = 0)
+    {
+        if (infobase is null)
+            throw new ArgumentNullException(nameof(infobase));
+
+        var id = (infobase.Id ?? string.Empty).Trim();
+        if (id.Length > 0)
+            return id;
+
+        return "rec#" + storedIndex.ToString("D10", CultureInfo.InvariantCulture)
+            + "|" + GetConnectionKey(infobase);
     }
 
     /// <summary>
@@ -637,7 +778,15 @@ public static class RunningInfobaseMatcher
     /// такие процессы не связывались с базой и значок «Предприятие» не появлялся.
     /// Матч по /IBName выполняется ТОЛЬКО когда имя базы уникально в списке
     /// (одинаковые имена в разных серверах/папках не сопоставляются — защита от
-    /// ложных срабатываний). Возвращает словарь «Id базы → сопоставленные процессы».
+    /// ложных срабатываний).
+    /// <para>
+    /// Issue #153 (1.0.1.115): результат — словарь «<see cref="GetRecordKey"/> →
+    /// процессы». Ключом служит идентификатор ЗАПИСИ, а не ключ подключения: две
+    /// записи с одинаковыми настройками запуска получают разные ключи, поэтому
+    /// индикатор запуска достаётся ровно одной строке (первой по стабильному
+    /// порядку), а не обеим и не «случайной». Для записей с непустым Id ключ
+    /// совпадает с Id (обратная совместимость).
+    /// </para>
     /// </summary>
     public static IReadOnlyDictionary<string, List<RunningOneCProcess>> MatchProcesses(
         IEnumerable<Infobase> infobases,
@@ -647,25 +796,50 @@ public static class RunningInfobaseMatcher
         // issue #134 (1.0.1.80): Id больше не обязателен — ключ базы строит GetBaseKey,
         // иначе базы из кластера (Id = "") выпадали из сопоставления целиком.
         var result = new Dictionary<string, List<RunningOneCProcess>>(StringComparer.OrdinalIgnoreCase);
+
         // issue #140 (1.0.1.84): веб-базы намеренно не участвуют в индикаторе запуска
         // (прежнее поведение: ключ /WS встречается и у прочих сценариев). Инспектор
         // процессов вызывает FindOwner и сопоставляет их отдельно.
-        var bases = (infobases ?? Enumerable.Empty<Infobase>())
-            .Where(ib => ib?.Connection is not null && ib.Connection.Type != ConnectionType.WebServer)
-            .ToList();
+        // Issue #153 (1.0.1.115): сохраняем исходный индекс записи (порядок в
+        // сохранённом списке) — он различает полностью одинаковые записи без Id и
+        // должен совпадать с индексом, который использует ApplyRunningProcesses.
+        var indexedBases = new List<(Infobase Base, int Index)>();
+        var position = 0;
+        foreach (var infobase in infobases ?? Enumerable.Empty<Infobase>())
+        {
+            if (infobase?.Connection is not null
+                && infobase.Connection.Type != ConnectionType.WebServer)
+            {
+                indexedBases.Add((infobase, position));
+            }
+
+            position++;
+        }
+
+        var bases = indexedBases.Select(x => x.Base).ToList();
         var processList = processes ?? (IReadOnlyList<RunningOneCProcess>)Array.Empty<RunningOneCProcess>();
         if (bases.Count == 0 || processList.Count == 0)
             return result;
+
+        // Стабильный индекс записи в сохранённом списке: для записей с Id он не нужен
+        // (ключ — сам Id), для записей без Id именно он различает дубликаты.
+        var indexByBase = new Dictionary<Infobase, int>();
+        foreach (var (infobase, index) in indexedBases)
+            indexByBase.TryAdd(infobase, index);
+        Func<Infobase, int> resolveRecordIndex =
+            infobase => indexByBase.TryGetValue(infobase, out var index) ? index : 0;
 
         // Диагностика (issue #103): при CM_DEBUG_RUNNING_MATCH=1 фиксируем входные
         // данные матчера — реальные командные строки процессов и параметры баз.
         if (RunningMatchDebug.IsEnabled)
         {
             RunningMatchDebug.Log($"MatchProcesses: bases={bases.Count}, processes={processList.Count}");
-            foreach (var ib in bases)
+            foreach (var (infobase, index) in indexedBases)
                 RunningMatchDebug.Log(
-                    $"  base key={GetBaseKey(ib)} id=\"{ib.Id}\" name=\"{ib.Name}\" db=\"{ib.Connection.DatabaseName}\" " +
-                    $"server=\"{ib.Connection.Server}\" file=\"{ib.Connection.FilePath}\" type={ib.Connection.Type}");
+                    $"  base recordKey={GetRecordKey(infobase, index)} connectionKey={GetConnectionKey(infobase)} " +
+                    $"index={index} id=\"{infobase.Id}\" name=\"{infobase.Name}\" " +
+                    $"db=\"{infobase.Connection.DatabaseName}\" server=\"{infobase.Connection.Server}\" " +
+                    $"file=\"{infobase.Connection.FilePath}\" type={infobase.Connection.Type}");
             foreach (var p in processList)
                 RunningMatchDebug.Log($"  process exe=\"{p.ProcessName}\" cmdline=\"{p.CommandLine}\"");
         }
@@ -682,9 +856,10 @@ public static class RunningInfobaseMatcher
         {
             var candidates = FindDirectOwnerCandidates(bases, process.CommandLine);
             var owner = candidates.Count > 0
-                ? SelectOwnerForProcess(candidates, process.CommandLine, resolveEnterpriseUser)
+                ? SelectOwnerForProcess(
+                    candidates, process.CommandLine, resolveEnterpriseUser, resolveRecordIndex)
                 // Fallback: /IBName (уникальное имя) и файловый хвост пути.
-                : FindOwner(bases, process.CommandLine);
+                : FindOwner(bases, process.CommandLine, resolveRecordIndex);
 
             if (owner is null)
             {
@@ -693,9 +868,13 @@ public static class RunningInfobaseMatcher
                 continue;
             }
 
-            AddToResult(result, GetBaseKey(owner), process);
+            var ownerIndex = resolveRecordIndex(owner);
+            var recordKey = GetRecordKey(owner, ownerIndex);
+            AddToResult(result, recordKey, process);
             if (RunningMatchDebug.IsEnabled)
-                RunningMatchDebug.Log($"  match: base id={owner.Id} name=\"{owner.Name}\"");
+                RunningMatchDebug.Log(
+                    $"  match: recordKey={recordKey} connectionKey={GetConnectionKey(owner)} " +
+                    $"index={ownerIndex} id=\"{owner.Id}\" name=\"{owner.Name}\"");
         }
 
         return result;

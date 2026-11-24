@@ -156,7 +156,9 @@ public sealed class Issue116BackgroundDownloadTests
         Assert.Contains("public ReleaseInfo? ReadyRelease", source);
         Assert.Contains("public bool IsReadyFor(ReleaseInfo? release)", source);
         // Диалог установки готового файла: без подтверждения скачивания.
-        Assert.Contains("private async Task ShowReadyInstallAsync(ReleaseInfo release, string target)", source);
+        // Issue #155: добавлен признак «версия была пропущена» (необязательный параметр),
+        // поэтому сигнатура занимает две строки — проверяем начало объявления.
+        Assert.Contains("private async Task ShowReadyInstallAsync(", source);
         Assert.Contains("public Task OpenReadyInstallAsync()", source);
         // Повышение прав (pkexec) — только после явного согласия пользователя.
         Assert.Contains("Update.ReadyInstallPrompt", source);

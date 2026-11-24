@@ -43,9 +43,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     {
         Title = T("Launch.CustomPrograms.Title");
         Width = 900;
-        Height = 580;
+        // Issue #146 (1.0.1.115): 580 DIP не хватало на форму + пояснение.
+        Height = DialogWorkAreaPolicy.CustomProgramsDefaultHeight;
         MinWidth = 760;
-        MinHeight = 500;
+        MinHeight = DialogWorkAreaPolicy.CustomProgramsMinHeight;
         FontSize = 13;
         _vm = new CustomProgramsViewModel(AppServices.TryGetService<ICustomProgramsStore>(), viewMode);
         DataContext = _vm;
@@ -55,8 +56,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     }
 
     /// <summary>
-    /// Issue #146 (1.0.1.106): клампит высоту окна по рабочей области монитора,
-    /// чтобы пояснение и кнопки помещались на экранах 768 px с масштабированием.
+    /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
+    /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 780 DIP помещает форму
+    /// и пояснение без прокрутки, а на маленьком экране клампится по рабочей области
+    /// (прокрутка остаётся аварийным вариантом).
     /// </summary>
     private void ApplyWorkAreaLimits()
     {
@@ -64,9 +67,14 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         if (screen is null)
             return;
         var dipHeight = screen.WorkingArea.Height / screen.Scaling;
-        MaxHeight = DialogWorkAreaPolicy.MaxHeight(dipHeight);
-        MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight, dipHeight);
-        Height = DialogWorkAreaPolicy.ClampHeight(Height, MinHeight, dipHeight);
+        var size = DialogWorkAreaPolicy.Recommend(
+            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
+            DialogWorkAreaPolicy.CustomProgramsMinHeight,
+            DialogWorkAreaPolicy.CustomProgramsContentHeight,
+            dipHeight);
+        MaxHeight = size.MaxHeight;
+        MinHeight = size.MinHeight;
+        Height = size.Height;
     }
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>
@@ -130,16 +138,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
 
         dock.Children.Add(bottom);
         dock.Children.Add(modePanel);
-        // issue #146: центральная область прокручивается при малой высоте окна,
-        // чтобы список программ и редактор оставались доступны, а нижние кнопки
-        // и переключатель режима — видимыми.
-        var centralScroll = new ScrollViewer
-        {
-            VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
-            HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
-            Content = BuildEditorGrid()
-        };
-        dock.Children.Add(centralScroll);
+        // Issue #146 (1.0.1.115): внешнего ScrollViewer больше нет — прокручивается
+        // только правая форма, а список программ прокручивает свой ListBox.
+        dock.Children.Add(BuildEditorGrid());
         return dock;
     }
 
@@ -224,6 +225,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             new Binding("SelectedProgram.Enabled") { Mode = BindingMode.TwoWay });
         form.Children.Add(enabled);
 
+        // Правая колонка (issue #146, 1.0.1.115): пояснение закреплено внизу и видно
+        // всегда; прокручиваются только поля формы (аварийный вариант для малых экранов).
+        var right = new DockPanel();
         var hint = new TextBlock
         {
             Text = T("Launch.CustomPrograms.Hint"),
@@ -232,16 +236,16 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             Margin = new Thickness(0, 14, 0, 0)
         };
         ThemeBrushes.Bind(hint, TextBlock.ForegroundProperty, "TextSecondaryColorBrush");
-        form.Children.Add(hint);
-
-        var scroll = new ScrollViewer
+        DockPanel.SetDock(hint, Dock.Bottom);
+        right.Children.Add(hint);
+        right.Children.Add(new ScrollViewer
         {
             VerticalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             Content = form
-        };
-        Grid.SetColumn(scroll, 2);
-        grid.Children.Add(scroll);
+        });
+        Grid.SetColumn(right, 2);
+        grid.Children.Add(right);
         return grid;
     }
 

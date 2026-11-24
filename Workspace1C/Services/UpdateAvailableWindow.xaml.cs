@@ -51,8 +51,13 @@ public partial class UpdateAvailableWindow : Window
     /// (<see cref="AppUpdateMode.InstallOnStartup"/>, <see cref="AppUpdateMode.DownloadAskInstall"/>)
     /// блок остаётся.
     /// </param>
+    /// <param name="wasSkipped">
+    /// Issue #155: релиз ранее пропущен пользователем, но он открыл ручную проверку
+    /// повторно. Показываем пояснение, что версию можно обновить или пропустить снова.
+    /// </param>
     public UpdateAvailableWindow(
-        ReleaseInfo release, UpdateService service, bool showReleaseNotes = true)
+        ReleaseInfo release, UpdateService service, bool showReleaseNotes = true,
+        bool wasSkipped = false)
     {
         InitializeComponent();
         _release = release;
@@ -87,6 +92,14 @@ public partial class UpdateAvailableWindow : Window
                 LocalizationManager.T("Common.VersionEffective")));
         NewVersionText.Text = string.Format(
             LocalizationManager.T("Update.NewVersion"), NormalizeTag(release.TagName));
+
+        // Issue #155: при повторной ручной проверке пропущенного релиза поясняем,
+        // что версию можно обновить или пропустить снова.
+        if (wasSkipped)
+        {
+            SkippedHintText.Text = LocalizationManager.T("Update.SkippedHint");
+            SkippedHintText.Visibility = Visibility.Visible;
+        }
 
         // Issue #116 (1.0.1.82): ссылка «Что нового» открывает стандартный диалог
         // изменений новой версии. Нужна в ручных режимах, где блок описания скрыт.
@@ -480,6 +493,10 @@ public partial class UpdateAvailableWindow : Window
     /// </summary>
     private async void OnDownloadClick(object sender, RoutedEventArgs e)
     {
+        // Issue #155: пользователь явно выбрал обновление — пропуск этой версии
+        // больше не должен скрывать её от фоновых проверок.
+        _service.ClearSkippedVersion();
+
         DownloadButton.IsEnabled = false;
         SkipVersionButton.IsEnabled = false;
         CancelButton.IsEnabled = false;
@@ -632,6 +649,9 @@ public partial class UpdateAvailableWindow : Window
     /// </summary>
     private void OnInstallClick(object sender, RoutedEventArgs e)
     {
+        // Issue #155: явное обновление снимает пропуск версии.
+        _service.ClearSkippedVersion();
+
         InstallButton.IsEnabled = false;
         SkipVersionButton.IsEnabled = false;
         CancelButton.IsEnabled = false;

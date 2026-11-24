@@ -6,10 +6,10 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Issue #146 (1.0.1.106): окна правки меню («Утилиты», «Меню трея», «Мои программы»)
-/// не помещались на экранах 768 px с масштабированием — поясняющий текст уходил за
-/// нижнюю границу. Политика <see cref="DialogWorkAreaPolicy"/> клампит высоту окна
-/// по рабочей области монитора; обе оболочки применяют её одинаково.
+/// Issue #146 (1.0.1.106/1.0.1.115): окна правки меню («Утилиты», «Меню трея»,
+/// «Мои программы») не помещались на экранах 768 px с масштабированием — поясняющий
+/// текст уходил за нижнюю границу. Политика <see cref="DialogWorkAreaPolicy"/> клампит
+/// высоту окна по рабочей области монитора; обе оболочки применяют её одинаково.
 /// </summary>
 public sealed class Issue146DialogSizeTests
 {
@@ -112,12 +112,12 @@ public sealed class Issue146DialogSizeTests
         var source = File.ReadAllText(
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", fileName));
 
-        Assert.Contains("DialogWorkAreaPolicy.ClampHeight", source, StringComparison.Ordinal);
-        Assert.Contains("DialogWorkAreaPolicy.MaxHeight", source, StringComparison.Ordinal);
-        // Issue #146: MinHeight тоже клампится, иначе нижняя граница побеждает
-        // верхнюю и окно снова выходит за рабочую область.
-        Assert.Contains("DialogWorkAreaPolicy.ClampMinHeight", source, StringComparison.Ordinal);
-        Assert.Contains("MinHeight = DialogWorkAreaPolicy.ClampMinHeight(MinHeight,", source, StringComparison.Ordinal);
+        // Issue #146 (1.0.1.115): размеры окна считает общая политика; в коде окна
+        // не должно быть «своих» клампов и зашитых высот.
+        Assert.Contains("DialogWorkAreaPolicy.Recommend", source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight = size.MaxHeight;", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = size.MinHeight;", source, StringComparison.Ordinal);
+        Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -128,37 +128,37 @@ public sealed class Issue146DialogSizeTests
         var xaml = File.ReadAllText(
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", fileName));
 
-        // Панель операций в правой колонке обёрнута в ScrollViewer: длинное
-        // пояснение не обрезается, а прокручивается.
-        Assert.Contains("ScrollViewer Grid.Column=\"2\"", xaml, StringComparison.Ordinal);
+        // Панель операций в правой колонке — DockPanel: пояснение закреплено внизу,
+        // прокручивается только сама панель (аварийный вариант для малых экранов).
+        Assert.Contains("<DockPanel Grid.Column=\"2\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer", xaml, StringComparison.Ordinal);
         Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void CustomPrograms_CentralAreaScrolls()
+    public void CustomPrograms_NoNestedScrollViewer()
     {
         var xaml = File.ReadAllText(
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", "CustomProgramsWindow.xaml"));
 
-        // Issue #146: центральная область (список программ и редактор) обёрнута
-        // в ScrollViewer, поэтому при малой высоте окна содержимое доступно,
-        // а нижние кнопки и переключатель режима остаются видимыми.
-        var start = xaml.IndexOf("x:Name=\"CentralScrollViewer\"", StringComparison.Ordinal);
-        Assert.True(start >= 0, "В CustomProgramsWindow.xaml нет ScrollViewer центральной области.");
-        var block = xaml.Substring(start, Math.Min(400, xaml.Length - start));
-        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", block, StringComparison.Ordinal);
-        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", block, StringComparison.Ordinal);
+        // Issue #146 (1.0.1.115): двойная вложенность (окно + внутренний ScrollViewer)
+        // убрана — прокручивается только правая форма, список прокручивает ListBox.
+        Assert.DoesNotContain("CentralScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void CustomProgramsAvalonia_CentralAreaScrolls()
+    public void CustomProgramsAvalonia_NoNestedScrollViewer()
     {
         var source = File.ReadAllText(
             Path.Combine(FindRepoRoot(), "Workspace1C", "Views", "CustomProgramsWindow.Avalonia.cs"));
 
-        // Issue #146: в Avalonia центральная область тоже в ScrollViewer.
-        Assert.Contains("var centralScroll = new ScrollViewer", source, StringComparison.Ordinal);
-        Assert.Contains("Content = BuildEditorGrid()", source, StringComparison.Ordinal);
+        // Issue #146: в Avalonia тоже нет внешнего центрального ScrollViewer —
+        // прокручивается только правая форма.
+        Assert.DoesNotContain("centralScroll", source, StringComparison.Ordinal);
+        Assert.Contains("dock.Children.Add(BuildEditorGrid());", source, StringComparison.Ordinal);
+        Assert.Contains("right.Children.Add(new ScrollViewer", source, StringComparison.Ordinal);
         Assert.Contains("ScrollBarVisibility.Auto", source, StringComparison.Ordinal);
         Assert.Contains("ScrollBarVisibility.Disabled", source, StringComparison.Ordinal);
     }

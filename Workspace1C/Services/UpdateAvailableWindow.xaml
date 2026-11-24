@@ -108,6 +108,11 @@
                     <TextBlock x:Name="HeadingText" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"/>
                     <TextBlock x:Name="CurrentVersionText" Margin="0,10,0,0" TextWrapping="Wrap"/>
                     <TextBlock x:Name="NewVersionText" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                    <!-- Issue #155: версия была пропущена, но пользователь открыл
+                         ручную проверку снова — поясняем, что можно обновить или
+                         пропустить повторно. -->
+                    <TextBlock x:Name="SkippedHintText" Margin="0,8,0,0" TextWrapping="Wrap"
+                               Foreground="{DynamicResource AccentBrush}" Visibility="Collapsed"/>
                     <!-- Issue #116 (1.0.1.82): ссылка «Что нового» открывает стандартный
                          диалог изменений новой версии. Показывается в ручных режимах,
                          где блок описания в этом окне скрыт. -->

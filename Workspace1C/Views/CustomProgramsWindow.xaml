@@ -6,7 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{loc:Loc Launch.CustomPrograms.Title}"
         Icon="{StaticResource AppIcon}"
-        Width="900" Height="580" MinWidth="760" MinHeight="500"
+        Width="900" Height="780" MinWidth="760" MinHeight="600"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13"
         Background="{DynamicResource ContentBackgroundBrush}">
 
@@ -64,13 +64,10 @@
             </StackPanel>
         </Border>
 
-        <!-- Центральная область (issue #146): при малой высоте окна прокручивается,
-             чтобы список программ и редактор оставались доступны, а нижние кнопки
-             и переключатель режима — видимыми. -->
-        <ScrollViewer x:Name="CentralScrollViewer"
-                      VerticalScrollBarVisibility="Auto"
-                      HorizontalScrollBarVisibility="Disabled">
-            <Grid>
+        <!-- Центральная область (issue #146, 1.0.1.115): внешнего ScrollViewer больше
+             нет — прокручивается только правая форма, а список программ прокручивает
+             свой ListBox. Пояснение закреплено внизу правой колонки и видно всегда. -->
+        <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="280"/>
                     <ColumnDefinition Width="12"/>
@@ -141,10 +138,15 @@
                     </ListBox>
                 </DockPanel>
 
-                <!-- Поля выбранной программы. -->
-                <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel IsEnabled="{Binding HasSelection}">
+                <!-- Поля выбранной программы (issue #146): пояснение закреплено внизу
+                     правой колонки и видно без прокрутки; прокручиваются только поля. -->
+                <DockPanel Grid.Column="2">
+                    <TextBlock DockPanel.Dock="Bottom" Text="{loc:Loc Launch.CustomPrograms.Hint}"
+                               TextWrapping="Wrap" FontSize="12" Margin="0,14,0,0"
+                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel IsEnabled="{Binding HasSelection}">
                         <TextBlock Text="{loc:Loc Launch.CustomPrograms.Name}" Margin="0,0,0,4"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBox Text="{Binding SelectedProgram.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
@@ -208,12 +210,9 @@
                                   IsChecked="{Binding SelectedProgram.Enabled, Mode=TwoWay}"
                                   Margin="0,4,0,0"/>
 
-                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.Hint}" TextWrapping="Wrap"
-                                   FontSize="12" Margin="0,14,0,0"
-                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
-                    </StackPanel>
-                </ScrollViewer>
-            </Grid>
-        </ScrollViewer>
+                        </StackPanel>
+                    </ScrollViewer>
+                </DockPanel>
+        </Grid>
     </DockPanel>
 </Window>

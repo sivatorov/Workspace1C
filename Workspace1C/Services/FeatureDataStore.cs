@@ -63,23 +63,27 @@ public static class FeatureDataStore
     }
 
     /// <summary>
-    /// Асинхронное чтение (issue #143): файл читается потоком, не блокируя вызывающий
-    /// поток. Отмена прерывает чтение; битый/недоступный файл по-прежнему даёт
-    /// значение по умолчанию (поведение <see cref="Load{T}"/> сохранено).
+    /// Асинхронное чтение (issue #143): файловые вызовы (<c>File.Exists</c>,
+    /// <c>File.ReadAllText</c>) выполняются на выделенном потоке
+    /// (<see cref="BlockingIo"/>), а не на UI-потоке и не на потоке пула —
+    /// недоступный SMB/UNC-профиль не «вешает» окно и не вызывает голодание пула.
+    /// Отмена прерывает чтение; битый/недоступный файл по-прежнему даёт значение
+    /// по умолчанию (поведение <see cref="Load{T}"/> сохранено).
     /// </summary>
     public static async Task<T> LoadAsync<T>(string fileName, CancellationToken ct = default)
         where T : new()
     {
         var path = PathOf(fileName);
+        DbmsBackupTrace.Log("io-begin", $"load {DbmsBackupTrace.DescribePath(path)}");
         try
         {
-            if (!File.Exists(path))
-                return new T();
-            await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
-                FileShare.Read, 4096, useAsync: true);
-            var value = await JsonSerializer.DeserializeAsync<T>(stream, Options, ct)
-                .ConfigureAwait(false);
-            return value ?? new T();
+            return await BlockingIo.Run(() =>
+            {
+                if (!File.Exists(path))
+                    return new T();
+                var json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<T>(json, Options) ?? new T();
+            }, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -88,6 +92,10 @@ public static class FeatureDataStore
         catch
         {
             return new T();
+        }
+        finally
+        {
+            DbmsBackupTrace.Log("io-end", "load");
         }
     }
 
@@ -103,28 +111,34 @@ public static class FeatureDataStore
     }
 
     /// <summary>
-    /// Асинхронная запись (issue #143): данные пишутся во временный файл потоком,
-    /// затем атомарно переименовываются. Отмена проверяется до/после записи и
-    /// передаётся в файловые операции — зависший сетевой профиль больше не держит
-    /// UI-поток. Формат JSON не меняется (тот же <see cref="Options"/>).
+    /// Асинхронная запись (issue #143): сериализация — в памяти, а все блокирующие
+    /// файловые операции (<c>Directory.CreateDirectory</c>, запись временного файла,
+    /// <c>File.Move</c>) выполняются на выделенном потоке (<see cref="BlockingIo"/>).
+    /// Отмена проверяется до/после каждой операции; формат JSON не меняется
+    /// (тот же <see cref="Options"/>).
     /// </summary>
     public static async Task SaveAsync<T>(string fileName, T value, CancellationToken ct = default)
     {
         var path = PathOf(fileName);
-        var dir = Path.GetDirectoryName(path);
-        ct.ThrowIfCancellationRequested();
-        if (!string.IsNullOrEmpty(dir))
-            Directory.CreateDirectory(dir);
-        var tmp = path + ".tmp";
-        var bytes = JsonSerializer.SerializeToUtf8Bytes(value, Options);
-        ct.ThrowIfCancellationRequested();
-        await using (var stream = new FileStream(tmp, FileMode.Create, FileAccess.Write,
-            FileShare.None, 4096, useAsync: true))
+        DbmsBackupTrace.Log("io-begin", $"save {DbmsBackupTrace.DescribePath(path)}");
+        try
         {
-            await stream.WriteAsync(bytes, ct).ConfigureAwait(false);
-            await stream.FlushAsync(ct).ConfigureAwait(false);
+            await BlockingIo.Run(() =>
+            {
+                var dir = Path.GetDirectoryName(path);
+                ct.ThrowIfCancellationRequested();
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
+                var tmp = path + ".tmp";
+                var bytes = JsonSerializer.SerializeToUtf8Bytes(value, Options);
+                File.WriteAllBytes(tmp, bytes);
+                ct.ThrowIfCancellationRequested();
+                File.Move(tmp, path, overwrite: true);
+            }, ct).ConfigureAwait(false);
         }
-        ct.ThrowIfCancellationRequested();
-        File.Move(tmp, path, overwrite: true);
+        finally
+        {
+            DbmsBackupTrace.Log("io-end", "save");
+        }
     }
 }

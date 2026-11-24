@@ -236,7 +236,11 @@ public sealed class Issue153SharedConnectionTests
     {
         var code = ReadProjectFile("Workspace1C", "Services", "RunningInfobaseMatcher.cs");
 
-        Assert.Contains("SelectOwnerForProcess(candidates, process.CommandLine", code, StringComparison.Ordinal);
+        // Issue #153 (1.0.1.115): владелец выбирается через SelectOwnerForProcess
+        // с резолвером стабильного индекса записи, а результат ключуется GetRecordKey.
+        Assert.Contains("SelectOwnerForProcess(", code, StringComparison.Ordinal);
+        Assert.Contains("resolveRecordIndex", code, StringComparison.Ordinal);
+        Assert.Contains("GetRecordKey(owner, ownerIndex)", code, StringComparison.Ordinal);
         Assert.Contains("ТОЛЬКО ДЛЯ ДИАГНОСТИКИ", code, StringComparison.Ordinal);
     }
 

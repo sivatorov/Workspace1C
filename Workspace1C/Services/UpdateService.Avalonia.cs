@@ -298,18 +298,10 @@ namespace Workspace1C.Services
         /// версию», issue #116). Пропуск действует, пока релиз не новее пропущенной
         /// версии (сравнение по компаратору версий <see cref="GitHubReleaseService.IsNewerThan"/>):
         /// «пропущена 1.0.1.48, вышла 1.0.1.49» — обновление снова предлагается.
+        /// Issue #155: нераспознанная сохранённая версия ничего не блокирует.
         /// </summary>
         public bool IsSkipped(ReleaseInfo release)
-        {
-            if (release is null)
-                return false;
-            var skipped = LoadSkippedVersion();
-            if (string.IsNullOrWhiteSpace(skipped))
-                return false;
-            // Релиз считается пропущенным, если он НЕ новее пропущенной версии (равен
-            // или старше; нераспознанная пропущенная версия ничего не блокирует).
-            return !GitHubReleaseService.IsNewerThan(release, skipped);
-        }
+            => UpdateManualCheckLogic.IsSkipped(release, LoadSkippedVersion());
 
         /// <summary>
         /// Записывает версию релиза как «пропущенную» (issue #116) и сбрасывает состояние
@@ -334,6 +326,31 @@ namespace Workspace1C.Services
                 // Не удалось сохранить пропуск — обновление просто предложится снова.
             }
             SetAvailableRelease(null);
+        }
+
+        /// <summary>
+        /// Сбрасывает сохранённый пропуск версии (issue #155): вызывается, когда
+        /// пользователь в диалоге явно выбрал «Обновить» (скачивание/установку).
+        /// Последующие фоновые проверки больше не скрывают эту версию. Ошибки профиля
+        /// не пробрасываются — как и в <see cref="SkipVersion"/>.
+        /// </summary>
+        public void ClearSkippedVersion()
+        {
+            try
+            {
+                var repository = AppServices.TryGetService<IInfobaseRepository>();
+                if (repository is null)
+                    return;
+                var settings = repository.LoadSettings();
+                if (string.IsNullOrWhiteSpace(settings.SkippedUpdateVersion))
+                    return;
+                settings.SkippedUpdateVersion = string.Empty;
+                repository.SaveSettings(settings);
+            }
+            catch
+            {
+                // Не удалось очистить пропуск — не критично: диалог уже показан.
+            }
         }
 
         /// <summary>Читает пропущенную версию из настроек; при ошибке — «ничего не пропущено».</summary>
@@ -700,22 +717,22 @@ namespace Workspace1C.Services
                     return;
                 }
 
-                // Issue #129: сравнение с эффективной версией — при понижении ручная
-                // проверка должна предлагать обновление на реальную сборку.
-                if (!GitHubReleaseService.IsNewerThan(release, EffectiveVersionService.CurrentForUpdates))
+                // Issue #155: «Пропустить эту версию» влияет только на фоновые проверки.
+                // Ручная проверка обязана показать диалог даже для пропущенного релиза —
+                // пользователь мог передумать. Пропуск учитывается лишь в том, что в
+                // режиме «Обновлять при запуске» такой релиз НЕ ставится молча.
+                var plan = UpdateManualCheckLogic.Plan(
+                    release,
+                    EffectiveVersionService.CurrentForUpdates,
+                    LoadSkippedVersion(),
+                    Mode);
+
+                if (!plan.HasNewerRelease)
                 {
                     SetAvailableRelease(null);
                     ShowOnUi(() => _dialogs.ShowInfo(
                         LocalizationManager.T("Update.UpToDate"),
                         LocalizationManager.T(CheckResultTitleKey)));
-                    return;
-                }
-
-                if (IsSkipped(release))
-                {
-                    // Пропущенная версия при ручной проверке не предлагается (issue #116):
-                    // состояние сбрасывается без уведомлений и диалогов.
-                    SetAvailableRelease(null);
                     return;
                 }
 
@@ -725,7 +742,7 @@ namespace Workspace1C.Services
                 SetAvailableRelease(release);
                 RememberUserActionRelease(release);
 
-                if (Mode == AppUpdateMode.InstallOnStartup)
+                if (plan.InstallAutomatically)
                 {
                     // issue #22 (1.0.0.28): если тот же файл уже качается (фоновая проверка,
                     // задание UpdateApp) — повторный запуск блокируется предупреждением.
@@ -746,9 +763,10 @@ namespace Workspace1C.Services
                     return;
                 }
 
-                // Остальные режимы (issue #116) — показываем единый диалог с вопросом
-                // о применении обновления.
-                await Dispatcher.UIThread.InvokeAsync(() => ShowUpdateDialogAsync(release));
+                // Остальные режимы (issue #116), а также пропущенная версия в любом
+                // режиме (issue #155) — показываем диалог с вопросом о применении.
+                await Dispatcher.UIThread.InvokeAsync(
+                    () => ShowUpdateDialogAsync(release, plan.WasSkipped));
             }
             catch
             {
@@ -775,7 +793,7 @@ namespace Workspace1C.Services
         /// </list>
         /// Все ошибки обрабатываются внутри и не роняют приложение.
         /// </summary>
-        private async Task ShowUpdateDialogAsync(ReleaseInfo release)
+        private async Task ShowUpdateDialogAsync(ReleaseInfo release, bool wasSkipped = false)
         {
             // Пока цепочка идёт, окно остаётся отзывчивым, поэтому вторую проверку
             // обновлений нужно отсекать: обе писали бы в один и тот же файл загрузки.
@@ -800,7 +818,7 @@ namespace Workspace1C.Services
                 // предлагает установку готового файла, без подтверждения скачивания.
                 if (IsReadyFor(release))
                 {
-                    await ShowReadyInstallAsync(release, target);
+                    await ShowReadyInstallAsync(release, target, wasSkipped);
                     return;
                 }
 
@@ -817,13 +835,13 @@ namespace Workspace1C.Services
                 // обновляем заменой исполняемого файла напрямую.
                 if (IsDirectoryWritable(Path.GetDirectoryName(target)))
                 {
-                    await ShowSelfUpdateDialogAsync(release, target);
+                    await ShowSelfUpdateDialogAsync(release, target, wasSkipped);
                     return;
                 }
 
                 // Каталог не на запись: вероятно, установка через deb в системный каталог.
                 // Для замены нужны права администратора — предлагаем обновление через pkexec.
-                await ShowPrivilegedUpdateDialogAsync(release, target);
+                await ShowPrivilegedUpdateDialogAsync(release, target, wasSkipped);
             }
             catch
             {
@@ -845,14 +863,16 @@ namespace Workspace1C.Services
         /// согласием пользователя на повышение прав. AppImage — ручной путь
         /// (самообновление недоступно, файл в фоновом режиме не скачивался).
         /// </summary>
-        private async Task ShowReadyInstallAsync(ReleaseInfo release, string target)
+        private async Task ShowReadyInstallAsync(
+            ReleaseInfo release, string target, bool wasSkipped = false)
         {
             var readyBinary = ReadyFilePath;
             if (string.IsNullOrWhiteSpace(readyBinary) || !File.Exists(readyBinary))
             {
                 // Готовый файл исчез (очистка temp, сбой диска) — откат к обычному
                 // диалогу со скачиванием, чтобы обновление осталось доступным.
-                await ShowSelfUpdateDialogAsync(release, target);
+                // Issue #155: признак пропуска сохраняем и в резервной ветке.
+                await ShowSelfUpdateDialogAsync(release, target, wasSkipped);
                 return;
             }
 
@@ -868,8 +888,15 @@ namespace Workspace1C.Services
             {
                 // Issue #139 (1.0.1.84): диалог перезапуска — по той же политике
                 // размеров, что и окно «Доступна новая версия…» (fitContent).
-                var restartNow = ConfirmRestartNow(
-                    LocalizationManager.T("Update.RestartNowPrompt"));
+                var restartPrompt = LocalizationManager.T("Update.RestartNowPrompt");
+                if (wasSkipped)
+                {
+                    restartPrompt = LocalizationManager.T("Update.SkippedHint")
+                        + Environment.NewLine + Environment.NewLine + restartPrompt;
+                }
+                var restartNow = ConfirmRestartNow(restartPrompt);
+                // Issue #155: пользователь выбрал применение — пропуск снимаем.
+                ClearSkippedVersion();
 
                 if (restartNow)
                 {
@@ -902,11 +929,20 @@ namespace Workspace1C.Services
 
             // Системный каталог (например deb в /usr/bin): установка готового файла
             // через pkexec — только после явного согласия пользователя на повышение прав.
+            var readyPrompt = LocalizationManager.T("Update.ReadyInstallPrompt");
+            if (wasSkipped)
+            {
+                readyPrompt = LocalizationManager.T("Update.SkippedHint")
+                    + Environment.NewLine + Environment.NewLine + readyPrompt;
+            }
             var installNow = _dialogs.Confirm(
-                LocalizationManager.T("Update.ReadyInstallPrompt"),
+                readyPrompt,
                 LocalizationManager.T("Update.NewVersionAvailable"));
             if (!installNow)
                 return;
+
+            // Issue #155: пользователь выбрал обновление — пропуск снимаем.
+            ClearSkippedVersion();
 
             if (!await ApplyPrivilegedUpdateAsync(target, readyBinary).ConfigureAwait(true))
             {
@@ -924,7 +960,8 @@ namespace Workspace1C.Services
         /// скачивания, скачивает бинарник, затем предлагает применить обновление
         /// (перезапустить сейчас или после закрытия).
         /// </summary>
-        private async Task ShowSelfUpdateDialogAsync(ReleaseInfo release, string target)
+        private async Task ShowSelfUpdateDialogAsync(
+            ReleaseInfo release, string target, bool wasSkipped = false)
         {
             if (string.IsNullOrWhiteSpace(release.DownloadUrl))
             {
@@ -958,16 +995,27 @@ namespace Workspace1C.Services
                 summary = LocalizationManager.T("Update.NewVersionAvailableForDownload")
                     + Environment.NewLine + Environment.NewLine + summary;
             }
+            // Issue #155: повторная ручная проверка пропущенного релиза — поясняем,
+            // что версию можно обновить или пропустить снова.
+            if (wasSkipped)
+            {
+                summary = LocalizationManager.T("Update.SkippedHint")
+                    + Environment.NewLine + Environment.NewLine + summary;
+            }
             var result = ConfirmUpdateWithResult(summary, notes, release);
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
-                // пока не выйдет более новая версия.
+                // пока не выйдет более новая версия. Повторный пропуск идемпотентен.
                 SkipVersion(release);
                 return;
             }
             if (result == UpdateDialogResult.Cancelled)
                 return;
+
+            // Issue #155: пользователь явно выбрал обновление — пропуск снимаем,
+            // чтобы фоновые проверки больше не скрывали эту версию.
+            ClearSkippedVersion();
 
             // Скачиваем новый бинарник, не блокируя поток интерфейса: диалог показан
             // из UI-потока, и синхронное ожидание здесь замораживало окно на всё время
@@ -1043,7 +1091,8 @@ namespace Workspace1C.Services
         /// от повышения прав показывается запасной диалог с кликабельной ссылкой на страницу
         /// выпуска (issue #225).
         /// </summary>
-        private async Task ShowPrivilegedUpdateDialogAsync(ReleaseInfo release, string target)
+        private async Task ShowPrivilegedUpdateDialogAsync(
+            ReleaseInfo release, string target, bool wasSkipped = false)
         {
             if (string.IsNullOrWhiteSpace(release.DownloadUrl))
             {
@@ -1059,13 +1108,20 @@ namespace Workspace1C.Services
                 ? LocalizationManager.T("Update.AdminPromptDeb")
                 : LocalizationManager.T("Update.AdminPromptGeneric");
 
+            // Issue #155: повторная ручная проверка пропущенного релиза — поясняем,
+            // что версию можно обновить или пропустить снова.
+            if (wasSkipped)
+            {
+                prompt = LocalizationManager.T("Update.SkippedHint")
+                    + Environment.NewLine + Environment.NewLine + prompt;
+            }
             // Повышение прав запускаем только после явного согласия пользователя.
             // Issue #116: описание релиза передаётся только в автоматических режимах.
             var result = ConfirmUpdateWithResult(prompt, ReleaseNotesForDialog(release), release);
             if (result == UpdateDialogResult.Skipped)
             {
                 // «Пропустить эту версию» (issue #116): релиз не будет предлагаться,
-                // пока не выйдет более новая версия.
+                // пока не выйдет более новая версия. Повторный пропуск идемпотентен.
                 SkipVersion(release);
                 return;
             }
@@ -1076,6 +1132,9 @@ namespace Workspace1C.Services
                     LocalizationManager.T("Update.TargetNotWritable"), release.HtmlUrl);
                 return;
             }
+
+            // Issue #155: пользователь явно выбрал обновление — пропуск снимаем.
+            ClearSkippedVersion();
 
             var (newBinary, joinedExisting) = await DownloadWithProgressAsync(release)
                 .ConfigureAwait(true);

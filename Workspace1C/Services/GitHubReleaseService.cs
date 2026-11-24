@@ -234,18 +234,7 @@ public class GitHubReleaseService
     /// При невозможности распарсить одну из версий возвращает false.
     /// </summary>
     public static bool IsNewerThan(ReleaseInfo release, string currentVersion)
-    {
-        if (release is null)
-            return false;
-
-        if (!TryParseVersion(NormalizeTag(release.TagName), out var releaseVer))
-            return false;
-
-        if (!TryParseVersion(NormalizeTag(currentVersion), out var currentVer))
-            return false;
-
-        return releaseVer > currentVer;
-    }
+        => TryCompareVersions(release, currentVersion, out var comparison) && comparison > 0;
 
     /// <summary>
     /// Совпадает ли версия выпуска с указанной версией (issue #129). Тег нормализуется
@@ -254,7 +243,23 @@ public class GitHubReleaseService
     /// действительно более новой версии. При невозможности распарсить — false.
     /// </summary>
     public static bool IsSameVersion(ReleaseInfo release, string version)
+        => TryCompareVersions(release, version, out var comparison) && comparison == 0;
+
+    /// <summary>
+    /// Сравнивает версию выпуска с произвольной версией по правилам
+    /// <see cref="IsNewerThan"/> (issue #155): нормализация тега, разбор через
+    /// <see cref="Version"/> и дополнение отсутствующих частей нулями.
+    /// Возвращает false, если хотя бы одна из версий не распознана — вызывающий код
+    /// сам решает, что делать с нераспознанной версией (для пропуска это «не пропущено»).
+    /// </summary>
+    /// <param name="release">Выпуск GitHub.</param>
+    /// <param name="version">Версия для сравнения (например, пропущенная).</param>
+    /// <param name="comparison">Результат сравнения: <0 — выпуск старше,
+    /// 0 — равен, >0 — новее.</param>
+    internal static bool TryCompareVersions(
+        ReleaseInfo release, string version, out int comparison)
     {
+        comparison = 0;
         if (release is null)
             return false;
 
@@ -264,7 +269,8 @@ public class GitHubReleaseService
         if (!TryParseVersion(NormalizeTag(version), out var versionVer))
             return false;
 
-        return releaseVer == versionVer;
+        comparison = releaseVer.CompareTo(versionVer);
+        return true;
     }
 
     /// <summary>
@@ -308,13 +314,27 @@ public class GitHubReleaseService
 
     private static bool TryParseVersion(string text, out Version version)
     {
+        version = new Version(0, 0, 0, 0);
+        if (string.IsNullOrWhiteSpace(text))
+            return false;
+
         // Защита от хвостовых суффиксов вида «+sha», если они не были обрезаны ранее.
         var plus = text.IndexOf('+');
         if (plus >= 0)
             text = text.Substring(0, plus);
 
         // Устойчиво и к 3-частным, и к 4-частным версиям (например «0.3.5.75»).
-        return Version.TryParse(text.Trim(), out version!);
+        if (!Version.TryParse(text.Trim(), out var parsed))
+            return false;
+
+        // Issue #155: приводим к 4 частям, иначе «1.0.1» (Build = -1) сравнивался бы
+        // как МЕНЬШИЙ, чем «1.0.1.0» — релиз выглядел бы «прошлым» из-за формы записи.
+        version = new Version(
+            parsed.Major,
+            parsed.Minor,
+            parsed.Build >= 0 ? parsed.Build : 0,
+            parsed.Revision >= 0 ? parsed.Revision : 0);
+        return true;
     }
 
     /// <summary>

@@ -125,8 +125,9 @@ public sealed class Issue116ManualUpdateNoNotificationTests
     }
 
     [Theory]
-    [InlineData("UpdateService.cs", "private void ShowUpdateDialog(ReleaseInfo release)")]
-    [InlineData("UpdateService.Avalonia.cs", "private async Task ShowUpdateDialogAsync(ReleaseInfo release)")]
+    // Issue #155: в сигнатуре диалога появился признак «версия была пропущена».
+    [InlineData("UpdateService.cs", "private void ShowUpdateDialog(ReleaseInfo release, bool wasSkipped = false)")]
+    [InlineData("UpdateService.Avalonia.cs", "private async Task ShowUpdateDialogAsync(ReleaseInfo release, bool wasSkipped = false)")]
     public void UpdateDialog_IsUserAction(string fileName, string signature)
     {
         var source = ReadProjectFile("Workspace1C", "Services", fileName);
