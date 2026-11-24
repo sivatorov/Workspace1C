@@ -9,8 +9,8 @@
         mc:Ignorable="d"
         Title="{loc:Loc ContextMenu.Editor.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="560" Width="760"
-        MinWidth="640" MinHeight="480"
+        Height="685" Width="760"
+        MinWidth="640" MinHeight="685"
         WindowStartupLocation="CenterOwner"
         FontSize="13"
         ShowInTaskbar="False"
@@ -95,8 +95,20 @@
                 </DockPanel>
             </Border>
 
-            <!-- Панель операций -->
-            <StackPanel Grid.Column="2">
+            <!-- Правая колонка (issue #146, 1.0.1.116): пояснение закреплено внизу
+                 (DockPanel.Dock="Bottom") и видно всегда; прокручивается только панель
+                 операций — и только если она не помещается (аварийный вариант для
+                 маленьких экранов). -->
+            <DockPanel Grid.Column="2">
+                <Border DockPanel.Dock="Bottom" Margin="0,14,0,0" Padding="10" CornerRadius="6"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
+                    <TextBlock Text="{loc:Loc ContextMenu.Editor.Hint}" TextWrapping="Wrap"
+                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
+                </Border>
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel>
                 <!-- Перемещение -->
                 <TextBlock Text="{loc:Loc ContextMenu.Editor.MoveHeader}" Margin="0,0,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -186,14 +198,9 @@
                     </Button>
                 </StackPanel>
 
-                <!-- Пояснение -->
-                <Border Grid.Column="0" Margin="0,14,0,0" Padding="10" CornerRadius="6"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1">
-                    <TextBlock Text="{loc:Loc ContextMenu.Editor.Hint}" TextWrapping="Wrap"
-                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"/>
-                </Border>
-            </StackPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
         </Grid>
     </DockPanel>
 </Window>

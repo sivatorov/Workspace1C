@@ -648,21 +648,12 @@
                                     </materialDesign:PackIcon.RenderTransform>
                                 </materialDesign:PackIcon>
                             </Button>
-                            <!-- Инспектор процессов 1С (issue #134, доработка ArtyoZ):
-                                 иконка набора инструментов сразу после «Проверить доступность
-                                 всех баз» и до разделителя — быстрый доступ вместо пункта
-                                 «Утилиты → Операции», где он был неюзабелен. -->
-                            <Button x:Name="ProcessInspectorButton"
-                                    Command="{Binding ProcessInspectorCommand}"
-                                    Style="{DynamicResource IconButton}" Margin="0,0,2,0" Padding="6"
-                                    ToolTip="{loc:Loc Main.ProcessInspectorTooltip}">
-                                <Path Width="18" Height="18" Stretch="Uniform"
-                                      Data="{DynamicResource IconApplicationCog}"
-                                      Fill="{DynamicResource InfoBrush}"/>
-                            </Button>
-                            <!-- Вертикальный разделитель: отделяет группу «Управление списком» от «Настройки» -->
-                            <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"
-                                    Background="{DynamicResource BorderBrushColor}" Opacity="0.55"/>
+                            <!-- Issue #146 (A4): «Инспектор процессов 1С» убран с панели
+                                 инструментов вместе со своим разделителем (как «Очистка кеша»
+                                 в 1.0.1.99). Теперь это обычный пункт меню «Утилиты»,
+                                 по умолчанию вынесенный на верхний уровень панели разделов
+                                 (кнопка-иконка в SectionButtonsPanel); хоткей Ctrl+Alt+I
+                                 сохранён. -->
                             <!-- Навигация 1.0.1.99: четыре сценарных раздела вместо одной кнопки
                                  «Утилиты». Каждая кнопка открывает только свой раздел, меню
                                  строится динамически (BuildUtilitiesMenu) по компоновке.
@@ -677,8 +668,11 @@
                                  UtilitiesMenuEvents.LayoutChanged, без перезапуска. Режим
                                  «С надписью» применяется к кнопке группы; стандартные разделы
                                  по умолчанию остаются компактными (только иконка). -->
-                            <StackPanel x:Name="SectionButtonsPanel" Orientation="Horizontal"
-                                        VerticalAlignment="Center"/>
+                            <!-- Issue #146 (A3): WrapPanel вместо StackPanel — при большом числе
+                                 верхнеуровневых пунктов/разделителей кнопки переносятся на
+                                 следующую строку панели команд, а не уходят за край (R8). -->
+                            <WrapPanel x:Name="SectionButtonsPanel" Orientation="Horizontal"
+                                       VerticalAlignment="Center"/>
                             <!-- Issue #146: разделитель перед быстрыми кнопками темы,
                                  компактности и настроек — визуально отделяет их от меню. -->
                             <Border Width="1" Margin="4,5" VerticalAlignment="Stretch"

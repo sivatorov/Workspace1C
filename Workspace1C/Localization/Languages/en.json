@@ -54,6 +54,7 @@
     "Main.Utilities": "Utilities",
     "Main.UtilitiesTooltip": "Common commands and utilities not tied to a specific infobase",
     "Main.ProcessInspectorTooltip": "1C process inspector",
+    "ProcessInspector.MenuItem": "1C process inspector",
     "Main.UtilitiesConnectionReplace": "Replace in connection strings…",
     "Main.UtilitiesUndoConnectionReplace": "Undo last connection string replacement",
     "Main.CustomActionsSettings": "Configure actions…",

@@ -35,13 +35,13 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("TrayMenu.Title");
             Width = 760;
-            // Issue #146 (1.0.1.115): 560 DIP не хватало на дерево + панель операций +
-            // пояснение. 760 DIP помещает пояснение без прокрутки на обычном экране.
-            Height = DialogWorkAreaPolicy.EditorDefaultHeight;
+            // Issue #146 (1.0.1.116): высота и минимум — из профиля TrayEditor
+            // (855 DIP); окно открывается на минимально необходимой высоте.
+            Height = DialogWorkAreaPolicy.TrayEditor.DefaultHeight;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
             MinWidth = 640;
-            MinHeight = DialogWorkAreaPolicy.EditorMinHeight;
+            MinHeight = DialogWorkAreaPolicy.TrayEditor.MinHeight;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             _vm = new TrayMenuEditorViewModel(store);
@@ -52,8 +52,8 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
-        /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 760 DIP помещает
+        /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
+        /// <see cref="DialogWorkAreaPolicy.TrayEditor"/> — высота 855 DIP помещает
         /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
         /// (прокрутка остаётся аварийным вариантом).
         /// </summary>
@@ -64,9 +64,7 @@ namespace Workspace1C
                 return;
             var dipHeight = screen.WorkingArea.Height / screen.Scaling;
             var size = DialogWorkAreaPolicy.Recommend(
-                DialogWorkAreaPolicy.EditorDefaultHeight,
-                DialogWorkAreaPolicy.EditorMinHeight,
-                DialogWorkAreaPolicy.EditorContentHeight,
+                DialogWorkAreaPolicy.TrayEditor,
                 dipHeight);
             MaxHeight = size.MaxHeight;
             MinHeight = size.MinHeight;

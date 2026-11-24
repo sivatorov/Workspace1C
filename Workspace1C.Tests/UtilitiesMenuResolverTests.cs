@@ -20,8 +20,12 @@ public sealed class UtilitiesMenuResolverTests
         var settings = new AppSettings { UtilitiesMenuEditingEnabled = false };
         var layout = UtilitiesMenuResolver.Resolve(settings, null);
         Assert.NotNull(layout);
-        // Первый раздел новой компоновки — «Серверы».
-        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
+        // Issue #146 (A4): в корне сначала верхнеуровневый пункт «Инспектор процессов»
+        // и разделитель, затем четыре сценарных раздела; первый раздел — «Серверы».
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers,
+            layout!.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupServers).GroupId);
+        Assert.Equal(UtilitiesMenuCatalog.RootSections,
+            layout.Root.Where(n => n.Kind == "group").Select(n => n.GroupId!).ToArray());
     }
 
     [Fact]
@@ -37,7 +41,9 @@ public sealed class UtilitiesMenuResolverTests
         });
         var layout = UtilitiesMenuResolver.Resolve(settings, store);
         // Правка выключена — файл компоновки игнорируется.
-        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers,
+            layout!.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupServers).GroupId);
+        Assert.DoesNotContain(layout.Root, n => n.ItemId == "ActualReleases");
     }
 
     [Fact]
@@ -46,9 +52,13 @@ public sealed class UtilitiesMenuResolverTests
         var settings = new AppSettings { UtilitiesMenuEditingEnabled = true };
         var layout = UtilitiesMenuResolver.Resolve(settings, null);
         Assert.NotNull(layout);
-        // Четыре сценарных раздела первого уровня (навигация 1.0.1.99).
-        Assert.Equal(4, layout!.Root.Count);
-        Assert.Equal(UtilitiesMenuCatalog.RootSections, layout.Root.Select(n => n.GroupId!).ToArray());
+        // Issue #146 (A4): 6 узлов корня — верхнеуровневый «Инспектор процессов»,
+        // разделитель и четыре сценарных раздела (навигация 1.0.1.99).
+        Assert.Equal(6, layout!.Root.Count);
+        Assert.Equal("ProcessInspector", layout.Root[0].ItemId);
+        Assert.Equal("separator", layout.Root[1].Kind);
+        Assert.Equal(UtilitiesMenuCatalog.RootSections,
+            layout.Root.Skip(2).Select(n => n.GroupId!).ToArray());
     }
 
     [Fact]
@@ -77,7 +87,9 @@ public sealed class UtilitiesMenuResolverTests
     {
         var layout = UtilitiesMenuResolver.Resolve(null, null);
         Assert.NotNull(layout);
-        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout!.Root[0].GroupId);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers,
+            layout!.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupServers).GroupId);
+        Assert.Equal("ProcessInspector", layout.Root[0].ItemId);
     }
 
     /// <summary>

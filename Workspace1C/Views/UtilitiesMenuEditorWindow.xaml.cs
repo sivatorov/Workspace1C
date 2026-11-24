@@ -131,8 +131,8 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
-        /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 760 DIP помещает
+        /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
+        /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 825 DIP помещает
         /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
         /// (прокрутка остаётся аварийным вариантом).
         /// </summary>
@@ -140,9 +140,7 @@ namespace Workspace1C
         {
             var workArea = SystemParameters.WorkArea;
             var size = DialogWorkAreaPolicy.Recommend(
-                DialogWorkAreaPolicy.EditorDefaultHeight,
-                DialogWorkAreaPolicy.EditorMinHeight,
-                DialogWorkAreaPolicy.EditorContentHeight,
+                DialogWorkAreaPolicy.UtilitiesEditor,
                 workArea.Height);
             MaxHeight = size.MaxHeight;
             MinHeight = size.MinHeight;

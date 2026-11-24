@@ -124,13 +124,16 @@ public sealed class Issue146UtilitiesMenuTests
         Assert.Contains("CheckForUpdates", ids);
     }
 
-    /// <summary>Пустая/отсутствующая компоновка — стандартная (рабочая точка входа).</summary>
+    /// <summary>
+    /// Пустая/отсутствующая компоновка — стандартная (рабочая точка входа).
+    /// Issue #146 (A4): в корне ещё верхнеуровневый «Инспектор процессов» и разделитель.
+    /// </summary>
     [Fact]
     public void Migrate_EmptyOrCorruptLayout_ReturnsDefault()
     {
-        Assert.Equal(UtilitiesMenuCatalog.RootSections.Count,
+        Assert.Equal(UtilitiesMenuCatalog.RootSections.Count + 2,
             UtilitiesMenuLayouts.Migrate(null).Root.Count);
-        Assert.Equal(UtilitiesMenuCatalog.RootSections.Count,
+        Assert.Equal(UtilitiesMenuCatalog.RootSections.Count + 2,
             UtilitiesMenuLayouts.Migrate(new UtilitiesMenuLayout { SchemaVersion = 1 }).Root.Count);
     }
 
@@ -286,18 +289,26 @@ public sealed class Issue146UtilitiesMenuTests
         Assert.Contains(plan, b => b.SectionId == UtilitiesMenuCatalog.GroupMore);
     }
 
-    /// <summary>Стандартная компоновка даёт четыре кнопки разделов в порядке каталога.</summary>
+    /// <summary>
+    /// Стандартная компоновка даёт четыре кнопки разделов в порядке каталога.
+    /// Issue #146 (A3): в плане могут быть и верхнеуровневые пункты/разделители,
+    /// поэтому кнопки разделов фильтруются по <see cref="UtilitiesSectionButtonKind.Group"/>.
+    /// </summary>
     [Fact]
     public void SectionMenuPlanner_VisibleSections_ReturnsFourButtons()
     {
         var plan = UtilitiesSectionMenuPlanner.Build(UtilitiesMenuLayouts.Default());
+        var groups = plan.Where(b => b.Kind == UtilitiesSectionButtonKind.Group).ToList();
 
         Assert.Equal(UtilitiesMenuCatalog.RootSections,
-            plan.Select(b => b.SectionId).ToArray());
-        Assert.All(plan, b => Assert.False(b.IsCustom));
+            groups.Select(b => b.SectionId).ToArray());
+        Assert.All(groups, b => Assert.False(b.IsCustom));
     }
 
-    /// <summary>Плоская компоновка без групп даёт одну кнопку «Утилиты».</summary>
+    /// <summary>
+    /// Плоская компоновка без групп даёт кнопки верхнеуровневых пунктов и в конце —
+    /// запасную кнопку «Утилиты» (issue #146, A3): пункты не отнимают доступ к меню.
+    /// </summary>
     [Fact]
     public void SectionMenuPlanner_FlatRoot_ReturnsUtilitiesButton()
     {
@@ -312,10 +323,13 @@ public sealed class Issue146UtilitiesMenuTests
 
         var plan = UtilitiesSectionMenuPlanner.Build(layout);
 
-        Assert.Single(plan);
-        Assert.True(plan[0].IsCustom);
-        Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesSectionId, plan[0].SectionId);
-        Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesTitleKey, plan[0].TitleKey);
+        Assert.Equal(3, plan.Count);
+        Assert.Equal(2, plan.Count(b => b.Kind == UtilitiesSectionButtonKind.Item));
+        Assert.All(plan.Take(2), b => Assert.Equal(b.ItemId, b.SectionId));
+        Assert.Equal(UtilitiesSectionButtonKind.Group, plan[^1].Kind);
+        Assert.True(plan[^1].IsCustom);
+        Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesSectionId, plan[^1].SectionId);
+        Assert.Equal(UtilitiesSectionMenuPlanner.UtilitiesTitleKey, plan[^1].TitleKey);
     }
 
     /// <summary>

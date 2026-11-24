@@ -3043,8 +3043,10 @@ namespace Workspace1C
                     item.Command = _vm!.ImportClusterInfobasesCommand; break;
                 case UtilitiesMenuCommandKind.MigrateClusterInfobases:
                     item.Command = _vm!.MigrateClusterInfobasesCommand; break;
-                // issue #134 (1.0.1.84): пункт «Инспектор процессов 1С» из «Утилит» удалён —
-                // команда доступна кнопкой панели инструментов и Ctrl+Alt+I.
+                // Issue #146 (A4): «Инспектор процессов 1С» — снова пункт «Утилит»
+                // (по умолчанию на верхнем уровне панели), хоткей Ctrl+Alt+I сохранён.
+                case UtilitiesMenuCommandKind.ProcessInspector:
+                    item.Command = _vm!.ProcessInspectorCommand; break;
                 case UtilitiesMenuCommandKind.KillOneCProcesses:
                     // В Avalonia-версии MainViewModel это методы, а не команды.
                     item.Click += (_, _) => _vm!.KillOneCProcesses(); break;

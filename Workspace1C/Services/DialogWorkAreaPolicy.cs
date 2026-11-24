@@ -18,31 +18,33 @@ public static class DialogWorkAreaPolicy
     public const double DefaultMargin = 48;
 
     /// <summary>
-    /// Issue #146 (1.0.1.115): высота окна по умолчанию для редакторов меню
-    /// («Утилиты», «Меню трея»). 560 DIP не хватало на дерево + панель операций +
-    /// пояснение, поэтому пользователь видел прокрутку даже на обычном экране.
+    /// Issue #146 (1.0.1.116): профиль высот диалогового окна. Все три значения
+    /// совпадают (<c>Height = MinHeight = contentHeight</c>) — окно открывается на
+    /// минимально необходимой высоте, а <see cref="DialogSize.RequiresScrolling"/>
+    /// включается только после клампа по маленькой рабочей области.
     /// </summary>
-    public const double EditorDefaultHeight = 760;
-
-    /// <summary>Минимальная высота редакторов меню: пояснение и кнопки остаются видны.</summary>
-    public const double EditorMinHeight = 600;
+    /// <param name="DefaultHeight">Высота окна по умолчанию, DIP.</param>
+    /// <param name="MinHeight">Минимальная высота окна, DIP.</param>
+    /// <param name="ContentHeight">Высота, при которой содержимое помещается без прокрутки, DIP.</param>
+    public readonly record struct DialogProfile(
+        double DefaultHeight,
+        double MinHeight,
+        double ContentHeight);
 
     /// <summary>
-    /// Высота, при которой содержимое редактора меню помещается без прокрутки.
-    /// Используется для признака <see cref="DialogSize.RequiresScrolling"/>:
-    /// если кламп по рабочей области урезал окно ниже этого значения, прокрутка
-    /// остаётся аварийным вариантом для маленьких экранов.
+    /// Issue #146 (1.0.1.116): окно «Настройка меню утилиты» — 825 DIP. Общие
+    /// константы <c>Editor*</c> удалены: у «Утилит» и «Меню трея» разные высоты.
     /// </summary>
-    public const double EditorContentHeight = 640;
+    public static readonly DialogProfile UtilitiesEditor = new(825, 825, 825);
 
-    /// <summary>Высота окна «Мои программы» по умолчанию (issue #146).</summary>
-    public const double CustomProgramsDefaultHeight = 780;
+    /// <summary>Issue #146 (1.0.1.116): окно «Настройка меню трея» — 855 DIP.</summary>
+    public static readonly DialogProfile TrayEditor = new(855, 855, 855);
 
-    /// <summary>Минимальная высота окна «Мои программы».</summary>
-    public const double CustomProgramsMinHeight = 600;
+    /// <summary>Issue #146 (1.0.1.116): окно «Контекстное меню» — 685 DIP.</summary>
+    public static readonly DialogProfile ContextMenuEditor = new(685, 685, 685);
 
-    /// <summary>Высота, при которой форма «Моих программ» помещается без прокрутки.</summary>
-    public const double CustomProgramsContentHeight = 660;
+    /// <summary>Issue #146 (1.0.1.116): окно «Мои программы» — 760 DIP.</summary>
+    public static readonly DialogProfile CustomPrograms = new(760, 760, 760);
 
     /// <summary>
     /// Issue #146 (1.0.1.115): рекомендуемые размеры диалогового окна с учётом
@@ -55,6 +57,25 @@ public static class DialogWorkAreaPolicy
         double MinHeight,
         double MaxHeight,
         bool RequiresScrolling);
+
+    /// <summary>
+    /// Issue #146 (1.0.1.116): рекомендованные размеры окна по его профилю. Профиль
+    /// избавляет окна от «магических чисел» и гарантирует, что WPF и Avalonia
+    /// считают одинаково.
+    /// </summary>
+    /// <param name="profile">Профиль высот окна (например, <see cref="UtilitiesEditor"/>).</param>
+    /// <param name="workAreaHeight">Высота рабочей области монитора, DIP.</param>
+    /// <param name="margin">Отступ от краёв рабочей области, DIP.</param>
+    public static DialogSize Recommend(
+        DialogProfile profile,
+        double workAreaHeight,
+        double margin = DefaultMargin) =>
+        Recommend(
+            profile.DefaultHeight,
+            profile.MinHeight,
+            profile.ContentHeight,
+            workAreaHeight,
+            margin);
 
     /// <summary>
     /// Считает итоговые размеры окна: <c>Height</c> клампится в рабочую область,

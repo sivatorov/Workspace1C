@@ -378,8 +378,10 @@ public partial class MainWindow
                 item.Command = _viewModel.ImportClusterInfobasesCommand; break;
             case UtilitiesMenuCommandKind.MigrateClusterInfobases:
                 item.Command = _viewModel.MigrateClusterInfobasesCommand; break;
-            // issue #134 (1.0.1.84): пункт «Инспектор процессов 1С» из «Утилит» удалён —
-            // команда доступна кнопкой панели инструментов и Ctrl+Alt+I.
+            // Issue #146 (A4): «Инспектор процессов 1С» — снова пункт «Утилит»
+            // (по умолчанию на верхнем уровне панели), хоткей Ctrl+Alt+I сохранён.
+            case UtilitiesMenuCommandKind.ProcessInspector:
+                item.Command = _viewModel.ProcessInspectorCommand; break;
             case UtilitiesMenuCommandKind.KillOneCProcesses:
                 item.Command = _viewModel.KillOneCProcessesCommand; break;
             case UtilitiesMenuCommandKind.ConnectionReplace:
@@ -494,17 +496,29 @@ public partial class MainWindow
         SectionButtonsPanel.Children.Clear();
         foreach (var section in UtilitiesSectionMenuPlanner.Build(layout))
         {
-            var node = UtilitiesMenuLayouts.FindRootSection(layout, section.SectionId);
-            SectionButtonsPanel.Children.Add(BuildSectionButton(section, node));
+            // Issue #146: корневой узел ищется и по GroupId/NodeId (группа), и по
+            // ItemId (верхнеуровневый пункт) — см. FindRootNode.
+            var node = UtilitiesMenuLayouts.FindRootNode(layout, section.SectionId);
+            var element = BuildSectionButton(section, node);
+            if (element is not null)
+                SectionButtonsPanel.Children.Add(element);
         }
     }
 
     /// <summary>
-    /// Кнопка раздела/пользовательской группы на верхней панели (issue #146):
-    /// «С надписью» — иконка + подпись, «Иконка» — только иконка с подсказкой.
+    /// Элемент верхней панели по записи планировщика (issue #146):
+    /// <see cref="UtilitiesSectionButtonKind.Group"/> — кнопка раздела,
+    /// <see cref="UtilitiesSectionButtonKind.Item"/> — кнопка только с иконкой и командой
+    /// пункта, <see cref="UtilitiesSectionButtonKind.Separator"/> — вертикальная черта.
+    /// null — пункт неизвестен или доступен только в Avalonia/Linux (R10).
     /// </summary>
-    private Button BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
+    private FrameworkElement? BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
     {
+        if (section.Kind == UtilitiesSectionButtonKind.Separator)
+            return BuildSectionSeparator();
+
+        if (section.Kind == UtilitiesSectionButtonKind.Item)
+            return BuildSectionItemButton(section, node);
         var title = !string.IsNullOrWhiteSpace(section.Title)
             ? section.Title!
             : (!string.IsNullOrWhiteSpace(section.TitleKey)
@@ -562,6 +576,75 @@ public partial class MainWindow
 
         button.Click += OnSectionMenuButton_Click;
         // ПКМ по любой кнопке раздела — редактор структуры меню (issue #146).
+        button.PreviewMouseRightButtonDown += OnUtilitiesButton_PreviewMouseRightButtonDown;
+        return button;
+    }
+
+    /// <summary>
+    /// Вертикальная черта верхнеуровневого разделителя (issue #146): та же геометрия,
+    /// что у статических разделителей панели инструментов (MainWindow.xaml:632).
+    /// </summary>
+    private Border BuildSectionSeparator()
+    {
+        var line = new Border
+        {
+            Width = 1,
+            Margin = new Thickness(4, 5, 4, 5),
+            Opacity = 0.55,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Background = TryFindResource("BorderBrushColor") as Brush
+                         ?? new SolidColorBrush(Color.FromArgb(0x80, 0x6B, 0x72, 0x80)),
+        };
+        // ПКМ по черте — редактор структуры меню, как у кнопок разделов.
+        line.PreviewMouseRightButtonDown += OnUtilitiesButton_PreviewMouseRightButtonDown;
+        return line;
+    }
+
+    /// <summary>
+    /// Кнопка верхнеуровневого пункта (issue #146): только иконка, подсказка — название,
+    /// клик выполняет команду пункта. Команда/действие берутся из общего построителя
+    /// пункта меню (<see cref="CreateItem"/>), поэтому поведение совпадает с меню.
+    /// </summary>
+    private Button? BuildSectionItemButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
+    {
+        var catalogItem = UtilitiesMenuCatalog.Find(section.ItemId);
+        // Пункты только для Avalonia/Linux в WPF не показываем (R10): иначе получилась
+        // бы пустая или нерабочая кнопка.
+        if (catalogItem is null || catalogItem.LinuxOnly)
+            return null;
+
+        var itemNode = node ?? new UtilitiesMenuNode
+        {
+            Kind = "item",
+            ItemId = section.ItemId,
+        };
+        var menuItem = CreateItem(itemNode);
+        if (menuItem is null)
+            return null;
+
+        var title = catalogItem.DisplayText();
+        var button = new Button
+        {
+            Style = TryFindResource("IconButton") as Style,
+            Margin = new Thickness(0, 0, 2, 0),
+            Padding = new Thickness(6),
+            MinWidth = 32,
+            Tag = catalogItem.Id,
+            ToolTip = title,
+            Content = menuItem.Icon,
+            Command = menuItem.Command,
+            IsEnabled = menuItem.IsEnabled,
+        };
+
+        // Пункты, у которых действие задано обработчиком Click (а не командой),
+        // получают тот же обработчик через событие MenuItem.Click.
+        if (menuItem.Command is null)
+        {
+            button.Click += (_, _) =>
+                menuItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        }
+
+        // ПКМ по кнопке пункта — редактор структуры меню (issue #146).
         button.PreviewMouseRightButtonDown += OnUtilitiesButton_PreviewMouseRightButtonDown;
         return button;
     }

@@ -54,6 +54,7 @@
     "Main.Utilities": "Утилиты",
     "Main.UtilitiesTooltip": "Общие команды и утилиты, не привязанные к конкретной базе",
     "Main.ProcessInspectorTooltip": "Инспектор процессов 1С",
+    "ProcessInspector.MenuItem": "Инспектор процессов 1С",
     "Main.UtilitiesConnectionReplace": "Заменить в строках подключения…",
     "Main.UtilitiesUndoConnectionReplace": "Отменить последнюю замену строк подключения",
     "Main.CustomActionsSettings": "Настроить действия…",

@@ -1094,18 +1094,11 @@ namespace Workspace1C
             exportBtn.Focusable = false;
             panel.Children.Add(exportBtn);
 
-            // Инспектор процессов 1С (issue #134): остаётся быстрым действием —
-            // он нужен во время разбора «зависших» сеансов при открытом списке.
-            var processInspectorBtn = TopBarIconButton(
-                "IconApplicationCog",
-                LocalizationManager.T("Main.ProcessInspectorTooltip"),
-                themeBrushKey: "TopBarActionBrush");
-            processInspectorBtn.Bind(Button.CommandProperty, new Binding("ProcessInspectorCommand"));
-            panel.Children.Add(processInspectorBtn);
-
-            // Очистка кеша, синхронизация с ibases.v8i и проверка доступности
-            // перенесены в разделы «Обслуживание» и «Инструменты» (навигация 1.0.1.99).
-            panel.Children.Add(CommandPanelSeparator());
+            // Issue #146 (A4): «Инспектор процессов 1С» убран с панели команд вместе со
+            // своим разделителем (как «Очистка кеша» в 1.0.1.99) — это снова обычный
+            // пункт меню «Утилиты», по умолчанию вынесенный на верхний уровень панели
+            // разделов; хоткей Ctrl+Alt+I сохранён. Разделитель после группы «Правка»
+            // остаётся единственным между быстрыми действиями и кнопками разделов.
 
             // Issue #146: кнопки разделов строятся по компоновке через общий планировщик.
             // Скрытый раздел не даёт кнопку; пользовательская группа верхнего уровня
@@ -1148,30 +1141,42 @@ namespace Workspace1C
         /// </summary>
         private Control BuildSectionButtons()
         {
-            var container = new StackPanel
+            // Issue #146 (A3, R8): WrapPanel вместо StackPanel — при большом числе
+            // верхнеуровневых пунктов/разделителей кнопки переносятся на следующую
+            // строку, а не уходят за край панели команд.
+            var container = new WrapPanel
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                Spacing = 2
+                ItemSpacing = 2
             };
 
             var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
             var layout = UtilitiesMenuResolver.ResolveForDisplay(_vm?.Settings, store);
             foreach (var section in UtilitiesSectionMenuPlanner.Build(layout))
             {
-                var node = UtilitiesMenuLayouts.FindRootSection(layout, section.SectionId);
-                container.Children.Add(BuildSectionButton(section, node));
+                // Issue #146: корневой узел ищется и по GroupId/NodeId (группа), и по
+                // ItemId (верхнеуровневый пункт) — см. FindRootNode.
+                var node = UtilitiesMenuLayouts.FindRootNode(layout, section.SectionId);
+                var element = BuildSectionButton(section, node);
+                if (element is not null)
+                    container.Children.Add(element);
             }
             return container;
         }
 
         /// <summary>
-        /// Кнопка раздела/пользовательской группы (issue #146): режим «С надписью» из
-        /// <see cref="UtilitiesMenuGroupPresentation"/> — иконка + подпись, иначе только
-        /// иконка с подсказкой. ПКМ по кнопке открывает редактор структуры меню.
+        /// Элемент верхней панели (issue #146): группа — кнопка раздела/подписи,
+        /// верхнеуровневый пункт — кнопка только с иконкой и командой, разделитель —
+        /// вертикальная черта. null — пункт неизвестен или недоступен на платформе.
         /// </summary>
-        private Button BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
+        private Control? BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
         {
+            if (section.Kind == UtilitiesSectionButtonKind.Separator)
+                return CommandPanelSeparator();
+
+            if (section.Kind == UtilitiesSectionButtonKind.Item)
+                return BuildSectionItemButton(section, node);
             var title = !string.IsNullOrWhiteSpace(section.Title)
                 ? section.Title!
                 : (!string.IsNullOrWhiteSpace(section.TitleKey)
@@ -1239,6 +1244,61 @@ namespace Workspace1C
             };
             // Меню строится при каждом клике: пометки «ПРО» всегда актуальны.
             button.Click += (_, _) => OpenSectionMenu(section.SectionId, button);
+            return button;
+        }
+
+        /// <summary>
+        /// Кнопка верхнеуровневого пункта (issue #146): только иконка, подсказка — название,
+        /// клик выполняет команду пункта. Команда/иконка берутся из общего построителя
+        /// пункта меню (<see cref="CreateAvaloniaItem"/>), поэтому поведение совпадает с меню.
+        /// </summary>
+        private Button? BuildSectionItemButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
+        {
+            var catalogItem = UtilitiesMenuCatalog.Find(section.ItemId);
+            // LinuxOnly-пункты показываем только на Linux (R10): на Windows-сборке
+            // Avalonia кнопка была бы нерабочей.
+            if (catalogItem is null || (catalogItem.LinuxOnly && !OperatingSystem.IsLinux()))
+                return null;
+
+            var itemNode = node ?? new UtilitiesMenuNode
+            {
+                Kind = "item",
+                ItemId = section.ItemId,
+            };
+            var menuItem = CreateAvaloniaItem(itemNode);
+            if (menuItem is null)
+                return null;
+
+            var title = catalogItem.DisplayText();
+            var button = new Button
+            {
+                Content = menuItem.Icon,
+                Tag = catalogItem.Id,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(UiMetrics.Scaled(8)),
+                IsEnabled = menuItem.IsEnabled,
+                Command = menuItem.Command,
+            };
+            button.Styled(Themes.ControlThemes.IconButton);
+            ToolTip.SetTip(button, title);
+            UiAutomation.SetNameFromTip(button);
+
+            // Пункты с обработчиком Click (а не командой) получают тот же обработчик.
+            if (menuItem.Command is null)
+            {
+                button.Click += (_, _) =>
+                    menuItem.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            }
+
+            // ПКМ по кнопке пункта — редактор структуры меню (issue #146).
+            button.PointerPressed += (_, e) =>
+            {
+                if (!e.GetCurrentPoint(button).Properties.IsRightButtonPressed)
+                    return;
+                e.Handled = true;
+                OpenUtilitiesMenuEditorDirectly();
+            };
             return button;
         }
 

@@ -582,16 +582,16 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
             SeparatorBefore = item.Node.SeparatorBefore,
         };
         // Issue #146: положение в дереве — источник истины для признака верхнего уровня.
-        // Группа, оказавшаяся в корне, становится отдельной кнопкой панели и получает
-        // стабильный NodeId, даже если создана до появления схемы 5.
-        if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+        // В корне может оказаться любой узел (группа, пункт, разделитель): все они
+        // показываются на верхней панели (пункт — иконкой, разделитель — чертой).
+        // Стабильный NodeId по-прежнему нужен только пользовательской группе.
+        node.IsTopLevel = item.Parent is null;
+        if (node.IsTopLevel
+            && string.Equals(node.Kind, "group", StringComparison.Ordinal)
+            && string.IsNullOrWhiteSpace(node.GroupId)
+            && string.IsNullOrWhiteSpace(node.NodeId))
         {
-            node.IsTopLevel = item.Parent is null;
-            if (node.IsTopLevel && string.IsNullOrWhiteSpace(node.GroupId)
-                && string.IsNullOrWhiteSpace(node.NodeId))
-            {
-                node.NodeId = UtilitiesMenuLayouts.NewNodeId();
-            }
+            node.NodeId = UtilitiesMenuLayouts.NewNodeId();
         }
         foreach (var child in item.Children)
             node.Children.Add(ToNode(child));
@@ -600,16 +600,16 @@ public class UtilitiesMenuEditorViewModel : ViewModelBase
 
     /// <summary>
     /// Issue #146: синхронизирует признак верхнего уровня после перемещения узла.
-    /// Группа в корне получает <see cref="UtilitiesMenuNode.IsTopLevel"/> = true и
-    /// стабильный <see cref="UtilitiesMenuNode.NodeId"/>, вложенная — false.
+    /// Любой корневой узел (группа, пункт, разделитель) получает
+    /// <see cref="UtilitiesMenuNode.IsTopLevel"/> = true, вложенный — false.
+    /// Стабильный <see cref="UtilitiesMenuNode.NodeId"/> выдаётся только пользовательской
+    /// группе: по нему кнопка панели открывает её содержимое.
     /// </summary>
     private static void UpdateTopLevelState(UtilitiesMenuNodeItem item)
     {
-        if (!IsGroup(item))
-            return;
         var topLevel = item.Parent is null;
         item.Node.IsTopLevel = topLevel;
-        if (topLevel && string.IsNullOrWhiteSpace(item.Node.NodeId))
+        if (topLevel && IsGroup(item) && string.IsNullOrWhiteSpace(item.Node.NodeId))
             item.Node.NodeId = UtilitiesMenuLayouts.NewNodeId();
     }
 

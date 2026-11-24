@@ -35,16 +35,20 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("ContextMenu.Editor.Title");
             Width = 760;
-            Height = 560;
+            // Issue #146 (1.0.1.116): начальные размеры — из профиля ContextMenuEditor
+            // (685 DIP); окно открывается на минимально необходимой высоте.
+            Height = DialogWorkAreaPolicy.ContextMenuEditor.DefaultHeight;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
             MinWidth = 640;
-            MinHeight = 480;
+            MinHeight = DialogWorkAreaPolicy.ContextMenuEditor.MinHeight;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
 
             _vm = new ContextMenuEditorViewModel(store);
             DataContext = _vm;
             Content = BuildLayout();
+            // issue #146 (1.0.1.116): высота окна не должна выходить за рабочую область.
+            ApplyWorkAreaLimits();
 
             if (_vm.Groups.Count > 0)
                 _vm.SelectedGroup = _vm.Groups[0];
@@ -52,6 +56,26 @@ namespace Workspace1C
 
         /// <summary>Компоновка после редактирования (актуальна после «Готово»).</summary>
         public ContextMenuLayout Layout => _vm.Layout;
+
+        /// <summary>
+        /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
+        /// <see cref="DialogWorkAreaPolicy.ContextMenuEditor"/> — высота 685 DIP
+        /// помещает панель операций и пояснение без прокрутки, а на маленьком экране
+        /// клампится по рабочей области (прокрутка остаётся аварийным вариантом).
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null)
+                return;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            var size = DialogWorkAreaPolicy.Recommend(
+                DialogWorkAreaPolicy.ContextMenuEditor,
+                dipHeight);
+            MaxHeight = size.MaxHeight;
+            MinHeight = size.MinHeight;
+            Height = size.Height;
+        }
 
         private Control BuildLayout()
         {
@@ -97,9 +121,20 @@ namespace Workspace1C
             BuildTree();
             treeBorder.Child = _tree;
 
-            // Правая панель операций.
-            var panel = BuildOperationsPanel();
-            dock.Children.Add(panel);
+            // Правая колонка (issue #146, 1.0.1.116): пояснение закреплено внизу и
+            // видно всегда; прокручивается только панель операций — и только если она
+            // не помещается (аварийный вариант для маленьких экранов).
+            var right = new DockPanel();
+            var hint = BuildHint("ContextMenu.Editor.Hint");
+            DockPanel.SetDock(hint, Dock.Bottom);
+            right.Children.Add(hint);
+            right.Children.Add(new ScrollViewer
+            {
+                Content = BuildOperationsPanel(),
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            });
+            dock.Children.Add(right);
 
             return dock;
         }
@@ -199,7 +234,15 @@ namespace Workspace1C
             fileRow2.Children.Add(ActionButton("IconRestore", null, _vm.ResetDefaultCommand, caption: "ContextMenu.Editor.Reset"));
             panel.Children.Add(fileRow2);
 
-            // Пояснение.
+            return panel;
+        }
+
+        /// <summary>
+        /// Issue #146 (1.0.1.116): блок пояснения вынесен из прокручиваемой панели —
+        /// он закрепляется внизу правой колонки и виден без прокрутки.
+        /// </summary>
+        private Border BuildHint(string key)
+        {
             var hint = new Border
             {
                 Background = TryBrush("CardBackgroundBrush"),
@@ -211,15 +254,13 @@ namespace Workspace1C
             };
             var hintBlock = new TextBlock
             {
-                Text = LocalizationManager.T("ContextMenu.Editor.Hint"),
+                Text = LocalizationManager.T(key),
                 TextWrapping = TextWrapping.Wrap,
                 FontSize = 12
             };
             ThemeBrushes.Bind(hintBlock, TextBlock.ForegroundProperty, "TextSecondaryBrush");
             hint.Child = hintBlock;
-            panel.Children.Add(hint);
-
-            return panel;
+            return hint;
         }
 
         private TextBlock SectionHeader(string key, double top = 0)

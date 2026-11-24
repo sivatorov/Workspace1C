@@ -172,6 +172,13 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Очистить локальный кеш 1С выбранной базы.</summary>
     ClearCache,
 
+    /// <summary>
+    /// «Инспектор процессов 1С» (issue #146, A4): в 1.0.1.84 пункт был убран из меню,
+    /// теперь возвращён в каталог как обычный пункт «Утилит» с размещением на верхнем
+    /// уровне по умолчанию. Хоткей Ctrl+Alt+I при этом сохраняется.
+    /// </summary>
+    ProcessInspector,
+
     /// <summary>Синхронизировать список баз с ibases.v8i.</summary>
     SyncIbases,
 
@@ -930,8 +937,13 @@ public static class UtilitiesMenuCatalog
             new("ClusterMigration", "ClusterMigration.MenuItem", GroupServers,
                 "DatabaseExport", "IconDatabaseExport", "#16A34A", UtilitiesMenuCommandKind.MigrateClusterInfobases,
                 isNew: true, requiredFeature: Licensing.ProFeature.ClusterMigration),
-            // issue #134 (1.0.1.84): «Инспектор процессов 1С» убран из меню «Утилиты» —
-            // он доступен кнопкой на панели инструментов и горячей клавишей Ctrl+Alt+I.
+            // Issue #146 (A4, 1.0.1.116): «Инспектор процессов 1С» снова в каталоге меню
+            // «Утилиты» — обычный пункт с размещением на верхнем уровне по умолчанию
+            // (кнопка-иконка на панели), как ранее поступили с «Очисткой кеша» в 1.0.1.99.
+            // Жёстко зашитая кнопка на панели инструментов удалена; хоткей Ctrl+Alt+I остаётся.
+            new("ProcessInspector", "ProcessInspector.MenuItem", GroupTopLevel,
+                "ApplicationCog", "IconApplicationCog", "#22C55E",
+                UtilitiesMenuCommandKind.ProcessInspector, "HotkeyProcessInspector"),
             new("KillOneCProcesses", "Settings.Bases.KillProcesses", GroupProcesses,
                 "CloseNetwork", "IconClose", "#F59E0B", UtilitiesMenuCommandKind.KillOneCProcesses),
             new("ConnectionReplace", "Main.UtilitiesConnectionReplace", GroupBaseLists,
@@ -999,6 +1011,12 @@ public static class UtilitiesMenuLayouts
         var layout = new UtilitiesMenuLayout { SchemaVersion = CurrentSchemaVersion };
         layout.Root = new List<UtilitiesMenuNode>
         {
+            // Issue #146 (A4, 1.0.1.116): «Инспектор процессов 1С» — верхнеуровневый пункт
+            // по умолчанию (кнопка-иконка с подсказкой на панели), как «Очистка кеша»
+            // в 1.0.1.99. Разделитель отделяет его от кнопок сценарных разделов.
+            TopLevelItem("ProcessInspector"),
+            TopLevelSeparator(),
+
             // ---- 1. Серверы ----
             Section(UtilitiesMenuCatalog.GroupServers, new List<UtilitiesMenuNode>
             {
@@ -1152,14 +1170,18 @@ public static class UtilitiesMenuLayouts
 
         var originalSchema = layout.SchemaVersion;
         layout.Root ??= new List<UtilitiesMenuNode>();
-        // Issue #146: в актуальной схеме корневые группы — это группы верхнего уровня
-        // (стандартные разделы и пользовательские папки). Признак восстанавливается,
-        // а пользовательская группа без NodeId получает стабильный идентификатор,
-        // чтобы кнопка панели открывала её после перезапуска.
+        // Issue #146: в актуальной схеме любой узел корня — верхнего уровня: группы
+        // (стандартные разделы и пользовательские папки), пункты и разделители.
+        // Признак восстанавливается, а пользовательская группа без NodeId получает
+        // стабильный идентификатор, чтобы кнопка панели открывала её после перезапуска.
         if (originalSchema >= CurrentSchemaVersion)
-            NormalizeTopLevelGroups(layout.Root);
+            NormalizeTopLevelNodes(layout.Root);
         if (!NeedsMigration(layout))
         {
+            // Схема актуальна, но каталог мог пополниться новыми пунктами (в т.ч.
+            // верхнеуровневыми). Их надо добавить и без полной миграции, иначе
+            // новый пункт не появится в уже сохранённой компоновке схемы 5.
+            AddMissingCatalogItems(layout);
             layout.SchemaVersion = CurrentSchemaVersion;
             return layout;
         }
@@ -1195,6 +1217,10 @@ public static class UtilitiesMenuLayouts
         // вернуть стандартную, чтобы у пользователя осталась рабочая точка входа.
         if (!ContainsAnyItem(layout.Root))
             return Default();
+
+        // Issue #146 (A3): после миграции все узлы корня — верхнего уровня
+        // (группы, пункты и разделители), вложенные — нет.
+        NormalizeTopLevelNodes(layout.Root);
 
         layout.SchemaVersion = CurrentSchemaVersion;
         return layout;
@@ -1266,13 +1292,14 @@ public static class UtilitiesMenuLayouts
     }
 
     /// <summary>
-    /// Issue #146: восстанавливает признак группы верхнего уровня для актуальной схемы.
-    /// Все группы корня получают <see cref="UtilitiesMenuNode.IsTopLevel"/> = true,
-    /// вложенные — false. Пользовательская группа (не стандартный раздел и не служебная
-    /// «Новинки программы») без <see cref="UtilitiesMenuNode.NodeId"/> получает стабильный
+    /// Issue #146: восстанавливает признак верхнего уровня для актуальной схемы.
+    /// Все узлы корня (группы, пункты и разделители) получают
+    /// <see cref="UtilitiesMenuNode.IsTopLevel"/> = true, вложенные — false.
+    /// Пользовательская группа (не стандартный раздел и не служебная «Новинки
+    /// программы») без <see cref="UtilitiesMenuNode.NodeId"/> получает стабильный
     /// идентификатор, чтобы кнопка панели могла её открыть.
     /// </summary>
-    private static void NormalizeTopLevelGroups(
+    private static void NormalizeTopLevelNodes(
         IEnumerable<UtilitiesMenuNode>? nodes, bool topLevel = true)
     {
         if (nodes is null)
@@ -1281,13 +1308,15 @@ public static class UtilitiesMenuLayouts
         {
             if (node is null)
                 continue;
-            if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
+            node.IsTopLevel = topLevel;
+            if (topLevel
+                && string.Equals(node.Kind, "group", StringComparison.Ordinal)
+                && IsUserGroup(node)
+                && string.IsNullOrWhiteSpace(node.NodeId))
             {
-                node.IsTopLevel = topLevel;
-                if (topLevel && IsUserGroup(node) && string.IsNullOrWhiteSpace(node.NodeId))
-                    node.NodeId = NewNodeId();
+                node.NodeId = NewNodeId();
             }
-            NormalizeTopLevelGroups(node.Children, topLevel: false);
+            NormalizeTopLevelNodes(node.Children, topLevel: false);
         }
     }
 
@@ -1440,17 +1469,24 @@ public static class UtilitiesMenuLayouts
 
     /// <summary>
     /// Добавляет в пользовательское дерево пункты каталога, которых в нём нет.
-    /// Новинки и пункты без подходящей существующей группы попадают в «Новинки
-    /// программы»; остальные — в конец группы с совпадающим <c>GroupId</c>
-    /// (<see cref="UtilitiesMenuItem.DefaultGroup"/>), если она есть в дереве.
+    /// Пункты с <see cref="UtilitiesMenuCatalog.GroupTopLevel"/> добавляются в корень
+    /// (<see cref="UtilitiesMenuLayout.Root"/>) как верхнеуровневые: перед первой
+    /// группой, с разделителем между ними (issue #146 — пункт можно показать иконкой
+    /// на панели, не открывая меню). Остальные новинки и пункты без подходящей
+    /// существующей группы попадают в «Новинки программы»; прочие — в конец группы
+    /// с совпадающим <c>GroupId</c> (<see cref="UtilitiesMenuItem.DefaultGroup"/>).
     /// </summary>
-    private static void AddMissingCatalogItems(UtilitiesMenuLayout layout)
+    /// <param name="layout">Компоновка, в которую добавляются отсутствующие пункты.</param>
+    /// <param name="catalog">Каталог для проверки (null — <see cref="UtilitiesMenuCatalog.All"/>);
+    /// параметр нужен юнит-тестам, чтобы не менять глобальную регистрацию внешних пунктов.</param>
+    internal static void AddMissingCatalogItems(UtilitiesMenuLayout layout,
+        IReadOnlyList<UtilitiesMenuItem>? catalog = null)
     {
         var present = new HashSet<string>(StringComparer.Ordinal);
         UtilitiesMenuResolver.CollectItemIds(layout.Root, present);
 
         var missing = new List<UtilitiesMenuItem>();
-        foreach (var item in UtilitiesMenuCatalog.All)
+        foreach (var item in catalog ?? UtilitiesMenuCatalog.All)
         {
             if (!present.Contains(item.Id))
                 missing.Add(item);
@@ -1458,9 +1494,45 @@ public static class UtilitiesMenuLayouts
         if (missing.Count == 0)
             return;
 
+        // Сначала верхнеуровневые пункты: они живут в корне, а не в группе.
+        var topLevel = missing
+            .Where(item => string.Equals(item.DefaultGroup, UtilitiesMenuCatalog.GroupTopLevel,
+                StringComparison.Ordinal))
+            .ToList();
+        if (topLevel.Count > 0)
+        {
+            var insertIndex = layout.Root.FindIndex(n => n is not null
+                && string.Equals(n.Kind, "group", StringComparison.Ordinal));
+            if (insertIndex < 0)
+                insertIndex = layout.Root.Count;
+
+            var inserted = new List<UtilitiesMenuNode>(topLevel.Count + 1);
+            foreach (var item in topLevel)
+            {
+                inserted.Add(new UtilitiesMenuNode
+                {
+                    Kind = "item",
+                    ItemId = item.Id,
+                    IsTopLevel = true,
+                });
+            }
+            // Между верхнеуровневыми пунктами и первой группой — разделитель, чтобы
+            // кнопки-иконки визуально не сливались с кнопками разделов.
+            var nextIsSeparator = insertIndex < layout.Root.Count
+                && string.Equals(layout.Root[insertIndex].Kind, "separator", StringComparison.Ordinal);
+            if (insertIndex < layout.Root.Count && !nextIsSeparator)
+                inserted.Add(new UtilitiesMenuNode { Kind = "separator", IsTopLevel = true });
+            layout.Root.InsertRange(insertIndex, inserted);
+        }
+
         UtilitiesMenuNode? newItemsGroup = null;
         foreach (var item in missing)
         {
+            if (string.Equals(item.DefaultGroup, UtilitiesMenuCatalog.GroupTopLevel,
+                StringComparison.Ordinal))
+            {
+                continue;
+            }
             var target = item.IsNew ? null : FindGroup(layout.Root, item.DefaultGroup);
             if (target is null)
             {
@@ -1505,6 +1577,7 @@ public static class UtilitiesMenuLayouts
             GroupId = UtilitiesMenuCatalog.GroupNewItems,
             Visible = true,
             SeparatorBefore = layout.Root.Count > 0,
+            IsTopLevel = true,
         };
         layout.Root.Add(group);
         return group;
@@ -1546,20 +1619,31 @@ public static class UtilitiesMenuLayouts
     }
 
     /// <summary>
-    /// Ищет корневую группу по идентификатору раздела: стандартный раздел — по
+    /// Ищет корневой узел по идентификатору раздела/пункта: стандартный раздел — по
     /// <see cref="UtilitiesMenuNode.GroupId"/>, пользовательская группа — по
-    /// <see cref="UtilitiesMenuNode.NodeId"/> (issue #146). null — не найдена.
+    /// <see cref="UtilitiesMenuNode.NodeId"/>, верхнеуровневый пункт — по
+    /// <see cref="UtilitiesMenuNode.ItemId"/> (issue #146). null — не найден.
     /// </summary>
-    public static UtilitiesMenuNode? FindRootSection(UtilitiesMenuLayout? layout, string? sectionId)
+    public static UtilitiesMenuNode? FindRootNode(UtilitiesMenuLayout? layout, string? sectionId)
     {
         if (layout?.Root is null || string.IsNullOrWhiteSpace(sectionId))
             return null;
         return layout.Root.FirstOrDefault(n =>
             n is not null
-            && string.Equals(n.Kind, "group", StringComparison.Ordinal)
-            && (string.Equals(n.GroupId, sectionId, StringComparison.Ordinal)
-                || string.Equals(n.NodeId, sectionId, StringComparison.Ordinal)));
+            && ((string.Equals(n.Kind, "group", StringComparison.Ordinal)
+                 && (string.Equals(n.GroupId, sectionId, StringComparison.Ordinal)
+                     || string.Equals(n.NodeId, sectionId, StringComparison.Ordinal)))
+                || (string.Equals(n.Kind, "item", StringComparison.Ordinal)
+                    && string.Equals(n.ItemId, sectionId, StringComparison.Ordinal))));
     }
+
+    /// <summary>
+    /// Совместимое имя поиска корневого узла раздела (issue #146). Находит также
+    /// верхнеуровневые пункты по <see cref="UtilitiesMenuNode.ItemId"/> — панель
+    /// строит для них кнопку-иконку.
+    /// </summary>
+    public static UtilitiesMenuNode? FindRootSection(UtilitiesMenuLayout? layout, string? sectionId) =>
+        FindRootNode(layout, sectionId);
 
     /// <summary>
     /// Общая часть извлечения: скрытый раздел не открывается (галочка видимости в
@@ -1663,6 +1747,28 @@ public static class UtilitiesMenuLayouts
             && (n.Children?.Count ?? 0) == 0);
     }
 
+    /// <summary>
+    /// Узел-пункт каталога верхнего уровня (issue #146): на панели — кнопка только
+    /// с иконкой, подсказка — название пункта.
+    /// </summary>
+    public static UtilitiesMenuNode TopLevelItem(string itemId)
+    {
+        var node = Item(itemId);
+        node.IsTopLevel = true;
+        return node;
+    }
+
+    /// <summary>
+    /// Узел-разделитель верхнего уровня (issue #146): вертикальная черта между
+    /// кнопками панели.
+    /// </summary>
+    public static UtilitiesMenuNode TopLevelSeparator()
+    {
+        var node = Separator();
+        node.IsTopLevel = true;
+        return node;
+    }
+
     /// <summary>Узел-пункт каталога.</summary>
     public static UtilitiesMenuNode Item(string itemId, bool separatorBefore = false)
     {
@@ -1707,23 +1813,44 @@ public static class UtilitiesMenuLayouts
 }
 
 /// <summary>
+/// Вид элемента верхней панели (issue #146): группа — кнопка раздела (иконка или
+/// иконка с подписью), пункт — кнопка только с иконкой (клик выполняет действие),
+/// разделитель — вертикальная черта между кнопками.
+/// </summary>
+public enum UtilitiesSectionButtonKind
+{
+    /// <summary>Группа/раздел — кнопка, открывающая меню.</summary>
+    Group,
+
+    /// <summary>Верхнеуровневый пункт каталога — кнопка-иконка с командой.</summary>
+    Item,
+
+    /// <summary>Верхнеуровневый разделитель — вертикальная черта.</summary>
+    Separator
+}
+
+/// <summary>
 /// Кнопка раздела на верхней панели (issue #146): либо реальный раздел первого уровня,
-/// либо пользовательская группа верхнего уровня, либо единственная кнопка «Утилиты»
-/// для пользовательской компоновки без групп.
+/// либо пользовательская группа верхнего уровня, либо верхнеуровневый пункт/разделитель,
+/// либо единственная кнопка «Утилиты» для пользовательской компоновки без групп.
 /// </summary>
 /// <param name="SectionId">Идентификатор раздела: <c>GroupId</c> стандартного раздела,
-/// <c>NodeId</c> пользовательской группы или
+/// <c>NodeId</c> пользовательской группы, <c>ItemId</c> верхнеуровневого пункта или
 /// <see cref="UtilitiesSectionMenuPlanner.UtilitiesSectionId"/> для полной компоновки.</param>
 /// <param name="TitleKey">Ключ локализации заголовка (пусто у пользовательской группы).</param>
 /// <param name="IsCustom">True — пользовательская группа или кнопка «Утилиты» (полная компоновка).</param>
 /// <param name="NodeId">Стабильный идентификатор пользовательской группы (null — стандартный раздел).</param>
 /// <param name="Title">Пользовательский заголовок группы (null — брать локализованный по <paramref name="TitleKey"/>).</param>
+/// <param name="Kind">Вид элемента панели (issue #146, A3): группа, пункт или разделитель.</param>
+/// <param name="ItemId">Идентификатор пункта каталога для <see cref="UtilitiesSectionButtonKind.Item"/>.</param>
 public sealed record UtilitiesSectionButton(
     string SectionId,
     string TitleKey,
     bool IsCustom,
     string? NodeId = null,
-    string? Title = null);
+    string? Title = null,
+    UtilitiesSectionButtonKind Kind = UtilitiesSectionButtonKind.Group,
+    string? ItemId = null);
 
 /// <summary>
 /// Планировщик кнопок разделов верхней панели (issue #146), общий для WPF и Avalonia.
@@ -1748,25 +1875,55 @@ public static class UtilitiesSectionMenuPlanner
         string.Equals(sectionId, UtilitiesSectionId, StringComparison.Ordinal);
 
     /// <summary>
-    /// Строит список кнопок разделов: для каждого видимого корневого узла-группы —
-    /// стандартный раздел (по <c>GroupId</c>) или пользовательская группа верхнего
-    /// уровня (по <c>NodeId</c>/<c>CustomTitle</c>). Скрытые группы кнопок не дают;
-    /// если групп нет ИЛИ все они скрыты — одна кнопка «Утилиты», чтобы пользователь
-    /// не остался без точки входа в меню.
+    /// Строит список элементов верхней панели в порядке компоновки (issue #146):
+    /// для каждой видимой корневой группы — кнопка раздела/пользовательской группы,
+    /// для верхнеуровневого пункта — кнопка-иконка с командой, для разделителя —
+    /// вертикальная черта. Ведущие/замыкающие/двойные разделители отбрасываются.
+    /// Если в корне нет ни одной группы, в конец добавляется запасная кнопка «Утилиты»,
+    /// чтобы пункты верхнего уровня не отнимали доступ к полному меню.
+    /// <para>
+    /// <c>LinuxOnly</c>-пункты планировщик НЕ фильтрует: это делает рендерер платформы
+    /// (WPF пропускает их, Avalonia/Linux показывает), иначе планировщик стал бы
+    /// платформозависимым.
+    /// </para>
     /// </summary>
     public static IReadOnlyList<UtilitiesSectionButton> Build(UtilitiesMenuLayout? layout)
     {
         if (layout is null)
             return Array.Empty<UtilitiesSectionButton>();
 
-        // Кнопки строятся по фактическому порядку групп в компоновке (issue #146):
-        // так порядок кнопок совпадает с порядком групп в редакторе, а пользовательская
-        // группа верхнего уровня получает собственную кнопку.
         var result = new List<UtilitiesSectionButton>();
         foreach (var node in layout.Root)
         {
             if (node is null || !node.Visible)
                 continue;
+
+            if (string.Equals(node.Kind, "separator", StringComparison.Ordinal))
+            {
+                // Ведущий, двойной и замыкающий разделитель не нужен: черта имеет
+                // смысл только между двумя элементами панели.
+                if (result.Count == 0
+                    || result[^1].Kind == UtilitiesSectionButtonKind.Separator)
+                {
+                    continue;
+                }
+                result.Add(new UtilitiesSectionButton(
+                    "separator", string.Empty, false,
+                    Kind: UtilitiesSectionButtonKind.Separator));
+                continue;
+            }
+
+            if (string.Equals(node.Kind, "item", StringComparison.Ordinal))
+            {
+                var item = UtilitiesMenuCatalog.Find(node.ItemId);
+                if (item is null)
+                    continue;
+                result.Add(new UtilitiesSectionButton(
+                    item.Id, item.TextKey, false,
+                    Kind: UtilitiesSectionButtonKind.Item, ItemId: item.Id));
+                continue;
+            }
+
             if (!string.Equals(node.Kind, "group", StringComparison.Ordinal))
                 continue;
 
@@ -1789,7 +1946,13 @@ public static class UtilitiesSectionMenuPlanner
                 string.IsNullOrWhiteSpace(node.CustomTitle) ? null : node.CustomTitle));
         }
 
-        if (result.Count == 0)
+        // Замыкающий разделитель отбрасываем.
+        while (result.Count > 0 && result[^1].Kind == UtilitiesSectionButtonKind.Separator)
+            result.RemoveAt(result.Count - 1);
+
+        // Запасная кнопка «Утилиты» — только если в корне нет ни одной группы:
+        // верхнеуровневые пункты сами по себе не дают доступа к полному меню.
+        if (!result.Any(b => b.Kind == UtilitiesSectionButtonKind.Group))
             result.Add(new UtilitiesSectionButton(UtilitiesSectionId, UtilitiesTitleKey, true));
         return result;
     }

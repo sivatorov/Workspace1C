@@ -103,9 +103,11 @@ public sealed class Issue146DialogSizeTests
     [Theory]
     [InlineData("UtilitiesMenuEditorWindow.xaml.cs")]
     [InlineData("TrayMenuEditorWindow.xaml.cs")]
+    [InlineData("ContextMenuEditorWindow.xaml.cs")]
     [InlineData("CustomProgramsWindow.xaml.cs")]
     [InlineData("UtilitiesMenuEditorWindow.Avalonia.cs")]
     [InlineData("TrayMenuEditorWindow.Avalonia.cs")]
+    [InlineData("ContextMenuEditorWindow.Avalonia.cs")]
     [InlineData("CustomProgramsWindow.Avalonia.cs")]
     public void Editors_ApplyWorkAreaPolicy(string fileName)
     {

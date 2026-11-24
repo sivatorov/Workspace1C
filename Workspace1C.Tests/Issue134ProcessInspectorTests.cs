@@ -19,8 +19,11 @@ namespace Workspace1C.Tests;
 /// <item>мультивыделение и массовое завершение со сводкой «завершено / не удалось»;</item>
 /// <item>колонка «Пользователь» с fallback на имя из параметра <c>/N</c>;</item>
 /// <item>скрытие/показ колонок с сохранением в настройках;</item>
-/// <item>настраиваемая горячая клавиша и кнопка на панели рядом с «Утилитами».</item>
+/// <item>настраиваемая горячая клавиша.</item>
 /// </list>
+/// Issue #146 (1.0.1.116, A4): жёстко зашитая кнопка инспектора убрана с панели
+/// инструментов (как «Очистка кеша» в 1.0.1.99); инспектор снова обычный пункт меню
+/// «Утилиты» и по умолчанию вынесен на верхний уровень панели разделов.
 /// Source-гварды проверяют обе оболочки (WPF и Avalonia) и отсутствие подменю
 /// «Завершить процессы» после отката.
 /// </summary>
@@ -290,106 +293,134 @@ public sealed class Issue134ProcessInspectorTests
         Assert.Contains("processInspector:", code, StringComparison.Ordinal);
     }
 
-    // ===================== Кнопка на панели рядом с «Утилитами» =====================
+    // ============ Issue #146 (A4): пункт меню вместо кнопки на панели ============
 
+    /// <summary>
+    /// Issue #146 (A4): в WPF-разметке больше нет жёстко зашитой кнопки инспектора,
+    /// но пункт есть в каталоге меню «Утилиты» (по умолчанию — верхний уровень).
+    /// </summary>
     [Fact]
-    public void Wpf_HasProcessInspectorToolbarButton()
+    public void Wpf_ProcessInspectorNotOnToolbar_ButInCatalog()
     {
         var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
 
-        Assert.Contains("ProcessInspectorButton", xaml, StringComparison.Ordinal);
-        Assert.Contains("ProcessInspectorCommand", xaml, StringComparison.Ordinal);
-        Assert.Contains("Main.ProcessInspectorTooltip", xaml, StringComparison.Ordinal);
-        Assert.Contains("IconApplicationCog", xaml, StringComparison.Ordinal);
-    }
+        Assert.DoesNotContain("ProcessInspectorButton", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProcessInspectorCommand", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Main.ProcessInspectorTooltip", xaml, StringComparison.Ordinal);
 
-    [Fact]
-    public void Avalonia_HasProcessInspectorToolbarButton()
-    {
-        var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
-
-        Assert.Contains("ProcessInspectorCommand", code, StringComparison.Ordinal);
-        Assert.Contains("Main.ProcessInspectorTooltip", code, StringComparison.Ordinal);
-        Assert.Contains("IconApplicationCog", code, StringComparison.Ordinal);
+        var item = UtilitiesMenuCatalog.Find("ProcessInspector");
+        Assert.NotNull(item);
+        Assert.Equal(UtilitiesMenuCommandKind.ProcessInspector, item!.CommandKind);
+        Assert.Equal(UtilitiesMenuCatalog.GroupTopLevel, item.DefaultGroup);
+        Assert.Equal("ProcessInspector.MenuItem", item.TextKey);
+        Assert.Equal("HotkeyProcessInspector", item.HotkeyKey);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84), обновлено в 1.0.1.99: инспектор процессов остаётся
-    /// быстрым действием на панели (до разделителя), а «Проверить доступность»
-    /// перенесена в раздел «Обслуживание» → «Процессы».
+    /// Issue #146 (A4): в Avalonia-панели команд больше нет кнопки инспектора,
+    /// но пункт есть в каталоге меню «Утилиты».
     /// </summary>
     [Fact]
-    public void Wpf_ProcessInspectorButton_StaysOnToolbar_BeforeSeparator()
+    public void Avalonia_ProcessInspectorNotOnToolbar_ButInCatalog()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+
+        Assert.DoesNotContain("processInspectorBtn", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("ProcessInspectorCommand", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Main.ProcessInspectorTooltip", code, StringComparison.Ordinal);
+
+        var item = UtilitiesMenuCatalog.Find("ProcessInspector");
+        Assert.NotNull(item);
+        Assert.Equal(UtilitiesMenuCommandKind.ProcessInspector, item!.CommandKind);
+    }
+
+    /// <summary>
+    /// Issue #146 (A4): WPF — кнопки на панели нет, пункт есть в каталоге и в корне
+    /// стандартной компоновки (верхний уровень, до разделов). «Проверить доступность»
+    /// остаётся пунктом раздела «Обслуживание» → «Процессы».
+    /// </summary>
+    [Fact]
+    public void Wpf_ProcessInspectorNotOnToolbar_CatalogAndRootLayout()
     {
         var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
 
-        var inspector = xaml.IndexOf("x:Name=\"ProcessInspectorButton\"", StringComparison.Ordinal);
-        // Issue #146: после действий панели идёт динамический контейнер кнопок разделов.
-        var sections = xaml.IndexOf("x:Name=\"SectionButtonsPanel\"", StringComparison.Ordinal);
-
-        Assert.True(inspector >= 0, "Не найдена кнопка инспектора процессов.");
-        Assert.True(sections >= 0, "Не найден контейнер кнопок сценарных разделов.");
-        Assert.True(inspector < sections, "Инспектор должен стоять до кнопок разделов.");
-        // На панели кнопки проверки доступности больше нет — она в меню раздела.
+        Assert.DoesNotContain("ProcessInspectorButton", xaml, StringComparison.Ordinal);
         Assert.DoesNotContain("CheckAvailabilityCommand", xaml, StringComparison.Ordinal);
+
+        var layout = UtilitiesMenuLayouts.Default();
+        var node = Assert.Single(layout.Root,
+            n => n.Kind == "item" && n.ItemId == "ProcessInspector");
+        Assert.True(node.IsTopLevel);
+        Assert.Same(node, layout.Root[0]);
         Assert.Equal(UtilitiesMenuCommandKind.CheckAvailability,
             UtilitiesMenuCatalog.Find("CheckAvailability")!.CommandKind);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84), обновлено в 1.0.1.99: в Avalonia кнопка инспектора
-    /// добавляется на панель, а проверка доступности — пункт раздела «Обслуживание».
+    /// Issue #146 (A4): Avalonia — кнопки на панели нет, пункт есть в каталоге и в корне
+    /// стандартной компоновки; проверка доступности — пункт раздела «Обслуживание».
     /// </summary>
     [Fact]
-    public void Avalonia_ProcessInspectorButton_StaysOnToolbar_CheckAvailabilityInMenu()
+    public void Avalonia_ProcessInspectorNotOnToolbar_CatalogAndRootLayout()
     {
         var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
 
-        var inspector = code.IndexOf(
-            "panel.Children.Add(processInspectorBtn);", StringComparison.Ordinal);
-        Assert.True(inspector >= 0, "Не найдено добавление кнопки инспектора процессов.");
+        Assert.DoesNotContain("processInspectorBtn", code, StringComparison.Ordinal);
         Assert.DoesNotContain("checkAvailBtn", code, StringComparison.Ordinal);
+
+        var layout = UtilitiesMenuLayouts.Default();
+        var node = Assert.Single(layout.Root,
+            n => n.Kind == "item" && n.ItemId == "ProcessInspector");
+        Assert.True(node.IsTopLevel);
         Assert.Equal(UtilitiesMenuCatalog.GroupProcesses,
             UtilitiesMenuCatalog.Find("CheckAvailability")!.DefaultGroup);
     }
 
-    // ===================== Инспектор убран из меню «Утилиты» =====================
+    // ============ Инспектор снова в каталоге «Утилит» (issue #146, A4) ============
 
     /// <summary>
-    /// issue #134 (1.0.1.84): пункта «Инспектор процессов 1С» больше нет ни в каталоге,
-    /// ни в стандартной компоновке «Утилит», ни в обработчиках меню обеих оболочек.
+    /// Issue #146 (A4): пункт «Инспектор процессов 1С» снова в каталоге, значение
+    /// перечисления существует, в стандартной компоновке пункт — в корне (верхний
+    /// уровень), обработчики меню обеих оболочек его знают.
     /// </summary>
     [Fact]
-    public void ProcessInspector_IsRemovedFromUtilitiesCatalogAndLayout()
+    public void ProcessInspector_IsInUtilitiesCatalogAndRootLayout()
     {
-        Assert.Null(UtilitiesMenuCatalog.Find("ProcessInspector"));
-        Assert.DoesNotContain(
+        var item = UtilitiesMenuCatalog.Find("ProcessInspector");
+        Assert.NotNull(item);
+        Assert.Contains(
             UtilitiesMenuCatalog.All,
-            item => string.Equals(item.Id, "ProcessInspector", StringComparison.Ordinal));
+            i => string.Equals(i.Id, "ProcessInspector", StringComparison.Ordinal));
+        Assert.Equal(UtilitiesMenuCommandKind.ProcessInspector, item!.CommandKind);
+        Assert.True(Enum.TryParse<UtilitiesMenuCommandKind>("ProcessInspector", out var kind));
+        Assert.Equal(UtilitiesMenuCommandKind.ProcessInspector, kind);
 
         var layout = UtilitiesMenuLayouts.Default();
         var ids = new HashSet<string>(StringComparer.Ordinal);
         UtilitiesMenuResolver.CollectItemIds(layout.Root, ids);
-        Assert.DoesNotContain("ProcessInspector", ids);
+        Assert.Contains("ProcessInspector", ids);
         // Соседний пункт «Завершить процессы 1С» остаётся на месте.
         Assert.Contains("KillOneCProcesses", ids);
 
-        // Значение перечисления удалено вместе с пунктом.
-        Assert.False(Enum.TryParse<UtilitiesMenuCommandKind>("ProcessInspector", out _));
+        var node = Assert.Single(layout.Root,
+            n => n.Kind == "item" && n.ItemId == "ProcessInspector");
+        Assert.True(node.IsTopLevel);
+        Assert.Same(node, layout.Root[0]);
+        Assert.Equal("separator", layout.Root[1].Kind);
+        Assert.Equal(UtilitiesMenuCatalog.GroupServers, layout.Root[2].GroupId);
 
         var wpf = ReadProjectFile("Workspace1C", "Views", "MainWindow.UtilitiesMenu.cs");
         var avalonia = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Tree.cs");
-        Assert.DoesNotContain("UtilitiesMenuCommandKind.ProcessInspector", wpf, StringComparison.Ordinal);
-        Assert.DoesNotContain("UtilitiesMenuCommandKind.ProcessInspector", avalonia, StringComparison.Ordinal);
+        Assert.Contains("UtilitiesMenuCommandKind.ProcessInspector", wpf, StringComparison.Ordinal);
+        Assert.Contains("UtilitiesMenuCommandKind.ProcessInspector", avalonia, StringComparison.Ordinal);
     }
 
     /// <summary>
-    /// issue #134 (1.0.1.84): старая пользовательская компоновка могла содержать
-    /// удалённый пункт <c>ProcessInspector</c>. <c>NormalizeNode</c> обязан молча
-    /// отбросить неизвестный <c>ItemId</c>, не роняя загрузку меню.
+    /// Issue #146 (A4): старая пользовательская компоновка с пунктом <c>ProcessInspector</c>
+    /// теперь не теряет его: пункт валиден, сохраняется в дереве, загрузка не падает.
     /// </summary>
     [Fact]
-    public void OldCustomLayout_WithRemovedProcessInspectorItem_IsDroppedSafely()
+    public void OldCustomLayout_WithRemovedProcessInspectorItem_IsRestored()
     {
         var dir = Path.Combine(
             Path.GetTempPath(), "ws1c-issue134-" + Guid.NewGuid().ToString("N"));
@@ -416,7 +447,7 @@ public sealed class Issue134ProcessInspectorTests
             // собираем идентификаторы рекурсивно.
             var ids = new HashSet<string>(StringComparer.Ordinal);
             UtilitiesMenuResolver.CollectItemIds(layout!.Root, ids);
-            Assert.DoesNotContain("ProcessInspector", ids);
+            Assert.Contains("ProcessInspector", ids);
             Assert.Contains("CommandPalette", ids);
             Assert.Contains("KillOneCProcesses", ids);
         }

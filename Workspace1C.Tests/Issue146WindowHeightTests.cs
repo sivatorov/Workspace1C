@@ -6,148 +6,165 @@ using Xunit;
 namespace Workspace1C.Tests;
 
 /// <summary>
-/// Issue #146 (1.0.1.115): поясняющий текст в окнах «Настройка меню трея»,
-/// «Мои программы» и «Настройка меню утилиты» должен быть виден без прокрутки
-/// при рабочей области от 720 DIP (масштаб Windows 100–150 %). Прокрутка остаётся
-/// только аварийным вариантом для действительно маленьких экранов.
+/// Issue #146 (1.0.1.116): окна правки меню открываются с <c>Height = MinHeight</c>
+/// («Утилиты» — 825, «Мои программы» — 760, «Меню трея» — 855, «Контекстное меню» —
+/// 685 DIP), поэтому поясняющий текст виден без прокрутки на обычном экране.
+/// Прокрутка остаётся только аварийным вариантом после клампа по маленькой рабочей
+/// области.
 /// <para>
-/// Расчётная логика покрыта через <see cref="DialogWorkAreaPolicy.Recommend"/>,
+/// Расчётная логика покрыта через
+/// <see cref="DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.DialogProfile, double, double)"/>,
 /// структура окон — source-guard проверками XAML/кода (WPF и Avalonia).
 /// </para>
 /// </summary>
 public sealed class Issue146WindowHeightTests
 {
     [Fact]
-    public void Policy_Constants_MatchPlan()
+    public void Policy_Profiles_MatchIssue146Values()
     {
-        // План 1.0.1.115, раздел 3.3: высота 760 (редакторы) / 780 («Мои программы»),
-        // минимальная — 600.
-        Assert.Equal(760, DialogWorkAreaPolicy.EditorDefaultHeight);
-        Assert.Equal(600, DialogWorkAreaPolicy.EditorMinHeight);
-        Assert.Equal(780, DialogWorkAreaPolicy.CustomProgramsDefaultHeight);
-        Assert.Equal(600, DialogWorkAreaPolicy.CustomProgramsMinHeight);
-        // Высота содержимого должна помещаться в рабочую область 720 DIP минус отступ.
-        Assert.True(DialogWorkAreaPolicy.EditorContentHeight <= 720 - DialogWorkAreaPolicy.DefaultMargin);
-        Assert.True(DialogWorkAreaPolicy.CustomProgramsContentHeight <= 720 - DialogWorkAreaPolicy.DefaultMargin);
+        // План 1.0.1.116, раздел 3.5: Height = MinHeight = contentHeight для всех окон.
+        AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 825);
+        AssertProfile(DialogWorkAreaPolicy.TrayEditor, 855);
+        AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 685);
+        AssertProfile(DialogWorkAreaPolicy.CustomPrograms, 760);
     }
 
     [Theory]
-    [InlineData(720.0, 672.0)]
-    [InlineData(768.0, 720.0)]
-    [InlineData(900.0, 760.0)]
-    [InlineData(1080.0, 760.0)]
-    public void Policy_Recommend_Editor_FitsHintWithoutScrolling(double workArea, double expectedHeight)
+    [InlineData(900.0)]
+    [InlineData(1000.0)]
+    [InlineData(1080.0)]
+    public void Policy_Recommend_Utilities_FullHeightWithoutScrolling(double workArea)
     {
-        var size = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.EditorDefaultHeight,
-            DialogWorkAreaPolicy.EditorMinHeight,
-            DialogWorkAreaPolicy.EditorContentHeight,
-            workArea);
+        var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, workArea);
 
-        Assert.Equal(expectedHeight, size.Height, 3);
-        Assert.False(size.RequiresScrolling, $"При рабочей области {workArea} DIP прокрутка не нужна.");
-        Assert.True(size.Height >= DialogWorkAreaPolicy.EditorContentHeight,
-            "Высота окна должна вмещать пояснение без прокрутки.");
-        Assert.True(size.MinHeight <= workArea);
+        Assert.Equal(825, size.Height, 3);
+        Assert.Equal(825, size.MinHeight, 3);
+        Assert.False(size.RequiresScrolling,
+            $"При рабочей области {workArea} DIP «Утилиты» помещаются без прокрутки.");
         Assert.True(size.Height <= workArea);
-        Assert.True(size.Height >= size.MinHeight);
     }
 
     [Theory]
-    [InlineData(720.0, 672.0)]
-    [InlineData(768.0, 720.0)]
-    [InlineData(900.0, 780.0)]
-    [InlineData(1080.0, 780.0)]
-    public void Policy_Recommend_CustomPrograms_FitsHintWithoutScrolling(double workArea, double expectedHeight)
+    [InlineData(1000.0)]
+    [InlineData(1080.0)]
+    public void Policy_Recommend_Tray_FullHeightWithoutScrolling(double workArea)
     {
-        var size = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
-            DialogWorkAreaPolicy.CustomProgramsMinHeight,
-            DialogWorkAreaPolicy.CustomProgramsContentHeight,
-            workArea);
+        var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.TrayEditor, workArea);
 
-        Assert.Equal(expectedHeight, size.Height, 3);
-        Assert.False(size.RequiresScrolling, $"При рабочей области {workArea} DIP прокрутка не нужна.");
-        Assert.True(size.Height >= DialogWorkAreaPolicy.CustomProgramsContentHeight);
-        Assert.True(size.MinHeight <= workArea);
+        Assert.Equal(855, size.Height, 3);
+        Assert.Equal(855, size.MinHeight, 3);
+        Assert.False(size.RequiresScrolling,
+            $"При рабочей области {workArea} DIP «Меню трея» помещается без прокрутки.");
+        Assert.True(size.Height <= workArea);
     }
 
     [Theory]
-    [InlineData(600.0)]
-    [InlineData(500.0)]
-    public void Policy_Recommend_TinyWorkArea_RequiresScrolling(double workArea)
+    [InlineData(800.0)]
+    [InlineData(900.0)]
+    public void Policy_Recommend_ContextMenu_FullHeightWithoutScrolling(double workArea)
     {
-        var editor = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.EditorDefaultHeight,
-            DialogWorkAreaPolicy.EditorMinHeight,
-            DialogWorkAreaPolicy.EditorContentHeight,
-            workArea);
-        var programs = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
-            DialogWorkAreaPolicy.CustomProgramsMinHeight,
-            DialogWorkAreaPolicy.CustomProgramsContentHeight,
-            workArea);
+        var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.ContextMenuEditor, workArea);
 
-        // На маленьком экране окно урезается по рабочей области — прокрутка включается.
-        Assert.True(editor.RequiresScrolling);
-        Assert.True(programs.RequiresScrolling);
-        // MinHeight не выходит за рабочую область (нижняя граница не побеждает верхнюю).
-        Assert.True(editor.MinHeight <= workArea);
-        Assert.True(programs.MinHeight <= workArea);
-        Assert.Equal(workArea - DialogWorkAreaPolicy.DefaultMargin, editor.Height, 3);
+        Assert.Equal(685, size.Height, 3);
+        Assert.Equal(685, size.MinHeight, 3);
+        Assert.False(size.RequiresScrolling,
+            $"При рабочей области {workArea} DIP «Контекстное меню» помещается без прокрутки.");
+        Assert.True(size.Height <= workArea);
+    }
+
+    [Theory]
+    [InlineData(900.0)]
+    [InlineData(1000.0)]
+    public void Policy_Recommend_CustomPrograms_FullHeightWithoutScrolling(double workArea)
+    {
+        var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.CustomPrograms, workArea);
+
+        Assert.Equal(760, size.Height, 3);
+        Assert.Equal(760, size.MinHeight, 3);
+        Assert.False(size.RequiresScrolling,
+            $"При рабочей области {workArea} DIP «Мои программы» помещаются без прокрутки.");
+        Assert.True(size.Height <= workArea);
     }
 
     [Fact]
-    public void Policy_Recommend_UnknownWorkArea_KeepsRequestedHeight()
+    public void Policy_Recommend_SmallWorkArea_ClampsAndRequiresScrolling()
     {
-        var size = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.EditorDefaultHeight,
-            DialogWorkAreaPolicy.EditorMinHeight,
-            DialogWorkAreaPolicy.EditorContentHeight,
-            0);
+        // На экране 600 DIP верхняя граница (600 − 48 = 552) побеждает высоту профиля:
+        // окно урезается, и только тогда включается прокрутка (аварийный режим).
+        var profiles = new (string Name, DialogWorkAreaPolicy.DialogProfile Profile)[]
+        {
+            ("Утилиты", DialogWorkAreaPolicy.UtilitiesEditor),
+            ("Меню трея", DialogWorkAreaPolicy.TrayEditor),
+            ("Контекстное меню", DialogWorkAreaPolicy.ContextMenuEditor),
+            ("Мои программы", DialogWorkAreaPolicy.CustomPrograms),
+        };
 
-        Assert.Equal(DialogWorkAreaPolicy.EditorDefaultHeight, size.Height, 3);
+        foreach (var (name, profile) in profiles)
+        {
+            var size = DialogWorkAreaPolicy.Recommend(profile, 600);
+
+            Assert.Equal(600 - DialogWorkAreaPolicy.DefaultMargin, size.Height, 3);
+            Assert.Equal(size.Height, size.MinHeight, 3);
+            Assert.True(size.MinHeight <= 600, $"{name}: MinHeight не должен выходить за экран.");
+            Assert.True(size.RequiresScrolling, $"{name}: после клампа нужна прокрутка.");
+        }
+    }
+
+    [Fact]
+    public void Policy_Recommend_UnknownWorkArea_KeepsProfileHeight()
+    {
+        var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, 0);
+
+        Assert.Equal(825, size.Height, 3);
         Assert.False(size.RequiresScrolling);
         Assert.True(double.IsPositiveInfinity(size.MaxHeight));
     }
 
     [Theory]
-    [InlineData("UtilitiesMenuEditorWindow.xaml", "760", "600")]
-    [InlineData("TrayMenuEditorWindow.xaml", "760", "600")]
-    public void WpfEditors_DefaultHeightAtLeast720(string fileName, string height, string minHeight)
+    [InlineData("UtilitiesMenuEditorWindow.xaml", "825")]
+    [InlineData("TrayMenuEditorWindow.xaml", "855")]
+    [InlineData("ContextMenuEditorWindow.xaml", "685")]
+    [InlineData("CustomProgramsWindow.xaml", "760")]
+    public void WpfWindows_XamlHeightEqualsMinHeight(string fileName, string value)
     {
+        // Issue #146: требование владельца «сделать Height = MinHeight» зафиксировано
+        // в разметке, чтобы окно не открывалось с завышенным запасом.
         var xaml = ReadView(fileName);
 
-        Assert.Contains($"Height=\"{height}\"", xaml, StringComparison.Ordinal);
-        Assert.Contains($"MinHeight=\"{minHeight}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains($"Height=\"{value}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains($"MinHeight=\"{value}\"", xaml, StringComparison.Ordinal);
     }
 
     [Theory]
-    [InlineData("UtilitiesMenuEditorWindow.Avalonia.cs")]
-    [InlineData("TrayMenuEditorWindow.Avalonia.cs")]
-    public void AvaloniaEditors_HeightComesFromPolicy(string fileName)
+    [InlineData("UtilitiesMenuEditorWindow.Avalonia.cs", "UtilitiesEditor")]
+    [InlineData("TrayMenuEditorWindow.Avalonia.cs", "TrayEditor")]
+    [InlineData("ContextMenuEditorWindow.Avalonia.cs", "ContextMenuEditor")]
+    [InlineData("CustomProgramsWindow.Avalonia.cs", "CustomPrograms")]
+    public void AvaloniaWindows_UseProfiles(string fileName, string profile)
     {
         var source = ReadView(fileName);
 
-        Assert.Contains("Height = DialogWorkAreaPolicy.EditorDefaultHeight;", source, StringComparison.Ordinal);
-        Assert.Contains("MinHeight = DialogWorkAreaPolicy.EditorMinHeight;", source, StringComparison.Ordinal);
-        // Зашитых 560/480 больше нет — высота считается политикой.
-        Assert.DoesNotContain("Height = 560;", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("MinHeight = 480;", source, StringComparison.Ordinal);
+        Assert.Contains($"DialogWorkAreaPolicy.{profile}", source, StringComparison.Ordinal);
+        Assert.Contains($"Height = DialogWorkAreaPolicy.{profile}.DefaultHeight;", source, StringComparison.Ordinal);
+        Assert.Contains($"MinHeight = DialogWorkAreaPolicy.{profile}.MinHeight;", source, StringComparison.Ordinal);
+        Assert.Contains("DialogWorkAreaPolicy.Recommend(", source, StringComparison.Ordinal);
     }
 
-    [Fact]
-    public void CustomPrograms_DefaultHeightAtLeast760()
+    [Theory]
+    [InlineData("ContextMenuEditorWindow.xaml.cs")]
+    [InlineData("ContextMenuEditorWindow.Avalonia.cs")]
+    public void ContextMenuEditor_AppliesWorkAreaPolicy(string fileName)
     {
-        var wpf = ReadView("CustomProgramsWindow.xaml");
-        Assert.Contains("Height=\"780\"", wpf, StringComparison.Ordinal);
-        Assert.Contains("MinHeight=\"600\"", wpf, StringComparison.Ordinal);
+        // Issue #146 (1.0.1.116): «Контекстное меню» раньше не использовало политику
+        // вовсе — теперь кламп по рабочей области общий с остальными окнами.
+        var source = ReadView(fileName);
 
-        var avalonia = ReadView("CustomProgramsWindow.Avalonia.cs");
-        Assert.Contains("Height = DialogWorkAreaPolicy.CustomProgramsDefaultHeight;", avalonia, StringComparison.Ordinal);
-        Assert.Contains("MinHeight = DialogWorkAreaPolicy.CustomProgramsMinHeight;", avalonia, StringComparison.Ordinal);
-        Assert.DoesNotContain("Height = 580;", avalonia, StringComparison.Ordinal);
-        Assert.DoesNotContain("MinHeight = 500;", avalonia, StringComparison.Ordinal);
+        Assert.Contains("ApplyWorkAreaLimits();", source, StringComparison.Ordinal);
+        Assert.Contains("DialogWorkAreaPolicy.Recommend", source, StringComparison.Ordinal);
+        Assert.Contains("DialogWorkAreaPolicy.ContextMenuEditor", source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight = size.MaxHeight;", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = size.MinHeight;", source, StringComparison.Ordinal);
+        Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -220,9 +237,70 @@ public sealed class Issue146WindowHeightTests
         Assert.Contains("DockPanel.SetDock(hint, Dock.Bottom)", source, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void ContextMenuEditor_Wpf_HintOutsideScrollViewer()
+    {
+        // Issue #146 (1.0.1.116): пояснение «Контекстного меню» вынесено из прокручиваемой
+        // панели в DockPanel.Dock="Bottom" — как в «Утилитах» и «Меню трея» (1.0.1.115).
+        var xaml = ReadView("ContextMenuEditorWindow.xaml");
+
+        var dock = xaml.IndexOf("<DockPanel Grid.Column=\"2\">", StringComparison.Ordinal);
+        Assert.True(dock >= 0, "Правая колонка «Контекстного меню» должна быть DockPanel.");
+
+        var bottom = xaml.IndexOf("DockPanel.Dock=\"Bottom\"", dock, StringComparison.Ordinal);
+        var hint = xaml.IndexOf("ContextMenu.Editor.Hint", dock, StringComparison.Ordinal);
+        var scroll = xaml.IndexOf("<ScrollViewer", dock, StringComparison.Ordinal);
+
+        Assert.True(bottom >= 0 && bottom < hint,
+            "Пояснение должно быть закреплено внизу правой колонки (DockPanel.Dock=\"Bottom\").");
+        Assert.True(hint >= 0 && hint < scroll,
+            "Пояснение должно находиться вне прокручиваемой панели (до ScrollViewer).");
+    }
+
+    [Fact]
+    public void ContextMenuEditor_Avalonia_HintOutsideScrollViewer()
+    {
+        var source = ReadView("ContextMenuEditorWindow.Avalonia.cs");
+
+        Assert.Contains("DockPanel.SetDock(hint, Dock.Bottom)", source, StringComparison.Ordinal);
+        Assert.Contains("BuildHint(\"ContextMenu.Editor.Hint\")", source, StringComparison.Ordinal);
+
+        // BuildOperationsPanel больше не добавляет пояснение — оно вне ScrollViewer.
+        var panelStart = source.IndexOf("private Control BuildOperationsPanel()", StringComparison.Ordinal);
+        var hintMethod = source.IndexOf("private Border BuildHint(", StringComparison.Ordinal);
+        Assert.True(panelStart >= 0 && hintMethod > panelStart,
+            "BuildOperationsPanel и BuildHint должны быть объявлены.");
+        var panel = source.Substring(panelStart, hintMethod - panelStart);
+        Assert.DoesNotContain("ContextMenu.Editor.Hint", panel, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContextMenuEditor_Wpf_OperationsPanelScrolls()
+    {
+        var xaml = ReadView("ContextMenuEditorWindow.xaml");
+
+        // Прокручивается только панель операций (аварийный режим), пояснение — вне её.
+        Assert.Contains("<DockPanel Grid.Column=\"2\">", xaml, StringComparison.Ordinal);
+        Assert.Contains("ScrollViewer", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalScrollBarVisibility=\"Auto\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("HorizontalScrollBarVisibility=\"Disabled\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContextMenuEditor_RemainsResizable()
+    {
+        var xaml = ReadView("ContextMenuEditorWindow.xaml");
+        var avalonia = ReadView("ContextMenuEditorWindow.Avalonia.cs");
+
+        Assert.DoesNotContain("ResizeMode=\"NoResize\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("SizeToContent", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("CanResize = false", avalonia, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData("UtilitiesMenuEditorWindow.xaml")]
     [InlineData("TrayMenuEditorWindow.xaml")]
+    [InlineData("ContextMenuEditorWindow.xaml")]
     [InlineData("CustomProgramsWindow.xaml")]
     public void WpfWindows_RemainResizable(string fileName)
     {
@@ -237,6 +315,7 @@ public sealed class Issue146WindowHeightTests
     [Theory]
     [InlineData("UtilitiesMenuEditorWindow.Avalonia.cs")]
     [InlineData("TrayMenuEditorWindow.Avalonia.cs")]
+    [InlineData("ContextMenuEditorWindow.Avalonia.cs")]
     [InlineData("CustomProgramsWindow.Avalonia.cs")]
     public void AvaloniaWindows_RemainResizable(string fileName)
     {
@@ -244,6 +323,13 @@ public sealed class Issue146WindowHeightTests
 
         Assert.DoesNotContain("CanResize = false", source, StringComparison.Ordinal);
         Assert.DoesNotContain("SizeToContent = SizeToContent.WidthAndHeight", source, StringComparison.Ordinal);
+    }
+
+    private static void AssertProfile(DialogWorkAreaPolicy.DialogProfile profile, double expected)
+    {
+        Assert.Equal(expected, profile.DefaultHeight, 3);
+        Assert.Equal(expected, profile.MinHeight, 3);
+        Assert.Equal(expected, profile.ContentHeight, 3);
     }
 
     private static string ReadView(string fileName) =>

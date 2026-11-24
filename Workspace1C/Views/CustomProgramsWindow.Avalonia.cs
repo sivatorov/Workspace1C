@@ -43,10 +43,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     {
         Title = T("Launch.CustomPrograms.Title");
         Width = 900;
-        // Issue #146 (1.0.1.115): 580 DIP не хватало на форму + пояснение.
-        Height = DialogWorkAreaPolicy.CustomProgramsDefaultHeight;
+        // Issue #146 (1.0.1.116): высота и минимум — из профиля CustomPrograms (760 DIP).
+        Height = DialogWorkAreaPolicy.CustomPrograms.DefaultHeight;
         MinWidth = 760;
-        MinHeight = DialogWorkAreaPolicy.CustomProgramsMinHeight;
+        MinHeight = DialogWorkAreaPolicy.CustomPrograms.MinHeight;
         FontSize = 13;
         _vm = new CustomProgramsViewModel(AppServices.TryGetService<ICustomProgramsStore>(), viewMode);
         DataContext = _vm;
@@ -56,8 +56,8 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     }
 
     /// <summary>
-    /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
-    /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 780 DIP помещает форму
+    /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
+    /// <see cref="DialogWorkAreaPolicy.CustomPrograms"/> — высота 760 DIP помещает форму
     /// и пояснение без прокрутки, а на маленьком экране клампится по рабочей области
     /// (прокрутка остаётся аварийным вариантом).
     /// </summary>
@@ -68,9 +68,7 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             return;
         var dipHeight = screen.WorkingArea.Height / screen.Scaling;
         var size = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
-            DialogWorkAreaPolicy.CustomProgramsMinHeight,
-            DialogWorkAreaPolicy.CustomProgramsContentHeight,
+            DialogWorkAreaPolicy.CustomPrograms,
             dipHeight);
         MaxHeight = size.MaxHeight;
         MinHeight = size.MinHeight;

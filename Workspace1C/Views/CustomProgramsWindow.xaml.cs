@@ -30,8 +30,8 @@ public partial class CustomProgramsWindow : Window
     }
 
     /// <summary>
-    /// Issue #146 (1.0.1.106/1.0.1.115): рекомендованные размеры окна берутся из
-    /// <see cref="DialogWorkAreaPolicy.Recommend"/> — высота 780 DIP помещает форму
+    /// Issue #146 (1.0.1.116): рекомендованные размеры окна берутся из профиля
+    /// <see cref="DialogWorkAreaPolicy.CustomPrograms"/> — высота 760 DIP помещает форму
     /// и пояснение без прокрутки, а на маленьком экране клампится по рабочей области
     /// (прокрутка остаётся аварийным вариантом).
     /// </summary>
@@ -39,9 +39,7 @@ public partial class CustomProgramsWindow : Window
     {
         var workArea = SystemParameters.WorkArea;
         var size = DialogWorkAreaPolicy.Recommend(
-            DialogWorkAreaPolicy.CustomProgramsDefaultHeight,
-            DialogWorkAreaPolicy.CustomProgramsMinHeight,
-            DialogWorkAreaPolicy.CustomProgramsContentHeight,
+            DialogWorkAreaPolicy.CustomPrograms,
             workArea.Height);
         MaxHeight = size.MaxHeight;
         MinHeight = size.MinHeight;

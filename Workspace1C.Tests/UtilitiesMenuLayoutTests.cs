@@ -24,6 +24,8 @@ public sealed class UtilitiesMenuLayoutTests
     /// Стандартная компоновка — четыре сценарных раздела первого уровня
     /// («Серверы», «Обслуживание», «Инструменты», «Ещё»), внутри — подгруппы.
     /// Разделители — самостоятельные узлы <c>Kind == "separator"</c> (issue #374).
+    /// Issue #146 (A3): в корне могут быть и верхнеуровневые пункты/разделители,
+    /// поэтому разделы ищутся по <c>GroupId</c>, а не по индексам Root[0..3].
     /// </summary>
     [Fact]
     public void DefaultLayout_HasFourScenarioSections()
@@ -31,14 +33,17 @@ public sealed class UtilitiesMenuLayoutTests
         var layout = UtilitiesMenuLayouts.Default();
 
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, layout.SchemaVersion);
-        Assert.Equal(4, layout.Root.Count);
-        AssertGroup(layout.Root[0], UtilitiesMenuCatalog.GroupServers);
-        AssertGroup(layout.Root[1], UtilitiesMenuCatalog.GroupMaintenance);
-        AssertGroup(layout.Root[2], UtilitiesMenuCatalog.GroupTools);
-        AssertGroup(layout.Root[3], UtilitiesMenuCatalog.GroupMore);
+        var serversNode = layout.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupServers);
+        var maintenanceNode = layout.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupMaintenance);
+        var toolsNode = layout.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupTools);
+        var moreNode = layout.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupMore);
+        AssertGroup(serversNode, UtilitiesMenuCatalog.GroupServers);
+        AssertGroup(maintenanceNode, UtilitiesMenuCatalog.GroupMaintenance);
+        AssertGroup(toolsNode, UtilitiesMenuCatalog.GroupTools);
+        AssertGroup(moreNode, UtilitiesMenuCatalog.GroupMore);
 
         // ---- Серверы: кластеры и консоль ----
-        var servers = layout.Root[0].Children;
+        var servers = serversNode.Children;
         AssertItem(servers[0], "ServerMonitor");
         AssertItem(servers[1], "Services");
         AssertItem(servers[2], "ServerConsoleExternal");
@@ -49,7 +54,7 @@ public sealed class UtilitiesMenuLayoutTests
         AssertItem(servers[7], "ClusterMigration");
 
         // ---- Обслуживание: копии, планировщик, диагностика, процессы ----
-        var maintenance = layout.Root[1].Children;
+        var maintenance = maintenanceNode.Children;
         Assert.Equal(7, maintenance.Count);
         AssertGroup(maintenance[0], UtilitiesMenuCatalog.GroupBackups);
         AssertSeparator(maintenance[1]);
@@ -65,7 +70,7 @@ public sealed class UtilitiesMenuLayoutTests
         Assert.Contains(maintenance[6].Children, n => n.ItemId == "CheckAvailability");
 
         // ---- Инструменты: сравнение, журналы, списки баз, разработка, сервисы ----
-        var tools = layout.Root[2].Children;
+        var tools = toolsNode.Children;
         Assert.Equal(9, tools.Count);
         AssertGroup(tools[0], UtilitiesMenuCatalog.GroupCompare);
         AssertGroup(tools[2], UtilitiesMenuCatalog.GroupJournals);
@@ -77,7 +82,7 @@ public sealed class UtilitiesMenuLayoutTests
         Assert.Contains(tools[4].Children, n => n.ItemId == "SyncIbases");
 
         // ---- Ещё: обновления, блокировка, справка ----
-        var more = layout.Root[3].Children;
+        var more = moreNode.Children;
         Assert.Equal(5, more.Count);
         AssertGroup(more[0], UtilitiesMenuCatalog.GroupUpdates);
         AssertGroup(more[2], UtilitiesMenuCatalog.GroupApp);

@@ -56,12 +56,16 @@ public sealed class UtilitiesMenuLayoutStoreTests : IDisposable
         Assert.NotNull(restored);
         Assert.Equal(layout.Root.Count, restored!.Root.Count);
         Assert.Equal(UtilitiesMenuLayouts.CurrentSchemaVersion, restored.SchemaVersion);
+        // Issue #146 (A4): первый узел корня — верхнеуровневый «Инспектор процессов»,
+        // затем разделитель; разделы ищутся по GroupId, а не по индексу.
+        AssertItem(restored.Root[0], "ProcessInspector");
+        Assert.Equal("separator", restored.Root[1].Kind);
         // Первый раздел — «Серверы»; первый пункт — «Серверы 1С».
-        Assert.Equal("group", restored.Root[0].Kind);
-        Assert.Equal(UtilitiesMenuCatalog.GroupServers, restored.Root[0].GroupId);
-        AssertItem(restored.Root[0].Children[0], "ServerMonitor");
+        var servers = restored.Root.Single(n => n.GroupId == UtilitiesMenuCatalog.GroupServers);
+        Assert.Equal("group", servers.Kind);
+        AssertItem(servers.Children[0], "ServerMonitor");
         // Разделители сохраняются как самостоятельные узлы (issue #374).
-        Assert.Equal("separator", restored.Root[0].Children[3].Kind);
+        Assert.Equal("separator", servers.Children[3].Kind);
     }
 
     [Fact]
