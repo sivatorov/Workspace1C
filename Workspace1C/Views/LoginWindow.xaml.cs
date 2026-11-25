@@ -109,9 +109,41 @@ namespace Workspace1C
             {
                 ProfilesList.Visibility = Visibility.Collapsed;
                 HintLabel.Text = LocalizationManager.T("Auth.EnterPasswordHint");
+                // Issue #164 (1.0.1.121): скрытого элемента недостаточно — строка Auto
+                // схлопывается сама, но обнуление высоты гарантирует, что над полем
+                // пароля не останется пустого места даже при перерасчёте раскладки.
+                ProfilesListRow.Height = new GridLength(0);
             }
 
+            // Issue #164 (1.0.1.121): высота окна — по содержимому, верхняя граница
+            // берётся из общей политики размеров и клампится по рабочей области.
+            ApplyWorkAreaLimits();
+
             Loaded += (_, _) => ApplySelectionState();
+        }
+
+        /// <summary>
+        /// Issue #164 (1.0.1.121): окно входа растягивается по содержимому
+        /// (<c>SizeToContent="Height"</c>), поэтому <c>MinHeight</c>/<c>MaxHeight</c>
+        /// берутся из профиля <see cref="DialogWorkAreaPolicy.Login"/> и клампятся по
+        /// рабочей области монитора: длинный список профилей не растянет окно на весь
+        /// экран (прокрутка остаётся внутри списка).
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            try
+            {
+                var size = DialogWorkAreaPolicy.Recommend(
+                    DialogWorkAreaPolicy.Login,
+                    SystemParameters.WorkArea.Height);
+                MinHeight = size.MinHeight;
+                MaxHeight = size.MaxHeight;
+            }
+            catch
+            {
+                // Геометрия — вспомогательная возможность: окно откроется с размерами
+                // из XAML (MinHeight 220, без верхней границы) и не заблокирует вход.
+            }
         }
 
         private UserProfile? SelectedProfile => ProfilesList.SelectedItem as UserProfile;

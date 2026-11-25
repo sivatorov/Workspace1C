@@ -299,7 +299,8 @@ namespace Workspace1C
                 });
             rightPanel.Children.Add(includeTest);
 
-            // Разрядность.
+            // Разрядность + галочка фильтра (issue #167): список файлов фильтруется
+            // по x64/x86 только при установленной галочке.
             var archPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             archPanel.Children.Add(MakeLabel(T("PlatformDownload.Architecture")));
             var archBox = new ComboBox { Width = 160, Height = 30 };
@@ -308,7 +309,88 @@ namespace Workspace1C
             archBox.SelectedIndex = _viewModel.Is64Bit ? 0 : 1;
             archBox.SelectionChanged += (_, _) => _viewModel.Is64Bit = archBox.SelectedIndex == 0;
             archPanel.Children.Add(archBox);
+            var archFilter = new CheckBox
+            {
+                Content = T("PlatformDownload.FilterArchitecture"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0)
+            };
+            archFilter.Bind(ToggleButton.IsCheckedProperty,
+                new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterByArchitecture))
+                {
+                    Source = _viewModel,
+                    Mode = Avalonia.Data.BindingMode.TwoWay
+                });
+            ToolTip.SetTip(archFilter, T("PlatformDownload.FilterArchitectureTooltip"));
+            archPanel.Children.Add(archFilter);
             rightPanel.Children.Add(archPanel);
+
+            // Раздел страницы загрузок (issue #167): строка видима только при HasSections;
+            // список файлов фильтруется по разделу при установленной галочке.
+            var sectionPanel = new Grid
+            {
+                Margin = new Thickness(0, 2, 0, 0),
+                ColumnDefinitions =
+                {
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Auto),
+                    new ColumnDefinition(GridLength.Star)
+                },
+                IsVisible = _viewModel.HasSections
+            };
+            var sectionLabel = MakeLabel(T("PlatformDownload.Section"));
+            sectionLabel.Margin = new Thickness(0, 0, 8, 0);
+            Grid.SetColumn(sectionLabel, 0);
+            sectionPanel.Children.Add(sectionLabel);
+
+            var sectionFilter = new CheckBox
+            {
+                Content = T("PlatformDownload.FilterSection"),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            sectionFilter.Bind(ToggleButton.IsCheckedProperty,
+                new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterBySection))
+                {
+                    Source = _viewModel,
+                    Mode = Avalonia.Data.BindingMode.TwoWay
+                });
+            ToolTip.SetTip(sectionFilter, T("PlatformDownload.FilterSectionTooltip"));
+            Grid.SetColumn(sectionFilter, 1);
+            sectionPanel.Children.Add(sectionFilter);
+
+            var sectionBox = new ComboBox
+            {
+                MinWidth = 180,
+                Height = 30,
+                Margin = new Thickness(8, 0, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                ItemsSource = _viewModel.AvailableSections,
+                SelectedItem = _viewModel.SelectedSection
+            };
+            sectionBox.Bind(ComboBox.IsEnabledProperty,
+                new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterBySection)) { Source = _viewModel });
+            sectionBox.SelectionChanged += (_, _) =>
+            {
+                if (sectionBox.SelectedItem is string section)
+                    _viewModel.SelectedSection = section;
+            };
+            Grid.SetColumn(sectionBox, 2);
+            sectionPanel.Children.Add(sectionBox);
+
+            _viewModel.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(PlatformDownloadViewModel.HasSections))
+                    sectionPanel.IsVisible = _viewModel.HasSections;
+                if (e.PropertyName == nameof(PlatformDownloadViewModel.AvailableSections))
+                {
+                    sectionBox.ItemsSource = _viewModel.AvailableSections;
+                    sectionBox.SelectedItem = _viewModel.SelectedSection;
+                }
+                if (e.PropertyName == nameof(PlatformDownloadViewModel.SelectedSection) &&
+                    !ReferenceEquals(sectionBox.SelectedItem, _viewModel.SelectedSection))
+                    sectionBox.SelectedItem = _viewModel.SelectedSection;
+            };
+            rightPanel.Children.Add(sectionPanel);
 
             // Файл дистрибутива: варианты для текущей ОС, сгруппированные по заголовкам
             // групп страницы релиза (issue #330 п.2/#334 п.2).

@@ -103,7 +103,12 @@ internal sealed class MaterialMessageWindowAvalonia : Window
         }
         else
         {
-            Width = 440;
+            // Issue #163: фиксированная ширина вместо авторазмера по ширине.
+            // Авторазмер измерял текст с бесконечной шириной, и одна длинная строка
+            // растягивала окно почти на весь экран (Wrap не срабатывал).
+            Width = 480;
+            MinWidth = 420;
+            MaxWidth = 560;
             SizeToContent = SizeToContent.Height;
         }
         // CanResize=false запрещает перетаскивание границ оконным менеджером
@@ -138,6 +143,10 @@ internal sealed class MaterialMessageWindowAvalonia : Window
             FontSize = 13,
             VerticalAlignment = VerticalAlignment.Center
         };
+        // Issue #163: явный MaxWidth у текста — перенос не зависит от родителя.
+        // В режиме fitContent (диалог обновления) ширину текста не ограничиваем.
+        if (!_fitContent)
+            messageBlock.MaxWidth = 500;
         ThemeBrushes.Bind(messageBlock, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
 
         // Тело: сетка, чтобы длинный текст переносился.

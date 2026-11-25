@@ -950,13 +950,17 @@
                                     <ColumnDefinition Width="26"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+                                <!-- Issue #159 (1.0.1.121): раскрыватель — на всю колонку и
+                                     высоту строки, чтобы клик по строке не требовал попадания
+                                     точно в «+»/«−». -->
                                 <ToggleButton x:Name="Expander"
                                               Grid.Column="0"
                                               IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                               ClickMode="Press"
-                                              Width="22" Height="22"
+                                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                              MinWidth="22" MinHeight="22"
                                               Background="Transparent" BorderThickness="0"
-                                              Cursor="Hand" VerticalAlignment="Center">
+                                              Cursor="Hand">
                                     <ToggleButton.Template>
                                         <ControlTemplate TargetType="ToggleButton">
                                             <TextBlock x:Name="ExpanderSymbol"
@@ -976,7 +980,10 @@
                                         </ControlTemplate>
                                     </ToggleButton.Template>
                                 </ToggleButton>
-                                <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center"/>
+                                <!-- Issue #159: содержимое строки растягивается на всю ширину
+                                     колонки — область выбора не заканчивается на тексте. -->
+                                <ContentPresenter Grid.Column="1" ContentSource="Header"
+                                                  HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
                         <ItemsPresenter x:Name="ItemsHost" Margin="16,0,0,0"/>

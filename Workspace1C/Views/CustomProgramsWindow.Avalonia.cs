@@ -98,6 +98,8 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         };
         var ok = new Button { Content = T("Common.Save"), MinWidth = 130 };
         ok.Click += (_, _) => SaveAndClose();
+        // Issue #158 (1.0.1.121): «Отмена» закрывает окно штатно, без сохранения и без
+        // установки DialogResult — окно закрывается даже после ошибки сохранения.
         var cancel = new Button { Content = T("Common.Cancel"), MinWidth = 110 };
         cancel.Click += (_, _) => Close();
         foreach (var b in new Control[] { ok, cancel })
@@ -407,15 +409,42 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         return button;
     }
 
+    /// <summary>
+    /// «Сохранить»: запись списка и закрытие окна только при успехе.
+    /// Issue #158 (1.0.1.121): ошибка сохранения (в том числе ввода-вывода на Linux)
+    /// показывается сообщением, окно остаётся открытым и закрывается кнопкой «Отмена»;
+    /// исключение записи не выходит наружу и не блокирует закрытие.
+    /// </summary>
     private void SaveAndClose()
     {
         if (!_vm.TrySave(out var error))
         {
-            _dialogs.ShowWarning(error, T("Launch.CustomPrograms.Title"));
+            ShowSaveError(error);
             return;
         }
         DialogResult = true;
         Close();
+    }
+
+    /// <summary>Показ понятного сообщения об ошибке сохранения (issue #158).</summary>
+    private void ShowSaveError(string error)
+    {
+        try
+        {
+            _dialogs.ShowWarning(error, T("Launch.CustomPrograms.SaveFailedTitle"));
+        }
+        catch (Exception ex)
+        {
+            try
+            {
+                AppServices.TryGetService<IAppLogger>()?.Error(
+                    "[custom-programs] Не удалось показать сообщение об ошибке сохранения.", ex);
+            }
+            catch
+            {
+                // Журнал не должен ломать сценарий закрытия окна.
+            }
+        }
     }
 
     private void BrowseFile()

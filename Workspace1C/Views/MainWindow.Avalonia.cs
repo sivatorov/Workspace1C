@@ -2610,11 +2610,25 @@ namespace Workspace1C
         private Control BuildStatusBar()
         {
             var grid = new Grid();
+            // Issue #168: ровно пять колонок — одна растягивающаяся (*) слева под все
+            // информационные надписи и четыре Auto справа под кнопки и версию.
+            // Индексы: 0 — информация, 1 — отмена загрузок, 2 — значок обновления +
+            // версия, 3 — колокольчик/«Текущая сессия», 4 — правая панель.
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            // Информационная область (issue #168): ИД базы, итог синхронизации и
+            // индикатор загрузок живут в одной *-колонке и обрезаются многоточием,
+            // поэтому длинные надписи не сдвигают версию и кнопки управления.
+            // ClipToBounds: при очень узком окне Auto-дети информационной области не
+            // должны «наезжать» на правый кластер с версией и кнопками.
+            var infoPanel = new Grid { Margin = new Thickness(0, 0, 8, 0), ClipToBounds = true };
+            infoPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            infoPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            infoPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             _statusInfo = new TextBlock { FontSize = 12, TextTrimming = TextTrimming.CharacterEllipsis, VerticalAlignment = VerticalAlignment.Center };
             ThemeBrushes.Bind(_statusInfo, TextBlock.ForegroundProperty, "SidebarTextBrush");
@@ -2667,14 +2681,23 @@ namespace Workspace1C
                         _vm.CopyInfobaseIdCommand.Execute(null);
                 };
             }
-            grid.Children.Add(_statusInfo);
+            infoPanel.Children.Add(_statusInfo);
             Grid.SetColumn(_statusInfo, 0);
 
-            _syncMessage = new TextBlock { FontSize = 12, Margin = new Thickness(16, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            // Issue #168: итог синхронизации — слева от всех кнопок; ширина ограничена,
+            // полный текст доступен в подсказке.
+            _syncMessage = new TextBlock
+            {
+                FontSize = 12,
+                Margin = new Thickness(16, 0, 0, 0),
+                MaxWidth = 260,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             ThemeBrushes.Bind(_syncMessage, TextBlock.ForegroundProperty, "SidebarTextBrush");
             _syncMessage.Bind(TextBlock.TextProperty, new Binding("SyncMessage"));
-            ToolTip.SetTip(_syncMessage, LocalizationManager.T("Main.SyncResultTooltip"));
-            grid.Children.Add(_syncMessage);
+            _syncMessage.Bind(ToolTip.TipProperty, new Binding("SyncMessage"));
+            infoPanel.Children.Add(_syncMessage);
             Grid.SetColumn(_syncMessage, 1);
 
             // Версия приложения и значок обновления (issue #116): значок стоит СЛЕВА
@@ -2702,15 +2725,23 @@ namespace Workspace1C
                 Orientation = Orientation.Horizontal,
                 Spacing = 4,
                 VerticalAlignment = VerticalAlignment.Center,
+                // Issue #166 (Linux): прозрачный фон — паритет с WPF
+                // (MainWindow.xaml:3866-3869). Без Background клик по пустому месту
+                // контейнера не попадал в элемент — работали только сами глифы.
+                Background = Brushes.Transparent,
                 Cursor = new Cursor(StandardCursorType.Hand),
                 IsVisible = false
             };
-            _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(UiMetrics.IconControl), "@AccentBrush");
-            _footerUpdateWarningIcon = IconHelper.MakeIcon("IconWarning", UiMetrics.Scaled(16), "@AccentBrush");
+            // Issue #166: перегрузка MakeIcon(string, double, string) трактует третий
+            // аргумент как ключ ресурса-кисти для DynamicResource, а «@AccentBrush» —
+            // это спецификация ThemeBrushes.FromSpec: ключа с префиксом «@» в
+            // ресурсах нет, Fill не разрешался и значок оставался невидимым.
+            _footerUpdateSyncIcon = IconHelper.MakeIcon("IconSync", UiMetrics.Scaled(UiMetrics.IconControl), ThemeBrushes.FromSpec("@AccentBrush"));
+            _footerUpdateWarningIcon = IconHelper.MakeIcon("IconWarning", UiMetrics.Scaled(16), ThemeBrushes.FromSpec("@AccentBrush"));
             _footerUpdateWarningIcon.IsVisible = false;
             // Состояние «готов к установке» (issue #116 v1.0.1.58): зелёная галочка —
             // файл обновления уже скачан в фоне, клик сразу открывает установку.
-            _footerUpdateReadyIcon = IconHelper.MakeIcon("IconCheck", UiMetrics.Scaled(16), "@SuccessBrush");
+            _footerUpdateReadyIcon = IconHelper.MakeIcon("IconCheck", UiMetrics.Scaled(16), ThemeBrushes.FromSpec("@SuccessBrush"));
             _footerUpdateReadyIcon.IsVisible = false;
             _footerUpdateIcon.Children.Add(_footerUpdateSyncIcon);
             _footerUpdateIcon.Children.Add(_footerUpdateWarningIcon);
@@ -2818,14 +2849,25 @@ namespace Workspace1C
             downloadsEtaText.Bind(TextBlock.TextProperty, new Binding("DownloadsEtaText"));
             downloadsPanel.Children.Add(downloadsEtaText);
 
+            // Индикатор загрузок — в информационной области (колонка 2 infoPanel),
+            // слева от всех кнопок. Раньше панель ставилась в несуществующую колонку 5
+            // (создавалось всего пять колонок 0–4) — это ломало раскладку при активной
+            // загрузке (issue #168).
+            infoPanel.Children.Add(downloadsPanel);
+            Grid.SetColumn(downloadsPanel, 2);
+
+            grid.Children.Add(infoPanel);
+            Grid.SetColumn(infoPanel, 0);
+
+            // Отмена фоновых загрузок (issue #168): единственный элемент управления
+            // в левой группе — стоит сразу за информационной областью, рядом с прогрессом.
             var cancelDownloadsBtn = StatusBarIconButton("IconClose");
             ToolTip.SetTip(cancelDownloadsBtn, LocalizationManager.T("Main.Downloads.Cancel"));
             UiAutomation.SetNameFromTip(cancelDownloadsBtn);
             cancelDownloadsBtn.Bind(Button.CommandProperty, new Binding("CancelDownloadsCommand"));
-            downloadsPanel.Children.Add(cancelDownloadsBtn);
-
-            grid.Children.Add(downloadsPanel);
-            Grid.SetColumn(downloadsPanel, 5);
+            cancelDownloadsBtn.Bind(Control.IsVisibleProperty, new Binding("HasActiveDownloads"));
+            grid.Children.Add(cancelDownloadsBtn);
+            Grid.SetColumn(cancelDownloadsBtn, 1);
 
             // Фон панели и цвет текста в разметке заданы явно (MainWindow.xaml:2300):
             // тёмная полоса SidebarBrush с контрастным текстом, а не прозрачная
@@ -2852,13 +2894,19 @@ namespace Workspace1C
                     // (issue #116 v1.0.1.58) меняется из той же фоновой загрузки.
                     updateService.ReadyStateChanged += () =>
                         Dispatcher.UIThread.Post(RefreshFooterUpdateState);
-                    Dispatcher.UIThread.Post(RefreshFooterUpdateState);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Состояние ссылок не критично: остаётся только версия.
+                // Issue #166: сбой подписки не должен скрывать значок — ручная
+                // проверка остаётся доступной. В лог пишем только тип исключения.
+                LogFooterUpdateWarning(ex);
             }
+
+            // Issue #166: начальное состояние значка выставляем всегда, в том числе
+            // когда службы обновления нет (раньше RefreshFooterUpdateState не
+            // вызывался вовсе и IsVisible=false из инициализатора оставался навсегда).
+            RefreshFooterUpdateState();
 
             return bar;
         }
@@ -2878,11 +2926,22 @@ namespace Workspace1C
             // Issue #129: подпись версии тоже зависит от «Считать версию прошлой».
             RefreshFooterVersionText();
 
+            // Issue #166: значок доступен во всех режимах и не зависит от службы
+            // обновления. До расчёта состояния показываем стрелки и не скрываем
+            // контейнер — иначе при отсутствии службы или исключении кнопка
+            // исчезала бы навсегда (IsVisible=false из инициализатора).
+            _footerUpdateIcon.IsVisible = true;
+            _footerUpdateSyncIcon.IsVisible = true;
+
             try
             {
                 var updateService = AppServices.TryGetService<UpdateService>();
                 if (updateService is null)
+                {
+                    // Службы нет — оставляем ручную проверку с базовой подсказкой.
+                    ToolTip.SetTip(_footerUpdateIcon, LocalizationManager.T("Main.Footer.CheckUpdates"));
                     return;
+                }
 
                 // Состояние «файл обновления скачан и готов к установке» (issue #116,
                 // v1.0.1.58): зелёная галочка вместо «внимания», клик — сразу диалог
@@ -2910,9 +2969,30 @@ namespace Workspace1C
                             updateService.AvailableRelease!.TagName)
                         : LocalizationManager.T("Main.Footer.CheckUpdates"));
             }
+            catch (Exception ex)
+            {
+                // Issue #166: не скрываем значок навсегда — ручная проверка остаётся
+                // доступной. В лог пишем только тип исключения: сообщения службы
+                // обновления могут содержать URL с токенами.
+                LogFooterUpdateWarning(ex);
+            }
+        }
+
+        /// <summary>
+        /// Issue #166: предупреждение о сбое состояния значка обновления. В лог
+        /// попадает только тип исключения — сообщения службы обновления могут
+        /// содержать URL с токенами.
+        /// </summary>
+        private static void LogFooterUpdateWarning(Exception ex)
+        {
+            try
+            {
+                AppServices.TryGetService<Services.IAppLogger>()?.Warn(
+                    "FooterUpdateState: сбой обновления значка обновления (" + ex.GetType().Name + ")");
+            }
             catch
             {
-                // Состояние значка не критично: остаётся только версия.
+                // Логгер недоступен — диагностика не критична для работы окна.
             }
         }
 

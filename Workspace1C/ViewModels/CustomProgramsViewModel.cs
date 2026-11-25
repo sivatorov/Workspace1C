@@ -18,14 +18,18 @@ namespace Workspace1C.ViewModels;
 public class CustomProgramsViewModel : ViewModelBase
 {
     private readonly ICustomProgramsStore? _store;
+    private readonly IAppLogger? _logger;
     private CustomProgram? _selectedProgram;
     private string _viewMode;
 
     /// <param name="store">Хранилище программ (может быть null — редактирование без сохранения).</param>
     /// <param name="viewMode">Текущий режим отображения группы из настроек.</param>
-    public CustomProgramsViewModel(ICustomProgramsStore? store, string? viewMode)
+    /// <param name="logger">Журнал приложения (issue #158, 1.0.1.121); null — берётся из
+    /// <see cref="AppServices"/>, в тестах может отсутствовать.</param>
+    public CustomProgramsViewModel(ICustomProgramsStore? store, string? viewMode, IAppLogger? logger = null)
     {
         _store = store;
+        _logger = logger ?? TryResolveLogger();
         _viewMode = CustomProgramsViewModes.Normalize(viewMode);
         Programs = new ObservableCollection<CustomProgram>(
             store?.LoadAll() ?? (IReadOnlyList<CustomProgram>)Array.Empty<CustomProgram>());
@@ -174,44 +178,91 @@ public class CustomProgramsViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Последняя ошибка сохранения (issue #158, 1.0.1.121): готовый для показа текст либо
+    /// <c>null</c>. Заполняется <see cref="TrySave"/>, чтобы окно могло показать сообщение
+    /// и остаться открытым, не разбирая строку ошибки.
+    /// </summary>
+    public string? LastSaveError { get; private set; }
+
+    /// <summary>
     /// Проверяет обязательные поля (имя и исполняемый файл) и сохраняет список в
     /// хранилище. При ошибке возвращает <c>false</c> и сообщение для пользователя
     /// (локализованный ключ с подстановкой имени программы).
+    /// <para>
+    /// Issue #158 (1.0.1.121): исключение записи (в том числе <see cref="System.IO.IOException"/>
+    /// на Linux) никогда не выходит наружу — оно пишется в журнал
+    /// (<see cref="IAppLogger.Error"/>), а окно показывает понятное сообщение и остаётся
+    /// открытым, чтобы пользователь закрыл его кнопкой «Отмена».
+    /// </para>
     /// </summary>
     public bool TrySave(out string error)
     {
         error = string.Empty;
-        foreach (var program in Programs)
-        {
-            if (string.IsNullOrWhiteSpace(program.Name))
-            {
-                error = LocalizationManager.T("Launch.CustomPrograms.ErrorNameRequired");
-                return false;
-            }
-            if (string.IsNullOrWhiteSpace(program.FilePath))
-            {
-                error = string.Format(
-                    LocalizationManager.T("Launch.CustomPrograms.ErrorFileRequiredFor"),
-                    program.Name);
-                return false;
-            }
-        }
-
-        // Порядок — по позиции в списке редактора.
-        for (var i = 0; i < Programs.Count; i++)
-            Programs[i].Order = i;
-
+        LastSaveError = null;
         try
         {
+            foreach (var program in Programs)
+            {
+                if (string.IsNullOrWhiteSpace(program.Name))
+                {
+                    error = LocalizationManager.T("Launch.CustomPrograms.ErrorNameRequired");
+                    return false;
+                }
+                if (string.IsNullOrWhiteSpace(program.FilePath))
+                {
+                    error = string.Format(
+                        LocalizationManager.T("Launch.CustomPrograms.ErrorFileRequiredFor"),
+                        program.Name);
+                    return false;
+                }
+            }
+
+            // Порядок — по позиции в списке редактора.
+            for (var i = 0; i < Programs.Count; i++)
+                Programs[i].Order = i;
+
             _store?.SaveAll(Programs);
+            return true;
         }
         catch (Exception ex)
         {
             error = string.Format(
-                LocalizationManager.T("Launch.CustomPrograms.ErrorSave"), ex.Message);
+                LocalizationManager.T("Launch.CustomPrograms.SaveFailed"), ex.Message);
+            LastSaveError = error;
+            LogSaveError(ex);
             return false;
         }
-        return true;
+    }
+
+    /// <summary>Резолвит журнал из <see cref="AppServices"/> (в тестах контейнер не настроен).</summary>
+    private static IAppLogger? TryResolveLogger()
+    {
+        try
+        {
+            return AppServices.TryGetService<IAppLogger>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Пишет ошибку сохранения в журнал, не раскрывая секретов и не роняя сохранение,
+    /// если сам журнал недоступен (issue #158).
+    /// </summary>
+    private void LogSaveError(Exception ex)
+    {
+        try
+        {
+            _logger?.Error(
+                $"[custom-programs] Не удалось сохранить список программ (хранилище: " +
+                $"{_store?.GetType().Name ?? "нет"}).", ex);
+        }
+        catch
+        {
+            // Журнал не должен ломать сценарий сохранения.
+        }
     }
 
     private void RaiseCommandsCanExecuteChanged()

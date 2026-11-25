@@ -32,7 +32,9 @@ namespace Workspace1C
         public SecretUnlockWindow(string profileName)
         {
             _profileId = _profileService.CurrentProfile?.Id ?? string.Empty;
-            WpfUi.SetupWindow(this, "Secrets.UnlockTitle", 480, 260);
+            // Issue #163: узкое окно запроса пароля; длинная подсказка переносится.
+            WpfUi.SetupWindow(this, "Secrets.UnlockTitle", 440, 260);
+            MaxWidth = 520;
             ShowInTaskbar = false;
             ResizeMode = ResizeMode.NoResize;
 

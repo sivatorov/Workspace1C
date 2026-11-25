@@ -236,7 +236,21 @@ namespace Workspace1C
             // (CanToggleVisibility=false) — чекбокс отключён, менять можно только
             // местоположение.
             check.Bind(CheckBox.IsEnabledProperty, new Binding("CanToggleVisibility"));
-            var icon = IconHelper.MakeIcon(node.DisplayIconKey, 16, "TextPrimaryBrush");
+            // Issue #159 (1.0.1.121): DisplayIconKey — PackIcon-имя каталога («Folder»,
+            // «Sync», …), а IconHelper ждёт ключ геометрии Icon*; неизвестный ключ
+            // резолвился в запасную «папку», и у всех узлов была одна и та же иконка.
+            // Берём то же разрешение, что меню и WPF (WpfIconGeometryKey), — см.
+            // TrayMenuEditorWindow.Avalonia.cs.
+            var geometryKey = node.DisplayIconGeometryKey;
+            if (string.IsNullOrWhiteSpace(geometryKey))
+                geometryKey = "IconFolder";
+            // Issue #159: цвет — HEX каталога или «@Кисть»; FromSpec разрешает оба и не
+            // падает на неизвестной кисти (в отличие от перегрузки MakeIcon(..., string),
+            // которая трактует «@AccentBrush» как имя ресурса без префикса).
+            var colorSpec = node.DisplayIconColor;
+            var icon = string.IsNullOrWhiteSpace(colorSpec)
+                ? IconHelper.MakeIcon(geometryKey, 16, "TextPrimaryBrush")
+                : IconHelper.MakeIcon(geometryKey, 16, ThemeBrushes.FromSpec(colorSpec));
             if (icon is not null)
             {
                 icon.Margin = new Thickness(4, 0, 0, 0);
@@ -253,12 +267,40 @@ namespace Workspace1C
             // Issue #61: вторичный текст строки — вторичная кисть темы.
             ThemeBrushes.Bind(kind, TextBlock.ForegroundProperty, "TextSecondaryBrush");
             kind.Bind(TextBlock.TextProperty, new Binding("KindLabel"));
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0 };
-            row.Children.Add(check);
+            var content = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Spacing = 0,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            content.Children.Add(check);
             if (icon is not null)
-                row.Children.Add(icon);
-            row.Children.Add(title);
-            row.Children.Add(kind);
+                content.Children.Add(icon);
+            content.Children.Add(title);
+            content.Children.Add(kind);
+
+            // Issue #159 (1.0.1.121): кликабельна вся строка узла, а не только глиф.
+            // Прозрачный фон обязателен для hit-test (прозрачные области StackPanel
+            // событий указателя не получают), Stretch — на всю ширину дерева,
+            // MinHeight — высота строки. Иначе после раскрытия группы приходилось
+            // «попадать в точку» — маленький шеврон.
+            var row = new Border
+            {
+                Background = Brushes.Transparent,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinHeight = 24,
+                Cursor = new Cursor(StandardCursorType.Hand),
+                Child = content
+            };
+            // Issue #159: ПКМ по любому месту строки выделяет узел — как в WPF-дереве,
+            // где выделение по всей строке выполняет сам TreeViewItem.
+            row.PointerPressed += (_, e) =>
+            {
+                if (!e.GetCurrentPoint(row).Properties.IsRightButtonPressed)
+                    return;
+                _tree.SelectedItem = node;
+                e.Handled = true;
+            };
             return row;
         }
 

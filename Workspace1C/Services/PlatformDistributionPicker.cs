@@ -167,6 +167,57 @@ public static class PlatformDistributionPicker
     }
 
     /// <summary>
+    /// Уникальные непустые разделы страницы загрузок (issue #167): заголовки групп
+    /// (<see cref="PlatformReleaseFile.Group"/>), в порядке первого появления на странице,
+    /// без дублей (сравнение без учёта регистра) и без пустых/пробельных значений.
+    /// Чистый метод — используется для выбора раздела и покрывается юнит-тестами.
+    /// Файлы без группы (старые релизы, JSON-ответ) разделов не добавляют.
+    /// </summary>
+    /// <param name="files">Файлы дистрибутива релиза.</param>
+    public static IReadOnlyList<string> ExtractSections(IReadOnlyList<PlatformReleaseFile> files)
+    {
+        if (files is null || files.Count == 0)
+            return Array.Empty<string>();
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files)
+        {
+            var group = file?.Group?.Trim();
+            if (string.IsNullOrWhiteSpace(group))
+                continue;
+            if (seen.Add(group))
+                result.Add(group);
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Фильтрует файлы релиза по выбранному разделу страницы (issue #167): остаются
+    /// только файлы группы <paramref name="section"/> (сравнение без учёта регистра,
+    /// значения обрезаются). Пустой/пробельный раздел — фильтр не применяется
+    /// (возвращаются все файлы). Файлы без группы при активном фильтре отбрасываются:
+    /// пользователь выбрал конкретный раздел. Чистый метод, покрыт юнит-тестами.
+    /// </summary>
+    /// <param name="files">Файлы дистрибутива релиза.</param>
+    /// <param name="section">Выбранный раздел; null/пусто — без фильтра.</param>
+    public static IReadOnlyList<PlatformReleaseFile> FilterBySection(
+        IReadOnlyList<PlatformReleaseFile> files, string? section)
+    {
+        if (files is null || files.Count == 0)
+            return Array.Empty<PlatformReleaseFile>();
+        if (string.IsNullOrWhiteSpace(section))
+            return files;
+
+        var target = section.Trim();
+        return files
+            .Where(f => !string.IsNullOrWhiteSpace(f.Group)
+                && string.Equals(f.Group!.Trim(), target, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
+    /// <summary>
     /// Выбирает файл дистрибутива из списка файлов релиза по типу и разрядности.
     /// Приоритет: файлы подходящего типа (см. <paramref name="type"/>), затем файлы
     /// нужной разрядности (x64 для 64-битной ОС, x86 для 32-битной), затем первый

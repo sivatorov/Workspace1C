@@ -1,5 +1,7 @@
 #if WINDOWS
+using System;
 using System.Windows;
+using System.Windows.Input;
 using Workspace1C.Localization;
 using Workspace1C.Services;
 using Workspace1C.ViewModels;
@@ -90,21 +92,75 @@ public partial class CustomProgramsWindow : Window
             program.IconPath = path!;
     }
 
-    /// <summary>«Сохранить»: проверка обязательных полей, запись списка и закрытие окна.</summary>
+    /// <summary>
+    /// «Сохранить»: проверка обязательных полей, запись списка и закрытие окна.
+    /// Issue #158 (1.0.1.121): при ошибке сохранения окно остаётся открытым и
+    /// закрывается кнопкой «Отмена»; исключение записи не выходит наружу.
+    /// </summary>
     private void OnOk_Click(object sender, RoutedEventArgs e)
     {
         if (!_vm.TrySave(out var error))
         {
-            _dialogs.ShowWarning(error, T("Launch.CustomPrograms.Title"));
+            ShowSaveError(error);
             return;
         }
-        DialogResult = true;
+        CloseWithResult(true);
     }
 
-    /// <summary>«Отмена»: закрытие без сохранения (изменения остаются только в памяти).</summary>
+    /// <summary>
+    /// «Отмена»: закрытие без сохранения (изменения остаются только в памяти).
+    /// Issue #158 (1.0.1.121): только <see cref="Window.Close()"/> — без установки
+    /// <see cref="Window.DialogResult"/>, которая вне <c>ShowDialog</c> бросает
+    /// <c>InvalidOperationException</c> и блокирует закрытие.
+    /// </summary>
     private void OnCancel_Click(object sender, RoutedEventArgs e)
     {
-        DialogResult = false;
+        Close();
+    }
+
+    /// <summary>
+    /// Esc закрывает редактор без сохранения (issue #158: паритет с Avalonia
+    /// <c>ModalWindowBase.CloseOnEscape</c>; кнопка «Отмена» больше не <c>IsCancel</c>).
+    /// </summary>
+    private void OnWindowKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            e.Handled = true;
+            Close();
+        }
+    }
+
+    /// <summary>
+    /// Устанавливает <see cref="Window.DialogResult"/> и закрывает окно. Вне модального
+    /// показа свойство бросает <c>InvalidOperationException</c> — тогда закрываем штатно,
+    /// чтобы окно гарантированно закрылось (issue #158).
+    /// </summary>
+    private void CloseWithResult(bool result)
+    {
+        try
+        {
+            DialogResult = result;
+        }
+        catch (InvalidOperationException)
+        {
+            // Окно показано немодально — результат не нужен, закрываем без исключения.
+            Close();
+        }
+    }
+
+    /// <summary>Показ понятного сообщения об ошибке сохранения (issue #158).</summary>
+    private void ShowSaveError(string error)
+    {
+        try
+        {
+            _dialogs.ShowWarning(error, T("Launch.CustomPrograms.SaveFailedTitle"));
+        }
+        catch (Exception ex)
+        {
+            AppServices.TryGetService<IAppLogger>()?.Error(
+                "[custom-programs] Не удалось показать сообщение об ошибке сохранения.", ex);
+        }
     }
 
     /// <summary>Каталог для начального выбора в диалоге (существующий, иначе пусто).</summary>

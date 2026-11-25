@@ -77,6 +77,12 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
     private Services.DownloadEtaTracker? _etaTracker;
     private bool _is64Bit;
     private bool _includeTestVersions;
+    // Issue #167: фильтры списка файлов — разрядность (по умолчанию включён, как раньше)
+    // и раздел страницы загрузок (по умолчанию выключен; доступен только при HasSections).
+    private bool _filterByArchitecture = true;
+    private IReadOnlyList<string> _availableSections = Array.Empty<string>();
+    private string? _selectedSection;
+    private bool _filterBySection;
     private PlatformDownloadType _downloadType;
     private IReadOnlyList<PlatformDownloadType> _availableDownloadTypes = new[] { PlatformDownloadType.Auto };
     private PlatformCatalogNode? _selectedVersionNode;
@@ -241,6 +247,75 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         {
             if (SetProperty(ref _is64Bit, value))
                 RepickFile();
+        }
+    }
+
+    /// <summary>
+    /// True (по умолчанию) — список файлов фильтруется по выбранной разрядности
+    /// x64/x86 (issue #167). Снятая галочка показывает файлы обеих разрядностей:
+    /// до issue #167 фильтрация выполнялась всегда, и x86-файлы были недоступны
+    /// без переключения разрядности.
+    /// </summary>
+    public bool FilterByArchitecture
+    {
+        get => _filterByArchitecture;
+        set
+        {
+            if (SetProperty(ref _filterByArchitecture, value))
+                RepickFile();
+        }
+    }
+
+    /// <summary>
+    /// Доступные разделы страницы загрузок (issue #167): уникальные непустые заголовки
+    /// групп в порядке страницы. Строится из сырых файлов релиза, поэтому не «мигает»
+    /// при смене галочек. Пустой список — разделов на странице нет, строка выбора скрыта
+    /// (<see cref="HasSections"/>).
+    /// </summary>
+    public IReadOnlyList<string> AvailableSections
+    {
+        get => _availableSections;
+        private set
+        {
+            if (SetProperty(ref _availableSections, value ?? Array.Empty<string>()))
+                OnPropertyChanged(nameof(HasSections));
+        }
+    }
+
+    /// <summary>True — на странице загрузок есть разделы (issue #167): только тогда
+    /// показывается строка выбора раздела.</summary>
+    public bool HasSections => _availableSections.Count > 0;
+
+    /// <summary>Выбранный раздел страницы загрузок (issue #167) или null.</summary>
+    public string? SelectedSection
+    {
+        get => _selectedSection;
+        set
+        {
+            var normalized = string.IsNullOrWhiteSpace(value) ? null : value!.Trim();
+            if (!SetProperty(ref _selectedSection, normalized))
+                return;
+            if (_filterBySection)
+                RepickFile();
+        }
+    }
+
+    /// <summary>
+    /// True — список файлов фильтруется по выбранному разделу страницы (issue #167).
+    /// Без разделов на странице фильтр игнорируется (<see cref="HasSections"/> = false).
+    /// </summary>
+    public bool FilterBySection
+    {
+        get => _filterBySection;
+        set
+        {
+            if (!SetProperty(ref _filterBySection, value))
+                return;
+            // При включении без выбранного раздела сразу выбираем первый доступный —
+            // иначе галочка визуально «ничего не делает».
+            if (value && _selectedSection is null && _availableSections.Count > 0)
+                SetSelectedSectionCore(_availableSections[0]);
+            RepickFile();
         }
     }
 
@@ -651,17 +726,63 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
             SetNodeExpanded(child, isExpanded);
     }
 
+    /// <summary>
+    /// Пересчитывает список разделов страницы загрузок из сырых файлов релиза
+    /// (issue #167). Если выбранный раздел исчез (сменилась версия/платформа),
+    /// выбор сбрасывается и фильтр по разделу снимается — иначе список файлов
+    /// остался бы пустым без видимой причины.
+    /// </summary>
+    private void RefreshSections(IReadOnlyList<PlatformReleaseFile> allFiles)
+    {
+        var sections = PlatformDistributionPicker.ExtractSections(allFiles);
+        if (!sections.SequenceEqual(_availableSections, StringComparer.Ordinal))
+            AvailableSections = sections;
+
+        if (_selectedSection is null)
+            return;
+
+        var stillAvailable = sections.Any(s =>
+            string.Equals(s, _selectedSection, StringComparison.OrdinalIgnoreCase));
+        if (stillAvailable)
+            return;
+
+        SetSelectedSectionCore(null);
+        if (_filterBySection)
+        {
+            _filterBySection = false;
+            OnPropertyChanged(nameof(FilterBySection));
+        }
+    }
+
+    /// <summary>Устанавливает выбранный раздел без запуска пересчёта (внутренние сбросы).</summary>
+    private void SetSelectedSectionCore(string? section)
+    {
+        var normalized = string.IsNullOrWhiteSpace(section) ? null : section!.Trim();
+        SetProperty(ref _selectedSection, normalized, nameof(SelectedSection));
+    }
+
     /// <summary>Пересчитывает варианты дистрибутива и выбранный файл
-    /// (версия + разрядность + тип → файл, issue #330).</summary>
+    /// (версия + разрядность + тип → файл, issue #330; фильтры issue #167).</summary>
     private void RepickFile()
     {
         var allFiles = SelectedRelease?.Release.Files
             ?? (IReadOnlyList<PlatformReleaseFile>)Array.Empty<PlatformReleaseFile>();
 
-        // Issue #330 п.1: список файлов/вариантов фильтруется по выбранному переключателю
-        // разрядности — в списке остаются только дистрибутивы выбранной битности и файлы
-        // без разрядности (Linux-пакеты, архивы). Правило — в чистом методе FilterByArchitecture.
-        var files = PlatformDistributionPicker.FilterByArchitecture(allFiles, Is64Bit);
+        // Issue #167: разделы берутся из СЫРЫХ файлов выбранного релиза — список
+        // разделов не «мигает» при смене галочек фильтрации.
+        RefreshSections(allFiles);
+
+        // Issue #167: фильтр по разрядности применяется ТОЛЬКО при установленной галочке.
+        // По умолчанию она включена — прежнее поведение сохраняется (в списке остаются
+        // файлы выбранной битности и файлы без разрядности: Linux-пакеты, архивы).
+        IReadOnlyList<PlatformReleaseFile> files = _filterByArchitecture
+            ? PlatformDistributionPicker.FilterByArchitecture(allFiles, Is64Bit)
+            : allFiles;
+
+        // Issue #167: фильтр по разделу — только при включённой галочке, выбранном
+        // разделе и наличии разделов на странице.
+        if (_filterBySection && HasSections && !string.IsNullOrWhiteSpace(_selectedSection))
+            files = PlatformDistributionPicker.FilterBySection(files, _selectedSection);
 
         // Варианты для целевой ОС: реальный выбор (полный/тонкий клиент, x64/x86, пакеты)
         // вместо единственного «Авто». Рекомендуемый помечен и предвыбран по умолчанию.
@@ -701,11 +822,19 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
             return;
         }
 
-        // Сохраняем выбор пользователя; при смене версии/разрядности выбираем рекомендуемый.
-        if (SelectedDistribution is null || !options.Any(o => ReferenceEquals(o, SelectedDistribution)))
-        {
-            SelectedDistribution = options.FirstOrDefault(o => o.IsRecommended) ?? options.FirstOrDefault();
-        }
+        // Issue #167: выбор пользователя сохраняется, если выбранный файл проходит
+        // новые фильтры; иначе выбирается рекомендуемый вариант. Сравнение — по URL
+        // файла: варианты пересоздаются при каждом пересчёте (ReferenceEquals бесполезен).
+        var previous = SelectedDistribution?.File;
+        var preserved = previous is null
+            ? null
+            : options.FirstOrDefault(o => ReferenceEquals(o.File, previous)
+                || (!string.IsNullOrWhiteSpace(previous.Url)
+                    && string.Equals(o.File.Url, previous.Url, StringComparison.OrdinalIgnoreCase)));
+
+        SelectedDistribution = preserved
+            ?? options.FirstOrDefault(o => o.IsRecommended)
+            ?? options.FirstOrDefault();
 
         PickedFile = SelectedDistribution?.File
             ?? PlatformDistributionPicker.PickFile(files, Is64Bit, DownloadType, _isWindows);

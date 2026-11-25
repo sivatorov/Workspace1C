@@ -3758,36 +3758,94 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <!-- ИД базы (issue #110): двойной клик по строке состояния копирует ИД
-                     выделенной базы; в контекстном меню — явный пункт. -->
-                <TextBlock Grid.Column="0" Text="{Binding StatusBarInfo}"
-                           Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
-                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                           ToolTip="{Binding StatusBarInfo}">
-                    <TextBlock.InputBindings>
-                        <MouseBinding Gesture="LeftDoubleClick" Command="{Binding CopyInfobaseIdCommand}"/>
-                    </TextBlock.InputBindings>
-                    <TextBlock.ContextMenu>
-                        <ContextMenu Style="{DynamicResource ModernContextMenu}">
-                            <MenuItem Header="{loc:Loc Main.StatusIdCopy}"
-                                      Command="{Binding CopyInfobaseIdCommand}"
-                                      Style="{DynamicResource ModernMenuItem}">
-                                <MenuItem.Icon>
-                                    <materialDesign:PackIcon Kind="Identifier" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem Header="{loc:Loc Main.CopyPath}"
-                                      Command="{Binding CopyConnectionStringCommand}"
-                                      Style="{DynamicResource ModernMenuItem}">
-                                <MenuItem.Icon>
-                                    <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </TextBlock.ContextMenu>
-                </TextBlock>
+                <!-- Issue #168: слева — одна растягивающаяся (*) колонка со всеми
+                     информационными надписями (ИД базы, итог синхронизации, индикатор
+                     фоновых загрузок). Длинные тексты обрезаются многоточием (полный —
+                     в подсказке) и НЕ сдвигают правый кластер: значок обновления,
+                     версия и кнопки управления стоят в Auto-колонках 2–4 и всегда
+                     прижаты вправо. -->
+                <Grid Grid.Column="0" Margin="0,0,8,0" ClipToBounds="True">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <!-- ИД базы (issue #110): двойной клик по строке состояния копирует ИД
+                         выделенной базы; в контекстном меню — явный пункт. -->
+                    <TextBlock Grid.Column="0" Text="{Binding StatusBarInfo}"
+                               Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
+                               TextTrimming="CharacterEllipsis" MinWidth="0" VerticalAlignment="Center"
+                               ToolTip="{Binding StatusBarInfo}">
+                        <TextBlock.InputBindings>
+                            <MouseBinding Gesture="LeftDoubleClick" Command="{Binding CopyInfobaseIdCommand}"/>
+                        </TextBlock.InputBindings>
+                        <TextBlock.ContextMenu>
+                            <ContextMenu Style="{DynamicResource ModernContextMenu}">
+                                <MenuItem Header="{loc:Loc Main.StatusIdCopy}"
+                                          Command="{Binding CopyInfobaseIdCommand}"
+                                          Style="{DynamicResource ModernMenuItem}">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="Identifier" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                                <MenuItem Header="{loc:Loc Main.CopyPath}"
+                                          Command="{Binding CopyConnectionStringCommand}"
+                                          Style="{DynamicResource ModernMenuItem}">
+                                    <MenuItem.Icon>
+                                        <materialDesign:PackIcon Kind="ContentCopy" Width="16" Height="16" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </MenuItem.Icon>
+                                </MenuItem>
+                            </ContextMenu>
+                        </TextBlock.ContextMenu>
+                    </TextBlock>
+                    <!-- Итог синхронизации (issue #168): информационная надпись слева от
+                         всех кнопок. Ширина ограничена, полный текст — в подсказке,
+                         поэтому появление сводки не сдвигает версию и кнопки. -->
+                    <TextBlock Grid.Column="1" Text="{Binding SyncMessage}"
+                               Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
+                               VerticalAlignment="Center" Margin="16,0,0,0"
+                               MaxWidth="260" TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding SyncMessage}"/>
+                    <!-- Индикатор фоновых загрузок (issue #334 п.1, #168): текст статуса,
+                         прогресс и ETA — в информационной области слева от кнопок.
+                         Кнопка отмены вынесена отдельно (колонка 1), чтобы не растягивать
+                         левую группу. Клик по тексту: если качаются файлы из разных окон —
+                         выбор нужного окна (ContextMenu над индикатором, issue #359). -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"
+                                Visibility="{Binding HasActiveDownloads, Converter={StaticResource BoolToVis}}">
+                        <Button Click="OnDownloadsIndicatorClick"
+                                Style="{x:Null}" Background="Transparent" BorderThickness="0"
+                                Cursor="Hand" Padding="0" VerticalAlignment="Center"
+                                ToolTip="{Binding DownloadsStatusText}">
+                            <TextBlock Text="{Binding DownloadsStatusText}"
+                                       Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
+                                       TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+                        </Button>
+                        <ProgressBar Value="{Binding ActiveDownloadsProgress, Mode=OneWay}" Width="110" Height="6"
+                                     Minimum="0" Maximum="1"
+                                     Foreground="{DynamicResource AccentBrush}"
+                                     Background="#22000000"
+                                     VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <!-- Оценка оставшегося времени (issue #360): «16:13» / «2:15:18»;
+                             пусто, пока данных недостаточно. -->
+                        <TextBlock Text="{Binding DownloadsEtaText}" FontSize="12"
+                                   Foreground="{DynamicResource SidebarTextBrush}"
+                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </Grid>
+                <!-- Отмена фоновых загрузок (issue #168): единственный элемент
+                     управления в левой группе — стоит сразу за информационной
+                     областью, рядом с прогрессом. -->
+                <Button Grid.Column="1" Command="{Binding CancelDownloadsCommand}"
+                        Style="{DynamicResource StatusBarIconButton}"
+                        Margin="4,0,0,0"
+                        ToolTip="{loc:Loc Main.Downloads.Cancel}"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding HasActiveDownloads, Converter={StaticResource BoolToVis}}">
+                    <materialDesign:PackIcon Kind="CloseCircleOutline" Width="18" Height="18"
+                                             Foreground="{DynamicResource SidebarTextBrush}"/>
+                </Button>
                 <!-- Версия приложения и значок обновления (issue #116, п.3 v1.0.1.50):
                      значок стоит СЛЕВА от версии; клик по версии — окно «Что нового».
                      Вместо текстовых ссылок «Обновить»/«Проверить обновления» — один
@@ -3803,7 +3861,7 @@
                      RefreshFooterUpdateState; клик — единый OnFooterUpdateIconClick
                      (ручная проверка: для доступного релиза она открывает диалог
                      обновления, для готового файла — сразу диалог установки). -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
                     <!-- В WPF StackPanel не имеет Spacing: зазор задаётся Margin'ом значка. -->
                     <StackPanel x:Name="FooterUpdateIcon" Orientation="Horizontal"
                                 VerticalAlignment="Center" Cursor="Hand"
@@ -3830,11 +3888,6 @@
                                ToolTip="{loc:Loc Main.Footer.WhatsNewTooltip}"
                                MouseLeftButtonUp="OnFooterVersionClick"/>
                 </StackPanel>
-                <TextBlock Grid.Column="2" Text="{Binding SyncMessage}"
-                           Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
-                           VerticalAlignment="Center" Margin="16,0,8,0"
-                           TextTrimming="CharacterEllipsis"
-                           ToolTip="{loc:Loc Main.SyncResultTooltip}"/>
                 <!-- Issue #131 (уточнение 7OH): переключатель уведомлений о длительных
                      операциях живёт в подвале рядом с кнопкой «Текущая сессия», а не в
                      блоке действий правой панели. Иконка — колокольчик (уведомления
@@ -3907,40 +3960,6 @@
                     <materialDesign:PackIcon Kind="PageLayoutSidebarRight" Width="18" Height="18"
                                              Foreground="{DynamicResource SidebarTextBrush}"/>
                 </Button>
-                <!-- Индикатор фоновых загрузок (issue #334 п.1): скачивание платформы
-                     и цепочек продолжается после закрытия окон; здесь — текст статуса
-                     и кнопка отмены. Клик по тексту: если качаются файлы из разных
-                     окон — выбор нужного окна (ContextMenu над индикатором, issue #359),
-                     иначе сразу открывается окно этой загрузки. -->
-                <StackPanel Grid.Column="5" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0,0,0"
-                            Visibility="{Binding HasActiveDownloads, Converter={StaticResource BoolToVis}}">
-                    <Button Click="OnDownloadsIndicatorClick"
-                            Style="{x:Null}" Background="Transparent" BorderThickness="0"
-                            Cursor="Hand" Padding="0" VerticalAlignment="Center"
-                            ToolTip="{Binding DownloadsStatusText}">
-                        <TextBlock Text="{Binding DownloadsStatusText}"
-                                   Foreground="{DynamicResource SidebarTextBrush}" FontSize="12"
-                                   TextTrimming="CharacterEllipsis" MaxWidth="360"/>
-                    </Button>
-                    <ProgressBar Value="{Binding ActiveDownloadsProgress, Mode=OneWay}" Width="110" Height="6"
-                                 Minimum="0" Maximum="1"
-                                 Foreground="{DynamicResource AccentBrush}"
-                                 Background="#22000000"
-                                 VerticalAlignment="Center" Margin="8,0,0,0"/>
-                    <!-- Оценка оставшегося времени (issue #360): «16:13» / «2:15:18»;
-                         пусто, пока данных недостаточно. -->
-                    <TextBlock Text="{Binding DownloadsEtaText}" FontSize="12"
-                               Foreground="{DynamicResource SidebarTextBrush}"
-                               VerticalAlignment="Center" Margin="6,0,0,0"/>
-                    <Button Command="{Binding CancelDownloadsCommand}"
-                            Style="{DynamicResource StatusBarIconButton}"
-                            Margin="4,0,0,0"
-                            ToolTip="{loc:Loc Main.Downloads.Cancel}"
-                            VerticalAlignment="Center">
-                        <materialDesign:PackIcon Kind="CloseCircleOutline" Width="18" Height="18"
-                                                 Foreground="{DynamicResource SidebarTextBrush}"/>
-                    </Button>
-                </StackPanel>
             </Grid>
         </Border>
 

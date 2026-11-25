@@ -39,11 +39,18 @@ namespace Workspace1C
             _setupMode = setupMode;
             _changeMode = changeMode;
 
+            // Issue #164 (1.0.1.121): окно растягивается по содержимому
+            // (SizeToContent="Height"), фиксированные высоты 340/430 давали пустое
+            // место под кнопками (жалоба 7OH). Границы берутся из общего профиля и
+            // клампятся по рабочей области монитора.
+            ApplyProfileSize(changeMode
+                ? DialogWorkAreaPolicy.AppLockChange
+                : DialogWorkAreaPolicy.AppLock);
+
             if (changeMode)
             {
                 // Смена пароля (issue #294): текущий пароль + новый + повтор.
-                // Окно выше обычного — в нём три поля ввода.
-                Height = 430;
+                // Окно выше обычного — в нём три поля ввода (профиль AppLockChange).
                 Title = LocalizationManager.T("AppLock.ChangeTitle");
                 TitleLabel.Text = LocalizationManager.T("AppLock.ChangeTitle");
                 PromptLabel.Text = LocalizationManager.T("AppLock.ChangePrompt");
@@ -98,6 +105,30 @@ namespace Workspace1C
                 Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background,
                     new Action(() => first.Focus()));
             };
+        }
+
+        /// <summary>
+        /// Issue #164 (1.0.1.121): окно блокировки растягивается по содержимому
+        /// (<c>SizeToContent="Height"</c>), поэтому вместо фиксированной высоты
+        /// 340/430 DIP задаются только границы — из общего профиля
+        /// <see cref="DialogWorkAreaPolicy"/> с клампом по рабочей области монитора.
+        /// Геометрия — вспомогательная возможность: её сбой не должен мешать
+        /// блокировке/разблокировке, поэтому используется безопасный запасной вариант.
+        /// </summary>
+        private void ApplyProfileSize(DialogWorkAreaPolicy.DialogProfile profile)
+        {
+            try
+            {
+                var size = DialogWorkAreaPolicy.Recommend(profile, SystemParameters.WorkArea.Height);
+                MinHeight = size.MinHeight;
+                MaxHeight = size.MaxHeight;
+            }
+            catch
+            {
+                // Не удалось определить рабочую область — берём границы профиля как есть.
+                MinHeight = profile.MinHeight;
+                MaxHeight = profile.MaxHeight;
+            }
         }
 
         private void OnOk_Click(object sender, RoutedEventArgs e)

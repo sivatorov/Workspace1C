@@ -100,18 +100,22 @@ namespace Workspace1C
             // Кегль окна из разметки: подписи без явного размера берут его по наследству.
             FontSize = 13;
             Width = 460;
-            // Авторазмер по контенту с ограничениями (аудит UI): фиксированная высота 360
-            // сжимала список при 4+ профилях. NaN (Height) — авторасчёт по контенту.
+            // Авторазмер по контенту (аудит UI): фиксированная высота сжимала список при
+            // 4+ профилях. NaN (Height) — авторасчёт по контенту; границы высоты — из
+            // общей политики (issue #164, 1.0.1.121): MinHeight 220, MaxHeight 560.
             Height = double.NaN;
-            MinHeight = 360;
-            MaxHeight = 560;
+            MinHeight = DialogWorkAreaPolicy.Login.MinHeight;
+            MaxHeight = DialogWorkAreaPolicy.Login.MaxHeight;
             MinWidth = 400;
             CanResize = false;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
             var grid = new Grid { Margin = new Thickness(16) };
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            grid.RowDefinitions.Add(new RowDefinition(new GridLength(1, GridUnitType.Star)));
+            // Issue #164 (1.0.1.121): строка списка — Auto, а не Star. В окне с
+            // авторазмером (Height = NaN) Star-строка резервировала пустое место над
+            // полем пароля даже при скрытом списке (одна учётная запись).
+            grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
@@ -140,6 +144,9 @@ namespace Workspace1C
                 DisplayMemberBinding = new Avalonia.Data.Binding("Name"),
                 // Аудит UI P3a: порядок табуляции совпадает с визуальным.
                 TabIndex = 0,
+                // Issue #164 (1.0.1.121): при многих профилях прокрутка остаётся внутри
+                // списка, а окно (Height = NaN) не выходит за экран.
+                MaxHeight = 280,
                 IsVisible = profileService.Profiles.Count > 1
             };
             _profilesList.SelectionChanged += (_, _) => OnSelectionChanged();
@@ -186,12 +193,44 @@ namespace Workspace1C
 
             Content = grid;
 
+            // Issue #164 (1.0.1.121): верхняя граница высоты клампится по рабочей
+            // области текущего монитора (общая политика размеров).
+            ApplyWorkAreaLimits();
+
             Opened += (_, _) =>
             {
                 if (_profilesList.Items.Count > 0)
                     _profilesList.SelectedIndex = 0;
                 ApplySelectionState();
             };
+        }
+
+        /// <summary>
+        /// Issue #164 (1.0.1.121): окно входа растягивается по содержимому
+        /// (<c>Height = NaN</c>), поэтому <c>MinHeight</c>/<c>MaxHeight</c> берутся из
+        /// профиля <see cref="DialogWorkAreaPolicy.Login"/> и клампятся по рабочей
+        /// области текущего монитора (как в редакторе «Утилит»). Длинный список
+        /// профилей не растянет окно на весь экран — прокрутка остаётся в списке.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            try
+            {
+                var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+                if (screen is null || screen.Scaling <= 0)
+                    return;
+                var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+                var size = DialogWorkAreaPolicy.Recommend(
+                    DialogWorkAreaPolicy.Login,
+                    dipHeight);
+                MinHeight = size.MinHeight;
+                MaxHeight = size.MaxHeight;
+            }
+            catch
+            {
+                // Геометрия — вспомогательная возможность: окно откроется с размерами
+                // профиля (MinHeight 220, MaxHeight 560) и не заблокирует вход.
+            }
         }
 
         private UserProfile? SelectedProfile =>

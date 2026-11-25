@@ -33,10 +33,18 @@ public static class DialogWorkAreaPolicy
     /// <param name="DefaultHeight">Высота окна по умолчанию (по содержимому), DIP.</param>
     /// <param name="MinHeight">Минимальная высота окна (нижняя граница), DIP.</param>
     /// <param name="ContentHeight">Высота, при которой содержимое помещается без прокрутки, DIP.</param>
+    /// <param name="MaxHeight">
+    /// Issue #164 (1.0.1.121): необязательная верхняя граница высоты окна, DIP. По умолчанию
+    /// <see cref="double.PositiveInfinity"/> — ограничением служит только рабочая область
+    /// монитора. Задаётся для окон с авторазмером по содержимому
+    /// (<c>SizeToContent="Height"</c>/<c>Height = NaN</c>), чтобы длинный список не растянул
+    /// окно на весь экран.
+    /// </param>
     public readonly record struct DialogProfile(
         double DefaultHeight,
         double MinHeight,
-        double ContentHeight);
+        double ContentHeight,
+        double MaxHeight = double.PositiveInfinity);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Настройка меню утилиты» — 680 DIP по содержимому,
@@ -73,6 +81,46 @@ public static class DialogWorkAreaPolicy
     public static readonly DialogProfile HowToBuy = new(720, 520, 720);
 
     /// <summary>
+    /// Issue #164 (1.0.1.121): окно входа — 420 DIP по содержимому (заголовок, список
+    /// профилей высотой до 280 DIP, подпись и поле пароля, кнопки), минимальная высота
+    /// 220 DIP. Окно растягивается по содержимому
+    /// (<c>SizeToContent="Height"</c> в WPF, <c>Height = NaN</c> в Avalonia), поэтому
+    /// <see cref="DialogProfile.DefaultHeight"/> — стартовая высота, а
+    /// <see cref="DialogProfile.MaxHeight"/> 560 DIP страхует от выхода за экран при
+    /// длинном списке профилей (сам список ограничен 280 DIP и прокручивается).
+    /// </summary>
+    public static readonly DialogProfile Login = new(
+        DefaultHeight: 420,
+        MinHeight: 220,
+        ContentHeight: 420,
+        MaxHeight: 560);
+
+    /// <summary>
+    /// Issue #164 (1.0.1.121): окно блокировки — 340 DIP по содержимому (заголовок,
+    /// пояснение, подпись и поле пароля, кнопки), минимальная высота 240 DIP. Окно
+    /// растягивается по содержимому (<c>SizeToContent="Height"</c> в WPF,
+    /// <c>Height = NaN</c> в Avalonia), поэтому <see cref="DialogProfile.MaxHeight"/>
+    /// 520 DIP страхует от выхода за экран при крупном системном шрифте.
+    /// </summary>
+    public static readonly DialogProfile AppLock = new(
+        DefaultHeight: 340,
+        MinHeight: 240,
+        ContentHeight: 340,
+        MaxHeight: 520);
+
+    /// <summary>
+    /// Issue #164 (1.0.1.121): окно смены пароля блокировки — три поля ввода (текущий,
+    /// новый, повтор), поэтому выше обычного: 430 DIP по содержимому, минимальная
+    /// высота 340 DIP, верхняя граница 560 DIP. Заменяет жёсткое <c>Height = 430</c>,
+    /// из-за которого под кнопками оставалось пустое место (жалоба 7OH).
+    /// </summary>
+    public static readonly DialogProfile AppLockChange = new(
+        DefaultHeight: 430,
+        MinHeight: 340,
+        ContentHeight: 430,
+        MaxHeight: 560);
+
+    /// <summary>
     /// Issue #146 (1.0.1.115): рекомендуемые размеры диалогового окна с учётом
     /// рабочей области монитора. <see cref="RequiresScrolling"/> = true только
     /// тогда, когда рабочая область не позволяет окну достичь высоты содержимого
@@ -101,7 +149,8 @@ public static class DialogWorkAreaPolicy
             profile.MinHeight,
             profile.ContentHeight,
             workAreaHeight,
-            margin);
+            margin,
+            profile.MaxHeight);
 
     /// <summary>
     /// Считает итоговые размеры окна: <c>Height</c> клампится в рабочую область,
@@ -113,16 +162,30 @@ public static class DialogWorkAreaPolicy
     /// <param name="contentHeight">Высота, при которой содержимое помещается без прокрутки.</param>
     /// <param name="workAreaHeight">Высота рабочей области монитора, DIP.</param>
     /// <param name="margin">Отступ от краёв рабочей области, DIP.</param>
+    /// <param name="maxHeightCap">
+    /// Необязательная верхняя граница высоты окна (например,
+    /// <see cref="DialogProfile.MaxHeight"/>), DIP. Не задана/NaN/≤ 0 — ограничение
+    /// только по рабочей области.
+    /// </param>
     public static DialogSize Recommend(
         double requestedHeight,
         double preferredMinHeight,
         double contentHeight,
         double workAreaHeight,
-        double margin = DefaultMargin)
+        double margin = DefaultMargin,
+        double maxHeightCap = double.PositiveInfinity)
     {
         var max = MaxHeight(workAreaHeight, margin);
-        var min = ClampMinHeight(preferredMinHeight, workAreaHeight, margin);
-        var height = ClampHeight(requestedHeight, min, workAreaHeight, margin);
+        // Issue #164 (1.0.1.121): профиль может ограничить высоту окна с авторазмером
+        // (SizeToContent/NaN), чтобы длинный список не растянул окно на весь экран.
+        if (!double.IsNaN(maxHeightCap) && maxHeightCap > 0 && maxHeightCap < max)
+            max = maxHeightCap;
+
+        var min = Math.Min(ClampMinHeight(preferredMinHeight, workAreaHeight, margin), max);
+        var requested = requestedHeight;
+        if (double.IsNaN(requested) || requested <= 0)
+            requested = min;
+        var height = Math.Min(Math.Max(requested, min), max);
 
         if (double.IsNaN(contentHeight) || contentHeight <= 0)
             contentHeight = height;

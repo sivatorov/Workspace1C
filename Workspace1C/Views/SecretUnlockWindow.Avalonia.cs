@@ -44,9 +44,11 @@ namespace Workspace1C
             _profileId = _profileService.CurrentProfile?.Id ?? string.Empty;
 
             Title = LocalizationManager.T("Secrets.UnlockTitle");
-            Width = 480;
+            // Issue #163: узкое окно запроса пароля (паритет с WPF 440/520).
+            Width = 440;
             Height = 270;
-            MinWidth = 420;
+            MinWidth = 400;
+            MaxWidth = 520;
             MinHeight = 230;
             CanResize = false;
             FontSize = 13;

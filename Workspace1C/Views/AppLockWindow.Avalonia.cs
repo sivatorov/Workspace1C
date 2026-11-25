@@ -6,6 +6,7 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
+using Workspace1C.Services;
 using Workspace1C.Themes;
 using Workspace1C.ViewModels;
 
@@ -47,12 +48,23 @@ public sealed class AppLockWindow : ModalWindowBase
         _setupMode = setupMode;
         _changeMode = changeMode;
 
+        // Issue #164 (1.0.1.121): окно блокировки растягивается по содержимому.
+        // Фиксированные высоты 340/430 оставляли пустое место под кнопками (жалоба
+        // 7OH). Границы высоты берутся из общего профиля DialogWorkAreaPolicy.
+        var profile = changeMode
+            ? DialogWorkAreaPolicy.AppLockChange
+            : DialogWorkAreaPolicy.AppLock;
         Width = 460;
-        Height = changeMode ? 430 : 340;
+        Height = double.NaN;
         MinWidth = 440;
-        MinHeight = changeMode ? 400 : 320;
+        MinHeight = profile.MinHeight;
+        MaxHeight = profile.MaxHeight;
         FontSize = 13;
         Content = BuildRoot();
+
+        // Issue #164 (1.0.1.121): верхняя граница высоты клампится по рабочей
+        // области текущего монитора (как в окне входа).
+        ApplyWorkAreaLimits(profile);
 
         if (changeMode)
         {
@@ -108,6 +120,31 @@ public sealed class AppLockWindow : ModalWindowBase
             first.Focus();
             Avalonia.Threading.Dispatcher.UIThread.Post(() => first.Focus());
         };
+    }
+
+    /// <summary>
+    /// Issue #164 (1.0.1.121): окно блокировки растягивается по содержимому
+    /// (<c>Height = NaN</c>), поэтому <c>MinHeight</c>/<c>MaxHeight</c> берутся из
+    /// профиля <see cref="DialogWorkAreaPolicy"/> и клампятся по рабочей области
+    /// текущего монитора. Геометрия — вспомогательная возможность: её сбой не должен
+    /// мешать блокировке/разблокировке.
+    /// </summary>
+    private void ApplyWorkAreaLimits(DialogWorkAreaPolicy.DialogProfile profile)
+    {
+        try
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null || screen.Scaling <= 0)
+                return;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            var size = DialogWorkAreaPolicy.Recommend(profile, dipHeight);
+            MinHeight = size.MinHeight;
+            MaxHeight = size.MaxHeight;
+        }
+        catch
+        {
+            // Не удалось определить монитор — остаются границы профиля (Min/Max).
+        }
     }
 
     private static string T(string key) => LocalizationManager.T(key);

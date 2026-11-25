@@ -279,11 +279,14 @@ public sealed class Issue116UpdateModesAuditTests
         Assert.Contains("FooterUpdateReadyIcon", xaml);
         Assert.Contains("Foreground=\"{DynamicResource SuccessBrush}\"", xaml);
 
-        // Avalonia: те же цвета через спецификации темы.
+        // Avalonia: те же цвета через спецификации темы. Issue #166 (Linux): строка
+        // «@AccentBrush» — это спецификация ThemeBrushes.FromSpec, а не ключ ресурса,
+        // поэтому она передаётся в перегрузку MakeIcon(..., IBrush). Раньше строка
+        // уходила в DynamicResource как ключ, Fill не разрешался и значок был невидим.
         var avalonia = ReadProjectFile("Workspace1C/Views/MainWindow.Avalonia.cs");
-        Assert.Contains("IconHelper.MakeIcon(\"IconSync\", UiMetrics.Scaled(UiMetrics.IconControl), \"@AccentBrush\")", avalonia);
-        Assert.Contains("IconHelper.MakeIcon(\"IconWarning\", UiMetrics.Scaled(16), \"@AccentBrush\")", avalonia);
-        Assert.Contains("IconHelper.MakeIcon(\"IconCheck\", UiMetrics.Scaled(16), \"@SuccessBrush\")", avalonia);
+        Assert.Contains("IconHelper.MakeIcon(\"IconSync\", UiMetrics.Scaled(UiMetrics.IconControl), ThemeBrushes.FromSpec(\"@AccentBrush\"))", avalonia);
+        Assert.Contains("IconHelper.MakeIcon(\"IconWarning\", UiMetrics.Scaled(16), ThemeBrushes.FromSpec(\"@AccentBrush\"))", avalonia);
+        Assert.Contains("IconHelper.MakeIcon(\"IconCheck\", UiMetrics.Scaled(16), ThemeBrushes.FromSpec(\"@SuccessBrush\"))", avalonia);
     }
 
     // ===================== 5. Клики: версия и значок =====================

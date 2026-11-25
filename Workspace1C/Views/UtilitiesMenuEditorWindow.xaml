@@ -33,7 +33,11 @@
         <conv:PackIconKindConverter x:Key="PackIconKindConverter"/>
         <!-- Шаблон узла дерева: чекбокс видимости + иконка + заголовок + пометка вида -->
         <HierarchicalDataTemplate x:Key="MenuNodeTemplate" ItemsSource="{Binding Children}">
-            <StackPanel Orientation="Horizontal">
+            <!-- Issue #159 (1.0.1.121): строка растягивается по ширине дерева, фон
+                 прозрачный (участвует в hit-test) — паритет с Avalonia-редактором:
+                 выделение/клик работают по всей строке, а не только по глифам. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch"
+                        Background="Transparent" MinHeight="24">
                 <!-- issue #4: у группы «Новинки программы» видимость зафиксирована
                      (CanToggleVisibility=false) — чекбокс отключён, менять можно
                      только местоположение. -->

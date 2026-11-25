@@ -1081,7 +1081,11 @@ namespace Workspace1C
                     $"Исключение при закрытии окна {GetType().Name} (OnClosing)", ex);
                 ModalCloseTrace.Log(
                     $"OnClosing: окно {GetType().Name} — исключение {ex.GetType().Name}: {ex.Message}");
-                throw;
+                // Issue #158 (1.0.1.121): исключение больше НЕ пробрасывается. Повторный
+                // throw из OnClosing отменял закрытие и окно «залипало» на экране
+                // (у 7OH — редактор «Мои программы» после ошибки сохранения).
+                // Ошибка уже в журнале; закрытие продолжаем штатно.
+                e.Cancel = false;
             }
             ModalCloseTrace.Log($"OnClosing: окно {GetType().Name}, после base — Cancel={e.Cancel}");
         }

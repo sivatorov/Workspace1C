@@ -8,6 +8,7 @@
         Icon="{StaticResource AppIcon}"
         Width="900" Height="600" MinWidth="760" MinHeight="440"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13"
+        KeyDown="OnWindowKeyDown"
         Background="{DynamicResource ContentBackgroundBrush}">
 
     <Window.Resources>
@@ -44,8 +45,12 @@
                     <TextBlock Text="{loc:Loc Common.Save}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Button>
+            <!-- Issue #158 (1.0.1.121): «Отмена» закрывает окно через Close() в обработчике.
+                 IsCancel убран: установка DialogResult вне ShowDialog бросает
+                 InvalidOperationException и окно не закрывается. Esc обрабатывает
+                 KeyDown="OnWindowKeyDown" у окна. -->
             <Button MinWidth="110" Margin="8,0,0,0"
-                    Content="{loc:Loc Common.Cancel}" IsCancel="True" Click="OnCancel_Click"/>
+                    Content="{loc:Loc Common.Cancel}" Click="OnCancel_Click"/>
         </StackPanel>
 
         <!-- Режим отображения группы (переключатель хранится в настройках приложения). -->

@@ -7,7 +7,9 @@
         mc:Ignorable="d"
         Title="{loc:Loc Auth.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="360" Width="460"
+        Width="460"
+        SizeToContent="Height"
+        MinHeight="220"
         WindowStartupLocation="CenterScreen"
         ResizeMode="NoResize"
         FontSize="13"
@@ -22,9 +24,12 @@
     </Window.Resources>
 
     <Grid Margin="16">
+        <!-- Issue #164 (1.0.1.121): высота окна — по содержимому (SizeToContent="Height").
+             Строка списка профилей — Auto и именована, чтобы при одной записи схлопнуть
+             её в ноль (иначе *-строка оставляла пустоту над полем пароля). -->
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition x:Name="ProfilesListRow" Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -35,7 +40,9 @@
                    TextWrapping="Wrap" Margin="0,0,0,12" Opacity="0.85"/>
 
         <!-- ============ Список учётных записей ============ -->
-        <ListBox x:Name="ProfilesList" Grid.Row="1" Margin="0,0,0,12"
+        <!-- MaxHeight: при многих профилях прокрутка остаётся внутри списка, а окно
+             (SizeToContent="Height") не выходит за экран. -->
+        <ListBox x:Name="ProfilesList" Grid.Row="1" Margin="0,0,0,12" MaxHeight="280"
                  SelectionChanged="OnProfilesList_SelectionChanged">
             <ListBox.ItemTemplate>
                 <DataTemplate>
