@@ -143,7 +143,7 @@ jobs:
         run: |
           $has = (& dotnet msbuild Workspace1C/Workspace1C.csproj -nologo -getProperty:HasProModules).Trim()
           Write-Host "HasProModules=$has"
-          if ($has -ne 'true') { throw "HasProModules=$has: модули ПРО не найдены — релиз с ПРО невозможен." }
+          if ($has -ne 'true') { throw "HasProModules=${has}: модули ПРО не найдены — релиз с ПРО невозможен." }
 
       - name: Сборка Windows single-file
         working-directory: Workspace1C
