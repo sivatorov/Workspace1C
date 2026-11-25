@@ -50,7 +50,8 @@ namespace Workspace1C
         public RepositoryBrowserWindow(Infobase infobase, Action? persistChanges = null)
         {
             Title = LocalizationManager.T("RepositoryBrowser.Title");
-            Width = 1180;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1100;
             Height = 640;
             MinWidth = 900;
             MinHeight = 460;

@@ -80,9 +80,12 @@ public sealed class Issue71SettingsWindowLayoutTests
     // ------------------------------------------------------------------
 
     [Theory]
-    [InlineData("SettingsWindow.xaml", "1100", "760")]
-    // issue #93: стартовая высота окна Свойств снижена с 800 до 680.
-    [InlineData("ConnectionSettingsWindow.xaml", "900", "680")]
+    // Issue #119 (1.0.1.119): стартовые размеры WPF-окон уменьшены по таблице 1.4
+    // плана (гигантские окна открывались больше рабочей области на 1366×768).
+    [InlineData("SettingsWindow.xaml", "1000", "720")]
+    // issue #93: стартовая высота окна Свойств снижена с 800 до 680;
+    // issue #119 — до 660.
+    [InlineData("ConnectionSettingsWindow.xaml", "900", "660")]
     public void WpfSettingsWindows_HaveComfortableStartSizes(string fileName, string width, string height)
     {
         var xaml = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));
@@ -92,8 +95,9 @@ public sealed class Issue71SettingsWindowLayoutTests
     }
 
     [Theory]
-    [InlineData("SettingsWindow.Avalonia.cs", "1100", "760")]
-    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "900", "680")]
+    // Issue #119 (1.0.1.119): Avalonia-паритет с WPF — стартовые размеры уменьшены (T3).
+    [InlineData("SettingsWindow.Avalonia.cs", "1000", "720")]
+    [InlineData("ConnectionSettingsWindow.Avalonia.cs", "900", "660")]
     public void AvaloniaSettingsWindows_HaveComfortableStartSizes(string fileName, string width, string height)
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", fileName));

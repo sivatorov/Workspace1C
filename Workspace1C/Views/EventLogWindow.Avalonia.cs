@@ -40,8 +40,9 @@ namespace Workspace1C
                 ? LocalizationManager.T("EventLog.Title")
                 : $"{LocalizationManager.T("EventLog.Title")} — {_vm.Title}";
             Title = title;
-            Width = 1200;
-            Height = 760;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1100;
+            Height = 720;
             MinWidth = 820;
             MinHeight = 480;
             FontSize = 13;

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="840" Width="1080" MinHeight="660" MinWidth="760"
+        Height="760" Width="1080" MinHeight="520" MinWidth="760"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -51,6 +51,7 @@
 
         <!-- Таблица баз × состояние -->
         <DataGrid x:Name="BasesGrid" Grid.Row="2"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                   SelectionMode="Single" SelectionUnit="FullRow"

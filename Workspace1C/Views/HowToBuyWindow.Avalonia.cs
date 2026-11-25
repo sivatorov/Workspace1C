@@ -47,8 +47,13 @@ namespace Workspace1C
             var panel = new StackPanel();
 
             var price = AvaloniaUi.Text(LocalizationManager.T("Pro.HowToBuy.PriceHeader"), 13, bold: true);
-            price.Margin = new Thickness(0, 0, 0, 10);
+            price.Margin = new Thickness(0, 0, 0, 4);
             panel.Children.Add(price);
+
+            // Явно про major: для 1.x ключ выпускается с major=1 (ключи 2.x не подойдут).
+            var majorNote = AvaloniaUi.Text(LocalizationManager.T("Pro.HowToBuy.MajorNote"), 12, secondary: true);
+            majorNote.Margin = new Thickness(0, 0, 0, 10);
+            panel.Children.Add(majorNote);
 
             for (var i = 0; i < StepKeys.Length; i++)
             {
@@ -96,6 +101,12 @@ namespace Workspace1C
                 AvaloniaUi.Button("Pro.HowToBuy.OpenIssues", (_, _) => OpenContact(ProFeatures.IssuesUrl), 150),
                 AvaloniaUi.Button("Pro.HowToBuy.OpenReadme", (_, _) => OpenContact(ProFeatures.BuyUrl), 180)));
             panel.Children.Add(AvaloniaUi.Card(contacts));
+
+            // Что остаётся бесплатным (public core 1.x) — чтобы покупка была осознанной.
+            var free = new StackPanel { Margin = new Thickness(0, 10, 0, 0) };
+            free.Children.Add(AvaloniaUi.Section("Pro.License.WhatFreeHeader"));
+            free.Children.Add(AvaloniaUi.Text(LocalizationManager.T("Pro.License.WhatFree"), 12, secondary: true));
+            panel.Children.Add(AvaloniaUi.Card(free));
 
             var scroll = new ScrollViewer { Content = panel };
             AvaloniaUi.Place(root, scroll, 0);

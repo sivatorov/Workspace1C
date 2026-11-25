@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using Avalonia.Media;
@@ -51,10 +52,11 @@ public sealed class ConfigTypeEditWindow : ModalWindowBase
         var isNew = model is null;
 
         Title = T(isNew ? "Updates.AddConfig" : "Updates.EditConfig");
+        // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
         Width = 700;
-        Height = 720;
+        Height = 680;
         MinWidth = 600;
-        MinHeight = 620;
+        MinHeight = 560;
         FontSize = 13;
         CanResize = true;
 
@@ -141,7 +143,8 @@ public sealed class ConfigTypeEditWindow : ModalWindowBase
 
     private Control BuildRoot()
     {
-        var panel = new StackPanel { Margin = new Thickness(16), Spacing = 8 };
+        // Issue #119 (T3): отступ задаёт корневой DockPanel, а форма прокручивается.
+        var panel = new StackPanel { Spacing = 8 };
         _rootPanel = panel;
 
         var title = new TextBlock
@@ -221,7 +224,7 @@ public sealed class ConfigTypeEditWindow : ModalWindowBase
 
         panel.Children.Add(MakeFieldRow(T("Updates.Editions"), editionsColumn));
 
-        // Кнопки: Сохранить / Отмена.
+        // Кнопки: Сохранить / Отмена. Issue #119 (T3): футер — вне прокрутки.
         var buttons = new StackPanel
         {
             Orientation = Orientation.Horizontal,
@@ -236,9 +239,17 @@ public sealed class ConfigTypeEditWindow : ModalWindowBase
         cancel.Click += (_, _) => OnCancelClick();
         buttons.Children.Add(save);
         buttons.Children.Add(cancel);
-        panel.Children.Add(buttons);
 
-        return panel;
+        var root = new DockPanel { Margin = new Thickness(16) };
+        DockPanel.SetDock(buttons, Dock.Bottom);
+        root.Children.Add(buttons);
+        root.Children.Add(new ScrollViewer
+        {
+            Content = panel,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        });
+        return root;
     }
 
     private void OnSaveClick()

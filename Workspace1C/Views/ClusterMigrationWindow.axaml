@@ -13,7 +13,7 @@
                        xmlns:loc="clr-namespace:Workspace1C.Localization"
                        x:Class="Workspace1C.ClusterMigrationWindow"
                        Title="{loc:Loc ClusterMigration.Title}"
-                       Width="1200" Height="700"
+                       Width="1100" Height="680"
                        MinWidth="1000" MinHeight="520"
                        FontSize="13"
                        CanResize="True">

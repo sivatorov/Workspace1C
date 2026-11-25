@@ -20,7 +20,8 @@ namespace Workspace1C
         {
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
-            WpfUi.SetupWindow(this, "TechLog.Title", 980, 720);
+            // Issue #119 (1.0.1.119): стартовый размер уменьшен по таблице 1.4 плана.
+            WpfUi.SetupWindow(this, "TechLog.Title", 980, 680);
 
             var root = WpfUi.Rows(0, 0, 0, -1, 0);
             root.Margin = new Thickness(16);

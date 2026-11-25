@@ -162,6 +162,11 @@ namespace Workspace1C
             // «Общие»/«Клавиши» и т.п.). Окна без заданных минимумов (MinWidth/MinHeight
             // по умолчанию) условие не трогает.
             ClampWindowToMinSize(this);
+
+            // Issue #119 (1.0.1.119): окно не должно выходить за рабочую область
+            // монитора и не должно быть «гигантским» на большом экране. Общий механизм
+            // для всех диалогов; главное окно вызывает его явно (MainWindow.Avalonia.cs).
+            ClampWindowToWorkArea(this);
         }
 
         /// <summary>
@@ -182,6 +187,75 @@ namespace Workspace1C
                 if (window.MinHeight > 0 && size.Height < window.MinHeight)
                     window.Height = window.MinHeight;
             }));
+        }
+
+        /// <summary>
+        /// Issue #119 (1.0.1.119): единый механизм ограничения размера окна рабочей
+        /// областью монитора. В отличие от <see cref="ClampWindowToMinSize"/> зажимает
+        /// максимум: окно не выходит за рабочую область и не открывается «гигантским»
+        /// на большом экране. Расчёт — чистый <see cref="Services.WindowBoundsPolicy"/>.
+        /// Вызывается базовым классом для всех диалогов и главным окном явно.
+        /// </summary>
+        public static void ClampWindowToWorkArea(Window window)
+        {
+            if (window is null)
+                return;
+
+            window.Opened += (_, _) => ApplyWorkAreaClamp(window);
+            if (window.IsVisible)
+                ApplyWorkAreaClamp(window);
+        }
+
+        private static void ApplyWorkAreaClamp(Window window)
+        {
+            try
+            {
+                var screens = window.Screens;
+                var screen = screens?.ScreenFromWindow(window) ?? screens?.Primary;
+                if (screen is null || screen.Scaling <= 0)
+                    return;
+
+                var workWidth = screen.WorkingArea.Width / screen.Scaling;
+                var workHeight = screen.WorkingArea.Height / screen.Scaling;
+                if (workWidth <= 0 || workHeight <= 0)
+                    return;
+
+                var designWidth = window.Width;
+                if (double.IsNaN(designWidth) || designWidth <= 0)
+                    designWidth = window.Bounds.Width > 0 ? window.Bounds.Width : window.MinWidth;
+
+                var designHeight = window.Height;
+                if (double.IsNaN(designHeight) || designHeight <= 0)
+                    designHeight = window.Bounds.Height > 0 ? window.Bounds.Height : window.MinHeight;
+
+                var bounds = Services.WindowBoundsPolicy.Recommend(
+                    designWidth,
+                    designHeight,
+                    window.MinWidth,
+                    window.MinHeight,
+                    workWidth,
+                    workHeight);
+
+                if (!double.IsPositiveInfinity(bounds.MaxWidth) && bounds.MaxWidth > 0)
+                    window.MaxWidth = bounds.MaxWidth;
+                if (!double.IsPositiveInfinity(bounds.MaxHeight) && bounds.MaxHeight > 0)
+                    window.MaxHeight = bounds.MaxHeight;
+
+                if (window.MinWidth > window.MaxWidth)
+                    window.MinWidth = window.MaxWidth;
+                if (window.MinHeight > window.MaxHeight)
+                    window.MinHeight = window.MaxHeight;
+
+                if (!double.IsNaN(window.Width) && window.Width > bounds.MaxWidth)
+                    window.Width = bounds.MaxWidth;
+                if (!double.IsNaN(window.Height) && window.Height > bounds.MaxHeight)
+                    window.Height = bounds.MaxHeight;
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность: сбой определения
+                // монитора не должен мешать показу окна.
+            }
         }
 
         // Кэш настройки «Системный заголовок окна» на время жизни процесса.

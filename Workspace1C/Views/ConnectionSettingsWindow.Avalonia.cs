@@ -75,8 +75,10 @@ namespace Workspace1C
             Title = LocalizationManager.T("ConnectionSettings.Title");
             // issue #93: окно стало ниже — вкладка «Запуск» разложена на две
             // под-вкладки, прежняя высота 800/минимум 780 была избыточной.
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF);
+            // MinHeight = 640 не меняется — его держит страховка Issue55AdaptiveLayout.
             Width = 900;
-            Height = 680;
+            Height = 660;
             MinWidth = 760;
             MinHeight = 640;
             FontSize = 13;

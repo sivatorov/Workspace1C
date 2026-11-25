@@ -15,6 +15,9 @@ public enum UtilitiesMenuCommandKind
     /// <summary>Окно «Лицензия» редакции ПРО (2.0, docs/pro/PRO-EDITION.md).</summary>
     ShowLicense,
 
+    /// <summary>Окно «Как купить ПРО…»: пошаговая инструкция покупки (issue #119, T6).</summary>
+    ShowHowToBuy,
+
     /// <summary>Пункт модуля ПРО: действие зарегистрировано через <see cref="UtilitiesMenuCatalog.RegisterExternal"/>.</summary>
     External,
 
@@ -268,11 +271,36 @@ public sealed class UtilitiesMenuItem
     public Licensing.ProFeature? RequiredFeature { get; }
 
     /// <summary>
-    /// Заголовок пункта. С issue #146 (1.0.1.103) без отметки «*»: она не объясняла,
-    /// к какому пункту относится, и оставалась в меню даже при действующей лицензии.
-    /// Доступность функции проверяется самой командой (ProGate) и подсказкой пункта.
+    /// Пункт требует ключ: функция не входит в бесплатное публичное ядро и сейчас
+    /// недоступна по лицензии. Только такие пункты получают отметку « · ПРО»
+    /// и подсказку «требуется ключ» (public core остаётся без отметки).
     /// </summary>
-    public string DisplayText() => Localization.LocalizationManager.T(TextKey);
+    public bool RequiresProKey =>
+        RequiredFeature is { } feature
+        && !Licensing.ProFeatures.IsInPublicCore(feature)
+        && !Licensing.EditionService.Has(feature);
+
+    /// <summary>
+    /// Заголовок пункта. Public core — только локализованное название; новые 2.x-пункты
+    /// без ключа получают суффикс <c>Pro.MenuSuffix</c> (« · ПРО»). Отметка «*» с
+    /// issue #146 (1.0.1.103) не используется.
+    /// </summary>
+    public string DisplayText()
+    {
+        var title = Localization.LocalizationManager.T(TextKey);
+        return RequiresProKey
+            ? title + " " + Localization.LocalizationManager.T("Pro.MenuSuffix")
+            : title;
+    }
+
+    /// <summary>
+    /// Подсказка пункта: для закрытых новых 2.x-функций — «требуется ключ»
+    /// (<c>Pro.RequiredFormat</c>), иначе null (подсказка не задаётся).
+    /// </summary>
+    public string? DisplayToolTip() => RequiresProKey
+        ? string.Format(Localization.LocalizationManager.T("Pro.RequiredFormat"),
+            Localization.LocalizationManager.T(TextKey))
+        : null;
 }
 
 /// <summary>
@@ -599,6 +627,20 @@ public static class UtilitiesMenuCatalog
             return false;
         action();
         return true;
+    }
+
+    /// <summary>
+    /// Единый гейт для <see cref="UtilitiesMenuCommandKind.External"/>-пунктов: перед
+    /// выполнением действия проверяет <see cref="Licensing.ProGate.Ensure"/>. При отказе
+    /// окно «Лицензия» показывает сам гейт, действие НЕ выполняется (и повторного окна
+    /// из команды модуля нет). Пункты без <see cref="RequiredFeature"/> выполняются как раньше.
+    /// </summary>
+    public static bool ExecuteExternalGated(string itemId)
+    {
+        var item = Find(itemId);
+        if (item?.RequiredFeature is { } feature && !Licensing.ProGate.Ensure(feature))
+            return false;
+        return ExecuteExternal(itemId);
     }
 
     /// <summary>Возвращает пункт каталога по идентификатору (или null).</summary>
@@ -977,6 +1019,10 @@ public static class UtilitiesMenuCatalog
             // «Лицензия…» (2.0, docs/pro/PRO-EDITION.md): редакция, код компьютера, активация ключа.
             new("License", "Pro.MenuItem", GroupHelp,
                 "Key", "IconAccountKey", "#F59E0B", UtilitiesMenuCommandKind.ShowLicense,
+                isNew: true),
+            // «Как купить ПРО…» (1.0.1.119, T6): пошаговая инструкция покупки и активации.
+            new("HowToBuy", "Pro.HowToBuy.MenuItem", GroupHelp,
+                "Tag", "IconTag", "#F59E0B", UtilitiesMenuCommandKind.ShowHowToBuy,
                 isNew: true)
         };
     }
@@ -1146,7 +1192,8 @@ public static class UtilitiesMenuLayouts
                 Group(UtilitiesMenuCatalog.GroupHelp, new List<UtilitiesMenuNode>
                 {
                     Item("CommandPalette"),
-                    Item("License")
+                    Item("License"),
+                    Item("HowToBuy")
                 })
             })
         };

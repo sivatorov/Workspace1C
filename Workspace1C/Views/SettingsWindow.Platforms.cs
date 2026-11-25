@@ -643,6 +643,23 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Открывает окно-инструкцию «Как купить ПРО…» (1.0.1.119, T6); после закрытия
+        /// обновляет блок (пользователь мог перейти к активации ключа).
+        /// </summary>
+        private void OnAboutHowToBuy_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new HowToBuyWindow { Owner = this }.ShowDialog();
+            }
+            catch
+            {
+                // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+            }
+            RefreshAboutLicense();
+        }
+
+        /// <summary>
         /// Открывает окно «Как купить ПРО» из бесплатной редакции; после закрытия
         /// обновляет блок (пользователь мог перейти к активации ключа).
         /// </summary>

@@ -25,7 +25,8 @@ namespace Workspace1C
         {
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
-            WpfUi.SetupWindow(this, "EventLog.Title", 1200, 760);
+            // Issue #119 (1.0.1.119): стартовый размер уменьшен по таблице 1.4 плана.
+            WpfUi.SetupWindow(this, "EventLog.Title", 1100, 720);
             Title = string.IsNullOrWhiteSpace(_vm.Title)
                 ? LocalizationManager.T("EventLog.Title")
                 : $"{LocalizationManager.T("EventLog.Title")} — {_vm.Title}";

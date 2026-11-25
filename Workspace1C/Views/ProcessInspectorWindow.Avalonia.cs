@@ -71,8 +71,9 @@ namespace Workspace1C
         public ProcessInspectorWindow(IEnumerable<Infobase> infobases, Action<Infobase> openBase)
         {
             Title = LocalizationManager.T("ProcessInspector.Title");
-            Width = 1080;
-            Height = 600;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1000;
+            Height = 560;
             MinWidth = 820;
             MinHeight = 420;
             FontSize = 13;

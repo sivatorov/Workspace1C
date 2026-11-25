@@ -57,10 +57,12 @@ namespace Workspace1C
             int freeSpaceWarningGb = Services.DiskFreeSpaceHelper.DefaultWarningGb)
         {
             Title = LocalizationManager.T("Maintenance.Title");
+            // Issue #119 (T3): паритет с WPF — 1080×760, минимальная высота 520,
+            // чтобы окно помещалось на 1024×600 (кламп и прокрутка политики).
             Width = 1080;
-            Height = 840;
+            Height = 760;
             MinWidth = 760;
-            MinHeight = 660;
+            MinHeight = 520;
             FontSize = 13;
             CanResize = true;
             DataContext = _vm = new MaintenanceCenterViewModel(

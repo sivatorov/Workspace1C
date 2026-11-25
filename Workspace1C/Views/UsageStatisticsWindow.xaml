@@ -4,7 +4,7 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Icon="{StaticResource AppIcon}"
-        Height="640" Width="1080" MinHeight="480" MinWidth="820"
+        Height="620" Width="1000" MinHeight="480" MinWidth="820"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -53,6 +53,7 @@
 
         <!-- Таблица статистики по базам -->
         <DataGrid x:Name="BasesGrid" Grid.Row="3"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   AutoGenerateColumns="False" IsReadOnly="True"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                   SelectionMode="Single" SelectionUnit="FullRow"

@@ -4,7 +4,7 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         xmlns:conv="clr-namespace:Workspace1C.Converters"
         Icon="{StaticResource AppIcon}"
-        Height="680" Width="1400" MinHeight="560" MinWidth="1120"
+        Height="680" Width="1200" MinHeight="560" MinWidth="1120"
         WindowStartupLocation="CenterScreen"
         ShowInTaskbar="True"
         Background="{DynamicResource ContentBackgroundBrush}">

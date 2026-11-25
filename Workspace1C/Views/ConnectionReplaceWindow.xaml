@@ -11,7 +11,7 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         xmlns:app="clr-namespace:Workspace1C"
         Icon="{StaticResource AppIcon}"
-        Height="620" Width="1060" MinHeight="440" MinWidth="860"
+        Height="620" Width="1000" MinHeight="440" MinWidth="860"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -122,6 +122,7 @@
 
         <!-- Предпросмотр «База | Поле | Было | Станет»; «Станет» подсвечивается зелёным при Changed. -->
         <DataGrid x:Name="PreviewGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                   ColumnHeaderStyle="{StaticResource CenteredColumnHeader}"
                   SelectionMode="Single" SelectionUnit="FullRow" GridLinesVisibility="Horizontal"

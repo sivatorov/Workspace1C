@@ -39,8 +39,9 @@ namespace Workspace1C
         public UsageStatisticsWindow(IEnumerable<Infobase> infobases)
         {
             Title = LocalizationManager.T("Stats.Title");
-            Width = 1080;
-            Height = 640;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1000;
+            Height = 620;
             MinWidth = 820;
             MinHeight = 480;
             FontSize = 13;

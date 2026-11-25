@@ -122,8 +122,10 @@ namespace Workspace1C
             // Семь вкладок с длинными подписями в одну строку не помещаются
             // ни в какую разумную ширину, поэтому полоса вкладок слева.
             // Размеры и кегль окна из разметки (SettingsWindow.xaml:14-21).
-            Width = 1100;
-            Height = 760;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF);
+            // MinWidth/MinHeight не меняются — их держит страховка Issue55AdaptiveLayout.
+            Width = 1000;
+            Height = 720;
             MinWidth = 960;
             MinHeight = 720;
             FontSize = 13;
@@ -5686,6 +5688,7 @@ namespace Workspace1C
             var buyProButton = new Button
             {
                 Padding = new Thickness(16, 8),
+                Margin = new Thickness(0, 0, 8, 0),
                 Content = AboutLicenseButtonContent("Settings.About.BuyPro", "IconTag", "SuccessBrush")
             };
             buyProButton.Styled(ControlThemes.SecondaryButton);
@@ -5703,6 +5706,27 @@ namespace Workspace1C
                 RefreshAboutLicenseUi();
             };
             buttons.Children.Add(buyProButton);
+
+            // Ссылка на инструкцию «Как купить ПРО…» (1.0.1.119, T6).
+            var howToBuyButton = new Button
+            {
+                Padding = new Thickness(16, 8),
+                Content = AboutLicenseButtonContent("Pro.HowToBuy.MenuItem", "IconInfo", "InfoBrush")
+            };
+            howToBuyButton.Styled(ControlThemes.SecondaryButton);
+            howToBuyButton.Click += (_, _) =>
+            {
+                try
+                {
+                    new HowToBuyWindow().ShowDialogSync(this);
+                }
+                catch
+                {
+                    // Окно не открылось — блок лицензии остаётся в прежнем состоянии.
+                }
+                RefreshAboutLicenseUi();
+            };
+            buttons.Children.Add(howToBuyButton);
             body.Children.Add(buttons);
 
             card.Child = body;

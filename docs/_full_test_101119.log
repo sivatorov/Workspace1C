@@ -1,0 +1,9 @@
+  Определение проектов для восстановления...
+  Все проекты обновлены для восстановления.
+C:\Program Files\dotnet\sdk\11.0.100-rc.2.26504.105\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.RuntimeIdentifierInference.targets(385,5): message NETSDK1057: Вы используете предварительную версию .NET. Дополнительные сведения см. на странице https://aka.ms/dotnet-support-policy [g:\h\Workspace1C\Workspace1C\Workspace1C.Tests\Workspace1C.Tests.csproj]
+  Workspace1C -> g:\h\Workspace1C\Workspace1C\Workspace1C\bin\Release\net10.0-windows\Workspace1C.dll
+  Workspace1C.Tests -> g:\h\Workspace1C\Workspace1C\Workspace1C.Tests\bin\Release\net10.0-windows\Workspace1C.Tests.dll
+Тестовый запуск для g:\h\Workspace1C\Workspace1C\Workspace1C.Tests\bin\Release\net10.0-windows\Workspace1C.Tests.dll (.NETCoreApp,Version=v10.0)
+Общее количество тестовых файлов (1), соответствующих указанному шаблону.
+
+Пройден!   : не пройдено     0, пройдено  8068, пропущено     0, всего  8068, длительность 3 m 7 s. - Workspace1C.Tests.dll (net10.0)

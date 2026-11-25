@@ -134,10 +134,11 @@ public class TestDeployWindow : ModalWindowBase
         }
 
         Title = LocalizationManager.T("TestDeploy.Title");
+        // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
         Width = 720;
-        Height = 700;
+        Height = 660;
         MinWidth = 640;
-        MinHeight = 620;
+        MinHeight = 560;
         FontSize = 13;
         Content = BuildRoot();
         // Автоподстановка «Имя базы данных СУБД» из «Имя базы на сервере» (issue #79).

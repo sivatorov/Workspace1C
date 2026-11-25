@@ -117,8 +117,10 @@ namespace Workspace1C
             _openClusterImport = openClusterImport;
             _openClusterMigration = openClusterMigration;
             Title = LocalizationManager.T("ServerMonitor.Title");
-            Width = 1400;
-            Height = 760;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            // MinWidth = 1120 не меняется — его держит страховка Issue55AdaptiveLayout.
+            Width = 1200;
+            Height = 680;
             MinWidth = 1120;
             MinHeight = 560;
             FontSize = 13;

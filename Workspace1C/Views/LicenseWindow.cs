@@ -11,12 +11,19 @@ namespace Workspace1C
     public sealed class LicenseWindow : Window
     {
         private readonly LicenseViewModel _vm;
+        private readonly Button _buyButton;
 
         public LicenseWindow(ProFeature? requested = null)
         {
             _vm = new LicenseViewModel(requested);
             DataContext = _vm;
             WpfUi.SetupWindow(this, "Pro.Title", 640, 620);
+
+            // Issue #119 (T6): метка ★ и список функций обновляются без перезапуска
+            // после активации/удаления ключа (общее событие EditionService.Changed).
+            UpdateTitle();
+            EditionService.Changed += OnEditionChanged;
+            Closed += OnClosed;
 
             var root = WpfUi.Rows(0, 0, 0, -1, 0, 0);
             root.Margin = new Thickness(16);
@@ -28,6 +35,17 @@ namespace Workspace1C
             head.Children.Add(WpfUi.BoundText(nameof(LicenseViewModel.OwnerText)));
             if (!string.IsNullOrEmpty(_vm.CommunityBuildText))
                 head.Children.Add(WpfUi.Text(_vm.CommunityBuildText, 12, secondary: true));
+
+            // Понятное пояснение: что даёт ПРО и что остаётся бесплатным.
+            var explanation = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            explanation.Children.Add(WpfUi.Section("Pro.License.WhatProHeader"));
+            explanation.Children.Add(WpfUi.Text(Localization.LocalizationManager.T("Pro.License.WhatPro"), 12));
+            var whatFreeHeader = WpfUi.Section("Pro.License.WhatFreeHeader");
+            whatFreeHeader.Margin = new Thickness(0, 6, 0, 0);
+            explanation.Children.Add(whatFreeHeader);
+            explanation.Children.Add(WpfUi.Text(Localization.LocalizationManager.T("Pro.License.WhatFree"), 12, secondary: true));
+            head.Children.Add(explanation);
+
             head.Margin = new Thickness(0, 0, 0, 10);
             WpfUi.Place(root, head, 0);
 
@@ -47,12 +65,14 @@ namespace Workspace1C
                 try { Clipboard.SetText(_vm.MachineCode); _vm.StatusText = Localization.LocalizationManager.T("Pro.CodeCopied"); }
                 catch { /* буфер обмена занят другим приложением */ }
             }, 150);
-            var buy = WpfUi.Button("Pro.Buy", (_, _) =>
+            _buyButton = WpfUi.Button("Pro.Buy", (_, _) =>
             {
                 // Пошаговая инструкция покупки (цена, контакты, активация) вместо GitHub.
                 new HowToBuyWindow().ShowDialog();
             }, 110);
-            machine.Children.Add(WpfUi.Wrap(codeBox, copy, buy));
+            // «Купить» нужна только без ключа (после активации скрывается без перезапуска).
+            _buyButton.Visibility = _vm.IsPro ? Visibility.Collapsed : Visibility.Visible;
+            machine.Children.Add(WpfUi.Wrap(codeBox, copy, _buyButton));
             machine.Children.Add(WpfUi.Label("Pro.HowToBuy"));
             WpfUi.Place(root, WpfUi.Card(machine), 1);
 
@@ -107,6 +127,40 @@ namespace Workspace1C
             WpfUi.Place(root, buttons, 5);
 
             Content = root;
+        }
+
+        /// <summary>
+        /// Заголовок окна с меткой ★ при действительном ключе (LicenseSummary.ProMark).
+        /// </summary>
+        private void UpdateTitle()
+        {
+            Title = (_vm.IsPro ? LicenseSummary.ProMark + " " : string.Empty)
+                + Localization.LocalizationManager.T("Pro.Title");
+        }
+
+        /// <summary>
+        /// Ключ активировали/удалили — обновляет редакцию, список функций, видимость
+        /// «Купить» и метку ★ в заголовке без перезапуска окна.
+        /// </summary>
+        private void OnEditionChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.CheckAccess())
+                RefreshEdition();
+            else
+                Dispatcher.BeginInvoke(new Action(RefreshEdition));
+        }
+
+        private void RefreshEdition()
+        {
+            _vm.Refresh();
+            _buyButton.Visibility = _vm.IsPro ? Visibility.Collapsed : Visibility.Visible;
+            UpdateTitle();
+        }
+
+        private void OnClosed(object? sender, EventArgs e)
+        {
+            EditionService.Changed -= OnEditionChanged;
+            Closed -= OnClosed;
         }
 
         /// <summary>Регистрирует показ окна для <see cref="ProGate"/> (вызывается при старте WPF).</summary>

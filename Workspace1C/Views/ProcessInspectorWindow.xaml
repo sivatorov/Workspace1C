@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="560" Width="1080" MinHeight="400" MinWidth="820"
+        Height="560" Width="1000" MinHeight="400" MinWidth="820"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -55,6 +55,7 @@
              клавиатурный фокус после загрузки данных и первого прохода разметки,
              поэтому Ctrl+A/стрелки/Enter работают без клика мышью. -->
         <DataGrid x:Name="ProcessesGrid" Grid.Row="2"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   Style="{StaticResource ProcessesGridStyle}"
                   Focusable="True"
                   AutoGenerateColumns="False" IsReadOnly="True"

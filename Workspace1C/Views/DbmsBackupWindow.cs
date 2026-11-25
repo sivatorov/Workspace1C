@@ -21,7 +21,8 @@ namespace Workspace1C
         {
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
-            WpfUi.SetupWindow(this, "Dbms.Title", 960, 760);
+            // Issue #119 (1.0.1.119): стартовый размер уменьшен по таблице 1.4 плана.
+            WpfUi.SetupWindow(this, "Dbms.Title", 960, 700);
             // issue #143: сторож UI-потока — WARN в dbms-backup-debug.log, если
             // UI-поток не отвечает больше 3 с (с последним этапом операции).
             UiThreadWatchdog.EnsureStarted(Dispatcher);

@@ -170,9 +170,9 @@ public sealed class Issue93And95SubtabsTests
         Assert.Contains("Connection.LaunchSubtab.Events", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"ConnSubTabControl\"", xaml, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"ConnSubTabItem\"", xaml, StringComparison.Ordinal);
-        // Высота окна уменьшена (issue #93).
+        // Высота окна уменьшена (issue #93), затем ещё раз в issue #119 (T2).
         Assert.Contains("MinHeight=\"640\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Height=\"680\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Height=\"660\"", xaml, StringComparison.Ordinal);
         // Оба набора контролов на месте.
         Assert.Contains("x:Name=\"DoubleClickActionCombo\"", xaml, StringComparison.Ordinal);
         Assert.Contains("IsChecked=\"{Binding IsAutoMode", xaml, StringComparison.Ordinal);
@@ -185,7 +185,8 @@ public sealed class Issue93And95SubtabsTests
 
         Assert.Contains("LaunchSubTab(\"Connection.LaunchSubtab.Mode\"", code, StringComparison.Ordinal);
         Assert.Contains("LaunchSubTab(\"Connection.LaunchSubtab.Events\"", code, StringComparison.Ordinal);
-        Assert.Contains("Height = 680;", code, StringComparison.Ordinal);
+        // Issue #119 (T3): стартовая высота Avalonia-окна приведена к WPF (660).
+        Assert.Contains("Height = 660;", code, StringComparison.Ordinal);
         Assert.Contains("MinHeight = 640;", code, StringComparison.Ordinal);
         // Старые сохранённые высоты зажимаются к новой стартовой.
         Assert.Contains("if (height > 680) height = 680;", code, StringComparison.Ordinal);

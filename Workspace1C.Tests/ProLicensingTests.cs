@@ -219,8 +219,11 @@ public sealed class ProLicensingTests : IDisposable
 
         UtilitiesMenuLayout ResolveMenu() => UtilitiesMenuResolver.ResolveForDisplay(settings, store);
 
+        // Issue #119 (T5): группа «ПРО» видна всегда в официальной сборке — 2.x-пункты
+        // не исчезают без ключа (раньше до активации группы не было вовсе).
         var beforeActivation = UtilitiesMenuLayouts.ExtractSection(ResolveMenu(), UtilitiesMenuCatalog.GroupTools);
-        Assert.DoesNotContain(beforeActivation!.Root, node => node.GroupId == UtilitiesMenuCatalog.GroupPro);
+        var proBefore = Assert.Single(beforeActivation!.Root.Where(node => node.GroupId == UtilitiesMenuCatalog.GroupPro));
+        Assert.NotEmpty(proBefore.Children);
 
         Assert.True(EditionService.Activate(Issue(VersionInfo.Major(), MachineIdProvider.Current)).IsValid);
         var activeMenu = ResolveMenu();
@@ -232,8 +235,9 @@ public sealed class ProLicensingTests : IDisposable
         Assert.Equal(expected.OrderBy(feature => feature), features.OrderBy(feature => feature));
 
         EditionService.Deactivate();
+        // После деактивации группа остаётся видимой (пункты ведут в окно «Лицензия»).
         var afterDeactivation = UtilitiesMenuLayouts.ExtractSection(ResolveMenu(), UtilitiesMenuCatalog.GroupTools);
-        Assert.DoesNotContain(afterDeactivation!.Root, node => node.GroupId == UtilitiesMenuCatalog.GroupPro);
+        Assert.Single(afterDeactivation!.Root.Where(node => node.GroupId == UtilitiesMenuCatalog.GroupPro));
     }
 
     [Fact]

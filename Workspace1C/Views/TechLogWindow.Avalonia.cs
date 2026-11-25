@@ -22,8 +22,9 @@ namespace Workspace1C
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
             Title = LocalizationManager.T("TechLog.Title");
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
             Width = 980;
-            Height = 720;
+            Height = 680;
             MinWidth = 760;
             MinHeight = 520;
             FontSize = 13;

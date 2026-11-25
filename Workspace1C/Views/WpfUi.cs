@@ -5,6 +5,7 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using Workspace1C.Localization;
+using Workspace1C.Services;
 
 namespace Workspace1C
 {
@@ -16,14 +17,29 @@ namespace Workspace1C
     /// </summary>
     internal static class WpfUi
     {
-        /// <summary>Общие настройки модального окна: иконка, фон и цвет текста темы.</summary>
+        /// <summary>
+        /// Общие настройки модального окна: иконка, фон и цвет текста темы.
+        /// Issue #119 (1.0.1.119): стартовые размеры ограничиваются рабочей областью
+        /// и разумным потолком через <see cref="WindowBoundsPolicy"/>; окончательный
+        /// кламп по конкретному монитору делает <see cref="WindowWorkAreaLimiter"/>.
+        /// </summary>
         public static void SetupWindow(Window window, string titleKey, double width, double height)
         {
             window.Title = LocalizationManager.T(titleKey);
-            window.Width = width;
-            window.Height = height;
-            window.MinWidth = Math.Min(width, 640);
-            window.MinHeight = Math.Min(height, 420);
+
+            var minWidth = Math.Min(width, 640);
+            var minHeight = Math.Min(height, 420);
+            var workArea = SystemParameters.WorkArea;
+            var bounds = WindowBoundsPolicy.Recommend(
+                width, height, minWidth, minHeight, workArea.Width, workArea.Height);
+
+            window.Width = bounds.Width;
+            window.Height = bounds.Height;
+            window.MinWidth = bounds.MinWidth;
+            window.MinHeight = bounds.MinHeight;
+            window.MaxWidth = bounds.MaxWidth;
+            window.MaxHeight = bounds.MaxHeight;
+
             window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
             window.ShowInTaskbar = false;
             window.SetResourceReference(Control.BackgroundProperty, "ContentBackgroundBrush");
@@ -32,6 +48,8 @@ namespace Workspace1C
                 window.Icon = icon;
             if (Application.Current?.MainWindow is { } owner && !ReferenceEquals(owner, window) && owner.IsLoaded)
                 window.Owner = owner;
+
+            WindowWorkAreaLimiter.Attach(window);
         }
 
         /// <summary>Текстовый блок с цветом текста темы.</summary>
@@ -298,6 +316,9 @@ namespace Workspace1C
                 ItemsSource = items,
                 AutoGenerateColumns = false,
                 IsReadOnly = true,
+                // Issue #119 (1.0.1.119): при сужении окна колонки не обрезаются —
+                // появляется горизонтальная прокрутка (MinWidth колонок не трогаем).
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
                 CanUserAddRows = false,
                 CanUserDeleteRows = false,
                 HeadersVisibility = DataGridHeadersVisibility.Column,

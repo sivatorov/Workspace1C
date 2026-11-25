@@ -34,6 +34,11 @@ namespace Workspace1C
             // окну приложения (главное, оформленное самостоятельно, пропускается).
             WindowChromeHelper.RegisterGlobalWindowStyling();
 
+            // Issue #119 (1.0.1.119): единое ограничение размеров окон рабочей областью
+            // монитора. Глобальный обработчик покрывает и XAML-окна, и окна, собранные
+            // кодом через WpfUi.SetupWindow.
+            WindowWorkAreaLimiter.RegisterGlobal();
+
             // Режим COM-агента перехватывается раньше, в Program.Main: агенту не нужны
             // ни WPF, ни ресурсные словари тем. См. ComReadHost.
 

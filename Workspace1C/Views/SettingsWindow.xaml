@@ -12,10 +12,10 @@
         mc:Ignorable="d"
         Title="{loc:Loc Settings.Title}"
         Icon="{StaticResource AppIcon}"
-        Width="1100"
+        Width="1000"
         MinWidth="960"
         MinHeight="720"
-        Height="760"
+        Height="720"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         FontSize="13"
@@ -3249,7 +3249,7 @@
                                             </StackPanel>
                                         </Button>
                                         <!-- «Купить ПРО» нужна только в бесплатной редакции. -->
-                                        <Button x:Name="AboutBuyProButton" Padding="14,6"
+                                        <Button x:Name="AboutBuyProButton" Padding="14,6" Margin="0,0,8,0"
                                                 Style="{DynamicResource SecondaryButton}" Cursor="Hand"
                                                 Click="OnAboutBuyPro_Click">
                                             <StackPanel Orientation="Horizontal">
@@ -3259,6 +3259,17 @@
                                                                          Foreground="{DynamicResource SuccessBrush}"
                                                                          Margin="0,0,5,0" VerticalAlignment="Center"/>
                                                 <TextBlock Text="{loc:Loc Settings.About.BuyPro}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <!-- Ссылка на инструкцию «Как купить ПРО…» (1.0.1.119, T6). -->
+                                        <Button x:Name="AboutHowToBuyButton" Padding="14,6"
+                                                Style="{DynamicResource SecondaryButton}" Cursor="Hand"
+                                                Click="OnAboutHowToBuy_Click">
+                                            <StackPanel Orientation="Horizontal">
+                                                <materialDesign:PackIcon Kind="HelpCircleOutline" Width="14" Height="14"
+                                                                         Foreground="{DynamicResource InfoBrush}"
+                                                                         Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{loc:Loc Pro.HowToBuy.MenuItem}" VerticalAlignment="Center"/>
                                             </StackPanel>
                                         </Button>
                                     </StackPanel>

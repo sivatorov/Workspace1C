@@ -59,6 +59,21 @@ public static class ProFeatures
     private static readonly HashSet<ProFeature> ImplementedFeatures = new();
     private static readonly object Sync = new();
 
+    /// <summary>
+    /// Явный перечень функций публичного ядра (были в 1.0.x, остаются бесплатными в 1.x).
+    /// Намеренно не зависит от порядка значений <see cref="ProFeature"/>: добавление новых
+    /// 2.x-функций в enum не должно случайно расширять бесплатный набор.
+    /// </summary>
+    private static readonly HashSet<ProFeature> PublicCore = new()
+    {
+        ProFeature.ServerAlerts,
+        ProFeature.TelegramBot,
+        ProFeature.Mcp,
+        ProFeature.ClusterMigration,
+        ProFeature.TestDeploy,
+        ProFeature.MassLoadCf
+    };
+
     /// <summary>Все функции ПРО в порядке показа в окне «Лицензия».</summary>
     public static IReadOnlyList<ProFeature> All { get; } = (ProFeature[])System.Enum.GetValues(typeof(ProFeature));
 
@@ -69,7 +84,7 @@ public static class ProFeatures
     /// Функция реализована в публичном коде (была в 1.0.x). Остальные существуют только
     /// в официальной сборке с модулями из приватного репозитория.
     /// </summary>
-    public static bool IsInPublicCore(ProFeature feature) => feature <= ProFeature.MassLoadCf;
+    public static bool IsInPublicCore(ProFeature feature) => PublicCore.Contains(feature);
 
     /// <summary>
     /// Отмечает функцию как реализованную. Вызывается модулем ПРО при регистрации
@@ -109,6 +124,24 @@ public static class ProFeatures
     /// </summary>
     public static string StatusKey(ProFeature feature) =>
         IsImplemented(feature) ? "Pro.FeatureStatus.Available" : "Pro.FeatureStatus.InDevelopment";
+
+    /// <summary>
+    /// Честный статус функции для окна «Лицензия» с учётом доступности:
+    /// <c>Available</c> — доступна по лицензии; <c>OfficialBuildOnly</c> — новая 2.x
+    /// в публичной сборке (кода функции нет, «только в официальной сборке»);
+    /// <c>InDevelopment</c> — в официальной сборке ещё не реализована;
+    /// <c>RequiresKey</c> — есть в сборке, но нужен ключ.
+    /// </summary>
+    public static string StatusKey(ProFeature feature, bool available)
+    {
+        if (available)
+            return "Pro.FeatureStatus.Available";
+        if (!IsInPublicCore(feature) && !EditionService.HasProModules)
+            return "Pro.FeatureStatus.OfficialBuildOnly";
+        if (!IsImplemented(feature))
+            return "Pro.FeatureStatus.InDevelopment";
+        return "Pro.FeatureStatus.RequiresKey";
+    }
 
     /// <summary>
     /// Ссылка на раздел «ПРО-версия» README репозитория (справочная кнопка

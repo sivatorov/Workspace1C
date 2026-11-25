@@ -119,6 +119,15 @@ public partial class MainWindow
                     target.Add(new Separator());
                 continue;
             }
+            if (string.Equals(node.Kind, "placeholder", StringComparison.Ordinal))
+            {
+                // Публичная сборка: 2.x-функция физически отсутствует. Показываем
+                // недоступный пункт «только в официальной сборке» без External-экшена.
+                var placeholder = CreatePlaceholderItem(node);
+                if (placeholder is not null)
+                    target.Add(placeholder);
+                continue;
+            }
             if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
             {
                 var title = GroupTitle(node);
@@ -197,12 +206,35 @@ public partial class MainWindow
             Header = catalogItem.DisplayText(),
             Style = TryFindResource("ModernMenuItem") as Style,
         };
+        // Новые 2.x-пункты без ключа: подсказка «требуется ключ» (Pro.RequiredFormat).
+        var toolTip = catalogItem.DisplayToolTip();
+        if (!string.IsNullOrWhiteSpace(toolTip))
+            item.ToolTip = toolTip;
         item.Icon = ItemIcon(node, catalogItem);
         var hotkey = HotkeyFor(catalogItem.HotkeyKey);
         if (!string.IsNullOrWhiteSpace(hotkey))
             item.InputGestureText = hotkey!;
         ApplyCommand(item, catalogItem);
         return item;
+    }
+
+    /// <summary>
+    /// Пункт-заглушка публичной сборки: новая 2.x-функция отсутствует физически.
+    /// Пункт недоступен, показывает «только в официальной сборке» и НЕ вызывает
+    /// несуществующий External-экшен (issue #119, T5).
+    /// </summary>
+    private MenuItem? CreatePlaceholderItem(UtilitiesMenuNode node)
+    {
+        if (!Enum.TryParse<Services.Licensing.ProFeature>(node.ItemId, out var feature))
+            return null;
+        var title = LocalizationManager.T(Services.Licensing.ProFeatures.TitleKey(feature));
+        return new MenuItem
+        {
+            Header = title + " — " + LocalizationManager.T("Pro.FeatureStatus.OfficialBuildOnly"),
+            ToolTip = string.Format(LocalizationManager.T("Pro.RequiredFormat"), title),
+            IsEnabled = false,
+            Style = TryFindResource("ModernMenuItem") as Style,
+        };
     }
 
     /// <summary>Иконка пункта: внешний файл → пользовательская → из каталога.</summary>
@@ -395,8 +427,12 @@ public partial class MainWindow
                 item.Click += (_, _) => OnCheckForUpdatesMenuClick(item, new RoutedEventArgs()); break;
             case UtilitiesMenuCommandKind.ShowLicense:
                 item.Click += (_, _) => new LicenseWindow { Owner = this }.ShowDialog(); break;
+            case UtilitiesMenuCommandKind.ShowHowToBuy:
+                item.Click += (_, _) => new HowToBuyWindow { Owner = this }.ShowDialog(); break;
             case UtilitiesMenuCommandKind.External:
-                item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternal(catalogItem.Id); break;
+                // Единый гейт на уровне меню: без ключа — окно «Лицензия», действие
+                // не выполняется; повторного окна из команды модуля нет (issue #119, T5).
+                item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternalGated(catalogItem.Id); break;
             case UtilitiesMenuCommandKind.EventLog:
                 item.Command = _viewModel.EventLogCommand; break;
             case UtilitiesMenuCommandKind.SharedLists:
@@ -630,7 +666,7 @@ public partial class MainWindow
             Padding = new Thickness(6),
             MinWidth = 32,
             Tag = catalogItem.Id,
-            ToolTip = title,
+            ToolTip = catalogItem.DisplayToolTip() ?? title,
             Content = menuItem.Icon,
             Command = menuItem.Command,
             IsEnabled = menuItem.IsEnabled,

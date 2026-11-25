@@ -49,8 +49,9 @@ namespace Workspace1C
         public PlatformDownloadWindow()
         {
             Title = T("PlatformDownload.WindowTitle");
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
             Width = 980;
-            Height = 700;
+            Height = 680;
             MinWidth = 760;
             MinHeight = 560;
             FontSize = 13;

@@ -11,7 +11,7 @@
         Icon="{StaticResource AppIcon}"
         Width="900"
         MinHeight="640" MinWidth="760"
-        Height="680"
+        Height="660"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"
         FontSize="13"

@@ -30,8 +30,9 @@ namespace Workspace1C
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
             Title = LocalizationManager.T("IbUsers.Title");
-            Width = 1240;
-            Height = 820;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1100;
+            Height = 720;
             MinWidth = 900;
             MinHeight = 560;
             FontSize = 13;

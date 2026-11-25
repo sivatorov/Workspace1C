@@ -27,8 +27,9 @@ namespace Workspace1C
             // UI-поток не отвечает больше 3 с (с последним этапом операции).
             UiThreadWatchdog.EnsureStarted();
             Title = LocalizationManager.T("Dbms.Title");
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
             Width = 960;
-            Height = 760;
+            Height = 700;
             MinWidth = 760;
             MinHeight = 560;
             FontSize = 13;

@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="640" Width="1180" MinHeight="460" MinWidth="900"
+        Height="640" Width="1100" MinHeight="460" MinWidth="900"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">
@@ -169,6 +169,7 @@
                 <TextBlock Grid.Row="0" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6"
                            Text="{loc:Loc RepositoryBrowser.Versions}"/>
                 <DataGrid x:Name="VersionsGrid" Grid.Row="1"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                           AutoGenerateColumns="False" IsReadOnly="True"
                           HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                           SelectionMode="Single" SelectionUnit="FullRow"
@@ -231,6 +232,7 @@
                 <TextBlock Grid.Row="0" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6"
                            Text="{loc:Loc RepositoryBrowser.Objects}"/>
                 <DataGrid x:Name="ObjectsGrid" Grid.Row="1"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                           AutoGenerateColumns="False" IsReadOnly="True"
                           HeadersVisibility="Column" CanUserAddRows="False" CanUserDeleteRows="False"
                           SelectionMode="Single" SelectionUnit="FullRow"

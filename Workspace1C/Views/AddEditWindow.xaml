@@ -10,6 +10,7 @@
         Title="{loc:Loc AddEdit.Title}"
         Icon="{StaticResource AppIcon}"
         Width="480"
+        MaxHeight="640"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"

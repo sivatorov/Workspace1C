@@ -12,7 +12,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Icon="{StaticResource AppIcon}"
-        Height="700" Width="1200" MinHeight="520" MinWidth="1000"
+        Height="680" Width="1100" MinHeight="520" MinWidth="1000"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
         Background="{DynamicResource ContentBackgroundBrush}">

@@ -24,10 +24,18 @@ public static class EditionService
     public static event EventHandler? Changed;
 
     /// <summary>
+    /// Переопределение наличия модулей ПРО (тесты). Не null — используется вместо
+    /// символа <c>PRO_MODULES</c>; в тестах сбрасывать обратно в null.
+    /// </summary>
+    internal static bool? HasProModulesOverride { get; set; }
+
+    /// <summary>
     /// В сборку встроены модули ПРО из приватного репозитория (символ PRO_MODULES).
     /// Без них новые функции 2.x отсутствуют даже при действительном ключе.
     /// </summary>
-    public static bool HasProModules =>
+    public static bool HasProModules => HasProModulesOverride ?? BuiltWithProModules;
+
+    private static bool BuiltWithProModules =>
 #if PRO_MODULES
         true;
 #else

@@ -199,6 +199,10 @@ namespace Workspace1C
             // его ниже MinWidth/MinHeight.
             ModalWindowBase.ClampWindowToMinSize(this);
 
+            // Issue #119 (1.0.1.119): главное окно тоже не должно выходить за рабочую
+            // область монитора (окно на втором мониторе, маленький экран).
+            ModalWindowBase.ClampWindowToWorkArea(this);
+
             DataContext = viewModel;
 
             Content = BuildRoot();
@@ -1281,7 +1285,7 @@ namespace Workspace1C
                 Command = menuItem.Command,
             };
             button.Styled(Themes.ControlThemes.IconButton);
-            ToolTip.SetTip(button, title);
+            ToolTip.SetTip(button, catalogItem.DisplayToolTip() ?? title);
             UiAutomation.SetNameFromTip(button);
 
             // Пункты с обработчиком Click (а не командой) получают тот же обработчик.

@@ -40,7 +40,8 @@ namespace Workspace1C
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
 
             Title = LocalizationManager.T("ConnectionReplace.Title");
-            Width = 1060;
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
+            Width = 1000;
             Height = 620;
             MinWidth = 860;
             MinHeight = 440;

@@ -5,6 +5,22 @@ using Workspace1C.Services.Licensing;
 
 namespace Workspace1C.ViewModels;
 
+/// <summary>Честный статус функции в окне «Лицензия».</summary>
+public enum ProFeatureStatusKind
+{
+    /// <summary>Функция доступна по действующей лицензии.</summary>
+    Available,
+
+    /// <summary>Функция есть в этой сборке, но нужен ключ.</summary>
+    RequiresKey,
+
+    /// <summary>Новая 2.x-функция отсутствует в публичной сборке (только официальная).</summary>
+    OfficialBuildOnly,
+
+    /// <summary>Функция ещё не реализована даже в официальной сборке.</summary>
+    InDevelopment
+}
+
 /// <summary>Строка списка функций ПРО в окне «Лицензия».</summary>
 public sealed class ProFeatureRow
 {
@@ -16,6 +32,8 @@ public sealed class ProFeatureRow
         Highlighted = highlighted;
         InDevelopment = !ProFeatures.IsImplemented(feature);
         Status = LocalizationManager.T(ProFeatures.StatusKey(feature));
+        StatusKind = ResolveStatusKind(feature, available);
+        HonestStatus = LocalizationManager.T(ProFeatures.StatusKey(feature, available));
         Mark = available ? "✓" : "—";
     }
 
@@ -31,7 +49,27 @@ public sealed class ProFeatureRow
     /// <summary>Локализованный статус функции: «доступна» или «в разработке».</summary>
     public string Status { get; }
 
+    /// <summary>Честный статус: доступна / требуется ключ / только официальная сборка / в разработке.</summary>
+    public ProFeatureStatusKind StatusKind { get; }
+
+    /// <summary>Локализованный честный статус функции.</summary>
+    public string HonestStatus { get; }
+
     public string Display => (Highlighted ? "▶ " : "   ") + Mark + "  " + Title + " — " + Status;
+
+    /// <summary>Строка для окна «Лицензия» с честным статусом.</summary>
+    public string HonestDisplay => (Highlighted ? "▶ " : "   ") + Mark + "  " + Title + " — " + HonestStatus;
+
+    private static ProFeatureStatusKind ResolveStatusKind(ProFeature feature, bool available)
+    {
+        if (available)
+            return ProFeatureStatusKind.Available;
+        if (!ProFeatures.IsInPublicCore(feature) && !EditionService.HasProModules)
+            return ProFeatureStatusKind.OfficialBuildOnly;
+        if (!ProFeatures.IsImplemented(feature))
+            return ProFeatureStatusKind.InDevelopment;
+        return ProFeatureStatusKind.RequiresKey;
+    }
 }
 
 /// <summary>
@@ -81,7 +119,10 @@ public sealed class LicenseViewModel : ViewModelBase
     public IReadOnlyList<ProFeatureRow> Features { get => _features; private set => SetProperty(ref _features, value); }
 
     /// <summary>Текст для списка функций одной строкой на функцию (простые окна без DataGrid).</summary>
-    public string FeaturesText => string.Join("\n", Features.Select(r => r.Display));
+    public string FeaturesText => string.Join("\n", Features.Select(r => r.HonestDisplay));
+
+    /// <summary>Редакция ПРО активна (действительный ключ на этом компьютере).</summary>
+    public bool IsPro => EditionService.IsPro;
 
     /// <summary>Сборка без модулей ПРО: новые функции 2.x недоступны даже с ключом.</summary>
     public bool IsCommunityBuild => !EditionService.HasProModules;
@@ -109,7 +150,12 @@ public sealed class LicenseViewModel : ViewModelBase
         Refresh();
     }
 
-    private void Refresh()
+    /// <summary>
+    /// Перечитывает состояние лицензии и список функций. Вызывается после активации,
+    /// удаления ключа и по событию <see cref="EditionService.Changed"/> — список и метка
+    /// редакции обновляются без перезапуска окна.
+    /// </summary>
+    public void Refresh()
     {
         var current = EditionService.Current;
         EditionText = LocalizationManager.T(current.IsValid ? "Pro.EditionPro" : "Pro.EditionFree");

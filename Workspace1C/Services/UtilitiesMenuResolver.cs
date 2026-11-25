@@ -48,7 +48,13 @@ public static class UtilitiesMenuResolver
         // Настройка правки здесь намеренно не участвует: она влияет на возможность
         // редактирования, а не на то, какую компоновку показывать пользователю.
         var layout = store?.Load() ?? UtilitiesMenuLayouts.Default();
-        if (EditionService.IsPro && EditionService.HasProModules)
+
+        // Issue #119 (T5): группа «ПРО» видна всегда.
+        //  - официальная сборка (HasProModules): реальные 2.x-пункты, зарегистрированные
+        //    модулями; без ключа они помечены « · ПРО» и ведут в окно «Лицензия»;
+        //  - публичная сборка: placeholder-пункты «только в официальной сборке»,
+        //    которые не вызывают несуществующий External-экшен.
+        if (EditionService.HasProModules)
         {
             var items = UtilitiesMenuCatalog.All
                 .Where(item => item.RequiredFeature is { } feature && !ProFeatures.IsInPublicCore(feature))
@@ -59,29 +65,56 @@ public static class UtilitiesMenuResolver
             {
                 var itemIds = items.Select(item => item.ItemId!).ToHashSet(StringComparer.Ordinal);
                 RemoveProItems(layout.Root, itemIds);
-
-                var tools = layout.Root.FirstOrDefault(node =>
-                    node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupTools);
-                if (tools is null)
-                {
-                    tools = new UtilitiesMenuNode { Kind = "group", GroupId = UtilitiesMenuCatalog.GroupTools };
-                    layout.Root.Add(tools);
-                }
-                if (!tools.Visible)
-                {
-                    tools.Children.Clear();
-                    tools.Visible = true;
-                }
-                tools.Children.Add(new UtilitiesMenuNode
-                {
-                    Kind = "group",
-                    GroupId = UtilitiesMenuCatalog.GroupPro,
-                    Children = items
-                });
+                AddProGroup(layout, items);
             }
         }
+        else
+        {
+            var placeholders = ProFeatures.All
+                .Where(feature => !ProFeatures.IsInPublicCore(feature))
+                .Select(feature => new UtilitiesMenuNode
+                {
+                    Kind = "placeholder",
+                    ItemId = feature.ToString()
+                })
+                .ToList();
+            if (placeholders.Count > 0)
+                AddProGroup(layout, placeholders);
+        }
+
         EnsureNewItemsGroup(layout);
         return layout;
+    }
+
+    /// <summary>
+    /// Добавляет (или заменяет) группу «ПРО» в разделе «Инструменты»: группа видна
+    /// всегда, даже без ключа; при скрытом разделе «Инструменты» он раскрывается.
+    /// </summary>
+    private static void AddProGroup(UtilitiesMenuLayout layout, List<UtilitiesMenuNode> children)
+    {
+        var tools = layout.Root.FirstOrDefault(node =>
+            node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupTools);
+        if (tools is null)
+        {
+            tools = new UtilitiesMenuNode { Kind = "group", GroupId = UtilitiesMenuCatalog.GroupTools };
+            layout.Root.Add(tools);
+        }
+        if (!tools.Visible)
+        {
+            tools.Children.Clear();
+            tools.Visible = true;
+        }
+
+        // Пользовательская компоновка могла сохранить старую группу «ПРО» — заменяем,
+        // чтобы не было двух одинаковых подменю.
+        tools.Children.RemoveAll(node =>
+            node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupPro);
+        tools.Children.Add(new UtilitiesMenuNode
+        {
+            Kind = "group",
+            GroupId = UtilitiesMenuCatalog.GroupPro,
+            Children = children
+        });
     }
 
     private static void RemoveProItems(List<UtilitiesMenuNode> nodes, HashSet<string> itemIds)

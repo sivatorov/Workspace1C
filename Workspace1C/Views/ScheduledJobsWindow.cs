@@ -22,7 +22,8 @@ namespace Workspace1C
         {
             _vm = vm ?? throw new ArgumentNullException(nameof(vm));
             DataContext = _vm;
-            WpfUi.SetupWindow(this, "Jobs.Title", 1280, 800);
+            // Issue #119 (1.0.1.119): стартовый размер уменьшен по таблице 1.4 плана.
+            WpfUi.SetupWindow(this, "Jobs.Title", 1100, 720);
 
             var root = new Grid { Margin = new Thickness(16) };
             root.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0.75, GridUnitType.Star) });

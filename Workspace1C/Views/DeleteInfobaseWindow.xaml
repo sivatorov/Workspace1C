@@ -6,7 +6,7 @@
         xmlns:loc="clr-namespace:Workspace1C.Localization"
         Title="{loc:Loc DeleteInfobase.Title}"
         Icon="{StaticResource AppIcon}"
-        MinWidth="520" Height="Auto" SizeToContent="Height"
+        MinWidth="520" MaxHeight="620" Height="Auto" SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         FontSize="13"

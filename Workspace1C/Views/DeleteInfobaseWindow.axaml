@@ -11,6 +11,7 @@
                        Title="{loc:Loc DeleteInfobase.Title}"
                        MinWidth="520"
                        SizeToContent="Height"
+                       MaxHeight="620"
                        FontSize="13"
                        CanResize="False"
                        SystemDecorations="None">

@@ -2899,6 +2899,15 @@ namespace Workspace1C
                         target.Add(MenuSeparator());
                     continue;
                 }
+                if (string.Equals(node.Kind, "placeholder", StringComparison.Ordinal))
+                {
+                    // Публичная сборка: 2.x-функция отсутствует. Недоступный пункт
+                    // «только в официальной сборке» без External-экшена (issue #119, T5).
+                    var placeholder = CreateAvaloniaPlaceholderItem(node);
+                    if (placeholder is not null)
+                        target.Add(placeholder);
+                    continue;
+                }
                 if (string.Equals(node.Kind, "group", StringComparison.Ordinal))
                 {
                     var title = AvaloniaGroupTitle(node);
@@ -2971,6 +2980,10 @@ namespace Workspace1C
 
             var item = new MenuItem { Header = catalogItem.DisplayText() };
             item.Styled(Themes.ControlThemes.ModernMenuItem);
+            // Новые 2.x-пункты без ключа: подсказка «требуется ключ» (Pro.RequiredFormat).
+            var toolTip = catalogItem.DisplayToolTip();
+            if (!string.IsNullOrWhiteSpace(toolTip))
+                ToolTip.SetTip(item, toolTip);
             if (!string.IsNullOrWhiteSpace(node.ExternalIconPath))
             {
                 item.Icon = CreateAvaloniaExternalIcon(node.ExternalIconPath!);
@@ -3007,6 +3020,26 @@ namespace Workspace1C
                 ToolTip.SetTip(item, LocalizationManager.T("Admin.ServerConsoleWindowsOnlyHint"));
             }
 
+            return item;
+        }
+
+        /// <summary>
+        /// Пункт-заглушка публичной сборки: новая 2.x-функция отсутствует физически.
+        /// Пункт недоступен, показывает «только в официальной сборке» и НЕ вызывает
+        /// несуществующий External-экшен (issue #119, T5).
+        /// </summary>
+        private MenuItem? CreateAvaloniaPlaceholderItem(UtilitiesMenuNode node)
+        {
+            if (!Enum.TryParse<Services.Licensing.ProFeature>(node.ItemId, out var feature))
+                return null;
+            var title = LocalizationManager.T(Services.Licensing.ProFeatures.TitleKey(feature));
+            var item = new MenuItem
+            {
+                Header = title + " — " + LocalizationManager.T("Pro.FeatureStatus.OfficialBuildOnly"),
+                IsEnabled = false
+            };
+            ToolTip.SetTip(item, string.Format(LocalizationManager.T("Pro.RequiredFormat"), title));
+            item.Styled(Themes.ControlThemes.ModernMenuItem);
             return item;
         }
 
@@ -3172,8 +3205,13 @@ namespace Workspace1C
                 case UtilitiesMenuCommandKind.ShowLicense:
                     item.Click += (_, _) => new LicenseWindow().ShowDialogSync(this);
                     break;
+                case UtilitiesMenuCommandKind.ShowHowToBuy:
+                    item.Click += (_, _) => new HowToBuyWindow().ShowDialogSync(this);
+                    break;
                 case UtilitiesMenuCommandKind.External:
-                    item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternal(catalogItem.Id);
+                    // Единый гейт на уровне меню: без ключа — окно «Лицензия», действие
+                    // не выполняется; повторного окна из команды модуля нет (issue #119, T5).
+                    item.Click += (_, _) => UtilitiesMenuCatalog.ExecuteExternalGated(catalogItem.Id);
                     break;
                 case UtilitiesMenuCommandKind.CheckForUpdates:
                     item.Click += async (_, _) =>

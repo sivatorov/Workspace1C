@@ -8,7 +8,7 @@
         xmlns:vm="clr-namespace:Workspace1C.ViewModels"
         Title="{loc:Loc PlatformDownload.WindowTitle}"
         Icon="{StaticResource AppIcon}"
-        Width="980" Height="700"
+        Width="980" Height="680"
         MinHeight="560" MinWidth="760"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanResizeWithGrip"

@@ -63,8 +63,9 @@ namespace Workspace1C
             string? initialCfPath = null, string? dumpDirectory = null,
             string? dumpTemplate = null, string? timestampFormat = null)
         {
+            // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
             Width = 980;
-            Height = 680;
+            Height = 660;
             MinWidth = 780;
             MinHeight = 520;
             FontSize = 13;

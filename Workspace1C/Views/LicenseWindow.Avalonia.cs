@@ -18,18 +18,24 @@ namespace Workspace1C
     public sealed class LicenseWindow : ModalWindowBase
     {
         private readonly LicenseViewModel _vm;
+        private readonly Button _buyButton;
 
         public LicenseWindow(ProFeature? requested = null)
         {
             _vm = new LicenseViewModel(requested);
             DataContext = _vm;
-            Title = LocalizationManager.T("Pro.Title");
+            UpdateTitle();
             Width = 640;
             Height = 620;
             MinWidth = 520;
             MinHeight = 480;
             FontSize = 13;
             CanResize = true;
+
+            // Issue #119 (T6): метка ★ и список функций обновляются без перезапуска
+            // после активации/удаления ключа (общее событие EditionService.Changed).
+            EditionService.Changed += OnEditionChanged;
+            Closed += OnClosed;
 
             var root = AvaloniaUi.Rows(0, 0, 0, -1, 0, 0);
             root.Margin = new Thickness(16);
@@ -41,6 +47,17 @@ namespace Workspace1C
             head.Children.Add(AvaloniaUi.BoundText(nameof(LicenseViewModel.OwnerText)));
             if (!string.IsNullOrEmpty(_vm.CommunityBuildText))
                 head.Children.Add(AvaloniaUi.Text(_vm.CommunityBuildText, 12, secondary: true));
+
+            // Понятное пояснение: что даёт ПРО и что остаётся бесплатным.
+            var explanation = new StackPanel { Margin = new Thickness(0, 8, 0, 0) };
+            explanation.Children.Add(AvaloniaUi.Section("Pro.License.WhatProHeader"));
+            explanation.Children.Add(AvaloniaUi.Text(LocalizationManager.T("Pro.License.WhatPro"), 12));
+            var whatFreeHeader = AvaloniaUi.Section("Pro.License.WhatFreeHeader");
+            whatFreeHeader.Margin = new Thickness(0, 6, 0, 0);
+            explanation.Children.Add(whatFreeHeader);
+            explanation.Children.Add(AvaloniaUi.Text(LocalizationManager.T("Pro.License.WhatFree"), 12, secondary: true));
+            head.Children.Add(explanation);
+
             AvaloniaUi.Place(root, head, 0);
 
             var machine = new StackPanel();
@@ -69,12 +86,14 @@ namespace Workspace1C
                     // Буфер обмена недоступен (Wayland без менеджера буфера) — код можно выделить вручную.
                 }
             }, 150);
-            var buy = AvaloniaUi.Button("Pro.Buy", (_, _) =>
+            _buyButton = AvaloniaUi.Button("Pro.Buy", (_, _) =>
             {
                 // Пошаговая инструкция покупки (цена, контакты, активация) вместо GitHub.
                 new HowToBuyWindow().ShowDialogSync(this);
             }, 110);
-            machine.Children.Add(AvaloniaUi.Wrap(codeBox, copy, buy));
+            // «Купить» нужна только без ключа (после активации скрывается без перезапуска).
+            _buyButton.IsVisible = !_vm.IsPro;
+            machine.Children.Add(AvaloniaUi.Wrap(codeBox, copy, _buyButton));
             machine.Children.Add(AvaloniaUi.Label("Pro.HowToBuy"));
             AvaloniaUi.Place(root, AvaloniaUi.Card(machine), 1);
 
@@ -117,6 +136,40 @@ namespace Workspace1C
             AvaloniaUi.Place(root, buttons, 5);
 
             Content = root;
+        }
+
+        /// <summary>
+        /// Заголовок окна с меткой ★ при действительном ключе (LicenseSummary.ProMark).
+        /// </summary>
+        private void UpdateTitle()
+        {
+            Title = (_vm.IsPro ? LicenseSummary.ProMark + " " : string.Empty)
+                + LocalizationManager.T("Pro.Title");
+        }
+
+        /// <summary>
+        /// Ключ активировали/удалили — обновляет редакцию, список функций, видимость
+        /// «Купить» и метку ★ в заголовке без перезапуска окна.
+        /// </summary>
+        private void OnEditionChanged(object? sender, EventArgs e)
+        {
+            if (Dispatcher.UIThread.CheckAccess())
+                RefreshEdition();
+            else
+                Dispatcher.UIThread.Post(RefreshEdition);
+        }
+
+        private void RefreshEdition()
+        {
+            _vm.Refresh();
+            _buyButton.IsVisible = !_vm.IsPro;
+            UpdateTitle();
+        }
+
+        private void OnClosed(object? sender, EventArgs e)
+        {
+            EditionService.Changed -= OnEditionChanged;
+            Closed -= OnClosed;
         }
 
         /// <summary>Регистрирует показ окна для <see cref="ProGate"/> (вызывается при старте Avalonia).</summary>

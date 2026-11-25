@@ -60,8 +60,9 @@ public sealed class NotificationChannelsWindow : ModalWindowBase
     public NotificationChannelsWindow()
     {
         Title = T("Notifications.Title");
+        // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
         Width = 620;
-        Height = 720;
+        Height = 660;
         MinWidth = 520;
         MinHeight = 480;
         FontSize = 13;

@@ -85,10 +85,11 @@ public sealed class ScriptScenarioEditWindow : ModalWindowBase
         _initialBase = initialBase;
         _vm = new ScriptScenarioEditViewModel(scenario);
         Title = T(scenario is null ? "Script.AddTitle" : "Script.EditTitle");
+        // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
         Width = 660;
-        Height = 720;
+        Height = 680;
         MinWidth = 560;
-        MinHeight = 620;
+        MinHeight = 560;
         // Явная высота вместо SizeToContent.Height: авторазмер мог схлопывать окно в пустой
         // прямоугольник при модальном показе (регресс «пустого незакрываемого окна», issue #308).
         // Окно чуть выше (issue #308): не всё влезало без скролла; после показа высота
@@ -401,12 +402,14 @@ public sealed class ScriptScenarioEditWindow : ModalWindowBase
         _previewBox.TextWrapping = TextWrapping.Wrap;
         panel.Children.Add(_previewBox);
 
+        // Issue #119 (T3): кнопки — вне прокрутки (футер Dock.Bottom), прокручивается
+        // только длинная форма; горизонтальная полоса — fallback (issue #55).
         var bottom = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
             Spacing = 8,
-            Margin = new Avalonia.Thickness(0, 10, 0, 0)
+            Margin = new Avalonia.Thickness(14, 0, 14, 12)
         };
         var ok = new Button { Content = T("Common.Save"), Width = 90 }.Styled(ControlThemes.DialogConfirmButton);
         ok.Click += (_, _) => OkClicked();
@@ -414,17 +417,18 @@ public sealed class ScriptScenarioEditWindow : ModalWindowBase
         cancel.Click += (_, _) => { DialogResult = false; Close(); };
         bottom.Children.Add(ok);
         bottom.Children.Add(cancel);
-        panel.Children.Add(bottom);
 
         UpdatePreview();
-        return new ScrollViewer
+        var root = new DockPanel();
+        DockPanel.SetDock(bottom, Dock.Bottom);
+        root.Children.Add(bottom);
+        root.Children.Add(new ScrollViewer
         {
             Content = panel,
-            // Горизонтальная полоса - fallback (issue #55): строка «Интерпретатор + галки»
-            // не обрезается правым краем при узком окне, а прокручивается.
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto
-        };
+        });
+        return root;
     }
 
     private void BrowseFile()
