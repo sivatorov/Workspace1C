@@ -69,15 +69,17 @@ public sealed class UtilitiesMenuLayoutTests
         Assert.Contains(maintenance[4].Children, n => n.ItemId == "ClearCache");
         Assert.Contains(maintenance[6].Children, n => n.ItemId == "CheckAvailability");
 
-        // ---- Инструменты: сравнение, журналы, списки баз, разработка, сервисы ----
+        // ---- Инструменты: сравнение, журналы, списки баз, разработка, сервисы, ПРО ----
         var tools = toolsNode.Children;
-        Assert.Equal(9, tools.Count);
+        // Issue #146 (T8): группа «ПРО» — обычный узел компоновки в конце раздела.
+        Assert.Equal(11, tools.Count);
         AssertGroup(tools[0], UtilitiesMenuCatalog.GroupCompare);
         AssertGroup(tools[2], UtilitiesMenuCatalog.GroupJournals);
         AssertGroup(tools[4], UtilitiesMenuCatalog.GroupBaseLists);
         AssertGroup(tools[6], UtilitiesMenuCatalog.GroupDevelopment);
         AssertGroup(tools[8], UtilitiesMenuCatalog.GroupProServices);
         Assert.Contains(tools[8].Children, n => n.ItemId == "TelegramBot");
+        AssertGroup(tools[10], UtilitiesMenuCatalog.GroupPro);
         Assert.Contains(tools[4].Children, n => n.ItemId == "ExportV8iFile");
         Assert.Contains(tools[4].Children, n => n.ItemId == "SyncIbases");
 

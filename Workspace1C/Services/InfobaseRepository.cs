@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using Workspace1C.Models;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C.Services;
 
@@ -54,6 +55,7 @@ public class InfobaseRepository : IInfobaseRepository
 
     private readonly IProfileService? _profileService;
     private readonly string? _explicitDirectory;
+    private readonly SecretJsonProtector? _secrets;
 
     /// <summary>
     /// Создаёт репозиторий. Если передан явный <paramref name="directory"/> — файлы данных
@@ -62,11 +64,24 @@ public class InfobaseRepository : IInfobaseRepository
     /// у каждой учётной записи свой список баз, групп и настроек. Если сервис профилей не задан —
     /// общий каталог данных приложения (легаси-режим).
     /// </summary>
-    public InfobaseRepository(IProfileService? profileService = null, string? directory = null)
+    public InfobaseRepository(
+        IProfileService? profileService = null,
+        string? directory = null,
+        SecretJsonProtector? secretProtector = null)
     {
         _profileService = profileService;
         _explicitDirectory = directory;
+        _secrets = secretProtector;
     }
+
+    /// <summary>Расшифровывает секретные поля прочитанного JSON (если сервис подключён).</summary>
+    private string UnprotectJson(string json) => _secrets?.Unprotect(json) ?? json;
+
+    /// <summary>
+    /// Шифрует секретные поля перед записью. Если шифрование включено, а ключа нет,
+    /// бросает <see cref="SecretProtectionException"/> — пароли открытым текстом не пишутся.
+    /// </summary>
+    private string ProtectJson(string json) => _secrets?.Protect(json) ?? json;
 
     /// <summary>Каталог, в котором репозиторий хранит файлы данных.</summary>
     private string DataDirectory =>
@@ -87,7 +102,7 @@ public class InfobaseRepository : IInfobaseRepository
             return new List<Infobase>();
         try
         {
-            var json = File.ReadAllText(InfobasesPath);
+            var json = UnprotectJson(File.ReadAllText(InfobasesPath));
             // Отбрасываем пустые элементы, которые могли прийти из легаси/повреждённого файла
             // (иначе потребители спотыкались бы о null и старт «зависал») (issue #64).
             var infobases = (JsonSerializer.Deserialize<List<Infobase>>(json, JsonOptions) ?? new List<Infobase>())
@@ -130,7 +145,7 @@ public class InfobaseRepository : IInfobaseRepository
     /// </summary>
     public void Save(List<Infobase> infobases)
     {
-        WriteAtomic(InfobasesPath, JsonSerializer.Serialize(infobases, JsonOptions));
+        WriteAtomic(InfobasesPath, ProtectJson(JsonSerializer.Serialize(infobases, JsonOptions)));
     }
 
     /// <summary>
@@ -330,7 +345,7 @@ public class InfobaseRepository : IInfobaseRepository
         }
         try
         {
-            var json = File.ReadAllText(SettingsPath);
+            var json = UnprotectJson(File.ReadAllText(SettingsPath));
             // Читаем настройки теми же опциями, что и пишем (SettingsJsonOptions):
             // так литералы NaN/±Infinity из сохранённого файла корректно разбираются
             // обратно (issue #188). JsonOptions для баз остаётся без этого флага.
@@ -396,6 +411,17 @@ public class InfobaseRepository : IInfobaseRepository
         var json = JsonSerializer.Serialize(settings, SettingsJsonOptions);
         try
         {
+            // Шифрование включено, а ключа нет — файл не перезаписываем: старые
+            // (зашифрованные) значения остаются на диске, открытые пароли не пишутся.
+            json = ProtectJson(json);
+        }
+        catch (SecretProtectionException ex)
+        {
+            LogSecretsProtectionFailureOnce(ex);
+            return;
+        }
+        try
+        {
             WriteAtomic(SettingsPath, json);
         }
         catch (Exception ex)
@@ -408,7 +434,7 @@ public class InfobaseRepository : IInfobaseRepository
 
     public async Task SaveAsync(List<Infobase> infobases, CancellationToken cancellationToken = default)
     {
-        var json = JsonSerializer.Serialize(infobases, JsonOptions);
+        var json = ProtectJson(JsonSerializer.Serialize(infobases, JsonOptions));
         await WriteAtomicAsync(InfobasesPath, json, cancellationToken).ConfigureAwait(false);
     }
 
@@ -428,6 +454,15 @@ public class InfobaseRepository : IInfobaseRepository
     {
         settings.SchemaVersion = ConfigSchemaVersion;
         var json = JsonSerializer.Serialize(settings, SettingsJsonOptions);
+        try
+        {
+            json = ProtectJson(json);
+        }
+        catch (SecretProtectionException ex)
+        {
+            LogSecretsProtectionFailureOnce(ex);
+            return;
+        }
         try
         {
             await WriteAtomicAsync(SettingsPath, json, cancellationToken).ConfigureAwait(false);
@@ -510,6 +545,41 @@ public class InfobaseRepository : IInfobaseRepository
 
         System.Diagnostics.Debug.WriteLine(
             $"Не удалось сохранить настройки интерфейса (issue #136): {exception}");
+    }
+
+    /// <summary>
+    /// Флаг «о невозможности зашифровать секреты уже сообщили» (issue #163): не засоряем
+    /// журнал одинаковыми записями. Пароли при этом не теряются — файл не перезаписывается.
+    /// </summary>
+    private static int _secretsProtectionFailureLogged;
+
+    /// <summary>
+    /// Однократно сообщает, что сохранение настроек пропущено из-за недоступного ключа
+    /// шифрования (issue #163). Не бросает и не раскрывает значения паролей.
+    /// </summary>
+    private static void LogSecretsProtectionFailureOnce(SecretProtectionException exception)
+    {
+        if (Interlocked.Exchange(ref _secretsProtectionFailureLogged, 1) != 0)
+            return;
+
+        try
+        {
+            var logger = AppServices.TryGetService<IAppLogger>();
+            if (logger is not null)
+            {
+                logger.Warn(
+                    "Сохранение настроек пропущено: шифрование паролей включено, но пароль " +
+                    "учётной записи недоступен в текущем сеансе (issue #163).");
+                return;
+            }
+        }
+        catch
+        {
+            // Журнал недоступен — ниже отладочный вывод.
+        }
+
+        System.Diagnostics.Debug.WriteLine(
+            $"Шифрование паролей: ключ недоступен, настройки не сохранены (issue #163): {exception.Status}");
     }
 
     /// <summary>

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Workspace1C.Models;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C.Services;
 
@@ -34,15 +35,21 @@ public sealed class ServerListStore : IServerListStore
 
     private readonly IProfileService? _profileService;
     private readonly string? _directoryOverride;
+    private readonly SecretJsonProtector? _secrets;
     private readonly JsonSerializerOptions _jsonOptions;
 
     /// <param name="profileService">Профиль для определения каталога данных (может быть null).</param>
     /// <param name="directoryOverride">Явный каталог хранения вместо каталога данных
     /// (используется в юнит-тестах для изоляции от реальных данных профиля).</param>
-    public ServerListStore(IProfileService? profileService = null, string? directoryOverride = null)
+    /// <param name="secretProtector">Шифратор паролей (issue #163); null — без шифрования.</param>
+    public ServerListStore(
+        IProfileService? profileService = null,
+        string? directoryOverride = null,
+        SecretJsonProtector? secretProtector = null)
     {
         _profileService = profileService;
         _directoryOverride = directoryOverride;
+        _secrets = secretProtector;
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -72,6 +79,8 @@ public sealed class ServerListStore : IServerListStore
                 return new List<ManagementServer>();
 
             var json = File.ReadAllText(FilePath);
+            if (_secrets is not null)
+                json = _secrets.Unprotect(json);
             var raw = JsonSerializer.Deserialize<List<ManagementServer>>(json, _jsonOptions);
             return Normalize(raw);
         }
@@ -89,6 +98,9 @@ public sealed class ServerListStore : IServerListStore
         var normalized = Normalize(servers?.ToList() ?? new List<ManagementServer>());
         Directory.CreateDirectory(DataDirectory);
         var json = JsonSerializer.Serialize(normalized, _jsonOptions);
+        // Пароли серверов шифруются паролем учётной записи (issue #163).
+        if (_secrets is not null)
+            json = _secrets.Protect(json);
 
         // Атомарная запись: сначала во временный файл, затем замена целевого
         // (как ItsAccountsStore.Save), чтобы не оставить битый файл при сбое.

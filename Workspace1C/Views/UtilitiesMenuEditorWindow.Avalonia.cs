@@ -61,23 +61,91 @@ namespace Workspace1C
         public UtilitiesMenuLayout Layout => _vm.Layout;
 
         /// <summary>
+        /// Issue #159: единая точка открытия редактора для обоих входов — ПКМ по кнопке
+        /// раздела на панели и кнопка «Настроить структуру…» в настройках. Раньше оба
+        /// места глушили исключение пустым <c>catch</c>: падение шаблона или конструктора
+        /// выглядело как «редактор не открывается» без единого сообщения. Теперь ошибка
+        /// пишется в журнал и показывается пользователю, а не пропадает молча.
+        /// </summary>
+        /// <param name="owner">Окно-владелец (может быть null).</param>
+        public static void ShowEditor(Window? owner)
+        {
+            try
+            {
+                var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
+                var window = new UtilitiesMenuEditorWindow(store);
+                if (owner is not null)
+                    window.ShowDialogSync(owner);
+                else
+                    window.ShowDialogSync();
+            }
+            catch (Exception ex)
+            {
+                ReportOpenFailure(ex);
+            }
+        }
+
+        /// <summary>
+        /// Issue #159: ошибка открытия редактора не теряется — пишется в журнал
+        /// (<see cref="IAppLogger"/>) и показывается диалогом. В сообщении есть тип и
+        /// текст исключения, поэтому причину видно без отладчика.
+        /// </summary>
+        internal static void ReportOpenFailure(Exception ex)
+        {
+            try
+            {
+                AppServices.TryGetService<IAppLogger>()?.Error(
+                    "Не удалось открыть редактор меню «Утилиты»", ex);
+            }
+            catch
+            {
+                // Журнал — вспомогательная возможность; показ ошибки важнее.
+            }
+
+            try
+            {
+                var message = string.Format(
+                    LocalizationManager.T("Utilities.Editor.OpenFailed"),
+                    ex.GetType().Name + ": " + ex.Message);
+                AppServices.TryGetService<IDialogService>()?.ShowError(
+                    message, LocalizationManager.T("Utilities.Editor.OpenFailedTitle"));
+            }
+            catch
+            {
+                // Диалог недоступен (например, приложение уже закрывается) —
+                // ошибка к этому моменту уже записана в журнал.
+            }
+        }
+
+        /// <summary>
         /// Issue #146 (1.0.1.118): рекомендованные размеры окна берутся из профиля
         /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 680 DIP помещает
         /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
         /// (прокрутка остаётся аварийным вариантом).
+        /// Issue #159: расчёт обёрнут в <c>try/catch</c> — у ещё не показанного окна
+        /// <see cref="Window.Screens"/> может быть недоступен, и сбой геометрии не должен
+        /// мешать открытию редактора (smoke-тест конструирования окна без показа).
         /// </summary>
         private void ApplyWorkAreaLimits()
         {
-            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
-            if (screen is null)
-                return;
-            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
-            var size = DialogWorkAreaPolicy.Recommend(
-                DialogWorkAreaPolicy.UtilitiesEditor,
-                dipHeight);
-            MaxHeight = size.MaxHeight;
-            MinHeight = size.MinHeight;
-            Height = size.Height;
+            try
+            {
+                var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+                if (screen is null)
+                    return;
+                var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+                var size = DialogWorkAreaPolicy.Recommend(
+                    DialogWorkAreaPolicy.UtilitiesEditor,
+                    dipHeight);
+                MaxHeight = size.MaxHeight;
+                MinHeight = size.MinHeight;
+                Height = size.Height;
+            }
+            catch
+            {
+                // Геометрия — вспомогательная возможность: окно откроется с размерами
+                // профиля (Height/MinHeight заданы в конструкторе).
+            }
         }
 
         private Control BuildLayout()
@@ -212,8 +280,10 @@ namespace Workspace1C
             // Поместить в группу.
             panel.Children.Add(SectionHeader("Utilities.Editor.MoveToGroupHeader", top: 14));
             _groupCombo.ItemsSource = _vm.Groups;
+            // Issue #158: шаблон может быть вызван с null (пустой ComboBox) —
+            // обращаемся к элементу только после проверки.
             _groupCombo.ItemTemplate = new FuncDataTemplate<UtilitiesMenuNodeItem>(
-                (g, _) => new TextBlock { Text = g.GroupLabel });
+                (g, _) => new TextBlock { Text = g?.GroupLabel ?? string.Empty });
             _groupCombo.Bind(SelectingItemsControl.SelectedItemProperty, new Binding("SelectedGroup"));
             var groupRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
             groupRow.Children.Add(_groupCombo);
@@ -373,9 +443,13 @@ namespace Workspace1C
         }
 
         /// <summary>Строка иконки каталога: превью слева + подпись (issue #374).</summary>
-        private Control BuildIconRow(UtilitiesIconOption option)
+        private Control BuildIconRow(UtilitiesIconOption? option)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+            // Issue #158: Avalonia вызывает шаблон и с null (пока ничего не выбрано) —
+            // раньше это давало NullReferenceException при открытии редактора.
+            if (option is null)
+                return row;
             // Issue #146: превью — та же геометрия Icon*, что рисуют меню, дерево и
             // правка группы (единый резолвер WpfIconGeometryKey). Раньше PackIcon-ключ
             // передавался в IconHelper напрямую, и в поле выбора была «другая» иконка.

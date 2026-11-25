@@ -227,6 +227,77 @@ public sealed class Issue157CacheCleanProgressTests
         }
     }
 
+    // ===================== Текст статуса по состояниям (issue #157, 7OH) =====================
+
+    [Fact]
+    public void StatusText_WhileCalculating_IsUpdating()
+    {
+        var wpf = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.xaml.cs");
+        var avalonia = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.Avalonia.cs");
+
+        foreach (var source in new[] { wpf, avalonia })
+        {
+            // Пока идёт расчёт, показывается «обновляются» — и стартовый текст,
+            // и текст с прогрессом.
+            var state = ExtractMethod(source, "private void UpdateCalculatingState");
+            Assert.Contains("CacheClean.Calculating", state, StringComparison.Ordinal);
+
+            // Прогресс не переключает строку на финальный текст: «рассчитаны» —
+            // только после исчезновения полосы (issue #157, комментарий 7OH).
+            var progress = ExtractMethod(source, "private void UpdateProgressStatus");
+            Assert.DoesNotContain("CacheClean.CalculatingDone", progress, StringComparison.Ordinal);
+            Assert.Contains("CacheClean.Calculating", progress, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void StatusText_AfterComplete_IsCalculated()
+    {
+        var wpf = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.xaml.cs");
+        var avalonia = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.Avalonia.cs");
+
+        foreach (var source in new[] { wpf, avalonia })
+        {
+            var state = ExtractMethod(source, "private void UpdateCalculatingState");
+            // Ветка calculating == false — «Размеры кэша рассчитаны».
+            Assert.Contains("CacheClean.CalculatingDone", state, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void ProgressBar_Hidden_WhenComplete()
+    {
+        var wpf = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.xaml.cs");
+        var avalonia = ReadProjectFile("Workspace1C/Views/CacheCleanWindow.Avalonia.cs");
+
+        // Порядок в UpdateCalculatingState: сначала скрываем полосу, затем меняем текст.
+        var wpfState = ExtractMethod(wpf, "private void UpdateCalculatingState");
+        Assert.True(
+            wpfState.IndexOf("SizesProgressBar.Visibility", StringComparison.Ordinal) <
+            wpfState.IndexOf("SizesStatusText.Text", StringComparison.Ordinal),
+            "WPF: полоса прогресса должна скрываться до смены текста статуса.");
+
+        var avaloniaState = ExtractMethod(avalonia, "private void UpdateCalculatingState");
+        Assert.True(
+            avaloniaState.IndexOf("_sizesProgressBar.IsVisible", StringComparison.Ordinal) <
+            avaloniaState.IndexOf("_sizesStatusText.Text", StringComparison.Ordinal),
+            "Avalonia: полоса прогресса должна скрываться до смены текста статуса.");
+    }
+
+    [Fact]
+    public void Localization_UsesNewWording()
+    {
+        var ru = LoadStrings("ru.json");
+        var en = LoadStrings("en.json");
+
+        Assert.Equal("Размеры кэша обновляются", ru["CacheClean.Calculating"]);
+        Assert.Equal("Размеры кэша обновляются… {0} из {1}", ru["CacheClean.CalculatingProgress"]);
+        Assert.Equal("Размеры кэша рассчитаны", ru["CacheClean.CalculatingDone"]);
+
+        Assert.Equal("Cache sizes are being updated", en["CacheClean.Calculating"]);
+        Assert.Equal("Cache sizes are being updated… {0} of {1}", en["CacheClean.CalculatingProgress"]);
+    }
+
     // ===================== Локализация =====================
 
     [Fact]
@@ -255,6 +326,20 @@ public sealed class Issue157CacheCleanProgressTests
     }
 
     // ===================== Вспомогательное =====================
+
+    /// <summary>
+    /// Вырезает исходный текст метода по сигнатуре (до следующего метода того же
+    /// уровня) — для проверки порядка операторов и используемых ключей локализации.
+    /// </summary>
+    private static string ExtractMethod(string source, string signature)
+    {
+        var start = source.IndexOf(signature, StringComparison.Ordinal);
+        Assert.True(start >= 0, $"Не найден метод: {signature}");
+        var end = source.IndexOf("private void ", start + signature.Length, StringComparison.Ordinal);
+        if (end < 0)
+            end = source.Length;
+        return source[start..end];
+    }
 
     private static Dictionary<string, string> LoadStrings(string languageFile)
     {

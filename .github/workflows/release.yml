@@ -1,6 +1,11 @@
 # =============================================================================
 # Публикация релиза Workspace 1C в GitHub Releases.
 #
+# Подход к выпуску: ОДНА основная программа с модулями ПРО внутри. Модули 2.x
+# компилируются в бинарь (символ PRO_MODULES), но закрыты лицензией: без ключа
+# пункты видны с отметкой « · ПРО», после активации функции доступны сразу, без
+# перезапуска. Отдельной «публичной» сборки в релизах нет.
+#
 # Срабатывает на push тега релиза (например v1.0.0.0 или 1.0.0.0):
 #   1) windows — собирает один исполняемый файл Windows (WPF, net10.0-windows,
 #      win-x64) скриптом build-windows-single-file.ps1 → Workspace1C.exe;
@@ -8,6 +13,10 @@
 #      linux-x64) скриптом build-linux-single-file.sh → Workspace1C-linux-x64;
 #   3) release — создаёт (или обновляет) GitHub Release по тегу и прикрепляет
 #      оба файла. Текст релиза берётся из rel_notes_<версия>.md, если он есть.
+#
+# Модули ПРО берутся из приватного Workspace1C.Pro по секрету PRO_REPO_TOKEN.
+# Без секрета релиз не публикуется (job падает), а собранный бинарь дополнительно
+# проверяется через --license-info → proModules=true.
 #
 # Имена asset'ов согласованы с автообновлением (Services/GitHubReleaseService.cs):
 # Windows ищет «Workspace1C.exe», Linux — «Workspace1C» или имя с «linux-x64».
@@ -100,7 +109,9 @@ jobs:
 
       # Модули редакции ПРО (docs/pro/PRO-EDITION.md): приватный репозиторий
       # Workspace1C.Pro, секрет PRO_REPO_TOKEN — fine-grained PAT с правом чтения.
-      # Без секрета собирается бесплатная редакция (с предупреждением).
+      # Без секрета сборка падает ниже (основная программа выпускается только с ПРО).
+      # При push тега pro_ref пуст — берётся ветка по умолчанию приватного репозитория;
+      # для воспроизводимой сборки задавайте pro_ref (полный SHA) через workflow_dispatch.
       - name: Модули ПРО (приватный репозиторий)
         if: env.PRO_REPO_TOKEN != ''
         uses: actions/checkout@v7
@@ -110,20 +121,52 @@ jobs:
           token: ${{ env.PRO_REPO_TOKEN }}
           path: pro
 
-      - name: Предупреждение — сборка без модулей ПРО
+      # Основная программа выпускается С модулями ПРО: они вкомпилированы, а доступ
+      # к функциям 2.x закрывает лицензия. Без секрета модулей нет — такой бинарь
+      # публиковать нельзя (у пользователя с ключом функции останутся недоступны).
+      - name: Ошибка — сборка без модулей ПРО
         if: env.PRO_REPO_TOKEN == ''
         shell: bash
-        run: echo "::warning title=ПРО::Секрет PRO_REPO_TOKEN не задан — собирается бесплатная редакция без модулей ПРО 2.x."
+        run: |
+          echo "::error title=ПРО::Секрет PRO_REPO_TOKEN не задан — сборка без модулей ПРО 2.x запрещена."
+          exit 1
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
 
+      # Печать редакции в лог: видно, что в сборку войдут модули ПРО (модель
+      # «одна программа»). Заодно страховка от «тихой» сборки публичной редакции.
+      - name: Печать редакции (HasProModules)
+        shell: pwsh
+        run: |
+          $has = (& dotnet msbuild Workspace1C/Workspace1C.csproj -nologo -getProperty:HasProModules).Trim()
+          Write-Host "HasProModules=$has"
+          if ($has -ne 'true') { throw "HasProModules=$has: модули ПРО не найдены — релиз с ПРО невозможен." }
+
       - name: Сборка Windows single-file
         working-directory: Workspace1C
         shell: pwsh
         run: ./build-windows-single-file.ps1 -Configuration Release
+
+      # Токен задан, но приватный репозиторий мог не скачаться или не найтись —
+      # проверяем по самому бинарю, что модули ПРО действительно вошли в сборку.
+      - name: Проверка модулей ПРО в Windows-бинаре
+        if: env.PRO_REPO_TOKEN != ''
+        shell: pwsh
+        run: |
+          # WPF-приложение — GUI-подсистема: stdout читаем через RedirectStandardOutput.
+          $tmp = [System.IO.Path]::GetTempFileName()
+          $proc = Start-Process -FilePath Workspace1C/dist/win-x64/Workspace1C.exe `
+            -ArgumentList '--license-info', '--json' -NoNewWindow -Wait -PassThru `
+            -RedirectStandardOutput $tmp
+          $info = Get-Content $tmp -Raw | ConvertFrom-Json
+          Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+          if ($proc.ExitCode -ne 0 -or -not $info.data.proModules) {
+            throw "Windows-бинарь собран без модулей ПРО (proModules=false)."
+          }
+          Write-Host "Модули ПРО в Windows-бинаре: proModules=true."
 
       - name: Проверка запуска Windows-бинаря
         if: inputs.build_only
@@ -185,7 +228,9 @@ jobs:
 
       # Модули редакции ПРО (docs/pro/PRO-EDITION.md): приватный репозиторий
       # Workspace1C.Pro, секрет PRO_REPO_TOKEN — fine-grained PAT с правом чтения.
-      # Без секрета собирается бесплатная редакция (с предупреждением).
+      # Без секрета сборка падает ниже (основная программа выпускается только с ПРО).
+      # При push тега pro_ref пуст — берётся ветка по умолчанию приватного репозитория;
+      # для воспроизводимой сборки задавайте pro_ref (полный SHA) через workflow_dispatch.
       - name: Модули ПРО (приватный репозиторий)
         if: env.PRO_REPO_TOKEN != ''
         uses: actions/checkout@v7
@@ -195,15 +240,31 @@ jobs:
           token: ${{ env.PRO_REPO_TOKEN }}
           path: pro
 
-      - name: Предупреждение — сборка без модулей ПРО
+      # Основная программа выпускается С модулями ПРО: они вкомпилированы, а доступ
+      # к функциям 2.x закрывает лицензия. Без секрета модулей нет — такой бинарь
+      # публиковать нельзя (у пользователя с ключом функции останутся недоступны).
+      - name: Ошибка — сборка без модулей ПРО
         if: env.PRO_REPO_TOKEN == ''
         shell: bash
-        run: echo "::warning title=ПРО::Секрет PRO_REPO_TOKEN не задан — собирается бесплатная редакция без модулей ПРО 2.x."
+        run: |
+          echo "::error title=ПРО::Секрет PRO_REPO_TOKEN не задан — сборка без модулей ПРО 2.x запрещена."
+          exit 1
 
       - name: Установка .NET SDK
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
+
+      # Печать редакции в лог: видно, что в сборку войдут модули ПРО (модель
+      # «одна программа»). Заодно страховка от «тихой» сборки публичной редакции.
+      - name: Печать редакции (HasProModules)
+        run: |
+          has=$(dotnet msbuild Workspace1C/Workspace1C.csproj -nologo -getProperty:HasProModules | tr -d '[:space:]')
+          echo "HasProModules=$has"
+          if [[ "$has" != "true" ]]; then
+            echo "::error::HasProModules=$has: модули ПРО не найдены — релиз с ПРО невозможен."
+            exit 1
+          fi
 
       # На реальном Linux скрипт собирает net10.0 + Avalonia (linux-x64),
       # выдаёт dist/linux-x64/Workspace1C — один исполняемый файл.
@@ -220,6 +281,17 @@ jobs:
             echo "::error::Версия Linux-сборки $version, ожидается ${RELEASE_TAG#v}."
             exit 1
           fi
+
+      # Токен задан, но приватный репозиторий мог не скачаться или не найтись —
+      # проверяем по самому бинарю, что модули ПРО действительно вошли в сборку.
+      - name: Проверка модулей ПРО в Linux-бинаре
+        if: env.PRO_REPO_TOKEN != ''
+        run: |
+          chmod +x Workspace1C/dist/linux-x64/Workspace1C
+          out=$(./Workspace1C/dist/linux-x64/Workspace1C --license-info --json)
+          echo "$out"
+          echo "$out" | python3 -c "import json,sys; d=json.load(sys.stdin); raise SystemExit(0 if d['data']['proModules'] else 1)" \
+            || { echo "::error::Linux-бинарь собран без модулей ПРО (proModules=false)."; exit 1; }
 
       # Смок-тест (issue #89, v1.0.1.24): бинарь обязан стартовать на чистой Ubuntu.
       # Ловит до публикации сбой «FileNotFoundException на старте» (например, отсутствия

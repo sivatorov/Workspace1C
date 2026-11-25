@@ -509,6 +509,16 @@ public static class DbmsBackupService
             return result;
         }
 
+        // issue #143: один запуск на процесс. Окно теперь немодальное, его можно
+        // закрыть и открыть снова, пока копия ещё выполняется, — повторный запуск
+        // не должен создавать второй дамп параллельно.
+        if (Interlocked.CompareExchange(ref _activeRun, 1, 0) == 1)
+        {
+            DbmsBackupTrace.Log("reentrancy", "service-run");
+            result.ErrorMessage = LocalizationManager.T("Dbms.Reentrancy");
+            return result;
+        }
+
         var timeout = TimeSpan.FromMinutes(profile.TimeoutMinutes > 0 ? profile.TimeoutMinutes : 360);
         var directory = profile.OutputDirectory.Trim();
         var target = Path.Combine(directory, BuildFileName(profile, DateTime.Now));
@@ -517,15 +527,48 @@ public static class DbmsBackupService
         {
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Prepare));
 
+            // issue #143: до запуска утилиты проверяем, что она действительно лежит
+            // в указанном каталоге. Проверки подключения/каталога могут пройти
+            // успешно, а pg_dump/sqlcmd при этом отсутствует (например, в поле
+            // «Каталог pg_dump / sqlcmd» указана папка для копий) — раньше это
+            // давало невнятную ошибку после «успешных» проверок.
+            var missingTool = await BlockingIo.Run(() => CheckToolFile(profile), ct).ConfigureAwait(false);
+            if (missingTool is not null)
+            {
+                DbmsBackupTrace.Error("error",
+                    "run: tool-not-found " + DbmsBackupTrace.DescribePath(missingTool));
+                result.ErrorMessage = LocalizationManager.T("Dbms.ToolNotFound") + ": " + missingTool;
+                return result;
+            }
+
             // Создание каталога — на выделенном потоке (issue #143): сетевой путь
             // может отвечать десятки секунд, и раньше это выглядело как «наглухо
             // зависло», а блокировка потока пула мешала срабатыванию таймаутов.
             DbmsBackupTrace.Log("io-begin", $"create-directory {DbmsBackupTrace.DescribePath(directory)}");
-            await BlockingIo.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+            try
+            {
+                await BlockingIo.Run(() => Directory.CreateDirectory(directory), ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                or NotSupportedException or ArgumentException)
+            {
+                // Конкретная причина вместо общего «копия не создана»: путь и текст
+                // ошибки файловой системы (нет прав, диск/UNC недоступен).
+                DbmsBackupTrace.Error("error",
+                    "run: create-directory " + DbmsBackupTrace.DescribePath(directory) + ": " + ex.Message, ex);
+                result.ErrorMessage = LocalizationManager.T("Dbms.DirUnavailable") + ": " + directory +
+                    ": " + ex.Message;
+                return result;
+            }
             DbmsBackupTrace.Log("io-end", "create-directory");
 
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Check));
 
+            var tool = ToolPath(profile);
             ProcessRunResult run;
             if (profile.Dbms == DbmsKind.PostgreSql)
             {
@@ -534,7 +577,9 @@ public static class DbmsBackupService
                     env["PGPASSWORD"] = profile.Password;
                 log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Dump));
-                run = await RunToolAsync(ToolPath(profile), BuildPgDumpArguments(profile, target),
+                DbmsBackupTrace.Log("tool-start",
+                    $"{DbmsBackupTrace.DescribePath(tool)}; target={DbmsBackupTrace.DescribePath(target)}");
+                run = await RunToolAsync(tool, BuildPgDumpArguments(profile, target),
                     timeout, env, ct).ConfigureAwait(false);
             }
             else
@@ -557,9 +602,18 @@ public static class DbmsBackupService
 
                 log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Dump));
-                run = await RunToolAsync(ToolPath(profile), BuildSqlCmdArguments(profile, target),
+                DbmsBackupTrace.Log("tool-start",
+                    $"{DbmsBackupTrace.DescribePath(tool)}; target={DbmsBackupTrace.DescribePath(target)}");
+                run = await RunToolAsync(tool, BuildSqlCmdArguments(profile, target),
                     timeout, null, ct).ConfigureAwait(false);
             }
+
+            // issue #143: в журнал диагностики — код возврата, длительность и хвост
+            // stderr (без паролей). По этим данным видно, почему копия не создалась.
+            DbmsBackupTrace.Log("tool-exit",
+                $"exit={run.ExitCode}; timedout={run.TimedOut}; canceled={run.Canceled}; " +
+                $"startError={(run.StartError is null ? "нет" : "да")}");
+            LogOutputTail(run);
 
             if (run.Canceled)
             {
@@ -574,12 +628,40 @@ public static class DbmsBackupService
                 return result;
             }
 
+            if (run.StartError is not null)
+            {
+                await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
+                result.ErrorMessage = LocalizationManager.T("Dbms.ToolNotFound") + ": " + run.StartError;
+                return result;
+            }
+
             if (!run.Success)
             {
                 await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
-                result.ErrorMessage = string.IsNullOrWhiteSpace(run.CombinedOutput)
-                    ? LocalizationManager.T("Dbms.Failed")
-                    : run.CombinedOutput;
+                var tail = OutputTail(run);
+                DbmsBackupTrace.Error("error",
+                    $"run: tool-failed exit={run.ExitCode}; tool={DbmsBackupTrace.DescribePath(tool)}; " +
+                    $"target={DbmsBackupTrace.DescribePath(target)}; output={tail}");
+                result.ErrorMessage = BuildToolFailureMessage(tool, target, run.ExitCode, tail);
+                return result;
+            }
+
+            // issue #143: успешный код возврата ещё не значит, что файл создан.
+            // Для PostgreSQL файл пишет сама утилита локально — проверяем наличие и
+            // размер, чтобы не показывать «успех» без копии (и наоборот, не терять
+            // понятную причину, если файл пуст). Для MS SQL путь может быть виден
+            // только серверу SQL — там ограничиваемся предупреждением в журнале.
+            var fileState = await BlockingIo.Run(() => GetFileState(target), ct).ConfigureAwait(false);
+            DbmsBackupTrace.Log("verify-file",
+                $"{DbmsBackupTrace.DescribePath(target)}; exists={fileState.Exists}; size={fileState.Length}");
+            if (profile.Dbms == DbmsKind.PostgreSql && (!fileState.Exists || fileState.Length <= 0))
+            {
+                var tail = OutputTail(run);
+                DbmsBackupTrace.Error("error",
+                    $"run: file-not-created target={DbmsBackupTrace.DescribePath(target)}; " +
+                    $"exists={fileState.Exists}; size={fileState.Length}; output={tail}");
+                result.ErrorMessage = string.Format(CultureInfo.InvariantCulture,
+                    LocalizationManager.T("Dbms.FileNotCreated"), target, run.ExitCode, tail);
                 return result;
             }
 
@@ -590,14 +672,16 @@ public static class DbmsBackupService
             if (profile.KeepCount > 0)
             {
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Rotate));
+                // keepPath защищает только что созданный файл: при неточных отметках
+                // времени на сетевом/FAT-каталоге ротация не должна его удалять.
                 var removed = await BlockingIo.Run(() => BackupRotation.Apply(directory, BuildFilePrefix(profile),
-                    FileExtension(profile), profile.KeepCount, 0), ct).ConfigureAwait(false);
+                    FileExtension(profile), profile.KeepCount, 0, target), ct).ConfigureAwait(false);
+                DbmsBackupTrace.Log("rotate", $"removed={removed.Count}; keep={profile.KeepCount}");
                 if (removed.Count > 0)
                     log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogRotated"), removed.Count));
             }
 
-            var targetExists = string.IsNullOrWhiteSpace(profile.WebDavUrl) ||
-                await BlockingIo.Run(() => File.Exists(target), ct).ConfigureAwait(false);
+            var targetExists = string.IsNullOrWhiteSpace(profile.WebDavUrl) || fileState.Exists;
             if (!string.IsNullOrWhiteSpace(profile.WebDavUrl) && targetExists)
             {
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Upload));
@@ -628,6 +712,79 @@ public static class DbmsBackupService
             await TryDeleteAsync(target, CancellationToken.None).ConfigureAwait(false);
             throw;
         }
+        finally
+        {
+            Interlocked.Exchange(ref _activeRun, 0);
+        }
+    }
+
+    /// <summary>Признак выполняющегося копирования (issue #143).</summary>
+    private static int _activeRun;
+
+    /// <summary>
+    /// Возвращает полный путь отсутствующей утилиты или null (issue #143). Пустой
+    /// <see cref="DbmsBackupProfile.ToolsDirectory"/> — поиск в PATH, наличие проверит
+    /// сам запуск процесса.
+    /// </summary>
+    internal static string? CheckToolFile(DbmsBackupProfile profile)
+    {
+        if (string.IsNullOrWhiteSpace(profile.ToolsDirectory))
+            return null;
+        var tool = ToolPath(profile);
+        try
+        {
+            return File.Exists(tool) ? null : tool;
+        }
+        catch
+        {
+            return tool;
+        }
+    }
+
+    /// <summary>Состояние файла копии: существование и размер (issue #143).</summary>
+    internal static (bool Exists, long Length) GetFileState(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? (true, info.Length) : (false, 0);
+        }
+        catch
+        {
+            return (false, 0);
+        }
+    }
+
+    /// <summary>Последние строки вывода утилиты (stderr/stdout) для причины ошибки.</summary>
+    internal static string OutputTail(ProcessRunResult run, int maxLength = 600)
+    {
+        var text = run.CombinedOutput;
+        if (string.IsNullOrWhiteSpace(text))
+            return string.Empty;
+        text = text.Trim();
+        return text.Length <= maxLength ? text : text.Substring(text.Length - maxLength);
+    }
+
+    /// <summary>Пишет хвост вывода утилиты в диагностику (issue #143).</summary>
+    private static void LogOutputTail(ProcessRunResult run)
+    {
+        var tail = OutputTail(run, 400);
+        if (tail.Length == 0)
+            return;
+        DbmsBackupTrace.Log("tool-output", tail);
+    }
+
+    /// <summary>
+    /// Понятное сообщение об ошибке утилиты: программа, код возврата, путь копии и
+    /// хвост вывода (issue #143). Без этого после «успешных» проверок пользователь
+    /// видел общее «копия не создана» без причины.
+    /// </summary>
+    internal static string BuildToolFailureMessage(string tool, string target, int exitCode, string tail)
+    {
+        var template = LocalizationManager.T("Dbms.ToolFailed");
+        if (template.Contains("{0}", StringComparison.Ordinal))
+            return string.Format(CultureInfo.InvariantCulture, template, tool, exitCode, target, tail);
+        return LocalizationManager.T("Dbms.Failed") + $": {tool}; exit={exitCode}; {target}; {tail}";
     }
 
     /// <summary>Удаление недописанного файла на выделенном потоке (issue #143).</summary>

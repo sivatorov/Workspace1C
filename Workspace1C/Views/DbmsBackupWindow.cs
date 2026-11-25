@@ -23,6 +23,9 @@ namespace Workspace1C
             DataContext = _vm;
             // Issue #119 (1.0.1.119): стартовый размер уменьшен по таблице 1.4 плана.
             WpfUi.SetupWindow(this, "Dbms.Title", 960, 700);
+            // issue #143: окно немодальное и со своей кнопкой на панели задач, чтобы
+            // во время копирования можно было переключиться обратно на стартер.
+            ShowInTaskbar = true;
             // issue #143: сторож UI-потока — WARN в dbms-backup-debug.log, если
             // UI-поток не отвечает больше 3 с (с последним этапом операции).
             UiThreadWatchdog.EnsureStarted(Dispatcher);
@@ -66,6 +69,11 @@ namespace Workspace1C
             form.Children.Add(WpfUi.Wrap(
                 WpfUi.Label("Dbms.Tools"), WpfUi.BoundTextBox(nameof(DbmsBackupViewModel.ToolsDirectory), 360),
                 WpfUi.Button("Common.Browse", (_, _) => Browse(false), 90)));
+            // issue #143: подпись больше не вводит в заблуждение — это каталог, где
+            // уже лежит утилита, а не папка для копий, которую нужно создать.
+            var toolsHint = WpfUi.Label("Dbms.ToolsHint", 11);
+            toolsHint.Margin = new Thickness(0, 2, 0, 4);
+            form.Children.Add(toolsHint);
             WpfUi.Place(root, WpfUi.Card(form), 1);
 
             var cloud = new StackPanel();
@@ -139,7 +147,10 @@ namespace Workspace1C
             WpfUi.Place(root, buttons, 5);
 
             Content = root;
-            Closed += (_, _) => _vm.Cancel();
+            // issue #143: закрытие окна НЕ отменяет фоновую копию и не роняет процесс.
+            // Отмена — только явной кнопкой «Отмена»; окно можно закрыть, а задание
+            // продолжит работу и обновит журнал при повторном открытии (окно
+            // переиспользуется командой меню, пока копия выполняется).
             // issue #143: окно открывается сразу. Профиль (если не передан) и тип
             // СУБД по кластеру догружаются в фоне — никакой синхронной файловой
             // работы на UI-потоке, окно не «вешается» на старом/сетевом профиле.

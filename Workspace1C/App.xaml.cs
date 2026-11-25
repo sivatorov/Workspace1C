@@ -118,9 +118,11 @@ namespace Workspace1C
                 var shutdownModeBeforeStartup = ShutdownMode;
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
-                // Если в приложении несколько учётных записей — показываем окно авторизации
-                // по аналогии со списком пользователей 1С. При одной записи входим без запроса.
-                if (profileService.Profiles.Count > 1)
+                // Окно авторизации показываем, если учётных записей несколько (выбор профиля
+                // по аналогии со списком пользователей 1С), а также если единственная запись
+                // защищена паролем (issue #164): без пароля вход невозможен. CurrentProfile
+                // может быть null при повреждённом profiles.json — условие безопасно к null.
+                if (profileService.Profiles.Count > 1 || profileService.CurrentProfile?.HasPassword == true)
                 {
                     // Локализацию поднимаем до показа окна: настройки профиля читаются
                     // ниже, а без словаря окно входа показывает ключи (Auth.Title,
@@ -612,6 +614,10 @@ namespace Workspace1C
 
         protected override void OnExit(ExitEventArgs e)
         {
+            // Выход очищает сеансовый ключ шифрования паролей (issue #163): пароль
+            // учётной записи не должен переживать завершение процесса даже в памяти.
+            Services.Secrets.PasswordSession.Clear();
+
             // Процесс-агент COM закрывается сам, когда закроется его stdin, но при
             // нештатном завершении лучше не полагаться на это и убрать его явно.
             try

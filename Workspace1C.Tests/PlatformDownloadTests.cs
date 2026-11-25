@@ -59,9 +59,12 @@ public sealed class PlatformDownloadTests
     // ======================= BuildTargetFileName =======================
 
     [Fact]
-    public void BuildTargetFileName_PrependsVersionPrefix()
+    public void BuildTargetFileName_KeepsFileNameWithoutVersionPrefix()
     {
-        Assert.Equal("8.3.27.2214_8.3.27.2214_x64.zip",
+        // Issue #162: имя сохраняется ровно как объявлено в каталоге/логе загрузки —
+        // префикс версии больше не добавляется (раньше получалось
+        // «8.3.27.2214_8.3.27.2214_x64.zip», а в журнале было другое имя).
+        Assert.Equal("8.3.27.2214_x64.zip",
             OneCUpdatesService.BuildTargetFileName("8.3.27.2214", "8.3.27.2214_x64.zip"));
     }
 
@@ -70,10 +73,10 @@ public sealed class PlatformDownloadTests
     {
         // '/' недопустим в именах файлов на обеих платформах (Windows и Linux) —
         // тест стабилен при прогоне под любой ОС.
-        Assert.Equal("8.3.27.2214_8.3.27.2214_x64_server.zip",
+        Assert.Equal("8.3.27.2214_x64_server.zip",
             OneCUpdatesService.BuildTargetFileName("8.3.27.2214", "8.3.27.2214/x64/server.zip"));
 
-        Assert.Equal("8.3.27.2214_a_b.zip",
+        Assert.Equal("a_b.zip",
             OneCUpdatesService.BuildTargetFileName("8.3.27.2214", "a\0b.zip"));
     }
 

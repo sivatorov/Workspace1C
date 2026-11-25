@@ -2,6 +2,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls;
+using Workspace1C.Services;
 using Workspace1C.Services.Licensing;
 using Workspace1C.ViewModels;
 
@@ -29,9 +30,24 @@ namespace Workspace1C
         {
             _vm = new HowToBuyViewModel();
             DataContext = _vm;
-            WpfUi.SetupWindow(this, "Pro.HowToBuy.Title", 620, 600);
+            // Issue #165 (1.0.1.120): окно открывается по содержимому (720×720 DIP),
+            // а не 620×600 — прежняя высота обрезала нижнюю панель кнопок на низких
+            // экранах и при масштабировании 125/150 %.
+            WpfUi.SetupWindow(this, "Pro.HowToBuy.Title", 720, 720);
 
-            var root = WpfUi.Rows(0, -1, 0);
+            // Issue #165: общая политика размеров — высота/минимум по содержимому с
+            // клампом по рабочей области (на 1366×768, масштаб 100 % — окно 680 DIP,
+            // при масштабе 150 % — 432 DIP, прокрутка остаётся аварийным режимом).
+            var workArea = SystemParameters.WorkArea;
+            var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.HowToBuy, workArea.Height);
+            MinHeight = size.MinHeight;
+            MaxHeight = size.MaxHeight;
+            Height = size.Height;
+
+            // Issue #165: прокручивается только содержимое (строка *), а строка
+            // статуса и нижняя панель кнопок — Auto. При Auto у ScrollViewer он
+            // «просит» высоту всего текста и выталкивает кнопки за край окна.
+            var root = WpfUi.Rows(-1, 0, 0);
             root.Margin = new Thickness(16);
 
             var panel = new StackPanel();
@@ -98,6 +114,7 @@ namespace Workspace1C
             var scroll = new ScrollViewer
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Content = panel
             };
             WpfUi.Place(root, scroll, 0);

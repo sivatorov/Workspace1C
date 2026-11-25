@@ -2017,20 +2017,23 @@ public class OneCUpdatesService : IOneCUpdatesService
     }
 
     /// <summary>
-    /// Формирует имя итогового файла дистрибутива платформы: префикс версии + имя файла
-    /// (символы, недопустимые в имени файла, заменяются на '_'). Пустые части пропускаются.
+    /// Формирует имя итогового файла дистрибутива платформы: имя файла, объявленное в
+    /// каталоге/логе загрузки (например «server64_8_5_1_1621.zip»), без префикса версии
+    /// (issue #162: в журнале показывалось одно имя, а на диск писалось другое).
+    /// Символы, недопустимые в имени файла, заменяются на '_'. Версия используется только
+    /// как запасной вариант, когда имя файла пустое.
     /// </summary>
-    /// <param name="version">Версия платформы, например «8.3.27.2214».</param>
+    /// <param name="version">Версия платформы, например «8.3.27.2214» (запасное имя).</param>
     /// <param name="fileName">Имя файла из каталога, например «8.3.27.2214_x64.zip».</param>
     internal static string BuildTargetFileName(string version, string fileName)
     {
-        var versionPart = SanitizeFileName(version);
         var namePart = SanitizeFileName(fileName);
-        if (string.IsNullOrWhiteSpace(versionPart))
+        // Issue #162: имя сохраняемого файла должно совпадать с тем, что показано в логе.
+        // Префикс версии не добавляется; уже содержащая версию часть имени не дублируется.
+        if (!string.IsNullOrWhiteSpace(namePart))
             return namePart;
-        if (string.IsNullOrWhiteSpace(namePart))
-            return versionPart;
-        return $"{versionPart}_{namePart}";
+
+        return SanitizeFileName(version);
     }
 
     /// <summary>Заменяет символы, недопустимые в имени файла, на '_' (пустая строка — пустая).</summary>

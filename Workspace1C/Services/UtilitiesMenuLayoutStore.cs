@@ -5,6 +5,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Workspace1C.Models;
+using Workspace1C.Services.Licensing;
 
 namespace Workspace1C.Services;
 
@@ -209,6 +210,14 @@ public sealed class UtilitiesMenuLayoutStore : IUtilitiesMenuLayoutStore
         // возвращаем как есть, НЕ трактуя как пункт каталога.
         if (string.Equals(node.Kind, "separator", StringComparison.Ordinal))
             return node;
+
+        // Issue #146 (T8): заглушка ПРО-функции (публичная сборка) — такой же
+        // участник компоновки, как обычный пункт: сохраняем её видимость и позицию.
+        if (string.Equals(node.Kind, "placeholder", StringComparison.Ordinal))
+        {
+            node.ItemId ??= string.Empty;
+            return Enum.TryParse<ProFeature>(node.ItemId, out _) ? node : null;
+        }
 
         // Пункт: должен ссылаться на существующий пункт каталога.
         node.ItemId ??= string.Empty;

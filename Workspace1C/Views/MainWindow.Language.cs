@@ -128,10 +128,13 @@ namespace Workspace1C
             // App.xaml.cs после создания окна), поэтому без VM дополнение не добавляем.
             var titleSuffixEnabled = false;
             var titleSuffixTemplate = string.Empty;
+            string? appUser = null;
             if (_viewModel is not null)
             {
                 titleSuffixEnabled = _viewModel.TitleSuffixEnabled;
                 titleSuffixTemplate = _viewModel.TitleSuffixTemplate;
+                // %app_user% — имя активной учётной записи (issue #164).
+                appUser = _viewModel.TitleSuffixAppUser;
             }
 
             // Метка редакции ПРО — признак действующего лицензионного ключа. От VM не
@@ -143,7 +146,7 @@ namespace Workspace1C
 
             var fullTitle = TitleSuffixResolver.Compose(
                 baseTitle, _infoVersion ?? string.Empty, titleSuffixEnabled, titleSuffixTemplate,
-                proMark: proMark);
+                proMark: proMark, appUser: appUser);
 
             // Системный заголовок окна (важен для панели задач и перечисления окон).
             Title = fullTitle;

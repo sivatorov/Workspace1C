@@ -144,12 +144,26 @@ public partial class MainViewModel
 
     private System.Windows.Input.ICommand? _dbmsBackupCommand;
 
+    /// <summary>
+    /// Открытое немодальное окно копий СУБД (issue #143). Пока оно живо, повторный
+    /// вызов команды активирует его, а не создаёт второй экземпляр с новым заданием.
+    /// </summary>
+    private Workspace1C.DbmsBackupWindow? _dbmsBackupWindow;
+
     /// <summary>Команда «Резервные копии средствами СУБД (1.0.0.69)».</summary>
     public System.Windows.Input.ICommand DbmsBackupCommand =>
         _dbmsBackupCommand ??= new RelayCommand(_ => ExecuteDbmsBackup());
 
     private async void ExecuteDbmsBackup()
     {
+        // issue #143: окно немодальное, его можно закрыть, пока копия идёт в фоне.
+        // Повторный вызов команды не должен открывать второе окно с новым заданием.
+        if (_dbmsBackupWindow is { IsVisible: true } existing)
+        {
+            existing.Activate();
+            return;
+        }
+
         // issue #143: профили читаются в фоне ДО показа окна. Раньше синхронный
         // DbmsBackupService.Load() в конструкторе VM выполнялся на UI-потоке и мог
         // «наглухо» повесить окно на недоступном/сетевом профиле.
@@ -169,8 +183,24 @@ public partial class MainViewModel
             data,
             defaultDbms: DefaultDbmsKind,
             clusterResolver: ClusterInfobaseCredentialsResolver.CreateDefault());
-        var window = new Workspace1C.DbmsBackupWindow(vm);
-        window.ShowDialogSync(OwnerWindow());
+        var window = new Workspace1C.DbmsBackupWindow(vm)
+        {
+            // issue #143: своя плашка на панели задач — можно переключиться на стартер.
+            ShowInTaskbar = true
+        };
+        _dbmsBackupWindow = window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_dbmsBackupWindow, window))
+                _dbmsBackupWindow = null;
+        };
+        // issue #143: немодальный показ — главное окно не блокируется, задание идёт
+        // в фоне, отмена доступна только явной кнопкой в окне.
+        var owner = OwnerWindow();
+        if (owner is not null)
+            window.Show(owner);
+        else
+            window.Show();
     }
 
     // ======================= Команды Telegram-бота (1.0.0.69) =======================

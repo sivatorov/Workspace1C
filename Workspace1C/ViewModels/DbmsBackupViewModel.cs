@@ -53,6 +53,12 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     private bool _isBusy;
     private int _running;
     private int _operationGate;
+    /// <summary>
+    /// Общий на процесс признак выполняющегося копирования (issue #143): окно стало
+    /// немодальным, его можно закрыть и открыть снова, поэтому повторный запуск из
+    /// нового экземпляра ViewModel не должен создавать второй дамп.
+    /// </summary>
+    private static int _activeRuns;
     private string _statusText = string.Empty;
     private string _progressStageText = string.Empty;
     private double _progressPercent;
@@ -524,6 +530,16 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             return;
         }
 
+        // issue #143: барьер на процесс — закрытое и снова открытое окно не запустит
+        // второй дамп, пока первый ещё выполняется в фоне.
+        if (Interlocked.CompareExchange(ref _activeRuns, 1, 0) == 1)
+        {
+            DbmsBackupTrace.Log("reentrancy", "run: process-busy");
+            AppendLog(LocalizationManager.T("Dbms.Reentrancy"));
+            Interlocked.Exchange(ref _running, 0);
+            return;
+        }
+
         // IsBusy — до CurrentProfile/Validate (issue #143): второй клик не должен
         // проскочить, пока идёт медленная проверка/чтение профиля.
         IsBusy = true;
@@ -559,9 +575,27 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             // оставаться отзывчивым. Никакого синхронного Save на UI-пути.
             _data.Upsert(profile);
             DbmsBackupTrace.Log("upsert", $"infobase={profile.InfobaseId}");
-            await DbmsTimeoutGuard.RunAsync(
-                token => DbmsBackupService.SaveAsync(_data, token), SaveTimeout, _cts.Token, "run-save")
-                .ConfigureAwait(true);
+            // issue #143: запись профиля — вспомогательный шаг. Её сбой (медленный
+            // или недоступный каталог профиля, ограниченный пользователь) не должен
+            // отменять саму копию: проверки уже прошли, копия создаётся по текущим
+            // параметрам. Ошибка фиксируется в журнале окна.
+            try
+            {
+                await DbmsTimeoutGuard.RunAsync(
+                    token => DbmsBackupService.SaveAsync(_data, token), SaveTimeout, _cts.Token, "run-save")
+                    .ConfigureAwait(true);
+            }
+            catch (TimeoutException ex)
+            {
+                ReportTimeout("run-save", "Dbms.SaveTimeout", ex, SaveTimeout);
+                AppendLog(string.Format(LocalizationManager.T("Dbms.SaveFailedContinue"),
+                    LocalizationManager.T("Dbms.SaveTimeout")));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                DbmsBackupTrace.Error("error", "run-save: " + ex.Message, ex);
+                AppendLog(string.Format(LocalizationManager.T("Dbms.SaveFailedContinue"), ex.Message));
+            }
 
             elapsedCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
             _ = TrackElapsedAsync(elapsedCts.Token);
@@ -600,6 +634,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             ElapsedText = string.Empty;
             IsBusy = false;
             Interlocked.Exchange(ref _running, 0);
+            Interlocked.Exchange(ref _activeRuns, 0);
             DbmsBackupTrace.Log("exit", "run-finally");
         }
     }

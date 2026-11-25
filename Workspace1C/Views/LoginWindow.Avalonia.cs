@@ -24,6 +24,7 @@ namespace Workspace1C
         private readonly IProfileService _profileService;
         private readonly ListBox _profilesList;
         private readonly StackPanel _passwordPanel;
+        private readonly TextBlock _passwordLabel;
         private readonly PasswordBox _passwordInput;
         private readonly TextBlock _errorLabel;
 
@@ -124,13 +125,22 @@ namespace Workspace1C
             };
             Grid.SetRow(hint, 0);
 
+            // Одна учётная запись (issue #164): окно показывается только ради пароля,
+            // список выбора из одной строки не нужен — скрываем его и поясняем, что
+            // требуется пароль именно этой записи.
+            if (profileService.Profiles.Count <= 1)
+            {
+                hint.Text = LocalizationManager.T("Auth.EnterPasswordHint");
+            }
+
             _profilesList = new ListBox
             {
                 Margin = new Thickness(0, 0, 0, 12),
                 ItemsSource = profileService.Profiles,
                 DisplayMemberBinding = new Avalonia.Data.Binding("Name"),
                 // Аудит UI P3a: порядок табуляции совпадает с визуальным.
-                TabIndex = 0
+                TabIndex = 0,
+                IsVisible = profileService.Profiles.Count > 1
             };
             _profilesList.SelectionChanged += (_, _) => OnSelectionChanged();
             Grid.SetRow(_profilesList, 1);
@@ -141,9 +151,12 @@ namespace Workspace1C
                 Margin = new Thickness(0, 0, 0, 12),
                 IsVisible = false
             };
-            var passwordLabel = new TextBlock { Text = LocalizationManager.T("Auth.Password") };
-            ThemeBrushes.Bind(passwordLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
-            _passwordPanel.Children.Add(passwordLabel);
+            // Подпись показывает, в какую запись входим (issue #164): префикс из локализации,
+            // имя активной записи — жирным. Текст собирается в ApplySelectionState по формату
+            // Auth.PasswordForAccountFormat («Пароль учётной записи {0}»).
+            _passwordLabel = new TextBlock();
+            ThemeBrushes.Bind(_passwordLabel, TextBlock.ForegroundProperty, "FormLabelBrush");
+            _passwordPanel.Children.Add(_passwordLabel);
             _passwordInput = new PasswordBox { TabIndex = 1 };
             _passwordInput.Styled(ControlThemes.ModernPasswordBox);
             // Отступ из разметки (LoginWindow.xaml), общая тема даёт 10,6.
@@ -192,8 +205,37 @@ namespace Workspace1C
 
         private void ApplySelectionState()
         {
-            var hasPassword = SelectedProfile?.HasPassword == true;
+            var profile = SelectedProfile;
+            var hasPassword = profile?.HasPassword == true;
             _passwordPanel.IsVisible = hasPassword;
+
+            // Формат локализации содержит подстановку {0}; имя выносим в отдельный Run
+            // с полужирным начертанием, остальной текст формата остаётся обычным.
+            var format = LocalizationManager.T("Auth.PasswordForAccountFormat");
+            var placeholder = format.IndexOf("{0}", StringComparison.Ordinal);
+            string prefix, account, suffix;
+            if (placeholder < 0)
+            {
+                prefix = format;
+                account = string.Empty;
+                suffix = string.Empty;
+            }
+            else
+            {
+                prefix = format.Substring(0, placeholder);
+                account = profile?.Name ?? string.Empty;
+                suffix = format.Substring(placeholder + 3);
+            }
+
+            _passwordLabel.Inlines.Clear();
+            _passwordLabel.Inlines.Add(new Avalonia.Controls.Documents.Run { Text = prefix });
+            _passwordLabel.Inlines.Add(new Avalonia.Controls.Documents.Run
+            {
+                Text = account,
+                FontWeight = FontWeight.Bold
+            });
+            _passwordLabel.Inlines.Add(new Avalonia.Controls.Documents.Run { Text = suffix });
+
             if (hasPassword)
             {
                 _passwordInput.Focus();

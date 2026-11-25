@@ -17,6 +17,9 @@ namespace Workspace1C
         public ProfilesPanel()
         {
             InitializeComponent();
+            // DataContext задаётся снаружи (окно настроек), поэтому подключаем
+            // запрос пароля при каждой смене контекста (issue #163, T3).
+            DataContextChanged += (_, _) => AttachPasswordPrompt();
         }
 
         /// <summary>
@@ -27,6 +30,25 @@ namespace Workspace1C
         {
             if (DataContext is ProfilesViewModel vm)
                 vm.Password = PasswordInput.Password;
+        }
+
+        /// <summary>
+        /// Подключает к ViewModel окно запроса пароля учётной записи: оно нужно,
+        /// когда шифрование включено, а ключа в сеансе нет (после перезапуска/смены).
+        /// </summary>
+        private void AttachPasswordPrompt()
+        {
+            if (DataContext is not ProfilesViewModel vm)
+                return;
+
+            vm.PasswordPrompt = profileName =>
+            {
+                var dialog = new SecretUnlockWindow(profileName);
+                var owner = Window.GetWindow(this);
+                if (owner != null && !ReferenceEquals(owner, dialog))
+                    dialog.Owner = owner;
+                return dialog.ShowDialog() == true && dialog.Unlocked;
+            };
         }
     }
 }

@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C.Services;
 
@@ -15,6 +16,34 @@ public static class FeatureDataStore
 {
     /// <summary>Переопределение каталога (тесты).</summary>
     public static string? DirectoryOverride { get; set; }
+
+    /// <summary>
+    /// Переопределение шифратора секретов (тесты). null — берётся зарегистрированный
+    /// в контейнере <see cref="SecretJsonProtector"/> (issue #163).
+    /// </summary>
+    public static SecretJsonProtector? SecretJsonProtectorOverride { get; set; }
+
+    /// <summary>
+    /// Шифратор секретов: явный (тесты) → зарегистрированный в DI. null — шифрование
+    /// не подключено (ранний старт/CLI), значения пишутся/читаются как есть.
+    /// </summary>
+    private static SecretJsonProtector? ResolveProtector()
+    {
+        if (SecretJsonProtectorOverride is not null)
+            return SecretJsonProtectorOverride;
+        try
+        {
+            return AppServices.TryGetService<SecretJsonProtector>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string UnprotectJson(string json) => ResolveProtector()?.Unprotect(json) ?? json;
+
+    private static string ProtectJson(string json) => ResolveProtector()?.Protect(json) ?? json;
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -54,7 +83,7 @@ public static class FeatureDataStore
         {
             if (!File.Exists(path))
                 return new T();
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(path), Options) ?? new T();
+            return JsonSerializer.Deserialize<T>(UnprotectJson(File.ReadAllText(path)), Options) ?? new T();
         }
         catch
         {
@@ -81,7 +110,7 @@ public static class FeatureDataStore
             {
                 if (!File.Exists(path))
                     return new T();
-                var json = File.ReadAllText(path);
+                var json = UnprotectJson(File.ReadAllText(path));
                 return JsonSerializer.Deserialize<T>(json, Options) ?? new T();
             }, ct).ConfigureAwait(false);
         }
@@ -106,7 +135,7 @@ public static class FeatureDataStore
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
         var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(value, Options));
+        File.WriteAllText(tmp, ProtectJson(JsonSerializer.Serialize(value, Options)));
         File.Move(tmp, path, overwrite: true);
     }
 
@@ -131,7 +160,8 @@ public static class FeatureDataStore
                     Directory.CreateDirectory(dir);
                 var tmp = path + ".tmp";
                 var bytes = JsonSerializer.SerializeToUtf8Bytes(value, Options);
-                File.WriteAllBytes(tmp, bytes);
+                var json = ProtectJson(System.Text.Encoding.UTF8.GetString(bytes));
+                File.WriteAllBytes(tmp, System.Text.Encoding.UTF8.GetBytes(json));
                 ct.ThrowIfCancellationRequested();
                 File.Move(tmp, path, overwrite: true);
             }, ct).ConfigureAwait(false);

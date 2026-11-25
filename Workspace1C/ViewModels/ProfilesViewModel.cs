@@ -5,6 +5,7 @@ using System.Linq;
 using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C.ViewModels;
 
@@ -33,6 +34,7 @@ public sealed class ProfilesViewModel : ViewModelBase
     private string _name = string.Empty;
     private string _password = string.Empty;
     private bool _protectWithPassword;
+    private bool _encryptPasswords;
     private string _currentAccountLabel = string.Empty;
     private string _editingTitle = string.Empty;
     private string? _errorMessage;
@@ -131,8 +133,45 @@ public sealed class ProfilesViewModel : ViewModelBase
     public bool ProtectWithPassword
     {
         get => _protectWithPassword;
-        set => SetProperty(ref _protectWithPassword, value);
+        set
+        {
+            if (!SetProperty(ref _protectWithPassword, value))
+                return;
+            // Без пароля шифровать нечем: снимаем зависимую галочку.
+            if (!value)
+                EncryptPasswords = false;
+            OnPropertyChanged(nameof(CanEncryptPasswords));
+        }
     }
+
+    /// <summary>
+    /// Признак «Шифровать этим все пароли» (issue #163, T3): двусторонняя привязка
+    /// к галочке под «Защитить паролем». Доступен только при защищённой паролем записи.
+    /// </summary>
+    public bool EncryptPasswords
+    {
+        get => _encryptPasswords;
+        set
+        {
+            if (!SetProperty(ref _encryptPasswords, value))
+                return;
+            OnPropertyChanged(nameof(ShowEncryptionHint));
+        }
+    }
+
+    /// <summary>Галочка шифрования доступна только при заданном пароле записи.</summary>
+    public bool CanEncryptPasswords =>
+        _protectWithPassword && (SelectedProfile?.Profile.HasPassword ?? false);
+
+    /// <summary>Показывать индикацию «шифрование включено» под галочкой.</summary>
+    public bool ShowEncryptionHint => _encryptPasswords;
+
+    /// <summary>
+    /// Запрос пароля учётной записи, если ключа нет в сеансе (issue #163, T3).
+    /// Аргумент — имя записи; возвращает true, если ключ получен. Задаётся view
+    /// (WPF-панель открывает окно ввода пароля); null — запрос недоступен.
+    /// </summary>
+    public Func<string, bool>? PasswordPrompt { get; set; }
 
     /// <summary>Подпись активной (текущей) учётной записи вверху окна.</summary>
     public string CurrentAccountLabel
@@ -202,7 +241,9 @@ public sealed class ProfilesViewModel : ViewModelBase
     {
         Name = profile?.Name ?? string.Empty;
         ProtectWithPassword = profile?.HasPassword ?? false;
+        EncryptPasswords = profile?.EncryptPasswordsWithProfilePassword ?? false;
         Password = string.Empty;
+        OnPropertyChanged(nameof(CanEncryptPasswords));
     }
 
     private void UpdateEditingTitle()
@@ -242,7 +283,11 @@ public sealed class ProfilesViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Сохраняет изменения выбранной учётной записи (имя и пароль).</summary>
+    /// <summary>
+    /// Сохраняет изменения выбранной учётной записи (имя, пароль и флаг шифрования).
+    /// Issue #163 (T3): при включении/снятии галочки — подтверждение, при отсутствии
+    /// ключа в сеансе — запрос пароля; при смене пароля сервис перешифровывает хранилища.
+    /// </summary>
     private void Save()
     {
         ErrorMessage = null;
@@ -262,21 +307,99 @@ public sealed class ProfilesViewModel : ViewModelBase
 
         try
         {
+            var encryptionCurrently = profile.EncryptPasswordsWithProfilePassword;
+            var wantProtect = ProtectWithPassword;
+            var wantEncrypt = wantProtect && EncryptPasswords;
+
+            // 1) Если шифрование уже включено, ключ нужен до любых изменений:
+            //    иначе нельзя ни расшифровать, ни перешифровать файлы.
+            if (encryptionCurrently && !EnsureSessionKey(profile))
+            {
+                ErrorMessage = LocalizationManager.T("Secrets.NotChangedNoKey");
+                RefreshList(profile.Id);
+                return;
+            }
+
+            // 2) Осознанные подтверждения включения/снятия шифрования.
+            if (wantEncrypt && !encryptionCurrently
+                && !_dialogService.Confirm(
+                    LocalizationManager.T("Secrets.EncryptionEnableConfirm"),
+                    LocalizationManager.T("Profiles.Title")))
+            {
+                RefreshList(profile.Id);
+                return;
+            }
+
+            if (!wantEncrypt && encryptionCurrently
+                && !_dialogService.Confirm(
+                    LocalizationManager.T("Secrets.EncryptionDisableConfirm"),
+                    LocalizationManager.T("Profiles.Title")))
+            {
+                RefreshList(profile.Id);
+                return;
+            }
+
             if (!string.Equals(profile.Name, name, StringComparison.Ordinal))
                 _profileService.RenameProfile(profile.Id, name);
 
-            var wantPassword = ProtectWithPassword;
-            if (wantPassword && !string.IsNullOrEmpty(Password))
+            // 3) Пароль. При включённом шифровании сервис сам перешифрует хранилища
+            //    (смена) или вернёт открытый вид (снятие пароля).
+            var passwordChanged = false;
+            if (wantProtect && !string.IsNullOrEmpty(Password))
+            {
                 _profileService.SetPassword(profile.Id, Password);
-            else if (!wantPassword && profile.HasPassword)
+                passwordChanged = true;
+            }
+            else if (!wantProtect && profile.HasPassword)
+            {
                 _profileService.SetPassword(profile.Id, null);
+                passwordChanged = true;
+            }
+
+            // 4) Флаг шифрования. После установки пароля в этом же сохранении ключ
+            //    берём из только что введённого пароля, иначе запрашиваем его.
+            var effectiveEncrypt = wantProtect && EncryptPasswords;
+            if (profile.EncryptPasswordsWithProfilePassword != effectiveEncrypt)
+            {
+                if (effectiveEncrypt)
+                {
+                    if (passwordChanged && !string.IsNullOrEmpty(Password))
+                        _profileService.TryUnlockPasswordSession(profile.Id, Password);
+
+                    if (!EnsureSessionKey(profile))
+                    {
+                        ErrorMessage = LocalizationManager.T("Secrets.NotChangedNoKey");
+                        RefreshList(profile.Id);
+                        return;
+                    }
+                }
+
+                _profileService.SetPasswordEncryptionEnabled(effectiveEncrypt);
+            }
 
             RefreshList(profile.Id);
         }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
+            RefreshList(profile.Id);
         }
+    }
+
+    /// <summary>
+    /// Гарантирует наличие сеансового ключа выбранной записи: если его нет —
+    /// показывает окно запроса пароля (issue #163, T3). Неверный пароль не меняет
+    /// данные — окно остаётся открытым до верного ввода или отмены.
+    /// </summary>
+    private bool EnsureSessionKey(UserProfile profile)
+    {
+        if (PasswordSession.HasKey
+            && string.Equals(PasswordSession.ProfileId, profile.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return PasswordPrompt?.Invoke(profile.Name) == true;
     }
 
     /// <summary>Делает выбранную учётную запись активной (текущей).</summary>

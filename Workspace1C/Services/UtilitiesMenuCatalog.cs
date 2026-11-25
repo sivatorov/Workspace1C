@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using Workspace1C.Models;
 
 namespace Workspace1C.Services;
@@ -365,6 +367,13 @@ public static class UtilitiesMenuCatalog
 
     public const string GroupPro = "Pro";
 
+    /// <summary>
+    /// Стабильный <see cref="UtilitiesMenuNode.NodeId"/> группы «ПРО» (issue #146, T8):
+    /// группа — обычный узел компоновки, но идентификатор фиксирован, чтобы миграция и
+    /// повторная загрузка не создавали второй узел.
+    /// </summary>
+    public const string ProGroupNodeId = "pro-group";
+
     /// <summary>Подгруппа «Ещё» → обновления приложения и платформы.</summary>
     public const string GroupUpdates = "Updates";
 
@@ -654,6 +663,48 @@ public static class UtilitiesMenuCatalog
                 return item;
         }
         return null;
+    }
+
+    /// <summary>
+    /// Пункты каталога, закрытые лицензией (функция вне публичного ядра). Именно они
+    /// входят в группу «ПРО» (issue #146, T8). Состав вычисляется динамически: модули
+    /// ПРО регистрируют свои пункты при старте приложения.
+    /// </summary>
+    public static IReadOnlyList<UtilitiesMenuItem> ProItems() =>
+        All.Where(item => item.RequiredFeature is { } feature
+                          && !Licensing.ProFeatures.IsInPublicCore(feature))
+           .ToList();
+
+    /// <summary>
+    /// Функции ПРО, для которых в публичной сборке (без модулей) показываются
+    /// недоступные заглушки «только в официальной сборке» (issue #119, T5).
+    /// </summary>
+    public static IReadOnlyList<Licensing.ProFeature> ProPlaceholderFeatures() =>
+        Licensing.ProFeatures.All
+            .Where(feature => !Licensing.ProFeatures.IsInPublicCore(feature))
+            .ToList();
+
+    /// <summary>
+    /// Состав группы «ПРО» для текущей сборки: реальные пункты каталога (официальная
+    /// сборка с модулями) либо заглушки публичной сборки. Используется стандартной
+    /// компоновкой и синхронизацией <see cref="UtilitiesMenuResolver.EnsureProGroup"/>.
+    /// </summary>
+    public static List<UtilitiesMenuNode> ProGroupChildren()
+    {
+        if (Licensing.EditionService.HasProModules)
+        {
+            return ProItems()
+                .Select(item => new UtilitiesMenuNode { Kind = "item", ItemId = item.Id })
+                .ToList();
+        }
+
+        return ProPlaceholderFeatures()
+            .Select(feature => new UtilitiesMenuNode
+            {
+                Kind = "placeholder",
+                ItemId = feature.ToString()
+            })
+            .ToList();
     }
 
     // ======================= Темизация меню (Задача 6) =======================
@@ -1055,6 +1106,11 @@ public static class UtilitiesMenuLayouts
     public static UtilitiesMenuLayout Default()
     {
         var layout = new UtilitiesMenuLayout { SchemaVersion = CurrentSchemaVersion };
+        // Issue #146 (T8): группа «ПРО» — обычный узел стандартной компоновки, а не
+        // внедряемая при отображении служебная группа. Её можно скрыть, переместить
+        // и отредактировать как любую другую; состав пунктов синхронизирует резолвер.
+        var proGroup = Group(UtilitiesMenuCatalog.GroupPro, UtilitiesMenuCatalog.ProGroupChildren());
+        proGroup.NodeId = UtilitiesMenuCatalog.ProGroupNodeId;
         layout.Root = new List<UtilitiesMenuNode>
         {
             // Issue #146 (A4, 1.0.1.116): «Инспектор процессов 1С» — верхнеуровневый пункт
@@ -1163,7 +1219,9 @@ public static class UtilitiesMenuLayouts
                 {
                     Item("ServerAlerts"),
                     Item("TelegramBot")
-                })
+                }),
+                Separator(),
+                proGroup
             }),
 
             // ---- 4. Ещё ----
@@ -1225,6 +1283,9 @@ public static class UtilitiesMenuLayouts
             NormalizeTopLevelNodes(layout.Root);
         if (!NeedsMigration(layout))
         {
+            // Issue #146 (T8): старая компоновка схемы 5 могла быть сохранена без
+            // группы «ПРО» — добавляем её один раз, не меняя видимость «Инструментов».
+            UtilitiesMenuResolver.EnsureProGroup(layout);
             // Схема актуальна, но каталог мог пополниться новыми пунктами (в т.ч.
             // верхнеуровневыми). Их надо добавить и без полной миграции, иначе
             // новый пункт не появится в уже сохранённой компоновке схемы 5.
@@ -1258,6 +1319,9 @@ public static class UtilitiesMenuLayouts
         if (originalSchema < CurrentSchemaVersion)
             NormalizeRootSectionsCompact(layout.Root);
 
+        // Issue #146 (T8): группа «ПРО» — обычный узел компоновки. Добавляем её при
+        // миграции, чтобы редактор видел группу и пользователь мог её скрыть/переместить.
+        UtilitiesMenuResolver.EnsureProGroup(layout);
         AddMissingCatalogItems(layout);
 
         // Пустая после миграции компоновка (нет ни одного пункта) — безопаснее
@@ -1535,6 +1599,14 @@ public static class UtilitiesMenuLayouts
         var missing = new List<UtilitiesMenuItem>();
         foreach (var item in catalog ?? UtilitiesMenuCatalog.All)
         {
+            // Issue #146 (T8): закрытые лицензией пункты живут в группе «ПРО» и
+            // синхронизируются резолвером. Иначе они попадали бы в «Новинки» или
+            // в группу DefaultGroup и дублировались/выглядели «висящими».
+            if (item.RequiredFeature is { } feature
+                && !Licensing.ProFeatures.IsInPublicCore(feature))
+            {
+                continue;
+            }
             if (!present.Contains(item.Id))
                 missing.Add(item);
         }

@@ -31,6 +31,14 @@ public class UserProfile
     /// <summary>Признак того, что профиль защищён паролем.</summary>
     public bool HasPassword => !string.IsNullOrWhiteSpace(PasswordHash);
 
+    /// <summary>
+    /// Шифровать пароли хранилищ (баз, ИТС, СУБД, SMTP, обновлений, сценариев) паролем
+    /// этой учётной записи (issue #163, план 1.0.1.120). Флаг хранится в
+    /// <c>profiles.json</c>; сам пароль на диск не пишется — только его хэш
+    /// (<see cref="PasswordHash"/>) и зашифрованные значения в файлах профиля.
+    /// </summary>
+    public bool EncryptPasswordsWithProfilePassword { get; set; }
+
     /// <summary>Дата и время создания профиля (UTC).</summary>
     public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 }

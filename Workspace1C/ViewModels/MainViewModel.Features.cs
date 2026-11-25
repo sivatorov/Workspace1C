@@ -192,12 +192,28 @@ public partial class MainViewModel
 
     private ICommand? _dbmsBackupCommand;
 
+    /// <summary>
+    /// Открытое немодальное окно копий СУБД (issue #143). Пока оно живо, повторный
+    /// вызов команды активирует его, а не создаёт второй экземпляр с новым заданием.
+    /// </summary>
+    private Workspace1C.DbmsBackupWindow? _dbmsBackupWindow;
+
     /// <summary>Команда «Резервные копии средствами СУБД (1.0.0.69)».</summary>
     public ICommand DbmsBackupCommand =>
         _dbmsBackupCommand ??= new RelayCommand(_ => ExecuteDbmsBackup());
 
     private async void ExecuteDbmsBackup()
     {
+        // issue #143: окно немодальное, его можно закрыть, пока копия идёт в фоне.
+        // Повторный вызов команды не должен открывать второе окно с новым заданием.
+        if (_dbmsBackupWindow is { IsLoaded: true } existing)
+        {
+            if (existing.WindowState == System.Windows.WindowState.Minimized)
+                existing.WindowState = System.Windows.WindowState.Normal;
+            existing.Activate();
+            return;
+        }
+
         // issue #143: профили читаются в фоне ДО показа окна. Раньше синхронный
         // DbmsBackupService.Load() в конструкторе VM выполнялся на UI-потоке и мог
         // «наглухо» повесить окно на недоступном/сетевом профиле.
@@ -217,11 +233,22 @@ public partial class MainViewModel
             data,
             defaultDbms: DefaultDbmsKind,
             clusterResolver: ClusterInfobaseCredentialsResolver.CreateDefault());
-        var window = new DbmsBackupWindow(vm)
+        var window = new Workspace1C.DbmsBackupWindow(vm)
         {
-            Owner = System.Windows.Application.Current.MainWindow
+            Owner = System.Windows.Application.Current.MainWindow,
+            // issue #143: своя плашка на панели задач — можно переключиться на стартер.
+            ShowInTaskbar = true,
+            WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner
         };
-        window.ShowDialog();
+        _dbmsBackupWindow = window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_dbmsBackupWindow, window))
+                _dbmsBackupWindow = null;
+        };
+        // issue #143: немодальный показ — главное окно не блокируется, задание идёт
+        // в фоне, отмена доступна только явной кнопкой в окне.
+        window.Show();
     }
 
     // ======================= Команды Telegram-бота (1.0.0.69) =======================

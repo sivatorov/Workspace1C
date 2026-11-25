@@ -361,11 +361,13 @@ namespace Workspace1C
             };
             rightPanel.Children.Add(pickedFileLine);
 
-            // Учётная запись.
+            // Учётная запись. Issue #162: значение — в рамке и на первичной кисти текста,
+            // иначе в тёмной теме оно сливалось с фоном и не читалось.
             var accountLine = MakeLabel(
                 _viewModel.HasAccount
                     ? string.Format(T("PlatformDownload.AccountValue"), _viewModel.AccountName)
-                    : T("PlatformDownload.NoAccount"), secondary: true);
+                    : T("PlatformDownload.NoAccount"));
+            ThemeBrushes.Bind(accountLine, TextBlock.ForegroundProperty, "TextPrimaryBrush");
             _viewModel.PropertyChanged += (_, e) =>
             {
                 if (e.PropertyName == nameof(PlatformDownloadViewModel.AccountName) ||
@@ -376,7 +378,16 @@ namespace Workspace1C
                         : T("PlatformDownload.NoAccount");
                 }
             };
-            rightPanel.Children.Add(accountLine);
+            var accountFrame = new Border
+            {
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(6, 4),
+                Child = accountLine
+            };
+            ThemeBrushes.Bind(accountFrame, Border.BackgroundProperty, "ContentBackgroundColorBrush");
+            ThemeBrushes.Bind(accountFrame, Border.BorderBrushProperty, "BorderColorBrush");
+            rightPanel.Children.Add(accountFrame);
 
             // Папка загрузки + кнопка выбора.
             var dirPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -386,8 +397,15 @@ namespace Workspace1C
                 Width = 420,
                 Height = 30,
                 Text = _viewModel.TargetDirectory,
-                VerticalContentAlignment = VerticalAlignment.Center
+                VerticalContentAlignment = VerticalAlignment.Center,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 0)
             };
+            // Issue #162: в тёмной теме текст поля был тёмным на тёмном фоне, рамки не было.
+            ThemeBrushes.Bind(dirBox, TextBox.BackgroundProperty, "ContentBackgroundColorBrush");
+            ThemeBrushes.Bind(dirBox, TextBox.ForegroundProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(dirBox, TextBox.CaretBrushProperty, "TextPrimaryBrush");
+            ThemeBrushes.Bind(dirBox, TextBox.BorderBrushProperty, "BorderColorBrush");
             dirBox.TextChanged += (_, _) => _viewModel.TargetDirectory = dirBox.Text ?? string.Empty;
             dirPanel.Children.Add(dirBox);
             var chooseDir = MakeButton(T("PlatformDownload.ChooseDirectory"), () => _viewModel.ChooseDirectory(), secondary: true);

@@ -1785,12 +1785,12 @@ namespace Workspace1C
         /// заголовок с шестерёнкой (открывает редактор группы) и две формы отображения,
         /// переключаемые настройкой: «Списком» — полноширинные кнопки «иконка + подпись»
         /// (как родной стартер 1С), «Иконками» — квадратные кнопки в строку с переносом.
-        /// Группа скрыта, если программ нет.
+        /// Issue #158: группа видна всегда — даже когда программ нет; в этом случае
+        /// показывается подсказка «Добавьте программу» и кнопка настройки.
         /// </summary>
         private Control BuildCustomProgramsBlock()
         {
             var root = new StackPanel { Spacing = 0 };
-            root.Bind(Control.IsVisibleProperty, new Binding("HasCustomPrograms"));
 
             // Заголовок группы + быстрый переход в настройки (шестерёнка).
             var header = new Grid { Margin = new Thickness(0, 4, 0, 2) };
@@ -1809,7 +1809,9 @@ namespace Workspace1C
 
             var gear = new Button
             {
-                Content = IconHelper.MakeIcon("IconCog", UiMetrics.IconControl, "TextSecondaryBrush"),
+                // Issue #158: в наборах иконок нет ключа IconCog, резолвер откатывался
+                // на «папку». Шестерёнка настроек — существующий ключ IconSettings.
+                Content = IconHelper.MakeIcon("IconSettings", UiMetrics.IconControl, "TextSecondaryBrush"),
                 Width = 24,
                 MinWidth = 24,
                 Padding = new Thickness(0),
@@ -1828,6 +1830,8 @@ namespace Workspace1C
             // Режим «Списком»: полноширинные кнопки «иконка + подпись».
             var listView = new ItemsControl();
             listView.Bind(ItemsControl.ItemsSourceProperty, new Binding("CustomPrograms"));
+            // Issue #158: список виден только при наличии программ (пустая группа
+            // показывает подсказку и кнопку настройки вместо пустого ItemsControl).
             listView.Bind(Control.IsVisibleProperty, new Binding("CustomProgramsListView"));
             listView.ItemTemplate = new FuncDataTemplate<CustomProgram>(
                 (program, _) => CreateCustomProgramListButton(program));
@@ -1844,6 +1848,37 @@ namespace Workspace1C
             iconsView.ItemTemplate = new FuncDataTemplate<CustomProgram>(
                 (program, _) => CreateCustomProgramIconButton(program));
             root.Children.Add(iconsView);
+
+            // Issue #158: пустая группа — подсказка «Добавьте программу» и кнопка
+            // настройки, чтобы группа была полезной и без установленной 1С/стартера.
+            var empty = new StackPanel
+            {
+                Spacing = 4,
+                Margin = new Thickness(0, 2, 0, 6)
+            };
+            empty.Bind(Control.IsVisibleProperty, new Binding("ShowCustomProgramsEmptyHint"));
+
+            var emptyHint = new TextBlock
+            {
+                Text = LocalizationManager.T("Launch.CustomPrograms.EmptyHint"),
+                FontSize = UiMetrics.ScaledFont(12),
+                TextWrapping = TextWrapping.Wrap
+            };
+            ThemeBrushes.Bind(emptyHint, TextBlock.ForegroundProperty, "TextSecondaryColorBrush");
+            empty.Children.Add(emptyHint);
+
+            var emptySettings = new Button
+            {
+                Content = LocalizationManager.T("Launch.CustomPrograms.SettingsButton"),
+                Padding = new Thickness(10, 5),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = new Cursor(StandardCursorType.Hand)
+            };
+            emptySettings.Styled(ControlThemes.ModernButton);
+            emptySettings.Bind(Button.CommandProperty, new Binding("ShowCustomProgramsSettingsCommand"));
+            ToolTip.SetTip(emptySettings, LocalizationManager.T("Launch.CustomPrograms.SettingsTooltip"));
+            empty.Children.Add(emptySettings);
+            root.Children.Add(empty);
 
             return root;
         }
@@ -3038,7 +3073,8 @@ namespace Workspace1C
                 Header = title + " — " + LocalizationManager.T("Pro.FeatureStatus.OfficialBuildOnly"),
                 IsEnabled = false
             };
-            ToolTip.SetTip(item, string.Format(LocalizationManager.T("Pro.RequiredFormat"), title));
+            // Ключ здесь не поможет: кода функции в публичной сборке нет.
+            ToolTip.SetTip(item, string.Format(LocalizationManager.T("Pro.OfficialBuildOnlyFormat"), title));
             item.Styled(Themes.ControlThemes.ModernMenuItem);
             return item;
         }

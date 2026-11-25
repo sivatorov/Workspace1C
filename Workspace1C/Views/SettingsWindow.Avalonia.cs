@@ -1801,7 +1801,9 @@ namespace Workspace1C
 
             void UpdateAvaloniaTitleSuffixPreview(TextBox box, TextBlock preview)
             {
-                var resolved = Workspace1C.Services.TitleSuffixResolver.Resolve(box.Text ?? string.Empty);
+                // %app_user% — имя активной учётной записи (issue #164).
+                var appUser = AppServices.TryGetService<Workspace1C.Services.IProfileService>()?.CurrentProfile?.Name;
+                var resolved = Workspace1C.Services.TitleSuffixResolver.Resolve(box.Text ?? string.Empty, appUser);
                 preview.Text = string.Format(
                     LocalizationManager.T("Settings.Display.TitleSuffixPreviewFormat"),
                     resolved.Length == 0
@@ -5110,8 +5112,10 @@ namespace Workspace1C
 
             // Группа «Мои программы» (issue #91; компоновка — issue #152).
             panel.Children.Add(GroupSectionHeader("Launch.CustomPrograms.Header"));
+            // Issue #158: ключа IconCog нет в наборах иконок (резолвер откатывался на
+            // «папку») — используем существующую шестерёнку IconSettings.
             var customProgramsButton = MenuEditButton(
-                "IconCog", "Launch.CustomPrograms.SettingsButton", OpenCustomProgramsEditor);
+                "IconSettings", "Launch.CustomPrograms.SettingsButton", OpenCustomProgramsEditor);
             panel.Children.Add(MenuSettingsRow(
                 null, customProgramsButton, "Launch.CustomPrograms.SettingsHint"));
 
@@ -5217,20 +5221,12 @@ namespace Workspace1C
             return header;
         }
 
-        /// <summary>Открывает редактор структуры меню «Утилиты» (issue #374).</summary>
+        /// <summary>Открывает редактор структуры меню «Утилиты» (issue #374).
+        /// Issue #159: тот же вход, что и по ПКМ на кнопке раздела —
+        /// <see cref="UtilitiesMenuEditorWindow.ShowEditor"/>; ошибка не глушится,
+        /// а логируется и показывается пользователю.</summary>
         private void OpenUtilitiesMenuEditor()
-        {
-            try
-            {
-                var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
-                var win = new UtilitiesMenuEditorWindow(store);
-                win.ShowDialogSync(this);
-            }
-            catch
-            {
-                // Не критично: редактор не открылся — настройка останется прежней.
-            }
-        }
+            => UtilitiesMenuEditorWindow.ShowEditor(this);
 
         /// <summary>
         /// Открывает редактор группы «Мои программы» (issue #91): список своих программ под

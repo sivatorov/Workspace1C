@@ -373,6 +373,7 @@ public sealed class Issue119ProVisibilityTests : IDisposable
                      {
                          "Pro.MenuSuffix",
                          "Pro.RequiredFormat",
+                         "Pro.OfficialBuildOnlyFormat",
                          "Pro.FeatureStatus.Available",
                          "Pro.FeatureStatus.RequiresKey",
                          "Pro.FeatureStatus.OfficialBuildOnly",

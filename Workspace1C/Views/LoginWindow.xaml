@@ -48,8 +48,15 @@
         </ListBox>
 
         <!-- ============ Поле пароля ============ -->
+        <!-- Подпись показывает, в какую запись входим (issue #164): префикс из локализации,
+             имя активной записи — жирным. Текст собирается в ApplySelectionState по формату
+             Auth.PasswordForAccountFormat («Пароль учётной записи {0}»). -->
         <StackPanel Grid.Row="2" x:Name="PasswordPanel" Visibility="Collapsed" Margin="0,0,0,12">
-            <TextBlock Text="{loc:Loc Auth.Password}" Margin="0,0,0,4"/>
+            <TextBlock Margin="0,0,0,4">
+                <Run x:Name="PasswordLabelPrefix" Text="{loc:Loc Auth.Password}"/>
+                <Run x:Name="PasswordLabelAccount" FontWeight="Bold"/>
+                <Run x:Name="PasswordLabelSuffix"/>
+            </TextBlock>
             <PasswordBox x:Name="PasswordInput" Padding="8,6" KeyDown="OnPasswordInput_KeyDown"/>
         </StackPanel>
 

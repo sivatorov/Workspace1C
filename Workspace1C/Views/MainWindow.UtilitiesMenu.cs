@@ -231,7 +231,9 @@ public partial class MainWindow
         return new MenuItem
         {
             Header = title + " — " + LocalizationManager.T("Pro.FeatureStatus.OfficialBuildOnly"),
-            ToolTip = string.Format(LocalizationManager.T("Pro.RequiredFormat"), title),
+            // Ключ здесь не поможет: кода функции в публичной сборке нет. Подсказка
+            // «требуется ключ» вводила в заблуждение уже лицензированных пользователей.
+            ToolTip = string.Format(LocalizationManager.T("Pro.OfficialBuildOnlyFormat"), title),
             IsEnabled = false,
             Style = TryFindResource("ModernMenuItem") as Style,
         };

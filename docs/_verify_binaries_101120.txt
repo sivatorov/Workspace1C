@@ -1,0 +1,17 @@
+Проверка бинарей 1.0.1.120 — 2026-11-25 (UTC)
+
+Windows: Workspace1C\dist\win-x64\Workspace1C.exe
+  FileVersion    = 1.0.1.120
+  ProductVersion = 1.0.1.120+a8d77379f822fd94c0dd6232ca88a0d4b03443e0
+  Размер         = 85 691 596 байт (81,7 МБ)
+  --license-info --json: ok=true, edition=pro, proModules=true, programMajor=1, licenseMajor=1
+  --list: exit=0, stderr пуст (32 строки) — см. docs/_smoke_win_101120.txt
+
+Linux (кросс-сборка из Windows; запуск на этой машине невозможен):
+  Workspace1C\dist\linux-x64\Workspace1C
+  Размер         = 53 979 309 байт (51,5 МБ)
+  HasProModules  = true (dotnet msbuild -p:ForceLinux=true)
+  Типы модулей ПРО в сборке: PipelinesWindow, MultiBaseQuery, EnvironmentDiff,
+                             PerformanceTrends, AuditLog
+  Строка версии 1.0.1.120 в бинаре найдена
+  Smoke-запуск --license-info --json и --list выполняется в CI на ubuntu-latest

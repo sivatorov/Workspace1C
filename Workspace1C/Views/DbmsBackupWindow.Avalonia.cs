@@ -27,6 +27,10 @@ namespace Workspace1C
             // UI-поток не отвечает больше 3 с (с последним этапом операции).
             UiThreadWatchdog.EnsureStarted();
             Title = LocalizationManager.T("Dbms.Title");
+            // issue #143: окно немодальное и со своей кнопкой на панели задач, чтобы
+            // во время копирования можно было переключиться обратно на стартер.
+            // Базовый ModalWindowBase по умолчанию скрывает плашку — включаем явно.
+            ShowInTaskbar = true;
             // Issue #119 (T3): целевой стартовый размер из таблицы 1.4 (паритет с WPF).
             Width = 960;
             Height = 700;
@@ -74,6 +78,11 @@ namespace Workspace1C
             form.Children.Add(AvaloniaUi.Wrap(
                 AvaloniaUi.Label("Dbms.Tools"), AvaloniaUi.BoundTextBox(nameof(DbmsBackupViewModel.ToolsDirectory), 360),
                 AvaloniaUi.Button("Common.Browse", (_, _) => Browse(false), 90)));
+            // issue #143: подпись больше не вводит в заблуждение — это каталог, где
+            // уже лежит утилита, а не папка для копий, которую нужно создать.
+            var toolsHint = AvaloniaUi.Label("Dbms.ToolsHint", 11);
+            toolsHint.Margin = new Thickness(0, 2, 0, 4);
+            form.Children.Add(toolsHint);
             AvaloniaUi.Place(root, AvaloniaUi.Card(form), 1);
 
             var cloud = new StackPanel();
@@ -146,7 +155,10 @@ namespace Workspace1C
             AvaloniaUi.Place(root, buttons, 5);
 
             Content = root;
-            Closed += (_, _) => _vm.Cancel();
+            // issue #143: закрытие окна НЕ отменяет фоновую копию и не роняет процесс.
+            // Отмена — только явной кнопкой «Отмена»; окно можно закрыть, а задание
+            // продолжит работу и обновит журнал при повторном открытии (окно
+            // переиспользуется командой меню, пока копия выполняется).
             // issue #143: окно открывается сразу. Профиль (если не передан) и тип
             // СУБД по кластеру догружаются в фоне — никакой синхронной файловой
             // работы на UI-потоке, окно не «вешается» на старом/сетевом профиле.

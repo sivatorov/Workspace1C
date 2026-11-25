@@ -135,6 +135,10 @@ public partial class MainViewModel
         if (!HasAppLockPassword)
             return;
 
+        // Блокировка завершает доступ к секретам: сеансовый пароль учётной записи
+        // (ключ шифрования паролей, issue #163) очищается и потребуется снова.
+        AppServices.TryGetService<IProfileService>()?.ClearPasswordSession();
+
         IsAppLocked = true;
         _appLockActive = true;
         // Сохраняем сразу (не по debounce): блокировка обязана пережить и аварийное

@@ -11,6 +11,7 @@ using Workspace1C.Localization;
 using Workspace1C.Themes;
 using Workspace1C.Models;
 using Workspace1C.Services;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C
 {
@@ -28,6 +29,16 @@ namespace Workspace1C
             new PasswordBox { Width = 260, Padding = new Thickness(8, 6) }
                 .Styled(Themes.ControlThemes.ModernPasswordBox);
         private readonly CheckBox _protectCheck = new() { Content = LocalizationManager.T("Profiles.ProtectWithPassword"), Margin = new Thickness(108, 0, 0, 0) };
+        // Issue #163 (T3): шифрование всех паролей паролем этой записи.
+        private readonly CheckBox _encryptCheck = new() { Content = LocalizationManager.T("Profiles.EncryptPasswords"), Margin = new Thickness(108, 0, 0, 0) };
+        private readonly TextBlock _encryptionHint = new()
+        {
+            Text = LocalizationManager.T("Secrets.EncryptionEnabledHint"),
+            Margin = new Thickness(108, 0, 0, 0),
+            TextWrapping = TextWrapping.Wrap,
+            Opacity = 0.85,
+            IsVisible = false
+        };
         private readonly TextBlock _errorLabel;
         private readonly TextBlock _editingTitle;
         private readonly TextBlock _selectPrompt;
@@ -203,6 +214,11 @@ namespace Workspace1C
             panel.Children.Add(passRow);
 
             panel.Children.Add(_protectCheck);
+            panel.Children.Add(_encryptCheck);
+            panel.Children.Add(_encryptionHint);
+
+            _protectCheck.IsCheckedChanged += (_, _) => UpdateEncryptionControls();
+            _encryptCheck.IsCheckedChanged += (_, _) => UpdateEncryptionControls();
 
             return panel;
         }
@@ -344,7 +360,9 @@ namespace Workspace1C
             _fieldsPanel.IsVisible = true;
             _nameBox.Text = profile.Name;
             _protectCheck.IsChecked = profile.HasPassword;
+            _encryptCheck.IsChecked = profile.EncryptPasswordsWithProfilePassword;
             _passwordInput.Clear();
+            UpdateEncryptionControls();
         }
 
         private void ClearEditor()
@@ -354,7 +372,22 @@ namespace Workspace1C
             _fieldsPanel.IsVisible = false;
             _nameBox.Text = string.Empty;
             _protectCheck.IsChecked = false;
+            _encryptCheck.IsChecked = false;
             _passwordInput.Clear();
+            UpdateEncryptionControls();
+        }
+
+        /// <summary>
+        /// Галочка шифрования доступна только при заданном пароле; без пароля она
+        /// снимается. Индикация «шифрование включено» видна при установленной галочке.
+        /// </summary>
+        private void UpdateEncryptionControls()
+        {
+            var hasPassword = _protectCheck.IsChecked == true;
+            _encryptCheck.IsEnabled = hasPassword;
+            if (!hasPassword && _encryptCheck.IsChecked == true)
+                _encryptCheck.IsChecked = false;
+            _encryptionHint.IsVisible = _encryptCheck.IsChecked == true;
         }
 
         private void ShowError(string message)
@@ -402,23 +435,99 @@ namespace Workspace1C
                 return;
             }
 
+            var dialogs = AppServices.GetRequiredService<IDialogService>();
+
             try
             {
+                var encryptionCurrently = profile.EncryptPasswordsWithProfilePassword;
+                var wantProtect = _protectCheck.IsChecked == true;
+                var wantEncrypt = wantProtect && _encryptCheck.IsChecked == true;
+
+                // 1) Ключ нужен до любых изменений, если шифрование уже включено.
+                if (encryptionCurrently && !EnsureSessionKey(profile))
+                {
+                    ShowError(LocalizationManager.T("Secrets.NotChangedNoKey"));
+                    RefreshList(profile.Id);
+                    return;
+                }
+
+                // 2) Подтверждения включения/снятия шифрования.
+                if (wantEncrypt && !encryptionCurrently
+                    && !dialogs.Confirm(LocalizationManager.T("Secrets.EncryptionEnableConfirm"),
+                                        LocalizationManager.T("Profiles.Title")))
+                {
+                    RefreshList(profile.Id);
+                    return;
+                }
+
+                if (!wantEncrypt && encryptionCurrently
+                    && !dialogs.Confirm(LocalizationManager.T("Secrets.EncryptionDisableConfirm"),
+                                        LocalizationManager.T("Profiles.Title")))
+                {
+                    RefreshList(profile.Id);
+                    return;
+                }
+
                 if (!string.Equals(profile.Name, name, StringComparison.Ordinal))
                     _profileService.RenameProfile(profile.Id, name);
 
-                var wantPassword = _protectCheck.IsChecked == true;
-                if (wantPassword && !string.IsNullOrEmpty(_passwordInput.Password))
+                // 3) Пароль: при включённом шифровании сервис сам перешифрует хранилища.
+                var passwordChanged = false;
+                if (wantProtect && !string.IsNullOrEmpty(_passwordInput.Password))
+                {
                     _profileService.SetPassword(profile.Id, _passwordInput.Password);
-                else if (!wantPassword && profile.HasPassword)
+                    passwordChanged = true;
+                }
+                else if (!wantProtect && profile.HasPassword)
+                {
                     _profileService.SetPassword(profile.Id, null);
+                    passwordChanged = true;
+                }
+
+                // 4) Флаг шифрования.
+                var effectiveEncrypt = wantProtect && _encryptCheck.IsChecked == true;
+                if (profile.EncryptPasswordsWithProfilePassword != effectiveEncrypt)
+                {
+                    if (effectiveEncrypt)
+                    {
+                        if (passwordChanged && !string.IsNullOrEmpty(_passwordInput.Password))
+                            _profileService.TryUnlockPasswordSession(profile.Id, _passwordInput.Password);
+
+                        if (!EnsureSessionKey(profile))
+                        {
+                            ShowError(LocalizationManager.T("Secrets.NotChangedNoKey"));
+                            RefreshList(profile.Id);
+                            return;
+                        }
+                    }
+
+                    _profileService.SetPasswordEncryptionEnabled(effectiveEncrypt);
+                }
 
                 RefreshList(profile.Id);
             }
             catch (Exception ex)
             {
                 ShowError(ex.Message);
+                RefreshList(profile.Id);
             }
+        }
+
+        /// <summary>
+        /// Гарантирует сеансовый ключ выбранной записи: при его отсутствии показывает
+        /// окно запроса пароля (issue #163, T3). Неверный пароль данные не меняет.
+        /// </summary>
+        private bool EnsureSessionKey(UserProfile profile)
+        {
+            if (PasswordSession.HasKey
+                && string.Equals(PasswordSession.ProfileId, profile.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var prompt = new SecretUnlockWindow(profile.Name);
+            prompt.ShowDialogSync(this);
+            return prompt.Unlocked;
         }
 
         /// <summary>Делает выбранный профиль активным и обновляет список с подписью.</summary>

@@ -495,10 +495,13 @@ namespace Workspace1C
             // Фокус в диалог не переносим: первым элементом обхода в безрамочном окне
             // оказывается кнопка «Свернуть» собственной полосы заголовка, и рамка
             // фокуса вставала бы на неё.
+            // Issue #160: закрываем ровно один — самый верхний — диалог. Если верхнее
+            // окно само содержит открытый дочерний диалог (настройки → редактор),
+            // CloseOnEscape закроет именно дочерний, а не весь стек окон.
             if (e.Key == Key.Escape && e.KeyModifiers == KeyModifiers.None
                 && TopmostModalDialog() is { } dialog)
             {
-                dialog.CloseAsCancel();
+                dialog.CloseOnEscape();
                 e.Handled = true;
                 return;
             }

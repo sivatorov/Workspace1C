@@ -35,6 +35,13 @@ public partial class MainViewModel
     public bool HasCustomPrograms => _customPrograms.Count > 0;
 
     /// <summary>
+    /// Issue #158: пустая группа «Мои программы» видна всегда — при отсутствии
+    /// программ вместо кнопок показывается подсказка «Добавьте программу» и кнопка
+    /// настройки. Заголовок и шестерёнка видны в любом случае.
+    /// </summary>
+    public bool ShowCustomProgramsEmptyHint => !HasCustomPrograms;
+
+    /// <summary>
     /// Режим отображения группы: <see cref="CustomProgramsViewModes.List"/> («Списком»)
     /// либо <see cref="CustomProgramsViewModes.Icons"/> («Иконками»). Хранится в
     /// <see cref="AppSettings.CustomProgramsViewMode"/>; при изменении панель
@@ -55,12 +62,20 @@ public partial class MainViewModel
         }
     }
 
-    /// <summary>Показывать группу вертикальным списком кнопок («иконка + подпись»).</summary>
+    /// <summary>
+    /// Показывать группу вертикальным списком кнопок («иконка + подпись»). Issue #158:
+    /// только при наличии программ — пустая группа показывает подсказку и кнопку настройки.
+    /// </summary>
     public bool CustomProgramsListView =>
+        HasCustomPrograms &&
         string.Equals(GetCustomProgramsViewMode(), CustomProgramsViewModes.List, StringComparison.Ordinal);
 
-    /// <summary>Показывать группу кнопками-иконками в строку с переносом.</summary>
+    /// <summary>
+    /// Показывать группу кнопками-иконками в строку с переносом. Issue #158: только при
+    /// наличии программ.
+    /// </summary>
     public bool CustomProgramsIconsView =>
+        HasCustomPrograms &&
         string.Equals(GetCustomProgramsViewMode(), CustomProgramsViewModes.Icons, StringComparison.Ordinal);
 
     /// <summary>Перечитывает программы из хранилища (после редактора или старта).</summary>
@@ -81,6 +96,9 @@ public partial class MainViewModel
         foreach (var program in loaded.Where(p => p.Enabled))
             _customPrograms.Add(program);
         OnPropertyChanged(nameof(HasCustomPrograms));
+        OnPropertyChanged(nameof(ShowCustomProgramsEmptyHint));
+        OnPropertyChanged(nameof(CustomProgramsListView));
+        OnPropertyChanged(nameof(CustomProgramsIconsView));
     }
 
     /// <summary>

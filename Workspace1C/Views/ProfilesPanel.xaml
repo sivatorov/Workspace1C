@@ -128,6 +128,23 @@
                         </StackPanel>
                         <CheckBox x:Name="ProtectCheck" Content="{loc:Loc Profiles.ProtectWithPassword}" Margin="108,0,0,0"
                                   IsChecked="{Binding ProtectWithPassword}"/>
+                        <!-- Issue #163 (T3): шифрование всех паролей паролем этой записи. -->
+                        <CheckBox x:Name="EncryptCheck" Content="{loc:Loc Profiles.EncryptPasswords}" Margin="108,6,0,0"
+                                  IsChecked="{Binding EncryptPasswords}"
+                                  IsEnabled="{Binding CanEncryptPasswords}"/>
+                        <TextBlock x:Name="EncryptionHint" Text="{loc:Loc Secrets.EncryptionEnabledHint}"
+                                   Margin="108,4,0,0" Opacity="0.85" TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding ShowEncryptionHint}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
                     </StackPanel>
                 </StackPanel>
             </Border>

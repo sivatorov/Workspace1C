@@ -2,9 +2,11 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Workspace1C.Localization;
+using Workspace1C.Services;
 using Workspace1C.Services.Licensing;
 using Workspace1C.Themes;
 using Workspace1C.ViewModels;
@@ -34,14 +36,20 @@ namespace Workspace1C
             _vm = new HowToBuyViewModel();
             DataContext = _vm;
             Title = LocalizationManager.T("Pro.HowToBuy.Title");
-            Width = 620;
-            Height = 600;
-            MinWidth = 520;
-            MinHeight = 480;
+            // Issue #165 (1.0.1.120): окно открывается по содержимому (720×720 DIP),
+            // а не 620×600 — прежняя высота обрезала нижнюю панель кнопок на низких
+            // экранах и при масштабировании 125/150 %.
+            Width = 720;
+            Height = 720;
+            MinWidth = 560;
+            MinHeight = DialogWorkAreaPolicy.HowToBuy.MinHeight;
             FontSize = 13;
             CanResize = true;
 
-            var root = AvaloniaUi.Rows(0, -1, 0);
+            // Issue #165: прокручивается только содержимое (строка *), а строка
+            // статуса и нижняя панель кнопок — Auto. При Auto у ScrollViewer он
+            // «просит» высоту всего текста и выталкивает кнопки за край окна.
+            var root = AvaloniaUi.Rows(-1, 0, 0);
             root.Margin = new Thickness(16);
 
             var panel = new StackPanel();
@@ -108,7 +116,12 @@ namespace Workspace1C
             free.Children.Add(AvaloniaUi.Text(LocalizationManager.T("Pro.License.WhatFree"), 12, secondary: true));
             panel.Children.Add(AvaloniaUi.Card(free));
 
-            var scroll = new ScrollViewer { Content = panel };
+            var scroll = new ScrollViewer
+            {
+                Content = panel,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+            };
             AvaloniaUi.Place(root, scroll, 0);
 
             AvaloniaUi.Place(root, AvaloniaUi.BoundText(nameof(HowToBuyViewModel.StatusText), 12, secondary: false), 1);
@@ -126,6 +139,42 @@ namespace Workspace1C
             AvaloniaUi.Place(root, buttons, 2);
 
             Content = root;
+
+            // Issue #165: общая политика размеров — высота/минимум по содержимому с
+            // клампом по рабочей области (на 1366×768, масштаб 100 % — окно 680 DIP,
+            // при масштабе 150 % — 432 DIP), ширина тоже не выходит за экран.
+            ApplyWorkAreaLimits();
+        }
+
+        /// <summary>
+        /// Issue #165 (1.0.1.120): применяет <see cref="DialogWorkAreaPolicy.HowToBuy"/>
+        /// к текущему монитору. Кнопки закреплены вне прокрутки, поэтому кламп высоты
+        /// не скрывает их: прокручивается только текст инструкции.
+        /// </summary>
+        private void ApplyWorkAreaLimits()
+        {
+            var screen = Screens.ScreenFromWindow(this) ?? Screens.Primary;
+            if (screen is null || screen.Scaling <= 0)
+                return;
+
+            var dipWidth = screen.WorkingArea.Width / screen.Scaling;
+            var dipHeight = screen.WorkingArea.Height / screen.Scaling;
+            if (dipWidth <= 0 || dipHeight <= 0)
+                return;
+
+            var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.HowToBuy, dipHeight);
+            MaxHeight = size.MaxHeight;
+            MinHeight = size.MinHeight;
+            Height = size.Height;
+
+            var maxWidth = dipWidth - DialogWorkAreaPolicy.DefaultMargin;
+            if (maxWidth <= 0)
+                return;
+
+            MaxWidth = maxWidth;
+            if (MinWidth > maxWidth)
+                MinWidth = maxWidth;
+            Width = WindowSizeMath.ClampToWorkArea(Width, maxWidth);
         }
 
         private void OpenContact(string url)

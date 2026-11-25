@@ -34,8 +34,7 @@ public static class UtilitiesMenuResolver
     }
 
     /// <summary>
-    /// Готовит фактически отображаемое меню и кнопки панели, не сохраняя служебную
-    /// группу в компоновке пользователя. Issue #146: сохранённая пользовательская
+    /// Готовит фактически отображаемое меню и кнопки панели. Issue #146: сохранённая пользовательская
     /// компоновка — источник истины для отображения, даже если режим правки выключен:
     /// флаг <see cref="AppSettings.UtilitiesMenuEditingEnabled"/> разрешает менять
     /// структуру, но не должен подменять уже настроенные группы стандартной
@@ -49,79 +48,184 @@ public static class UtilitiesMenuResolver
         // редактирования, а не на то, какую компоновку показывать пользователю.
         var layout = store?.Load() ?? UtilitiesMenuLayouts.Default();
 
-        // Issue #119 (T5): группа «ПРО» видна всегда.
-        //  - официальная сборка (HasProModules): реальные 2.x-пункты, зарегистрированные
-        //    модулями; без ключа они помечены « · ПРО» и ведут в окно «Лицензия»;
-        //  - публичная сборка: placeholder-пункты «только в официальной сборке»,
-        //    которые не вызывают несуществующий External-экшен.
-        if (EditionService.HasProModules)
-        {
-            var items = UtilitiesMenuCatalog.All
-                .Where(item => item.RequiredFeature is { } feature && !ProFeatures.IsInPublicCore(feature))
-                .Select(item => new UtilitiesMenuNode { ItemId = item.Id })
-                .ToList();
-
-            if (items.Count > 0)
-            {
-                var itemIds = items.Select(item => item.ItemId!).ToHashSet(StringComparer.Ordinal);
-                RemoveProItems(layout.Root, itemIds);
-                AddProGroup(layout, items);
-            }
-        }
-        else
-        {
-            var placeholders = ProFeatures.All
-                .Where(feature => !ProFeatures.IsInPublicCore(feature))
-                .Select(feature => new UtilitiesMenuNode
-                {
-                    Kind = "placeholder",
-                    ItemId = feature.ToString()
-                })
-                .ToList();
-            if (placeholders.Count > 0)
-                AddProGroup(layout, placeholders);
-        }
+        // Issue #146 (T8): группа «ПРО» — обычный узел компоновки. Резолвер больше не
+        // внедряет её при каждом отображении и не форсирует видимость «Инструментов»:
+        // группа скрывается/перемещается/редактируется как любая другая.
+        EnsureProGroup(layout);
 
         EnsureNewItemsGroup(layout);
         return layout;
     }
 
     /// <summary>
-    /// Добавляет (или заменяет) группу «ПРО» в разделе «Инструменты»: группа видна
-    /// всегда, даже без ключа; при скрытом разделе «Инструменты» он раскрывается.
+    /// Issue #146 (T8): гарантирует группу «ПРО» в компоновке и синхронизирует её состав.
+    /// <para>
+    /// Группа — обычный узел: если она уже есть, сохраняются её видимость, позиция,
+    /// режим отображения, пользовательский заголовок/иконка и <c>NodeId</c>. При
+    /// отсутствии (компоновки до 1.0.1.120) группа добавляется один раз внутрь раздела
+    /// «Инструменты»; видимость раздела при этом НЕ меняется — скрытый «Инструменты»
+    /// остаётся скрытым. Состав синхронизируется: новые пункты ПРО добавляются,
+    /// исчезнувшие (модуль не зарегистрирован) — удаляются. Пункт, перенесённый
+    /// пользователем в другую группу, не дублируется.
+    /// </para>
     /// </summary>
-    private static void AddProGroup(UtilitiesMenuLayout layout, List<UtilitiesMenuNode> children)
+    public static UtilitiesMenuLayout? EnsureProGroup(UtilitiesMenuLayout? layout)
     {
-        var tools = layout.Root.FirstOrDefault(node =>
-            node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupTools);
-        if (tools is null)
+        if (layout?.Root is null)
+            return layout;
+
+        var proGroup = FindGroup(layout.Root, UtilitiesMenuCatalog.GroupPro);
+        var created = proGroup is null;
+        if (proGroup is null)
         {
-            tools = new UtilitiesMenuNode { Kind = "group", GroupId = UtilitiesMenuCatalog.GroupTools };
-            layout.Root.Add(tools);
-        }
-        if (!tools.Visible)
-        {
-            tools.Children.Clear();
-            tools.Visible = true;
+            // Группа живёт в разделе «Инструменты». Если раздела нет (пользовательская
+            // компоновка без стандартных разделов), создаём его — это единственное
+            // место, где группа ПРО показывается так же, как в стандартной компоновке.
+            var tools = FindGroup(layout.Root, UtilitiesMenuCatalog.GroupTools);
+            if (tools is null)
+            {
+                tools = new UtilitiesMenuNode
+                {
+                    Kind = "group",
+                    GroupId = UtilitiesMenuCatalog.GroupTools,
+                    IsTopLevel = true,
+                    Visible = true
+                };
+                layout.Root.Add(tools);
+            }
+
+            proGroup = new UtilitiesMenuNode
+            {
+                Kind = "group",
+                GroupId = UtilitiesMenuCatalog.GroupPro,
+                NodeId = UtilitiesMenuCatalog.ProGroupNodeId,
+                Visible = true
+            };
+            tools.Children.Add(proGroup);
         }
 
-        // Пользовательская компоновка могла сохранить старую группу «ПРО» — заменяем,
-        // чтобы не было двух одинаковых подменю.
-        tools.Children.RemoveAll(node =>
-            node.Kind == "group" && node.GroupId == UtilitiesMenuCatalog.GroupPro);
-        tools.Children.Add(new UtilitiesMenuNode
-        {
-            Kind = "group",
-            GroupId = UtilitiesMenuCatalog.GroupPro,
-            Children = children
-        });
+        // Повреждённая/ручная компоновка могла содержать несколько групп «ПРО» —
+        // оставляем первую (дублирующее подменю — причина issue #146).
+        RemoveDuplicateGroups(layout.Root, UtilitiesMenuCatalog.GroupPro, proGroup);
+
+        // Для компоновок, где группы ещё не было: переносим уже размещённые пункты ПРО
+        // внутрь новой группы (это наследие прежнего авто-размещения, а не выбор
+        // пользователя). Для существующей группы выбор пользователя сохраняется.
+        if (created)
+            MoveExistingProItems(layout.Root, proGroup);
+
+        SyncProGroupChildren(layout, proGroup);
+        return layout;
     }
 
-    private static void RemoveProItems(List<UtilitiesMenuNode> nodes, HashSet<string> itemIds)
+    /// <summary>
+    /// Синхронизирует состав группы «ПРО», не трогая свойства и порядок существующих
+    /// узлов. Удаляются только служебные/устаревшие узлы: placeholder-заглушки, ставшие
+    /// ненужными (сборка с модулями), и пункты, которых больше нет в каталоге.
+    /// </summary>
+    private static void SyncProGroupChildren(UtilitiesMenuLayout layout, UtilitiesMenuNode proGroup)
     {
-        nodes.RemoveAll(node => node.Kind == "item" && node.ItemId is { } id && itemIds.Contains(id));
-        foreach (var node in nodes)
-            RemoveProItems(node.Children, itemIds);
+        var expected = UtilitiesMenuCatalog.ProGroupChildren();
+        var expectedItems = expected
+            .Where(node => string.Equals(node.Kind, "item", StringComparison.Ordinal))
+            .Select(node => node.ItemId!)
+            .ToHashSet(StringComparer.Ordinal);
+        var expectedPlaceholders = expected
+            .Where(node => string.Equals(node.Kind, "placeholder", StringComparison.Ordinal))
+            .Select(node => node.ItemId!)
+            .ToHashSet(StringComparer.Ordinal);
+
+        proGroup.Children.RemoveAll(node => node is not null
+            && string.Equals(node.Kind, "placeholder", StringComparison.Ordinal)
+            && !expectedPlaceholders.Contains(node.ItemId ?? string.Empty));
+
+        proGroup.Children.RemoveAll(node => node is not null
+            && string.Equals(node.Kind, "item", StringComparison.Ordinal)
+            && !string.IsNullOrWhiteSpace(node.ItemId)
+            && UtilitiesMenuCatalog.Find(node.ItemId) is null);
+
+        // Пункт, который пользователь перенёс в свою группу, не дублируем (issue #65).
+        var present = new HashSet<string>(StringComparer.Ordinal);
+        CollectItemIds(layout.Root, present);
+        foreach (var itemId in expectedItems)
+        {
+            if (present.Add(itemId))
+                proGroup.Children.Add(new UtilitiesMenuNode { Kind = "item", ItemId = itemId });
+        }
+
+        foreach (var featureId in expectedPlaceholders)
+        {
+            var exists = proGroup.Children.Any(node => node is not null
+                && string.Equals(node.Kind, "placeholder", StringComparison.Ordinal)
+                && string.Equals(node.ItemId, featureId, StringComparison.Ordinal));
+            if (!exists)
+                proGroup.Children.Add(new UtilitiesMenuNode { Kind = "placeholder", ItemId = featureId });
+        }
+    }
+
+    /// <summary>
+    /// Переносит уже размещённые в компоновке пункты ПРО в только что созданную группу
+    /// (наследие прежнего авто-размещения). Настройки узла (видимость, иконка) сохраняются.
+    /// </summary>
+    private static void MoveExistingProItems(List<UtilitiesMenuNode> nodes, UtilitiesMenuNode proGroup)
+    {
+        if (nodes is null)
+            return;
+        var proIds = UtilitiesMenuCatalog.ProItems()
+            .Select(item => item.Id)
+            .ToHashSet(StringComparer.Ordinal);
+        if (proIds.Count == 0)
+            return;
+
+        var moved = new List<UtilitiesMenuNode>();
+        foreach (var node in nodes.ToList())
+        {
+            if (node is null)
+                continue;
+            if (string.Equals(node.Kind, "item", StringComparison.Ordinal)
+                && node.ItemId is { } id && proIds.Contains(id))
+            {
+                if (ReferenceEquals(nodes, proGroup.Children))
+                    continue;
+                nodes.Remove(node);
+                moved.Add(node);
+                continue;
+            }
+            if (string.Equals(node.Kind, "group", StringComparison.Ordinal)
+                && !ReferenceEquals(node, proGroup))
+            {
+                MoveExistingProItems(node.Children, proGroup);
+            }
+        }
+
+        foreach (var node in moved)
+        {
+            // Не дублируем пункт, уже находящийся в группе ПРО.
+            if (!proGroup.Children.Any(existing => existing is not null
+                && string.Equals(existing.Kind, "item", StringComparison.Ordinal)
+                && string.Equals(existing.ItemId, node.ItemId, StringComparison.Ordinal)))
+            {
+                proGroup.Children.Add(node);
+            }
+        }
+    }
+
+    /// <summary>Удаляет все группы с указанным <c>GroupId</c>, кроме <paramref name="keep"/>.</summary>
+    private static void RemoveDuplicateGroups(
+        IEnumerable<UtilitiesMenuNode> nodes, string groupId, UtilitiesMenuNode keep)
+    {
+        if (nodes is null)
+            return;
+        var list = nodes as List<UtilitiesMenuNode> ?? nodes.ToList();
+        list.RemoveAll(node => node is not null
+            && !ReferenceEquals(node, keep)
+            && string.Equals(node.Kind, "group", StringComparison.Ordinal)
+            && string.Equals(node.GroupId, groupId, StringComparison.Ordinal));
+        foreach (var node in list)
+        {
+            if (node is not null && !ReferenceEquals(node, keep))
+                RemoveDuplicateGroups(node.Children, groupId, keep);
+        }
     }
 
     /// <summary>

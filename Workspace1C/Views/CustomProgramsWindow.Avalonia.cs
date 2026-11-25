@@ -180,7 +180,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         DockPanel.SetDock(ops, Dock.Bottom);
         left.Children.Add(ops);
 
-        _list.Bind(ItemsControl.ItemsSourceProperty, new Binding("CustomPrograms"));
+        // Issue #158: источник списка редактора — то же свойство VM, что и у WPF
+        // (Programs). Раньше здесь стояло несуществующее «CustomPrograms», из-за чего
+        // строка добавленной программы в редакторе не появлялась.
+        _list.Bind(ItemsControl.ItemsSourceProperty, new Binding("Programs"));
         _list.Bind(ListBox.SelectedItemProperty, new Binding("SelectedProgram") { Mode = BindingMode.TwoWay });
         _list.ItemTemplate = new FuncDataTemplate<CustomProgram>((program, _) => BuildListItem(program));
         left.Children.Add(_list);

@@ -736,20 +736,12 @@ namespace Workspace1C
         }
 
         /// <summary>Открывает редактор структуры меню «Утилиты» напрямую (issue #374):
-        /// по ПКМ на кнопке «Утилиты» — минуя окно настроек и контекстное меню.</summary>
+        /// по ПКМ на кнопке «Утилиты» — минуя окно настроек и контекстное меню.
+        /// Issue #159: открытие идёт через <see cref="UtilitiesMenuEditorWindow.ShowEditor"/> —
+        /// исключение не теряется в пустом <c>catch</c>, а пишется в журнал и показывается
+        /// пользователю; модальный показ синхронный, как в окне настроек и в WPF.</summary>
         private void OpenUtilitiesMenuEditorDirectly()
-        {
-            try
-            {
-                var store = AppServices.TryGetService<IUtilitiesMenuLayoutStore>();
-                var win = new UtilitiesMenuEditorWindow(store);
-                win.ShowDialog(this);
-            }
-            catch
-            {
-                // Не критично: редактор не открылся — настройка останется прежней.
-            }
-        }
+            => UtilitiesMenuEditorWindow.ShowEditor(this);
 
         /// <summary>
         /// Блок кнопок над списком: развернуть и свернуть все группы и две

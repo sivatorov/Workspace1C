@@ -322,7 +322,9 @@ namespace Workspace1C
             if (TitleSuffixPreviewText is null)
                 return;
             var template = TitleSuffixTemplateBox?.Text ?? string.Empty;
-            var resolved = Services.TitleSuffixResolver.Resolve(template);
+            // %app_user% — имя активной учётной записи (issue #164).
+            var appUser = AppServices.TryGetService<Services.IProfileService>()?.CurrentProfile?.Name;
+            var resolved = Services.TitleSuffixResolver.Resolve(template, appUser);
             TitleSuffixPreviewText.Text = string.Format(
                 LocalizationManager.T("Settings.Display.TitleSuffixPreviewFormat"),
                 resolved.Length == 0

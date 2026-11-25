@@ -1123,6 +1123,10 @@
                                             Padding="6,2" Margin="0,0,4,0" Click="OnTitleSuffixToken_Click" Tag="%user_domain%">
                                         <TextBlock Text="%user_domain%" FontSize="11" VerticalAlignment="Center"/>
                                     </Button>
+                                    <Button x:Name="TitleSuffixTokenAppUser" Style="{DynamicResource SecondaryButton}"
+                                            Padding="6,2" Margin="0,0,4,0" Click="OnTitleSuffixToken_Click" Tag="%app_user%">
+                                        <TextBlock Text="%app_user%" FontSize="11" VerticalAlignment="Center"/>
+                                    </Button>
                                     <Button x:Name="TitleSuffixTokenComputerIp" Style="{DynamicResource SecondaryButton}"
                                             Padding="6,2" Margin="0,0,4,0" Click="OnTitleSuffixToken_Click" Tag="%computer_ip%">
                                         <TextBlock Text="%computer_ip%" FontSize="11" VerticalAlignment="Center"/>
@@ -1524,6 +1528,58 @@
                                 </StackPanel>
                             </GroupBox>
 
+                            <!-- Issue #161: блок «Доля цвета папки» перенесён наверх — перед
+                                 редактором цветов, как в Linux-раскладке, чтобы настройка была
+                                 видна сразу, а не в самом низу под списком всех цветов. -->
+                            <!-- Issue #145: доли цвета строки-папки (0–100 %).
+                                 0 — цвет группы не подмешивается в фон строки,
+                                 100 — строка окрашена чистым цветом группы. -->
+                            <GroupBox Header="{loc:Loc Settings.GroupColorTintGroup}" Padding="8" Margin="0,0,0,8">
+                                <StackPanel>
+                                    <TextBlock Text="{loc:Loc Settings.GroupColorTintHint}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
+                                               TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <Grid Margin="0,0,0,6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorTint}"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Slider x:Name="GroupColorTintSlider" Grid.Column="1"
+                                                Minimum="0" Maximum="100" TickFrequency="1"
+                                                IsSnapToTickEnabled="True" Margin="8,0"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="OnGroupColorTintChanged"/>
+                                        <TextBlock x:Name="GroupColorTintValueText" Grid.Column="2"
+                                                   MinWidth="48" TextAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorHoverTint}"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                        <Slider x:Name="GroupColorHoverTintSlider" Grid.Column="1"
+                                                Minimum="0" Maximum="100" TickFrequency="1"
+                                                IsSnapToTickEnabled="True" Margin="8,0"
+                                                VerticalAlignment="Center"
+                                                ValueChanged="OnGroupColorHoverTintChanged"/>
+                                        <TextBlock x:Name="GroupColorHoverTintValueText" Grid.Column="2"
+                                                   MinWidth="48" TextAlignment="Right"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    </Grid>
+                                </StackPanel>
+                            </GroupBox>
+
                             <!-- Редактор цветов выбранной палитры -->
                             <GroupBox Header="{loc:Loc Settings.Colors}" Padding="8" Margin="0,0,0,8">
                                 <StackPanel>
@@ -1571,55 +1627,6 @@
                                             </DataTemplate>
                                         </ItemsControl.ItemTemplate>
                                     </ItemsControl>
-                                </StackPanel>
-                            </GroupBox>
-
-                            <!-- Issue #145: доли цвета строки-папки (0–100 %).
-                                 0 — цвет группы не подмешивается в фон строки,
-                                 100 — строка окрашена чистым цветом группы. -->
-                            <GroupBox Header="{loc:Loc Settings.GroupColorTintGroup}" Padding="8" Margin="0,0,0,8">
-                                <StackPanel>
-                                    <TextBlock Text="{loc:Loc Settings.GroupColorTintHint}"
-                                               Foreground="{DynamicResource TextSecondaryBrush}" FontSize="12"
-                                               TextWrapping="Wrap" Margin="0,0,0,8"/>
-                                    <Grid Margin="0,0,0,6">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorTint}"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <Slider x:Name="GroupColorTintSlider" Grid.Column="1"
-                                                Minimum="0" Maximum="100" TickFrequency="1"
-                                                IsSnapToTickEnabled="True" Margin="8,0"
-                                                VerticalAlignment="Center"
-                                                ValueChanged="OnGroupColorTintChanged"/>
-                                        <TextBlock x:Name="GroupColorTintValueText" Grid.Column="2"
-                                                   MinWidth="48" TextAlignment="Right"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    </Grid>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" MinWidth="220"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="0" Text="{loc:Loc Settings.GroupColorHoverTint}"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                        <Slider x:Name="GroupColorHoverTintSlider" Grid.Column="1"
-                                                Minimum="0" Maximum="100" TickFrequency="1"
-                                                IsSnapToTickEnabled="True" Margin="8,0"
-                                                VerticalAlignment="Center"
-                                                ValueChanged="OnGroupColorHoverTintChanged"/>
-                                        <TextBlock x:Name="GroupColorHoverTintValueText" Grid.Column="2"
-                                                   MinWidth="48" TextAlignment="Right"
-                                                   VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
-                                    </Grid>
                                 </StackPanel>
                             </GroupBox>
                         </StackPanel>

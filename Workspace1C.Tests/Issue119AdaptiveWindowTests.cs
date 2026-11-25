@@ -286,7 +286,9 @@ public sealed class Issue119AdaptiveWindowTests
             ("WebPublishWindow.Avalonia.cs", 920, 660),
             ("TestDeployWindow.Avalonia.cs", 720, 660),
             ("LicenseWindow.Avalonia.cs", 640, 620),
-            ("HowToBuyWindow.Avalonia.cs", 620, 600)
+            // Issue #165 (1.0.1.120): окно «Как купить ПРО» открывается 720×720,
+            // чтобы нижняя панель кнопок не обрезалась; политика клампит по экрану.
+            ("HowToBuyWindow.Avalonia.cs", 720, 720)
         };
 
         foreach (var (file, width, height) in expected)

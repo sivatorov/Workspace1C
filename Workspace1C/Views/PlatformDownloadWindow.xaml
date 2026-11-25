@@ -198,18 +198,28 @@
                         </Grid.ColumnDefinitions>
                         <TextBlock Grid.Column="0" Text="{loc:Loc PlatformDownload.Account}"
                                    VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <TextBlock Grid.Column="1" VerticalAlignment="Center">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Text" Value="{loc:Loc PlatformDownload.NoAccount}"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasAccount}" Value="True">
-                                            <Setter Property="Text" Value="{Binding AccountName}"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <!-- issue #162: значение учётной записи ИТС — в рамке и с явной кистью
+                             первичного текста. Локальный Style ниже перекрывает неявный стиль
+                             TextBlock окна, поэтому Foreground задан на самом элементе — иначе
+                             в тёмной теме текст оставался чёрным на тёмном фоне. -->
+                        <Border Grid.Column="1" VerticalAlignment="Center"
+                                BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="1"
+                                CornerRadius="4" Padding="6,4"
+                                Background="{DynamicResource ContentBackgroundBrush}">
+                            <TextBlock VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextPrimaryBrush}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{loc:Loc PlatformDownload.NoAccount}"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasAccount}" Value="True">
+                                                <Setter Property="Text" Value="{Binding AccountName}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Border>
                     </Grid>
 
                     <!-- Папка загрузки + кнопка «Выбрать…» -->
@@ -222,9 +232,16 @@
                         <TextBlock Grid.Column="0" Text="{loc:Loc PlatformDownload.Directory}"
                                    VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <!-- issue #330: кнопка «Выбрать…» не обрезается по вертикали —
-                             выравнивание по центру, без жёсткой высоты у TextBox -->
+                             выравнивание по центру, без жёсткой высоты у TextBox.
+                             issue #162: явные кисти фона/текста/рамки — в тёмной теме
+                             поле было тёмным на тёмном и без рамки. -->
                         <TextBox Grid.Column="1" Text="{Binding TargetDirectory, UpdateSourceTrigger=PropertyChanged}"
-                                 MinHeight="30" VerticalContentAlignment="Center" IsReadOnly="False"/>
+                                 MinHeight="30" VerticalContentAlignment="Center" IsReadOnly="False"
+                                 Padding="6,0" BorderThickness="1"
+                                 Background="{DynamicResource ContentBackgroundBrush}"
+                                 Foreground="{DynamicResource TextPrimaryBrush}"
+                                 CaretBrush="{DynamicResource TextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource BorderBrushColor}"/>
                         <Button Grid.Column="2" Margin="8,0,0,0" VerticalAlignment="Center"
                                 Content="{loc:Loc PlatformDownload.ChooseDirectory}"
                                 Command="{Binding ChooseDirectoryCommand}" Style="{StaticResource SecondaryButton}"/>

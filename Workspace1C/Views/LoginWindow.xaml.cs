@@ -102,6 +102,15 @@ namespace Workspace1C
             if (ProfilesList.Items.Count > 0)
                 ProfilesList.SelectedIndex = 0;
 
+            // Одна учётная запись (issue #164): окно показывается только ради пароля,
+            // список выбора из одной строки не нужен — скрываем его и поясняем, что
+            // требуется пароль именно этой записи.
+            if (profileService.Profiles.Count <= 1)
+            {
+                ProfilesList.Visibility = Visibility.Collapsed;
+                HintLabel.Text = LocalizationManager.T("Auth.EnterPasswordHint");
+            }
+
             Loaded += (_, _) => ApplySelectionState();
         }
 
@@ -113,12 +122,33 @@ namespace Workspace1C
             ApplySelectionState();
         }
 
-        /// <summary>Показывает поле пароля только для защищённого выбранного профиля.</summary>
+        /// <summary>
+        /// Показывает поле пароля только для защищённого выбранного профиля и обновляет
+        /// подпись «Пароль учётной записи <Имя>» (имя — жирным, issue #164).
+        /// </summary>
         private void ApplySelectionState()
         {
             var profile = SelectedProfile;
             var hasPassword = profile?.HasPassword == true;
             PasswordPanel.Visibility = hasPassword ? Visibility.Visible : Visibility.Collapsed;
+
+            // Формат локализации содержит подстановку {0}; имя выносим в отдельный Run
+            // с полужирным начертанием, остальной текст формата остаётся обычным.
+            var format = LocalizationManager.T("Auth.PasswordForAccountFormat");
+            var placeholder = format.IndexOf("{0}", StringComparison.Ordinal);
+            if (placeholder < 0)
+            {
+                PasswordLabelPrefix.Text = format;
+                PasswordLabelAccount.Text = string.Empty;
+                PasswordLabelSuffix.Text = string.Empty;
+            }
+            else
+            {
+                PasswordLabelPrefix.Text = format.Substring(0, placeholder);
+                PasswordLabelAccount.Text = profile?.Name ?? string.Empty;
+                PasswordLabelSuffix.Text = format.Substring(placeholder + 3);
+            }
+
             if (hasPassword)
                 PasswordInput.Focus();
         }

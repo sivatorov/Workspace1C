@@ -100,7 +100,9 @@ namespace Workspace1C
                 version,
                 _vm?.TitleSuffixEnabled ?? false,
                 _vm?.TitleSuffixTemplate ?? string.Empty,
-                proMark: proMark);
+                proMark: proMark,
+                // %app_user% — имя активной учётной записи (issue #164).
+                appUser: _vm?.TitleSuffixAppUser);
         }
     }
 }

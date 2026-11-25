@@ -12,16 +12,19 @@ public sealed class TitleSuffixResolverTests
     [Fact]
     public void Resolve_SubstitutesAllKnownTokens()
     {
+        // %app_user% (issue #164) требует имя активной учётной записи — передаём его.
         var resolved = TitleSuffixResolver.Resolve(
-            "%computer_name%|%user_name%|%user_domain%|%computer_ip%|%display_server%");
+            "%computer_name%|%user_name%|%user_domain%|%app_user%|%computer_ip%|%display_server%",
+            "ТестоваяЗапись");
 
-        // Все пять токенов заменены: в результате не осталось ни одного известного токена.
+        // Все известные токены заменены: в результате не осталось ни одного из них.
         foreach (var token in TitleSuffixResolver.Tokens)
             Assert.DoesNotContain(token, resolved);
 
-        // Имя компьютера и пользователя подставлены из окружения.
+        // Имя компьютера, пользователя и активной учётной записи подставлены.
         Assert.Contains(Environment.MachineName, resolved);
         Assert.Contains(Environment.UserName, resolved);
+        Assert.Contains("ТестоваяЗапись", resolved);
     }
 
     [Fact]

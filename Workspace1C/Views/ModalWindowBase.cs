@@ -1,5 +1,6 @@
 #if LINUX
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using Avalonia;
@@ -961,7 +962,10 @@ namespace Workspace1C
                     e.Handled = true;
                     return;
                 }
-                CloseAsCancel();
+                // Issue #160: закрываем только самый верхний диалог. Если ESC пришёл в
+                // родителя (фокус на Linux/X11 остался в нём), родитель не закрывается —
+                // закрывается открытый поверх него дочерний диалог (см. CloseOnEscape).
+                CloseOnEscape();
                 e.Handled = true;
                 return;
             }
@@ -969,9 +973,83 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #160 (1.0.1.120): Esc закрывает только самый верхний диалог.
+        /// Если у этого окна открыт дочерний диалог (например, «Настройки» → редактор
+        /// структуры меню), закрывать нужно именно его: на Linux/X11 клавиатурный фокус
+        /// после показа вложенного окна иногда остаётся в родителе, и Esc приходит в
+        /// родительский <see cref="OnKeyDown"/>. Прежний безусловный
+        /// <see cref="CloseAsCancel"/> закрывал родителя, а вместе с ним (как владельцем) —
+        /// и все дочерние окна: один Esc закрывал сразу несколько окон (issue #160).
+        /// Теперь родитель остаётся открытым, а закрывается только верхний вложенный
+        /// диалог; если вложенных нет — окно закрывается как «Отмена».
+        /// </summary>
+        internal void CloseOnEscape()
+        {
+            if (FindTopmostOwnedDialog(this) is { } child)
+            {
+                ModalCloseTrace.Log(
+                    $"CloseOnEscape: окно {GetType().Name} — Esc при открытом дочернем окне " +
+                    $"{child.GetType().Name}, закрываю только его");
+                if (child is ModalWindowBase modalChild)
+                    modalChild.CloseOnEscape();
+                else
+                    child.Close();
+                return;
+            }
+
+            CloseAsCancel();
+        }
+
+        /// <summary>
+        /// Самый верхний по Z-порядку видимый диалог, вложенный в
+        /// <paramref name="ancestor"/> по цепочке <see cref="Window.Owner"/>;
+        /// <c>null</c>, если вложенных окон нет. Z-порядок берём у платформы
+        /// (<see cref="Window.SortWindowsByZOrder"/>), а не порядок открытия.
+        /// </summary>
+        internal static Window? FindTopmostOwnedDialog(Window ancestor)
+        {
+            if (Avalonia.Application.Current?.ApplicationLifetime
+                    is not Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop)
+                return null;
+
+            var candidates = new List<Window>();
+            foreach (var window in desktop.Windows)
+            {
+                if (ReferenceEquals(window, ancestor) || !window.IsVisible)
+                    continue;
+                if (IsOwnedBy(window, ancestor))
+                    candidates.Add(window);
+            }
+
+            if (candidates.Count == 0)
+                return null;
+
+            var ordered = candidates.ToArray();
+            Window.SortWindowsByZOrder(ordered);
+            return ordered[ordered.Length - 1];
+        }
+
+        /// <summary>
+        /// true, если <paramref name="window"/> вложено в <paramref name="ancestor"/>
+        /// (непосредственный владелец или владелец владельца и т.д.).
+        /// </summary>
+        private static bool IsOwnedBy(Window window, Window ancestor)
+        {
+            var current = window.Owner;
+            // Защита от гипотетического цикла в цепочке владельцев.
+            for (var depth = 0; current is not null && depth < 64; depth++)
+            {
+                if (ReferenceEquals(current, ancestor))
+                    return true;
+                current = current.Owner;
+            }
+            return false;
+        }
+
+        /// <summary>
         /// Закрывает диалог так же, как кнопка «Отмена»: без положительного
-        /// результата. Вызывается и из <see cref="OnKeyDown"/>, и из главного окна,
-        /// когда Esc пришёл туда (см. MainWindow.Avalonia.cs, OnWindowKeyDown).
+        /// результата. Вызывается из <see cref="CloseOnEscape"/> и из главного окна,
+        /// когда Esc пришёл туда (см. MainWindow.Avalonia.Hotkeys.cs, OnWindowKeyDown).
         /// </summary>
         internal void CloseAsCancel()
         {

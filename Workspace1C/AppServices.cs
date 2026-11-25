@@ -1,5 +1,6 @@
 using Workspace1C.Services;
 using Workspace1C.Services.EventLog;
+using Workspace1C.Services.Secrets;
 using Workspace1C.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +21,13 @@ public static partial class AppServices
         // реализации сервисов платформы 1С не зависят от UI-фреймворка.
         services.AddSingleton<IProfileService, ProfileService>();
         services.AddSingleton<IAppLogger, FileAppLogger>();
+        // Шифрование паролей хранилищ паролем учётной записи (issue #163, план 1.0.1.120).
+        // Ключ живёт только в памяти сеанса (PasswordSession); флаг включения берётся
+        // из активного профиля, поэтому протектор создаётся лениво через контейнер.
+        services.AddSingleton<IPasswordProtector, PasswordProtector>();
+        services.AddSingleton<SecretJsonProtector>(sp => new SecretJsonProtector(
+            sp.GetRequiredService<IPasswordProtector>(),
+            () => sp.GetService<IProfileService>()?.IsPasswordEncryptionEnabled == true));
         services.AddSingleton<IInfobaseRepository, InfobaseRepository>();
         services.AddSingleton<IOneCLauncher, OneCLauncherService>();
         services.AddSingleton<IOneCComConnector, OneCComConnector>();

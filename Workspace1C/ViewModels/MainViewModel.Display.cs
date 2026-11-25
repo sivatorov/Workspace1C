@@ -100,8 +100,15 @@ public partial class MainViewModel : ViewModelBase
     /// <summary>«Дополнить заголовок программы» (issue #28): добавлять строку из шаблона к заголовку окна.</summary>
     public bool TitleSuffixEnabled => _titleSuffixEnabled;
 
-    /// <summary>Шаблон дополнения заголовка окна (issue #28): %computer_name%, %user_name%, %user_domain%, %computer_ip%, %display_server%.</summary>
+    /// <summary>Шаблон дополнения заголовка окна (issue #28): %computer_name%, %user_name%, %user_domain%, %app_user%, %computer_ip%, %display_server%.</summary>
     public string TitleSuffixTemplate => _titleSuffixTemplate;
+
+    /// <summary>
+    /// Имя активной учётной записи для токена %app_user% в дополнении заголовка
+    /// (issue #164). null, если активного профиля нет (повреждённый profiles.json).
+    /// </summary>
+    public string? TitleSuffixAppUser =>
+        AppServices.TryGetService<IProfileService>()?.CurrentProfile?.Name;
 
     /// <summary>
     /// Применяет настройки дополнения заголовка окна (issue #28): «Дополнить заголовок

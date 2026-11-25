@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Workspace1C.Models;
+using Workspace1C.Services.Secrets;
 
 namespace Workspace1C.Services;
 
@@ -23,6 +24,7 @@ public sealed class ItsAccountsStore : IItsAccountsStore
     private readonly IInfobaseRepository? _repository;
     private readonly IProfileService? _profileService;
     private readonly string? _directoryOverride;
+    private readonly SecretJsonProtector? _secrets;
     private readonly JsonSerializerOptions _jsonOptions;
 
     /// <summary>Имя файла учётных записей ИТС (рядом с настройками приложения).</summary>
@@ -38,11 +40,13 @@ public sealed class ItsAccountsStore : IItsAccountsStore
     public ItsAccountsStore(
         IInfobaseRepository? repository = null,
         IProfileService? profileService = null,
-        string? directoryOverride = null)
+        string? directoryOverride = null,
+        SecretJsonProtector? secretProtector = null)
     {
         _repository = repository;
         _profileService = profileService;
         _directoryOverride = directoryOverride;
+        _secrets = secretProtector;
         _jsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -79,7 +83,11 @@ public sealed class ItsAccountsStore : IItsAccountsStore
     {
         var normalized = Normalize(accounts ?? new List<ItsAccount>());
         Directory.CreateDirectory(DataDirectory);
+        // Пароли ИТС шифруются паролем учётной записи, если шифрование включено.
+        // Без ключа Protect бросает SecretProtectionException — открытый пароль не пишется.
         var json = JsonSerializer.Serialize(normalized, _jsonOptions);
+        if (_secrets is not null)
+            json = _secrets.Protect(json);
 
         // Атомарная запись: сначала во временный файл, затем замена целевого
         // (как CustomConfigTypesStore.Save), чтобы не оставить битый файл
@@ -177,6 +185,10 @@ public sealed class ItsAccountsStore : IItsAccountsStore
         try
         {
             var json = File.ReadAllText(FilePath);
+            // Обратная совместимость: открытые значения читаются как есть; зашифрованные
+            // расшифровываются при наличии сеансового ключа.
+            if (_secrets is not null)
+                json = _secrets.Unprotect(json);
             var list = JsonSerializer.Deserialize<List<ItsAccount>>(json, _jsonOptions)
                        ?? new List<ItsAccount>();
             return Normalize(list);

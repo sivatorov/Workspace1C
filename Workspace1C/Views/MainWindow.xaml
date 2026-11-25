@@ -3348,10 +3348,11 @@
                              «Мои программы», где его можно переименовать, скрыть или удалить. -->
 
                         <!-- Группа «Мои программы» (issue #91): свои программы под кнопками
-                             запуска конфигуратора. Скрыта, если программ нет. Режим отображения —
+                             запуска конфигуратора. Issue #158: группа видна всегда — при пустом
+                             списке показываются подсказка и кнопка настройки. Режим отображения —
                              «Списком» (как родной стартер) или «Иконками» (в строку с переносом);
                              переключатель хранится в настройках. Шестерёнка открывает редактор группы. -->
-                        <StackPanel Visibility="{Binding HasCustomPrograms, Converter={StaticResource BoolToVis}}">
+                        <StackPanel>
                             <Grid Margin="8,4,8,2">
                                 <TextBlock Text="{loc:Loc Launch.CustomPrograms.Header}"
                                            FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center"
@@ -3367,6 +3368,20 @@
                                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Button>
                             </Grid>
+
+                            <!-- Issue #158: пустая группа — подсказка и кнопка настройки,
+                                 чтобы группа была полезной и без установленной 1С/стартера. -->
+                            <StackPanel Margin="8,2,8,6"
+                                        Visibility="{Binding ShowCustomProgramsEmptyHint, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{loc:Loc Launch.CustomPrograms.EmptyHint}"
+                                           TextWrapping="Wrap" FontSize="12" Margin="0,0,0,6"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                <Button Content="{loc:Loc Launch.CustomPrograms.SettingsButton}"
+                                        Command="{Binding ShowCustomProgramsSettingsCommand}"
+                                        ToolTip="{loc:Loc Launch.CustomPrograms.SettingsTooltip}"
+                                        Padding="10,5" HorizontalAlignment="Left"
+                                        Style="{StaticResource ActionPanelSecondaryButton}"/>
+                            </StackPanel>
 
                             <!-- Режим «Списком»: полноширинные кнопки «иконка + подпись». -->
                             <ItemsControl ItemsSource="{Binding CustomPrograms}"

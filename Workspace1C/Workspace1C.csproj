@@ -59,10 +59,10 @@
          поэтому AssemblyVersion/FileVersion/Version ограничены 4 частями, а точная
          пользовательская версия «0.3.1.1» задаётся через InformationalVersion
          и выводится в заголовок окна. -->
-    <Version>1.0.1.119</Version>
-    <AssemblyVersion>1.0.1.119</AssemblyVersion>
-    <FileVersion>1.0.1.119</FileVersion>
-    <InformationalVersion>1.0.1.119</InformationalVersion>
+    <Version>1.0.1.120</Version>
+    <AssemblyVersion>1.0.1.120</AssemblyVersion>
+    <FileVersion>1.0.1.120</FileVersion>
+    <InformationalVersion>1.0.1.120</InformationalVersion>
     <!-- RID/SelfContained только при publish, чтобы обычный dotnet run/build не ломался -->
     <PublishReadyToRun>false</PublishReadyToRun>
     <DebugType>embedded</DebugType>
@@ -906,19 +906,49 @@
 
   <!--
     Редакция ПРО (open-core, docs/pro/PRO-EDITION.md). Если рядом с репозиторием лежит
-    клон приватного Workspace1C.Pro (..\..\Workspace1C.Pro\src или путь в ProSourceDir),
-    его исходники компилируются в ту же сборку и определяется символ PRO_MODULES.
-    Без него собирается бесплатная редакция — никаких изменений в сборке.
+    клон приватного Workspace1C.Pro, его исходники компилируются в ту же сборку и
+    определяется символ PRO_MODULES. Без него собирается бесплатная редакция — никаких
+    изменений в сборке.
+
+    Поиск клона (первое найденное):
+      1. явное свойство -p:ProSourceDir=<путь к src\>;
+      2. ..\..\Workspace1C.Pro\src — репозитории-соседи в одной рабочей папке
+         (g:\h\Workspace1C\Workspace1C + g:\h\Workspace1C\Workspace1C.Pro);
+      3. ..\Workspace1C.Pro\src — клон внутри каталога проекта.
   -->
   <PropertyGroup>
+    <!-- Порядок важен: каждый следующий путь проверяется, только если предыдущий
+         не найден (иначе первое безусловное присваивание «съедало» бы остальные). -->
+    <ProSourceDir Condition="'$(ProSourceDir)' == '' And Exists('$(MSBuildThisFileDirectory)..\..\Workspace1C.Pro\src\ProModules.cs')">$(MSBuildThisFileDirectory)..\..\Workspace1C.Pro\src\</ProSourceDir>
+    <ProSourceDir Condition="'$(ProSourceDir)' == '' And Exists('$(MSBuildThisFileDirectory)..\Workspace1C.Pro\src\ProModules.cs')">$(MSBuildThisFileDirectory)..\Workspace1C.Pro\src\</ProSourceDir>
+    <!-- Значение по умолчанию — только для понятного сообщения в журнале, когда
+         клон не найден (HasProModules всё равно проверяет наличие ProModules.cs). -->
     <ProSourceDir Condition="'$(ProSourceDir)' == ''">$(MSBuildThisFileDirectory)..\..\Workspace1C.Pro\src\</ProSourceDir>
-    <HasProModules Condition="Exists('$(ProSourceDir)ProModules.cs')">true</HasProModules>
+    <!-- Путь можно передать без завершающего разделителя (-p:ProSourceDir=...\src);
+         ProSourceDir из командной строки — глобальное свойство, его нельзя
+         перезаписать, поэтому нормализуем в отдельное ProSourceDirFull. -->
+    <ProSourceDirFull Condition="'$(ProSourceDir)' != '' And !HasTrailingSlash('$(ProSourceDir)')">$(ProSourceDir)\</ProSourceDirFull>
+    <ProSourceDirFull Condition="'$(ProSourceDirFull)' == ''">$(ProSourceDir)</ProSourceDirFull>
+    <!-- CommunityEdition=true — явный опт-ин публичной редакции (скрипты передают
+         его при -AllowCommunity / ALLOW_COMMUNITY=1): модули не включаются, даже
+         если клон ПРО найден. -->
+    <HasProModules Condition="Exists('$(ProSourceDirFull)ProModules.cs') And '$(CommunityEdition)' != 'true'">true</HasProModules>
+    <!-- Всегда определённое значение: скрипты и CI читают его через -getProperty. -->
+    <HasProModules Condition="'$(HasProModules)' == ''">false</HasProModules>
   </PropertyGroup>
   <PropertyGroup Condition="'$(HasProModules)' == 'true'">
     <DefineConstants>$(DefineConstants);PRO_MODULES</DefineConstants>
   </PropertyGroup>
   <ItemGroup Condition="'$(HasProModules)' == 'true'">
-    <Compile Include="$(ProSourceDir)**\*.cs" Link="Pro\%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="$(ProSourceDirFull)**\*.cs" Link="Pro\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
+
+  <!-- Явная строка в журнале сборки: сразу видно, вошла ли редакция ПРО в бинарь. -->
+  <Target Name="ReportProModules" BeforeTargets="CoreCompile">
+    <Message Condition="'$(HasProModules)' == 'true'" Importance="high"
+             Text="ПРО: модули найдены ($(ProSourceDirFull)) — сборка с PRO_MODULES." />
+    <Message Condition="'$(HasProModules)' != 'true'" Importance="high"
+             Text="ПРО: модули не найдены ($(ProSourceDirFull)) — собирается бесплатная редакция без функций 2.x." />
+  </Target>
 
 </Project>

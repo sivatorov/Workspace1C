@@ -9,7 +9,8 @@ namespace Workspace1C.Services;
 /// Подстановка переменных в дополнение заголовка окна (issue #28).
 /// Чистый сервис без UI-зависимостей, тестируемый.
 /// Известные токены: <see cref="ComputerNameToken"/>, <see cref="UserNameToken"/>,
-/// <see cref="UserDomainToken"/>, <see cref="ComputerIpToken"/>, <see cref="DisplayServerToken"/>.
+/// <see cref="UserDomainToken"/>, <see cref="AppUserToken"/>, <see cref="ComputerIpToken"/>,
+/// <see cref="DisplayServerToken"/>.
 /// Неизвестные токены вида «%xxx%» в шаблоне сохраняются как есть — они не являются
 /// опечаткой пользователя и могут быть добавлены в будущих версиях.
 /// </summary>
@@ -24,6 +25,9 @@ public static class TitleSuffixResolver
     /// <summary>Домен (компьютерная группа) пользователя.</summary>
     public const string UserDomainToken = "%user_domain%";
 
+    /// <summary>Имя активной учётной записи приложения (issue #164).</summary>
+    public const string AppUserToken = "%app_user%";
+
     /// <summary>Первый IPv4-адрес локального интерфейса (не loopback).</summary>
     public const string ComputerIpToken = "%computer_ip%";
 
@@ -36,6 +40,7 @@ public static class TitleSuffixResolver
         ComputerNameToken,
         UserNameToken,
         UserDomainToken,
+        AppUserToken,
         ComputerIpToken,
         DisplayServerToken
     };
@@ -45,7 +50,15 @@ public static class TitleSuffixResolver
     /// если шаблон пуст или после подстановки остались только пробелы.
     /// Неизвестные токены «%xxx%» сохраняются как есть.
     /// </summary>
-    public static string Resolve(string template)
+    public static string Resolve(string template) => Resolve(template, null);
+
+    /// <summary>
+    /// Подставляет значения известных токенов в шаблон, включая <see cref="AppUserToken"/>
+    /// (issue #164). Если имя активной учётной записи неизвестно (<paramref name="appUser"/>
+    /// равен null или пуст), токен заменяется пустой строкой. Неизвестные токены «%xxx%»
+    /// сохраняются как есть.
+    /// </summary>
+    public static string Resolve(string template, string? appUser)
     {
         if (string.IsNullOrWhiteSpace(template))
             return string.Empty;
@@ -54,6 +67,7 @@ public static class TitleSuffixResolver
             .Replace(ComputerNameToken, Safe(() => Environment.MachineName))
             .Replace(UserNameToken, Safe(() => Environment.UserName))
             .Replace(UserDomainToken, Safe(() => Environment.UserDomainName))
+            .Replace(AppUserToken, appUser ?? string.Empty)
             .Replace(ComputerIpToken, ComputerIp())
             .Replace(DisplayServerToken, DisplayServer());
 
@@ -78,13 +92,18 @@ public static class TitleSuffixResolver
     /// Непустая метка ставится префиксом перед названием программы как признак
     /// действующего лицензионного ключа ПРО; пустая — заголовок без изменений.
     /// </param>
+    /// <param name="appUser">
+    /// Имя активной учётной записи приложения для токена <see cref="AppUserToken"/>
+    /// (issue #164); null или пусто — токен заменяется пустой строкой.
+    /// </param>
     public static string Compose(
         string baseTitle,
         string version,
         bool enabled,
         string template,
         string separator = " — ",
-        string proMark = "")
+        string proMark = "",
+        string? appUser = null)
     {
         var versionSuffix = string.IsNullOrWhiteSpace(version)
             ? string.Empty
@@ -106,7 +125,7 @@ public static class TitleSuffixResolver
         if (!enabled)
             return head;
 
-        var extra = Resolve(template);
+        var extra = Resolve(template, appUser);
         return extra.Length == 0 ? head : head + separator + extra;
     }
 

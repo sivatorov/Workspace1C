@@ -1177,7 +1177,20 @@ namespace Workspace1C
         private Control? BuildSectionButton(UtilitiesSectionButton section, UtilitiesMenuNode? node)
         {
             if (section.Kind == UtilitiesSectionButtonKind.Separator)
-                return CommandPanelSeparator();
+            {
+                // Issue #159: в WPF ПКМ по черте между разделами тоже открывает
+                // редактор структуры меню (MainWindow.UtilitiesMenu.cs) — на Linux
+                // обработчика не было, и паритет нарушался. Навешиваем тот же вход.
+                var separator = CommandPanelSeparator();
+                separator.PointerPressed += (_, e) =>
+                {
+                    if (!e.GetCurrentPoint(separator).Properties.IsRightButtonPressed)
+                        return;
+                    e.Handled = true;
+                    OpenUtilitiesMenuEditorDirectly();
+                };
+                return separator;
+            }
 
             if (section.Kind == UtilitiesSectionButtonKind.Item)
                 return BuildSectionItemButton(section, node);

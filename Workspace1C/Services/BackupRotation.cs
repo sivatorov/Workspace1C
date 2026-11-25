@@ -25,9 +25,15 @@ public static class BackupRotation
     /// <param name="extension">Расширение файла (с точкой или без, например «.dt»).</param>
     /// <param name="keepCount">Сколько последних копий хранить; ≤ 0 — хранить все.</param>
     /// <param name="deleteOlderThanDays">Удалять копии старше N дней; ≤ 0 — не удалять по возрасту.</param>
+    /// <param name="keepPath">
+    /// Файл, который нельзя удалять в этом проходе (issue #143): только что созданная
+    /// копия. Сортировка по времени записи на сетевых/FAT-каталогах может быть
+    /// неточной, и при совпадении отметок времени ротация могла удалить свежий файл.
+    /// </param>
     /// <returns>Пути фактически удалённых файлов (в порядке возрастания «давности»).</returns>
     public static IReadOnlyList<string> Apply(
-        string directory, string prefix, string extension, int keepCount, int deleteOlderThanDays)
+        string directory, string prefix, string extension, int keepCount, int deleteOlderThanDays,
+        string? keepPath = null)
     {
         var deleted = new List<string>();
         if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory))
@@ -35,6 +41,7 @@ public static class BackupRotation
 
         var ext = NormalizeExtension(extension);
         var normalizedPrefix = prefix?.Trim() ?? string.Empty;
+        var protectedPath = string.IsNullOrWhiteSpace(keepPath) ? null : Path.GetFullPath(keepPath);
 
         var files = Directory.EnumerateFiles(directory, "*" + ext)
             .Where(path =>
@@ -54,6 +61,12 @@ public static class BackupRotation
         for (var i = files.Count - 1; i >= 0; i--)
         {
             var file = files[i];
+            // Только что созданную копию не удаляем ни по лимиту, ни по возрасту
+            // (issue #143): иначе пользователь видит «файл начал создаваться и исчез».
+            if (protectedPath is not null &&
+                string.Equals(file.FullName, protectedPath, StringComparison.OrdinalIgnoreCase))
+                continue;
+
             var overKeepLimit = keepCount > 0 && i >= keepCount;
             var tooOld = ageCutoff.HasValue && SafeLastWriteUtc(file) < ageCutoff.Value;
             if (!overKeepLimit && !tooOld)

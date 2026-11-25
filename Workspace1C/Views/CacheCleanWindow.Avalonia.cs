@@ -511,11 +511,16 @@ namespace Workspace1C
             return false;
         }
 
-        /// <summary>Обновляет строку состояния расчёта по текущему прогрессу (issue #157).</summary>
+        /// <summary>
+        /// Обновляет строку состояния расчёта по текущему прогрессу (issue #157).
+        /// Финальный текст «Размеры кэша рассчитаны» здесь не выставляется: пока полоса
+        /// прогресса видна, расчёт считается идущим (issue #157, 7OH). Готовность
+        /// показывает <see cref="UpdateCalculatingState"/> уже после скрытия полосы.
+        /// </summary>
         private void UpdateProgressStatus(CacheSizeProgress progress)
         {
             _sizesStatusText.Text = progress.IsComplete
-                ? LocalizationManager.T("CacheClean.CalculatingDone")
+                ? LocalizationManager.T("CacheClean.Calculating")
                 : string.Format(LocalizationManager.T("CacheClean.CalculatingProgress"),
                     progress.Completed, progress.Total);
         }
