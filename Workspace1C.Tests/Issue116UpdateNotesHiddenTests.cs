@@ -17,8 +17,8 @@ namespace Workspace1C.Tests;
 /// <item>чистые тесты <see cref="AppUpdateModeHelper.ShouldShowReleaseNotes"/>: описание
 /// релиза в диалоге скрывается только в <see cref="AppUpdateMode.Manual"/> и
 /// <see cref="AppUpdateMode.NotifyOnly"/>;</item>
-/// <item>текст уведомления «Доступна новая версия X» содержит номер версии и ссылку на
-/// релиз, но НЕ содержит описания выпуска и подписи «Что нового»;</item>
+/// <item>текст уведомления «Доступна новая версия X» содержит номер версии, но НЕ
+/// содержит описания выпуска, подписи «Что нового» и ссылки на релиз (issue #169);</item>
 /// <item>source-гварды: обе оболочки больше не добавляют <c>Notify.ReleaseNotes</c> в
 /// уведомление о доступной версии, окно WPF скрывает блок по флагу, Avalonia не передаёт
 /// описание в диалог в ручных режимах;</item>
@@ -75,14 +75,17 @@ public sealed class Issue116UpdateNotesHiddenTests
         => string.Format(LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
 
     [Fact]
-    public void UpdateAvailableMessage_HasHeaderAndUrl_WithoutReleaseNotes()
+    public void UpdateAvailableMessage_IsHeaderOnly_WithoutReleaseNotes()
     {
         var release = SampleRelease();
         var message = UpdateService.BuildUpdateAvailableMessage(release);
 
-        // Остались ровно заголовок с номером версии и ссылка на страницу релиза (issue #116).
-        Assert.Equal(ExpectedHeader(release) + Environment.NewLine + ReleaseUrl, message);
-        // Описание выпуска и подпись «Что нового» в уведомление больше не попадают.
+        // Остался ровно заголовок с номером версии (issue #116, issue #169):
+        // ссылка на релиз в системном тосте не кликабельна и больше не добавляется.
+        Assert.Equal(ExpectedHeader(release), message);
+        Assert.DoesNotContain(ReleaseUrl, message, StringComparison.Ordinal);
+        Assert.DoesNotContain("http", message, StringComparison.Ordinal);
+        // Описание выпуска и подпись «Что нового» в уведомление не попадают.
         Assert.DoesNotContain("Что нового", message, StringComparison.Ordinal);
         Assert.DoesNotContain("Скрыт блок", message, StringComparison.Ordinal);
         Assert.DoesNotContain(ReleaseBody, message, StringComparison.Ordinal);
@@ -145,18 +148,19 @@ public sealed class Issue116UpdateNotesHiddenTests
     [Theory]
     [InlineData("UpdateService.cs")]
     [InlineData("UpdateService.Avalonia.cs")]
-    public void UpdateService_Notification_NoLongerAddsReleaseNotes(string fileName)
+    public void UpdateService_Notification_NoLongerAddsReleaseNotesOrUrl(string fileName)
     {
-        // Issue #116: обрезанный «Что нового:» убран из уведомления о доступной версии
-        // в обеих оболочках; остаются заголовок и ссылка на страницу релиза.
+        // Issue #116, issue #169: в уведомлении о доступной версии в обеих оболочках
+        // остался только заголовок — ни «Что нового», ни ссылки на страницу релиза.
         var source = ReadProjectFile("Workspace1C", "Services", fileName);
 
         Assert.DoesNotContain("Notify.ReleaseNotes", source, StringComparison.Ordinal);
         Assert.DoesNotContain("TruncateReleaseNotes", source, StringComparison.Ordinal);
         Assert.DoesNotContain("MaxUpdateNotesLength", source, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "message += Environment.NewLine + release.HtmlUrl", source, StringComparison.Ordinal);
 
         Assert.Contains("BuildUpdateAvailableMessage", source, StringComparison.Ordinal);
-        Assert.Contains("release.HtmlUrl", source, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,0 +1,9 @@
+﻿  Определение проектов для восстановления...
+  Все проекты обновлены для восстановления.
+  ПРО: модули найдены (G:\h\Workspace1C\Workspace1C\Workspace1C\..\..\Workspace1C.Pro\src\) — сборка с PRO_MODULES.
+  Workspace1C -> G:\h\Workspace1C\Workspace1C\Workspace1C\bin\Debug\net10.0-windows\Workspace1C.dll
+  Workspace1C.Tests -> G:\h\Workspace1C\Workspace1C\Workspace1C.Tests\bin\Debug\net10.0-windows\Workspace1C.Tests.dll
+Тестовый запуск для G:\h\Workspace1C\Workspace1C\Workspace1C.Tests\bin\Debug\net10.0-windows\Workspace1C.Tests.dll (.NETCoreApp,Version=v10.0)
+Общее количество тестовых файлов (1), соответствующих указанному шаблону.
+
+Пройден!   : не пройдено     0, пройдено  8263, пропущено     0, всего  8263, длительность 4 m 56 s. - Workspace1C.Tests.dll (net10.0)

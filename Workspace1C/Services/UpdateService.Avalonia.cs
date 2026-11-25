@@ -680,22 +680,15 @@ namespace Workspace1C.Services
                 release.TagName, StringComparison.Ordinal);
 
         /// <summary>
-        /// Текст уведомления о доступной новой версии (issue #44; issue #116): заголовок
-        /// «Доступна новая версия X» и ссылка на страницу релиза. Описание выпуска
-        /// (release.Body) в уведомление НЕ добавляется: обрезанный «Что нового» не содержит
-        /// полного списка изменений и только занимает место — полный список доступен по
-        /// ссылке на релиз. Метод internal — чтобы сборка тестов проверяла состав текста
-        /// без запуска уведомления.
+        /// Текст уведомления о доступной новой версии (issue #44; issue #116; issue #169):
+        /// только заголовок «Доступна новая версия X». Ссылка на страницу релиза в текст
+        /// НЕ добавляется: в системном тосте она не кликабельна (issue #169), а описание
+        /// выпуска (release.Body) не помещается целиком (issue #116). Метод internal —
+        /// чтобы сборка тестов проверяла состав текста без запуска уведомления.
         /// </summary>
         internal static string BuildUpdateAvailableMessage(ReleaseInfo release)
-        {
-            var message = string.Format(
+            => string.Format(
                 LocalizationManager.T("Notify.UpdateAvailable"), release.TagName);
-            if (!string.IsNullOrWhiteSpace(release.HtmlUrl))
-                message += Environment.NewLine + release.HtmlUrl;
-
-            return message;
-        }
 
         /// <summary>
         /// Ручная проверка обновлений (кнопка «Проверить обновления» во вкладке «О программе»).

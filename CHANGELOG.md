@@ -11,6 +11,56 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.122] — 2026-11-25
+
+### Исправлено
+
+- **Текст уведомления об обновлении (issue #169, Windows и Linux).** Тост о доступном
+  обновлении содержит только «Доступна новая версия X»: ссылка `release.HtmlUrl` больше
+  не добавляется в текст (`BuildUpdateAvailableMessage` в `UpdateService` и
+  `UpdateService.Avalonia`). Переход к странице релиза остаётся в диалоге обновления.
+
+- **Пустое поле внизу программы (дефект из сообщения пользователя, Windows и Linux).**
+  Прозрачная полоса внизу окна, через которую был виден рабочий стол, когда окно занимает
+  всю рабочую область. Причина — `WindowChrome.GlassFrameThickness = -1` (расширенная
+  рамка) применялась и в положении «окно на всю рабочую область». Добавлена чистая
+  политика `WindowGlassFramePolicy.Resolve(maximized, windowBounds, workArea, tolerance)`:
+  **0** при максимизации и при прижатии окна к верхней/нижней границе рабочей области,
+  иначе **-1**. Применена в `MainWindow.UpdateGlassFrameForMaximize` (пересчёт на
+  `StateChanged`, `SizeChanged`, `LocationChanged`, `Loaded`) и в `WindowChromeHelper`
+  для диалогов; `WindowWorkAreaLimiter.GetWorkAreaDip` стал `public`. Acrylic сохраняется,
+  при максимизации поведение прежнее.
+
+### Тесты
+
+- `Issue169UpdateNotificationTextTests` — текст уведомления об обновлении без URL.
+- `Issue170WindowGlassFrameTests` — политика толщины стеклянной рамки (максимизация,
+  прижатие к верхней/нижней границе, допуск).
+
+### Сборка
+
+- Single-file сборки Windows (WPF) и Linux (Avalonia), версия **1.0.1.122**.
+- Полный прогон тестов: **8277** тестов, **8277** пройдено, **0** падений,
+  **0** пропущено (длительность 4 m 46 s).
+
+Собранные артефакты (single-file, self-contained, версия `1.0.1.122`):
+
+| Платформа | Файл | Размер | Версия |
+|---|---|---|---|
+| Windows x64 (WPF) | `dist/win-x64/Workspace1C.exe` | ≈81,7 МБ | `FileVersion` = `1.0.1.122` |
+| Linux x64 (Avalonia) | `dist/linux-x64/Workspace1C` | ≈51,5 МБ | `1.0.1.122` (в релизе — `Workspace1C-linux-x64`) |
+
+Точные размеры, версии и smoke-проверки — в
+[`docs/_build_summary_101122.md`](docs/_build_summary_101122.md).
+
+### Документация
+
+- [`README.md`](README.md): версия и таблица бинарей 1.0.1.122, краткий перечень изменений выпуска.
+- Новые файлы: [`rel_notes_1.0.1.122.md`](rel_notes_1.0.1.122.md) и
+  [`docs/_telegram_msg_v1.0.1.122.txt`](docs/_telegram_msg_v1.0.1.122.txt).
+
+---
+
 ## [1.0.1.121] — 2026-11-25
 
 ### Исправлено

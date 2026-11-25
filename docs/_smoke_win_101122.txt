@@ -1,0 +1,56 @@
+Smoke-проверки Windows-артефакта Workspace 1C 1.0.1.122
+Дата: 2026-11-25
+Файл: bin/release-1.0.1.122/win-x64/Workspace1C.exe (85 697 016 байт)
+
+== Workspace1C.exe --license-info --json ==
+EXIT=0
+{
+  "ok": true,
+  "command": "license_info",
+  "data": {
+    "edition": "pro",
+    "status": "Valid",
+    "machineCode": "DV4P-KR4W-PQS4-PJAS",
+    "programMajor": 1,
+    "proModules": true,
+    "owner": "Sivatorov",
+    "licenseMajor": 1,
+    "issued": "2026-11-25",
+    "features": {
+      "ServerAlerts": true,
+      "TelegramBot": true,
+      "Mcp": true,
+      "ClusterMigration": true,
+      "TestDeploy": true,
+      "MassLoadCf": true,
+      "Pipelines": true,
+      "MultiBaseQuery": true,
+      "EnvironmentDiff": true,
+      "AutoTests": true,
+      "PerformanceTrends": true,
+      "AuditLog": true,
+      "CloudBackup": true
+    }
+  },
+  "error": null
+}
+
+== Workspace1C.exe --list ==
+LIST_EXIT=0
+(выведен список информационных баз профиля, по строкам "<id>\tfile\t<uuid>"; пример:
+650584	file	2320347e-aa19-4239-a540-1b5a59331fe6
+Accounting	file	aa71ed57-08d9-4c4b-83df-9abb325803f5
+ut11.6	file	52c5eb9c-c308-4f81-bf38-9ec72f1d0e5b
+...)
+
+== Версия файла (System.Diagnostics.FileVersionInfo) ==
+FileVersion=1.0.1.122
+ProductVersion=1.0.1.122+a3bc8053a158b5f65801f4dda36d25f7544a0ba5
+FileDescription=Workspace 1C
+ProductName=Workspace 1C
+
+== Linux-артефакт (bin/release-1.0.1.122/linux-x64/Workspace1C, 53 983 085 байт) ==
+dotnet msbuild Workspace1C.csproj -nologo -p:ForceLinux=true -getProperty:FileVersion
+1.0.1.122
+
+ELF magic (первые 4 байта): 7F 45 4C 46

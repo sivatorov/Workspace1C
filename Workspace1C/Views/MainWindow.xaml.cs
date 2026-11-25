@@ -189,6 +189,15 @@ namespace Workspace1C
         {
             InitializeComponent();
 
+            // Дефект «пустое поле внизу программы» (1.0.1.122): толщина стеклянной рамки
+            // зависит от фактического положения окна относительно рабочей области, поэтому
+            // пересчитываем её не только при StateChanged (OnWindowStateChanged), но и при
+            // изменении размеров/позиции окна и после загрузки. Иначе окно, вручную
+            // растянутое на всю рабочую область, оставляло прозрачную полосу снизу.
+            Loaded += (_, _) => UpdateGlassFrameForMaximize();
+            SizeChanged += (_, _) => UpdateGlassFrameForMaximize();
+            LocationChanged += (_, _) => UpdateGlassFrameForMaximize();
+
             // Глифы кнопок управления окном резолвятся по активному набору иконок (Задача 2):
             // стартовый рендер берёт Fluent/XAML-контуры, а активный набор применяется здесь
             // и при каждой смене полноценной темы (см. OnThemeChanged в MainWindow.UtilitiesMenu.cs).
@@ -1335,9 +1344,14 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// При максимизации возвращаем толщину стеклянной рамки к 0: это известное
-        /// обходное решение, иначе окно с WindowChrome и расширенной стеклянной рамкой
-        /// (GlassFrameThickness=-1) при развороте перекрывает панель задач Windows 11.
+        /// Толщина стеклянной рамки по фактическому положению окна (дефект «пустое поле
+        /// внизу программы», 1.0.1.122): развёрнутое окно — 0 (прежнее обходное решение,
+        /// иначе расширенная рамка перекрывает панель задач Windows 11); окно, прижатое
+        /// к верхней/нижней границе рабочей области, — тоже 0 (расширенная рамка
+        /// GlassFrameThickness=-1 оставляла прозрачную полосу ~44 px снизу, через которую
+        /// был виден рабочий стол); иначе — -1 (acrylic сохраняется). Расчёт — в чистой
+        /// <see cref="WindowGlassFramePolicy.Resolve"/>; пересчитывается при
+        /// StateChanged/SizeChanged/LocationChanged/Loaded.
         /// </summary>
         private void UpdateGlassFrameForMaximize()
         {
@@ -1346,9 +1360,18 @@ namespace Workspace1C
                 var chrome = System.Windows.Shell.WindowChrome.GetWindowChrome(this);
                 if (chrome is null)
                     return;
-                chrome.GlassFrameThickness = WindowState == WindowState.Maximized
-                    ? new Thickness(0)
-                    : new Thickness(-1);
+
+                var workArea = WindowWorkAreaLimiter.GetWorkAreaDip(this);
+                var work = workArea is { } area
+                    ? (area.Left, area.Top, area.Width, area.Height)
+                    : (double.NaN, double.NaN, double.NaN, double.NaN);
+
+                var thickness = WindowGlassFramePolicy.Resolve(
+                    WindowState == WindowState.Maximized,
+                    (Left, Top, ActualWidth, ActualHeight),
+                    work);
+
+                chrome.GlassFrameThickness = new Thickness(thickness);
             }
             catch
             {

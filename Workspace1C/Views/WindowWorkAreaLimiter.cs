@@ -130,8 +130,11 @@ namespace Workspace1C
         /// <summary>
         /// Рабочая область монитора окна в DIP. Координаты WinForms —
         /// физические пиксели, поэтому переводятся через DPI окна.
+        /// Открыт для <see cref="WindowGlassFramePolicy"/> (дефект «пустое поле
+        /// внизу программы», 1.0.1.122): политика толщины стеклянной рамки
+        /// сравнивает границы окна именно с рабочей областью его монитора.
         /// </summary>
-        private static Rect? GetWorkAreaDip(Window window)
+        public static Rect? GetWorkAreaDip(Window window)
         {
             try
             {

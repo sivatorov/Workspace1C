@@ -556,6 +556,15 @@ namespace Workspace1C
             // WindowChrome/DPI, когда зажим на SizeChanged не успевает.
             HookMinTrackAndMaximize(window);
 
+            // Дефект «пустое поле внизу программы» (1.0.1.122): толщина стеклянной рамки
+            // зависит не только от состояния окна, но и от его фактического положения
+            // относительно рабочей области, поэтому пересчитываем её при изменении
+            // размеров/позиции и после загрузки — как в главном окне.
+            window.SizeChanged += (_, _) => UpdateGlassFrameForMaximize(window);
+            window.LocationChanged += (_, _) => UpdateGlassFrameForMaximize(window);
+            window.Loaded += (_, _) => UpdateGlassFrameForMaximize(window);
+            UpdateGlassFrameForMaximize(window);
+
             // В развёрнутом виде скругление убираем и сбрасываем толщину стеклянной рамки.
             window.StateChanged += (_, _) =>
             {
@@ -1879,8 +1888,12 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// При максимизации возвращаем толщину стеклянной рамки к 0 (известное обходное
-        /// решение для WindowChrome с GlassFrameThickness=-1 и панели задач Windows 11).
+        /// Толщина стеклянной рамки по фактическому положению окна — та же политика, что
+        /// у главного окна (дефект «пустое поле внизу программы», 1.0.1.122): развёрнутое
+        /// окно — 0 (прежнее обходное решение для панели задач Windows 11); окно, прижатое
+        /// к верхней/нижней границе рабочей области, — тоже 0 (расширенная рамка
+        /// GlassFrameThickness=-1 оставляла прозрачную полосу снизу); иначе — -1.
+        /// Расчёт — в чистой <see cref="WindowGlassFramePolicy.Resolve"/>.
         /// </summary>
         private static void UpdateGlassFrameForMaximize(Window window)
         {
@@ -1889,9 +1902,18 @@ namespace Workspace1C
                 var chrome = WindowChrome.GetWindowChrome(window);
                 if (chrome is null)
                     return;
-                chrome.GlassFrameThickness = window.WindowState == WindowState.Maximized
-                    ? new Thickness(0)
-                    : new Thickness(-1);
+
+                var workArea = WindowWorkAreaLimiter.GetWorkAreaDip(window);
+                var work = workArea is { } area
+                    ? (area.Left, area.Top, area.Width, area.Height)
+                    : (double.NaN, double.NaN, double.NaN, double.NaN);
+
+                var thickness = WindowGlassFramePolicy.Resolve(
+                    window.WindowState == WindowState.Maximized,
+                    (window.Left, window.Top, window.ActualWidth, window.ActualHeight),
+                    work);
+
+                chrome.GlassFrameThickness = new Thickness(thickness);
             }
             catch
             {
