@@ -279,6 +279,35 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.Contains("T(\"PlatformDownload.FilterArchitectureTooltip\")", code, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WpfDialog_SectionComboShowsSuffix_ButKeepsRawSelectedSection()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "PlatformDownloadWindow.xaml");
+        var code = ReadProjectFile("Workspace1C", "Views", "PlatformDownloadWindow.xaml.cs");
+
+        // ItemsSource/SelectedItem остаются исходными строками — фильтр не ломается.
+        Assert.Contains("ItemsSource=\"{Binding AvailableSections}\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem=\"{Binding SelectedSection, Mode=TwoWay}\"", xaml, StringComparison.Ordinal);
+        // Отображаемое имя раздела — через конвертер с локализованным суффиксом.
+        Assert.Contains("PlatformSectionDisplayNameConverter", xaml, StringComparison.Ordinal);
+        Assert.Contains("Converter={StaticResource SectionNameConv}", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlatformDownload.SectionSuffix", code, StringComparison.Ordinal);
+        Assert.Contains("PlatformSectionDisplayName.Compose", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaDialog_SectionComboShowsSuffix_ButKeepsRawSelectedSection()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "PlatformDownloadWindow.Avalonia.cs");
+
+        // ItemsSource/SelectedItem остаются исходными строками — фильтр не ломается.
+        Assert.Contains("ItemsSource = _viewModel.AvailableSections", code, StringComparison.Ordinal);
+        Assert.Contains("SelectedItem = _viewModel.SelectedSection", code, StringComparison.Ordinal);
+        // Отображаемое имя раздела — с локализованным суффиксом.
+        Assert.Contains("PlatformSectionDisplayName.Compose", code, StringComparison.Ordinal);
+        Assert.Contains("T(\"PlatformDownload.SectionSuffix\")", code, StringComparison.Ordinal);
+    }
+
     // ===================== Issue #167 (1.0.1.123): подпись и сортировка =====================
 
     /// <summary>Четыре комбинации галочек: часть, уже выбранную галочкой, не дублируем.</summary>
@@ -328,22 +357,22 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.Equal("b_x64.zip", onlyX64.DisplayName);
         Assert.DoesNotContain("Полный клиент", onlyX64.DisplayName, StringComparison.Ordinal);
 
-        // Галочка раздела снята: раздел показывается с локализованной пометкой
-        // (в тестовой среде T возвращает ключ — сверяем через сам T), разрядность
-        // (учёт включён) не дублируется.
+        // Issue #167 (1.0.1.125): галочка раздела снята — раздел показывается в подписи
+        // файла БЕЗ пометки « (раздел)» (раздел уже отделён строкой-разделителем);
+        // разрядность (учёт включён) не дублируется.
         var sectionSuffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
         vm.FilterBySection = false;
         var sectionShown = Assert.Single(vm.DistributionOptions);
-        Assert.Equal("Windows (64-bit)" + sectionSuffix + " - b_x64.zip", sectionShown.DisplayName);
+        Assert.Equal("Windows (64-bit) - b_x64.zip", sectionShown.DisplayName);
+        Assert.DoesNotContain(sectionSuffix, sectionShown.DisplayName, StringComparison.Ordinal);
 
-        // Обе галочки сняты: «Раздел (пометка) - разрядность - имя_файла»,
-        // сортировка по итоговой строке.
+        // Обе галочки сняты: «Раздел - разрядность - имя_файла», сортировка по итоговой строке.
         vm.FilterByArchitecture = false;
         Assert.Equal(
             new[]
             {
-                "Windows (32-bit)" + sectionSuffix + " - x86 - a_x86.zip",
-                "Windows (64-bit)" + sectionSuffix + " - x64 - b_x64.zip",
+                "Windows (32-bit) - x86 - a_x86.zip",
+                "Windows (64-bit) - x64 - b_x64.zip",
             },
             vm.DistributionOptions.Select(o => o.DisplayName).ToArray());
 
@@ -360,25 +389,74 @@ public sealed class Issue167PlatformDownloadSectionTests
     }
 
     [Fact]
-    public void Compose_AddsSectionSuffix_OnlyWhenSectionShown()
+    public void Compose_FileLabelNeverHasSectionSuffix()
     {
         var file = File("file.zip", "x64", "Windows (64-bit)");
 
-        // Раздел показывается (галочка снята) — добавляется суффикс.
-        Assert.Equal("Windows (64-bit) (раздел) - x64 - file.zip",
-            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: true,
-                sectionSuffix: " (раздел)"));
-        Assert.Equal("Windows (64-bit) (раздел) - file.zip",
-            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: true,
-                sectionSuffix: " (раздел)"));
+        // Раздел показывается (галочка снята) — имя раздела выводится как есть, без пометки.
+        Assert.Equal("Windows (64-bit) - x64 - file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: true));
+        Assert.Equal("Windows (64-bit) - file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: true));
 
-        // Раздел уже выбран галочкой — суффикса нет (часть не выводится).
+        // Раздел уже выбран галочкой — части нет.
         Assert.Equal("x64 - file.zip",
-            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: false,
-                sectionSuffix: " (раздел)"));
+            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: false));
         Assert.Equal("file.zip",
-            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: false,
-                sectionSuffix: " (раздел)"));
+            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: false));
+    }
+
+    [Fact]
+    public void SectionDisplayName_AddsSuffixOnlyToSectionNames()
+    {
+        Assert.Equal("Windows (64-bit) (раздел)",
+            PlatformSectionDisplayName.Compose("Windows (64-bit)", " (раздел)"));
+        Assert.Equal("Windows (64-bit)",
+            PlatformSectionDisplayName.Compose("  Windows (64-bit)  ", null));
+        Assert.Equal(string.Empty, PlatformSectionDisplayName.Compose(null, " (раздел)"));
+        Assert.Equal(string.Empty, PlatformSectionDisplayName.Compose("   ", " (раздел)"));
+    }
+
+    [Fact]
+    public async Task Vm_SectionDisplayNames_HaveSuffix_SectionFilterValuesStayRaw()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64", GroupPlatform),
+            File("b_x64.zip", "x64", GroupThin)));
+
+        await vm.LoadCatalogAsync();
+
+        var suffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
+        // Значения фильтра — исходные строки без суффикса.
+        Assert.Equal(new[] { GroupPlatform, GroupThin }, vm.AvailableSections);
+        Assert.Equal(GroupPlatform, vm.SelectedSection);
+        // Отображаемые имена разделов — с локализованным суффиксом.
+        Assert.Equal(
+            new[] { GroupPlatform + suffix, GroupThin + suffix },
+            vm.SectionDisplayNames);
+    }
+
+    [Fact]
+    public async Task Vm_GroupHeaders_HaveSuffix_ButFileOptionsDoNot()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64", GroupPlatform),
+            File("b_x64.zip", "x64", GroupThin)));
+
+        await vm.LoadCatalogAsync();
+        // Обе группы видны в списке файлов.
+        vm.FilterBySection = false;
+
+        var suffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
+        var headers = vm.DistributionOptionsGrouped.OfType<PlatformFileGroupHeaderItem>().ToList();
+        Assert.Equal(2, headers.Count);
+        Assert.Equal(GroupPlatform + suffix, headers[0].Title);
+        Assert.Equal(GroupThin + suffix, headers[1].Title);
+
+        // Подписи файлов — без суффикса.
+        Assert.All(
+            vm.DistributionOptionsGrouped.OfType<PlatformDistributionOption>(),
+            o => Assert.DoesNotContain(suffix, o.DisplayName, StringComparison.Ordinal));
     }
 
     [Fact]

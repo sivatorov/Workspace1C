@@ -3,6 +3,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using Workspace1C.Services;
 
 namespace Workspace1C
@@ -142,13 +143,17 @@ namespace Workspace1C
                 if (handle != IntPtr.Zero)
                 {
                     var screen = System.Windows.Forms.Screen.FromHandle(handle);
-                    var source = PresentationSource.FromVisual(window);
-                    var transform = source?.CompositionTarget?.TransformFromDevice;
-                    var scaleX = transform?.M11 ?? 1.0;
-                    var scaleY = transform?.M22 ?? 1.0;
-                    if (scaleX <= 0 || double.IsNaN(scaleX))
+
+                    // Issue #172: масштаб DPI окна берём из VisualTreeHelper.GetDpi —
+                    // он достоверен и до первого показа, когда PresentationSource ещё
+                    // null. Прежний код в этом случае молча подставлял 1.0, и на HiDPI
+                    // (125%/150%) физические пиксели рабочей области сравнивались с DIP
+                    // окна — рамка ошибочно считалась «не прижатой» и оставалась
+                    // расширенной (прозрачной). TransformFromDevice — запасной источник.
+                    var (scaleX, scaleY) = GetDpiScale(window);
+                    if (scaleX <= 0 || double.IsNaN(scaleX) || double.IsInfinity(scaleX))
                         scaleX = 1.0;
-                    if (scaleY <= 0 || double.IsNaN(scaleY))
+                    if (scaleY <= 0 || double.IsNaN(scaleY) || double.IsInfinity(scaleY))
                         scaleY = 1.0;
 
                     var area = screen.WorkingArea;
@@ -166,6 +171,40 @@ namespace Workspace1C
 
             var fallback = SystemParameters.WorkArea;
             return fallback.Width > 0 && fallback.Height > 0 ? fallback : null;
+        }
+
+        /// <summary>
+        /// Фактический масштаб DPI окна (issue #172): сначала
+        /// <see cref="VisualTreeHelper.GetDpi"/> (работает до показа окна), затем
+        /// <c>TransformFromDevice</c> активного <see cref="PresentationSource"/>.
+        /// Если ничего не доступно — 1.0.
+        /// </summary>
+        private static (double X, double Y) GetDpiScale(Window window)
+        {
+            try
+            {
+                var dpi = VisualTreeHelper.GetDpi(window);
+                if (dpi.DpiScaleX > 0 && dpi.DpiScaleY > 0)
+                    return (dpi.DpiScaleX, dpi.DpiScaleY);
+            }
+            catch
+            {
+                // Visual недоступен — пробуем PresentationSource ниже.
+            }
+
+            try
+            {
+                var source = PresentationSource.FromVisual(window);
+                var transform = source?.CompositionTarget?.TransformFromDevice;
+                if (transform is { } m && m.M11 > 0 && m.M22 > 0)
+                    return (m.M11, m.M22);
+            }
+            catch
+            {
+                // Нет источника композиции — остаётся 1.0.
+            }
+
+            return (1.0, 1.0);
         }
     }
 }

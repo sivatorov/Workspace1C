@@ -33,6 +33,10 @@ namespace Workspace1C
                 PopulateLoggingPanel(LoggingDirectionsPanel, LogCategory.DirectionCategories);
             if (LoggingDiagnosticsPanel != null)
                 PopulateLoggingPanel(LoggingDiagnosticsPanel, LogCategory.DiagnosticCategories);
+
+            // issue #143 (1.0.1.125): диагностика резервного копирования СУБД.
+            if (DbmsBackupDiagnosticsCheck != null)
+                DbmsBackupDiagnosticsCheck.IsChecked = _viewModel.DbmsBackupDiagnosticsEnabled;
         }
 
         /// <summary>Заполняет панель строками-галочками всех переданных категорий.</summary>
@@ -116,6 +120,11 @@ namespace Workspace1C
             foreach (var pair in _loggingCategoryChecks)
                 values[pair.Key] = pair.Value.IsChecked == true;
             TraceFlags.SaveCategorySettings(values);
+
+            // issue #143 (1.0.1.125): переключатель диагностики СУБД хранится в
+            // settings.json (не в trace.json) и применяется сразу в сеттере.
+            if (DbmsBackupDiagnosticsCheck != null)
+                _viewModel.DbmsBackupDiagnosticsEnabled = DbmsBackupDiagnosticsCheck.IsChecked == true;
         }
     }
 }

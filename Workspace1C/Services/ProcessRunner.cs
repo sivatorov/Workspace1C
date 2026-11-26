@@ -101,6 +101,11 @@ public static class ProcessRunner
     /// Явно заданная <paramref name="outputEncoding"/> имеет приоритет — для утилит
     /// с известной фиксированной кодировкой чтения.
     /// </para>
+    /// <para>
+    /// <paramref name="timeout"/> = <c>null</c> (1.0.1.125, issue #143) — ожидание
+    /// без жёсткого лимита: длительная копия большой базы не обрывается по времени,
+    /// а прерывается только отменой <paramref name="ct"/>.
+    /// </para>
     /// </summary>
     public static async Task<ProcessRunResult> RunAsync(
         string fileName,
@@ -173,8 +178,12 @@ public static class ProcessRunner
             var stdoutText = rawReading ? Task.FromResult(string.Empty) : process.StandardOutput.ReadToEndAsync();
             var stderrText = rawReading ? Task.FromResult(string.Empty) : process.StandardError.ReadToEndAsync();
 
-            using var timeoutCts = new CancellationTokenSource(timeout ?? TimeSpan.FromMinutes(30));
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
+            // issue #143 (1.0.1.125): null — ожидание без жёсткого лимита
+            // (длительный дамп большой базы). Прерывание — только отменой.
+            using var timeoutCts = timeout is { } limit ? new CancellationTokenSource(limit) : null;
+            using var linked = timeoutCts is null
+                ? CancellationTokenSource.CreateLinkedTokenSource(ct)
+                : CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
             try
             {
                 await process.WaitForExitAsync(linked.Token).ConfigureAwait(false);

@@ -250,4 +250,19 @@ public sealed class PlatformDownloadTypeToTextConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
         => throw new NotSupportedException();
 }
+
+/// <summary>
+/// Добавляет к названию раздела локализованную пометку « (раздел)» / « (section)»
+/// (issue #167, 1.0.1.125). Применяется ТОЛЬКО к отображаемым названиям разделов в
+/// списке — значение фильтра <c>SelectedSection</c> остаётся исходным, без суффикса.
+/// </summary>
+public sealed class PlatformSectionDisplayNameConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => PlatformSectionDisplayName.Compose(
+            value as string, LocalizationManager.T("PlatformDownload.SectionSuffix"));
+
+    public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        => throw new NotSupportedException();
+}
 #endif

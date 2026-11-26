@@ -154,10 +154,10 @@ public sealed class PlatformDistributionOption
 /// <item>учёт раздела включён: «x64 - имя_файла»;</item>
 /// <item>оба учёта включены: «имя_файла».</item>
 /// </list>
-/// То, что пользователь уже выбрал галочкой, в подписи не дублируется. Когда часть
-/// «раздел» показывается (галочка раздела снята), к ней добавляется суффикс
-/// (например, « (раздел)») — чтобы отличать название раздела от имени файла
-/// (issue #167, 1.0.1.124).
+/// То, что пользователь уже выбрал галочкой, в подписи не дублируется. Пометка
+/// « (раздел)» к названию раздела в подписи файла НЕ добавляется (issue #167,
+/// 1.0.1.125): раздел в списке уже отделён строкой-разделителем, суффикс нужен
+/// только у самих названий разделов (см. <see cref="PlatformSectionDisplayName"/>).
 /// </summary>
 public static class PlatformFileDisplayName
 {
@@ -169,33 +169,49 @@ public static class PlatformFileDisplayName
     /// и <paramref name="includeSection"/> — включать ли соответствующую часть в строку
     /// (true — галочка фильтра СНЯТА и часть показывается; false — галочка установлена
     /// и часть уже выбрана, дублировать её не нужно). Отсутствующие части (нет разрядности
-    /// или раздела) пропускаются; имя файла выводится всегда.
-    /// <paramref name="sectionSuffix"/> — локализованный суффикс, который добавляется к
-    /// названию раздела, когда он выводится (issue #167, 1.0.1.124); пусто — без суффикса.
+    /// или раздела) пропускаются; имя файла выводится всегда. Подпись файла никогда не
+    /// содержит суффикса « (раздел)» — он применяется только к названиям разделов
+    /// (issue #167, 1.0.1.125).
     /// </summary>
     public static string Compose(
         PlatformReleaseFile? file,
         bool includeArchitecture,
-        bool includeSection,
-        string? sectionSuffix = null)
+        bool includeSection)
     {
         if (file is null)
             return string.Empty;
 
         var parts = new List<string>(3);
         if (includeSection && !string.IsNullOrWhiteSpace(file.Group))
-        {
-            var section = file.Group!.Trim();
-            if (!string.IsNullOrWhiteSpace(sectionSuffix))
-                section += sectionSuffix;
-            parts.Add(section);
-        }
+            parts.Add(file.Group!.Trim());
         if (includeArchitecture && !string.IsNullOrWhiteSpace(file.Architecture))
             parts.Add(file.Architecture!.Trim());
         if (!string.IsNullOrWhiteSpace(file.FileName))
             parts.Add(file.FileName.Trim());
 
         return string.Join(Separator, parts);
+    }
+}
+
+/// <summary>
+/// Отображаемое имя раздела страницы загрузок (issue #167, 1.0.1.125): к названию
+/// раздела добавляется локализованный суффикс (« (раздел)» / « (section)»), чтобы в
+/// списке разделов было видно, что это раздел, а не имя файла. Применяется ТОЛЬКО к
+/// названиям разделов (ComboBox разделов и заголовки групп файлов); подписи файлов и
+/// значения фильтра <c>SelectedSection</c> остаются исходными, без суффикса.
+/// </summary>
+public static class PlatformSectionDisplayName
+{
+    /// <summary>
+    /// Собирает отображаемое имя раздела: <paramref name="section"/> + <paramref name="suffix"/>.
+    /// Пустой/пробельный раздел — пустая строка; пустой суффикс — исходное имя.
+    /// </summary>
+    public static string Compose(string? section, string? suffix)
+    {
+        var name = section?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+            return string.Empty;
+        return string.IsNullOrWhiteSpace(suffix) ? name : name + suffix;
     }
 }
 

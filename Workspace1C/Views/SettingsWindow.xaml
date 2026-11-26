@@ -3125,6 +3125,15 @@
                         <GroupBox Header="{loc:Loc Settings.Logging.Diagnostics}" Padding="10,6" Margin="0,12,0,0">
                             <StackPanel x:Name="LoggingDiagnosticsPanel"/>
                         </GroupBox>
+                        <!-- issue #143 (1.0.1.125): диагностика резервного копирования СУБД
+                             (CM_DEBUG_DBMS=1) включается из UI и сохраняется в settings.json. -->
+                        <CheckBox x:Name="DbmsBackupDiagnosticsCheck" Margin="0,12,0,0">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{loc:Loc Settings.Logging.DbmsDiagnostics}" VerticalAlignment="Center"/>
+                                <controls:HelpLink Margin="6,0,0,0" VerticalAlignment="Center"
+                                                   HelpText="{loc:Loc Settings.Logging.DbmsDiagnosticsDesc}"/>
+                            </StackPanel>
+                        </CheckBox>
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

@@ -183,6 +183,12 @@ namespace Workspace1C
         {
             window.GetObservable(ClientSizeProperty).Subscribe(new SizeObserver(size =>
             {
+                // Issue #171: размер развёрнутого/свёрнутого окна задаёт оконный
+                // менеджер. Присвоение Width/Height такому окну возвращало его в
+                // Normal — окно открывалось «размером как развёрнутое», но не
+                // развёрнутым. Зажимаем минимум только в обычном состоянии.
+                if (window.WindowState != WindowState.Normal)
+                    return;
                 if (window.MinWidth > 0 && size.Width < window.MinWidth)
                     window.Width = window.MinWidth;
                 if (window.MinHeight > 0 && size.Height < window.MinHeight)
@@ -211,6 +217,13 @@ namespace Workspace1C
         {
             try
             {
+                // Issue #171: развёрнутое (и свёрнутое) окно ограничивать не нужно —
+                // его границы задаёт оконный менеджер. Присвоение Width/Height
+                // развёрнутому окну сбрасывало WindowState в Normal, и при старте
+                // окно открывалось «размером как развёрнутое», но обычным.
+                if (window.WindowState != WindowState.Normal)
+                    return;
+
                 var screens = window.Screens;
                 var screen = screens?.ScreenFromWindow(window) ?? screens?.Primary;
                 if (screen is null || screen.Scaling <= 0)

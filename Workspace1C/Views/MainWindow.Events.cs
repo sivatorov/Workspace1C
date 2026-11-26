@@ -61,22 +61,43 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #171: состояние окна, которое нужно подтвердить после появления HWND
+        /// и после показа окна (см. <see cref="EnsureSavedWindowState"/>).
+        /// </summary>
+        private WindowRestoreState _pendingWindowState = WindowRestoreState.None;
+
+        /// <summary>
         /// Восстанавливает сохранённые размер, позицию и состояние окна приложения.
+        /// <para>
+        /// Issue #171: решение «применять ли сохранённый <c>WindowState</c> и какие границы
+        /// восстанавливать» принимает чистая политика
+        /// <see cref="WindowStateRestorePolicy"/> (одинаково для WPF и Avalonia). Состояние
+        /// применяется ПОСЛЕ границ и дополнительно подтверждается после создания HWND и
+        /// после показа окна: при <c>WindowStartupLocation=Manual</c> WPF пересчитывает
+        /// размещение окна при показе и мог сбросить развёрнутое состояние в <c>Normal</c> —
+        /// окно открывалось «размером как развёрнутое», но не развёрнутым.
+        /// </para>
         /// </summary>
         private void ApplySavedWindowLayout()
         {
-            var width = _viewModel.SavedWindowWidth;
-            var height = _viewModel.SavedWindowHeight;
-
-            // Если запоминание окна отключено — не восстанавливаем положение и размер.
+            // Если запоминание окна отключено — не восстанавливаем положение, размер и состояние.
             if (!_viewModel.RememberWindowLayout)
             {
                 WindowStartupLocation = WindowStartupLocation.CenterScreen;
                 return;
             }
 
-            if (width > 0 && height > 0)
+            var saved = new WindowLayoutBounds(
+                _viewModel.SavedWindowWidth,
+                _viewModel.SavedWindowHeight,
+                _viewModel.SavedWindowLeft,
+                _viewModel.SavedWindowTop);
+            var plan = WindowStateRestorePolicy.PlanRestore(_viewModel.SavedWindowState);
+
+            if (plan.ApplyBounds && WindowStateRestorePolicy.IsValidBounds(saved))
             {
+                var width = saved.Width;
+                var height = saved.Height;
                 // issue #71 (RizvanShikhammatov: скриншот 455×822; 7OH: «Я даже меньше
                 // скажу»): восстановленные из профиля размеры НЕ должны сужать окно ниже
                 // минимально допустимых — профиль мог сохранить размер из старой версии
@@ -87,8 +108,8 @@ namespace Workspace1C
                 if (double.IsFinite(MinHeight) && MinHeight > 0)
                     height = Math.Max(height, MinHeight);
 
-                var left = _viewModel.SavedWindowLeft;
-                var top = _viewModel.SavedWindowTop;
+                var left = saved.Left;
+                var top = saved.Top;
                 if (left == 0 && top == 0)
                 {
                     // Если позиция не сохранена — центрируем окно.
@@ -129,13 +150,53 @@ namespace Workspace1C
                 Width = width;
                 Height = height;
             }
-
-            // Восстанавливаем развёрнутое состояние окна.
-            if (Enum.TryParse<WindowState>(_viewModel.SavedWindowState, out var state) &&
-                state != WindowState.Minimized)
+            else
             {
-                WindowState = state;
+                // Границы не сохранены или невалидны — окно открывается по центру.
+                WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
+
+            // Issue #171: состояние — ПОСЛЕ границ. Для Maximized применённые размер и
+            // позиция играют роль restore-bounds (размер, к которому окно вернётся при
+            // восстановлении), поэтому они не затирают состояние. Свёрнутое состояние
+            // не восстанавливается (PlanRestore возвращает None).
+            _pendingWindowState = plan.State;
+            EnsureSavedWindowState(finalAttempt: false);
+        }
+
+        /// <summary>
+        /// Issue #171: подтверждает сохранённое состояние окна после того, как платформа
+        /// завершила размещение окна. Вызывается при создании HWND (SourceInitialized) и
+        /// на Loaded: к этому моменту окно уже показано, и сброс состояния ограничителем
+        /// рабочей области/пересчётом размещения больше не произойдёт.
+        /// </summary>
+        /// <param name="finalAttempt">
+        /// Истина для последней попытки (после показа окна): снимает ожидание восстановления.
+        /// </param>
+        private void EnsureSavedWindowState(bool finalAttempt)
+        {
+            var state = _pendingWindowState;
+            if (state == WindowRestoreState.None)
+                return;
+
+            try
+            {
+                if (WindowState != WindowState.Minimized)
+                {
+                    var target = state == WindowRestoreState.Maximized
+                        ? WindowState.Maximized
+                        : WindowState.Normal;
+                    if (WindowState != target)
+                        WindowState = target;
+                }
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность: сбой не должен мешать запуску.
+            }
+
+            if (finalAttempt)
+                _pendingWindowState = WindowRestoreState.None;
         }
 
         /// <summary>
@@ -163,17 +224,37 @@ namespace Workspace1C
                 // чтобы при следующем запуске окно не открывалось в старом месте/размере.
                 _viewModel.SaveWindowLayout(0, 0, 0, 0, string.Empty);
             }
-            else if (WindowState == WindowState.Normal)
+            else
             {
-                // Сохраняем только в обычном состоянии, чтобы не сохранить развёрнутое окно как размер по умолчанию.
-                // Берём фактический размер (ActualWidth/ActualHeight): Width/Height равны NaN,
-                // пока размер окна не задан явно (например, на первом запуске нового профиля),
-                // а NaN/бесконечность не сериализуются в JSON и роняли сохранение настроек.
-                SaveValidatedWindowLayout(ActualWidth, ActualHeight, Left, Top, WindowState.ToString());
-            }
-            else if (WindowState == WindowState.Maximized)
-            {
-                SaveValidatedWindowLayout(RestoreBounds.Width, RestoreBounds.Height, RestoreBounds.Left, RestoreBounds.Top, WindowState.ToString());
+                // Issue #171: что сохранять — решает чистая политика (одинаково с Avalonia).
+                // Свёрнутое окно макет не перезаписывает; обычное сохраняется фактическими
+                // размерами; развёрнутое — состоянием Maximized с restore-bounds, а если
+                // restore-bounds недоступны (окно развёрнуто с самого старта) — ранее
+                // сохранёнными границами. Раньше невалидные границы отменяли сохранение
+                // целиком, и на диск оставалось прежнее состояние Normal — из-за этого
+                // окно открывалось «размером как развёрнутое, но в состоянии Normal».
+                // Width/Height равны NaN, пока размер окна не задан явно (например, на
+                // первом запуске нового профиля), а NaN/бесконечность не сериализуются
+                // в JSON и роняли сохранение настроек — политика такие значения отбрасывает.
+                var savePlan = WindowStateRestorePolicy.PlanSave(
+                    WindowState.ToString(),
+                    new WindowLayoutBounds(ActualWidth, ActualHeight, Left, Top),
+                    new WindowLayoutBounds(
+                        RestoreBounds.Width, RestoreBounds.Height,
+                        RestoreBounds.Left, RestoreBounds.Top),
+                    new WindowLayoutBounds(
+                        _viewModel.SavedWindowWidth, _viewModel.SavedWindowHeight,
+                        _viewModel.SavedWindowLeft, _viewModel.SavedWindowTop));
+
+                if (savePlan.Save)
+                {
+                    // Нет валидных границ — пишем нули («размер не сохранён»), но состояние
+                    // фиксируем всегда: именно его потеря и была причиной дефекта.
+                    var bounds = savePlan.BoundsValid ? savePlan.Bounds : default;
+                    _viewModel.SaveWindowLayout(
+                        bounds.Width, bounds.Height, bounds.Left, bounds.Top,
+                        WindowStateRestorePolicy.ToStateName(savePlan.State));
+                }
             }
 
             if (!_forceClose && _viewModel.CloseToTray)
@@ -197,25 +278,6 @@ namespace Workspace1C
             _viewModel.UnsubscribeLanguageChanged();
 
             base.OnClosing(e);
-        }
-
-        /// <summary>
-        /// Сохраняет геометрию окна, отбрасывая невалидные значения.
-        /// Width/Height (и RestoreBounds на первом запуске профиля) могут быть NaN,
-        /// нулём или бесконечностью — такие числа не сериализуются в JSON и роняли бы
-        /// сохранение настроек. В этом случае раскладку не перезаписываем, оставляя
-        /// прежние значения (прочие настройки сохраняются отдельно через SaveSettings).
-        /// </summary>
-        private void SaveValidatedWindowLayout(double width, double height, double left, double top, string state)
-        {
-            if (double.IsNaN(width) || double.IsInfinity(width) || width <= 0 ||
-                double.IsNaN(height) || double.IsInfinity(height) || height <= 0 ||
-                double.IsNaN(left) || double.IsInfinity(left) ||
-                double.IsNaN(top) || double.IsInfinity(top))
-            {
-                return;
-            }
-            _viewModel.SaveWindowLayout(width, height, left, top, state);
         }
 
         /// <summary>
@@ -339,6 +401,11 @@ namespace Workspace1C
         /// </summary>
         private void OnWindowLoaded(object sender, RoutedEventArgs e)
         {
+            // Issue #171: окно уже показано — окончательно подтверждаем сохранённое
+            // состояние (Maximized/Normal), чтобы ограничитель рабочей области или
+            // пересчёт размещения не оставили окно «размером как развёрнутое» в Normal.
+            EnsureSavedWindowState(finalAttempt: true);
+
             AttachTreeScrollHandler();
             // Внешний общий ScrollViewer и вынесенная вертикальная полоса (issue #309):
             // подписки на изменение вьюпорта/значения и отступ полосы под заголовком.

@@ -74,6 +74,15 @@ namespace Workspace1C
             var toolsHint = WpfUi.Label("Dbms.ToolsHint", 11);
             toolsHint.Margin = new Thickness(0, 2, 0, 4);
             form.Children.Add(toolsHint);
+            // issue #143 (1.0.1.125): таймаут копии. 0 — без ограничения, длинная
+            // копия большой базы не обрывается по времени (прерывание — «Отмена»).
+            form.Children.Add(WpfUi.Wrap(
+                WpfUi.Label("Dbms.TimeoutMinutes"),
+                WpfUi.BoundTextBox(nameof(DbmsBackupViewModel.TimeoutMinutes), 70),
+                WpfUi.Label("Dbms.TimeoutMinutesUnit")));
+            var timeoutHint = WpfUi.Label("Dbms.TimeoutMinutesHint", 11);
+            timeoutHint.Margin = new Thickness(0, 2, 0, 4);
+            form.Children.Add(timeoutHint);
             WpfUi.Place(root, WpfUi.Card(form), 1);
 
             var cloud = new StackPanel();

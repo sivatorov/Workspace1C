@@ -47,6 +47,8 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     private string _outputDirectory = string.Empty;
     private string _toolsDirectory = string.Empty;
     private string _keepCount = "7";
+    // issue #143 (1.0.1.125): таймаут копии в минутах; 0 — без ограничения.
+    private string _timeoutMinutes = "0";
     private string _webDavUrl = string.Empty;
     private string _webDavUser = string.Empty;
     private string _webDavPassword = string.Empty;
@@ -170,6 +172,7 @@ public sealed class DbmsBackupViewModel : ViewModelBase
         OutputDirectory = profile.OutputDirectory;
         ToolsDirectory = profile.ToolsDirectory;
         KeepCount = profile.KeepCount.ToString(CultureInfo.InvariantCulture);
+        TimeoutMinutes = profile.TimeoutMinutes.ToString(CultureInfo.InvariantCulture);
         WebDavUrl = profile.WebDavUrl;
         WebDavUser = profile.WebDavUser;
         WebDavPassword = profile.WebDavPassword;
@@ -287,6 +290,13 @@ public sealed class DbmsBackupViewModel : ViewModelBase
     public string OutputDirectory { get => _outputDirectory; set => SetProperty(ref _outputDirectory, value ?? string.Empty); }
     public string ToolsDirectory { get => _toolsDirectory; set => SetProperty(ref _toolsDirectory, value ?? string.Empty); }
     public string KeepCount { get => _keepCount; set => SetProperty(ref _keepCount, value ?? string.Empty); }
+
+    /// <summary>
+    /// Таймаут копии в минутах (issue #143, 1.0.1.125): пусто/0 — без ограничения.
+    /// Длительная копия большой базы не обрывается по времени, прерывается только
+    /// кнопкой «Отмена».
+    /// </summary>
+    public string TimeoutMinutes { get => _timeoutMinutes; set => SetProperty(ref _timeoutMinutes, value ?? string.Empty); }
     public string WebDavUrl { get => _webDavUrl; set => SetProperty(ref _webDavUrl, value ?? string.Empty); }
     public string WebDavUser { get => _webDavUser; set => SetProperty(ref _webDavUser, value ?? string.Empty); }
     public string WebDavPassword { get => _webDavPassword; set => SetProperty(ref _webDavPassword, value ?? string.Empty); }
@@ -376,6 +386,8 @@ public sealed class DbmsBackupViewModel : ViewModelBase
             OutputDirectory = OutputDirectory.Trim(),
             ToolsDirectory = ToolsDirectory.Trim(),
             KeepCount = ParseInt(KeepCount, 7),
+            // issue #143 (1.0.1.125): 0/пусто — без ограничения.
+            TimeoutMinutes = ParseInt(TimeoutMinutes, 0),
             WebDavUrl = WebDavUrl.Trim(),
             WebDavUser = WebDavUser.Trim(),
             WebDavPassword = WebDavPassword

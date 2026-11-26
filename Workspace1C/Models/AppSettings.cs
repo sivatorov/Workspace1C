@@ -237,6 +237,15 @@ public class AppSettings
     public int ComDetectTimeoutMs { get; set; } = 30000;
 
     /// <summary>
+    /// Диагностика резервного копирования средствами СУБД (issue #143, 1.0.1.125):
+    /// включает подробный журнал <c>dbms-backup-debug.log</c> из окна
+    /// «Настройки → Логирование». Эквивалент переменной окружения
+    /// <c>CM_DEBUG_DBMS=1</c>; применяется без перезапуска через
+    /// <see cref="Services.DbmsBackupTrace.ApplySettings"/>.
+    /// </summary>
+    public bool DbmsBackupDiagnosticsEnabled { get; set; }
+
+    /// <summary>
     /// Быстрая TCP-проверка порта кластера перед COM-подключением в общей проверке
     /// доступности клиент-серверных баз (функция 12, цикл 0.3.9.229–0.3.9.233).
     /// По умолчанию ВЫКЛЮЧЕН (консервативно, поведение проверки не меняется); при

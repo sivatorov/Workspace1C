@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -279,7 +280,28 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _availableSections, value ?? Array.Empty<string>()))
+            {
                 OnPropertyChanged(nameof(HasSections));
+                OnPropertyChanged(nameof(SectionDisplayNames));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Отображаемые имена разделов страницы загрузок (issue #167, 1.0.1.125): к каждому
+    /// названию из <see cref="AvailableSections"/> добавлен локализованный суффикс
+    /// « (раздел)» / « (section)». Используется ТОЛЬКО для отображения в списке разделов;
+    /// значения фильтра (<see cref="AvailableSections"/>/<see cref="SelectedSection"/>) и
+    /// подписи файлов остаются исходными — суффикса в них нет.
+    /// </summary>
+    public IReadOnlyList<string> SectionDisplayNames
+    {
+        get
+        {
+            var suffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
+            return _availableSections
+                .Select(section => PlatformSectionDisplayName.Compose(section, suffix))
+                .ToList();
         }
     }
 
@@ -800,16 +822,15 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         // Issue #167: подпись файла в окне скачивания — только раздел, разрядность
         // (где есть) и имя файла, без «Полный клиент (rar)»/«Пакет deb»: тип часто
         // не соответствует содержимому. Часть, уже выбранную галочкой, не дублируем.
-        // 1.0.1.124: когда раздел выводится, к нему добавляется локализованный
-        // суффикс « (раздел)» — чтобы не путать название раздела с именем файла.
-        var sectionSuffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
+        // 1.0.1.125: суффикс « (раздел)» к подписи файла НЕ добавляется — раздел в
+        // списке уже отделён строкой-разделителем, пометка нужна только названиям
+        // разделов (SectionDisplayNames и заголовки групп).
         foreach (var option in options)
         {
             option.DisplayNameOverride = PlatformFileDisplayName.Compose(
                 option.File,
                 includeArchitecture: !_filterByArchitecture,
-                includeSection: !_filterBySection,
-                sectionSuffix: sectionSuffix);
+                includeSection: !_filterBySection);
         }
 
         // Issue #167: сортировка списка по итоговой строке (OrdinalIgnoreCase);
@@ -826,8 +847,11 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
 
         // Группировка по заголовкам страницы релиза (issue #330 п.2/#334 п.2):
         // порядок групп/файлов как на странице, фолбэк-группа «Файлы релиза».
+        // Issue #167 (1.0.1.125): пометка « (раздел)» добавляется к заголовкам
+        // групп-разделов (жирная/цветная строка-разделитель), но не к подписям файлов.
         var groups = PlatformFileGroupViewModel.Build(
-            options, LocalizationManager.T("PlatformDownload.Group.Default"));
+            options, LocalizationManager.T("PlatformDownload.Group.Default"),
+            LocalizationManager.T("PlatformDownload.SectionSuffix"));
         DistributionFileGroups = groups;
         DistributionOptionsGrouped = PlatformFileGroupViewModel.Flatten(groups);
 
@@ -1114,9 +1138,12 @@ public sealed class PlatformFileGroupViewModel
     /// (<see cref="PlatformReleaseFile.Group"/>); файлы без группы (null/пусто —
     /// старые релизы без заголовков) попадают в одну фолбэк-группу
     /// <paramref name="defaultGroupTitle"/>. Чистый метод, покрыт юнит-тестами.
+    /// <paramref name="sectionSuffix"/> (issue #167, 1.0.1.125) добавляется только к
+    /// заголовкам настоящих разделов — фолбэк-группа «Файлы релиза» остаётся без пометки.
     /// </summary>
     public static IReadOnlyList<PlatformFileGroupViewModel> Build(
-        IReadOnlyList<PlatformDistributionOption> options, string defaultGroupTitle)
+        IReadOnlyList<PlatformDistributionOption> options, string defaultGroupTitle,
+        string? sectionSuffix = null)
     {
         var result = new List<PlatformFileGroupViewModel>();
         if (options is null || options.Count == 0)
@@ -1129,23 +1156,30 @@ public sealed class PlatformFileGroupViewModel
         // Порядок групп — по первому вхождению на странице.
         var order = new List<string>();
         var byGroup = new Dictionary<string, List<PlatformDistributionOption>>(StringComparer.Ordinal);
+        // Настоящие разделы (есть Group) помечаются суффиксом, фолбэк — нет.
+        var isSection = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var option in options)
         {
-            var key = string.IsNullOrWhiteSpace(option.File.Group)
-                ? fallback
-                : option.File.Group!.Trim();
+            var hasSection = !string.IsNullOrWhiteSpace(option.File.Group);
+            var key = hasSection ? option.File.Group!.Trim() : fallback;
             if (!byGroup.TryGetValue(key, out var list))
             {
                 list = new List<PlatformDistributionOption>();
                 byGroup[key] = list;
                 order.Add(key);
+                isSection[key] = hasSection;
             }
 
             list.Add(option);
         }
 
         foreach (var key in order)
-            result.Add(new PlatformFileGroupViewModel(key, byGroup[key]));
+        {
+            var title = isSection[key]
+                ? PlatformSectionDisplayName.Compose(key, sectionSuffix)
+                : key;
+            result.Add(new PlatformFileGroupViewModel(title, byGroup[key]));
+        }
         return result;
     }
 

@@ -197,6 +197,11 @@ namespace Workspace1C
             Loaded += (_, _) => UpdateGlassFrameForMaximize();
             SizeChanged += (_, _) => UpdateGlassFrameForMaximize();
             LocationChanged += (_, _) => UpdateGlassFrameForMaximize();
+            // Issue #172: при переносе окна между мониторами с разным масштабом (100% ↔ 125%
+            // ↔ 150%) WPF пересчитывает DIP→пиксели, и прежняя толщина стеклянной рамки/
+            // рамки ресайза устаревает — вокруг максимизированного окна остаётся прозрачная
+            // полоса. Пересчитываем геометрию по фактическому DPI окна.
+            DpiChanged += (_, _) => UpdateGlassFrameForMaximize();
 
             // Глифы кнопок управления окном резолвятся по активному набору иконок (Задача 2):
             // стартовый рендер берёт Fluent/XAML-контуры, а активный набор применяется здесь
@@ -1204,6 +1209,11 @@ namespace Workspace1C
             {
                 // Не блокируем запуск из-за недоступности эффекта стекла.
             }
+
+            // Issue #171: HWND уже создан — подтверждаем сохранённое состояние окна
+            // (Maximized/Normal) до показа. Окончательное подтверждение — на Loaded
+            // (см. OnWindowLoaded), когда окно уже размещено на экране.
+            EnsureSavedWindowState(finalAttempt: false);
         }
 
         /// <summary>
@@ -1344,14 +1354,18 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Толщина стеклянной рамки по фактическому положению окна (дефект «пустое поле
-        /// внизу программы», 1.0.1.122): развёрнутое окно — 0 (прежнее обходное решение,
-        /// иначе расширенная рамка перекрывает панель задач Windows 11); окно, прижатое
-        /// к верхней/нижней границе рабочей области, — тоже 0 (расширенная рамка
-        /// GlassFrameThickness=-1 оставляла прозрачную полосу ~44 px снизу, через которую
-        /// был виден рабочий стол); иначе — -1 (acrylic сохраняется). Расчёт — в чистой
-        /// <see cref="WindowGlassFramePolicy.Resolve"/>; пересчитывается при
-        /// StateChanged/SizeChanged/LocationChanged/Loaded.
+        /// Полная геометрия рамки по фактическому положению окна и его DPI (issue #172,
+        /// дефект «пустое поле внизу программы» 1.0.1.122). Развёрнутое окно при любом
+        /// масштабе (100%, 125%, 150%) получает нулевую стеклянную рамку, нулевую рамку
+        /// ресайза и прямые углы — иначе на HiDPI WPF пересчитывал
+        /// <c>ResizeBorderThickness</c> (6 DIP = 7.5 px при 125%) в физические пиксели,
+        /// и вокруг максимизированного окна оставалась прозрачная полоса. Окно, низ
+        /// которого прижат к нижней границе рабочей области (окно на всю её высоту),
+        /// тоже получает 0; иначе — -1 (acrylic сохраняется). Прижатие только к верхней
+        /// границе (Top = 0) рамку НЕ обнуляет — иначе acrylic отключался почти всегда
+        /// и давал «видеоартефакты» на списке баз (регрессия #170). Расчёт — в чистой
+        /// <see cref="WindowGlassFramePolicy.ResolveState"/>; пересчитывается при
+        /// StateChanged/SizeChanged/LocationChanged/DpiChanged/Loaded.
         /// </summary>
         private void UpdateGlassFrameForMaximize()
         {
@@ -1366,16 +1380,47 @@ namespace Workspace1C
                     ? (area.Left, area.Top, area.Width, area.Height)
                     : (double.NaN, double.NaN, double.NaN, double.NaN);
 
-                var thickness = WindowGlassFramePolicy.Resolve(
+                var state = WindowGlassFramePolicy.ResolveState(
                     WindowState == WindowState.Maximized,
                     (Left, Top, ActualWidth, ActualHeight),
-                    work);
+                    work,
+                    GetWindowDpiScale());
 
-                chrome.GlassFrameThickness = new Thickness(thickness);
+                var glass = new Thickness(state.GlassFrameThickness);
+                if (chrome.GlassFrameThickness != glass)
+                    chrome.GlassFrameThickness = glass;
+
+                var resize = new Thickness(state.ResizeBorderThickness);
+                if (chrome.ResizeBorderThickness != resize)
+                    chrome.ResizeBorderThickness = resize;
+
+                if (state.CornerRadiusOverride is { } corner)
+                {
+                    var radius = new CornerRadius(corner);
+                    if (chrome.CornerRadius != radius)
+                        chrome.CornerRadius = radius;
+                }
             }
             catch
             {
                 // Игнорируем: если рамку не удалось поправить, окно всё равно работает.
+            }
+        }
+
+        /// <summary>
+        /// Фактический масштаб DPI окна (issue #172): 1.0 = 96 DPI. До показа окна
+        /// <see cref="VisualTreeHelper.GetDpi"/> может быть недоступен — тогда 1.0,
+        /// а точное значение подставит пересчёт при DpiChanged/загрузке.
+        /// </summary>
+        private double GetWindowDpiScale()
+        {
+            try
+            {
+                return VisualTreeHelper.GetDpi(this).DpiScaleX;
+            }
+            catch
+            {
+                return 1.0;
             }
         }
 

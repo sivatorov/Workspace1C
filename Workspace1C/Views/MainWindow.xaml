@@ -1239,6 +1239,10 @@
                          управляется минимальной шириной контента (UpdateTreeMinWidth): ровно когда
                          сумма ширин колонок превышает ширину области. -->
                     <!-- Список баз в виде дерева «группа в группе» -->
+                    <!-- Issue #170: список баз рисуется на НЕПРОЗРАЧНОЙ подложке карточки.
+                         Прозрачный фон дерева поверх полупрозрачного окна (alpha ~0xE8)
+                         давал «видеоартефакты»/смазывание строк при прокрутке и ресайзе,
+                         когда расширенная стеклянная рамка (acrylic) пересоздавалась. -->
                     <controls:LeveledTreeView x:Name="MainTree"
                               Grid.Row="1"
                               AllowDrop="True"
@@ -1248,7 +1252,7 @@
                               Drop="OnMainTree_Drop"
                               GiveFeedback="OnMainTree_GiveFeedback"
                               ItemsSource="{Binding GroupNodes}"
-                              Background="Transparent"
+                              Background="{DynamicResource CardBackgroundBrush}"
                               BorderThickness="0"
                               Padding="0"
                               HorizontalAlignment="Stretch"

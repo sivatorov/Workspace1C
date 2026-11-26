@@ -1860,11 +1860,14 @@ namespace Workspace1C
             {
                 BorderThickness = new Thickness(0)
             };
-            // Фон списка баз — «стеклянная» версия фона рабочей области из темы:
-            // полупрозрачный, чтобы acrylic/размытие проступали и в области списка,
-            // а не только за верхней панелью (иначе стекло выглядело бы пятнами).
+            // Issue #170: фон списка баз — НЕПРОЗРАЧНЫЙ цвет рабочей области из темы.
+            // Прежний полупрозрачный фон (alpha ~0xE8) поверх acrylic давал «видео-
+            // артефакты»/смазывание строк при прокрутке и ресайзе: контент списка
+            // композитился с пересоздаваемым системным backdrop. Стеклянный эффект
+            // остаётся у окна (шапка и фон рабочей области), а строки списка рисуются
+            // на стабильной непрозрачной подложке.
             ThemeBrushes.Observe(_tree, "ContentBackgroundColorBrush",
-                brush => _tree.Background = ThemeBrushes.WithAlpha(brush, GlassBackgroundAlpha));
+                brush => _tree.Background = brush);
             // Внутренняя горизонтальная полоса дерева скрыта, но контенту разрешено
             // быть шире области (Hidden, а не Disabled): строки растягиваются по сумме
             // ширин колонок, а горизонтальную прокрутку ведёт внешний ScrollViewer
@@ -3335,10 +3338,24 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Issue #171: сохранённое состояние окна, которое нужно подтвердить после
+        /// показа окна (<see cref="EnsureSavedWindowState"/>).
+        /// </summary>
+        private WindowRestoreState _pendingWindowState = WindowRestoreState.None;
+
+        /// <summary>
         /// Восстанавливает сохранённые размер, позицию и состояние окна.
         /// Настройки читаются здесь из репозитория, а не из модели: она
         /// загружает их только в Initialize по событию Loaded, то есть уже
         /// после того, как окно построено и показано.
+        /// <para>
+        /// Issue #171: решение «применять ли сохранённый <c>WindowState</c> и какие границы
+        /// восстанавливать» принимает общая с WPF чистая политика
+        /// <see cref="WindowStateRestorePolicy"/>. Состояние выставляется последним и
+        /// подтверждается после показа окна (OnOpened): ограничитель рабочей области
+        /// выставлял <c>Width</c>/<c>Height</c> уже развёрнутому окну, из-за чего окно
+        /// открывалось «размером как развёрнутое», но в состоянии <c>Normal</c>.
+        /// </para>
         /// </summary>
         private void ApplySavedWindowLayout()
         {
@@ -3360,35 +3377,68 @@ namespace Workspace1C
                 return;
             }
 
-            if (settings.WindowWidth > 0 && settings.WindowHeight > 0)
+            var plan = WindowStateRestorePolicy.PlanRestore(settings.WindowState);
+            var saved = new WindowLayoutBounds(
+                settings.WindowWidth, settings.WindowHeight,
+                settings.WindowLeft, settings.WindowTop);
+
+            if (plan.ApplyBounds && WindowStateRestorePolicy.IsValidBounds(saved))
             {
                 // issue #71: восстановленный из профиля размер не должен сужать окно
                 // ниже MinWidth/MinHeight (профиль мог сохранить размер из старой версии
                 // или с маленького экрана — окно открылось бы «сжатым»).
-                Width = Math.Max(settings.WindowWidth, MinWidth);
-                Height = Math.Max(settings.WindowHeight, MinHeight);
-            }
+                Width = Math.Max(saved.Width, MinWidth);
+                Height = Math.Max(saved.Height, MinHeight);
 
-            var left = settings.WindowLeft;
-            var top = settings.WindowTop;
-            if (left == 0 && top == 0)
-            {
-                WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                if (saved.Left == 0 && saved.Top == 0)
+                {
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen;
+                }
+                else
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual;
+                    Position = ClampToScreen(new PixelPoint(
+                        (int)Math.Round(saved.Left), (int)Math.Round(saved.Top)));
+                }
             }
             else
             {
-                WindowStartupLocation = WindowStartupLocation.Manual;
-                Position = ClampToScreen(new PixelPoint((int)Math.Round(left), (int)Math.Round(top)));
+                // Границы не сохранены или невалидны — окно открывается по центру.
+                WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
 
-            // IsDefined обязателен: TryParse принимает и числовую строку, даже
-            // когда числа нет среди членов перечисления, и «999» дошло бы
-            // до окна. Тот же класс ошибки уже стрелял на разборе клавиш.
-            if (Enum.TryParse<WindowState>(settings.WindowState, out var state)
-                && Enum.IsDefined(state)
-                && state != WindowState.Minimized)
+            // Issue #171: состояние — ПОСЛЕ границ (для Maximized применённые размер и
+            // позиция играют роль restore-bounds). Свёрнутое состояние не
+            // восстанавливается: PlanRestore возвращает для него None.
+            _pendingWindowState = plan.State;
+            EnsureSavedWindowState();
+        }
+
+        /// <summary>
+        /// Issue #171: подтверждает сохранённое состояние окна после того, как платформа
+        /// завершила размещение и ограничители размера/рабочей области отработали.
+        /// Без этого окно открывалось размером как развёрнутое, но в состоянии Normal.
+        /// </summary>
+        private void EnsureSavedWindowState()
+        {
+            var state = _pendingWindowState;
+            if (state == WindowRestoreState.None)
+                return;
+
+            try
             {
-                WindowState = state;
+                if (WindowState != WindowState.Minimized)
+                {
+                    var target = state == WindowRestoreState.Maximized
+                        ? WindowState.Maximized
+                        : WindowState.Normal;
+                    if (WindowState != target)
+                        WindowState = target;
+                }
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность: сбой не должен мешать запуску.
             }
         }
 
@@ -3400,6 +3450,13 @@ namespace Workspace1C
         protected override void OnOpened(EventArgs e)
         {
             base.OnOpened(e);
+
+            // Issue #171: ограничители размера/рабочей области уже отработали (они
+            // подписаны на Opened раньше) — окончательно подтверждаем сохранённое
+            // состояние и снимаем ожидание восстановления.
+            EnsureSavedWindowState();
+            _pendingWindowState = WindowRestoreState.None;
+
             if (WindowStartupLocation == WindowStartupLocation.Manual
                 && WindowState == WindowState.Normal)
             {
@@ -3496,6 +3553,14 @@ namespace Workspace1C
         /// <summary>
         /// Сохраняет размер, позицию и состояние окна. Позиция пишется в физических
         /// пикселях: в Avalonia Position задан в них, в отличие от Left и Top в WPF.
+        /// <para>
+        /// Issue #171: что сохранять, решает общая с WPF чистая политика
+        /// <see cref="WindowStateRestorePolicy"/>. Развёрнутое окно сохраняется
+        /// состоянием <c>Maximized</c>, а размером/позицией — restore-bounds (или ранее
+        /// сохранёнными, если окно развёрнуто с самого старта). Состояние сохраняется
+        /// всегда: раньше отсутствие restore-bounds отменяло запись целиком, и на диск
+        /// оставалось прежнее состояние <c>Normal</c>.
+        /// </para>
         /// </summary>
         private void SaveWindowLayout()
         {
@@ -3521,34 +3586,37 @@ namespace Workspace1C
             if (!IsVisible)
                 return;
 
-            if (WindowState == WindowState.Normal)
-            {
-                RememberNormalBounds();
-            }
-            else if (WindowState == WindowState.Minimized)
+            var saved = new WindowLayoutBounds(
+                _vm.SavedWindowWidth, _vm.SavedWindowHeight,
+                _vm.SavedWindowLeft, _vm.SavedWindowTop);
+            var actual = new WindowLayoutBounds(
+                ClientSize.Width, ClientSize.Height, Position.X, Position.Y);
+            WindowLayoutBounds? restore = _normalBounds is { } normal
+                ? new WindowLayoutBounds(normal.Width, normal.Height, normal.Position.X, normal.Position.Y)
+                : null;
+
+            var plan = WindowStateRestorePolicy.PlanSave(WindowState.ToString(), actual, restore, saved);
+            if (!plan.Save)
             {
                 // Свёрнутое окно ничего не говорит о своей геометрии.
                 return;
             }
 
-            // Развёрнутое окно сохраняется своим состоянием, но размером
-            // и положением обычного: иначе следующий запуск взял бы размер
-            // во весь экран как обычный. Так же устроена версия для Windows
-            // (MainWindow.Events.cs, ветка Maximized и RestoreBounds).
-            if (_normalBounds is not { } bounds)
-                return;
+            if (plan.State == WindowRestoreState.Normal)
+                RememberNormalBounds();
+
+            var bounds = plan.BoundsValid ? plan.Bounds : default;
+            var state = WindowStateRestorePolicy.ToStateName(plan.State);
 
             // Ничего не изменилось: лишняя запись настроек при закрытии не нужна.
-            var state = WindowState.ToString();
             if (bounds.Width == _vm.SavedWindowWidth && bounds.Height == _vm.SavedWindowHeight
-                && bounds.Position.X == _vm.SavedWindowLeft && bounds.Position.Y == _vm.SavedWindowTop
+                && bounds.Left == _vm.SavedWindowLeft && bounds.Top == _vm.SavedWindowTop
                 && string.Equals(state, _vm.SavedWindowState, StringComparison.Ordinal))
             {
                 return;
             }
 
-            _vm.SaveWindowLayout(bounds.Width, bounds.Height,
-                bounds.Position.X, bounds.Position.Y, state);
+            _vm.SaveWindowLayout(bounds.Width, bounds.Height, bounds.Left, bounds.Top, state);
         }
 
         /// <summary>Геометрия окна в обычном состоянии, чтобы развёрнутое

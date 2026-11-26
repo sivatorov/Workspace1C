@@ -85,6 +85,9 @@ public partial class MainViewModel : ViewModelBase
     // Быстрая TCP-проверка порта кластера перед COM (функция 12, 0.3.9.233);
     // по умолчанию выключена (консервативно).
     private bool _tcpPrecheckEnabled;
+    // Диагностика резервного копирования СУБД (issue #143, 1.0.1.125): включает
+    // dbms-backup-debug.log из окна «Настройки → Логирование» (CM_DEBUG_DBMS).
+    private bool _dbmsBackupDiagnosticsEnabled;
     // Глубина истории запусков одной базы (issue #246), по умолчанию 30.
     private int _maxLaunchHistoryPerBase = 30;
     private readonly ObservableCollection<string> _activeTagFilters = new();
@@ -576,6 +579,9 @@ public partial class MainViewModel : ViewModelBase
         // профиля, — после неё каталог настроек уже другой, а список баз в окне прежний.
         OneCComConnector.ApplyTemplate(_comConnectorNameTemplate);
         _comDetectTimeoutMs = Math.Max(1000, settings.ComDetectTimeoutMs);
+        // issue #143 (1.0.1.125): переключатель «Настройки → Логирование».
+        _dbmsBackupDiagnosticsEnabled = settings.DbmsBackupDiagnosticsEnabled;
+        DbmsBackupTrace.ApplySettings(_dbmsBackupDiagnosticsEnabled);
         // Быстрая TCP-проверка порта кластера перед COM при проверке доступности
         // клиент-серверных баз (функция 12, 0.3.9.233).
         _tcpPrecheckEnabled = settings.AvailabilityTcpPrecheckEnabled;

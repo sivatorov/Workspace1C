@@ -708,6 +708,8 @@ public partial class MainViewModel : ViewModelBase
         s.ComConnectorNameTemplate = _comConnectorNameTemplate;
         s.ComDetectTimeoutMs = _comDetectTimeoutMs;
         s.AvailabilityTcpPrecheckEnabled = _tcpPrecheckEnabled;
+        // issue #143 (1.0.1.125): диагностика резервного копирования СУБД из UI.
+        s.DbmsBackupDiagnosticsEnabled = _dbmsBackupDiagnosticsEnabled;
         s.MaxLaunchHistoryPerBase = _maxLaunchHistoryPerBase;
         s.ShowVersionColumn = _showVersionColumn;
         s.ShowConfigurationColumn = _showConfigurationColumn;

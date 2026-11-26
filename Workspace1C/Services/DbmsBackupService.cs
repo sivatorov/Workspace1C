@@ -48,10 +48,12 @@ public sealed class DbmsBackupProfile
     public int KeepCount { get; set; } = 7;
 
     /// <summary>
-    /// Таймаут операции дампа в минутах (issue #143). 0 или отрицательное —
-    /// значение по умолчанию 360. Таймаут всегда прерывается кнопкой «Отмена».
+    /// Таймаут операции дампа в минутах (issue #143). 0 — без ограничения:
+    /// длительная копия большой базы не обрывается по времени и завершается
+    /// только по факту (или кнопкой «Отмена»). Отрицательное значение
+    /// нормализуется в 0. По умолчанию — без ограничения (1.0.1.125).
     /// </summary>
-    public int TimeoutMinutes { get; set; } = 360;
+    public int TimeoutMinutes { get; set; }
 
     /// <summary>Адрес WebDAV-каталога для выгрузки копии (пусто — не выгружать).</summary>
     public string WebDavUrl { get; set; } = string.Empty;
@@ -161,9 +163,10 @@ public static class DbmsBackupService
 
     /// <summary>
     /// Нормализует старый профиль (issue #143), не выполняя сетевых операций:
-    /// убирает пробелы/кавычки в путях, восстанавливает таймаут (0 → 360 мин) и
-    /// корректный тип СУБД, чтобы <see cref="Validate"/> не пропускал заведомо
-    /// проблемный профиль в блокирующую операцию.
+    /// убирает пробелы/кавычки в путях, приводит отрицательный таймаут к 0
+    /// («без ограничения», 1.0.1.125) и корректный тип СУБД, чтобы
+    /// <see cref="Validate"/> не пропускал заведомо проблемный профиль в
+    /// блокирующую операцию.
     /// </summary>
     public static void Normalize(DbmsBackupProfile profile)
     {
@@ -176,8 +179,9 @@ public static class DbmsBackupService
         profile.ToolsDirectory = NormalizePath(profile.ToolsDirectory);
         profile.WebDavUrl = (profile.WebDavUrl ?? string.Empty).Trim();
         profile.WebDavUser = (profile.WebDavUser ?? string.Empty).Trim();
-        if (profile.TimeoutMinutes <= 0)
-            profile.TimeoutMinutes = 360;
+        // issue #143 (1.0.1.125): 0 — без ограничения, длинная копия не обрывается.
+        if (profile.TimeoutMinutes < 0)
+            profile.TimeoutMinutes = 0;
         if (profile.KeepCount < 0)
             profile.KeepCount = 7;
         if (!Enum.IsDefined(profile.Dbms))
@@ -296,7 +300,7 @@ public static class DbmsBackupService
     /// <summary>
     /// Точка подмены запуска утилит (тесты). По умолчанию — <see cref="ProcessRunner"/>.
     /// </summary>
-    public static Func<string, IReadOnlyList<string>, TimeSpan, IDictionary<string, string>?,
+    public static Func<string, IReadOnlyList<string>, TimeSpan?, IDictionary<string, string>?,
         CancellationToken, Task<ProcessRunResult>> RunToolOverride { get; set; } =
         (fileName, args, timeout, environment, ct) =>
             ProcessRunner.RunAsync(fileName, args, timeout: timeout, environment: environment, ct: ct);
@@ -467,7 +471,7 @@ public static class DbmsBackupService
     /// не «съедает» потоки пула и не мешает срабатыванию сторожевого таймаута.
     /// </summary>
     private static Task<ProcessRunResult> RunToolAsync(string fileName, IReadOnlyList<string> args,
-        TimeSpan timeout, IDictionary<string, string>? environment, CancellationToken ct) =>
+        TimeSpan? timeout, IDictionary<string, string>? environment, CancellationToken ct) =>
         BlockingIo.RunAsync(() => RunToolOverride(fileName, args, timeout, environment, ct), ct);
 
     /// <summary>Удаляет недописанный файл копии после отмены/таймаута/ошибки.</summary>
@@ -519,7 +523,11 @@ public static class DbmsBackupService
             return result;
         }
 
-        var timeout = TimeSpan.FromMinutes(profile.TimeoutMinutes > 0 ? profile.TimeoutMinutes : 360);
+        // issue #143 (1.0.1.125): 0 — без жёсткого лимита. Копия большой базы
+        // не должна обрываться по времени; прервать её может только «Отмена».
+        TimeSpan? timeout = profile.TimeoutMinutes > 0
+            ? TimeSpan.FromMinutes(profile.TimeoutMinutes)
+            : null;
         var directory = profile.OutputDirectory.Trim();
         var target = Path.Combine(directory, BuildFileName(profile, DateTime.Now));
 

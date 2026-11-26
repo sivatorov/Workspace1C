@@ -83,6 +83,15 @@ namespace Workspace1C
             var toolsHint = AvaloniaUi.Label("Dbms.ToolsHint", 11);
             toolsHint.Margin = new Thickness(0, 2, 0, 4);
             form.Children.Add(toolsHint);
+            // issue #143 (1.0.1.125): таймаут копии. 0 — без ограничения, длинная
+            // копия большой базы не обрывается по времени (прерывание — «Отмена»).
+            form.Children.Add(AvaloniaUi.Wrap(
+                AvaloniaUi.Label("Dbms.TimeoutMinutes"),
+                AvaloniaUi.BoundTextBox(nameof(DbmsBackupViewModel.TimeoutMinutes), 70),
+                AvaloniaUi.Label("Dbms.TimeoutMinutesUnit")));
+            var timeoutHint = AvaloniaUi.Label("Dbms.TimeoutMinutesHint", 11);
+            timeoutHint.Margin = new Thickness(0, 2, 0, 4);
+            form.Children.Add(timeoutHint);
             AvaloniaUi.Place(root, AvaloniaUi.Card(form), 1);
 
             var cloud = new StackPanel();

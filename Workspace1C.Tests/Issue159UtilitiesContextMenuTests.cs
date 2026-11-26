@@ -131,10 +131,65 @@ public sealed class Issue159UtilitiesContextMenuTests
         var xaml = ReadProjectFile("Workspace1C", "Themes", themeFile);
         var theme = Slice(xaml, "x:Key=\"ModernTreeViewItem\"", "</Style>");
 
-        Assert.Contains("MinWidth=\"22\" MinHeight=\"22\"", theme, StringComparison.Ordinal);
+        // Issue #159 (1.0.1.125): раскрыватель — ЖЁСТКО ограниченный квадрат 24×24.
+        // Раньше ширина не задавалась (только MinWidth=22 при Stretch), и неявный
+        // стиль ToggleButton из MaterialDesign растягивал кнопку до 52 px: она
+        // вылезала из колонки вправо, а глиф «+»/«−» оказывался под чекбоксом.
+        Assert.Contains("Width=\"24\" Height=\"24\"", theme, StringComparison.Ordinal);
+        Assert.Contains("MinWidth=\"0\" MinHeight=\"0\" Padding=\"0\"", theme, StringComparison.Ordinal);
+        Assert.Contains("HorizontalAlignment=\"Left\"", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinWidth=\"22\" MinHeight=\"22\"", theme, StringComparison.Ordinal);
         Assert.DoesNotContain("Width=\"22\" Height=\"22\"", theme, StringComparison.Ordinal);
+        // Содержимое по-прежнему растягивается на всю ширину колонки.
         Assert.Contains("HorizontalAlignment=\"Stretch\"", theme, StringComparison.Ordinal);
         Assert.Contains("Background=\"Transparent\"", theme, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("LightTheme.xaml")]
+    [InlineData("DarkTheme.xaml")]
+    public void WpfTreeTheme_ExpanderIsFirstColumn_BeforeContent(string themeFile)
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Themes", themeFile);
+        var theme = Slice(xaml, "x:Key=\"ModernTreeViewItem\"", "</Style>");
+
+        // Раскладка строки: колонка раскрывателя 24 → колонка содержимого (*).
+        var expanderColumn = theme.IndexOf("<ColumnDefinition Width=\"24\"/>", StringComparison.Ordinal);
+        var contentColumn = theme.IndexOf("<ColumnDefinition Width=\"*\"/>", StringComparison.Ordinal);
+        Assert.True(expanderColumn >= 0,
+            "Первая колонка строки должна быть фиксированной ширины 24 (квадрат раскрывателя).");
+        Assert.True(contentColumn > expanderColumn,
+            "Колонка содержимого (*) должна идти после колонки раскрывателя.");
+        Assert.DoesNotContain("<ColumnDefinition Width=\"26\"/>", theme, StringComparison.Ordinal);
+
+        // В шаблоне раскрыватель объявлен РАНЬШЕ содержимого (чекбокс/иконка/заголовок):
+        // кнопка свёртки — в начале строки, а не справа и не под галочкой.
+        var expander = theme.IndexOf("x:Name=\"Expander\"", StringComparison.Ordinal);
+        var presenter = theme.IndexOf("ContentSource=\"Header\"", StringComparison.Ordinal);
+        Assert.True(expander >= 0, "В шаблоне должен быть раскрыватель x:Name=\"Expander\".");
+        Assert.True(presenter > expander,
+            "Раскрыватель должен идти в шаблоне до содержимого строки.");
+
+        // Раскрыватель — в колонке 0, содержимое — в колонке 1; отступ 4 px отделяет
+        // кнопку от чекбокса, чтобы они не слипались.
+        Assert.Contains("Grid.Column=\"0\"", theme, StringComparison.Ordinal);
+        Assert.Contains("Grid.Column=\"1\"", theme, StringComparison.Ordinal);
+        Assert.Contains("Margin=\"4,0,0,0\"", theme, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfTreeThemes_HaveIdenticalRowLayout()
+    {
+        // Светлая и тёмная темы должны давать одинаковую раскладку строки дерева:
+        // раскрыватель → отступ → чекбокс → отступ 8 px → иконка → заголовок.
+        var light = Slice(
+            ReadProjectFile("Workspace1C", "Themes", "LightTheme.xaml"),
+            "x:Key=\"ModernTreeViewItem\"", "</Style>");
+        var dark = Slice(
+            ReadProjectFile("Workspace1C", "Themes", "DarkTheme.xaml"),
+            "x:Key=\"ModernTreeViewItem\"", "</Style>");
+
+        Assert.Equal(NormalizeXaml(light), NormalizeXaml(dark));
     }
 
     [Fact]
@@ -158,8 +213,9 @@ public sealed class Issue159UtilitiesContextMenuTests
     [Fact]
     public void WpfEditorIcons_HaveConsistentGapAfterCheckbox()
     {
-        // Issue #159 (1.0.1.124): иконки во всех трёх WPF-редакторах имеют одинаковый
-        // отступ после галочки (8 px) — устранён регресс «иконки съехали под галочку».
+        // Issue #159 (1.0.1.124, усилено в 1.0.1.125): иконки во всех трёх WPF-редакторах
+        // имеют одинаковый отступ после галочки (8 px) и идут СТРОГО после чекбокса —
+        // устранён регресс «иконки/кнопки съехали под галочку».
         foreach (var file in new[]
                  {
                      "UtilitiesMenuEditorWindow.xaml",
@@ -168,7 +224,13 @@ public sealed class Issue159UtilitiesContextMenuTests
                  })
         {
             var xaml = ReadProjectFile("Workspace1C", "Views", file);
-            Assert.Contains("Margin=\"8,0,0,0\"", xaml, StringComparison.Ordinal);
+            var template = Slice(xaml, "<HierarchicalDataTemplate", "</HierarchicalDataTemplate>");
+
+            var checkbox = template.IndexOf("<CheckBox", StringComparison.Ordinal);
+            var iconGap = template.IndexOf("Margin=\"8,0,0,0\"", StringComparison.Ordinal);
+            Assert.True(checkbox >= 0, $"{file}: в шаблоне узла нет чекбокса.");
+            Assert.True(iconGap > checkbox,
+                $"{file}: иконка узла должна идти после чекбокса с отступом 8 px.");
         }
     }
 
@@ -404,6 +466,14 @@ public sealed class Issue159UtilitiesContextMenuTests
             foreach (var child in FlattenContext(node.Children))
                 yield return child;
         }
+    }
+
+    private static string NormalizeXaml(string text)
+    {
+        var withoutComments = System.Text.RegularExpressions.Regex.Replace(
+            text, "<!--.*?-->", string.Empty,
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+        return System.Text.RegularExpressions.Regex.Replace(withoutComments, "\\s+", string.Empty);
     }
 
     private static string Slice(string text, string startMarker, string endMarker)

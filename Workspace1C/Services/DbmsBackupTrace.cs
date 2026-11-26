@@ -34,6 +34,19 @@ public static class DbmsBackupTrace
     /// <summary>Переопределение включения (тесты); null — по переменной окружения.</summary>
     public static bool? EnabledOverride { get; set; }
 
+    /// <summary>
+    /// Применяет настройку «Диагностика резервного копирования СУБД» из
+    /// <see cref="Workspace1C.Models.AppSettings.DbmsBackupDiagnosticsEnabled"/>
+    /// (issue #143, 1.0.1.125): включённая настройка равносильна
+    /// <c>CM_DEBUG_DBMS=1</c>. Используется существующий
+    /// <see cref="EnabledOverride"/>; выключение возвращает решение переменной
+    /// окружения, чтобы диагностика, включённая снаружи, продолжала работать.
+    /// </summary>
+    public static void ApplySettings(bool enabled)
+    {
+        EnabledOverride = enabled ? true : null;
+    }
+
     /// <summary>Переопределение каталога журнала (тесты); null — <see cref="PlatformPaths.LogDirectory"/>.</summary>
     public static string? DirectoryOverride { get; set; }
 

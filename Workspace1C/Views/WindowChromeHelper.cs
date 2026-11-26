@@ -559,9 +559,12 @@ namespace Workspace1C
             // Дефект «пустое поле внизу программы» (1.0.1.122): толщина стеклянной рамки
             // зависит не только от состояния окна, но и от его фактического положения
             // относительно рабочей области, поэтому пересчитываем её при изменении
-            // размеров/позиции и после загрузки — как в главном окне.
+            // размеров/позиции и после загрузки — как в главном окне. Issue #172: при
+            // смене DPI (перенос между мониторами 100% ↔ 125% ↔ 150%) геометрия рамки
+            // тоже устаревает — пересчитываем по фактическому DPI окна.
             window.SizeChanged += (_, _) => UpdateGlassFrameForMaximize(window);
             window.LocationChanged += (_, _) => UpdateGlassFrameForMaximize(window);
+            window.DpiChanged += (_, _) => UpdateGlassFrameForMaximize(window);
             window.Loaded += (_, _) => UpdateGlassFrameForMaximize(window);
             UpdateGlassFrameForMaximize(window);
 
@@ -1888,12 +1891,16 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Толщина стеклянной рамки по фактическому положению окна — та же политика, что
-        /// у главного окна (дефект «пустое поле внизу программы», 1.0.1.122): развёрнутое
-        /// окно — 0 (прежнее обходное решение для панели задач Windows 11); окно, прижатое
-        /// к верхней/нижней границе рабочей области, — тоже 0 (расширенная рамка
-        /// GlassFrameThickness=-1 оставляла прозрачную полосу снизу); иначе — -1.
-        /// Расчёт — в чистой <see cref="WindowGlassFramePolicy.Resolve"/>.
+        /// Полная геометрия рамки по фактическому положению окна и его DPI — та же
+        /// политика, что у главного окна (issue #172, дефект «пустое поле внизу
+        /// программы» 1.0.1.122). Развёрнутое окно при любом масштабе (100%, 125%, 150%)
+        /// получает нулевую стеклянную рамку, нулевую рамку ресайза и прямые углы —
+        /// иначе на HiDPI <c>ResizeBorderThickness</c> (6 DIP) пересчитывался в
+        /// физические пиксели, и вокруг максимизированного окна оставалась прозрачная
+        /// полоса. Окно, низ которого прижат к нижней границе рабочей области (на всю
+        /// её высоту), — тоже 0; иначе — -1 (acrylic сохраняется). Прижатие только
+        /// к верхней границе рамку НЕ обнуляет (регрессия #170). Расчёт — в чистой
+        /// <see cref="WindowGlassFramePolicy.ResolveState"/>.
         /// </summary>
         private static void UpdateGlassFrameForMaximize(Window window)
         {
@@ -1908,12 +1915,26 @@ namespace Workspace1C
                     ? (area.Left, area.Top, area.Width, area.Height)
                     : (double.NaN, double.NaN, double.NaN, double.NaN);
 
-                var thickness = WindowGlassFramePolicy.Resolve(
+                var state = WindowGlassFramePolicy.ResolveState(
                     window.WindowState == WindowState.Maximized,
                     (window.Left, window.Top, window.ActualWidth, window.ActualHeight),
-                    work);
+                    work,
+                    GetWindowDpiScale(window).X);
 
-                chrome.GlassFrameThickness = new Thickness(thickness);
+                var glass = new Thickness(state.GlassFrameThickness);
+                if (chrome.GlassFrameThickness != glass)
+                    chrome.GlassFrameThickness = glass;
+
+                var resize = new Thickness(state.ResizeBorderThickness);
+                if (chrome.ResizeBorderThickness != resize)
+                    chrome.ResizeBorderThickness = resize;
+
+                if (state.CornerRadiusOverride is { } corner)
+                {
+                    var radius = new CornerRadius(corner);
+                    if (chrome.CornerRadius != radius)
+                        chrome.CornerRadius = radius;
+                }
             }
             catch
             {

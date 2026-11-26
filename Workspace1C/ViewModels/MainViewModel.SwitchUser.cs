@@ -122,6 +122,11 @@ public partial class MainViewModel
             _comDetectTimeoutMs = Math.Max(1000, settings.ComDetectTimeoutMs);
             OnPropertyChanged(nameof(ComDetectTimeoutMs));
 
+            // issue #143 (1.0.1.125): диагностика резервного копирования СУБД — у профиля своя.
+            _dbmsBackupDiagnosticsEnabled = settings.DbmsBackupDiagnosticsEnabled;
+            DbmsBackupTrace.ApplySettings(_dbmsBackupDiagnosticsEnabled);
+            OnPropertyChanged(nameof(DbmsBackupDiagnosticsEnabled));
+
             // Основные данные профиля: список баз и групп.
             var saved = _repository.Load();
             Infobases.Clear();

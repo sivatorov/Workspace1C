@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.124-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.125-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,17 +8,20 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.124**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.125**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 701 705 байт (81.7 MB) | `FileVersion` = `1.0.1.124` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 989 036 байт (51.5 MB) | `1.0.1.124` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 708 123 байт (81.7 MB) | `FileVersion` = `1.0.1.125` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 996 012 байт (51.5 MB) | `1.0.1.125` |
 
-Полный прогон тестов 1.0.1.124: **8326 тестов, 0 падений** (3 m 57 s). Команды сборки,
-логи и проверки — в [`docs/_build_summary_101124.md`](docs/_build_summary_101124.md).
+> Артефакты релиза 1.0.1.125 также разложены в `bin/release-1.0.1.125/win-x64/Workspace1C.exe`
+> и `bin/release-1.0.1.125/linux-x64/Workspace1C`.
+
+Полный прогон тестов 1.0.1.125: **8404 теста, 0 падений, 0 пропущено** (4 m 33 s).
+Команды сборки, логи и проверки — в [`docs/_build_summary_101125.md`](docs/_build_summary_101125.md).
 
 Windows-бинарь собирается штатным `build-windows-single-file.ps1 -Configuration Release`
 с модулями ПРО; после сборки выполняются smoke-проверки `Workspace1C.exe --list` и

@@ -380,6 +380,9 @@ public class InfobaseRepository : IInfobaseRepository
 #if DEBUG
             Console.Error.WriteLine("[l10n-debug] LoadSettings: Language=" + loaded.Language + ", file=" + SettingsPath);
 #endif
+            // issue #143 (1.0.1.125): настройка «Диагностика резервного копирования СУБД»
+            // действует сразу при старте — без переменной окружения CM_DEBUG_DBMS.
+            DbmsBackupTrace.ApplySettings(loaded.DbmsBackupDiagnosticsEnabled);
             return loaded;
         }
         catch (Exception ex)
@@ -406,6 +409,9 @@ public class InfobaseRepository : IInfobaseRepository
 #if DEBUG
         Console.Error.WriteLine("[l10n-debug] SaveSettings: Language=" + settings.Language + ", file=" + SettingsPath);
 #endif
+        // issue #143 (1.0.1.125): переключатель в «Настройки → Логирование»
+        // применяется сразу, не дожидаясь перезапуска приложения.
+        DbmsBackupTrace.ApplySettings(settings.DbmsBackupDiagnosticsEnabled);
         settings.SchemaVersion = ConfigSchemaVersion;
         // Сериализация — ошибка данных, а не прав доступа: её не скрываем.
         var json = JsonSerializer.Serialize(settings, SettingsJsonOptions);

@@ -13,6 +13,12 @@ namespace Workspace1C
         /// <summary>Общий выключатель «CM_ON» вкладки «Логирование» (issue #80).</summary>
         private ToggleButton? _loggingMasterOnCheck;
 
+        /// <summary>
+        /// Переключатель «Диагностика резервного копирования СУБД» (issue #143, 1.0.1.125):
+        /// включает CM_DEBUG_DBMS и хранится в settings.json.
+        /// </summary>
+        private ToggleButton? _dbmsBackupDiagnosticsCheck;
+
         /// <summary>Соответствие «категория → переключатель» вкладки «Логирование» (issue #80).</summary>
         private readonly Dictionary<string, ToggleButton> _loggingCategoryChecks = new();
 
@@ -44,6 +50,14 @@ namespace Workspace1C
             // Существовавшие до issue #80 диагностические флаги trace.json.
             panel.Children.Add(GroupSectionHeader("Settings.Logging.Diagnostics"));
             AddLoggingCategories(panel, LogCategory.DiagnosticCategories);
+
+            // issue #143 (1.0.1.125): диагностика резервного копирования СУБД
+            // (CM_DEBUG_DBMS=1) — настройка приложения, а не trace.json.
+            _dbmsBackupDiagnosticsCheck = SettingsSwitch(
+                "Settings.Logging.DbmsDiagnostics", _viewModel.DbmsBackupDiagnosticsEnabled,
+                helpTextKey: "Settings.Logging.DbmsDiagnosticsDesc");
+            _dbmsBackupDiagnosticsCheck.Margin = new Thickness(0, 8, 0, 0);
+            panel.Children.Add(_dbmsBackupDiagnosticsCheck);
 
             return panel;
         }
@@ -81,6 +95,11 @@ namespace Workspace1C
             foreach (var pair in _loggingCategoryChecks)
                 values[pair.Key] = pair.Value.IsChecked == true;
             TraceFlags.SaveCategorySettings(values);
+
+            // issue #143 (1.0.1.125): диагностика СУБД хранится в settings.json и
+            // применяется сразу в сеттере MainViewModel.
+            if (_dbmsBackupDiagnosticsCheck != null)
+                _viewModel.DbmsBackupDiagnosticsEnabled = _dbmsBackupDiagnosticsCheck.IsChecked == true;
         }
     }
 }

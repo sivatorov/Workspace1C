@@ -290,6 +290,25 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Диагностика резервного копирования средствами СУБД (issue #143, 1.0.1.125):
+    /// включает подробный журнал <c>dbms-backup-debug.log</c> из окна
+    /// «Настройки → Логирование». Эквивалент <c>CM_DEBUG_DBMS=1</c>; применяется
+    /// сразу, сохраняется в общем файле настроек.
+    /// </summary>
+    public bool DbmsBackupDiagnosticsEnabled
+    {
+        get => _settings.DbmsBackupDiagnosticsEnabled;
+        set
+        {
+            if (_settings.DbmsBackupDiagnosticsEnabled == value)
+                return;
+            _settings.DbmsBackupDiagnosticsEnabled = value;
+            DbmsBackupTrace.ApplySettings(value);
+            SaveSettingsSilently();
+        }
+    }
+
+    /// <summary>
     /// Разрешено ли несколько экземпляров: от этого зависит, вернётся ли
     /// спрятанное окно повторным запуском приложения.
     /// </summary>

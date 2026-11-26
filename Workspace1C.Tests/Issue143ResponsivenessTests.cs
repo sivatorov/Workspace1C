@@ -228,6 +228,7 @@ public sealed class Issue143ResponsivenessTests
     /// Старый dbms_backups.json: TimeoutMinutes = 0, отрицательный KeepCount, путь в
     /// кавычках и недоступный сетевой OutputDirectory — загружается без исключения,
     /// нормализуется и не приводит к блокирующим операциям в конструкторе.
+    /// С 1.0.1.125 (issue #143) 0 означает «без ограничения», а не 360 минут.
     /// </summary>
     [Fact]
     public async Task LoadAsync_NormalizesOldProfile_WithoutException()
@@ -244,7 +245,7 @@ public sealed class Issue143ResponsivenessTests
 
             var profile = data.Find("base-1");
             Assert.NotNull(profile);
-            Assert.Equal(360, profile!.TimeoutMinutes);
+            Assert.Equal(0, profile!.TimeoutMinutes);
             Assert.Equal(7, profile.KeepCount);
             Assert.Equal("\\\\192.0.2.1\\backup", profile.OutputDirectory);
         }

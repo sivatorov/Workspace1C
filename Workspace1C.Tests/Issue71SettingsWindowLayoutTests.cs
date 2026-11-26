@@ -214,8 +214,12 @@ public sealed class Issue71SettingsWindowLayoutTests
     public void MainWindow_Avalonia_RestoreClampsToMinSizes()
     {
         var code = ReadProjectFile(Path.Combine("Workspace1C", "Views", "MainWindow.Avalonia.cs"));
-        Assert.Contains("Math.Max(settings.WindowWidth, MinWidth)", code, StringComparison.Ordinal);
-        Assert.Contains("Math.Max(settings.WindowHeight, MinHeight)", code, StringComparison.Ordinal);
+        // Issue #171: сохранённые границы сначала собираются в WindowLayoutBounds (saved),
+        // поэтому зажим к минимуму выполняется по saved.Width/saved.Height.
+        Assert.Contains("new WindowLayoutBounds(", code, StringComparison.Ordinal);
+        Assert.Contains("settings.WindowWidth, settings.WindowHeight", code, StringComparison.Ordinal);
+        Assert.Contains("Math.Max(saved.Width, MinWidth)", code, StringComparison.Ordinal);
+        Assert.Contains("Math.Max(saved.Height, MinHeight)", code, StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------

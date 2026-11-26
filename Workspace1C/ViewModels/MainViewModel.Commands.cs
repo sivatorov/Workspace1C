@@ -1385,6 +1385,24 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Диагностика резервного копирования средствами СУБД (issue #143, 1.0.1.125):
+    /// включает подробный журнал <c>dbms-backup-debug.log</c> из окна
+    /// «Настройки → Логирование». Эквивалент <c>CM_DEBUG_DBMS=1</c>; применяется
+    /// сразу, сохраняется в <c>settings.json</c>.
+    /// </summary>
+    public bool DbmsBackupDiagnosticsEnabled
+    {
+        get => _dbmsBackupDiagnosticsEnabled;
+        set
+        {
+            if (!SetProperty(ref _dbmsBackupDiagnosticsEnabled, value))
+                return;
+            DbmsBackupTrace.ApplySettings(value);
+            ScheduleSaveSettings();
+        }
+    }
+
+    /// <summary>
     /// Глубина истории запусков одной базы (issue #246): максимальное количество записей
     /// истории запусков, которое запоминается для информационной базы. Минимум 1.
     /// </summary>

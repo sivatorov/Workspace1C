@@ -1100,19 +1100,25 @@
                                 Padding="4,3"
                                 Margin="0,1">
                             <Grid>
+                                <!-- Issue #159 (1.0.1.125): раскрыватель — ПЕРВАЯ колонка
+                                     фиксированной ширины 24 (квадрат 24×24), затем содержимое.
+                                     Раньше кнопка не была ограничена по ширине, и неявный
+                                     стиль ToggleButton (MaterialDesign) растягивал её до 52 px:
+                                     кнопка вылезала из колонки 26 px вправо, а глиф «+»/«−»
+                                     оказывался под чекбоксом («кнопки свертки уехали вправо»). -->
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="26"/>
+                                    <ColumnDefinition Width="24"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <!-- Issue #159 (1.0.1.121): раскрыватель — на всю колонку и
-                                     высоту строки, чтобы клик по строке не требовал попадания
-                                     точно в «+»/«−». -->
+                                <!-- Раскрыватель — квадрат 24×24 в начале строки; клик
+                                     срабатывает по всей площади (прозрачная панель-корень). -->
                                 <ToggleButton x:Name="Expander"
                                               Grid.Column="0"
                                               IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}"
                                               ClickMode="Press"
-                                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                                              MinWidth="22" MinHeight="22"
+                                              Width="24" Height="24"
+                                              MinWidth="0" MinHeight="0" Padding="0"
+                                              HorizontalAlignment="Left" VerticalAlignment="Center"
                                               Background="Transparent" BorderThickness="0"
                                               Cursor="Hand">
                                     <ToggleButton.Template>
@@ -1139,10 +1145,12 @@
                                         </ControlTemplate>
                                     </ToggleButton.Template>
                                 </ToggleButton>
-                                <!-- Issue #159: содержимое строки растягивается на всю ширину
-                                     колонки — область выбора не заканчивается на тексте. -->
+                                <!-- Issue #159: содержимое строки идёт строго после колонки
+                                     раскрывателя и растягивается на всю ширину — область
+                                     выбора не заканчивается на тексте. -->
                                 <ContentPresenter Grid.Column="1" ContentSource="Header"
-                                                  HorizontalAlignment="Stretch" VerticalAlignment="Center"/>
+                                                  HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                                                  Margin="4,0,0,0"/>
                             </Grid>
                         </Border>
                         <ItemsPresenter x:Name="ItemsHost" Margin="16,0,0,0"/>
