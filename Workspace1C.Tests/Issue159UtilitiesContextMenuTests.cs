@@ -138,6 +138,41 @@ public sealed class Issue159UtilitiesContextMenuTests
     }
 
     [Fact]
+    public void TreeExpanders_HaveFullSquareHitArea_TransparentPanelRoot()
+    {
+        // Issue #159 (1.0.1.124): корень шаблона раскрывателя — прозрачная панель,
+        // поэтому клик срабатывает по всей площади кнопки, а не только по линии шеврона.
+        var avalonia = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
+        var modern = Slice(avalonia, "<ControlTheme x:Key=\"ModernTreeItem\"", "</ControlTheme>");
+        Assert.Contains("<Border Background=\"Transparent\">", modern, StringComparison.Ordinal);
+
+        // WPF: то же — прозрачный Border вокруг глифа «+»/«−».
+        foreach (var themeFile in new[] { "LightTheme.xaml", "DarkTheme.xaml" })
+        {
+            var xaml = ReadProjectFile("Workspace1C", "Themes", themeFile);
+            var theme = Slice(xaml, "x:Key=\"ModernTreeViewItem\"", "</Style>");
+            Assert.Contains("<Border Background=\"Transparent\">", theme, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void WpfEditorIcons_HaveConsistentGapAfterCheckbox()
+    {
+        // Issue #159 (1.0.1.124): иконки во всех трёх WPF-редакторах имеют одинаковый
+        // отступ после галочки (8 px) — устранён регресс «иконки съехали под галочку».
+        foreach (var file in new[]
+                 {
+                     "UtilitiesMenuEditorWindow.xaml",
+                     "ContextMenuEditorWindow.xaml",
+                     "TrayMenuEditorWindow.xaml",
+                 })
+        {
+            var xaml = ReadProjectFile("Workspace1C", "Views", file);
+            Assert.Contains("Margin=\"8,0,0,0\"", xaml, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public void WpfEditorRow_IsStretchAndTransparent()
     {
         var xaml = ReadProjectFile("Workspace1C", "Views", "UtilitiesMenuEditorWindow.xaml");

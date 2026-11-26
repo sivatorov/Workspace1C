@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.123-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.124-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,17 +8,17 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.123**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.124**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 701 676 байт (81.7 MB) | `FileVersion` = `1.0.1.123` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 987 757 байт (51.5 MB) | `1.0.1.123` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 701 705 байт (81.7 MB) | `FileVersion` = `1.0.1.124` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 989 036 байт (51.5 MB) | `1.0.1.124` |
 
-Полный прогон тестов 1.0.1.123: **8322 теста, 0 падений** (3 m 25 s). Команды сборки,
-логи и проверки — в [`docs/_build_summary_101123.md`](docs/_build_summary_101123.md).
+Полный прогон тестов 1.0.1.124: **8326 тестов, 0 падений** (3 m 57 s). Команды сборки,
+логи и проверки — в [`docs/_build_summary_101124.md`](docs/_build_summary_101124.md).
 
 Windows-бинарь собирается штатным `build-windows-single-file.ps1 -Configuration Release`
 с модулями ПРО; после сборки выполняются smoke-проверки `Workspace1C.exe --list` и
@@ -219,6 +219,19 @@ smoke-тест выполняются в CI на `ubuntu-latest`.
 
 > Карта выше — основной источник «где искать». Здесь — детали и история версий
 > (полный список изменений по выпускам — в [`CHANGELOG.md`](CHANGELOG.md)).
+
+#### Выпуск 1.0.1.124
+
+- **Скачивание платформы: пометка раздела, раздел по умолчанию и раскладка фильтров
+  (1.0.1.124, Windows и Linux)** — в подписи файла, где выводится раздел, к названию
+  добавляется пометка « (раздел)»; при наличии разделов галочка раздела включена по
+  умолчанию и выбирается первый раздел; фильтры разрядности и раздела стоят в одной
+  строке, галочки — слева от своих надписей, у поля «Файл» галочки нет (issue #167).
+- **Раскрыватель дерева и выравнивание иконок в редакторах (1.0.1.124, Windows и
+  Linux)** — клик по раскрывателю срабатывает по всей площади кнопки (квадрат 24×24),
+  а не только по линии шеврона; в WPF-редакторах («Утилиты», «Контекстное меню»,
+  «Меню в трее») у иконки узла единый отступ после галочки — регресс «иконки съехали
+  под галочку» устранён (issue #159).
 
 #### Выпуск 1.0.1.123
 

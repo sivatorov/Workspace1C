@@ -963,12 +963,17 @@
                                               Cursor="Hand">
                                     <ToggleButton.Template>
                                         <ControlTemplate TargetType="ToggleButton">
-                                            <TextBlock x:Name="ExpanderSymbol"
-                                                       Text="+"
-                                                       FontSize="18"
-                                                       FontWeight="Bold"
-                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            <!-- Issue #159 (1.0.1.124): корень шаблона — прозрачный
+                                                 Border на всю площадь кнопки, поэтому клик срабатывает
+                                                 в любом месте квадрата, а не только по глифу «+»/«−». -->
+                                            <Border Background="Transparent">
+                                                <TextBlock x:Name="ExpanderSymbol"
+                                                           Text="+"
+                                                           FontSize="18"
+                                                           FontWeight="Bold"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                            </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
                                                     <Setter TargetName="ExpanderSymbol" Property="Opacity" Value="0.6"/>

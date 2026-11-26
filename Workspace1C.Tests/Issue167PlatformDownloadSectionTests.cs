@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Workspace1C.Localization;
 using Workspace1C.Models;
 using Workspace1C.Services;
 using Workspace1C.ViewModels;
@@ -34,6 +35,7 @@ public sealed class Issue167PlatformDownloadSectionTests
         "PlatformDownload.FilterArchitecture",
         "PlatformDownload.FilterArchitectureTooltip",
         "PlatformDownload.Section",
+        "PlatformDownload.SectionSuffix",
         "PlatformDownload.FilterSection",
         "PlatformDownload.FilterSectionTooltip",
     };
@@ -156,14 +158,23 @@ public sealed class Issue167PlatformDownloadSectionTests
             File("8.3.27.2214_thin_x64.zip", "x64", GroupThin)));
 
         await vm.LoadCatalogAsync();
-        Assert.Equal(2, vm.DistributionOptions.Count);
 
-        // Включение фильтра без выбора — выбирается первый раздел страницы.
-        vm.FilterBySection = true;
+        // Issue #167 (1.0.1.124): раздел по умолчанию включён — выбран первый раздел
+        // страницы, список сразу отфильтрован по нему.
+        Assert.True(vm.FilterBySection);
         Assert.Equal(GroupPlatform, vm.SelectedSection);
         var onlyPlatform = Assert.Single(vm.DistributionOptions);
         Assert.Equal("8.3.27.2214_x64.zip", onlyPlatform.File.FileName);
         Assert.Equal(GroupPlatform, vm.PickedFile!.Group);
+
+        // Снятие галочки возвращает оба файла.
+        vm.FilterBySection = false;
+        Assert.Equal(2, vm.DistributionOptions.Count);
+
+        // Повторное включение фильтра сохраняет выбранный раздел.
+        vm.FilterBySection = true;
+        Assert.Equal(GroupPlatform, vm.SelectedSection);
+        Assert.Single(vm.DistributionOptions);
 
         // Смена раздела фильтрует список и выбирает файл выбранного раздела.
         vm.SelectedSection = GroupThin;
@@ -172,9 +183,25 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.Equal("8.3.27.2214_thin_x64.zip", vm.PickedFile!.FileName);
         Assert.Equal(GroupThin, vm.PickedFile.Group);
 
-        // Снятие галочки возвращает оба файла.
+        // Снятие галочки снова возвращает оба файла.
         vm.FilterBySection = false;
         Assert.Equal(2, vm.DistributionOptions.Count);
+    }
+
+    [Fact]
+    public async Task Vm_SectionFilterOnByDefault_SelectsFirstSection()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64", GroupPlatform),
+            File("b_x64.zip", "x64", GroupThin)));
+
+        await vm.LoadCatalogAsync();
+
+        // Issue #167 (1.0.1.124): обе галочки включены по умолчанию, раздел — первый.
+        Assert.True(vm.FilterByArchitecture);
+        Assert.True(vm.FilterBySection);
+        Assert.Equal(GroupPlatform, vm.SelectedSection);
+        Assert.Equal("a_x64.zip", Assert.Single(vm.DistributionOptions).File.FileName);
     }
 
     [Fact]
@@ -292,24 +319,35 @@ public sealed class Issue167PlatformDownloadSectionTests
 
         await vm.LoadCatalogAsync();
 
-        // Галочка разрядности включена (по умолчанию), раздела — нет:
-        // «Раздел - имя_файла» (разрядность не дублируется).
+        // Issue #167 (1.0.1.124): по умолчанию обе галочки включены (разрядность и
+        // раздел), выбран первый раздел; в подписи нет ни раздела, ни разрядности.
+        Assert.True(vm.FilterByArchitecture);
+        Assert.True(vm.FilterBySection);
+        Assert.Equal("Windows (64-bit)", vm.SelectedSection);
         var onlyX64 = Assert.Single(vm.DistributionOptions);
-        Assert.Equal("Windows (64-bit) - b_x64.zip", onlyX64.DisplayName);
+        Assert.Equal("b_x64.zip", onlyX64.DisplayName);
         Assert.DoesNotContain("Полный клиент", onlyX64.DisplayName, StringComparison.Ordinal);
 
-        // Обе галочки сняты: «Раздел - разрядность - имя_файла», сортировка по строке.
+        // Галочка раздела снята: раздел показывается с локализованной пометкой
+        // (в тестовой среде T возвращает ключ — сверяем через сам T), разрядность
+        // (учёт включён) не дублируется.
+        var sectionSuffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
+        vm.FilterBySection = false;
+        var sectionShown = Assert.Single(vm.DistributionOptions);
+        Assert.Equal("Windows (64-bit)" + sectionSuffix + " - b_x64.zip", sectionShown.DisplayName);
+
+        // Обе галочки сняты: «Раздел (пометка) - разрядность - имя_файла»,
+        // сортировка по итоговой строке.
         vm.FilterByArchitecture = false;
         Assert.Equal(
             new[]
             {
-                "Windows (32-bit) - x86 - a_x86.zip",
-                "Windows (64-bit) - x64 - b_x64.zip",
+                "Windows (32-bit)" + sectionSuffix + " - x86 - a_x86.zip",
+                "Windows (64-bit)" + sectionSuffix + " - x64 - b_x64.zip",
             },
             vm.DistributionOptions.Select(o => o.DisplayName).ToArray());
 
-        // Галочка раздела включена (выбран первый раздел страницы), разрядность снята:
-        // «x64 - имя_файла» (раздел не дублируется).
+        // Только раздел включён: раздел не дублируется, разрядность показывается.
         vm.FilterBySection = true;
         Assert.Equal("Windows (64-bit)", vm.SelectedSection);
         var sectionOnly = Assert.Single(vm.DistributionOptions);
@@ -319,6 +357,28 @@ public sealed class Issue167PlatformDownloadSectionTests
         vm.FilterByArchitecture = true;
         var both = Assert.Single(vm.DistributionOptions);
         Assert.Equal("b_x64.zip", both.DisplayName);
+    }
+
+    [Fact]
+    public void Compose_AddsSectionSuffix_OnlyWhenSectionShown()
+    {
+        var file = File("file.zip", "x64", "Windows (64-bit)");
+
+        // Раздел показывается (галочка снята) — добавляется суффикс.
+        Assert.Equal("Windows (64-bit) (раздел) - x64 - file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: true,
+                sectionSuffix: " (раздел)"));
+        Assert.Equal("Windows (64-bit) (раздел) - file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: true,
+                sectionSuffix: " (раздел)"));
+
+        // Раздел уже выбран галочкой — суффикса нет (часть не выводится).
+        Assert.Equal("x64 - file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: true, includeSection: false,
+                sectionSuffix: " (раздел)"));
+        Assert.Equal("file.zip",
+            PlatformFileDisplayName.Compose(file, includeArchitecture: false, includeSection: false,
+                sectionSuffix: " (раздел)"));
     }
 
     [Fact]

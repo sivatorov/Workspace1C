@@ -33,8 +33,9 @@
                 <CheckBox IsChecked="{Binding IsVisible}" IsEnabled="{Binding CanToggleVisibility}"
                           VerticalAlignment="Center"
                           ToolTip="{loc:Loc ContextMenu.Editor.VisibleTooltip}"/>
+                <!-- Issue #159 (1.0.1.124): единый отступ после галочки (паритет редакторов). -->
                 <materialDesign:PackIcon Kind="{Binding DisplayIconKey, Converter={StaticResource PackIconKindConverter}}"
-                                         Width="16" Height="16" Margin="4,0,0,0" VerticalAlignment="Center"
+                                         Width="16" Height="16" Margin="8,0,0,0" VerticalAlignment="Center"
                                          Foreground="{Binding DisplayIconColor}">
                     <materialDesign:PackIcon.Style>
                         <Style TargetType="materialDesign:PackIcon" BasedOn="{StaticResource {x:Type materialDesign:PackIcon}}">

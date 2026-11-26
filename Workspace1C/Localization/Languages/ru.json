@@ -4241,6 +4241,7 @@
     "PlatformDownload.FilterArchitecture": "Только моя разрядность",
     "PlatformDownload.FilterArchitectureTooltip": "Показывать в списке файлы только выбранной разрядности (x64/x86). Снимите галочку, чтобы видеть оба варианта.",
     "PlatformDownload.Section": "Раздел:",
+    "PlatformDownload.SectionSuffix": " (раздел)",
     "PlatformDownload.FilterSection": "Фильтровать по разделу",
     "PlatformDownload.FilterSectionTooltip": "Показывать в списке только файлы выбранного раздела страницы загрузок.",
     "PlatformDownload.Type.Auto": "Авто (рекомендуемый)",

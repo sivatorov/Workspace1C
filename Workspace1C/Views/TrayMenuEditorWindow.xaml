@@ -32,8 +32,9 @@
                 <CheckBox IsChecked="{Binding IsVisible}"
                           VerticalAlignment="Center"
                           ToolTip="{loc:Loc TrayMenu.VisibleTooltip}"/>
+                <!-- Issue #159 (1.0.1.124): единый отступ после галочки (паритет редакторов). -->
                 <Path Data="{Binding DisplayIconKey, Converter={StaticResource IconKeyToGeometry}}"
-                      Width="16" Height="16" Stretch="Uniform" Margin="4,0,0,0"
+                      Width="16" Height="16" Stretch="Uniform" Margin="8,0,0,0"
                       VerticalAlignment="Center" Fill="{Binding DisplayIconColor}">
                     <Path.Style>
                         <Style TargetType="Path">

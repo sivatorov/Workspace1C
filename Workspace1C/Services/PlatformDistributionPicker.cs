@@ -154,7 +154,10 @@ public sealed class PlatformDistributionOption
 /// <item>учёт раздела включён: «x64 - имя_файла»;</item>
 /// <item>оба учёта включены: «имя_файла».</item>
 /// </list>
-/// То, что пользователь уже выбрал галочкой, в подписи не дублируется.
+/// То, что пользователь уже выбрал галочкой, в подписи не дублируется. Когда часть
+/// «раздел» показывается (галочка раздела снята), к ней добавляется суффикс
+/// (например, « (раздел)») — чтобы отличать название раздела от имени файла
+/// (issue #167, 1.0.1.124).
 /// </summary>
 public static class PlatformFileDisplayName
 {
@@ -167,15 +170,26 @@ public static class PlatformFileDisplayName
     /// (true — галочка фильтра СНЯТА и часть показывается; false — галочка установлена
     /// и часть уже выбрана, дублировать её не нужно). Отсутствующие части (нет разрядности
     /// или раздела) пропускаются; имя файла выводится всегда.
+    /// <paramref name="sectionSuffix"/> — локализованный суффикс, который добавляется к
+    /// названию раздела, когда он выводится (issue #167, 1.0.1.124); пусто — без суффикса.
     /// </summary>
-    public static string Compose(PlatformReleaseFile? file, bool includeArchitecture, bool includeSection)
+    public static string Compose(
+        PlatformReleaseFile? file,
+        bool includeArchitecture,
+        bool includeSection,
+        string? sectionSuffix = null)
     {
         if (file is null)
             return string.Empty;
 
         var parts = new List<string>(3);
         if (includeSection && !string.IsNullOrWhiteSpace(file.Group))
-            parts.Add(file.Group!.Trim());
+        {
+            var section = file.Group!.Trim();
+            if (!string.IsNullOrWhiteSpace(sectionSuffix))
+                section += sectionSuffix;
+            parts.Add(section);
+        }
         if (includeArchitecture && !string.IsNullOrWhiteSpace(file.Architecture))
             parts.Add(file.Architecture!.Trim());
         if (!string.IsNullOrWhiteSpace(file.FileName))

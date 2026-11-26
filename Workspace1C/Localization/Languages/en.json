@@ -4242,6 +4242,7 @@
     "PlatformDownload.FilterArchitecture": "Only my architecture",
     "PlatformDownload.FilterArchitectureTooltip": "Show only files of the selected architecture (x64/x86) in the list. Clear the checkbox to see both.",
     "PlatformDownload.Section": "Section:",
+    "PlatformDownload.SectionSuffix": " (section)",
     "PlatformDownload.FilterSection": "Filter by section",
     "PlatformDownload.FilterSectionTooltip": "Show only files from the selected section of the downloads page.",
     "PlatformDownload.Type.Auto": "Auto (recommended)",

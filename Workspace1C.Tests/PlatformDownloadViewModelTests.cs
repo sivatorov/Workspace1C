@@ -424,6 +424,11 @@ public sealed class PlatformDownloadViewModelTests
 
         await vm.LoadCatalogAsync();
 
+        // Issue #167 (1.0.1.124): раздел страницы по умолчанию включён и выбирается
+        // первый раздел («Тонкий клиент»), поэтому негруппированный файл отфильтрован.
+        // Для проверки самой группировки снимаем фильтр раздела.
+        vm.FilterBySection = false;
+
         // Две группы → в плоском списке два заголовка-разделителя.
         Assert.Equal(2, vm.DistributionFileGroups.Count);
         Assert.Equal(2, vm.DistributionOptionsGrouped.OfType<PlatformFileGroupHeaderItem>().Count());

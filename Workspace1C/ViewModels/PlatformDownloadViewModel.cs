@@ -77,12 +77,13 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
     private Services.DownloadEtaTracker? _etaTracker;
     private bool _is64Bit;
     private bool _includeTestVersions;
-    // Issue #167: фильтры списка файлов — разрядность (по умолчанию включён, как раньше)
-    // и раздел страницы загрузок (по умолчанию выключен; доступен только при HasSections).
+    // Issue #167: фильтры списка файлов — разрядность и раздел страницы загрузок.
+    // 1.0.1.124: раздел по умолчанию тоже включён — при наличии разделов выбирается
+    // первый из них (галочка стоит и список сразу отфильтрован).
     private bool _filterByArchitecture = true;
     private IReadOnlyList<string> _availableSections = Array.Empty<string>();
     private string? _selectedSection;
-    private bool _filterBySection;
+    private bool _filterBySection = true;
     private PlatformDownloadType _downloadType;
     private IReadOnlyList<PlatformDownloadType> _availableDownloadTypes = new[] { PlatformDownloadType.Auto };
     private PlatformCatalogNode? _selectedVersionNode;
@@ -302,7 +303,9 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
 
     /// <summary>
     /// True — список файлов фильтруется по выбранному разделу страницы (issue #167).
-    /// Без разделов на странице фильтр игнорируется (<see cref="HasSections"/> = false).
+    /// По умолчанию включён (issue #167, 1.0.1.124): при наличии разделов выбирается
+    /// первый из них. Без разделов на странице фильтр игнорируется
+    /// (<see cref="HasSections"/> = false).
     /// </summary>
     public bool FilterBySection
     {
@@ -731,6 +734,8 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
     /// (issue #167). Если выбранный раздел исчез (сменилась версия/платформа),
     /// выбор сбрасывается и фильтр по разделу снимается — иначе список файлов
     /// остался бы пустым без видимой причины.
+    /// 1.0.1.124: если фильтр включён, но раздел ещё не выбран (первая загрузка),
+    /// автоматически выбирается первый раздел страницы.
     /// </summary>
     private void RefreshSections(IReadOnlyList<PlatformReleaseFile> allFiles)
     {
@@ -739,7 +744,11 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
             AvailableSections = sections;
 
         if (_selectedSection is null)
+        {
+            if (_filterBySection && sections.Count > 0)
+                SetSelectedSectionCore(sections[0]);
             return;
+        }
 
         var stillAvailable = sections.Any(s =>
             string.Equals(s, _selectedSection, StringComparison.OrdinalIgnoreCase));
@@ -791,12 +800,16 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         // Issue #167: подпись файла в окне скачивания — только раздел, разрядность
         // (где есть) и имя файла, без «Полный клиент (rar)»/«Пакет deb»: тип часто
         // не соответствует содержимому. Часть, уже выбранную галочкой, не дублируем.
+        // 1.0.1.124: когда раздел выводится, к нему добавляется локализованный
+        // суффикс « (раздел)» — чтобы не путать название раздела с именем файла.
+        var sectionSuffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
         foreach (var option in options)
         {
             option.DisplayNameOverride = PlatformFileDisplayName.Compose(
                 option.File,
                 includeArchitecture: !_filterByArchitecture,
-                includeSection: !_filterBySection);
+                includeSection: !_filterBySection,
+                sectionSuffix: sectionSuffix);
         }
 
         // Issue #167: сортировка списка по итоговой строке (OrdinalIgnoreCase);

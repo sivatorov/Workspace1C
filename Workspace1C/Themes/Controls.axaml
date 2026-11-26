@@ -1252,11 +1252,17 @@
                                           Cursor="Hand">
                                 <ToggleButton.Template>
                                     <ControlTemplate>
-                                        <Path x:Name="ExpanderGlyph"
-                                              Data="{DynamicResource IconChevronRight}"
-                                              Width="16" Height="16" Stretch="Uniform"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Fill="{DynamicResource TextSecondaryBrush}"/>
+                                        <!-- Issue #159 (1.0.1.124): корень шаблона — прозрачная
+                                             панель на всю площадь кнопки, поэтому клик срабатывает
+                                             в любом месте квадрата 24×24, а не только по линии
+                                             шеврона. -->
+                                        <Border Background="Transparent">
+                                            <Path x:Name="ExpanderGlyph"
+                                                  Data="{DynamicResource IconChevronRight}"
+                                                  Width="16" Height="16" Stretch="Uniform"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                                        </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>
@@ -1432,12 +1438,16 @@
                                         <!-- Issue #159 (1.0.1.123): базовый глиф — шеврон
                                              вправо; раскрытое состояние подменяет Data на
                                              «шеврон вниз». Без поворотов, поэтому глиф
-                                             не «схлопывается в точку». -->
-                                        <Path x:Name="ExpanderGlyph"
-                                              Data="{DynamicResource IconChevronRight}"
-                                              Width="16" Height="16" Stretch="Uniform"
-                                              HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Fill="{DynamicResource TextSecondaryBrush}"/>
+                                             не «схлопывается в точку». Issue #159 (1.0.1.124):
+                                             корень — прозрачная панель на всю площадь кнопки,
+                                             клик по любому месту квадрата 24×24. -->
+                                        <Border Background="Transparent">
+                                            <Path x:Name="ExpanderGlyph"
+                                                  Data="{DynamicResource IconChevronRight}"
+                                                  Width="16" Height="16" Stretch="Uniform"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  Fill="{DynamicResource TextSecondaryBrush}"/>
+                                        </Border>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>

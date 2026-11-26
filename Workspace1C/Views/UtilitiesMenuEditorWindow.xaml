@@ -44,8 +44,10 @@
                 <CheckBox IsChecked="{Binding IsVisible}" IsEnabled="{Binding CanToggleVisibility}"
                           VerticalAlignment="Center"
                           ToolTip="{loc:Loc Utilities.Editor.VisibleTooltip}"/>
+                <!-- Issue #159 (1.0.1.124): единый отступ после галочки — иконка
+                     не «прилипает» к чекбоксу (регресс WPF после правок Linux). -->
                 <Path Data="{Binding DisplayIconGeometryKey, Converter={StaticResource IconKeyToGeometry}}"
-                      Width="16" Height="16" Margin="4,0,0,0" VerticalAlignment="Center"
+                      Width="16" Height="16" Margin="8,0,0,0" VerticalAlignment="Center"
                       Stretch="Uniform" Fill="{Binding DisplayIconColor}"/>
                 <TextBlock Text="{Binding Title}" Margin="6,0,0,0" VerticalAlignment="Center"/>
                 <TextBlock Text="{Binding KindLabel}" Margin="8,0,0,0" VerticalAlignment="Center"
