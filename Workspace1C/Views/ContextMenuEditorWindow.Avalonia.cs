@@ -35,10 +35,10 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("ContextMenu.Editor.Title");
             Width = 760;
-            // Issue #146 (1.0.1.118): начальные размеры — из профиля ContextMenuEditor
-            // (540/400 DIP): окно открывается по содержимому, но допускает уменьшение
-            // до MinHeight.
-            Height = DialogWorkAreaPolicy.ContextMenuEditor.DefaultHeight;
+            // Issue #159 (1.0.1.123): окно растягивается по содержимому
+            // (SizeToContent.Height) — постоянная внешняя прокрутка на Linux исчезает.
+            // MaxHeight/MinHeight уточняются в ApplyWorkAreaLimits по рабочей области.
+            SizeToContent = Avalonia.Controls.SizeToContent.Height;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
             MinWidth = 640;
@@ -73,9 +73,12 @@ namespace Workspace1C
             var size = DialogWorkAreaPolicy.Recommend(
                 DialogWorkAreaPolicy.ContextMenuEditor,
                 dipHeight);
+            // Issue #159: высота — по содержимому (SizeToContent.Height), Height не
+            // задаём; MaxHeight клампится по рабочей области, дерево прокручивается
+            // внутри и не растягивает окно за экран.
             MaxHeight = size.MaxHeight;
             MinHeight = size.MinHeight;
-            Height = size.Height;
+            _tree.MaxHeight = Math.Max(200, size.MaxHeight - 190);
         }
 
         private Control BuildLayout()
@@ -166,7 +169,17 @@ namespace Workspace1C
             // (CanToggleVisibility=false) — чекбокс отключён, менять можно только
             // местоположение.
             check.Bind(CheckBox.IsEnabledProperty, new Binding("CanToggleVisibility"));
-            var icon = IconHelper.MakeIcon(node.DisplayIconKey, 16, "TextPrimaryBrush");
+            // Issue #159 (1.0.1.123): иконка — по ключу геометрии Icon*
+            // (DisplayIconGeometryKey). Раньше PackIcon-имя каталога («Refresh»,
+            // «Broom») передавалось в IconHelper напрямую и резолвилось в запасную
+            // «папку», поэтому у всех узлов была одна и та же иконка.
+            var geometryKey = node.DisplayIconGeometryKey;
+            if (string.IsNullOrWhiteSpace(geometryKey))
+                geometryKey = "IconFolder";
+            var colorSpec = node.DisplayIconColor;
+            var icon = string.IsNullOrWhiteSpace(colorSpec)
+                ? IconHelper.MakeIcon(geometryKey, 16, "TextPrimaryBrush")
+                : IconHelper.MakeIcon(geometryKey, 16, ThemeBrushes.FromSpec(colorSpec));
             if (icon is not null)
             {
                 icon.Margin = new Thickness(4, 0, 0, 0);

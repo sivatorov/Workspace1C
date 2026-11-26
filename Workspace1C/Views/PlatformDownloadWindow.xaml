@@ -141,11 +141,11 @@
                               VerticalAlignment="Center" Margin="0,0,0,4"
                               IsChecked="{Binding IncludeTestVersions, Mode=TwoWay}"/>
 
-                    <!-- Разрядность + галочка фильтра (issue #167): список файлов
-                         фильтруется по x64/x86 только при установленной галочке. -->
+                    <!-- Разрядность (issue #167): выбор x64/x86. Галочка фильтра по
+                         разрядности перенесена в строку подписи поля «Файл» — слева от неё,
+                         без дополнительного текста. -->
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
@@ -157,36 +157,39 @@
                             <ComboBoxItem Content="x64" Tag="True"/>
                             <ComboBoxItem Content="x86" Tag="False"/>
                         </ComboBox>
-                        <CheckBox Grid.Column="2" Margin="12,0,0,0" VerticalAlignment="Center"
-                                  Content="{loc:Loc PlatformDownload.FilterArchitecture}"
-                                  ToolTip="{loc:Loc PlatformDownload.FilterArchitectureTooltip}"
-                                  IsChecked="{Binding FilterByArchitecture, Mode=TwoWay}"/>
                     </Grid>
 
-                    <!-- Раздел страницы загрузок (issue #167): видима только при HasSections;
-                         список файлов фильтруется по разделу при установленной галочке. -->
+                    <!-- Раздел страницы загрузок (issue #167): видима только при HasSections.
+                         Галочка слева от подписи, без текста; ComboBox активен при включённой
+                         галочке, список файлов фильтруется по выбранному разделу. -->
                     <Grid Margin="0,8,0,0" Visibility="{Binding HasSections, Converter={StaticResource BoolToVis}}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0" Text="{loc:Loc PlatformDownload.Section}"
-                                   VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
-                        <CheckBox Grid.Column="1" VerticalAlignment="Center"
-                                  Content="{loc:Loc PlatformDownload.FilterSection}"
+                        <CheckBox Grid.Column="0" VerticalAlignment="Center" Margin="0,0,6,0"
                                   ToolTip="{loc:Loc PlatformDownload.FilterSectionTooltip}"
                                   IsChecked="{Binding FilterBySection, Mode=TwoWay}"/>
-                        <ComboBox Grid.Column="2" Margin="8,0,0,0" MinWidth="180" Height="30"
+                        <TextBlock Grid.Column="1" Text="{loc:Loc PlatformDownload.Section}"
+                                   VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <ComboBox Grid.Column="2" MinWidth="180" Height="30"
                                   HorizontalAlignment="Left" VerticalContentAlignment="Center"
                                   ItemsSource="{Binding AvailableSections}"
                                   SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
                                   IsEnabled="{Binding FilterBySection}"/>
                     </Grid>
 
-                    <!-- Файл дистрибутива (варианты для текущей ОС, issue #330) -->
-                    <TextBlock Text="{loc:Loc PlatformDownload.File}" Margin="0,10,0,4"
-                               Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    <!-- Файл дистрибутива (варианты для текущей ОС, issue #330).
+                         Issue #167: галочка фильтра по разрядности — слева от подписи поля,
+                         без текста (достаточно положения рядом с заголовком). -->
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,4">
+                        <CheckBox VerticalAlignment="Center" Margin="0,0,6,0"
+                                  ToolTip="{loc:Loc PlatformDownload.FilterArchitectureTooltip}"
+                                  IsChecked="{Binding FilterByArchitecture, Mode=TwoWay}"/>
+                        <TextBlock Text="{loc:Loc PlatformDownload.File}" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
                     <!-- issue #330 п.2/#334 п.2: список файлов сгруппирован по заголовкам
                          групп страницы релиза (PlatformFileGroupHeaderItem — строка-разделитель,
                          PlatformDistributionOption — выбираемый вариант). -->

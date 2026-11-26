@@ -299,8 +299,8 @@ namespace Workspace1C
                 });
             rightPanel.Children.Add(includeTest);
 
-            // Разрядность + галочка фильтра (issue #167): список файлов фильтруется
-            // по x64/x86 только при установленной галочке.
+            // Разрядность (issue #167): выбор x64/x86. Галочка фильтра по разрядности
+            // перенесена в строку подписи поля «Файл» — слева от неё, без текста.
             var archPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             archPanel.Children.Add(MakeLabel(T("PlatformDownload.Architecture")));
             var archBox = new ComboBox { Width = 160, Height = 30 };
@@ -309,11 +309,14 @@ namespace Workspace1C
             archBox.SelectedIndex = _viewModel.Is64Bit ? 0 : 1;
             archBox.SelectionChanged += (_, _) => _viewModel.Is64Bit = archBox.SelectedIndex == 0;
             archPanel.Children.Add(archBox);
+            rightPanel.Children.Add(archPanel);
+
+            // Issue #167: галочка фильтра по разрядности — слева от подписи поля «Файл»,
+            // без дополнительного текста (достаточно положения рядом с заголовком).
             var archFilter = new CheckBox
             {
-                Content = T("PlatformDownload.FilterArchitecture"),
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(12, 0, 0, 0)
+                Margin = new Thickness(0, 0, 6, 0)
             };
             archFilter.Bind(ToggleButton.IsCheckedProperty,
                 new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterByArchitecture))
@@ -322,11 +325,9 @@ namespace Workspace1C
                     Mode = Avalonia.Data.BindingMode.TwoWay
                 });
             ToolTip.SetTip(archFilter, T("PlatformDownload.FilterArchitectureTooltip"));
-            archPanel.Children.Add(archFilter);
-            rightPanel.Children.Add(archPanel);
 
             // Раздел страницы загрузок (issue #167): строка видима только при HasSections;
-            // список файлов фильтруется по разделу при установленной галочке.
+            // галочка слева от подписи, без текста; список файлов фильтруется по разделу.
             var sectionPanel = new Grid
             {
                 Margin = new Thickness(0, 2, 0, 0),
@@ -338,15 +339,11 @@ namespace Workspace1C
                 },
                 IsVisible = _viewModel.HasSections
             };
-            var sectionLabel = MakeLabel(T("PlatformDownload.Section"));
-            sectionLabel.Margin = new Thickness(0, 0, 8, 0);
-            Grid.SetColumn(sectionLabel, 0);
-            sectionPanel.Children.Add(sectionLabel);
 
             var sectionFilter = new CheckBox
             {
-                Content = T("PlatformDownload.FilterSection"),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 6, 0)
             };
             sectionFilter.Bind(ToggleButton.IsCheckedProperty,
                 new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterBySection))
@@ -355,14 +352,18 @@ namespace Workspace1C
                     Mode = Avalonia.Data.BindingMode.TwoWay
                 });
             ToolTip.SetTip(sectionFilter, T("PlatformDownload.FilterSectionTooltip"));
-            Grid.SetColumn(sectionFilter, 1);
+            Grid.SetColumn(sectionFilter, 0);
             sectionPanel.Children.Add(sectionFilter);
+
+            var sectionLabel = MakeLabel(T("PlatformDownload.Section"));
+            sectionLabel.Margin = new Thickness(0, 0, 8, 0);
+            Grid.SetColumn(sectionLabel, 1);
+            sectionPanel.Children.Add(sectionLabel);
 
             var sectionBox = new ComboBox
             {
                 MinWidth = 180,
                 Height = 30,
-                Margin = new Thickness(8, 0, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 ItemsSource = _viewModel.AvailableSections,
                 SelectedItem = _viewModel.SelectedSection
@@ -393,9 +394,13 @@ namespace Workspace1C
             rightPanel.Children.Add(sectionPanel);
 
             // Файл дистрибутива: варианты для текущей ОС, сгруппированные по заголовкам
-            // групп страницы релиза (issue #330 п.2/#334 п.2).
+            // групп страницы релиза (issue #330 п.2/#334 п.2). Issue #167: галочка фильтра
+            // по разрядности — слева от подписи поля, без дополнительного текста.
             var fileLabel = MakeLabel(T("PlatformDownload.File"), secondary: true);
-            rightPanel.Children.Add(fileLabel);
+            var fileHeader = new StackPanel { Orientation = Orientation.Horizontal };
+            fileHeader.Children.Add(archFilter);
+            fileHeader.Children.Add(fileLabel);
+            rightPanel.Children.Add(fileHeader);
             var fileBox = new ComboBox { Height = 30, ItemsSource = _viewModel.DistributionOptionsGrouped };
             fileBox.DataTemplates.Add(new FuncDataTemplate<PlatformFileGroupHeaderItem>((header, _) =>
             {

@@ -166,6 +166,44 @@ namespace Workspace1C
                 profileService.EnsureInitialized();
                 LogStartupStage(startupLogger, "Профили инициализированы");
 
+                // Issue #164: настройки активного профиля читаем ДО окна входа — по ним
+                // решается, нужно ли активировать уже работающий экземпляр. Раньше проверка
+                // одиночного экземпляра стояла после LoginWindow.ShowLogin: повторный запуск
+                // ярлыком (в т.ч. из трея) сначала спрашивал пароль профиля, и только потом
+                // обнаруживал работающее приложение и завершался.
+                var startupRepository = AppServices.GetRequiredService<IInfobaseRepository>();
+                AppSettings startupSettings;
+                try
+                {
+                    startupSettings = startupRepository.LoadSettings();
+                }
+                catch
+                {
+                    startupSettings = new AppSettings();
+                }
+
+                // Issue #164: гейт одиночного экземпляра выполняется ДО показа окна входа.
+                // Второй процесс просит работающий экземпляр показать окно (в т.ч. из трея)
+                // и завершается, не спрашивая пароль. Если приложение заблокировано, пароль
+                // по-прежнему запросит уже работающий экземпляр (RestoreFromTray →
+                // ShowAppUnlockDialog). Слушатель активации запускает только первичный экземпляр.
+                if (StartupInstancePolicy.ShouldUseSingleInstanceGate(startupSettings.AllowMultipleInstances))
+                {
+                    var createdNew = TryAcquireSingleInstanceLock();
+                    if (StartupInstancePolicy.ShouldActivateExistingInstance(
+                            startupSettings.AllowMultipleInstances, createdNew))
+                    {
+                        // Уже запущен другой экземпляр — просим его показать окно и выходим.
+                        SignalExistingInstance();
+                        Shutdown();
+                        return;
+                    }
+                    // Слушаем сигнал от повторных запусков, чтобы поднять окно.
+                    StartActivationListener();
+                    SingleInstanceActive = true;
+                }
+                LogStartupStage(startupLogger, "Проверка единственного экземпляра завершена");
+
                 // Любое окно, закрытое до создания главного, гасит приложение: режим
                 // завершения по умолчанию OnLastWindowClose считает его последним,
                 // и запуск падает с «Dispatcher shut down». Поэтому до показа
@@ -187,13 +225,12 @@ namespace Workspace1C
                 {
                     LogStartupStage(startupLogger, "Окно авторизации: требуется выбор профиля или пароль");
 
-                    // Локализацию поднимаем до показа окна: настройки выбранного профиля
-                    // читаются ниже, а без словаря окно входа показывает ключи
-                    // (Auth.Title, Auth.Login) вместо подписей. Язык берётся из профиля,
-                    // активного с прошлого запуска, и уточняется после выбора.
+                    // Локализацию поднимаем до показа окна: настройки профиля прочитаны
+                    // выше, а без словаря окно входа показывает ключи (Auth.Title,
+                    // Auth.Login) вместо подписей. Язык берётся из профиля, активного
+                    // с прошлого запуска, и уточняется после выбора.
                     try
                     {
-                        var startupSettings = AppServices.GetRequiredService<IInfobaseRepository>().LoadSettings();
                         LocalizationManager.Instance.Initialize(startupSettings.Language, DataDirectory);
                     }
                     catch
@@ -272,21 +309,6 @@ namespace Workspace1C
                     // Локализация не должна блокировать запуск приложения.
                 }
                 LogStartupStage(startupLogger, "Локализация инициализирована");
-
-                if (!settings.AllowMultipleInstances)
-                {
-                    if (!TryAcquireSingleInstanceLock())
-                    {
-                        // Уже запущен другой экземпляр — просим его показать окно и выходим.
-                        SignalExistingInstance();
-                        Shutdown();
-                        return;
-                    }
-                    // Слушаем сигнал от повторных запусков, чтобы поднять окно.
-                    StartActivationListener();
-                    SingleInstanceActive = true;
-                }
-                LogStartupStage(startupLogger, "Проверка единственного экземпляра завершена");
 
                 // Успешный старт после автообновления (issue #89, v1.0.1.24): раз приложение
                 // запустилось и работает, бэкап прежнего бинаря (<exe>.cm-update-backup)
@@ -676,6 +698,15 @@ namespace Workspace1C
         {
             try
             {
+                // Issue #164: активация из трея идёт тем же путём, что и по значку
+                // в трее (ShowAndActivate): при заблокированном приложении он
+                // запрашивает пароль (issue #294), иначе просто показывает окно.
+                if (_desktopLifetime?.MainWindow is MainWindow mw)
+                {
+                    mw.ShowAndActivate();
+                    return;
+                }
+
                 if (_desktopLifetime?.MainWindow is not Window win)
                     return;
                 if (!win.IsVisible)

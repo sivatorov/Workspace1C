@@ -544,14 +544,12 @@ namespace Workspace1C
         /// Открывает редактор группы «Мои программы» (issue #91): список своих программ под
         /// кнопками запуска, иконки из файла и переключатель «списком / иконками».
         /// После закрытия режим отображения применяется и панель перечитывает список.
+        /// Issue #158 (1.0.1.123): окно открывается через общий guard — повторный клик
+        /// активирует уже открытый редактор, второе окно не создаётся.
         /// </summary>
         private void OnCustomProgramsEdit_Click(object sender, RoutedEventArgs e)
         {
-            var win = new CustomProgramsWindow(_viewModel.CustomProgramsViewMode)
-            {
-                Owner = this,
-            };
-            win.ShowDialog();
+            var win = CustomProgramsWindow.ShowEditor(this, _viewModel.CustomProgramsViewMode);
             _viewModel.CustomProgramsViewMode = win.ViewMode;
             _viewModel.ReloadCustomPrograms();
         }

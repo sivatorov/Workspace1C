@@ -119,7 +119,19 @@ public sealed class Issue146DialogSizeTests
         Assert.Contains("DialogWorkAreaPolicy.Recommend", source, StringComparison.Ordinal);
         Assert.Contains("MaxHeight = size.MaxHeight;", source, StringComparison.Ordinal);
         Assert.Contains("MinHeight = size.MinHeight;", source, StringComparison.Ordinal);
-        Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
+
+        if (fileName.EndsWith(".Avalonia.cs", StringComparison.Ordinal))
+        {
+            // Issue #159 (1.0.1.123): Avalonia-окна открываются по содержимому —
+            // высота из политики не присваивается, только границы.
+            Assert.Contains("SizeToContent = Avalonia.Controls.SizeToContent.Height",
+                source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Height = size.Height;", source, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
+        }
     }
 
     [Theory]

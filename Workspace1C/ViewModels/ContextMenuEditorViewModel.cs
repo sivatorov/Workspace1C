@@ -558,11 +558,42 @@ public sealed class ContextMenuNodeItem : ViewModelBase
     /// <summary>Ключ иконки для отображения в дереве (пусто — без иконки).</summary>
     public string DisplayIconKey => EffectiveIconKey;
 
+    /// <summary>
+    /// Issue #159 (1.0.1.123): ключ геометрии <c>Icon*</c> для превью в дереве
+    /// редактора. PackIcon-имя каталога («Refresh», «Broom») в Avalonia не рисуется:
+    /// <c>IconHelper</c> резолвил его в запасную «папку», поэтому все узлы выглядели
+    /// одинаково. Пункт берёт готовый <see cref="ContextMenuItem.AvaloniaIconKey"/>,
+    /// группа — стандартную иконку, неизвестный ключ — детерминированную «папку».
+    /// </summary>
+    public string DisplayIconGeometryKey
+    {
+        get
+        {
+            // Пользовательская иконка компоновки может хранить и PackIcon-имя,
+            // и готовый ключ Icon*; приводим к геометрии.
+            var custom = UtilitiesMenuCatalog.WpfIconGeometryKey(Node.IconKey);
+            if (!string.IsNullOrWhiteSpace(custom))
+                return custom;
+            if (string.Equals(Node.Kind, "separator", StringComparison.Ordinal))
+                return "IconMinus";
+            if (string.Equals(Node.Kind, "group", StringComparison.Ordinal))
+            {
+                var standard = ContextMenuCatalog.GroupAvaloniaIconKey(Node.GroupId ?? string.Empty);
+                return string.IsNullOrWhiteSpace(standard) ? "IconFolder" : standard;
+            }
+            var catalog = ContextMenuCatalog.Find(Node.ItemId);
+            if (catalog is not null && !string.IsNullOrWhiteSpace(catalog.AvaloniaIconKey))
+                return catalog.AvaloniaIconKey;
+            // Осмысленный фолбэк по типу узла — как в остальных редакторах.
+            return "IconFolder";
+        }
+    }
+
     /// <summary>Цвет иконки (#RRGGBB) для отображения в дереве.</summary>
     public string DisplayIconColor => EffectiveIconColor;
 
     /// <summary>Есть ли иконка для отображения в дереве (видимость превью).</summary>
-    public bool HasDisplayIcon => !string.IsNullOrWhiteSpace(EffectiveIconKey);
+    public bool HasDisplayIcon => !string.IsNullOrWhiteSpace(DisplayIconGeometryKey);
 
     /// <summary>Оповещает UI об изменении внешних свойств узла (заголовок, иконка).</summary>
     public void NotifyChanged()
@@ -573,6 +604,7 @@ public sealed class ContextMenuNodeItem : ViewModelBase
         OnPropertyChanged(nameof(EffectiveIconKey));
         OnPropertyChanged(nameof(EffectiveIconColor));
         OnPropertyChanged(nameof(DisplayIconKey));
+        OnPropertyChanged(nameof(DisplayIconGeometryKey));
         OnPropertyChanged(nameof(DisplayIconColor));
         OnPropertyChanged(nameof(HasDisplayIcon));
     }

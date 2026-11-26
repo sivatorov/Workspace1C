@@ -50,26 +50,33 @@ public static class DialogWorkAreaPolicy
     /// Issue #146 (1.0.1.118): окно «Настройка меню утилиты» — 680 DIP по содержимому,
     /// минимальная высота 440 DIP. Пояснение перенесено в конец прокручиваемого
     /// содержимого, поэтому запас перед ним не нужен.
+    /// Issue #159 (1.0.1.123): верхняя граница 800 DIP — окно растягивается по
+    /// содержимому (<c>SizeToContent.Height</c>), а длинный список прокручивается
+    /// внутри дерева, не растягивая окно на весь экран.
     /// </summary>
-    public static readonly DialogProfile UtilitiesEditor = new(680, 440, 680);
+    public static readonly DialogProfile UtilitiesEditor = new(680, 440, 680, 800);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Настройка меню трея» — 680 DIP по содержимому,
     /// минимальная высота 440 DIP (самый длинный текст пояснения).
+    /// Issue #159 (1.0.1.123): верхняя граница 800 DIP для авторазмера по содержимому.
     /// </summary>
-    public static readonly DialogProfile TrayEditor = new(680, 440, 680);
+    public static readonly DialogProfile TrayEditor = new(680, 440, 680, 800);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Контекстное меню» — 540 DIP по содержимому,
     /// минимальная высота 400 DIP (панель операций короче, чем у «Утилит»).
+    /// Issue #159 (1.0.1.123): верхняя граница 720 DIP для авторазмера по содержимому.
     /// </summary>
-    public static readonly DialogProfile ContextMenuEditor = new(540, 400, 540);
+    public static readonly DialogProfile ContextMenuEditor = new(540, 400, 540, 720);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Мои программы» — 600 DIP по содержимому,
     /// минимальная высота 440 DIP.
+    /// Issue #159 (1.0.1.123): верхняя граница 780 DIP; список программ
+    /// прокручивается своим <c>ListBox</c>, форма задаёт высоту окна.
     /// </summary>
-    public static readonly DialogProfile CustomPrograms = new(600, 440, 600);
+    public static readonly DialogProfile CustomPrograms = new(600, 440, 600, 780);
 
     /// <summary>
     /// Issue #165 (1.0.1.120): окно «Как купить ПРО-версию» — 720 DIP по содержимому

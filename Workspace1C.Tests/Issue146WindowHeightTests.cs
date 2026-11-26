@@ -149,7 +149,11 @@ public sealed class Issue146WindowHeightTests
         Assert.Equal(680, size.Height, 3);
         Assert.Equal(440, size.MinHeight, 3);
         Assert.False(size.RequiresScrolling);
-        Assert.True(double.IsPositiveInfinity(size.MaxHeight));
+        // Issue #159 (1.0.1.123): у профилей редакторов появилась верхняя граница
+        // авторазмера (800 DIP), поэтому при неизвестной рабочей области MaxHeight
+        // ограничен профилем, а не бесконечностью.
+        Assert.Equal(DialogWorkAreaPolicy.UtilitiesEditor.MaxHeight, size.MaxHeight, 3);
+        Assert.True(size.MaxHeight >= size.Height);
     }
 
     [Theory]
@@ -182,7 +186,12 @@ public sealed class Issue146WindowHeightTests
         var source = ReadView(fileName);
 
         Assert.Contains($"DialogWorkAreaPolicy.{profile}", source, StringComparison.Ordinal);
-        Assert.Contains($"Height = DialogWorkAreaPolicy.{profile}.DefaultHeight;", source, StringComparison.Ordinal);
+        // Issue #159 (1.0.1.123): высота — по содержимому, фиксированная высота
+        // профиля больше не задаётся (иначе на Linux появлялся постоянный скролл).
+        Assert.Contains("SizeToContent = Avalonia.Controls.SizeToContent.Height",
+            source, StringComparison.Ordinal);
+        Assert.DoesNotContain($"Height = DialogWorkAreaPolicy.{profile}.DefaultHeight;",
+            source, StringComparison.Ordinal);
         Assert.Contains($"MinHeight = DialogWorkAreaPolicy.{profile}.MinHeight;", source, StringComparison.Ordinal);
         Assert.Contains("DialogWorkAreaPolicy.Recommend(", source, StringComparison.Ordinal);
     }
@@ -201,7 +210,19 @@ public sealed class Issue146WindowHeightTests
         Assert.Contains("DialogWorkAreaPolicy.ContextMenuEditor", source, StringComparison.Ordinal);
         Assert.Contains("MaxHeight = size.MaxHeight;", source, StringComparison.Ordinal);
         Assert.Contains("MinHeight = size.MinHeight;", source, StringComparison.Ordinal);
-        Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
+
+        if (fileName.EndsWith(".Avalonia.cs", StringComparison.Ordinal))
+        {
+            // Issue #159 (1.0.1.123): Avalonia-окно растягивается по содержимому,
+            // поэтому Height из политики не присваивается.
+            Assert.Contains("SizeToContent = Avalonia.Controls.SizeToContent.Height",
+                source, StringComparison.Ordinal);
+            Assert.DoesNotContain("Height = size.Height;", source, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("Height = size.Height;", source, StringComparison.Ordinal);
+        }
     }
 
     [Theory]

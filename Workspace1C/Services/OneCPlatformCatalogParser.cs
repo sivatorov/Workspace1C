@@ -91,6 +91,38 @@ public static class OneCPlatformCatalogParser
         @"<(?:b|strong)(?:\s[^>]*)?>(?<text>(?:(?!</(?:b|strong)>)[\s\S]){1,120}?)</(?:b|strong)>",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    /// <summary>
+    /// Регулярное выражение заголовка группы в семантических тегах (issue #167):
+    /// <c><h1>…</h1></c>…<c><h4></c>, <c><summary></c>,
+    /// <c><caption></c>, <c><legend></c>. Страница <c>version_files</c>
+    /// размечает разделы («Windows (64-bit)», «Linux (64-bit)» и т.п.) не только
+    /// жирным текстом, поэтому прежний парсер не находил ни одного раздела и строка
+    /// выбора раздела в окне скачивания не появлялась.
+    /// </summary>
+    private static readonly Regex TagGroupHeaderRegex = new(
+        @"<(?<tag>h[1-4]|summary|caption|legend)\b[^>]*>(?<text>[\s\S]{1,200}?)</\k<tag>>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Регулярное выражение заголовка группы по CSS-классу (issue #167): элементы
+    /// с классом, содержащим <c>group</c>/<c>section</c>/<c>header</c>
+    /// (например, <c><div class="group">Windows (64-bit)</div></c>).
+    /// Слишком длинный текст такого контейнера отбрасывается нормализацией.
+    /// </summary>
+    private static readonly Regex ClassGroupHeaderRegex = new(
+        @"<(?<tag>[a-z][a-z0-9]*)\b[^>]*\bclass\s*=\s*[""'][^""']*(?:group|section|header)[^""']*[""'][^>]*>(?<text>[\s\S]{1,200}?)</\k<tag>>",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    /// <summary>
+    /// Известные названия разделов страницы загрузок (issue #167): «Windows (64-bit)»,
+    /// «Windows (32-bit)», «Linux (64-bit)», «Linux (32-bit)» (в т.ч. «64-бит»).
+    /// Используются как запасной путь, когда семантических заголовков на странице нет —
+    /// разделы могут быть просто текстом внутри ячеек таблицы.
+    /// </summary>
+    private static readonly Regex KnownSectionNameRegex = new(
+        @"(?<text>(?:Windows|Linux)\s*\(\s*(?:32|64)\s*(?:-\s*bit|бит[а]?)\s*\))",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     /// <summary>Регулярное выражение расширения дистрибутива (текст заголовка,
     /// содержащий имя файла/ссылку на дистрибутив, группой не является).</summary>
     private static readonly Regex DistributionExtensionRegex = new(
@@ -411,31 +443,67 @@ public static class OneCPlatformCatalogParser
             });
         }
 
+        // Issue #167: если заголовков на странице нет, но в релизе есть файлы разных
+        // семейств ОС (Windows и Linux), разделы синтезируются по типу/разрядности —
+        // «Windows (64-bit)», «Linux (64-bit)» и т.п. Одно семейство разделов не даёт.
+        ApplyFamilyFallback(result);
+
         return result;
     }
 
-    /// <summary>Извлекает заголовки групп из HTML-ответа страницы <c>version_files</c>
-    /// (issue #330 п.2/#334 п.2): жирные заголовки (<c><b></c>/<c><strong></c>)
-    /// с человекочитаемым текстом. Мусор отфильтровывается: ссылки, имена файлов
-    /// дистрибутивов, чисто числовые/версионные строки, слишком короткий/длинный текст.
-    /// Возвращает список «позиция в ответе → текст заголовка» в порядке появления.</summary>
+    /// <summary>
+    /// Извлекает заголовки групп из HTML-ответа страницы <c>version_files</c>
+    /// (issue #330 п.2/#334 п.2, расширено в issue #167): жирные заголовки
+    /// (<c><b></c>/<c><strong></c>), семантические (<c><h1>…<h4></c>,
+    /// <c><summary></c>, <c><caption></c>, <c><legend></c>) и элементы
+    /// с CSS-классом, содержащим <c>group</c>/<c>section</c>/<c>header</c>. Если
+    /// семантических заголовков нет, разделы ищутся по известным названиям
+    /// («Windows (64-bit)», «Linux (64-bit)» и т.п.) в тексте страницы.
+    /// Мусор отфильтровывается: ссылки, имена файлов дистрибутивов, чисто
+    /// числовые/версионные строки, слишком короткий/длинный текст.
+    /// Возвращает список «позиция в ответе → текст заголовка» в порядке появления.
+    /// </summary>
     private static List<(int Index, string Text)> ExtractGroupHeaders(string body)
     {
         var headers = new List<(int Index, string Text)>();
         if (string.IsNullOrWhiteSpace(body) || body.IndexOf('<') < 0)
             return headers;
 
-        foreach (Match match in GroupHeaderRegex.Matches(body))
+        AddHeaders(headers, GroupHeaderRegex.Matches(body), body);
+        AddHeaders(headers, TagGroupHeaderRegex.Matches(body), body);
+        AddHeaders(headers, ClassGroupHeaderRegex.Matches(body), body);
+
+        // Запасной путь: разделы размечены простым текстом (например, в ячейках
+        // таблицы) — используем известные названия разделов страницы загрузок.
+        if (headers.Count == 0)
         {
-            // Жирные ссылки («<b><a href=…>Скачать</a></b>») заголовками групп не являются.
+            foreach (Match match in KnownSectionNameRegex.Matches(body))
+            {
+                var text = NormalizeGroupHeaderText(match.Groups["text"].Value);
+                if (!string.IsNullOrWhiteSpace(text))
+                    headers.Add((match.Index, text));
+            }
+        }
+
+        headers.Sort((a, b) => a.Index.CompareTo(b.Index));
+        return headers;
+    }
+
+    /// <summary>Добавляет в список заголовки, найденные регулярным выражением
+    /// <paramref name="matches"/>: пропускает ссылки («<b><a …>Скачать</a></b>»),
+    /// нормализует текст и отбрасывает мусор.</summary>
+    private static void AddHeaders(
+        List<(int Index, string Text)> headers, MatchCollection matches, string body)
+    {
+        foreach (Match match in matches)
+        {
+            // Ссылки внутри заголовка («<b><a href=…>Скачать</a></b>») группой не являются.
             if (Regex.IsMatch(match.Groups["text"].Value, @"<a\s", RegexOptions.IgnoreCase))
                 continue;
             var text = NormalizeGroupHeaderText(match.Groups["text"].Value);
             if (!string.IsNullOrWhiteSpace(text))
                 headers.Add((match.Index, text));
         }
-
-        return headers;
     }
 
     /// <summary>Нормализует текст заголовка группы (снятие вложенной разметки,
@@ -455,8 +523,69 @@ public static class OneCPlatformCatalogParser
         // Чисто числовой/версионный текст («8.3.27») группой не является.
         if (Regex.IsMatch(text, @"^[\d.,\s\-–—%()]+$"))
             return null;
+        // Полный номер версии в заголовке («Файлы версии 8.5.1.1522») — это заголовок
+        // страницы/релиза, а не раздел списка файлов.
+        if (Regex.IsMatch(text, @"\b\d{1,4}\.\d{1,4}\.\d{1,4}\b"))
+            return null;
         return text;
     }
+
+    /// <summary>
+    /// Фолбэк разделов (issue #167): если на странице не найдено ни одного заголовка
+    /// группы, но файлы относятся к разным семействам ОС (Windows и Linux),
+    /// разделы синтезируются по семейству и разрядности — «Windows (64-bit)»,
+    /// «Windows (32-bit)», «Linux (64-bit)», «Linux (32-bit)». Если семейство одно
+    /// (например, только Windows) — разделы не создаются, строка выбора скрыта.
+    /// Файлы без определённой разрядности остаются без группы.
+    /// </summary>
+    private static void ApplyFamilyFallback(List<PlatformReleaseFile> files)
+    {
+        if (files is null || files.Count == 0)
+            return;
+        // Заголовки уже назначены хотя бы одному файлу — фолбэк не нужен.
+        if (files.Any(f => !string.IsNullOrWhiteSpace(f.Group)))
+            return;
+
+        var families = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files)
+        {
+            var family = DistributionFamily(file);
+            if (family is not null)
+                families.Add(family);
+        }
+
+        // Одно семейство ОС — разделы не несут информации (разрядность фильтруется отдельно).
+        if (families.Count < 2)
+            return;
+
+        foreach (var file in files)
+        {
+            var family = DistributionFamily(file);
+            if (family is null)
+                continue;
+            var bits = string.Equals(file.Architecture, PlatformDistributionPicker.Arch32,
+                StringComparison.OrdinalIgnoreCase)
+                ? "32-bit"
+                : string.Equals(file.Architecture, PlatformDistributionPicker.Arch64,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? "64-bit"
+                    : null;
+            if (bits is null)
+                continue;
+            file.Group = $"{family} ({bits})";
+        }
+    }
+
+    /// <summary>Семейство ОС файла дистрибутива: «Windows»/«Linux» или null.</summary>
+    private static string? DistributionFamily(PlatformReleaseFile file)
+        => file?.Kind switch
+        {
+            PlatformDistributionKind.WindowsSetupZip => "Windows",
+            PlatformDistributionKind.LinuxDeb
+                or PlatformDistributionKind.LinuxRpm
+                or PlatformDistributionKind.LinuxTarGz => "Linux",
+            _ => null,
+        };
 
     /// <summary>Возвращает заголовок группы, действующий на позиции <paramref name="position"/>
     /// в ответе (последний заголовок до этой позиции), или null — файлы до первого

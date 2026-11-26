@@ -123,6 +123,97 @@ public sealed class Issue164AccountPasswordPromptTests
         Assert.Equal("%unknown%", TitleSuffixResolver.Resolve("%unknown%", null));
     }
 
+    /// <summary>
+    /// Issue #164 (1.0.1.123): повторный запуск ярлыком при работающем экземпляре.
+    /// Второй экземпляр при запрете нескольких запусков активирует существующее окно
+    /// и не показывает вход; при <c>AllowMultipleInstances=true</c> запускается полноценно;
+    /// первичный экземпляр идёт обычным путём.
+    /// </summary>
+    [Fact]
+    public void StartupInstancePolicy_SecondInstance_ActivatesExistingWithoutLogin()
+    {
+        const bool allowMultiple = false;
+        const bool createdNew = false; // блокировка занята первым экземпляром
+
+        Assert.True(StartupInstancePolicy.ShouldUseSingleInstanceGate(allowMultiple));
+        Assert.True(StartupInstancePolicy.ShouldActivateExistingInstance(allowMultiple, createdNew));
+        Assert.False(StartupInstancePolicy.IsPrimaryInstance(allowMultiple, createdNew));
+
+        // Второй экземпляр завершается до окна входа: даже если профиль защищён паролем,
+        // вход не показывается — окно активирует уже работающее приложение.
+        Assert.False(StartupInstancePolicy.ShouldShowLogin(
+            activateExistingInstance: true, requiresLogin: true));
+    }
+
+    [Fact]
+    public void StartupInstancePolicy_AllowMultipleInstances_StartsFully()
+    {
+        const bool allowMultiple = true;
+        const bool createdNew = false; // гейт не используется, блокировки нет
+
+        Assert.False(StartupInstancePolicy.ShouldUseSingleInstanceGate(allowMultiple));
+        Assert.False(StartupInstancePolicy.ShouldActivateExistingInstance(allowMultiple, createdNew));
+        Assert.True(StartupInstancePolicy.IsPrimaryInstance(allowMultiple, createdNew));
+
+        // Вход и обычный запуск работают как прежде (регрессии нет).
+        Assert.True(StartupInstancePolicy.ShouldShowLogin(
+            activateExistingInstance: false, requiresLogin: true));
+        Assert.False(StartupInstancePolicy.ShouldShowLogin(
+            activateExistingInstance: false, requiresLogin: false));
+    }
+
+    [Fact]
+    public void StartupInstancePolicy_PrimaryInstance_NormalStartup()
+    {
+        const bool allowMultiple = false;
+        const bool createdNew = true; // этот процесс создал блокировку
+
+        Assert.True(StartupInstancePolicy.ShouldUseSingleInstanceGate(allowMultiple));
+        Assert.False(StartupInstancePolicy.ShouldActivateExistingInstance(allowMultiple, createdNew));
+        Assert.True(StartupInstancePolicy.IsPrimaryInstance(allowMultiple, createdNew));
+
+        // Первичный экземпляр показывает вход, если это требуется профилем.
+        Assert.True(StartupInstancePolicy.ShouldShowLogin(
+            activateExistingInstance: false, requiresLogin: true));
+    }
+
+    /// <summary>
+    /// Регрессионный source-guard: в обеих оболочках проверка одиночного экземпляра
+    /// (и обработка CLI-команд в WPF) стоит ДО <c>LoginWindow.ShowLogin</c>, иначе
+    /// второй процесс снова спросит пароль до активации существующего окна.
+    /// </summary>
+    [Fact]
+    public void StartupGate_RunsBeforeLoginWindow_InBothShells()
+    {
+        foreach (var file in new[] { "App.xaml.cs", "App.axaml.cs" })
+        {
+            var source = ReadProjectFile("Workspace1C", file);
+
+            var gateIndex = source.IndexOf(
+                "StartupInstancePolicy.ShouldActivateExistingInstance", StringComparison.Ordinal);
+            var loginIndex = source.IndexOf("LoginWindow.ShowLogin(", StringComparison.Ordinal);
+            var listenerIndex = source.IndexOf("StartActivationListener();", StringComparison.Ordinal);
+
+            Assert.True(gateIndex >= 0, $"{file}: нет вызова StartupInstancePolicy");
+            Assert.True(loginIndex >= 0, $"{file}: нет вызова LoginWindow.ShowLogin");
+            Assert.True(listenerIndex >= 0, $"{file}: нет запуска StartActivationListener");
+
+            Assert.True(gateIndex < loginIndex,
+                $"{file}: гейт одиночного экземпляра должен стоять до окна входа");
+            Assert.True(gateIndex < listenerIndex,
+                $"{file}: StartActivationListener запускается после решения гейта");
+        }
+
+        // WPF: команды --register/--launch/--designer обрабатываются до гейта (как раньше).
+        var wpf = ReadProjectFile("Workspace1C", "App.xaml.cs");
+        var cliIndex = wpf.IndexOf("ExplorerCommandLine.TryHandle(e.Args)", StringComparison.Ordinal);
+        var wpfGateIndex = wpf.IndexOf(
+            "StartupInstancePolicy.ShouldActivateExistingInstance", StringComparison.Ordinal);
+        Assert.True(cliIndex >= 0, "App.xaml.cs: нет обработки CLI-команд");
+        Assert.True(cliIndex < wpfGateIndex,
+            "App.xaml.cs: CLI-команды должны обрабатываться до гейта одиночного экземпляра");
+    }
+
     [Fact]
     public void Localization_HasAccountPasswordKeys()
     {

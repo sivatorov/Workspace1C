@@ -57,6 +57,15 @@ public sealed class PlatformDistributionOption
     /// <summary>True — имя файла включается в <see cref="DisplayName"/> (issue #330).</summary>
     public bool IncludeFileName { get; }
 
+    /// <summary>
+    /// Подпись для окна «Скачивание версии платформы 1С» (issue #167). Если задана,
+    /// <see cref="DisplayName"/> возвращает её вместо стандартного представления
+    /// «Полный клиент (rar) · x64 · имя». Окно скачивания показывает только раздел,
+    /// разрядность и имя файла (см. <see cref="PlatformFileDisplayName.Compose"/>);
+    /// остальные окна подпись не задают и работают как раньше.
+    /// </summary>
+    public string? DisplayNameOverride { get; set; }
+
     /// <summary>Тип дистрибутива по расширению.</summary>
     public PlatformDistributionKind Kind => File.Kind;
 
@@ -79,6 +88,9 @@ public sealed class PlatformDistributionOption
     {
         get
         {
+            if (!string.IsNullOrWhiteSpace(DisplayNameOverride))
+                return DisplayNameOverride!;
+
             var type = File.Kind == PlatformDistributionKind.WindowsSetupZip
                 ? (PlatformDistributionPicker.IsThinClient(File) ? "Тонкий клиент (" : "Полный клиент (")
                   + GetDistributionExtension(File) + ")"
@@ -127,6 +139,49 @@ public sealed class PlatformDistributionOption
         if (bytes >= kb)
             return $"{bytes / (double)kb:0.#} КБ";
         return bytes.ToString();
+    }
+}
+
+/// <summary>
+/// Чистый построитель подписи файла дистрибутива для окна «Скачивание версии
+/// платформы 1С» (issue #167). В отличие от <see cref="PlatformDistributionOption.DisplayName"/>
+/// не содержит типа дистрибутива («Полный клиент (rar)», «Пакет deb» и т.п.):
+/// эти «добавки» часто не соответствуют содержимому архива. Подпись состоит только
+/// из раздела страницы, разрядности (где есть) и имени файла:
+/// <list type="bullet">
+/// <item>обе галочки сняты: «Раздел - x64 - имя_файла»;</item>
+/// <item>учёт разрядности включён: «Раздел - имя_файла»;</item>
+/// <item>учёт раздела включён: «x64 - имя_файла»;</item>
+/// <item>оба учёта включены: «имя_файла».</item>
+/// </list>
+/// То, что пользователь уже выбрал галочкой, в подписи не дублируется.
+/// </summary>
+public static class PlatformFileDisplayName
+{
+    /// <summary>Разделитель частей подписи.</summary>
+    public const string Separator = " - ";
+
+    /// <summary>
+    /// Собирает итоговую подпись файла (issue #167). <paramref name="includeArchitecture"/>
+    /// и <paramref name="includeSection"/> — включать ли соответствующую часть в строку
+    /// (true — галочка фильтра СНЯТА и часть показывается; false — галочка установлена
+    /// и часть уже выбрана, дублировать её не нужно). Отсутствующие части (нет разрядности
+    /// или раздела) пропускаются; имя файла выводится всегда.
+    /// </summary>
+    public static string Compose(PlatformReleaseFile? file, bool includeArchitecture, bool includeSection)
+    {
+        if (file is null)
+            return string.Empty;
+
+        var parts = new List<string>(3);
+        if (includeSection && !string.IsNullOrWhiteSpace(file.Group))
+            parts.Add(file.Group!.Trim());
+        if (includeArchitecture && !string.IsNullOrWhiteSpace(file.Architecture))
+            parts.Add(file.Architecture!.Trim());
+        if (!string.IsNullOrWhiteSpace(file.FileName))
+            parts.Add(file.FileName.Trim());
+
+        return string.Join(Separator, parts);
     }
 }
 

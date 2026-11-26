@@ -7,6 +7,7 @@ using Avalonia.Controls.Templates;
 using Avalonia.Data;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using Workspace1C.Controls;
 using Workspace1C.Localization;
 using Workspace1C.Models;
@@ -25,6 +26,12 @@ namespace Workspace1C;
 /// </summary>
 public sealed class CustomProgramsWindow : ModalWindowBase
 {
+    /// <summary>
+    /// Issue #158 (1.0.1.123): открытое окно редактора (не более одного). Второй клик
+    /// по шестерёнке активирует его, а не создаёт дубль (у 7OH открывались два окна).
+    /// </summary>
+    private static CustomProgramsWindow? _openInstance;
+
     private readonly CustomProgramsViewModel _vm;
     private readonly IDialogService _dialogs = AppServices.GetRequiredService<IDialogService>();
     private readonly ListBox _list = new();
@@ -43,9 +50,11 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     {
         Title = T("Launch.CustomPrograms.Title");
         Width = 900;
-        // Issue #146 (1.0.1.118): высота и минимум — из профиля CustomPrograms
-        // (600/440 DIP): окно открывается по содержимому и допускает уменьшение.
-        Height = DialogWorkAreaPolicy.CustomPrograms.DefaultHeight;
+        // Issue #159 (1.0.1.123): окно растягивается по содержимому формы
+        // (SizeToContent.Height) — постоянная внешняя прокрутка на Linux исчезает.
+        // Список программ прокручивается своим ListBox. MaxHeight/MinHeight
+        // уточняются в ApplyWorkAreaLimits по рабочей области.
+        SizeToContent = Avalonia.Controls.SizeToContent.Height;
         MinWidth = 760;
         MinHeight = DialogWorkAreaPolicy.CustomPrograms.MinHeight;
         FontSize = 13;
@@ -71,13 +80,77 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         var size = DialogWorkAreaPolicy.Recommend(
             DialogWorkAreaPolicy.CustomPrograms,
             dipHeight);
+        // Issue #159: высота — по содержимому формы (SizeToContent.Height), Height не
+        // задаём; MaxHeight клампится по рабочей области, а длинный список программ
+        // прокручивается своим ListBox, не растягивая окно за экран.
         MaxHeight = size.MaxHeight;
         MinHeight = size.MinHeight;
-        Height = size.Height;
+        _list.MaxHeight = Math.Max(200, size.MaxHeight - 240);
     }
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>
     public string ViewMode => _vm.ViewMode;
+
+    /// <summary>Открыт ли редактор «Мои программы» прямо сейчас (issue #158).</summary>
+    public static bool IsOpen => CustomProgramsEditorGuard.IsOpen;
+
+    /// <summary>
+    /// Issue #158 (1.0.1.123): единственная точка открытия редактора. Повторный вызов
+    /// при уже открытом окне активирует существующее и НЕ создаёт второе. Слот
+    /// освобождается в <c>finally</c> и в <see cref="OnClosed"/>, поэтому ошибка
+    /// сохранения или удаления не «залипает» навсегда.
+    /// </summary>
+    /// <param name="owner">Окно-владелец (настройки или главное окно).</param>
+    /// <param name="viewMode">Текущий режим отображения группы из настроек.</param>
+    /// <returns>Открытое (или уже открытое) окно редактора — для чтения <see cref="ViewMode"/>.</returns>
+    public static CustomProgramsWindow ShowEditor(Window? owner, string? viewMode)
+    {
+        if (CustomProgramsEditorGuard.IsOpen && _openInstance is { } existing)
+        {
+            ModalCloseTrace.Log(
+                "CustomProgramsWindow.ShowEditor: окно уже открыто — активирую существующее");
+            try { existing.Activate(); } catch { /* активация не критична */ }
+            return existing;
+        }
+
+        var win = new CustomProgramsWindow(viewMode);
+        if (!CustomProgramsEditorGuard.TryEnter())
+        {
+            // Гонка: слот заняли между проверкой и созданием. Второе окно не показываем.
+            ModalCloseTrace.Log(
+                "CustomProgramsWindow.ShowEditor: слот занят — второе окно не создаётся");
+            return _openInstance ?? win;
+        }
+
+        _openInstance = win;
+        try
+        {
+            win.ShowDialogSync(owner);
+        }
+        finally
+        {
+            if (ReferenceEquals(_openInstance, win))
+                _openInstance = null;
+            CustomProgramsEditorGuard.Exit();
+        }
+        return win;
+    }
+
+    /// <summary>
+    /// Issue #158: снятие флага одного окна даже при закрытии окна в обход
+    /// <see cref="ShowEditor"/> (например, прямым <c>ShowDialogSync</c> из старого кода).
+    /// </summary>
+    protected override void OnClosed(EventArgs e)
+    {
+        // Слот освобождает только «своё» окно: закрытие постороннего экземпляра
+        // не должно открывать дорогу второму редактору.
+        if (ReferenceEquals(_openInstance, this))
+        {
+            _openInstance = null;
+            CustomProgramsEditorGuard.Exit();
+        }
+        base.OnClosed(e);
+    }
 
     /// <summary>Показывает окно модально (синхронно).</summary>
     public bool ShowSync(Window? owner = null) => ShowDialogSync(owner);
@@ -100,8 +173,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         ok.Click += (_, _) => SaveAndClose();
         // Issue #158 (1.0.1.121): «Отмена» закрывает окно штатно, без сохранения и без
         // установки DialogResult — окно закрывается даже после ошибки сохранения.
+        // 1.0.1.123: закрытие идёт через CloseSafely — сбой в цепочке закрытия
+        // (в т.ч. при перестройке шаблона списка) не оставляет окно на экране.
         var cancel = new Button { Content = T("Common.Cancel"), MinWidth = 110 };
-        cancel.Click += (_, _) => Close();
+        cancel.Click += (_, _) => CloseSafely();
         foreach (var b in new Control[] { ok, cancel })
         {
             b.Styled(ControlThemes.ModernButton);
@@ -175,7 +250,9 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         };
         ops.Children.Add(IconButton("IconPlus", "Common.Add", () => _vm.AddProgram()));
         // Удаление программы — опасное действие: DangerButton (P2-1).
-        ops.Children.Add(IconButton("IconDelete", "Common.Delete", () => _vm.DeleteSelected(),
+        // Issue #158 (1.0.1.123): удаление не должно бросать исключение наружу —
+        // ошибка хранилища/иконки логируется, окно остаётся рабочим и закрывается.
+        ops.Children.Add(IconButton("IconDelete", "Common.Delete", DeleteSelectedSafe,
             ControlThemes.DangerButton, "DangerTextBrush"));
         ops.Children.Add(IconButton("IconArrowUp", "Launch.CustomPrograms.MoveUp", () => _vm.MoveSelected(-1)));
         ops.Children.Add(IconButton("IconArrowDown", "Launch.CustomPrograms.MoveDown", () => _vm.MoveSelected(1)));
@@ -187,7 +264,12 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         // строка добавленной программы в редакторе не появлялась.
         _list.Bind(ItemsControl.ItemsSourceProperty, new Binding("Programs"));
         _list.Bind(ListBox.SelectedItemProperty, new Binding("SelectedProgram") { Mode = BindingMode.TwoWay });
-        _list.ItemTemplate = new FuncDataTemplate<CustomProgram>((program, _) => BuildListItem(program));
+        // Issue #158 (1.0.1.123): ContentPresenter может построить строку и для
+        // null-элемента (удаление/пересоздание контейнера). Раньше BuildListItem
+        // обращался к program.Name и падал NullReferenceException прямо во время
+        // удаления/закрытия окна — из-за этого окно «не закрывалось» вообще.
+        _list.ItemTemplate = new FuncDataTemplate<CustomProgram>(
+            (program, _) => BuildListItem(program));
         left.Children.Add(_list);
         Grid.SetColumn(left, 0);
         grid.Children.Add(left);
@@ -256,7 +338,35 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         return grid;
     }
 
-    private Control BuildListItem(CustomProgram program)
+    /// <summary>
+    /// Строка списка программ. Issue #158 (1.0.1.123): <paramref name="program"/> может
+    /// быть <c>null</c> — <c>ContentPresenter</c> вызывает шаблон и с пустым содержимым
+    /// (удаление элемента, пересоздание контейнера, закрытие окна). Возвращаем пустой
+    /// контрол вместо исключения; любые сбои построения строки тоже не выходят наружу.
+    /// </summary>
+    private Control BuildListItem(CustomProgram? program)
+    {
+        if (program is null)
+            return new Panel();
+
+        try
+        {
+            return BuildListItemCore(program);
+        }
+        catch (Exception ex)
+        {
+            LogWindowError(
+                $"Не удалось построить строку программы «{program.Name}».", ex);
+            return new TextBlock
+            {
+                Text = program.Name,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis
+            };
+        }
+    }
+
+    private Control BuildListItemCore(CustomProgram program)
     {
         var iconImage = new Image { Width = 18, Height = 18, Margin = new Thickness(0, 0, 8, 0) };
         iconImage.Bind(Image.SourceProperty, new MultiBinding
@@ -293,12 +403,15 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             }
         });
 
+        // Issue #158 (1.0.1.123): имя привязано к модели, а не скопировано в Text.
+        // CustomProgram реализует INotifyPropertyChanged, поэтому переименование
+        // в форме сразу видно в списке (раньше — только после переоткрытия окна).
         var name = new TextBlock
         {
-            Text = program.Name,
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
+        name.Bind(TextBlock.TextProperty, new Binding(nameof(CustomProgram.Name)));
 
         var iconHost = new Grid
         {
@@ -414,6 +527,8 @@ public sealed class CustomProgramsWindow : ModalWindowBase
     /// Issue #158 (1.0.1.121): ошибка сохранения (в том числе ввода-вывода на Linux)
     /// показывается сообщением, окно остаётся открытым и закрывается кнопкой «Отмена»;
     /// исключение записи не выходит наружу и не блокирует закрытие.
+    /// 1.0.1.123: закрытие — через <see cref="CloseSafely"/>, чтобы сбой при перестройке
+    /// списка не оставлял окно на экране.
     /// </summary>
     private void SaveAndClose()
     {
@@ -423,7 +538,59 @@ public sealed class CustomProgramsWindow : ModalWindowBase
             return;
         }
         DialogResult = true;
-        Close();
+        CloseSafely();
+    }
+
+    /// <summary>
+    /// Удаление выбранной программы. Issue #158 (1.0.1.123): исключение не выходит
+    /// наружу (иначе вместо удаления показывалось необработанное «Ошибка интерфейса»),
+    /// а пишется в журнал; окно остаётся рабочим и закрывается штатно.
+    /// </summary>
+    private void DeleteSelectedSafe()
+    {
+        try
+        {
+            _vm.DeleteSelected();
+        }
+        catch (Exception ex)
+        {
+            LogWindowError("Не удалось удалить программу из списка.", ex);
+        }
+    }
+
+    /// <summary>
+    /// Issue #158 (1.0.1.123): гарантированное закрытие окна. Если синхронное
+    /// <c>Close()</c> сорвалось (например, исключение в обработчике шаблона строки),
+    /// окно закрывается ещё раз из очереди UI-потока, а ошибка попадает в журнал.
+    /// </summary>
+    private void CloseSafely()
+    {
+        try
+        {
+            Close();
+        }
+        catch (Exception ex)
+        {
+            LogWindowError("Не удалось закрыть окно «Мои программы».", ex);
+            Dispatcher.UIThread.Post(() =>
+            {
+                try { Close(); }
+                catch { /* окно уже закрыто или не открывалось */ }
+            });
+        }
+    }
+
+    /// <summary>Запись ошибки окна в журнал; недоступность журнала не ломает UI.</summary>
+    private static void LogWindowError(string message, Exception ex)
+    {
+        try
+        {
+            AppServices.TryGetService<IAppLogger>()?.Error($"[custom-programs] {message}", ex);
+        }
+        catch
+        {
+            // Журнал не должен ломать сценарий закрытия/удаления.
+        }
     }
 
     /// <summary>Показ понятного сообщения об ошибке сохранения (issue #158).</summary>

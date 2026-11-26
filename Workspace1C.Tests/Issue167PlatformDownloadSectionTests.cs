@@ -247,7 +247,214 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.Contains("nameof(PlatformDownloadViewModel.HasSections)", code, StringComparison.Ordinal);
         Assert.Contains("nameof(PlatformDownloadViewModel.SelectedSection)", code, StringComparison.Ordinal);
         Assert.Contains("T(\"PlatformDownload.Section\")", code, StringComparison.Ordinal);
-        Assert.Contains("T(\"PlatformDownload.FilterSection\")", code, StringComparison.Ordinal);
+        // Issue #167: длинный текст галочки убран — остаётся только подсказка.
+        Assert.Contains("T(\"PlatformDownload.FilterSectionTooltip\")", code, StringComparison.Ordinal);
+        Assert.Contains("T(\"PlatformDownload.FilterArchitectureTooltip\")", code, StringComparison.Ordinal);
+    }
+
+    // ===================== Issue #167 (1.0.1.123): подпись и сортировка =====================
+
+    /// <summary>Четыре комбинации галочек: часть, уже выбранную галочкой, не дублируем.</summary>
+    [Theory]
+    [InlineData(true, true, "Windows (64-bit) - x64 - file.zip")]
+    [InlineData(false, true, "Windows (64-bit) - file.zip")]
+    [InlineData(true, false, "x64 - file.zip")]
+    [InlineData(false, false, "file.zip")]
+    public void Compose_FourCheckboxCombinations(bool includeArchitecture, bool includeSection, string expected)
+    {
+        var file = File("file.zip", "x64", "Windows (64-bit)");
+
+        var text = PlatformFileDisplayName.Compose(file, includeArchitecture, includeSection);
+
+        Assert.Equal(expected, text);
+    }
+
+    [Fact]
+    public void Compose_SkipsMissingParts_AndAlwaysShowsFileName()
+    {
+        // Нет разрядности/раздела — соответствующие части пропускаются.
+        var noArch = File("file.deb", null, "Linux (64-bit)");
+        Assert.Equal("Linux (64-bit) - file.deb", PlatformFileDisplayName.Compose(noArch, true, true));
+        Assert.Equal("file.deb", PlatformFileDisplayName.Compose(noArch, false, false));
+
+        var noGroup = File("file.zip", "x86");
+        Assert.Equal("x86 - file.zip", PlatformFileDisplayName.Compose(noGroup, true, true));
+
+        Assert.Equal(string.Empty, PlatformFileDisplayName.Compose(null, true, true));
+    }
+
+    [Fact]
+    public async Task Vm_DisplayName_OmitsArchitectureAndSection_WhenFiltersOn_AndSortedByFinalString()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("b_x64.zip", "x64", "Windows (64-bit)"),
+            File("a_x86.zip", "x86", "Windows (32-bit)")));
+
+        await vm.LoadCatalogAsync();
+
+        // Галочка разрядности включена (по умолчанию), раздела — нет:
+        // «Раздел - имя_файла» (разрядность не дублируется).
+        var onlyX64 = Assert.Single(vm.DistributionOptions);
+        Assert.Equal("Windows (64-bit) - b_x64.zip", onlyX64.DisplayName);
+        Assert.DoesNotContain("Полный клиент", onlyX64.DisplayName, StringComparison.Ordinal);
+
+        // Обе галочки сняты: «Раздел - разрядность - имя_файла», сортировка по строке.
+        vm.FilterByArchitecture = false;
+        Assert.Equal(
+            new[]
+            {
+                "Windows (32-bit) - x86 - a_x86.zip",
+                "Windows (64-bit) - x64 - b_x64.zip",
+            },
+            vm.DistributionOptions.Select(o => o.DisplayName).ToArray());
+
+        // Галочка раздела включена (выбран первый раздел страницы), разрядность снята:
+        // «x64 - имя_файла» (раздел не дублируется).
+        vm.FilterBySection = true;
+        Assert.Equal("Windows (64-bit)", vm.SelectedSection);
+        var sectionOnly = Assert.Single(vm.DistributionOptions);
+        Assert.Equal("x64 - b_x64.zip", sectionOnly.DisplayName);
+
+        // Обе галочки: только имя файла.
+        vm.FilterByArchitecture = true;
+        var both = Assert.Single(vm.DistributionOptions);
+        Assert.Equal("b_x64.zip", both.DisplayName);
+    }
+
+    [Fact]
+    public void WpfDialog_ArchitectureCheckboxHasNoText_AndSectionRowHasCheckbox()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "PlatformDownloadWindow.xaml");
+
+        // Длинные тексты галочек убраны (issue #167).
+        Assert.DoesNotContain("Content=\"{loc:Loc PlatformDownload.FilterArchitecture}\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content=\"{loc:Loc PlatformDownload.FilterSection}\"", xaml, StringComparison.Ordinal);
+        // Подсказки остались; галочки привязаны к фильтрам.
+        Assert.Contains("PlatformDownload.FilterArchitectureTooltip", xaml, StringComparison.Ordinal);
+        Assert.Contains("PlatformDownload.FilterSectionTooltip", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaDialog_ArchitectureCheckboxHasNoText_AndSectionRowHasCheckbox()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "PlatformDownloadWindow.Avalonia.cs");
+
+        Assert.DoesNotContain("Content = T(\"PlatformDownload.FilterArchitecture\")", code, StringComparison.Ordinal);
+        Assert.DoesNotContain("Content = T(\"PlatformDownload.FilterSection\")", code, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.SetTip(archFilter, T(\"PlatformDownload.FilterArchitectureTooltip\"))", code, StringComparison.Ordinal);
+        Assert.Contains("ToolTip.SetTip(sectionFilter, T(\"PlatformDownload.FilterSectionTooltip\"))", code, StringComparison.Ordinal);
+    }
+
+    // ===================== Issue #167: определение разделов парсером =====================
+
+    [Fact]
+    public void Parser_H2Headers_AreDetectedAsSections()
+    {
+        const string html = """
+            <h2>Windows (64-bit)</h2>
+            <a href="/d/win64.zip">Скачать</a>
+            <h2>Linux (64-bit)</h2>
+            <a href="/d/linux_amd64.deb">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal("Windows (64-bit)", files.Single(f => f.FileName == "win64.zip").Group);
+        Assert.Equal("Linux (64-bit)", files.Single(f => f.FileName == "linux_amd64.deb").Group);
+    }
+
+    [Fact]
+    public void Parser_SummaryHeaders_AreDetectedAsSections()
+    {
+        const string html = """
+            <details>
+              <summary>Linux (64-bit)</summary>
+              <a href="/d/linux_amd64.deb">Скачать</a>
+            </details>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal("Linux (64-bit)", Assert.Single(files).Group);
+    }
+
+    [Fact]
+    public void Parser_ClassBasedHeaders_AreDetectedAsSections()
+    {
+        const string html = """
+            <div class="download-section">Windows (32-bit)</div>
+            <a href="/d/win32.zip">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal("Windows (32-bit)", Assert.Single(files).Group);
+    }
+
+    [Fact]
+    public void Parser_KnownSectionNamesInPlainText_AreDetected()
+    {
+        const string html = """
+            <p>Windows (64-bit)</p>
+            <a href="/d/win64.zip">Скачать</a>
+            <p>Linux (64-bit)</p>
+            <a href="/d/linux_amd64.deb">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal("Windows (64-bit)", files.Single(f => f.FileName == "win64.zip").Group);
+        Assert.Equal("Linux (64-bit)", files.Single(f => f.FileName == "linux_amd64.deb").Group);
+    }
+
+    [Fact]
+    public void Parser_NoHeaders_SingleOsFamily_NoSections()
+    {
+        // Одно семейство (Windows) — разделы не синтезируются, строка скрыта.
+        const string html = """
+            <a href="/d/win64.zip">Скачать</a>
+            <a href="/d/win32.zip">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal(2, files.Count);
+        Assert.All(files, f => Assert.Null(f.Group));
+        Assert.Empty(PlatformDistributionPicker.ExtractSections(files));
+    }
+
+    [Fact]
+    public void Parser_NoHeaders_DifferentOsFamilies_SynthesizesSections()
+    {
+        const string html = """
+            <a href="/d/win64.zip">Скачать</a>
+            <a href="/d/linux_amd64.deb">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        Assert.Equal("Windows (64-bit)", files.Single(f => f.FileName == "win64.zip").Group);
+        Assert.Equal("Linux (64-bit)", files.Single(f => f.FileName == "linux_amd64.deb").Group);
+        Assert.Equal(
+            new[] { "Windows (64-bit)", "Linux (64-bit)" },
+            PlatformDistributionPicker.ExtractSections(files));
+    }
+
+    [Fact]
+    public void Parser_PageTitleWithVersion_IsNotMistakenForSection()
+    {
+        // Заголовок страницы «Файлы версии 8.5.1.1522» разделом не считается.
+        const string html = """
+            <h1>Файлы версии 8.5.1.1522</h1>
+            <a href="/d/win64.zip">Скачать</a>
+            <a href="/d/linux_amd64.deb">Скачать</a>
+            """;
+
+        var files = OneCPlatformCatalogParser.ParseDistributionFiles(html);
+
+        // Семантический заголовок отброшен — работает фолбэк по семействам.
+        Assert.Equal("Windows (64-bit)", files.Single(f => f.FileName == "win64.zip").Group);
+        Assert.Equal("Linux (64-bit)", files.Single(f => f.FileName == "linux_amd64.deb").Group);
     }
 
     // ===================== Локализация ru/en =====================

@@ -37,10 +37,11 @@ namespace Workspace1C
         {
             Title = LocalizationManager.T("Utilities.Editor.Title");
             Width = 820;
-            // Issue #146 (1.0.1.118): высота и минимум — из профиля UtilitiesEditor
-            // (680/440 DIP): окно открывается по содержимому, но допускает уменьшение
-            // до MinHeight.
-            Height = DialogWorkAreaPolicy.UtilitiesEditor.DefaultHeight;
+            // Issue #159 (1.0.1.123): окно растягивается по содержимому
+            // (SizeToContent.Height) — постоянная внешняя прокрутка на Linux исчезает.
+            // MaxHeight/MinHeight уточняются в ApplyWorkAreaLimits по рабочей области;
+            // дерево при длинном списке прокручивается само.
+            SizeToContent = Avalonia.Controls.SizeToContent.Height;
             // Минимальные размеры (issue #55): при уменьшении окна дерево и панель
             // операций не сжимаются до обрезки.
             MinWidth = 640;
@@ -137,14 +138,18 @@ namespace Workspace1C
                 var size = DialogWorkAreaPolicy.Recommend(
                     DialogWorkAreaPolicy.UtilitiesEditor,
                     dipHeight);
+                // Issue #159: высота — по содержимому (SizeToContent.Height), поэтому
+                // Height не задаём. MaxHeight клампится по рабочей области, MinHeight
+                // не превышает её. Дерево получает собственный предел и прокручивается
+                // внутри, а не растягивает окно за экран.
                 MaxHeight = size.MaxHeight;
                 MinHeight = size.MinHeight;
-                Height = size.Height;
+                _tree.MaxHeight = Math.Max(200, size.MaxHeight - 190);
             }
             catch
             {
-                // Геометрия — вспомогательная возможность: окно откроется с размерами
-                // профиля (Height/MinHeight заданы в конструкторе).
+                // Геометрия — вспомогательная возможность: окно откроется по
+                // содержимому с MinHeight профиля.
             }
         }
 

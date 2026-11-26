@@ -143,18 +143,56 @@ public class CustomProgramsViewModel : ViewModelBase
         RaiseCommandsCanExecuteChanged();
     }
 
-    /// <summary>Удаляет выбранную программу и выбирает соседнюю.</summary>
-    public void DeleteSelected()
+    /// <summary>
+    /// Удаляет выбранную программу и выбирает соседнюю.
+    /// <para>
+    /// Issue #158 (1.0.1.123): удаление не бросает исключений наружу (у 7OH вместо
+    /// удаления показывалось необработанное «Ошибка интерфейса», после чего окно
+    /// не закрывалось). Ошибка построения строки/иконки или самого списка пишется
+    /// в журнал, а редактор остаётся рабочим. Файлы иконок пользователя не удаляются —
+    /// только очищается ссылка на иконку у удаляемой записи.
+    /// </para>
+    /// </summary>
+    /// <returns><c>true</c>, если запись удалена; <c>false</c> — нечего удалять или ошибка.</returns>
+    public bool DeleteSelected()
     {
         if (SelectedProgram is not { } program)
-            return;
-        var index = Programs.IndexOf(program);
-        Programs.Remove(program);
-        SelectedProgram = Programs.Count == 0
-            ? null
-            : Programs[Math.Min(Math.Max(index, 0), Programs.Count - 1)];
-        RaiseCommandsCanExecuteChanged();
+            return false;
+
+        try
+        {
+            var index = Programs.IndexOf(program);
+            if (index < 0)
+                return false;
+
+            // Снимаем ссылку на иконку до удаления: шаблон строки больше не будет
+            // обращаться к файлу значка в момент перестройки списка.
+            program.IconPath = string.Empty;
+            program.UseCustomIcon = false;
+
+            RemoveProgramAt(index);
+            SelectedProgram = Programs.Count == 0
+                ? null
+                : Programs[Math.Min(Math.Max(index, 0), Programs.Count - 1)];
+            RaiseCommandsCanExecuteChanged();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            LogDeleteError(program, ex);
+            return false;
+        }
     }
+
+    /// <summary>Последняя ошибка удаления (issue #158): текст для журнала/диагностики.</summary>
+    public string? LastDeleteError { get; private set; }
+
+    /// <summary>
+    /// Удаляет запись по индексу. Вынесено в <c>virtual</c>-метод, чтобы тест мог
+    /// смоделировать сбой списка и проверить, что <see cref="DeleteSelected"/> не
+    /// пробрасывает исключение наружу (issue #158).
+    /// </summary>
+    protected virtual void RemoveProgramAt(int index) => Programs.RemoveAt(index);
 
     /// <summary>Перемещает выбранную программу на <paramref name="delta"/> позиций.</summary>
     public void MoveSelected(int delta)
@@ -169,12 +207,22 @@ public class CustomProgramsViewModel : ViewModelBase
         RaiseCommandsCanExecuteChanged();
     }
 
-    /// <summary>Сбрасывает иконку выбранной программы.</summary>
+    /// <summary>
+    /// Сбрасывает иконку выбранной программы. Issue #158 (1.0.1.123): сбой установки
+    /// свойства не выходит наружу — окно остаётся рабочим.
+    /// </summary>
     public void ClearSelectedIcon()
     {
         if (SelectedProgram is not { } program)
             return;
-        program.IconPath = string.Empty;
+        try
+        {
+            program.IconPath = string.Empty;
+        }
+        catch (Exception ex)
+        {
+            LogDeleteError(program, ex);
+        }
     }
 
     /// <summary>
@@ -262,6 +310,25 @@ public class CustomProgramsViewModel : ViewModelBase
         catch
         {
             // Журнал не должен ломать сценарий сохранения.
+        }
+    }
+
+    /// <summary>
+    /// Пишет ошибку удаления в журнал и запоминает её текст для диагностики
+    /// (issue #158). Недоступность журнала не ломает удаление.
+    /// </summary>
+    private void LogDeleteError(CustomProgram program, Exception ex)
+    {
+        LastDeleteError = ex.Message;
+        try
+        {
+            _logger?.Error(
+                $"[custom-programs] Не удалось удалить программу «{program.Name}» " +
+                $"(идентификатор: {program.Id}).", ex);
+        }
+        catch
+        {
+            // Журнал не должен ломать сценарий удаления.
         }
     }
 

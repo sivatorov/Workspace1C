@@ -50,8 +50,10 @@ public partial class MainViewModel
     /// </summary>
     private partial void ExecuteShowCustomProgramsSettings()
     {
-        var win = new Workspace1C.CustomProgramsWindow(CustomProgramsViewMode);
-        win.ShowDialogSync(OwnerWindow());
+        // Issue #158 (1.0.1.123): единственная точка открытия с guard — повторный
+        // клик активирует уже открытый редактор, второе окно не создаётся.
+        var win = Workspace1C.CustomProgramsWindow.ShowEditor(
+            OwnerWindow(), CustomProgramsViewMode);
         CustomProgramsViewMode = win.ViewMode;
         ReloadCustomPrograms();
     }

@@ -181,7 +181,9 @@ public sealed class Issue158MyProgramsSaveTests : IDisposable
             "private void OnCancel_Click(object sender, RoutedEventArgs e)",
             "private void OnWindowKeyDown(object sender, KeyEventArgs e)");
 
-        Assert.Contains("Close();", onCancel, StringComparison.Ordinal);
+        // Issue #158 (1.0.1.123): закрытие идёт через CloseSafely (с fallback из
+        // диспетчера), но без DialogResult и без исключений.
+        Assert.Contains("CloseSafely();", onCancel, StringComparison.Ordinal);
         Assert.DoesNotContain("DialogResult", onCancel, StringComparison.Ordinal);
     }
 
@@ -201,7 +203,9 @@ public sealed class Issue158MyProgramsSaveTests : IDisposable
     public void AvaloniaCancel_ClosesWindow()
     {
         var source = ReadProjectFile("Workspace1C", "Views", "CustomProgramsWindow.Avalonia.cs");
-        Assert.Contains("cancel.Click += (_, _) => Close();", source, StringComparison.Ordinal);
+        // Issue #158 (1.0.1.123): «Отмена» закрывает окно через CloseSafely
+        // (fallback из диспетчера), поэтому сбой в цепочке закрытия не «залипает».
+        Assert.Contains("cancel.Click += (_, _) => CloseSafely();", source, StringComparison.Ordinal);
     }
 
     [Fact]

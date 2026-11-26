@@ -52,12 +52,13 @@ public partial class MainViewModel
     /// <summary>
     /// Открывает редактор группы «Мои программы» и после закрытия применяет выбранный
     /// режим отображения и перечитывает список программ.
+    /// Issue #158 (1.0.1.123): единственная точка открытия с guard — повторный клик
+    /// активирует уже открытый редактор, второе окно не создаётся.
     /// </summary>
     private partial void ExecuteShowCustomProgramsSettings()
     {
-        var win = new Workspace1C.CustomProgramsWindow(CustomProgramsViewMode);
-        win.Owner = System.Windows.Application.Current?.MainWindow;
-        win.ShowDialog();
+        var win = Workspace1C.CustomProgramsWindow.ShowEditor(
+            System.Windows.Application.Current?.MainWindow, CustomProgramsViewMode);
         CustomProgramsViewMode = win.ViewMode;
         ReloadCustomPrograms();
     }

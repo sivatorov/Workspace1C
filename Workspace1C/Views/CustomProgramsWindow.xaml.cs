@@ -2,6 +2,7 @@
 using System;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Threading;
 using Workspace1C.Localization;
 using Workspace1C.Services;
 using Workspace1C.ViewModels;
@@ -17,6 +18,12 @@ namespace Workspace1C;
 /// </summary>
 public partial class CustomProgramsWindow : Window
 {
+    /// <summary>
+    /// Issue #158 (1.0.1.123): открытое окно редактора (не более одного). Повторное
+    /// открытие активирует существующее окно, а не создаёт второе.
+    /// </summary>
+    private static CustomProgramsWindow? _openInstance;
+
     private readonly CustomProgramsViewModel _vm;
     private readonly IDialogService _dialogs = AppServices.GetRequiredService<IDialogService>();
 
@@ -51,6 +58,60 @@ public partial class CustomProgramsWindow : Window
 
     /// <summary>Выбранный в окне режим отображения группы (для сохранения в настройках).</summary>
     public string ViewMode => _vm.ViewMode;
+
+    /// <summary>Открыт ли редактор «Мои программы» прямо сейчас (issue #158).</summary>
+    public static bool IsOpen => CustomProgramsEditorGuard.IsOpen;
+
+    /// <summary>
+    /// Issue #158 (1.0.1.123): единственная точка открытия редактора. Повторный вызов
+    /// при уже открытом окне активирует существующее и не создаёт второе. Слот
+    /// освобождается в <c>finally</c> и в <see cref="OnClosed"/>, поэтому ошибка
+    /// сохранения/удаления не «залипает» навсегда.
+    /// </summary>
+    /// <param name="owner">Окно-владелец (настройки или главное окно).</param>
+    /// <param name="viewMode">Текущий режим отображения группы из настроек.</param>
+    /// <returns>Открытое (или уже открытое) окно редактора — для чтения <see cref="ViewMode"/>.</returns>
+    public static CustomProgramsWindow ShowEditor(Window? owner, string? viewMode)
+    {
+        if (CustomProgramsEditorGuard.IsOpen && _openInstance is { } existing)
+        {
+            try { existing.Activate(); } catch { /* активация не критична */ }
+            return existing;
+        }
+
+        var win = new CustomProgramsWindow(viewMode);
+        if (owner is not null)
+            win.Owner = owner;
+
+        if (!CustomProgramsEditorGuard.TryEnter())
+            return _openInstance ?? win;
+
+        _openInstance = win;
+        try
+        {
+            win.ShowDialog();
+        }
+        finally
+        {
+            if (ReferenceEquals(_openInstance, win))
+                _openInstance = null;
+            CustomProgramsEditorGuard.Exit();
+        }
+        return win;
+    }
+
+    /// <inheritdoc />
+    protected override void OnClosed(EventArgs e)
+    {
+        // Слот освобождает только «своё» окно: закрытие постороннего экземпляра
+        // не должно открывать дорогу второму редактору.
+        if (ReferenceEquals(_openInstance, this))
+        {
+            _openInstance = null;
+            CustomProgramsEditorGuard.Exit();
+        }
+        base.OnClosed(e);
+    }
 
     private static string T(string key) => LocalizationManager.T(key);
 
@@ -115,7 +176,7 @@ public partial class CustomProgramsWindow : Window
     /// </summary>
     private void OnCancel_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        CloseSafely();
     }
 
     /// <summary>
@@ -127,7 +188,7 @@ public partial class CustomProgramsWindow : Window
         if (e.Key == Key.Escape && Keyboard.Modifiers == ModifierKeys.None)
         {
             e.Handled = true;
-            Close();
+            CloseSafely();
         }
     }
 
@@ -145,7 +206,42 @@ public partial class CustomProgramsWindow : Window
         catch (InvalidOperationException)
         {
             // Окно показано немодально — результат не нужен, закрываем без исключения.
+            CloseSafely();
+        }
+    }
+
+    /// <summary>
+    /// Issue #158 (1.0.1.123): гарантированное закрытие окна. Если синхронное
+    /// <see cref="Window.Close()"/> сорвалось, окно закрывается ещё раз из очереди
+    /// диспетчера, а ошибка пишется в журнал — окно не «залипает» на экране.
+    /// </summary>
+    private void CloseSafely()
+    {
+        try
+        {
             Close();
+        }
+        catch (Exception ex)
+        {
+            LogWindowError("Не удалось закрыть окно «Мои программы».", ex);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { Close(); }
+                catch { /* окно уже закрыто или не открывалось */ }
+            }), DispatcherPriority.Background);
+        }
+    }
+
+    /// <summary>Запись ошибки окна в журнал; недоступность журнала не ломает UI.</summary>
+    private static void LogWindowError(string message, Exception ex)
+    {
+        try
+        {
+            AppServices.TryGetService<IAppLogger>()?.Error($"[custom-programs] {message}", ex);
+        }
+        catch
+        {
+            // Журнал не должен ломать сценарий закрытия/удаления.
         }
     }
 

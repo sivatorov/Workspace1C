@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Workspace1C.Services;
 using Workspace1C.ViewModels;
 using Xunit;
 
@@ -180,7 +182,194 @@ public sealed class Issue159UtilitiesContextMenuTests
         Assert.Contains("UtilitiesMenuEditorWindow.ShowEditor(this)", columns, StringComparison.Ordinal);
     }
 
+    // ===================== 4. Issue #159 (1.0.1.123): раскрыватель и иконки =====================
+
+    [Fact]
+    public void AvaloniaTreeTheme_ExpanderUsesTwoExplicitGlyphs_NoRenderTransform()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
+        var theme = Slice(xaml, "<ControlTheme x:Key=\"ModernTreeItem\"", "</ControlTheme>");
+
+        // Два явных глифа по состоянию: свёрнуто — вправо, раскрыто — вниз.
+        Assert.Contains("IconChevronRight", theme, StringComparison.Ordinal);
+        Assert.Contains("IconChevronDown", theme, StringComparison.Ordinal);
+        Assert.Contains(
+            "Selector=\"ToggleButton:checked /template/ Path#ExpanderGlyph\"",
+            theme, StringComparison.Ordinal);
+
+        // Поворот больше не используется — именно он «схлопывал» глиф в точку.
+        Assert.DoesNotContain("RenderTransform", theme, StringComparison.Ordinal);
+        Assert.DoesNotContain("RotateTransform", theme, StringComparison.Ordinal);
+
+        // Размер и растяжение глифа сохранены.
+        Assert.Contains("Width=\"16\" Height=\"16\" Stretch=\"Uniform\"", theme, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ContextMenuEditor_UsesGeometryKey_NotRawPackIconName()
+    {
+        var editor = ReadProjectFile("Workspace1C", "Views", "ContextMenuEditorWindow.Avalonia.cs");
+        var row = Slice(editor, "private Control BuildTreeRow(", "private Control BuildOperationsPanel(");
+
+        // PackIcon-имя каталога в Avalonia не рисуется — только ключ геометрии Icon*.
+        Assert.Contains("node.DisplayIconGeometryKey", row, StringComparison.Ordinal);
+        Assert.DoesNotContain("MakeIcon(node.DisplayIconKey", row, StringComparison.Ordinal);
+        Assert.Contains("ThemeBrushes.FromSpec(colorSpec)", row, StringComparison.Ordinal);
+        // Единый осмысленный фолбэк.
+        Assert.Contains("\"IconFolder\"", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TrayEditor_UsesUnifiedFolderFallback()
+    {
+        var editor = ReadProjectFile("Workspace1C", "Views", "TrayMenuEditorWindow.Avalonia.cs");
+        var row = Slice(editor, "private Control BuildTreeRow(", "private Control BuildOperationsPanel(");
+
+        Assert.Contains("WpfIconGeometryKey(node.DisplayIconKey)", row, StringComparison.Ordinal);
+        Assert.Contains("geometryKey = \"IconFolder\"", row, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditorIcons_AreDistinctPerNodeType()
+    {
+        // Утилиты: разные типы узлов дают разные геометрические ключи.
+        var utilities = new UtilitiesMenuEditorViewModel(null);
+        var utilityKeys = FlattenUtilities(utilities.Roots)
+            .Select(n => n.DisplayIconGeometryKey)
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        Assert.True(utilityKeys.Count >= 3,
+            $"Ожидались различимые иконки «Утилит», получено {utilityKeys.Count}: {string.Join(", ", utilityKeys)}");
+
+        // Контекстное меню: раньше все пункты получали одну запасную «папку».
+        var context = new ContextMenuEditorViewModel(null);
+        var contextNodes = FlattenContext(context.Roots).ToList();
+        Assert.NotEmpty(contextNodes);
+        Assert.All(contextNodes, n => Assert.False(
+            string.IsNullOrWhiteSpace(n.DisplayIconGeometryKey),
+            "У каждого узла должен быть осмысленный ключ иконки или фолбэк."));
+
+        var contextKeys = contextNodes
+            .Select(n => n.DisplayIconGeometryKey)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        Assert.True(contextKeys.Count >= 3,
+            $"Ожидались различимые иконки контекстного меню, получено {contextKeys.Count}: {string.Join(", ", contextKeys)}");
+
+        // Группа и пункт не выглядят одинаково.
+        var group = contextNodes.First(n => n.Node.Kind == "group");
+        var differentItem = contextNodes.FirstOrDefault(n =>
+            n.Node.Kind != "group" && n.Node.Kind != "separator" &&
+            !string.Equals(n.DisplayIconGeometryKey, group.DisplayIconGeometryKey, StringComparison.Ordinal));
+        Assert.NotNull(differentItem);
+
+        // Разделитель — служебная иконка-линия, а не «папка».
+        var separator = contextNodes.FirstOrDefault(n => n.Node.Kind == "separator");
+        Assert.NotNull(separator);
+        Assert.Equal("IconMinus", separator!.DisplayIconGeometryKey);
+    }
+
+    // ===================== 5. Issue #159 (1.0.1.123): размеры окон =====================
+
+    [Theory]
+    [InlineData("UtilitiesMenuEditorWindow.Avalonia.cs")]
+    [InlineData("ContextMenuEditorWindow.Avalonia.cs")]
+    [InlineData("TrayMenuEditorWindow.Avalonia.cs")]
+    [InlineData("CustomProgramsWindow.Avalonia.cs")]
+    public void EditorWindows_SizeToContentHeight_WithWorkAreaClamp(string fileName)
+    {
+        var source = ReadProjectFile("Workspace1C", "Views", fileName);
+
+        // Высота — по содержимому, верхняя/нижняя границы — из политики.
+        Assert.Contains("SizeToContent = Avalonia.Controls.SizeToContent.Height",
+            source, StringComparison.Ordinal);
+        Assert.Contains("MaxHeight = size.MaxHeight", source, StringComparison.Ordinal);
+        Assert.Contains("MinHeight = size.MinHeight", source, StringComparison.Ordinal);
+        // Фиксированная высота больше не задаётся — иначе снова появился бы скролл.
+        Assert.DoesNotContain("Height = size.Height", source, StringComparison.Ordinal);
+        // Дерево/список ограничен и прокручивается сам.
+        Assert.Contains("MaxHeight = Math.Max(200, size.MaxHeight", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void EditorProfiles_ClampContentHeightToWorkArea()
+    {
+        var profiles = new[]
+        {
+            DialogWorkAreaPolicy.UtilitiesEditor,
+            DialogWorkAreaPolicy.TrayEditor,
+            DialogWorkAreaPolicy.ContextMenuEditor,
+            DialogWorkAreaPolicy.CustomPrograms,
+        };
+
+        foreach (var profile in profiles)
+        {
+            // Нормальный экран: высота по содержимому помещается, прокрутка не нужна.
+            var normal = DialogWorkAreaPolicy.Recommend(profile, 1080);
+            Assert.True(normal.Height <= 1080 - DialogWorkAreaPolicy.DefaultMargin + 0.5,
+                $"Высота {normal.Height} выходит за рабочую область.");
+            Assert.True(normal.MaxHeight <= 1080 - DialogWorkAreaPolicy.DefaultMargin + 0.5);
+            Assert.True(normal.Height <= profile.ContentHeight + 0.5,
+                "Высота не должна превышать высоту содержимого.");
+            Assert.True(normal.MinHeight <= normal.MaxHeight,
+                "MinHeight не должен побеждать MaxHeight на маленьком экране.");
+            Assert.False(normal.RequiresScrolling,
+                "На нормальном экране окно должно помещаться по содержимому без прокрутки.");
+
+            // Маленький экран: окно клампится, прокрутка — аварийный режим.
+            var small = DialogWorkAreaPolicy.Recommend(profile, 400);
+            Assert.True(small.MaxHeight <= 400 - DialogWorkAreaPolicy.DefaultMargin + 0.5);
+            Assert.True(small.Height <= small.MaxHeight + 0.5);
+            Assert.True(small.MinHeight <= small.MaxHeight + 0.5);
+            Assert.True(small.RequiresScrolling,
+                "На маленьком экране содержимое не помещается — прокрутка обязательна.");
+        }
+    }
+
+    [Fact]
+    public void EditorProfile_MaxHeightCap_IsRespected()
+    {
+        // Профили с авторазмером имеют верхнюю границу, чтобы длинный список
+        // не растягивал окно на весь экран.
+        foreach (var profile in new[]
+                 {
+                     DialogWorkAreaPolicy.UtilitiesEditor,
+                     DialogWorkAreaPolicy.TrayEditor,
+                     DialogWorkAreaPolicy.ContextMenuEditor,
+                     DialogWorkAreaPolicy.CustomPrograms,
+                 })
+        {
+            Assert.False(double.IsPositiveInfinity(profile.MaxHeight),
+                "У профилей редакторов должна быть верхняя граница MaxHeight.");
+            var size = DialogWorkAreaPolicy.Recommend(profile, 4000);
+            Assert.True(size.MaxHeight <= profile.MaxHeight + 0.5);
+        }
+    }
+
     // ===================== Вспомогательные методы =====================
+
+    private static IEnumerable<UtilitiesMenuNodeItem> FlattenUtilities(
+        IEnumerable<UtilitiesMenuNodeItem> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            yield return node;
+            foreach (var child in FlattenUtilities(node.Children))
+                yield return child;
+        }
+    }
+
+    private static IEnumerable<ContextMenuNodeItem> FlattenContext(
+        IEnumerable<ContextMenuNodeItem> nodes)
+    {
+        foreach (var node in nodes)
+        {
+            yield return node;
+            foreach (var child in FlattenContext(node.Children))
+                yield return child;
+        }
+    }
 
     private static string Slice(string text, string startMarker, string endMarker)
     {

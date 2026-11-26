@@ -786,7 +786,29 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
 
         // Варианты для целевой ОС: реальный выбор (полный/тонкий клиент, x64/x86, пакеты)
         // вместо единственного «Авто». Рекомендуемый помечен и предвыбран по умолчанию.
-        var options = PlatformDistributionPicker.BuildOptions(files, _isWindows, Is64Bit);
+        var options = PlatformDistributionPicker.BuildOptions(files, _isWindows, Is64Bit).ToList();
+
+        // Issue #167: подпись файла в окне скачивания — только раздел, разрядность
+        // (где есть) и имя файла, без «Полный клиент (rar)»/«Пакет deb»: тип часто
+        // не соответствует содержимому. Часть, уже выбранную галочкой, не дублируем.
+        foreach (var option in options)
+        {
+            option.DisplayNameOverride = PlatformFileDisplayName.Compose(
+                option.File,
+                includeArchitecture: !_filterByArchitecture,
+                includeSection: !_filterBySection);
+        }
+
+        // Issue #167: сортировка списка по итоговой строке (OrdinalIgnoreCase);
+        // при равенстве — по имени файла, чтобы порядок был детерминированным.
+        options.Sort((a, b) =>
+        {
+            var byLabel = string.Compare(a.DisplayName, b.DisplayName, StringComparison.OrdinalIgnoreCase);
+            return byLabel != 0
+                ? byLabel
+                : string.Compare(a.File.FileName, b.File.FileName, StringComparison.OrdinalIgnoreCase);
+        });
+
         DistributionOptions = options;
 
         // Группировка по заголовкам страницы релиза (issue #330 п.2/#334 п.2):

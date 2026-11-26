@@ -1228,8 +1228,9 @@
     </ControlTheme>
     <!-- Элемент дерева окна выбора группы: шаблон автора
          (GroupPickerWindow.xaml:29). Раскрыватель — векторный шеврон 16 px
-         в колонке 24 (P1a аудита UI: вместо текстовых «+»/«−»), при раскрытии
-         иконка поворачивается на 90°. Подсвечивается только сама выбранная
+         в колонке 24 (P1a аудита UI: вместо текстовых «+»/«−»). Issue #159
+         (1.0.1.123): два явных глифа по состоянию вместо поворота, зона клика —
+         вся колонка и высота строки. Подсвечивается только сама выбранная
          строка, вложенные сдвинуты на 16. -->
     <ControlTheme x:Key="GroupPickerTreeItem" TargetType="TreeViewItem">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -1244,28 +1245,23 @@
                         <Grid ColumnDefinitions="24,*">
                             <ToggleButton x:Name="PART_ExpandCollapseChevron" Grid.Column="0"
                                           IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=TreeViewItem}, Mode=TwoWay}"
-                                          ClickMode="Press" Width="20" Height="22"
+                                          ClickMode="Press"
+                                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                          MinWidth="24" MinHeight="24"
                                           Background="Transparent" BorderThickness="0" Padding="0"
-                                          Cursor="Hand" VerticalAlignment="Center">
+                                          Cursor="Hand">
                                 <ToggleButton.Template>
                                     <ControlTemplate>
                                         <Path x:Name="ExpanderGlyph"
                                               Data="{DynamicResource IconChevronRight}"
                                               Width="16" Height="16" Stretch="Uniform"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Fill="{DynamicResource TextSecondaryBrush}"
-                                              RenderTransformOrigin="0.5,0.5">
-                                            <Path.RenderTransform>
-                                                <RotateTransform Angle="0"/>
-                                            </Path.RenderTransform>
-                                        </Path>
+                                              Fill="{DynamicResource TextSecondaryBrush}"/>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>
                                     <Style Selector="ToggleButton:checked /template/ Path#ExpanderGlyph">
-                                        <Setter Property="RenderTransform">
-                                            <RotateTransform Angle="90"/>
-                                        </Setter>
+                                        <Setter Property="Data" Value="{DynamicResource IconChevronDown}"/>
                                     </Style>
                                 </ToggleButton.Styles>
                             </ToggleButton>
@@ -1406,8 +1402,10 @@
     </ControlTheme>
     <!-- Общий элемент дерева окон (Themes/LightTheme.xaml:670, ModernTreeViewItem):
          раскрыватель — векторный шеврон 16 px в колонке 24 (P1a аудита UI:
-         вместо текстовых «+»/«−»), при раскрытии иконка поворачивается на 90°;
-         подсветка наведения и выбора, вложенные со сдвигом 16. -->
+         вместо текстовых «+»/«−»). Issue #159 (1.0.1.123): состояние показывается
+         двумя явными глифами (вправо/вниз), без RenderTransform — поворот
+         визуально «схлопывал» шеврон в точку после раскрытия; подсветка наведения
+         и выбора, вложенные со сдвигом 16. -->
     <ControlTheme x:Key="ModernTreeItem" TargetType="TreeViewItem">
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Padding" Value="2,1"/>
@@ -1431,23 +1429,20 @@
                                           Cursor="Hand">
                                 <ToggleButton.Template>
                                     <ControlTemplate>
+                                        <!-- Issue #159 (1.0.1.123): базовый глиф — шеврон
+                                             вправо; раскрытое состояние подменяет Data на
+                                             «шеврон вниз». Без поворотов, поэтому глиф
+                                             не «схлопывается в точку». -->
                                         <Path x:Name="ExpanderGlyph"
                                               Data="{DynamicResource IconChevronRight}"
                                               Width="16" Height="16" Stretch="Uniform"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"
-                                              Fill="{DynamicResource TextSecondaryBrush}"
-                                              RenderTransformOrigin="0.5,0.5">
-                                            <Path.RenderTransform>
-                                                <RotateTransform Angle="0"/>
-                                            </Path.RenderTransform>
-                                        </Path>
+                                              Fill="{DynamicResource TextSecondaryBrush}"/>
                                     </ControlTemplate>
                                 </ToggleButton.Template>
                                 <ToggleButton.Styles>
                                     <Style Selector="ToggleButton:checked /template/ Path#ExpanderGlyph">
-                                        <Setter Property="RenderTransform">
-                                            <RotateTransform Angle="90"/>
-                                        </Setter>
+                                        <Setter Property="Data" Value="{DynamicResource IconChevronDown}"/>
                                     </Style>
                                     <Style Selector="ToggleButton:pointerover /template/ Path#ExpanderGlyph">
                                         <Setter Property="Opacity" Value="0.6"/>

@@ -5237,8 +5237,9 @@ namespace Workspace1C
         {
             try
             {
-                var win = new CustomProgramsWindow(_viewModel.CustomProgramsViewMode);
-                win.ShowDialogSync(this);
+                // Issue #158 (1.0.1.123): окно открывается через общий guard —
+                // повторный клик активирует уже открытый редактор, а не создаёт второй.
+                var win = CustomProgramsWindow.ShowEditor(this, _viewModel.CustomProgramsViewMode);
                 _viewModel.CustomProgramsViewMode = win.ViewMode;
                 _viewModel.ReloadCustomPrograms();
             }

@@ -110,6 +110,70 @@ namespace Workspace1C
                 var profileService = AppServices.GetRequiredService<IProfileService>();
                 profileService.EnsureInitialized();
 
+                // Issue #164: настройки активного профиля читаем ДО окна входа — по ним
+                // решается, нужно ли активировать уже работающий экземпляр. Раньше проверка
+                // одиночного экземпляра стояла после LoginWindow.ShowLogin: повторный запуск
+                // ярлыком (в т.ч. из трея) сначала спрашивал пароль профиля, и только потом
+                // обнаруживал работающее приложение и завершался.
+                var startupRepository = AppServices.GetRequiredService<IInfobaseRepository>();
+                AppSettings startupSettings;
+                try
+                {
+                    startupSettings = startupRepository.LoadSettings();
+                }
+                catch
+                {
+                    startupSettings = new AppSettings();
+                }
+
+                // Команды контекстного меню проводника (функция №12): --register / --launch / --designer.
+                // Выполняются после инициализации активного профиля (репозиторий уже указывает на его
+                // каталог данных) и до проверки одиночного экземпляра: даже если приложение уже запущено,
+                // эта команда обрабатывается здесь, а затем запускается ещё один полноценный процесс.
+                ExplorerCommandLine.TryHandle(e.Args);
+
+                // Issue #164: гейт одиночного экземпляра выполняется ДО показа окна входа.
+                // Второй процесс просит работающий экземпляр показать окно (в т.ч. из трея)
+                // и завершается, не спрашивая пароль. Если приложение заблокировано, пароль
+                // по-прежнему запросит уже работающий экземпляр (RestoreFromTray →
+                // ShowAppUnlockDialog). Слушатель активации запускает только первичный экземпляр.
+                if (StartupInstancePolicy.ShouldUseSingleInstanceGate(startupSettings.AllowMultipleInstances))
+                {
+                    // Issue #362: new Mutex может бросить UnauthorizedAccessException на сервере
+                    // терминалов (например, при конфликтующих правах доступа к именованным
+                    // объектам). Раньше исключение падало в общий catch старта и показывало
+                    // фатальный диалог «Не удалось запустить приложение». Теперь при отказе
+                    // доступа запускаемся без гейта второго экземпляра — приложение работает,
+                    // просто не подавляет второй запуск.
+                    try
+                    {
+                        _instanceMutex = new Mutex(true, MutexName, out var createdNew);
+                        // Владение мутексом получает только экземпляр, создавший его (createdNew == true).
+                        // Повторный запуск владение не получает, поэтому ReleaseMutex() в OnExit допустим
+                        // только при нашем владении: иначе он бросает ApplicationException
+                        // «Object synchronization method was called from an unsynchronized block of code»,
+                        // и под отладчиком с остановкой на исключениях это выглядит как падение.
+                        _ownsInstanceMutex = createdNew;
+                        if (StartupInstancePolicy.ShouldActivateExistingInstance(
+                                startupSettings.AllowMultipleInstances, createdNew))
+                        {
+                            // Уже запущен другой экземпляр — просим его показать окно (в т.ч. из трея) и выходим.
+                            SignalExistingInstance();
+                            Shutdown();
+                            return;
+                        }
+
+                        // Слушаем сигнал от повторных запусков, чтобы поднять окно (в том числе из трея).
+                        StartActivationListener();
+                    }
+                    catch (UnauthorizedAccessException)
+                    {
+                        // Доступ к именованному объекту запрещён (возможен на RDS при
+                        // специфичных политиках безопасности) — запускаемся без гейта.
+                        _ownsInstanceMutex = false;
+                    }
+                }
+
                 // Окно входа создаётся первым и становится главным окном приложения
                 // (Application.MainWindow). При ShutdownMode=OnLastWindowClose его закрытие
                 // после успешного входа молча гасило бы приложение раньше, чем появится
@@ -124,15 +188,13 @@ namespace Workspace1C
                 // может быть null при повреждённом profiles.json — условие безопасно к null.
                 if (profileService.Profiles.Count > 1 || profileService.CurrentProfile?.HasPassword == true)
                 {
-                    // Локализацию поднимаем до показа окна: настройки профиля читаются
-                    // ниже, а без словаря окно входа показывает ключи (Auth.Title,
+                    // Локализацию поднимаем до показа окна: настройки профиля прочитаны
+                    // выше, а без словаря окно входа показывает ключи (Auth.Title,
                     // Auth.SelectAccountHint, Auth.Login, Common.Cancel) вместо подписей
                     // (issue #189). Язык берётся из профиля, активного с прошлого запуска,
                     // и уточняется после выбора.
                     try
                     {
-                        var startupRepository = AppServices.GetRequiredService<IInfobaseRepository>();
-                        var startupSettings = startupRepository.LoadSettings();
                         LocalizationManager.Instance.Initialize(startupSettings.Language);
                     }
                     catch
@@ -196,12 +258,6 @@ namespace Workspace1C
                     }
                 }
 
-                // Команды контекстного меню проводника (функция №12): --register / --launch / --designer.
-                // Выполняются после инициализации активного профиля (репозиторий уже указывает на его
-                // каталог данных) и до проверки одиночного экземпляра: даже если приложение уже запущено,
-                // эта команда обрабатывается здесь, а затем запускается ещё один полноценный процесс.
-                ExplorerCommandLine.TryHandle(e.Args);
-
                 // Инициализируем локализацию: выбираем сохранённый язык, иначе язык
                 // системы. Внешние языки (.json) подгружаются из папки Languages.
                 try
@@ -215,42 +271,6 @@ namespace Workspace1C
                 catch
                 {
                     // Локализация не должна блокировать запуск приложения.
-                }
-
-                if (!settings.AllowMultipleInstances)
-                {
-                    // Issue #362: new Mutex может бросить UnauthorizedAccessException на сервере
-                    // терминалов (например, при конфликтующих правах доступа к именованным
-                    // объектам). Раньше исключение падало в общий catch старта и показывало
-                    // фатальный диалог «Не удалось запустить приложение». Теперь при отказе
-                    // доступа запускаемся без гейта второго экземпляра — приложение работает,
-                    // просто не подавляет второй запуск.
-                    try
-                    {
-                        _instanceMutex = new Mutex(true, MutexName, out var createdNew);
-                        // Владение мутексом получает только экземпляр, создавший его (createdNew == true).
-                        // Повторный запуск владение не получает, поэтому ReleaseMutex() в OnExit допустим
-                        // только при нашем владении: иначе он бросает ApplicationException
-                        // «Object synchronization method was called from an unsynchronized block of code»,
-                        // и под отладчиком с остановкой на исключениях это выглядит как падение.
-                        _ownsInstanceMutex = createdNew;
-                        if (!createdNew)
-                        {
-                            // Уже запущен другой экземпляр — просим его показать окно (в т.ч. из трея) и выходим.
-                            SignalExistingInstance();
-                            Shutdown();
-                            return;
-                        }
-
-                        // Слушаем сигнал от повторных запусков, чтобы поднять окно (в том числе из трея).
-                        StartActivationListener();
-                    }
-                    catch (UnauthorizedAccessException)
-                    {
-                        // Доступ к именованному объекту запрещён (возможен на RDS при
-                        // специфичных политиках безопасности) — запускаемся без гейта.
-                        _ownsInstanceMutex = false;
-                    }
                 }
 
                 base.OnStartup(e);

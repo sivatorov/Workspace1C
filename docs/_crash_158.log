@@ -1,0 +1,125 @@
+================================================================================
+Issue #158 — «Linux: Мои программы» — диагностика 1.0.1.123
+Дата: 2026-11-25
+Сборка с ошибкой: официальный linux-x64 (путь сборки /home/runner/work/...)
+Источник: скриншот 7OH (https://github.com/user-attachments/assets/c35112f7-f77c-4fe8-bde4-7a35ef2bcaf8)
+================================================================================
+
+1. ФАКТИЧЕСКАЯ ОШИБКА (из скриншота заказчика)
+--------------------------------------------------------------------------------
+Заголовок окна: «Workspace 1C — ошибка»
+Текст: «Ошибка интерфейса. Object reference not set to an instance of an object.»
+
+System.NullReferenceException
+   at Workspace1C.CustomProgramsWindow.BuildListItem(CustomProgram program)
+       in /home/runner/work/Workspace1C/Workspace1C/Workspace1C/Views/CustomProgramsWindow.Avalonia.cs:line 294
+   at Workspace1C.CustomProgramsWindow.<>c__DisplayClass13_4.<BuildEditorGrid>b__? (CustomProgram program, INameScope)
+       in /home/runner/work/.../CustomProgramsWindow.Avalonia.cs:line 188
+   at Avalonia.Controls.Templates.FuncDataTemplate`1.<>c__DisplayClass4_0.<.ctor>b__0(Object data, INameScope scope)
+   at Avalonia.Controls.Templates.FuncDataTemplate.Build(Object data, Control existing)
+   at Avalonia.Controls.Presenters.ContentPresenter.UpdateChild(Object content)
+   at Avalonia.Controls.Presenters.ContentPresenter.ContentChanged(AvaloniaPropertyChangedEventArgs e)
+   at Avalonia.Animation.Animatable.OnPropertyChangedCore(...)
+   at Avalonia.PropertyStore.EffectiveValue`1.SetAndRaise(...)
+   at Avalonia.PropertyStore.ValueStore.ReevaluateEffectiveValue(...)
+   ...
+
+Сопоставление строк с исходником 1.0.1.121 (коммит a3bc8053, файл
+Workspace1C/Views/CustomProgramsWindow.Avalonia.cs):
+  * строка ~188 — `_list.ItemTemplate = new FuncDataTemplate<CustomProgram>((program, _) => BuildListItem(program));`
+  * строка ~294 — внутри BuildListItem, обращение к `program` (в исходнике это
+    `Text = program.Name` в инициализаторе TextBlock; PDB-строка указывает на
+    начало выражения).
+
+2. ПРИЧИНА
+--------------------------------------------------------------------------------
+Avalonia ContentPresenter строит содержимое шаблона и для ПУСТОГО (null) элемента:
+  - удаление записи из ObservableCollection (строка исчезает, контейнер
+    переиспользуется/пересоздаётся);
+  - пересоздание контейнера при прокрутке;
+  - снятие визуального дерева при ЗАКРЫТИИ окна.
+
+FuncDataTemplate<CustomProgram> вызывает лямбду с data = null, а BuildListItem
+сразу обращался к program.Name (и к program.IconPath/FilePath в привязках) без
+проверки на null → NullReferenceException.
+
+Последствия (совпадают со всеми жалобами 7OH):
+  * «Попытка удалить программу приводит к ошибке» — NRE при удалении строки;
+  * «При сохранении тоже» — закрытие окна после сохранения снимает визуальное
+    дерево списка, ContentPresenter снова строит строку с null → NRE, окно
+    остаётся на экране;
+  * «После ошибки окно правки не закрывается вообще» / «даже без ошибки — оно
+    просто не закрывается» — исключение в цепочке закрытия (OnClosing →
+    ContentPresenter.UpdateChild → BuildListItem) прерывает закрытие;
+  * «Я смог открыть 2 окна» — после такого сбоя настройки оставались открытыми,
+    повторный клик по шестерёнке создавал НОВЫЙ CustomProgramsWindow, потому что
+    guard'а одного окна не было.
+
+Вложенный ShowDialogSync(this) из SettingsWindow сам по себе НЕ был причиной:
+ModalWindowBase.ShowDialogSync корректно снимает кадр по Closed/скрытию. Но
+после NRE окно не доходило до Closed, поэтому кадр не снимался и окно «залипало».
+
+3. ВОСПРОИЗВЕДЕНИЕ
+--------------------------------------------------------------------------------
+Полноценный GUI-прогон Linux в текущем окружении (Windows) невозможен — нет
+X11/Wayland и linux-рантайма. Сценарий воспроизведён по трассировке заказчика и
+по коду:
+
+  CM_MODAL_TRACE=1 ./Workspace1C-linux-x64
+    Настройки → «Мои программы» (шестерёнка) → добавить программу →
+    удалить программу / нажать «Сохранить» / «Отмена» / крестик.
+    Ожидаемый лог /tmp/cm_modal_trace.log на 1.0.1.121:
+      ShowDialogSync: вход, окно CustomProgramsWindow, owner=задан
+      OnClosing: окно CustomProgramsWindow, Cancel=False
+      <NullReferenceException в BuildListItem — окно не доходит до OnClosed>
+      (записи «ShowDialogSync.OnClosed» и «ShowDialogSync: выход» отсутствуют)
+
+После исправления 1.0.1.123 ожидаемая последовательность:
+      ShowDialogSync: вход, окно CustomProgramsWindow, owner=задан
+      BuildListItem(null) → пустой Panel (без исключения)
+      OnClosing: окно CustomProgramsWindow, Cancel=False
+      OnClosed: окно CustomProgramsWindow
+      ShowDialogSync.OnClosed: окно CustomProgramsWindow — снимаю кадр
+      ShowDialogSync: выход, окно CustomProgramsWindow, closed=True
+      CustomProgramsWindow.ShowEditor: слот освобождён
+
+4. ЧТО ИСПРАВЛЕНО (1.0.1.123)
+--------------------------------------------------------------------------------
+4.1. BuildListItem(CustomProgram? program):
+     - `if (program is null) return new Panel();`
+     - построение строки вынесено в BuildListItemCore и обёрнуто в try/catch:
+       сбой построения строки логируется и даёт простой TextBlock, а не
+       необработанное исключение.
+4.2. Имя в строке привязано к модели:
+       name.Bind(TextBlock.TextProperty, new Binding(nameof(CustomProgram.Name)));
+     CustomProgram реализует INotifyPropertyChanged → переименование сразу видно
+     в списке (раньше Text копировался один раз).
+4.3. Одно окно: Services/CustomProgramsEditorGuard (TryEnter/Exit/IsOpen).
+     Обе точки открытия (SettingsWindow.Avalonia.cs/.xaml.cs и
+     MainViewModel.CustomPrograms.*) используют CustomProgramsWindow.ShowEditor:
+     повторный вызов активирует существующее окно. Слот освобождается в finally
+     и в OnClosed.
+4.4. Безопасное закрытие: CloseSafely() для «Отмена», Esc и после сохранения;
+     при сбое синхронного Close() окно закрывается повторно из Dispatcher
+     (Avalonia) / Dispatcher.BeginInvoke (WPF), ошибка пишется в журнал.
+4.5. Удаление: CustomProgramsViewModel.DeleteSelected не пробрасывает исключения,
+     пишет ошибку через IAppLogger (LastDeleteError), снимает ссылку на иконку
+     перед удалением (файлы пользователя не трогаются), окно остаётся рабочим.
+4.6. OnClosing в ModalWindowBase уже не пробрасывает исключение и не отменяет
+     закрытие (1.0.1.121) — дополнительных правок не потребовалось.
+
+5. ПРОВЕРКИ
+--------------------------------------------------------------------------------
+* dotnet test --filter "FullyQualifiedName~Issue158"  → 40/40 пройдено.
+* dotnet test --filter "FullyQualifiedName~CustomPrograms" → 76/76 пройдено.
+* dotnet build Workspace1C.csproj -c Release → 0 ошибок.
+* dotnet build Workspace1C.csproj -c Release -p:ForceLinux=true → 0 ошибок.
+
+6. ОГРАНИЧЕНИЯ
+--------------------------------------------------------------------------------
+* Ручной прогон GUI на Linux (X11/Wayland) в этом окружении недоступен:
+  проверено сборкой ForceLinux и тестами (в т.ч. source-guard на null-безопасный
+  шаблон, guard одного окна и безопасное закрытие).
+* Реальный лог /tmp/cm_modal_trace.log с Linux-машины 7OH не приложен —
+  трассировка восстановлена по стеку исключения из скриншота.
+================================================================================
