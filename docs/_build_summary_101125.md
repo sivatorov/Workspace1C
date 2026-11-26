@@ -57,6 +57,12 @@ powershell -ExecutionPolicy Bypass -File Workspace1C\Workspace1C\build-linux-sin
   `FileVersion` = `1.0.1.125`.
 - `bin/release-1.0.1.125/linux-x64/Workspace1C` — 53 996 012 байт (51.5 MB), ELF.
 
+> Примечание. В GitHub Release `v1.0.1.125` загружена пересборка из коммита релиза
+> `009e77e1`: ассеты `Workspace1C.exe` — 85 599 766 байт и `Workspace1C-linux-x64` —
+> 53 889 319 байт. `FileVersion` скачанного `Workspace1C.exe` = `1.0.1.125`,
+> `ProductVersion` = `1.0.1.125+009e77e1…`. Побайтовое совпадение single-file сборок
+> между запусками не гарантируется; версия в релизных ассетах корректна.
+
 Абсолютные пути на машине сборки:
 
 - `G:\h\Workspace1C\bin\release-1.0.1.125\win-x64\Workspace1C.exe`
