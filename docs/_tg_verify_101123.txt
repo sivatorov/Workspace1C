@@ -1,0 +1,62 @@
+Подтверждение доставки Telegram-анонса релиза 1.0.1.123
+========================================================
+
+Дата проверки (UTC): 2026-11-26T03:49Z
+Проверял: SourceCraft Code Assistant Agent
+
+1. Релиз и текст анонса
+-----------------------
+URL релиза:            https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.123
+Файл текста анонса:    docs/_telegram_msg_v1.0.1.123.txt
+Длина текста:          1712 символов / 2928 байт (UTF-8, CRLF)
+SHA-256 текста:        5b1e1fcbcac1514812d75ee344d3763735f0b4a41846ef170ab0886329cc4c50
+Ссылка на релиз в тексте присутствует: да
+
+2. Источник отправки — workflow (ручная отправка НЕ выполнялась)
+---------------------------------------------------------------
+Workflow:              .github/workflows/release.yml, шаг "Новость в Telegram"
+Run id:                45750509624 (success)
+URL запуска:           https://github.com/sivatorov/Workspace1C/actions/runs/45750509624
+Целевой chat id:       -1004425443528 (env TG_CHAT, зафиксирован в workflow)
+Отправленный текст:    docs/_telegram_msg_v1.0.1.123.txt (полный файл, без обрезки)
+
+Выдержки из лога шага "Новость в Telegram" (2026-11-26T03:44:31Z):
+  TG_CHAT: -1004425443528
+  Текст новости: docs/_telegram_msg_v1.0.1.123.txt
+  Telegram HTTP 200
+  "ok":true
+
+Итог workflow: HTTP 200 + ok=true => сообщение принято Telegram Bot API.
+
+3. Подтверждение по публичной ленте канала (message_id)
+--------------------------------------------------------
+Канал публичный: @Workspace1C (https://t.me/Workspace1C)
+Пост с анонсом:      https://t.me/Workspace1C/175
+message_id:          175
+Дата публикации:     2026-11-26T03:44:31+00:00 (совпадает с временем шага workflow)
+Сравнение текста поста с файлом: normalized_equal=true (отличия только CRLF -> LF;
+                      1710 симв. поста против 1712 симв. файла, т.е. -2 симв. переводов строк)
+Ссылка на релиз в тексте поста: присутствует
+Дубликаты:           отсутствуют — в ленте (посты 156..175) только один пост с "1.0.1.123" (id 175).
+
+4. Проверка доступа к каналу (Bot API getChat)
+----------------------------------------------
+Запрос:  GET https://api.telegram.org/bot<token>/getChat?chat_id=-1004425443528
+Токен:   из notifications.json активного профиля e8971b25-df2e-4e46-b6ae-b35f3bca2c24 (не сохраняется)
+Ответ (ключевые поля):
+  ok:        true
+  id:        -1004425443528
+  type:      channel
+  title:     Workspace 1C
+  username:  Workspace1C
+  description: Менеджер рабочих окружений 1С
+  invite_link: https://t.me/+JCuyjPYfwXozYjEy
+
+5. Вывод
+--------
+Новость о релизе 1.0.1.123 доставлена в канал -1004425443528 одним сообщением
+(workflow run 45750509624, HTTP 200, ok=true), опубликована как пост
+https://t.me/Workspace1C/175 (message_id=175) с полным текстом из
+docs/_telegram_msg_v1.0.1.123.txt. Повторная отправка не выполнялась, чтобы не
+создавать дубль. Доступ к каналу подтверждён Bot API getChat (type=channel,
+title="Workspace 1C"). Issues не закрывались и не комментировались.
