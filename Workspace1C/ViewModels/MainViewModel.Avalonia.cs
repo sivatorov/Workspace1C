@@ -719,7 +719,9 @@ public partial class MainViewModel : ViewModelBase
         {
             if (SetPropertyWithRelated(ref _selectedInfobase, value, nameof(SelectedInfobase), nameof(RightPanelTitle), nameof(RightPanelSubtitle),
                     nameof(IsInfobaseSelected), nameof(ShowConnectionInfo), nameof(ShowRightPanelHint),
-                    nameof(RightPanelIconKey), nameof(HasRightPanelIcon), nameof(ShowOpenFolderLink)))
+                    nameof(RightPanelIconKey), nameof(HasRightPanelIcon), nameof(ShowOpenFolderLink),
+                    // Issue #180: подсказка кнопки «Конфигуратор» зависит от вида базы.
+                    nameof(ConfiguratorLaunchToolTip)))
             {
                 if (value is not null)
                     SelectedGroupNode = null;

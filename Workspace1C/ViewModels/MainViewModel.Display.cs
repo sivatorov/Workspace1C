@@ -1202,5 +1202,23 @@ public partial class MainViewModel : ViewModelBase
     public ICommand LaunchConfiguratorWithAuthCommand { get; }
     public ICommand LaunchNativeStarterCommand { get; }
 
+    /// <summary>
+    /// Подсказка кнопки «Конфигуратор» (issue #180): для базы на веб-сервере
+    /// сообщает, что Конфигуратор недоступен; иначе — название запуска и хоткей.
+    /// </summary>
+    public string ConfiguratorLaunchToolTip
+    {
+        get
+        {
+            if (SelectedInfobase is not { } infobase)
+                return LocalizationManager.T("Main.SelectInfobaseHint");
+            if (!ConfiguratorAvailability.IsConfiguratorAvailable(infobase))
+                return LocalizationManager.T("Main.ConfiguratorUnavailableWeb");
+
+            var launch = LocalizationManager.T("Main.LaunchConfiguratorShort");
+            return string.IsNullOrWhiteSpace(HotkeyConfigurator) ? launch : $"{launch} ({HotkeyConfigurator})";
+        }
+    }
+
 }
 #endif

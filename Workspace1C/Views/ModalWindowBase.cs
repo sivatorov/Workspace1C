@@ -866,7 +866,10 @@ namespace Workspace1C
             {
                 VerticalAlignment = VerticalAlignment.Center,
                 // Левый отступ — общая метрика полосы (issue #179), как в главном окне.
-                Margin = new Thickness(UiMetrics.Scaled(WindowChromeMetrics.TitleBarLeftInset), 0, 0, 0),
+                Margin = new Thickness(UiMetrics.TitleBarLeftInset, 0, 0, 0),
+                // Размер и насыщенность подписи — общие с главным окном (issue #179):
+                // стиль шрифта шапок больше не расходится.
+                FontSize = UiMetrics.TitleBarFontSize,
                 FontWeight = FontWeight.SemiBold,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Height = UiMetrics.Scaled(30)

@@ -553,7 +553,10 @@ namespace Workspace1C.Controls
             {
                 // Issue #120: запуск Конфигуратора сам активирует открытое окно
                 // (MainViewModel.Avalonia.Launch → TryActivateConfiguratorWindow).
-                vm.LaunchConfiguratorCommand.Execute(null);
+                // Issue #180: для базы на веб-сервере Конфигуратор недоступен —
+                // двойной щелчок/Enter не должен запускать обычный экземпляр.
+                if (vm.LaunchConfiguratorCommand.CanExecute(null))
+                    vm.LaunchConfiguratorCommand.Execute(null);
             }
             else if (ib.IsEnterpriseRunning)
             {

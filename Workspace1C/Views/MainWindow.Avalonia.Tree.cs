@@ -811,10 +811,17 @@ namespace Workspace1C
                     ActivateAllWindowsOrNothing(vm, tappedIb, card, nothingAction: false);
                     return;
                 }
+                // Issue #180: для базы на веб-сервере Конфигуратор недоступен —
+                // двойной щелчок не должен запускать обычный экземпляр вместо него.
                 if (dblAction == Workspace1C.Models.DoubleClickAction.Configurator)
-                    vm.LaunchConfiguratorCommand.Execute(null);
+                {
+                    if (vm.LaunchConfiguratorCommand.CanExecute(null))
+                        vm.LaunchConfiguratorCommand.Execute(null);
+                }
                 else
+                {
                     vm.LaunchEnterpriseCommand.Execute(null);
+                }
                     },
                     () => $"tapped={(ResolveRowBase(card)?.Id ?? "null")}");
             };
@@ -1470,7 +1477,8 @@ namespace Workspace1C
                 {
                     (LocalizationManager.T("Main.LaunchWithParams"), "LaunchConfiguratorWithParamsCommand", "IconTune", "@InfoBrush", _vm?.HotkeyConfiguratorWithParams),
                     (LocalizationManager.T("Main.LaunchWithAuth"), "LaunchConfiguratorWithAuthCommand", "IconAccountKey", "@PurpleAccentBrush", _vm?.HotkeyConfiguratorWithAuth)
-                });
+                },
+                configuratorButton: true);
 
             // Остальные действия («Очистить кеш», «Изменить настройки», «Удалить»,
             // «Добавить») перенесены в колонку «Действия» строк базы и верхнюю панель
@@ -2617,7 +2625,8 @@ namespace Workspace1C
             string commandPath,
             string tooltip,
             bool primary,
-            IReadOnlyList<(string Header, string Command, string? IconKey, string? IconColor, string? Gesture)> menuItems)
+            IReadOnlyList<(string Header, string Command, string? IconKey, string? IconColor, string? Gesture)> menuItems,
+            bool configuratorButton = false)
         {
             var radius = UiMetrics.RadiusLg;
             var mainCorner = new CornerRadius(radius, 0, 0, radius);
@@ -2643,11 +2652,22 @@ namespace Workspace1C
             main.MinHeight = UiMetrics.ActionPanelButtonHeight;
             main.Padding = new Thickness(UiMetrics.Scaled(8), 0, UiMetrics.Scaled(4), 0);
             main.Margin = new Thickness(0);
-            ToolTip.SetTip(main, tooltip);
             main.Bind(Button.CommandProperty, new Binding(commandPath));
-            // Без выбранной базы запуск недоступен: disabled-вид даёт PanelButton,
-            // подсказка меняется на «Выберите информационную базу».
-            BindActionAvailability(main, tooltip);
+            if (configuratorButton)
+            {
+                // Issue #180: для базы на веб-сервере Конфигуратор недоступен —
+                // кнопка неактивна (CanExecute команды), а подсказка объясняет причину.
+                main.Bind(InputElement.IsEnabledProperty, new Binding("IsInfobaseSelected"));
+                main.Bind(ToolTip.TipProperty, new Binding("ConfiguratorLaunchToolTip"));
+                ToolTip.SetShowOnDisabled(main, true);
+            }
+            else
+            {
+                ToolTip.SetTip(main, tooltip);
+                // Без выбранной базы запуск недоступен: disabled-вид даёт PanelButton,
+                // подсказка меняется на «Выберите информационную базу».
+                BindActionAvailability(main, tooltip);
+            }
 
             var menu = new ContextMenu().Styled(Themes.ControlThemes.ModernContextMenu);
             foreach (var (header, command, itemIcon, itemColor, gesture) in menuItems)

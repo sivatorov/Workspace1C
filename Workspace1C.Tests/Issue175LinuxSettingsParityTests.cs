@@ -110,6 +110,60 @@ public sealed class Issue175LinuxSettingsParityTests
     }
 
     [Fact]
+    public void LoggingTab_UsesCheckBoxesWithCheckOnLeftLikeWindows()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.Logging.cs");
+
+        // Issue #175 п.7 (1.0.1.129): в Windows вкладка «Логирование» построена
+        // на CheckBox (галка слева), а не на ToggleButton с дорожкой справа.
+        Assert.Contains("new CheckBox", code);
+        Assert.Contains("LoggingCheck(", code);
+        Assert.Contains("HorizontalAlignment = HorizontalAlignment.Left", code);
+        Assert.DoesNotContain("SettingsSwitch(", code);
+        Assert.DoesNotContain("toggle.Styled(ControlThemes.SettingsToggle)", code);
+    }
+
+    [Fact]
+    public void CheckBoxStyle_KeepsBoxLeftOfContent()
+    {
+        var theme = ReadProjectFile("Workspace1C", "Themes", "Controls.axaml");
+
+        // Issue #175 п.7: шаблон ModernMaterialCheckBox не переставляет галку
+        // вправо — PART_Box идёт первым, содержимое — во второй колонке.
+        var themeStart = theme.IndexOf("x:Key=\"ModernMaterialCheckBox\"", StringComparison.Ordinal);
+        Assert.True(themeStart > 0, "Не найден стиль ModernMaterialCheckBox");
+        var themeEnd = theme.IndexOf("</ControlTheme>", themeStart, StringComparison.Ordinal);
+        Assert.True(themeEnd > themeStart, "Не найден конец стиля ModernMaterialCheckBox");
+        var block = theme.Substring(themeStart, themeEnd - themeStart);
+
+        var box = block.IndexOf("Name=\"PART_Box\"", StringComparison.Ordinal);
+        var presenter = block.IndexOf("Name=\"PART_ContentPresenter\"", StringComparison.Ordinal);
+        Assert.True(box > 0, "В стиле CheckBox не найден PART_Box");
+        Assert.True(presenter > box, "PART_ContentPresenter должен идти после PART_Box (галка слева)");
+        // У ContentPresenter Grid.Column="1" стоит в той же строке перед Name.
+        var column = block.LastIndexOf("Grid.Column=\"1\"", presenter, StringComparison.Ordinal);
+        Assert.True(column > box, "Содержимое CheckBox должно быть во второй колонке (Grid.Column=\"1\")");
+    }
+
+    [Fact]
+    public void LoggingTab_ReservesRightInsetForScrollBar()
+    {
+        var code = AvaloniaSettingsCode();
+        var metrics = ReadProjectFile("Workspace1C", "Controls", "UiMetrics.Avalonia.cs");
+
+        // Issue #175 п.7 / issue #174 (1.0.1.129): правый запас содержимого
+        // больше 12 DIP и учитывает ширину вертикального скроллбара, чтобы он
+        // не наезжал на рамку групп. Вкладки используют единый помощник.
+        Assert.Contains("UiMetrics.SettingsContentRightPadding", code);
+        Assert.Contains("public const double ScrollBarWidth = 12", metrics);
+        Assert.Contains("public const double SettingsContentRightInset = 12 + ScrollBarWidth", metrics);
+        Assert.Contains(
+            "public const double SettingsContentRightPadding = SettingsContentRightInset + SettingsSideInset",
+            metrics);
+        Assert.DoesNotContain("SettingsContentRightInset = 12;", metrics);
+    }
+
+    [Fact]
     public void TabHeaders_HaveWidthAndPaddingToAvoidClipping()
     {
         var code = AvaloniaSettingsCode();

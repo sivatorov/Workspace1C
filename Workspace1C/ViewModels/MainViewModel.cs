@@ -884,7 +884,9 @@ public partial class MainViewModel : ViewModelBase
         LaunchCommand = new RelayCommand(p => Launch(p), _ => SelectedInfobase != null);
         // Обратная совместимость с XAML: отдельные команды делегируют в единую LaunchCommand.
         LaunchEnterpriseCommand = new RelayCommand(p => Launch(LaunchKind.Enterprise, false, p as Infobase), p => ResolveActionTarget(p) != null);
-        LaunchConfiguratorCommand = new RelayCommand(p => Launch(LaunchKind.Configurator, false, p as Infobase), p => ResolveActionTarget(p) != null);
+        // Issue #180: для базы на веб-сервере Конфигуратор недоступен (как в штатном стартере 1С).
+        LaunchConfiguratorCommand = new RelayCommand(p => Launch(LaunchKind.Configurator, false, p as Infobase),
+            p => ConfiguratorAvailability.IsConfiguratorAvailable(ResolveActionTarget(p)));
         // Переключение вкладок списка баз (Все / Избранное / Недавние / Запущенные) по горячим клавишам.
         ShowAllCommand = new RelayCommand(_ => IsListModeAll = true);
         ShowFavoritesCommand = new RelayCommand(_ => IsListModeFavorites = true);
@@ -896,12 +898,16 @@ public partial class MainViewModel : ViewModelBase
         LaunchEnterpriseThin64Command = new RelayCommand(_ => Launch(LaunchKind.Thin64), _ => SelectedInfobase != null);
         LaunchEnterpriseThick64Command = new RelayCommand(_ => Launch(LaunchKind.Thick64), _ => SelectedInfobase != null);
         LaunchEnterpriseAsAdminCommand = new RelayCommand(_ => Launch(LaunchKind.Enterprise, runAsAdmin: true), _ => SelectedInfobase != null);
-        LaunchConfiguratorAsAdminCommand = new RelayCommand(_ => Launch(LaunchKind.Configurator, runAsAdmin: true), _ => SelectedInfobase != null);
+        // Issue #180: все варианты запуска Конфигуратора недоступны для веб-базы.
+        LaunchConfiguratorAsAdminCommand = new RelayCommand(_ => Launch(LaunchKind.Configurator, runAsAdmin: true),
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         LaunchEnterpriseWithParamsCommand = new RelayCommand(LaunchEnterpriseWithParams, _ => SelectedInfobase != null);
         LaunchEnterpriseWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Enterprise), _ => SelectedInfobase != null);
-        LaunchConfiguratorWithParamsCommand = new RelayCommand(LaunchConfiguratorWithParams, _ => SelectedInfobase != null);
+        LaunchConfiguratorWithParamsCommand = new RelayCommand(LaunchConfiguratorWithParams,
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         // Запуск Конфигуратора с запросом авторизации (issue #48): SHIFT+хоткей Конфигуратора.
-        LaunchConfiguratorWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Configurator), _ => SelectedInfobase != null);
+        LaunchConfiguratorWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Configurator),
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         LaunchNativeStarterCommand = new RelayCommand(_ => LaunchNativeStarter());
         ImportFromIbasesV8iCommand = new RelayCommand(ImportFromIbasesV8i);
         ExportToIbasesV8iCommand = new RelayCommand(_ => ExportToIbases());
@@ -1133,6 +1139,8 @@ public partial class MainViewModel : ViewModelBase
                 // Аудит UI, P1-3 (1.0.1.90): от выбора базы зависит disabled-состояние
                 // кнопок запуска в правой панели (WPF-разметка привязывает IsEnabled).
                 OnPropertyChanged(nameof(IsInfobaseSelected));
+                // Issue #180: подсказка кнопки «Конфигуратор» зависит от вида базы.
+                OnPropertyChanged(nameof(ConfiguratorLaunchToolTip));
 
                 CommandManager.InvalidateRequerySuggested();
                 OnPropertyChanged(nameof(StatusBarInfo));

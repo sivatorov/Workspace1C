@@ -8,12 +8,16 @@ namespace Workspace1C.Tests;
 
 /// <summary>
 /// Issue #146 (1.0.1.118): окна правки меню открываются по содержимому
-/// (<c>Height = ContentHeight</c>: «Утилиты» — 680, «Меню трея» — 680,
-/// «Контекстное меню» — 540, «Мои программы» — 600 DIP), но <c>MinHeight</c>
-/// заметно ниже стартовой высоты (440/440/400/440 DIP), поэтому окно можно
-/// уменьшать. Пояснение — последний элемент прокручиваемого содержимого, сразу
-/// за панелью операций: пустого места перед ним нет. Прокрутка остаётся только
-/// аварийным вариантом после клампа по маленькой рабочей области.
+/// (<c>Height = ContentHeight</c>), но <c>MinHeight</c> заметно ниже стартовой
+/// высоты, поэтому окно можно уменьшать. Пояснение — последний элемент
+/// прокручиваемого содержимого, сразу за панелью операций: пустого места перед
+/// ним нет. Прокрутка остаётся только аварийным вариантом после клампа по
+/// маленькой рабочей области.
+/// <para>
+/// Issue #178 (1.0.1.129): «Мои программы» — 700/400 DIP (было 600/440): блок
+/// «Запускать от имени администратора» увеличил форму, и прежняя высота давала
+/// прокрутку при открытии.
+/// </para>
 /// <para>
 /// Расчётная логика покрыта через
 /// <see cref="DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.DialogProfile, double, double)"/>,
@@ -27,10 +31,11 @@ public sealed class Issue146WindowHeightTests
     {
         // План 1.0.1.118, раздел 2.4: MinHeight < DefaultHeight = ContentHeight.
         // Issue #159 (1.0.1.128): «Утилиты» 660/340, «Контекстное меню» 570/320.
+        // Issue #178 (1.0.1.129): «Мои программы» 700/400.
         AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 660, 340);
         AssertProfile(DialogWorkAreaPolicy.TrayEditor, 680, 440);
         AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 570, 320);
-        AssertProfile(DialogWorkAreaPolicy.CustomPrograms, 600, 440);
+        AssertProfile(DialogWorkAreaPolicy.CustomPrograms, 700, 400);
     }
 
     [Theory]
@@ -86,8 +91,8 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.CustomPrograms, workArea);
 
-        Assert.Equal(600, size.Height, 3);
-        Assert.Equal(440, size.MinHeight, 3);
+        Assert.Equal(700, size.Height, 3);
+        Assert.Equal(400, size.MinHeight, 3);
         Assert.True(size.MinHeight < size.Height);
         Assert.False(size.RequiresScrolling,
             $"При рабочей области {workArea} DIP «Мои программы» помещаются без прокрутки.");
@@ -106,8 +111,8 @@ public sealed class Issue146WindowHeightTests
         };
 
         // Экран 600 DIP: верхняя граница 600 − 48 = 552. Все окна с содержимым выше
-        // 552 («Утилиты» 640, «Меню трея» 680, «Контекстное меню» 600,
-        // «Мои программы» 600) урезаются до 552 и включают прокрутку.
+        // 552 («Утилиты» 660, «Меню трея» 680, «Контекстное меню» 570,
+        // «Мои программы» 700) урезаются до 552 и включают прокрутку.
         foreach (var (name, profile) in profiles)
         {
             var size = DialogWorkAreaPolicy.Recommend(profile, 600);
@@ -160,7 +165,7 @@ public sealed class Issue146WindowHeightTests
     [InlineData("UtilitiesMenuEditorWindow.xaml", 660, 340)]
     [InlineData("TrayMenuEditorWindow.xaml", 680, 440)]
     [InlineData("ContextMenuEditorWindow.xaml", 570, 320)]
-    [InlineData("CustomProgramsWindow.xaml", 600, 440)]
+    [InlineData("CustomProgramsWindow.xaml", 700, 400)]
     public void WpfWindows_MinHeightBelowHeight(string fileName, double height, double minHeight)
     {
         // Issue #146 (1.0.1.118): Height и MinHeight заданы раздельно, MinHeight ниже

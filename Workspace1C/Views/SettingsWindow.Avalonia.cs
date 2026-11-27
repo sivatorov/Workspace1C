@@ -1442,7 +1442,10 @@ namespace Workspace1C
             {
                 Content = platformsBottom,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                // Issue #174 (1.0.1.129): единый правый отступ под скроллбар —
+                // поля «Разрядности» и путей больше не липнут к краю.
+                Padding = SettingsScrollPadding
             };
             Grid.SetRow(platformsBottomScroll, 2);
             platforms.Children.Add(platformsBottomScroll);
@@ -2157,7 +2160,14 @@ namespace Workspace1C
             // ===== Оформление =====
             // Контейнер вкладки — Grid, заполняющий всю доступную высоту, чтобы правая
             // колонка со списком цветов могла прокручиваться внутри оставшейся высоты.
-            var appearance = new Grid();
+            // Issue #174 (1.0.1.129): внешнее боковое поле вкладки, чтобы карточки
+            // и правый предпросмотр стояли на одном правом краю с другими вкладками.
+            var appearance = new Grid
+            {
+                Margin = new Thickness(
+                    UiMetrics.SettingsSideInset, UiMetrics.SettingsSideInset,
+                    UiMetrics.SettingsSideInset, 0)
+            };
             // Две колонки: слева управление схемой и превью, справа список цветов
             // (превью — часть левой колонки под блоком схемы, по варианту 2 из #155).
             var schemeColumn = new StackPanel();
@@ -2638,6 +2648,9 @@ namespace Workspace1C
                 },
                 new Thickness(8), bottom: 0);
             previewGroup.VerticalAlignment = VerticalAlignment.Top;
+            // Issue #174 (1.0.1.129): правый край предпросмотра совпадает с правым
+            // краем прокручиваемых карточек левой колонки.
+            previewGroup.Margin = new Thickness(0, 0, UiMetrics.SettingsContentRightPadding, 0);
 
             // Корневой Grid из двух колонок: слева прокручиваемые настройки (тема +
             // редактор цветов), справа закреплённый живой предпросмотр, который НЕ
@@ -2652,7 +2665,9 @@ namespace Workspace1C
                 Content = schemeColumn,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Padding = new Thickness(0, 0, 12, 0)
+                // Issue #174 (1.0.1.129): тот же правый отступ, что у остальных
+                // вкладок (раньше было 12 DIP — правый край «прыгал»).
+                Padding = SettingsScrollPadding
             };
             schemeColumn.VerticalAlignment = VerticalAlignment.Top;
             Grid.SetColumn(schemeScroll, 0);
@@ -2664,7 +2679,16 @@ namespace Workspace1C
             var tabAppearance = MainTab("IconPalette", "Settings.TabAppearance", appearance);
 
             // ===== Базы =====
-            var bases = new StackPanel { Spacing = 6 };
+            // Issue #174 (1.0.1.129): «Базы» содержат вложенные подвкладки, поэтому
+            // внешнее боковое поле задаётся здесь, а правый запас под скроллбар —
+            // в SubTab (nestedInInset: true). Суммарный правый край — как у всех.
+            var bases = new StackPanel
+            {
+                Spacing = 6,
+                Margin = new Thickness(
+                    UiMetrics.SettingsSideInset, UiMetrics.SettingsSideInset,
+                    UiMetrics.SettingsSideInset, 0)
+            };
 
             // Подвкладки раздела «Базы»: список баз, каталоги шаблонов и обслуживание.
             // Каждая секция собирается в свой StackPanel, затем кладётся во вложенный
@@ -2674,7 +2698,10 @@ namespace Workspace1C
             var basesMaintenancePanel = new StackPanel { Spacing = 6 };
 
             // Вводное описание вкладки, как в разметке WPF (SettingsWindow.xaml:1326).
-            bases.Children.Add(Hint(LocalizationManager.T("Settings.Bases.Description")));
+            // Пояснение вкладки держим на том же правом краю, что и подвкладки.
+            var basesDescription = Hint(LocalizationManager.T("Settings.Bases.Description"));
+            basesDescription.Margin = new Thickness(0, 0, UiMetrics.SettingsContentRightPadding, 0);
+            bases.Children.Add(basesDescription);
 
             // Каталоги шаблонов конфигураций: список путей и правка вручную,
             // как на этой же вкладке в версии для Windows.
@@ -3288,9 +3315,9 @@ namespace Workspace1C
             // «Обслуживание». Секция ibases.v8i с 1.0.1.128 — отдельная вкладка.
             var basesTabs = new TabControl { Margin = new Thickness(0, 4, 0, 0) };
             basesTabs.Styled(ControlThemes.SettingsSubTabControl);
-            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.List", "Settings.Bases.Subtab.ListTooltip", "IconDatabase", basesListPanel));
-            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.Templates", "Settings.Bases.Subtab.TemplatesTooltip", "IconFolder", basesTemplatesPanel));
-            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.Maintenance", "Settings.Bases.Subtab.MaintenanceTooltip", "IconWrench", basesMaintenancePanel));
+            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.List", "Settings.Bases.Subtab.ListTooltip", "IconDatabase", basesListPanel, nestedInInset: true));
+            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.Templates", "Settings.Bases.Subtab.TemplatesTooltip", "IconFolder", basesTemplatesPanel, nestedInInset: true));
+            basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.Maintenance", "Settings.Bases.Subtab.MaintenanceTooltip", "IconWrench", basesMaintenancePanel, nestedInInset: true));
             bases.Children.Add(basesTabs);
 
             // Issue #175 (1.0.1.128): ibases.v8i — отдельная вкладка, как в Windows
@@ -3486,7 +3513,10 @@ namespace Workspace1C
                     Content = ibasesPanel,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    Margin = new Thickness(12, 12, 12, 0)
+                    Margin = new Thickness(12, 12, 12, 0),
+                    // Issue #174 (1.0.1.129): тот же правый отступ, что у остальных
+                    // вкладок — поля ibases.v8i не прилипают к скроллбару.
+                    Padding = SettingsScrollPadding
                 });
 
             var tabBases = MainTab("IconDatabase", "Settings.TabBases",
@@ -3503,7 +3533,14 @@ namespace Workspace1C
             // ===== Резервное копирование профиля =====
             // Отступы поштучно, как в коде за разметкой (SettingsWindow.Profile.cs:61-130),
             // а не общим зазором панели.
-            var profile = new StackPanel { Margin = new Thickness(12, 12, 12, 0) };
+            // Issue #174 (1.0.1.129): правый отступ больше прежних 12 DIP — поля
+            // и галочки профиля не прилипают к краю и полосе прокрутки.
+            var profile = new StackPanel
+            {
+                Margin = new Thickness(
+                    UiMetrics.SettingsSideInset, UiMetrics.SettingsSideInset,
+                    UiMetrics.SettingsContentTotalRightInset, 0)
+            };
 
             var profileDescription = new TextBlock
             {
@@ -3625,7 +3662,13 @@ namespace Workspace1C
             // Отдельная вкладка, как в Windows: управление профилями (создание,
             // переименование, удаление, пароль) открывается тем же окном, что и
             // раньше. Ключи сохранения настроек не меняются.
-            var accountsPanel = new StackPanel { Margin = new Thickness(12, 12, 12, 0) };
+            // Issue #174 (1.0.1.129): единый правый отступ вкладки «Учётные записи».
+            var accountsPanel = new StackPanel
+            {
+                Margin = new Thickness(
+                    UiMetrics.SettingsSideInset, UiMetrics.SettingsSideInset,
+                    UiMetrics.SettingsContentTotalRightInset, 0)
+            };
             accountsPanel.Children.Add(Hint(LocalizationManager.T("Profiles.Hint"), bottom: 10));
             manageProfilesButton.Margin = new Thickness(0);
             manageProfilesButton.HorizontalAlignment = HorizontalAlignment.Left;
@@ -3855,7 +3898,9 @@ namespace Workspace1C
                     // Отступы прокрутки из разметки (SettingsWindow.xaml:943);
                     // боковые — 12, как в Windows (issue #174).
                     Margin = new Thickness(12, 12, 12, 0),
-                    Padding = new Thickness(0, 0, 4, 0)
+                    // Issue #174 (1.0.1.129): единый правый отступ подвкладок,
+                    // чтобы поля сочетаний не липли к полосе прокрутки.
+                    Padding = SettingsScrollPadding
                 });
 
             // ===== Меню «Утилиты» (issue #374): правка структуры меню =====
@@ -3867,7 +3912,11 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(12, 12, 12, 0)
+                    Margin = new Thickness(12, 12, 12, 0),
+                    // Issue #174/#175 (1.0.1.129): единый правый отступ под
+                    // вертикальный скроллбар — правые края галочек и полей
+                    // совпадают со всеми остальными вкладками.
+                    Padding = SettingsScrollPadding
                 });
             _utilitiesMenuTab = tabUtilitiesMenu;
 
@@ -3881,7 +3930,10 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(12, 12, 12, 0)
+                    Margin = new Thickness(12, 12, 12, 0),
+                    // Issue #174/#175 (1.0.1.129): единый правый отступ под
+                    // скроллбар — рамка групп больше не уходит под прокрутку.
+                    Padding = SettingsScrollPadding
                 });
 
             // ===== О программе =====
@@ -3893,7 +3945,9 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(12, 12, 12, 0)
+                    Margin = new Thickness(12, 12, 12, 0),
+                    // Issue #174/#175 (1.0.1.129): единый правый отступ под скроллбар.
+                    Padding = SettingsScrollPadding
                 });
 
             // Порядок вкладок как в Windows (SettingsWindow.xaml:293 и далее,
@@ -4421,19 +4475,40 @@ namespace Workspace1C
 
 
         /// <summary>
+        /// Единый правый отступ содержимого вкладок настроек (issue #174, 1.0.1.129):
+        /// <see cref="UiMetrics.SettingsContentRightPadding"/> = базовый запас под
+        /// скроллбар плюс боковое поле. Все <c>ScrollViewer</c> вкладок используют
+        /// одно и то же значение, поэтому правые края галочек и полей совпадают.
+        /// </summary>
+        private static Thickness SettingsScrollPadding =>
+            new(0, 0, UiMetrics.SettingsContentRightPadding, 0);
+
+        /// <summary>
         /// Вложенная вкладка раздела настроек: значок и подпись в заголовке,
         /// содержимое в своей прокрутке. Повторяет заголовки подвкладок WPF.
         /// </summary>
-        private static TabItem SubTab(string titleKey, string tooltipKey, string iconKey, Control content)
+        /// <param name="nestedInInset">
+        /// Подвкладка лежит внутри контейнера, который уже даёт внешнее боковое поле
+        /// (<see cref="UiMetrics.SettingsSideInset"/>). Тогда слева padding не нужен,
+        /// а справа достаточно <see cref="UiMetrics.SettingsContentRightPadding"/>:
+        /// суммарный правый край остаётся тем же, что у обычных вкладок.
+        /// </param>
+        private static TabItem SubTab(string titleKey, string tooltipKey, string iconKey,
+            Control content, bool nestedInInset = false)
         {
             // Кегль и насыщенность подписи задаёт тема SettingsSubTabItem,
             // как стиль разметки (SettingsWindow.xaml:227).
+            // Issue #174 (1.0.1.129): правый отступ подвкладок приведён к единому
+            // значению вкладок (раньше был 4 DIP — галочки «прыгали» к краю).
             var tab = new TabItem
             {
                 Content = new ScrollViewer
                 {
                     Content = content,
-                    Padding = new Thickness(8, 4, 4, 4),
+                    Padding = nestedInInset
+                        ? new Thickness(0, 4, UiMetrics.SettingsContentRightPadding, 4)
+                        : new Thickness(UiMetrics.SettingsSideInset, 4,
+                            UiMetrics.SettingsContentTotalRightInset, 4),
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto
                 }
             };
@@ -4804,7 +4879,11 @@ namespace Workspace1C
                 {
                     Content = themesPanel,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    // Issue #174 (1.0.1.129): у вкладки «Темы» раньше не было
+                    // боковых полей — содержимое упиралось в край окна.
+                    Margin = new Thickness(12, 12, 12, 0),
+                    Padding = SettingsScrollPadding
                 });
         }
 
@@ -5279,39 +5358,49 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Строка настроек меню (issue #152): слева галочка (если есть) и кнопка правки,
-        /// справа длинное описание. Левая колонка чуть шире кнопки — есть отступ перед
-        /// текстом; это убирает вертикальную прокрутку вкладки.
+        /// Строка настроек меню (issue #152): переключатель (если есть) отдельной
+        /// строкой во всю ширину, под ним — кнопка правки слева и длинное описание
+        /// справа.
         /// </summary>
+        /// <remarks>
+        /// Issue #174 (1.0.1.129): раньше галочка-переключатель лежала в колонке
+        /// фиксированной ширины 210 DIP, поэтому её дорожка оказывалась в середине
+        /// строки, а в остальных вкладках — у правого края. Из-за этого галочки
+        /// «прыгали». Теперь переключатель растягивается на всю ширину: шаблон
+        /// <c>SettingsToggle</c> (Grid «*,Auto») ставит дорожку ровно на правый край,
+        /// как во всех остальных группах.
+        /// </remarks>
         private static Control MenuSettingsRow(Control? check, Control button, string hintKey)
         {
-            var left = new StackPanel
-            {
-                Spacing = 8,
-                Width = 210,
-                Margin = new Thickness(0, 0, 16, 0)
-            };
+            var panel = new StackPanel { Spacing = 6 };
             if (check is not null)
-                left.Children.Add(check);
-            left.Children.Add(button);
+            {
+                // Полная ширина строки — дорожка переключателя у правого края.
+                check.HorizontalAlignment = HorizontalAlignment.Stretch;
+                panel.Children.Add(check);
+            }
 
+            // Вторая строка: кнопка правки слева, длинное описание справа.
+            // Колонки «Auto,*» — единый шаблон строки с правым краем по содержимому.
             var hint = new TextBlock
             {
                 Text = LocalizationManager.T(hintKey),
                 TextWrapping = TextWrapping.Wrap,
-                VerticalAlignment = VerticalAlignment.Top,
-                FontSize = 12
+                VerticalAlignment = VerticalAlignment.Center,
+                FontSize = 12,
+                Margin = new Thickness(16, 0, 0, 0)
             };
             ThemeBrushes.Bind(hint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
-            var grid = new Grid
+            var row = new Grid
             {
-                ColumnDefinitions = new ColumnDefinitions("210,*"),
-                Children = { left, hint }
+                ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+                Children = { button, hint }
             };
-            Grid.SetColumn(left, 0);
+            Grid.SetColumn(button, 0);
             Grid.SetColumn(hint, 1);
-            return grid;
+            panel.Children.Add(row);
+            return panel;
         }
 
         /// <summary>Заголовок раздела вкладки «Правка меню». Issue #61: вместо фиксированного

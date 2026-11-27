@@ -297,13 +297,40 @@ public static class DbmsBackupService
         return null;
     }
 
+    /// <summary>Штатный запуск утилиты (без тестовой подмены).</summary>
+    private static readonly Func<string, IReadOnlyList<string>, TimeSpan?, IDictionary<string, string>?,
+        CancellationToken, Task<ProcessRunResult>> DefaultRunToolOverride =
+        (fileName, args, timeout, environment, ct) =>
+            ProcessRunner.RunAsync(fileName, args, timeout: timeout, environment: environment, ct: ct);
+
+    private static Func<string, IReadOnlyList<string>, TimeSpan?, IDictionary<string, string>?,
+        CancellationToken, Task<ProcessRunResult>> _runToolOverride = DefaultRunToolOverride;
+
     /// <summary>
     /// Точка подмены запуска утилит (тесты). По умолчанию — <see cref="ProcessRunner"/>.
     /// </summary>
     public static Func<string, IReadOnlyList<string>, TimeSpan?, IDictionary<string, string>?,
-        CancellationToken, Task<ProcessRunResult>> RunToolOverride { get; set; } =
-        (fileName, args, timeout, environment, ct) =>
-            ProcessRunner.RunAsync(fileName, args, timeout: timeout, environment: environment, ct: ct);
+        CancellationToken, Task<ProcessRunResult>> RunToolOverride
+    {
+        get => _runToolOverride;
+        set => _runToolOverride = value ?? DefaultRunToolOverride;
+    }
+
+    /// <summary>
+    /// True — запуск утилиты подменён тестом/вызывающим кодом (issue #143, 1.0.1.129):
+    /// тогда диагностический вызов «--version» не выполняется, чтобы не искажать
+    /// сценарий и число запусков. В обычной работе значение false — версия пишется
+    /// в журнал (раньше проверка «RunToolOverride is not null» была всегда истинной
+    /// из-за делегата по умолчанию, и версия не логировалась).
+    /// </summary>
+    internal static bool HasCustomRunToolOverride =>
+        !ReferenceEquals(_runToolOverride, DefaultRunToolOverride);
+
+    /// <summary>
+    /// Точка подмены пробной записи в каталог копий (тесты диагностики прав).
+    /// null — штатная запись пробного файла. Пробный файл удаляется в любом случае.
+    /// </summary>
+    internal static Action<string>? ProbeWriteOverride { get; set; }
 
     /// <summary>Порт СУБД по умолчанию (0 в профиле — «по умолчанию»).</summary>
     public static int EffectivePort(DbmsBackupProfile profile) => profile.Port > 0
@@ -358,15 +385,22 @@ public static class DbmsBackupService
             return DbmsCheckResult.Fail("Dbms.DirRequired");
 
         DbmsBackupTrace.Log("io-begin", $"check-directory {DbmsBackupTrace.DescribePath(dir)}");
+        // Уникальное имя: параллельные проверки не мешают друг другу, а «хвост»
+        // неудачной записи легко отличить и удалить.
+        var probe = Path.Combine(dir, ".w1c_write_test_" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
             ct.ThrowIfCancellationRequested();
             Directory.CreateDirectory(dir);
             ct.ThrowIfCancellationRequested();
-            var probe = Path.Combine(dir, ".w1c_write_test");
-            File.WriteAllText(probe, "ok");
+            // Пробная запись — единственный надёжный способ проверить права
+            // ограниченного пользователя: наличие каталога и его атрибуты этого
+            // не показывают (issue #143, комментарий RafaIS о правах).
+            if (ProbeWriteOverride is not null)
+                ProbeWriteOverride(probe);
+            else
+                File.WriteAllText(probe, "ok");
             ct.ThrowIfCancellationRequested();
-            File.Delete(probe);
             return DbmsCheckResult.Ok(dir);
         }
         catch (OperationCanceledException)
@@ -376,16 +410,50 @@ public static class DbmsBackupService
         }
         catch (UnauthorizedAccessException ex)
         {
-            return DbmsCheckResult.Fail("Dbms.NoWriteAccess", $"{dir}: {ex.Message}");
+            return DbmsCheckResult.Fail("Dbms.NoWriteAccess", DescribeAccessFailure(dir, ex));
         }
-        catch (Exception ex)
+        catch (System.Security.SecurityException ex)
         {
-            return DbmsCheckResult.Fail("Dbms.DirUnavailable", $"{dir}: {ex.Message}");
+            return DbmsCheckResult.Fail("Dbms.NoWriteAccess", DescribeAccessFailure(dir, ex));
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            return DbmsCheckResult.Fail("Dbms.DirUnavailable", DescribeAccessFailure(dir, ex));
+        }
+        catch (IOException ex)
+        {
+            return DbmsCheckResult.Fail("Dbms.DirUnavailable", DescribeAccessFailure(dir, ex));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
+        {
+            return DbmsCheckResult.Fail("Dbms.DirUnavailable", DescribeAccessFailure(dir, ex));
         }
         finally
         {
+            // Недописанный/пробный файл не должен остаться в каталоге копий ни при
+            // успехе, ни при ошибке прав/места (issue #143, 1.0.1.129).
+            TryDelete(probe);
             DbmsBackupTrace.Log("io-end", "check-directory");
         }
+    }
+
+    /// <summary>
+    /// Описание отказа файловой системы: путь и причина (issue #143, 1.0.1.129).
+    /// Рекомендация (выбрать каталог с правами записи либо запустить от имени
+    /// администратора) входит в локализованный текст ключей
+    /// <c>Dbms.NoWriteAccess</c> / <c>Dbms.DirUnavailable</c>.
+    /// </summary>
+    private static string DescribeAccessFailure(string dir, Exception ex) =>
+        $"{dir}: {ex.Message}";
+
+    /// <summary>
+    /// Текст причины отказа проверки: локализованное сообщение с рекомендацией
+    /// плюс подробности (путь, системная причина).
+    /// </summary>
+    internal static string FormatCheckFailure(DbmsCheckResult result)
+    {
+        var text = LocalizationManager.T(result.MessageKey);
+        return string.IsNullOrWhiteSpace(result.Detail) ? text : text + ": " + result.Detail;
     }
 
     /// <summary>
@@ -573,6 +641,26 @@ public static class DbmsBackupService
                 return result;
             }
             DbmsBackupTrace.Log("io-end", "create-directory");
+
+            // issue #143 (1.0.1.129): перед дампом проверяем, что в каталог реально
+            // можно писать (пробный файл). Для PostgreSQL файл копии пишет сама
+            // утилита локально — при отсутствии прав понятное сообщение появится
+            // ДО многоминутного дампа, а недописанный файл не останется. Для MS SQL
+            // путь может быть доступен только серверу SQL, поэтому локальную пробу
+            // не выполняем (её заменит ошибка BACKUP DATABASE с понятным текстом).
+            if (profile.Dbms == DbmsKind.PostgreSql)
+            {
+                var dirCheck = await BlockingIo.Run(() => CheckOutputDirectoryCore(profile, ct), ct)
+                    .ConfigureAwait(false);
+                if (!dirCheck.Success)
+                {
+                    DbmsBackupTrace.Error("error",
+                        $"run: directory-check {dirCheck.MessageKey}; " +
+                        DbmsBackupTrace.DescribePath(directory) + "; " + dirCheck.Detail);
+                    result.ErrorMessage = FormatCheckFailure(dirCheck);
+                    return result;
+                }
+            }
 
             progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Check));
 
@@ -775,8 +863,10 @@ public static class DbmsBackupService
     {
         // В тестах запуск утилиты подменён делегатом RunToolOverride — лишний вызов
         // «--version» менял бы ожидаемое число запусков; версия нужна только для
-        // реального процесса.
-        if (RunToolOverride is not null)
+        // реального процесса. Issue #143 (1.0.1.129): раньше проверка
+        // «RunToolOverride is not null» была всегда истинной (делегат по умолчанию),
+        // поэтому версия pg_dump в журнал не попадала вовсе.
+        if (HasCustomRunToolOverride)
             return;
         try
         {
@@ -838,6 +928,9 @@ public static class DbmsBackupService
     /// </summary>
     internal static string BuildToolFailureMessage(string tool, string target, int exitCode, string tail)
     {
+        // Issue #143 (1.0.1.129): хвост вывода показывается пользователю — пароль
+        // в строке подключения (если утилита его повторила) маскируется.
+        tail = SensitiveDataMasker.MaskDbPassword(tail ?? string.Empty);
         var template = LocalizationManager.T("Dbms.ToolFailed");
         var message = template.Contains("{0}", StringComparison.Ordinal)
             ? string.Format(CultureInfo.InvariantCulture, template, tool, exitCode, target, tail)

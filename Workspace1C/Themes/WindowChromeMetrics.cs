@@ -41,6 +41,13 @@ public static class WindowChromeMetrics
     public const double WindowButtonRightInset = 12;
 
     /// <summary>
+    /// Размер шрифта заголовка окна (DIP), общий для главного и дочерних окон
+    /// (issue #179): стиль подписи шапки больше не расходится — везде полужирный
+    /// шрифт одного размера. В компактном режиме уменьшается пропорционально.
+    /// </summary>
+    public const double TitleBarFontSize = 13;
+
+    /// <summary>
     /// Левый внутренний отступ полосы заголовка (DIP): от края окна до заголовка.
     /// </summary>
     public const double TitleBarLeftInset = 12;

@@ -11,6 +11,181 @@
 > возможности от точечных исправлений и регрессий предыдущих сборок.
 ---
 
+## [1.0.1.129] — 2026-11-27
+
+### Исправлено
+
+- **«Резервные копии СУБД»: «кракозябры» в выводе утилит и работа под
+  ограниченным пользователем (issue #143, Windows и Linux).**
+  - Кракозябры: `pg_dump`/`sqlcmd`/`pg_isready` на русской Windows пишут
+    сообщения в OEM (cp866) или ANSI (cp1251), а прежняя эвристика
+    [`ConsoleOutputDecoder`](Workspace1C/Services/ConsoleOutputDecoder.cs)
+    сравнивала только символы замены U+FFFD — у однобайтовых кодировок их нет,
+    поэтому всегда выбиралась cp866, и cp1251-текст превращался в псевдографику.
+    Теперь кандидаты сравниваются по «читаемости» (кириллица — плюс,
+    псевдографика/технические символы — минус); вывод читается сырыми байтами в
+    [`ProcessRunner`](Workspace1C/Services/ProcessRunner.cs), журнал окна и
+    `dbms-backup-debug.log` получают уже декодированные строки (сам лог —
+    UTF-8 без BOM).
+  - Права ограниченного пользователя: перед копией каталог проверяется пробной
+    записью/удалением файла; при отказе в доступе выводится понятное сообщение с
+    путём, системной причиной и рекомендацией — выбрать каталог с правами записи
+    либо запустить программу от имени администратора. Пробный/недописанный файл
+    удаляется в любом случае, дамп не запускается, окно остаётся отзывчивым.
+  - Сообщения об ошибках утилиты (код возврата, путь, хвост `stderr`) читаемы;
+    маскирование паролей сохранено (в том числе в тексте ошибки).
+  - Исправлена диагностика версии `pg_dump`: проверка подмены запуска больше не
+    отключает вывод версии в обычной работе.
+  - Тест: `Issue143EncodingAndPermissionsTests` (14 проверок, включая журнал
+    `dbms-backup-debug.log` в UTF-8 без BOM).
+
+- **Кнопка «Конфигуратор» для базы на веб-сервере (issue #180, Windows и Linux).**
+  - Для базы с типом подключения `WebServer` команды запуска Конфигуратора
+    (`LaunchConfiguratorCommand`, `LaunchConfiguratorAsAdminCommand`,
+    `LaunchConfiguratorWithParamsCommand`, `LaunchConfiguratorWithAuthCommand`)
+    неактивны, а при наведении показывается подсказка «Для базы на веб-сервере
+    Конфигуратор недоступен» — как в штатном стартере 1С.
+  - Правило доступности вынесено в [`Services/ConfiguratorAvailability.cs`](Workspace1C/Services/ConfiguratorAvailability.cs);
+    для файловых и клиент-серверных баз поведение запуска Конфигуратора не изменилось.
+  - Подсказка локализована (ru/en, ключ `Main.ConfiguratorUnavailableWeb`) и видна
+    на неактивной кнопке в WPF и Avalonia.
+  - Тест: `Issue180ConfiguratorAvailabilityTests`.
+
+- **Единая полоса заголовка главного и дочерних окон (issue #179, Windows и Linux).**
+  - Причина регрессии 1.0.1.128: у главного окна нижняя граница полосы задавалась
+    `BorderThickness` и входила в `Height` — контенту оставалось 33 DIP при высоте
+    кнопок 34 DIP, из-за чего системные кнопки обрезались, а шапка главного окна
+    выглядела ниже дочерних (у диалогов нижней границы нет).
+  - Нижняя граница шапки главного окна вынесена в оверлей, не участвующий в
+    раскладке; `WindowButtonHeight` = `TitleBarHeight`, вертикальное центрирование
+    и правый отступ (`WindowButtonRightInset`) одинаковы у главного и всех дочерних
+    окон. Компактный режим сжимает полосу и кнопки согласованно, без обрезки.
+  - Стиль шрифта заголовка главного окна выровнен с дочерними (полужирный, единый
+    размер `WindowChromeMetrics.TitleBarFontSize`), локализация ru/en не менялась.
+  - Тест: `Issue179WindowTitleBarTests` (18 проверок, включая компактный режим).
+
+- **«Мои программы»: запуск от имени администратора — кракозябры и высота диалога
+  (issue #178, Windows и Linux).**
+  - Кракозябры: сообщения `runas.exe` на русской Windows приходят в OEM-кодировке
+    (cp866) / ANSI (cp1251), а файл `custom_programs.json` мог быть сохранён вручную
+    в ANSI. Вывод процесса теперь читается сырыми байтами и декодируется центральным
+    правилом [`ConsoleOutputDecoder`](Workspace1C/Services/ConsoleOutputDecoder.cs)
+    (UTF-8 → cp866/cp1251); принудительный `Encoding.UTF8` в
+    [`ProcessRunner`](Workspace1C/Services/ProcessRunner.cs) больше не подставляется.
+    Хранилище [`CustomProgramsStore`](Workspace1C/Services/CustomProgramsStore.cs)
+    читает JSON как UTF-8 с fallback на cp1251 и всегда пишет UTF-8 без BOM —
+    названия программ, пути и учётные записи не искажаются.
+  - Высота диалога: профиль
+    [`DialogWorkAreaPolicy.CustomPrograms`](Workspace1C/Services/DialogWorkAreaPolicy.cs)
+    увеличен с 600/440 до 700/400 DIP — блок «Запускать от имени администратора»,
+    подпись и поле учётной записи, а также пояснение помещаются без прокрутки при
+    открытии и без лишнего запаса; клампинг по рабочей области сохранён.
+  - Тест: `Issue178CustomProgramsDialogTests` (декодирование кириллицы, UTF-8/ANSI
+    хранилища, размеры диалога); обновлены ожидания `Issue146WindowHeightTests`.
+
+- **Вкладка «Логирование» в Linux: галочки слева и отступ под скроллбар
+  (issue #175 п.7, только Linux/Avalonia).**
+  - Причина «галка сильно справа»: вкладка строилась на `ToggleButton` со стилем
+    `SettingsToggle` (подпись слева, дорожка-переключатель справа), тогда как в
+    Windows там `CheckBox` с галочкой слева. Теперь и общий выключатель «CM_ON»,
+    и категории, и «Диагностика СУБД» — `CheckBox` с галкой слева, единым
+    выравниванием по левому краю и тем же вертикальным ритмом, что в Windows;
+    пояснения остались под знаком «?» / подписью.
+  - Вертикальный скроллбар больше не наезжает на правую границу карточек-групп:
+    правый отступ содержимого вкладок вынесен в
+    [`UiMetrics.SettingsContentRightInset`](Workspace1C/Controls/UiMetrics.Avalonia.cs)
+    (`12 + ScrollBarWidth` = 24 DIP) и применяется как `Padding` правого края
+    `ScrollViewer` вкладок «Логирование», «Меню „Утилиты“» и «О программе».
+  - Ширина вкладок (260 DIP, `MinWidth` 240) и отсутствие обрезки «Резервное
+    копирование» сохранены; Windows/WPF-поведение не менялось, локализация ru/en
+    не требуется (тексты не менялись).
+  - Тесты: дополнены `Issue175LinuxSettingsParityTests` (галка слева, стиль
+    `CheckBox`, правый отступ больше 12 и учитывает ширину скролла) и
+    `Issue174LinuxSettingsLayoutTests`.
+
+- **Linux — отступы от края и выравнивание галочек/полей в настройках
+  (issue #174, только Linux/Avalonia).**
+  - Причина разного выравнивания: часть вкладок вообще не задавала правый отступ
+    (0/4/12 DIP), а строка меню «Утилиты» держала переключатель в колонке
+    фиксированной ширины 210 DIP — дорожка оказывалась в середине строки, тогда
+    как в остальных группах она прижата к правому краю.
+  - Введён единый правый padding
+    [`UiMetrics.SettingsContentRightPadding`](Workspace1C/Controls/UiMetrics.Avalonia.cs)
+    = `SettingsContentRightInset` (12 + ширина скроллбара) + `SettingsSideInset` (12) =
+    **36 DIP**; с внешним полем вкладки полный правый отступ — **48 DIP**. Он применён
+    ко всем вкладкам (Настройки, Отображение, Темы, Оформление, Клавиши, Меню «Утилиты»,
+    Платформы, ibases.v8i, Базы, Логирование, Резервное копирование, Учётные записи,
+    О программе) и к вложенным подвкладкам через `SubTab`.
+  - `MenuSettingsRow` перестроена: переключатель — отдельной строкой во всю ширину
+    (дорожка ровно у правого края), ниже кнопка правки и описание в Grid «Auto,*».
+  - Windows/WPF-разметка не менялась; локализация ru/en не требуется (тексты не менялись).
+  - Тесты: дополнены `Issue174LinuxSettingsLayoutTests` (единый padding не менее чем
+    у 8 прокруток, правый край переключателей, подвкладки, ширина вкладок без
+    горизонтального скролла), обновлён `Issue175LinuxSettingsParityTests`.
+
+### Проверки
+
+- Сборка Windows и Linux-кросс (`-p:ForceLinux=true`): **0 ошибок**.
+  Логи: [`docs/_t1_build_129_win.log`](docs/_t1_build_129_win.log),
+  [`docs/_t1_build_129_linux.log`](docs/_t1_build_129_linux.log).
+- Профильные тесты `--filter Issue180`: **5 из 5 пройдено**.
+  Лог: [`docs/_t1_test_129.log`](docs/_t1_test_129.log).
+- Issue #178: сборка Windows и Linux-кросс (`-p:ForceLinux=true`) — **0 ошибок**.
+  Логи: [`docs/_t3_build_129_win.log`](docs/_t3_build_129_win.log),
+  [`docs/_t3_build_129_linux.log`](docs/_t3_build_129_linux.log).
+- Issue #178: профильные тесты `--filter "Issue178|Issue146"` — **182 из 182 пройдено**.
+  Лог: [`docs/_t3_test_129.log`](docs/_t3_test_129.log).
+- Issue #179: сборка Windows и Linux-кросс — **0 ошибок**.
+  Логи: [`docs/_t2_build_129_win.log`](docs/_t2_build_129_win.log),
+  [`docs/_t2_build_129_linux.log`](docs/_t2_build_129_linux.log).
+- Issue #179: профильные тесты `--filter Issue179` — **18 из 18 пройдено**.
+  Лог: [`docs/_t2_test_129.log`](docs/_t2_test_129.log).
+- Issue #175 п.7: сборка Windows и Linux-кросс (`-p:ForceLinux=true`) — **0 ошибок**.
+  Логи: [`docs/_t4_build_win_129.log`](docs/_t4_build_win_129.log),
+  [`docs/_t4_build_linux_129.log`](docs/_t4_build_linux_129.log).
+- Issue #175 п.7: профильные тесты `--filter "Issue175|Issue174"` — **19 из 19 пройдено**.
+  Лог: [`docs/_t4_test_129.log`](docs/_t4_test_129.log).
+- Issue #174: сборка Windows и Linux-кросс (`-p:ForceLinux=true`) — **0 ошибок**
+  (WPF — 24 предупреждения, Linux — 38 предупреждений, ошибок нет).
+  Логи: [`docs/_t5_build_win_129.log`](docs/_t5_build_win_129.log),
+  [`docs/_t5_build_linux_129.log`](docs/_t5_build_linux_129.log).
+- Issue #174: профильные тесты `--filter "Issue174|Issue175"` — **22 из 22 пройдено**.
+  Лог: [`docs/_t5_test_129.log`](docs/_t5_test_129.log).
+- Issue #143: сборка Windows и Linux-кросс (`-p:ForceLinux=true`) — **0 ошибок**
+  (WPF — 24 предупреждения, Linux — 38 предупреждений, ошибок нет).
+  Логи: [`docs/_t6_build_win_129_issue143.log`](docs/_t6_build_win_129_issue143.log),
+  [`docs/_t6_build_linux_129_issue143.log`](docs/_t6_build_linux_129_issue143.log).
+- Issue #143: профильные тесты — **104 из 104 пройдено**; широкий прогон по связанным
+  классам — **299 из 299 пройдено**.
+  Логи: [`docs/_t6_test_129_issue143.log`](docs/_t6_test_129_issue143.log),
+  [`docs/_t6_test_129_issue143_wide.log`](docs/_t6_test_129_issue143_wide.log).
+- Финальная сборка после подъёма версии до `1.0.1.129`: Windows (WPF) — **0 ошибок**
+  (24 предупреждения), Linux-кросс (`-p:ForceLinux=true`) — **0 ошибок**
+  (38 предупреждений). `FileVersion`/`ProductVersion` собранных сборок — `1.0.1.129`.
+  Логи: [`docs/_t7_build_win_129.log`](docs/_t7_build_win_129.log),
+  [`docs/_t7_build_linux_129.log`](docs/_t7_build_linux_129.log).
+- **Полный прогон тестов** `dotnet test Workspace1C.slnx -c Release`: **8544 из 8544
+  пройдено, 0 падений, 0 пропусков** (длительность 3 m 11 s). Лог:
+  [`docs/_t8_full_test_129.log`](docs/_t8_full_test_129.log).
+  - По ходу прогона устранены две ложные причины падений (без маскировки тестов):
+    устаревшее ожидание `Issue152SettingsLayoutTests` (фиксированная колонка 210 DIP,
+    заменённая в issue #174 на `Auto,*` и переключатель во всю ширину) обновлено под
+    фактическую компоновку; в `MetadataExplorerSearchTests` ожидание debounce заменено
+    с жёсткой паузы `Task.Delay(500)` на опрос с таймаутом 10 с (тест был flaky
+    под нагрузкой полного прогона).
+- **Сборка Windows single-file** (`build-windows-single-file.ps1 -Configuration Release`):
+  один файл `Workspace1C.exe` — **85 719 860 байт (81.7 МБ)**, рядом нет DLL/PDB/
+  `Localization`. `FileVersion` = `1.0.1.129`, `ProductVersion` = `1.0.1.129+21cb47cc`,
+  `--license-info --json` → `"proModules": true` (edition `pro`, status `Valid`),
+  `--list` → код 0. Лог: [`docs/_t8_build_win_129.log`](docs/_t8_build_win_129.log).
+- **Сборка Linux single-file** (`build-linux-single-file.ps1 -Configuration Release`,
+  `-p:ForceLinux=true`): один файл `Workspace1C-linux-x64` — **54 005 228 байт
+  (51.5 МБ)**, ELF-магия `7F 45 4C 46`, строка версии `1.0.1.129` присутствует,
+  рядом нет DLL/PDB/`Localization`. Лог:
+  [`docs/_t8_build_linux_129.log`](docs/_t8_build_linux_129.log).
+- Итоговые артефакты подготовки релиза: `_rel_101129/Workspace1C.exe`
+  (85 719 860 байт) и `_rel_101129/Workspace1C-linux-x64` (54 005 228 байт).
+
 ## [1.0.1.128] — 2026-11-27
 
 ### Исправлено

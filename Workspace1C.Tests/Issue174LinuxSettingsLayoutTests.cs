@@ -93,4 +93,94 @@ public sealed class Issue174LinuxSettingsLayoutTests
         Assert.Contains("new Thickness(10, 8)", code);
         Assert.DoesNotContain("new Thickness(8), 0", code);
     }
+
+    [Fact]
+    public void ContentRightInset_IsGreaterThanTwelveAndIncludesScrollBar()
+    {
+        var metrics = ReadProjectFile("Workspace1C", "Controls", "UiMetrics.Avalonia.cs");
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #174 (1.0.1.129): правый отступ контента больше 12 DIP
+        // и складывается из бокового отступа и ширины скроллбара.
+        Assert.Contains("public const double ScrollBarWidth = 12", metrics);
+        Assert.Contains("public const double SettingsSideInset = 12", metrics);
+        Assert.Contains("public const double SettingsContentRightInset = 12 + ScrollBarWidth", metrics);
+        Assert.Contains(
+            "public const double SettingsContentRightPadding = SettingsContentRightInset + SettingsSideInset",
+            metrics);
+        Assert.Contains(
+            "public const double SettingsContentTotalRightInset = SettingsSideInset + SettingsContentRightPadding",
+            metrics);
+        // Итоговый padding складывается из базового запаса и бокового поля,
+        // то есть гарантированно больше прежних 12 DIP.
+        // Единый помощник правого padding вкладок настроек.
+        Assert.Contains("private static Thickness SettingsScrollPadding =>", code);
+        Assert.Contains("new(0, 0, UiMetrics.SettingsContentRightPadding, 0)", code);
+
+        // Ширина вкладок и отсутствие обрезки «Резервное копирование» сохранены.
+        Assert.Contains("tab.Width = UiMetrics.Scaled(260)", code);
+        Assert.Contains("tab.MinWidth = UiMetrics.Scaled(240)", code);
+    }
+
+    [Fact]
+    public void EverySettingsTab_UsesUnifiedRightPadding()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #174 (1.0.1.129): один и тот же правый padding у всех вкладок
+        // (клавиши, меню «Утилиты», логирование, о программе, ibases.v8i, темы,
+        // платформы, цветовое оформление). Раньше часть вкладок имела 0/4/12 DIP.
+        var applied = CountOccurrences(code, "Padding = SettingsScrollPadding");
+        Assert.True(applied >= 8,
+            $"Единый правый padding применён только к {applied} прокруткам вкладок (ожидалось ≥ 8)");
+        Assert.DoesNotContain("Padding = new Thickness(0, 0, 4, 0)", code);
+        Assert.DoesNotContain("Padding = new Thickness(0, 0, 12, 0)", code);
+
+        // Вкладки без собственной прокрутки задают полный правый отступ полем.
+        Assert.Contains("UiMetrics.SettingsContentTotalRightInset", code);
+    }
+
+    [Fact]
+    public void SubTabs_UseUnifiedRightInset()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #174 (1.0.1.129): вложенные подвкладки («Настройки», «Отображение»,
+        // «Базы») тоже получают единый правый отступ, а не прежние 4 DIP.
+        Assert.Contains("bool nestedInInset = false", code);
+        Assert.Contains("UiMetrics.SettingsContentTotalRightInset, 4", code);
+        Assert.Contains("nestedInInset: true", code);
+    }
+
+    [Fact]
+    public void RightAlignedSwitches_UseFullWidthRowTemplate()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #174 (1.0.1.129): баг выравнивания — переключатель в строке меню
+        // лежал в колонке фиксированной ширины 210 DIP, и дорожка оказывалась
+        // в середине строки, а не у правого края.
+        var start = code.IndexOf("private static Control MenuSettingsRow(", StringComparison.Ordinal);
+        Assert.True(start > 0, "Не найдена строка настроек меню MenuSettingsRow");
+        var end = code.IndexOf("\n        }", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец MenuSettingsRow");
+        var block = code[start..end];
+
+        Assert.DoesNotContain("Width = 210", block);
+        Assert.DoesNotContain("ColumnDefinitions(\"210,*\")", block);
+        Assert.Contains("ColumnDefinitions = new ColumnDefinitions(\"Auto,*\")", block);
+        Assert.Contains("HorizontalAlignment = HorizontalAlignment.Stretch", block);
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+        return count;
+    }
 }

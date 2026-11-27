@@ -163,7 +163,9 @@ public sealed class Issue179WindowTitleBarTests
         Assert.Contains("UiMetrics.WindowButtonRightInset", code, StringComparison.Ordinal);
         Assert.Contains("Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight)",
             code, StringComparison.Ordinal);
-        Assert.Contains("WindowChromeMetrics.TitleBarLeftInset", code, StringComparison.Ordinal);
+        // Левый отступ берётся из UiMetrics (компактный режим пропорционален), а сама
+        // метрика ссылается на общий WindowChromeMetrics.TitleBarLeftInset.
+        Assert.Contains("UiMetrics.TitleBarLeftInset", code, StringComparison.Ordinal);
         // Локальная высота кнопки диалога (30) больше не задаётся: высота берётся
         // из общей метрики (строка с точкой с запятой — именно кнопка, не заголовок).
         Assert.DoesNotContain("Height = UiMetrics.Scaled(30);", code, StringComparison.Ordinal);
@@ -193,5 +195,105 @@ public sealed class Issue179WindowTitleBarTests
         // Ключевые дочерние окна наследуют общий chrome.
         var settings = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
         Assert.Contains("SettingsWindow : ModalWindowBase", settings, StringComparison.Ordinal);
+    }
+
+    // ===================== Причина дефекта 1.0.1.129 =====================
+
+    [Fact]
+    public void Metrics_TitleBarFontSizeIsSharedAndPositive()
+    {
+        // Стиль шрифта шапки общий для главного и дочерних окон (issue #179).
+        Assert.True(WindowChromeMetrics.TitleBarFontSize > 0);
+    }
+
+    [Fact]
+    public void WpfMainTitleBar_DoesNotConsumeHeightWithBottomBorder()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
+
+        // Причина дефекта: BorderThickness="0,0,0,1" входил в Height=34 и оставлял
+        // контенту 33 DIP — кнопки (34) обрезались, шапка выглядела ниже дочерних.
+        // Проверяем именно тег TitleBarBorder, а не другие границы окна.
+        var start = xaml.IndexOf("x:Name=\"TitleBarBorder\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "TitleBarBorder не найден");
+        var tagEnd = xaml.IndexOf('>', start);
+        Assert.True(tagEnd > start, "Не найден конец тега TitleBarBorder");
+        var tag = xaml[start..tagEnd];
+        Assert.DoesNotContain("BorderThickness", tag, StringComparison.Ordinal);
+        Assert.DoesNotContain("BorderBrush", tag, StringComparison.Ordinal);
+
+        // Разделитель полосы — оверлей в той же строке, не влияющий на layout.
+        Assert.Contains("Grid.Row=\"0\" Height=\"1\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("VerticalAlignment=\"Bottom\"", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfTitleFont_SharedBetweenMainAndDialogs()
+    {
+        var main = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
+        var helper = ReadProjectFile("Workspace1C", "Views", "WindowChromeHelper.cs");
+
+        // Главное окно: размер — из общей метрики, насыщенность — полужирная.
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.TitleBarFontSize}",
+            main, StringComparison.Ordinal);
+        Assert.Contains("FontWeight=\"SemiBold\"", main, StringComparison.Ordinal);
+        // Диалоги: тот же размер и полужирный шрифт.
+        Assert.Contains("FontSize = WindowChromeMetrics.TitleBarFontSize",
+            helper, StringComparison.Ordinal);
+        Assert.Contains("FontWeight = FontWeights.SemiBold", helper, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaMainTitleBar_DoesNotConsumeHeightWithBottomBorder()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+
+        // Причина дефекта: BorderThickness = new Thickness(0, 0, 0, 1) «съедал» 1 DIP.
+        // Проверяем именно блок _titleBarBorder, а не другие границы окна.
+        var start = code.IndexOf("_titleBarBorder = new Border", StringComparison.Ordinal);
+        Assert.True(start >= 0, "_titleBarBorder не найден");
+        var end = code.IndexOf("ThemeBrushes.Bind(_titleBarBorder", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец блока _titleBarBorder");
+        var block = code[start..end];
+        Assert.DoesNotContain("Thickness(0, 0, 0, 1)", block, StringComparison.Ordinal);
+        Assert.Contains("BorderThickness = new Thickness(0)", block, StringComparison.Ordinal);
+
+        // Разделитель — отдельный оверлей, а не толщина границы полосы.
+        Assert.Contains("titleSeparator", code, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaTitleFont_SharedBetweenMainAndDialogs()
+    {
+        var main = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.cs");
+        var dialog = ReadProjectFile("Workspace1C", "Views", "ModalWindowBase.cs");
+
+        Assert.Contains("FontSize = UiMetrics.TitleBarFontSize", main, StringComparison.Ordinal);
+        Assert.Contains("FontSize = UiMetrics.TitleBarFontSize", dialog, StringComparison.Ordinal);
+        Assert.Contains("FontWeight = FontWeight.SemiBold", main, StringComparison.Ordinal);
+        Assert.Contains("FontWeight = FontWeight.SemiBold", dialog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaMainAndDialog_UseSameInsets()
+    {
+        var uiMetrics = ReadProjectFile("Workspace1C", "Controls", "UiMetrics.Avalonia.cs");
+        var dialog = ReadProjectFile("Workspace1C", "Views", "ModalWindowBase.cs");
+
+        // Компактный режим не «прыгает» на 9.6 DIP: боковые отступы берутся из
+        // компактной метрики, одинаковой у главного окна и диалогов.
+        Assert.Contains("CompactTitleBarSideInset", uiMetrics, StringComparison.Ordinal);
+        Assert.Contains("UiMetrics.TitleBarLeftInset", dialog, StringComparison.Ordinal);
+        Assert.Contains("UiMetrics.WindowButtonRightInset", dialog, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompactMode_KeepsButtonsWithinTitleBar()
+    {
+        // Компактный режим: кнопки не выше полосы — обрезки нет.
+        Assert.True(WindowChromeMetrics.CompactWindowButtonHeight <= WindowChromeMetrics.CompactTitleBarHeight);
+        Assert.Equal(WindowChromeMetrics.CompactTitleBarHeight, WindowChromeMetrics.CompactWindowButtonHeight);
+        // И полоса ниже обычной, а кнопки обычные — выше компактных (пропорциональность).
+        Assert.True(WindowChromeMetrics.CompactWindowButtonHeight < WindowChromeMetrics.WindowButtonHeight);
     }
 }

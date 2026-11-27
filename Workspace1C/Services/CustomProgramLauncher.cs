@@ -97,6 +97,12 @@ public static class CustomProgramLauncher
     /// Issue #178: при <see cref="CustomProgram.RunAsAdministrator"/> на Windows
     /// запуск идёт с повышением прав — UAC-запрос (Verb = "runas") либо
     /// <c>runas /savecred</c>, если задана учётная запись.
+    /// <para>
+    /// Для пути <c>runas.exe</c> включён захват stderr (<see cref="ProcessStartInfo.RedirectStandardError"/>):
+    /// сообщения runas на русской Windows пишутся в OEM-кодировке (cp866/cp1251), и
+    /// принудительное чтение как UTF-8 давало «кракозябры». Вывод декодируется
+    /// центральным правилом <see cref="DecodeProcessOutput"/> (issue #178).
+    /// </para>
     /// </summary>
     public static ProcessStartInfo BuildStartInfo(CustomProgram program)
     {
@@ -108,7 +114,10 @@ public static class CustomProgramLauncher
                 FileName = "runas.exe",
                 Arguments = BuildRunAsArguments(program),
                 UseShellExecute = false,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                // Issue #178: stderr читаем сырыми байтами и декодируем сами —
+                // кодировка вывода runas заранее неизвестна (cp866/cp1251/UTF-8).
+                RedirectStandardError = true
             };
             var runAsDir = ResolveWorkingDirectory(program);
             if (!string.IsNullOrWhiteSpace(runAsDir))
@@ -152,6 +161,8 @@ public static class CustomProgramLauncher
         }
 
         var startInfo = BuildStartInfo(program);
+        if (IsRunAsStartInfo(startInfo))
+            return TryStartRunAs(program, startInfo, logger, out error);
         try
         {
             Process.Start(startInfo);
@@ -191,6 +202,93 @@ public static class CustomProgramLauncher
                 $"[custom-programs] Не удалось запустить программу «{program.Name}»", ex));
             return false;
         }
+    }
+
+    /// <summary>
+    /// Issue #178: путь <c>runas.exe</c> запускается отдельно — его stderr читается
+    /// СЫРЫМИ байтами и декодируется <see cref="DecodeProcessOutput"/> (UTF-8 → cp866 →
+    /// cp1251). Так сообщения runas («неверное имя пользователя», отказ и т. п.) не
+    /// превращаются в «кракозябры» при показе пользователю. Ожидание ограничено
+    /// <see cref="RunAsFailureGraceMs"/>: если runas ещё работает (первый ввод пароля),
+    /// запуск считается успешным и окно не блокируется надолго.
+    /// </summary>
+    private const int RunAsFailureGraceMs = 300;
+
+    private static bool TryStartRunAs(
+        CustomProgram program, ProcessStartInfo startInfo, IAppLogger? logger, out string error)
+    {
+        error = string.Empty;
+        try
+        {
+            using var process = Process.Start(startInfo);
+            if (process is null)
+            {
+                error = FormatLocalized(
+                    "Launch.CustomPrograms.ErrorStart", program.Name, "runas.exe");
+                return false;
+            }
+
+            // Неверная учётная запись/отказ runas завершается почти мгновенно —
+            // успеваем прочитать и декодировать stderr без заметной задержки UI.
+            if (process.WaitForExit(RunAsFailureGraceMs) && process.ExitCode != 0)
+            {
+                var stderr = ReadAllBytes(process.StandardError.BaseStream);
+                var details = DecodeProcessOutput(null, stderr);
+                if (string.IsNullOrWhiteSpace(details))
+                    details = $"runas.exe (код {process.ExitCode})";
+                error = FormatLocalized("Launch.CustomPrograms.ErrorStart", program.Name, details);
+                TryLog(() => logger?.Error(
+                    $"[custom-programs] runas.exe не запустил программу «{program.Name}» " +
+                    $"(код {process.ExitCode}): {details}"));
+                return false;
+            }
+
+            TryLog(() => logger?.Info(
+                $"[custom-programs] Запущена программа «{program.Name}» от администратора " +
+                $"(учётная запись: {program.RunAsUserName}): {BuildCommandLine(program)}"));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = FormatLocalized("Launch.CustomPrograms.ErrorStart", program.Name, ex.Message);
+            TryLog(() => logger?.Error(
+                $"[custom-programs] Не удалось запустить программу «{program.Name}» от администратора", ex));
+            return false;
+        }
+    }
+
+    private static bool IsRunAsStartInfo(ProcessStartInfo startInfo) =>
+        string.Equals(startInfo.FileName, "runas.exe", StringComparison.OrdinalIgnoreCase);
+
+    private static byte[] ReadAllBytes(Stream stream)
+    {
+        try
+        {
+            using var buffer = new MemoryStream();
+            stream.CopyTo(buffer);
+            return buffer.ToArray();
+        }
+        catch
+        {
+            return Array.Empty<byte>();
+        }
+    }
+
+    /// <summary>
+    /// Issue #178: декодирует сырой вывод процесса (runas.exe и другие утилиты) через
+    /// центральное правило <see cref="ConsoleOutputDecoder"/>: строгий UTF-8, затем
+    /// cp866/cp1251. Публичный — единая точка для тестов и диагностики запуска
+    /// «Моих программ»; никогда не задаёт принудительно <c>Encoding.UTF8</c>.
+    /// </summary>
+    public static string DecodeProcessOutput(byte[]? stdout, byte[]? stderr)
+    {
+        var outText = ConsoleOutputDecoder.Decode(stdout);
+        var errText = ConsoleOutputDecoder.Decode(stderr);
+        if (string.IsNullOrWhiteSpace(outText))
+            return errText;
+        if (string.IsNullOrWhiteSpace(errText))
+            return outText;
+        return outText.TrimEnd() + Environment.NewLine + errText;
     }
 
     /// <summary>

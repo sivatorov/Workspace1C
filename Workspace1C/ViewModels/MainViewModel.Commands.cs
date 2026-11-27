@@ -1473,6 +1473,8 @@ public string HotkeyEnterprise
                 // Производные хоткеи Конфигуратора (issue #48): Ctrl+F4 / Shift+F4.
                 OnPropertyChanged(nameof(HotkeyConfiguratorWithParams));
                 OnPropertyChanged(nameof(HotkeyConfiguratorWithAuth));
+                // Issue #180: в подсказке кнопки «Конфигуратор» показывается хоткей.
+                OnPropertyChanged(nameof(ConfiguratorLaunchToolTip));
             }
         }
     }

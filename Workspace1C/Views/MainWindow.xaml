@@ -197,7 +197,6 @@
              кнопки управления окном (свернуть/развернуть/закрыть), встроенные в полосу.
              Перетаскивание окна за эту полосу — OnTopBar_MouseLeftButtonDown -> DragMove. -->
         <Border x:Name="TitleBarBorder" Grid.Row="0"
-                BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,0,0,1"
                 MouseLeftButtonDown="OnTopBar_MouseLeftButtonDown">
             <Border.Style>
                 <!-- Высота полосы и боковые отступы — из единого источника метрик
@@ -230,7 +229,9 @@
                             <BitmapImage UriSource="pack://application:,,,/app.ico" DecodePixelWidth="18"/>
                         </Image.Source>
                     </Image>
-                    <TextBlock x:Name="AppTitleBlock" Text="{loc:Loc App.Title}" FontSize="13" FontWeight="SemiBold"
+                    <TextBlock x:Name="AppTitleBlock" Text="{loc:Loc App.Title}"
+                               FontSize="{x:Static themes:WindowChromeMetrics.TitleBarFontSize}"
+                               FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
 
@@ -307,6 +308,16 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Разделитель полосы заголовка (issue #179): рисуется ОВЕРЛЕЕМ в той же строке
+             и на всю ширину, а не через BorderThickness у TitleBarBorder. Раньше
+             BorderThickness="0,0,0,1" входил в Height=34 и оставлял контенту 33 DIP:
+             кнопки (WindowButtonHeight=34) обрезались на 1 DIP, а шапка главного окна
+             выглядела ниже дочерних (у тех нижней границы нет). -->
+        <Border Grid.Row="0" Height="1"
+                VerticalAlignment="Bottom" HorizontalAlignment="Stretch"
+                Background="{DynamicResource BorderBrushColor}"
+                IsHitTestVisible="False"/>
 
         <!-- ===================== Основная область ===================== -->
         <Grid Grid.Row="1">
@@ -3266,16 +3277,13 @@
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
+                                <!-- Issue #180: для базы на веб-сервере кнопка неактивна, но подсказка
+                                     «Конфигуратор недоступен» должна показываться и у disabled-кнопки. -->
                                 <Button Grid.Column="0" Command="{Binding LaunchConfiguratorCommand}"
                                         Cursor="Hand" HorizontalContentAlignment="Left" HorizontalAlignment="Stretch"
-                                        Background="Transparent" BorderThickness="0" Padding="8,0,4,0" Height="34" MinHeight="34">
-                                    <Button.ToolTip>
-                                        <MultiBinding Converter="{StaticResource MultiFormat}" ConverterParameter="{}{0} ({1})">
-                                            <Binding Source="{x:Static loc:LocalizationManager.Instance}" Path="Source"
-                                                     Converter="{x:Static loc:LocalizationValueConverter.Instance}" ConverterParameter="Main.LaunchConfiguratorShort"/>
-                                            <Binding Path="HotkeyConfigurator"/>
-                                        </MultiBinding>
-                                    </Button.ToolTip>
+                                        Background="Transparent" BorderThickness="0" Padding="8,0,4,0" Height="34" MinHeight="34"
+                                        ToolTip="{Binding ConfiguratorLaunchToolTip}"
+                                        ToolTipService.ShowOnDisabled="True">
                                     <Button.Template>
                                         <ControlTemplate TargetType="Button">
                                             <!-- Issue #122 (v1.0.1.55): подложка hover была квадратной,

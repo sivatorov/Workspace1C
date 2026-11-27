@@ -927,6 +927,10 @@ namespace Workspace1C
                 VerticalAlignment = VerticalAlignment.Center,
                 // Левый отступ — та же метрика, что у полосы главного окна (issue #179).
                 Margin = new Thickness(WindowChromeMetrics.TitleBarLeftInset, 0, 0, 0),
+                // Размер и насыщенность подписи — общие с главным окном (issue #179):
+                // раньше стиль шрифта шапок расходился, теперь везде полужирный
+                // одного размера.
+                FontSize = WindowChromeMetrics.TitleBarFontSize,
                 FontWeight = FontWeights.SemiBold
             };
             // Текст заголовка читаемым цветом на акцентной полосе (AccentTextBrush,

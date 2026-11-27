@@ -512,6 +512,24 @@ public partial class MainViewModel : ViewModelBase
             ? withAuth ?? string.Empty
             : string.Empty;
 
+    /// <summary>
+    /// Подсказка кнопки «Конфигуратор» (issue #180): для базы на веб-сервере
+    /// сообщает, что Конфигуратор недоступен; иначе — название запуска и хоткей.
+    /// </summary>
+    public string ConfiguratorLaunchToolTip
+    {
+        get
+        {
+            if (SelectedInfobase is not { } infobase)
+                return LocalizationManager.T("Main.SelectInfobaseHint");
+            if (!ConfiguratorAvailability.IsConfiguratorAvailable(infobase))
+                return LocalizationManager.T("Main.ConfiguratorUnavailableWeb");
+
+            var launch = LocalizationManager.T("Main.LaunchConfiguratorShort");
+            return string.IsNullOrWhiteSpace(HotkeyConfigurator) ? launch : $"{launch} ({HotkeyConfigurator})";
+        }
+    }
+
     public string HotkeyEdit => _settings.HotkeyEdit;
     public string HotkeyAdd => _settings.HotkeyAdd;
     public string HotkeyFavorite => _settings.HotkeyFavorite;
@@ -614,6 +632,8 @@ public partial class MainViewModel : ViewModelBase
 
         OnPropertyChanged(nameof(HotkeyEnterprise));
         OnPropertyChanged(nameof(HotkeyConfigurator));
+        // Issue #180: в подсказке кнопки «Конфигуратор» показывается хоткей.
+        OnPropertyChanged(nameof(ConfiguratorLaunchToolTip));
         // Производные хоткеи запуска (issue #48): Ctrl/Shift + основной хоткей.
         OnPropertyChanged(nameof(HotkeyEnterpriseWithParams));
         OnPropertyChanged(nameof(HotkeyEnterpriseWithAuth));

@@ -69,8 +69,16 @@ public sealed class Issue152SettingsLayoutTests
         Assert.Equal(3, Count(source, "\"Settings.MenuEditing.Enabled\""));
         Assert.Contains("MenuSettingsRow(", source, StringComparison.Ordinal);
         Assert.Contains("MenuEditButton(", source, StringComparison.Ordinal);
+        // Issue #174 (1.0.1.129): фиксированная колонка 210 DIP убрана — переключатель
+        // растягивается на всю строку (дорожка у правого края), а строка «кнопка + описание»
+        // строится по шаблону «Auto,*».
+        Assert.DoesNotContain("new ColumnDefinitions(\"210,*\")", source, StringComparison.Ordinal);
         Assert.Contains(
-            "ColumnDefinitions = new ColumnDefinitions(\"210,*\")",
+            "check.HorizontalAlignment = HorizontalAlignment.Stretch",
+            source,
+            StringComparison.Ordinal);
+        Assert.Contains(
+            "ColumnDefinitions = new ColumnDefinitions(\"Auto,*\")",
             source,
             StringComparison.Ordinal);
     }

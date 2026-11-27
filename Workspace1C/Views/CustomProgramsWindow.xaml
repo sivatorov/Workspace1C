@@ -6,7 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         Title="{loc:Loc Launch.CustomPrograms.Title}"
         Icon="{StaticResource AppIcon}"
-        Width="900" Height="600" MinWidth="760" MinHeight="440"
+        Width="900" Height="700" MinWidth="760" MinHeight="400"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontSize="13"
         KeyDown="OnWindowKeyDown"
         Background="{DynamicResource ContentBackgroundBrush}">

@@ -1354,6 +1354,21 @@ namespace Workspace1C
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
+            // Разделитель полосы заголовка (issue #179): рисуется ОВЕРЛЕЕМ внутри высоты
+            // полосы, а не через BorderThickness у _titleBarBorder. Раньше нижняя граница
+            // входила в Height и «съедала» 1 DIP контента — кнопки (высота = высоте полосы)
+            // обрезались, а шапка главного окна выглядела ниже дочерних (у тех границы нет).
+            var titleSeparator = new Border
+            {
+                Height = 1,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                IsHitTestVisible = false
+            };
+            ThemeBrushes.Bind(titleSeparator, Border.BackgroundProperty, "BorderColorBrush");
+            Grid.SetColumnSpan(titleSeparator, 2);
+            grid.Children.Add(titleSeparator);
+
             var left = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -1376,7 +1391,8 @@ namespace Workspace1C
             // (App.axaml.cs:213-215), как в UpdateWindowTitle версии для Windows.
             _appTitleText = new TextBlock
             {
-                FontSize = UiMetrics.ScaledFont(13),
+                // Размер и насыщенность — общие с дочерними окнами (issue #179).
+                FontSize = UiMetrics.TitleBarFontSize,
                 FontWeight = FontWeight.SemiBold,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -1398,7 +1414,9 @@ namespace Workspace1C
             _titleBarBorder = new Border
             {
                 Child = grid,
-                BorderThickness = new Thickness(0, 0, 0, 1),
+                // Нижняя граница — отдельный оверлей (titleSeparator) внутри полосы:
+                // BorderThickness входил в Height и обрезал кнопки (issue #179).
+                BorderThickness = new Thickness(0),
                 // Высота шапки — единая метрика (issue #179): как у диалогов
                 // (ModalWindowBase.BuildTitleStrip) и как у WPF-окон. Кнопки окна
                 // имеют ту же высоту, поэтому центрируются по полосе без смещения

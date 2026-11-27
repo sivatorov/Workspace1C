@@ -117,8 +117,10 @@ public static class ProcessRunner
         CancellationToken ct = default)
     {
         // null → сырое чтение байтов + эвристика ConsoleOutputDecoder (issue #83).
+        // Issue #178: при сыром чтении кодировка НЕ задаётся вовсе — не подставляем
+        // принудительно Encoding.UTF8 (иначе вывод OEM-утилит снова стал бы «кракозябрами»).
         var rawReading = outputEncoding is null;
-        var encoding = outputEncoding ?? ConsoleOutputEncoding() ?? Encoding.UTF8;
+        var encoding = rawReading ? null : outputEncoding ?? ConsoleOutputEncoding() ?? Encoding.UTF8;
         var psi = new ProcessStartInfo
         {
             FileName = fileName,
@@ -131,7 +133,7 @@ public static class ProcessRunner
             RedirectStandardInput = true,
             CreateNoWindow = true
         };
-        if (!rawReading)
+        if (!rawReading && encoding is not null)
         {
             psi.StandardOutputEncoding = encoding;
             psi.StandardErrorEncoding = encoding;

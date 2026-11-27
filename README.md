@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.128-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.129-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,19 +8,59 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.128**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.129**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 607 722 байт (81.6 MB) | `FileVersion` = `1.0.1.128` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 895 207 байт (51.4 MB) | `1.0.1.128` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 719 860 байт (81.7 МБ) | `FileVersion`/`ProductVersion` = `1.0.1.129` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 54 005 228 байт (51.5 МБ) | `1.0.1.129` |
 
-> Размеры — фактические размеры ассетов опубликованного релиза `v1.0.1.128`
-> (`Workspace1C.exe` и `Workspace1C-linux-x64`), пересобранных CI workflow «Публикация
-> релиза», а не локальных сборок; `FileVersion`/`ProductVersion` Windows-файла —
-> `1.0.1.128`. Побайтовое совпадение single-file сборок между запусками не гарантируется.
+> Размеры ассетов релиза `v1.0.1.129` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
+> зафиксированы по локальной сборке `build-windows-single-file.ps1` /
+> `build-linux-single-file.ps1 -Configuration Release` (логи —
+> [`docs/_t8_build_win_129.log`](docs/_t8_build_win_129.log),
+> [`docs/_t8_build_linux_129.log`](docs/_t8_build_linux_129.log)). Windows-файл:
+> `FileVersion` = `1.0.1.129`, `ProductVersion` = `1.0.1.129+21cb47cc`,
+> `"proModules": true`; Linux-файл — ELF x64 self-contained. Побайтовое совпадение
+> single-file сборок между запусками не гарантируется.
+
+### Что нового в 1.0.1.129
+
+- **#180 — кнопка «Конфигуратор» для баз на веб-сервере.** Для баз с типом подключения
+  `WebServer` команды запуска Конфигуратора неактивны, а подсказка объясняет причину —
+  как в штатном стартере 1С (Windows и Linux).
+  ([issue #180](https://github.com/sivatorov/Workspace1C/issues/180))
+- **#179 — единая полоса заголовка главного и дочерних окон.** Системные кнопки
+  «свернуть/развернуть/закрыть» не обрезаны и не смещены, высота шапки, вертикальное
+  центрирование, правый отступ и стиль шрифта одинаковы у всех окон, включая компактный
+  режим (Windows и Linux).
+  ([issue #179](https://github.com/sivatorov/Workspace1C/issues/179))
+- **#178 — «Мои программы»: запуск от имени администратора.** Исправлены «кракозябры»
+  (вывод `runas.exe` и файл `custom_programs.json` декодируются как UTF-8 с fallback на
+  cp866/cp1251) и высота диалога — 700/400 DIP: блок «Запускать от имени администратора»
+  и поле учётной записи помещаются без прокрутки при открытии (Windows и Linux).
+  ([issue #178](https://github.com/sivatorov/Workspace1C/issues/178))
+- **#175 п.7 — вкладка «Логирование» в Linux как в Windows.** Галочка слева от подписи
+  (общий выключатель, категории и «Диагностика СУБД» — `CheckBox`, а не тумблер с дорожкой
+  справа), а вертикальный скроллбар больше не наезжает на правую границу карточек-групп —
+  правый отступ содержимого увеличен до 24 DIP (только Linux/Avalonia).
+  ([issue #175](https://github.com/sivatorov/Workspace1C/issues/175))
+- **#174 — единый правый отступ и выравнивание переключателей в настройках Linux.**
+  Правый отступ содержимого доведён до единого значения на всех вкладках и подвкладках
+  (36 DIP плюс внешнее поле вкладки), а галочки-переключатели выровнены по правому краю:
+  строка меню «Утилиты» больше не держит тумблер в колонке фиксированной ширины 210 DIP
+  (только Linux/Avalonia).
+  ([issue #174](https://github.com/sivatorov/Workspace1C/issues/174))
+- **#143 — «Резервные копии СУБД»: кодировки и права на каталог.** Исправлены «кракозябры»
+  вывода `pg_dump`/`sqlcmd`/`pg_isready` (вывод читается сырыми байтами и декодируется как
+  UTF-8 → cp866/cp1251) и добавлена понятная диагностика прав на каталог копий: перед
+  копией выполняется пробная запись, а при отказе в доступе показывается сообщение с путём,
+  причиной и рекомендацией выбрать каталог с правами записи или запустить программу от
+  имени администратора; пробный/недописанный файл не остаётся, дамп не запускается, окно
+  остаётся отзывчивым (Windows и Linux).
+  ([issue #143](https://github.com/sivatorov/Workspace1C/issues/143))
 
 В 1.0.1.128: единая высота полосы заголовка главного и дочерних окон с центрированными
 системными кнопками и единым правым отступом (issue #179), сохранение фильтров диалога

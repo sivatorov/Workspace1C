@@ -113,12 +113,17 @@ public partial class MainViewModel : ViewModelBase
         ShowRecentCommand = new RelayCommand(() => IsListModeRecent = true);
         ShowRunningCommand = new RelayCommand(() => IsListModeRunning = true);
         LaunchEnterpriseCommand = new RelayCommand(_ => Launch(_launchVm.LaunchCommand, LaunchKind.Enterprise), _ => SelectedInfobase is not null);
-        LaunchConfiguratorCommand = new RelayCommand(_ => Launch(_launchVm.LaunchCommand, LaunchKind.Configurator), _ => SelectedInfobase is not null);
+        // Issue #180: для базы на веб-сервере Конфигуратор недоступен (как в штатном стартере 1С).
+        LaunchConfiguratorCommand = new RelayCommand(_ => Launch(_launchVm.LaunchCommand, LaunchKind.Configurator),
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         LaunchEnterpriseWithParamsCommand = new RelayCommand(_ => LaunchWithParams(LaunchKind.Enterprise), _ => SelectedInfobase is not null);
         LaunchEnterpriseWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Enterprise), _ => SelectedInfobase is not null);
-        LaunchConfiguratorWithParamsCommand = new RelayCommand(_ => LaunchWithParams(LaunchKind.Configurator), _ => SelectedInfobase is not null);
+        // Issue #180: все варианты запуска Конфигуратора недоступны для веб-базы.
+        LaunchConfiguratorWithParamsCommand = new RelayCommand(_ => LaunchWithParams(LaunchKind.Configurator),
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         // Запуск Конфигуратора с запросом авторизации (issue #48): SHIFT+хоткей Конфигуратора.
-        LaunchConfiguratorWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Configurator), _ => SelectedInfobase is not null);
+        LaunchConfiguratorWithAuthCommand = new RelayCommand(_ => LaunchWithAuth(LaunchKind.Configurator),
+            _ => ConfiguratorAvailability.IsConfiguratorAvailable(SelectedInfobase));
         EditInfobaseCommand = new RelayCommand(p => EditInfobase(p as Infobase ?? SelectedInfobase), _ => SelectedInfobase is not null);
         AddInfobaseCommand = new RelayCommand(AddInfobase);
         DeleteInfobaseCommand = new RelayCommand(_ => DeleteInfobase(),

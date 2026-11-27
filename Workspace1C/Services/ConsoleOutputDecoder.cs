@@ -97,14 +97,60 @@ public static class ConsoleOutputDecoder
         if (marker866 != marker1251)
             return marker866 ? decoded866 : decoded1251;
 
-        // Неоднозначная метрика (нет замен ни в одном варианте или одинаково):
-        // предпочитаем cp866 — фактическую кодировку консоли 1С в русской локали
-        // Windows (до v1.0.1.23 здесь побеждал cp1251 при меньшем числе U+FFFD,
-        // что давало mojibake «шь Їрщыр» вместо «Имя файла» в выводе ring).
-        var bad866 = CountReplacementChars(decoded866);
-        var bad1251 = CountReplacementChars(decoded1251);
-        return SanitizeDecodedText(bad866 <= bad1251 ? decoded866 : decoded1251);
+        // Issue #143 (1.0.1.129): у однобайтовых кодировок cp866/cp1251 символов
+        // замены U+FFFD практически не бывает — прежняя метрика «минимум U+FFFD»
+        // всегда давала ничью и выбирала cp866. Но pg_dump/sqlcmd на русской Windows
+        // в части сборок пишут сообщения в ANSI (cp1251), и такой вывод превращался
+        // в «кракозябры» (cp1251-кириллица, прочитанная как cp866, даёт псевдографику
+        // ─│┌ и т. п.). Поэтому сравниваем кандидатов по «читаемости»: кириллические
+        // буквы — плюс, псевдографика/технические символы cp866 и U+FFFD — минус.
+        // При равенстве (например, чистый ASCII) остаётся cp866 — фактическая
+        // кодировка консоли 1С в русской локали Windows.
+        var score866 = ScoreCandidate(decoded866);
+        var score1251 = ScoreCandidate(decoded1251);
+        return SanitizeDecodedText(score1251 > score866 ? decoded1251 : decoded866);
     }
+
+    /// <summary>
+    /// Оценка «читаемости» варианта декодирования (issue #143, 1.0.1.129): кириллица
+    /// повышает оценку, символы замены и псевдографика/технические символы cp866 —
+    /// понижают. Позволяет отличить корректную кириллицу от mojibake-прочтения
+    /// «чужой» однобайтовой кодировки (cp1251-байты как cp866 и наоборот).
+    /// Internal — юнит-тесты.
+    /// </summary>
+    internal static int ScoreCandidate(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return 0;
+
+        var score = 0;
+        foreach (var ch in text)
+        {
+            if (ch == '\uFFFD')
+                score -= 10;
+            else if (IsCyrillicLetter(ch))
+                score += 2;
+            else if (IsGraphicNoise(ch))
+                score -= 3;
+        }
+        return score;
+    }
+
+    /// <summary>Кириллическая буква (включая Ё/ё).</summary>
+    private static bool IsCyrillicLetter(char ch) =>
+        (ch >= 'А' && ch <= 'я') || ch == 'Ё' || ch == 'ё';
+
+    /// <summary>
+    /// Псевдографика и технические символы, которыми cp866 изображает байты
+    /// кириллицы другой кодировки (cp1251) — признак mojibake.
+    /// </summary>
+    private static bool IsGraphicNoise(char ch) =>
+        (ch >= '\u2500' && ch <= '\u257F') || // Box Drawing
+        (ch >= '\u2580' && ch <= '\u259F') || // Block Elements
+        (ch >= '\u25A0' && ch <= '\u25FF') || // Geometric Shapes
+        (ch >= '\u2190' && ch <= '\u21FF') || // Arrows
+        ch is '\u00A0' or '\u00AD' or '\u00B0' or '\u00B7' or '\u2022' or
+            '\u221A' or '\u2116' or '\u00A4' or '\u00A6' or '\u00A7';
 
     /// <summary>
     /// Убирает из декодированного текста NUL-символы и BOM (U+FEFF) — остатки

@@ -68,6 +68,47 @@ namespace Workspace1C.Controls
         /// <summary>Внутренний отступ управляющих элементов (обычный режим).</summary>
         public const double PaddingControl = 8;
 
+        /// <summary>
+        /// Ширина вертикального скроллбара (DIP). Нужна, чтобы содержимое вкладок
+        /// настроек не уходило под полосу прокрутки (issue #175 п.7).
+        /// </summary>
+        public const double ScrollBarWidth = 12;
+
+        /// <summary>
+        /// Боковой отступ содержимого вкладок настроек (issue #174, 1.0.1.129):
+        /// от него начинается левый край карточек и полей, он же задаёт внешнее
+        /// поле правого края.
+        /// </summary>
+        public const double SettingsSideInset = 12;
+
+        /// <summary>
+        /// Базовый правый запас содержимого вкладок настроек под вертикальный
+        /// скроллбар (issue #175 п.7): 12 — уже существующий боковой отступ, плюс
+        /// ширина скроллбара. Применяется как часть <c>Padding</c> правого края
+        /// <c>ScrollViewer</c>, поэтому полоса прокрутки не наезжает на правую
+        /// границу карточек-групп, а «Резервное копирование» и ширина вкладок
+        /// (260 DIP) не меняются.
+        /// </summary>
+        public const double SettingsContentRightInset = 12 + ScrollBarWidth;
+
+        /// <summary>
+        /// Итоговый правый padding содержимого вкладок настроек (issue #174, 1.0.1.129):
+        /// базовый запас <see cref="SettingsContentRightInset"/> плюс дополнительный
+        /// боковой отступ <see cref="SettingsSideInset"/>. До этой правки часть
+        /// вкладок использовала 0/4/12 DIP, из-за чего правые края галочек и полей
+        /// не совпадали. 36 DIP гарантированно больше прежних 12 DIP и оставляет
+        /// воздух между содержимым и полосой прокрутки.
+        /// </summary>
+        public const double SettingsContentRightPadding = SettingsContentRightInset + SettingsSideInset;
+
+        /// <summary>
+        /// Полный правый отступ содержимого от края вкладки: внешнее поле
+        /// <see cref="SettingsSideInset"/> плюс <see cref="SettingsContentRightPadding"/>.
+        /// Нужен вложенным подвкладкам, у которых нет собственного внешнего поля,
+        /// чтобы их правый край совпадал с правым краем обычных вкладок.
+        /// </summary>
+        public const double SettingsContentTotalRightInset = SettingsSideInset + SettingsContentRightPadding;
+
         // ---- Компактный режим ----
         private static bool _compact;
         /// <summary>
@@ -225,15 +266,35 @@ namespace Workspace1C.Controls
         /// </summary>
         public static double TitleBarPadV => 0;
 
-        /// <summary>Горизонтальный внутренний отступ шапки окна (он же левый отступ заголовка).</summary>
-        public static double TitleBarPadH => Compact ? 8 : 12;
+        /// <summary>
+        /// Левый внутренний отступ шапки окна (он же левый отступ заголовка).
+        /// Та же метрика, что у диалогов (issue #179), поэтому заголовок главного
+        /// окна начинается там же, где у дочерних. В компактном режиме берётся
+        /// компактный боковой отступ (пропорционально, без «прыжка» на 9.6 DIP).
+        /// </summary>
+        public static double TitleBarLeftInset => Compact
+            ? Themes.WindowChromeMetrics.CompactTitleBarSideInset
+            : Themes.WindowChromeMetrics.TitleBarLeftInset;
+
+        /// <summary>Горизонтальный внутренний отступ шапки окна (равен левому отступу).</summary>
+        public static double TitleBarPadH => TitleBarLeftInset;
+
+        /// <summary>
+        /// Размер шрифта заголовка окна (issue #179): общий для главного и дочерних
+        /// окон, поэтому стиль подписи шапки не расходится. В компактном режиме
+        /// уменьшается тем же коэффициентом, что и остальной текст.
+        /// </summary>
+        public static double TitleBarFontSize =>
+            ScaledFont(Themes.WindowChromeMetrics.TitleBarFontSize);
 
         /// <summary>
         /// Правый отступ группы кнопок управления окном (issue #179): одинаков у
         /// главного окна и диалогов, чтобы кнопки не выглядели смещёнными вправо.
+        /// В компактном режиме — компактный боковой отступ, как и слева.
         /// </summary>
-        public static double WindowButtonRightInset =>
-            Scaled(Themes.WindowChromeMetrics.WindowButtonRightInset);
+        public static double WindowButtonRightInset => Compact
+            ? Themes.WindowChromeMetrics.CompactTitleBarSideInset
+            : Themes.WindowChromeMetrics.WindowButtonRightInset;
 
         /// <summary>Минимальная ширина правой панели сведений.</summary>
         public static double RightPanelMin => Compact ? 200 : 280;

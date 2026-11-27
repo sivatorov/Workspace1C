@@ -466,9 +466,14 @@ public sealed class MetadataExplorerSearchTests : IDisposable
         vm.SearchText = "заказ";
         Assert.False(vm.IsSearchActive);
 
-        await Task.Delay(500); // больше SearchDebounceMs (300)
+        // Ждём срабатывания debounce опросом, а не фиксированной паузой: под нагрузкой
+        // полного прогона таймер Task.Delay может сработать заметно позже 300 мс,
+        // и жёсткий Task.Delay(500) давал ложные падения (flaky).
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!vm.IsSearchActive && DateTime.UtcNow < deadline)
+            await Task.Delay(25);
 
-        Assert.True(vm.IsSearchActive);
+        Assert.True(vm.IsSearchActive, "Поиск после debounce не применился за 10 с.");
         Assert.Equal(1, vm.SearchResultsCount);
         Assert.True(FindObject(vm, "ЗаказКлиента")!.IsMatch);
     }
