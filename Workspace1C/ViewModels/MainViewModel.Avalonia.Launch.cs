@@ -761,124 +761,43 @@ public partial class MainViewModel : ViewModelBase
 
         infobase.IsPinned = !infobase.IsPinned;
         SaveSilently();
+        // Закрепление меняет GroupSortOrder и порядок строк в плоских списках
+        // «Избранное»/«Недавние»: их кэши сбрасываем, чтобы при переключении вкладки
+        // список построился заново. Текущее дерево при этом не пересобирается (issue #173).
+        _listFilter.Invalidate();
         UpdatePinnedSection(infobase);
     }
 
     /// <summary>
-    /// Точечно обновляет узел «Закреплённые», как это делает WPF-версия
-    /// (ApplyPinToggle / UpdatePinnedSection): полная пересборка дерева здесь
-    /// стоила бы пересоздания всех строк и потери выделения. Узел правится
-    /// всегда, а в видимый список попадает только когда он там уместен:
-    /// AllGroupNodes переживает и фильтр, и отключение группировки, и после
-    /// возврата к группам список берётся именно оттуда.
+    /// Точечно обновляет узел «Закреплённые» (issue #173) в постоянном наборе корней
+    /// <see cref="AllGroupNodes"/>. Набор переживает и фильтр, и отключение группировки,
+    /// поэтому закрепление из «Недавних»/«Избранного» сразу видно при возврате к группам —
+    /// без перезапуска и без полной пересборки дерева (выделение и прокрутка целы).
     /// </summary>
     private void UpdatePinnedSection(Infobase infobase)
     {
-        var pinned = AllGroupNodes.FirstOrDefault(node => node.Group is null
-            && string.Equals(node.Marker, GroupNodeViewModel.PinnedMarker, StringComparison.Ordinal));
+        // Сначала возвращаем строку на место в её группе (закреплённые идут первыми,
+        // GroupSortOrder), затем точечно правим узел «Закреплённые» — общий код с WPF.
+        PinnedSectionSync.SortOwningNode(AllGroupNodes, infobase, ApplyCurrentSort, _showEmptyGroups);
+        PinnedSectionSync.Apply(
+            AllGroupNodes,
+            infobase,
+            CreatePinnedNode,
+            _showEmptyGroups,
+            ApplyCurrentSort);
 
-        // Закрепление меняет и порядок внутри своей группы: закреплённые идут
-        // первыми (GroupSortOrder). Без этого строка осталась бы на прежнем
-        // месте до следующей полной пересборки.
-        SortOwningNode(infobase);
-
-        if (infobase.IsPinned)
-        {
-            if (pinned is null)
-            {
-                pinned = new GroupNodeViewModel(null, marker: GroupNodeViewModel.PinnedMarker);
-                pinned.Infobases.Add(infobase);
-                pinned.PopulateItems(_showEmptyGroups);
-                ApplyExpandedState(pinned);
-                SubscribeExpandedTracking(pinned);
-                AllGroupNodes.Insert(0, pinned);
-                // Стабильный набор корней (issue #21, Этап F): узел всегда в GroupNodes,
-                // видимость применяет ApplyStableRoots (в плоском режиме скрыт).
-                ApplyStableRoots(IsFilterModeActive() || !_groupByGroup);
-                return;
-            }
-
-            if (!pinned.Infobases.Contains(infobase))
-            {
-                pinned.Infobases.Add(infobase);
-                SortNodeInfobases(pinned);
-                pinned.PopulateItems(_showEmptyGroups);
-            }
-            else
-            {
-                pinned.NotifyCountChanged();
-            }
-
-            return;
-        }
-
-        if (pinned is null)
-            return;
-
-        pinned.Infobases.Remove(infobase);
-        if (pinned.Infobases.Count > 0)
-        {
-            pinned.PopulateItems(_showEmptyGroups);
-            return;
-        }
-
-        // Узел «Закреплённые» опустел — узел уничтожается: отписываем от коллекций
-        // (issue #21, эксперимент A 1.0.0.34), затем удаляем из обоих списков.
-        pinned.Detach();
-        AllGroupNodes.Remove(pinned);
+        // Стабильный набор корней (issue #21, Этап F): в плоском режиме правится только
+        // скрытый узел, видимым он станет при возврате к группам без пересборки.
         ApplyStableRoots(IsFilterModeActive() || !_groupByGroup);
     }
 
-    /// <summary>
-    /// Переупорядочивает узел, в котором лежит база, кроме служебного узла
-    /// «Закреплённые»: его состав меняется отдельно.
-    /// </summary>
-    private void SortOwningNode(Infobase infobase)
+    /// <summary>Создаёт узел «Закреплённые» с сохранённым состоянием развёрнутости (Avalonia).</summary>
+    private GroupNodeViewModel CreatePinnedNode()
     {
-        foreach (var root in AllGroupNodes)
-        {
-            var owner = FindNodeWith(root, infobase);
-            if (owner is null
-                || string.Equals(owner.Marker, GroupNodeViewModel.PinnedMarker, StringComparison.Ordinal))
-                continue;
-
-            SortNodeInfobases(owner);
-            owner.PopulateItems(_showEmptyGroups);
-            return;
-        }
-    }
-
-    /// <summary>Ищет узел дерева, в списке баз которого лежит указанная база.</summary>
-    private static GroupNodeViewModel? FindNodeWith(GroupNodeViewModel node, Infobase infobase)
-    {
-        if (node.Infobases.Contains(infobase))
-            return node;
-
-        foreach (var child in node.Children)
-        {
-            var found = FindNodeWith(child, infobase);
-            if (found is not null)
-                return found;
-        }
-
-        return null;
-    }
-
-    /// <summary>Переупорядочивает базы узла по текущему полю сортировки.</summary>
-    private void SortNodeInfobases(GroupNodeViewModel node)
-    {
-        var sorted = ApplyCurrentSort(node.Infobases).ToList();
-        node.SetNotificationsSuppressed(true);
-        try
-        {
-            node.Infobases.Clear();
-            foreach (var infobase in sorted)
-                node.Infobases.Add(infobase);
-        }
-        finally
-        {
-            node.SetNotificationsSuppressed(false);
-        }
+        var pinned = new GroupNodeViewModel(null, marker: GroupNodeViewModel.PinnedMarker);
+        ApplyExpandedState(pinned);
+        SubscribeExpandedTracking(pinned);
+        return pinned;
     }
 }
 #endif

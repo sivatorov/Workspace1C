@@ -280,28 +280,7 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         private set
         {
             if (SetProperty(ref _availableSections, value ?? Array.Empty<string>()))
-            {
                 OnPropertyChanged(nameof(HasSections));
-                OnPropertyChanged(nameof(SectionDisplayNames));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Отображаемые имена разделов страницы загрузок (issue #167, 1.0.1.125): к каждому
-    /// названию из <see cref="AvailableSections"/> добавлен локализованный суффикс
-    /// « (раздел)» / « (section)». Используется ТОЛЬКО для отображения в списке разделов;
-    /// значения фильтра (<see cref="AvailableSections"/>/<see cref="SelectedSection"/>) и
-    /// подписи файлов остаются исходными — суффикса в них нет.
-    /// </summary>
-    public IReadOnlyList<string> SectionDisplayNames
-    {
-        get
-        {
-            var suffix = LocalizationManager.T("PlatformDownload.SectionSuffix");
-            return _availableSections
-                .Select(section => PlatformSectionDisplayName.Compose(section, suffix))
-                .ToList();
         }
     }
 
@@ -817,20 +796,20 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
 
         // Варианты для целевой ОС: реальный выбор (полный/тонкий клиент, x64/x86, пакеты)
         // вместо единственного «Авто». Рекомендуемый помечен и предвыбран по умолчанию.
-        var options = PlatformDistributionPicker.BuildOptions(files, _isWindows, Is64Bit).ToList();
+        // Issue #167 (1.0.1.126): контрольные суммы/подписи и текстовые описания релиза
+        // (например, файл «checksum») дистрибутивами не являются и в список не попадают.
+        var options = PlatformDistributionPicker.BuildOptions(files, _isWindows, Is64Bit)
+            .Where(o => !PlatformDistributionPicker.IsNonDistributionFile(o.File.FileName))
+            .ToList();
 
-        // Issue #167: подпись файла в окне скачивания — только раздел, разрядность
-        // (где есть) и имя файла, без «Полный клиент (rar)»/«Пакет deb»: тип часто
-        // не соответствует содержимому. Часть, уже выбранную галочкой, не дублируем.
-        // 1.0.1.125: суффикс « (раздел)» к подписи файла НЕ добавляется — раздел в
-        // списке уже отделён строкой-разделителем, пометка нужна только названиям
-        // разделов (SectionDisplayNames и заголовки групп).
+        // Issue #167 (1.0.1.126): имя раздела к подписи файла НЕ добавляется вообще —
+        // раздел в списке уже отделён строкой-разделителем и выбирается в списке
+        // разделов. Разрядность показывается только когда её учёт выключен.
         foreach (var option in options)
         {
             option.DisplayNameOverride = PlatformFileDisplayName.Compose(
                 option.File,
-                includeArchitecture: !_filterByArchitecture,
-                includeSection: !_filterBySection);
+                includeArchitecture: !_filterByArchitecture);
         }
 
         // Issue #167: сортировка списка по итоговой строке (OrdinalIgnoreCase);
@@ -847,8 +826,9 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
 
         // Группировка по заголовкам страницы релиза (issue #330 п.2/#334 п.2):
         // порядок групп/файлов как на странице, фолбэк-группа «Файлы релиза».
-        // Issue #167 (1.0.1.125): пометка « (раздел)» добавляется к заголовкам
-        // групп-разделов (жирная/цветная строка-разделитель), но не к подписям файлов.
+        // Issue #167 (1.0.1.126): пометка « (раздел)» добавляется к заголовкам
+        // групп-разделов (жирная/цветная строка-разделитель), но не к подписям файлов;
+        // пустая фолбэк-группа «Файлы релиза» не выводится.
         var groups = PlatformFileGroupViewModel.Build(
             options, LocalizationManager.T("PlatformDownload.Group.Default"),
             LocalizationManager.T("PlatformDownload.SectionSuffix"));
@@ -1140,6 +1120,8 @@ public sealed class PlatformFileGroupViewModel
     /// <paramref name="defaultGroupTitle"/>. Чистый метод, покрыт юнит-тестами.
     /// <paramref name="sectionSuffix"/> (issue #167, 1.0.1.125) добавляется только к
     /// заголовкам настоящих разделов — фолбэк-группа «Файлы релиза» остаётся без пометки.
+    /// Не-дистрибутивы (контрольные суммы/подписи, например <c>checksum</c>) в группы
+    /// не попадают, а пустая фолбэк-группа не выводится (issue #167, 1.0.1.126).
     /// </summary>
     public static IReadOnlyList<PlatformFileGroupViewModel> Build(
         IReadOnlyList<PlatformDistributionOption> options, string defaultGroupTitle,
@@ -1160,6 +1142,12 @@ public sealed class PlatformFileGroupViewModel
         var isSection = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var option in options)
         {
+            // Issue #167 (1.0.1.126): контрольные суммы/подписи и текстовые описания
+            // релиза не являются дистрибутивами — в списке файлов их быть не должно.
+            if (option?.File is null ||
+                PlatformDistributionPicker.IsNonDistributionFile(option.File.FileName))
+                continue;
+
             var hasSection = !string.IsNullOrWhiteSpace(option.File.Group);
             var key = hasSection ? option.File.Group!.Trim() : fallback;
             if (!byGroup.TryGetValue(key, out var list))
@@ -1175,6 +1163,10 @@ public sealed class PlatformFileGroupViewModel
 
         foreach (var key in order)
         {
+            // Пустая фолбэк-группа «Файлы релиза» не выводится (issue #167, 1.0.1.126).
+            if (byGroup[key].Count == 0)
+                continue;
+
             var title = isSection[key]
                 ? PlatformSectionDisplayName.Compose(key, sectionSuffix)
                 : key;

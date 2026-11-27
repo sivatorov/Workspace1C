@@ -361,6 +361,8 @@ namespace Workspace1C
             var sectionLabel = MakeLabel(T("PlatformDownload.Section"));
             sectionPanel.Children.Add(sectionLabel);
 
+            // Issue #167 (1.0.1.126): в списке выбора раздела показываются исходные
+            // названия разделов без пометки « (раздел)».
             var sectionBox = new ComboBox
             {
                 MinWidth = 150,
@@ -369,14 +371,6 @@ namespace Workspace1C
                 ItemsSource = _viewModel.AvailableSections,
                 SelectedItem = _viewModel.SelectedSection
             };
-            // Issue #167 (1.0.1.125): элементы списка разделов показываются с пометкой
-            // « (раздел)», а SelectedItem/фильтр — исходные строки без суффикса.
-            sectionBox.ItemTemplate = new FuncDataTemplate<string>((section, _) => new TextBlock
-            {
-                Text = PlatformSectionDisplayName.Compose(
-                    section, T("PlatformDownload.SectionSuffix")),
-                VerticalAlignment = VerticalAlignment.Center
-            }, true);
             sectionBox.Bind(ComboBox.IsEnabledProperty,
                 new Avalonia.Data.Binding(nameof(PlatformDownloadViewModel.FilterBySection)) { Source = _viewModel });
             sectionBox.SelectionChanged += (_, _) =>

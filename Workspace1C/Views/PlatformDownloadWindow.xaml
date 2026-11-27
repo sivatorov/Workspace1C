@@ -18,9 +18,6 @@
 
     <Window.Resources>
         <win:PlatformDownloadTypeToTextConverter x:Key="DownloadTypeConv"/>
-        <!-- issue #167 (1.0.1.125): пометка « (раздел)» только у названий разделов,
-             подписи файлов и значение фильтра SelectedSection остаются исходными. -->
-        <win:PlatformSectionDisplayNameConverter x:Key="SectionNameConv"/>
         <!-- issue #167: строка выбора раздела видима только при наличии разделов (HasSections). -->
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
 
@@ -171,20 +168,13 @@
                             <TextBlock Text="{loc:Loc PlatformDownload.Section}"
                                        VerticalAlignment="Center" Margin="0,0,8,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"/>
-                            <!-- issue #167 (1.0.1.125): элементы списка разделов показываются
-                                 с пометкой « (раздел)», а SelectedItem/фильтр — исходные строки. -->
+                            <!-- issue #167 (1.0.1.126): в списке выбора раздела показываются
+                                 исходные названия разделов без пометки « (раздел)». -->
                             <ComboBox MinWidth="150" Height="30"
                                       HorizontalAlignment="Left" VerticalContentAlignment="Center"
                                       ItemsSource="{Binding AvailableSections}"
                                       SelectedItem="{Binding SelectedSection, Mode=TwoWay}"
-                                      IsEnabled="{Binding FilterBySection}">
-                                <ComboBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Converter={StaticResource SectionNameConv}}"
-                                                   VerticalAlignment="Center"/>
-                                    </DataTemplate>
-                                </ComboBox.ItemTemplate>
-                            </ComboBox>
+                                      IsEnabled="{Binding FilterBySection}"/>
                         </StackPanel>
                     </StackPanel>
 

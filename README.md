@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.125-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.126-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,23 +8,27 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.125**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.126**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 599 766 байт (81.6 MB) | `FileVersion` = `1.0.1.125` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 889 319 байт (51.4 MB) | `1.0.1.125` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 709 078 байт (81.7 MB) | `FileVersion` = `1.0.1.126` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 996 716 байт (51.5 MB) | `1.0.1.126` |
 
-> Размеры соответствуют ассетам релиза
-> [v1.0.1.125](https://github.com/sivatorov/Workspace1C/releases/tag/v1.0.1.125)
-> (пересборка из коммита релиза `009e77e1`). Локальная сборка из рабочего дерева дала
-> 85 708 123 и 53 996 012 байт соответственно — побайтовое совпадение single-file сборок
-> между запусками не гарантируется.
+> Размеры соответствуют ассетам релиза `v1.0.1.126` (`Workspace1C.exe` и
+> `Workspace1C-linux-x64`), `FileVersion`/`ProductVersion` Windows-файла — `1.0.1.126`.
+> Побайтовое совпадение single-file сборок между запусками не гарантируется.
 
-Полный прогон тестов 1.0.1.125: **8404 теста, 0 падений, 0 пропущено** (4 m 33 s).
-Команды сборки, логи и проверки — в [`docs/_build_summary_101125.md`](docs/_build_summary_101125.md).
+В 1.0.1.126: разделы и подписи файлов при скачивании платформы (issue #167 — имя
+раздела больше не дописывается к имени файла, в списке выбора раздела нет пометки
+« (раздел)», отсеиваются checksum/hash-файлы, пустая фолбэк-группа «Файлы релиза»
+скрыта) и мгновенное отражение закрепления баз во всех вкладках (issue #173, общий
+helper `PinnedSectionSync`, паритет WPF/Avalonia).
+
+Полный прогон тестов 1.0.1.126: **8427 тестов, 0 падений, 0 пропущено** (3 m 22 s).
+Команды сборки, логи и проверки — в [`docs/_t3_full_test_126.log`](docs/_t3_full_test_126.log).
 
 Windows-бинарь собирается штатным `build-windows-single-file.ps1 -Configuration Release`
 с модулями ПРО; после сборки выполняются smoke-проверки `Workspace1C.exe --list` и

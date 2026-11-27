@@ -2341,77 +2341,60 @@ public string HotkeyEnterprise
     private void ApplyPinToggle(Infobase infobase)
     {
         infobase.IsPinned = !infobase.IsPinned;
+        // Закрепление меняет GroupSortOrder и порядок строк в плоских списках
+        // «Избранное»/«Недавние»: их кэши сбрасываем, чтобы при переключении вкладки
+        // список построился заново. Текущее дерево при этом не пересобирается (issue #173).
+        _listFilter.Invalidate();
         UpdatePinnedSection(infobase);
         ScheduleSave();
     }
 
     /// <summary>
     /// Добавляет или убирает базу в узле «Закреплённые» без RebuildGroupTree.
+    /// <para>
+    /// Узел правится в кэше дерева «Все» (<c>_groupedTreeCache</c>) ВСЕГДА, независимо
+    /// от активной вкладки (issue #173). Раньше при активном фильтре («Недавние»,
+    /// «Избранное», поиск, тег) метод выходил сразу, кэш «Все» оставался прежним, и
+    /// после возврата на «Все базы» закреплённая база не появлялась в «Закреплённых»
+    /// до перезапуска (кэш переиспользовался без пересборки).
+    /// </para>
+    /// <para>
+    /// Видимость узлов применяет <see cref="ApplyStableRoots"/>: в плоском режиме узел
+    /// «Закреплённые» скрыт, а при возврате к группам станет видимым сразу.
+    /// </para>
     /// </summary>
     private void UpdatePinnedSection(Infobase infobase)
     {
-        // При отключённой группировке или активном временном фильтре
-        // (Избранное / Недавние / тег / поиск) закрепление не отображается —
-        // влияет только на данные и проявится после выхода из режима фильтра.
-        if (!_groupByGroup || IsFilterModeActive())
-        {
-            return;
-        }
-
         // Стабильный набор корней (issue #21, Этап F): узел «Закреплённые» правится в
         // кэше «Все» (_groupedTreeCache), а в GroupNodes он попадает через SyncStableRoots
         // (иначе поштучная синхронизация удалила бы узел, добавленный мимо кэша).
-        var cache = _groupedTreeCache;
-        if (cache is null)
-            return; // кэш «Все» ещё не построен — закрепление проявится при пересборке
+        // Невалидный кэш не трогаем: ближайшая пересборка построит дерево по данным,
+        // где IsPinned уже переключён.
+        if (!_groupedTreeCacheValid || _groupedTreeCache is not { } cache)
+            return;
 
-        var pinned = cache.FirstOrDefault(n => n.Group is null &&
-            string.Equals(n.Marker, GroupNodeViewModel.PinnedMarker, StringComparison.Ordinal));
+        // Сначала возвращаем строку на место в её группе (закреплённые идут первыми),
+        // затем точечно правим узел «Закреплённые» — общий код с Avalonia (issue #173).
+        PinnedSectionSync.SortOwningNode(cache, infobase, ApplyCurrentSort, _showEmptyGroups);
+        PinnedSectionSync.Apply(
+            cache,
+            infobase,
+            CreatePinnedNode,
+            _showEmptyGroups,
+            ApplyCurrentSort);
 
-        if (infobase.IsPinned)
-        {
-            if (pinned is null)
-            {
-                pinned = new GroupNodeViewModel(
-                    null,
-                    marker: GroupNodeViewModel.PinnedMarker,
-                    defaultColor: _pinnedColor,
-                    defaultIconColor: _pinnedIconColor,
-                    defaultIcon: _pinnedIcon) { IsExpanded = true };
-                pinned.Infobases.Add(infobase);
-                pinned.PopulateItems(); // NotifyCountChanged внутри
-                cache.Insert(0, pinned);
-                ApplyStableRoots(flatMode: false);
-                return;
-            }
-
-            if (!pinned.Infobases.Contains(infobase))
-            {
-                pinned.Infobases.Add(infobase);
-                pinned.PopulateItems();
-            }
-            else
-            {
-                pinned.NotifyCountChanged();
-            }
-        }
-        else if (pinned is not null)
-        {
-            pinned.Infobases.Remove(infobase);
-            if (pinned.Infobases.Count == 0)
-            {
-                // Узел «Закреплённые» опустел (issue #21, эксперимент A 1.0.0.34):
-                // отписываем от коллекций перед удалением из кэша.
-                pinned.Detach();
-                cache.Remove(pinned);
-                ApplyStableRoots(flatMode: false);
-            }
-            else
-            {
-                pinned.PopulateItems();
-            }
-        }
+        // В плоском режиме (фильтр/поиск/без группировки) правится только скрытый узел:
+        // он станет видимым при возврате к группам без пересборки.
+        ApplyStableRoots(flatMode: !_groupByGroup || IsFilterModeActive());
     }
+
+    /// <summary>Создаёт узел «Закреплённые» с сохранённым оформлением (WPF).</summary>
+    private GroupNodeViewModel CreatePinnedNode() => new(
+        null,
+        marker: GroupNodeViewModel.PinnedMarker,
+        defaultColor: _pinnedColor,
+        defaultIconColor: _pinnedIconColor,
+        defaultIcon: _pinnedIcon) { IsExpanded = true };
 
     /// <summary>
     /// Откладывает сохранение списка баз (debounce), чтобы серия быстрых кликов

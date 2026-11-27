@@ -398,6 +398,7 @@ public static class OneCPlatformCatalogParser
             // «/transfer_file?…path=Distr%2Ffile.deb» без этого guard давал бы мусорную
             // запись «transfer_file» — расширение в нём находится в query, а не в пути.
             if (string.IsNullOrWhiteSpace(fileName) ||
+                PlatformDistributionPicker.IsNonDistributionFile(fileName) ||
                 ClassifyKind(fileName) == PlatformDistributionKind.Other)
                 continue;
             if (!seen.Add(url))
@@ -428,6 +429,10 @@ public static class OneCPlatformCatalogParser
 
             var fileName = ExtractFileEndpointFileName(url);
             if (string.IsNullOrWhiteSpace(fileName))
+                continue;
+            // Issue #167 (1.0.1.126): контрольные суммы/подписи и текстовые описания
+            // релиза дистрибутивами не являются и в список файлов не попадают.
+            if (PlatformDistributionPicker.IsNonDistributionFile(fileName))
                 continue;
             if (ClassifyKind(fileName) == PlatformDistributionKind.Other)
                 continue;

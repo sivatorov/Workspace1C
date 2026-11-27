@@ -147,17 +147,13 @@ public sealed class PlatformDistributionOption
 /// платформы 1С» (issue #167). В отличие от <see cref="PlatformDistributionOption.DisplayName"/>
 /// не содержит типа дистрибутива («Полный клиент (rar)», «Пакет deb» и т.п.):
 /// эти «добавки» часто не соответствуют содержимому архива. Подпись состоит только
-/// из раздела страницы, разрядности (где есть) и имени файла:
+/// из разрядности (когда учёт выключен) и имени файла:
 /// <list type="bullet">
-/// <item>обе галочки сняты: «Раздел - x64 - имя_файла»;</item>
-/// <item>учёт разрядности включён: «Раздел - имя_файла»;</item>
-/// <item>учёт раздела включён: «x64 - имя_файла»;</item>
-/// <item>оба учёта включены: «имя_файла».</item>
+/// <item>учёт разрядности включён: «имя_файла»;</item>
+/// <item>учёт разрядности выключен: «x64 - имя_файла» (если разрядность определена).</item>
 /// </list>
-/// То, что пользователь уже выбрал галочкой, в подписи не дублируется. Пометка
-/// « (раздел)» к названию раздела в подписи файла НЕ добавляется (issue #167,
-/// 1.0.1.125): раздел в списке уже отделён строкой-разделителем, суффикс нужен
-/// только у самих названий разделов (см. <see cref="PlatformSectionDisplayName"/>).
+/// Имя раздела к подписи файла НЕ добавляется (issue #167, 1.0.1.126): раздел в
+/// списке уже отделён строкой-разделителем и выбирается в списке разделов.
 /// </summary>
 public static class PlatformFileDisplayName
 {
@@ -165,25 +161,17 @@ public static class PlatformFileDisplayName
     public const string Separator = " - ";
 
     /// <summary>
-    /// Собирает итоговую подпись файла (issue #167). <paramref name="includeArchitecture"/>
-    /// и <paramref name="includeSection"/> — включать ли соответствующую часть в строку
-    /// (true — галочка фильтра СНЯТА и часть показывается; false — галочка установлена
-    /// и часть уже выбрана, дублировать её не нужно). Отсутствующие части (нет разрядности
-    /// или раздела) пропускаются; имя файла выводится всегда. Подпись файла никогда не
-    /// содержит суффикса « (раздел)» — он применяется только к названиям разделов
-    /// (issue #167, 1.0.1.125).
+    /// Собирает итоговую подпись файла (issue #167). <paramref name="includeArchitecture"/> —
+    /// включать ли разрядность (true — галочка фильтра СНЯТА и разрядность показывается;
+    /// false — галочка установлена и разрядность уже выбрана, дублировать её не нужно).
+    /// Раздел к подписи файла не добавляется вообще (1.0.1.126). Имя файла выводится всегда.
     /// </summary>
-    public static string Compose(
-        PlatformReleaseFile? file,
-        bool includeArchitecture,
-        bool includeSection)
+    public static string Compose(PlatformReleaseFile? file, bool includeArchitecture)
     {
         if (file is null)
             return string.Empty;
 
-        var parts = new List<string>(3);
-        if (includeSection && !string.IsNullOrWhiteSpace(file.Group))
-            parts.Add(file.Group!.Trim());
+        var parts = new List<string>(2);
         if (includeArchitecture && !string.IsNullOrWhiteSpace(file.Architecture))
             parts.Add(file.Architecture!.Trim());
         if (!string.IsNullOrWhiteSpace(file.FileName))
@@ -228,6 +216,40 @@ public static class PlatformDistributionPicker
 
     /// <summary>Разрядность дистрибутива: 32-битная.</summary>
     public const string Arch32 = "x86";
+
+    /// <summary>
+    /// True — имя файла заведомо НЕ является дистрибутивом платформы (issue #167,
+    /// 1.0.1.126): контрольные суммы/подписи и текстовые описания к релизу.
+    /// Отсеиваются имена с <c>checksum</c> (например, файл <c>checksum</c> в разделе
+    /// «Файлы релиза»), расширения контрольных сумм/подписей
+    /// (<c>.md5</c>/<c>.sha1</c>/<c>.sha256</c>/<c>.sha512</c>/<c>.sig</c>/<c>.asc</c>)
+    /// и текстовые файлы-описания (<c>.txt</c>/<c>.md</c>/<c>.hash</c>/<c>.sum</c>),
+    /// если имя не распознано как дистрибутив. Чистый метод — используется парсером
+    /// файлов релиза и слоем отображения (фолбэк-группа «Файлы релиза»).
+    /// </summary>
+    public static bool IsNonDistributionFile(string? fileName)
+    {
+        var name = fileName?.Trim() ?? string.Empty;
+        if (name.Length == 0)
+            return false;
+
+        var lower = name.ToLowerInvariant();
+
+        // Контрольные суммы/подписи и файл «checksum» — это не платформа.
+        if (lower.Contains("checksum"))
+            return true;
+        if (lower.EndsWith(".md5") || lower.EndsWith(".sha1") || lower.EndsWith(".sha256") ||
+            lower.EndsWith(".sha512") || lower.EndsWith(".sig") || lower.EndsWith(".asc"))
+            return true;
+
+        // Текстовые readme/hash-описания (дистрибутивами не являются).
+        if (lower.EndsWith(".txt") || lower.EndsWith(".md") || lower.EndsWith(".hash") ||
+            lower.EndsWith(".sum") || lower.EndsWith(".digest"))
+            return true;
+
+        return lower is "readme" or "hash" or "hashes" or "md5" or "sha1" or "sha256" or "sha512"
+            or "sig" or "asc";
+    }
 
     /// <summary>
     /// Фильтрует файлы релиза по разрядности (issue #330 п.1): остаются файлы
