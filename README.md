@@ -14,14 +14,15 @@
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 723 475 байт (81.8 МБ) | `FileVersion` = `1.0.1.130` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 54 006 509 байт (51.5 МБ) | `1.0.1.130` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 614 938 байт (81.6 МБ) | `FileVersion` = `1.0.1.130` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 901 095 байт (51.4 МБ) | `1.0.1.130` |
 
 > Размеры ассетов релиза `v1.0.1.130` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
-> зафиксированы по локальной сборке `build-windows-single-file.ps1` /
-> `build-linux-single-file.ps1 -Configuration Release` (логи —
-> [`docs/_t5_build_win_130.log`](docs/_t5_build_win_130.log),
-> [`docs/_t6_build_linux_130.log`](docs/_t6_build_linux_130.log)). Windows-файл:
+> зафиксированы по факту публикации релиза (CI пересобирает ассеты из тега
+> `v1.0.1.130`). Локальные сборки `build-windows-single-file.ps1` /
+> `build-linux-single-file.ps1 -Configuration Release` — в логах
+> [`docs/_t5_build_win_130.log`](docs/_t5_build_win_130.log) и
+> [`docs/_t6_build_linux_130.log`](docs/_t6_build_linux_130.log). Windows-файл:
 > `FileVersion` = `1.0.1.130`, `"proModules": true`; Linux-файл — ELF x64
 > self-contained. Побайтовое совпадение single-file сборок между запусками
 > не гарантируется.

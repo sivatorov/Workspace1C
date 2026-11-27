@@ -60,10 +60,10 @@
   - issue #179 — **21 из 21**;
   - issue #174 — **11 из 11**.
 - Ассеты релиза:
-  - `Workspace1C.exe` — Windows x64, self-contained single-file, **85 723 475 байт
-    (81.8 МБ)**, `FileVersion` = `1.0.1.130`, `proModules = true`;
+  - `Workspace1C.exe` — Windows x64, self-contained single-file, **85 614 938 байт
+    (81.6 МБ)**, `FileVersion` = `1.0.1.130`, `proModules = true`;
   - `Workspace1C-linux-x64` — Linux x64, ELF self-contained single-file,
-    **54 006 509 байт (51.5 МБ)**.
+    **53 901 095 байт (51.4 МБ)**.
 
 Issues #181, #179 и #174 не закрываются — автору предлагается подтвердить исправления
 на версии 1.0.1.130.
