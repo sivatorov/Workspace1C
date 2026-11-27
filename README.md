@@ -17,8 +17,8 @@
 | Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 713 417 байт (81.7 MB) | `FileVersion` = `1.0.1.127` |
 | Linux x64 | `dist/linux-x64/Workspace1C` | 53 998 061 байт (51.5 MB) | `1.0.1.127` |
 
-> Размеры соответствуют ассетам релиза `v1.0.1.127` (`Workspace1C.exe` и
-> `Workspace1C-linux-x64`), `FileVersion`/`ProductVersion` Windows-файла — `1.0.1.127`.
+> Размеры — локальные сборки, загруженные в релиз `v1.0.1.127` (`Workspace1C.exe` и
+> `Workspace1C-linux-x64`); `FileVersion`/`ProductVersion` Windows-файла — `1.0.1.127`.
 > Побайтовое совпадение single-file сборок между запусками не гарантируется.
 
 В 1.0.1.127: подписи вынесенных пунктов подменю после смены темы (issue #177),
