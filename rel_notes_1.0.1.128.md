@@ -37,10 +37,10 @@
 - Модули ПРО включены (`"proModules": true` в `--license-info --json`); доступ к функциям
   2.x открывает лицензия.
 
-| Платформа | Ассет | Размер | Версия |
+| Платформа | Ассет | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `Workspace1C.exe` | 85 716 007 байт (81.7 MB) | `FileVersion`/`ProductVersion` = `1.0.1.128` |
-| Linux x64 | `Workspace1C-linux-x64` | 54 002 028 байт (51.5 MB) | `1.0.1.128` |
+| Windows 10/11 x64 | `Workspace1C.exe` | 85 607 722 байт (81.6 MB) | `FileVersion`/`ProductVersion` = `1.0.1.128` |
+| Linux x64 | `Workspace1C-linux-x64` | 53 895 207 байт (51.4 MB) | `1.0.1.128` |
 
 Оба файла — self-contained single-file: установка .NET не требуется.
 

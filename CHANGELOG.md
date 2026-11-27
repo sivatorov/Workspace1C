@@ -46,11 +46,11 @@
 
 - Полный прогон тестов: **8496 тестов, 0 падений, 0 пропущено** (2 m 52 s).
   Лог: [`docs/_t_full_test_128.log`](docs/_t_full_test_128.log).
-- Windows single-file: `dist/win-x64/Workspace1C.exe` — 85 716 007 байт (81.7 MB),
+- Windows single-file: ассет релиза `Workspace1C.exe` — 85 607 722 байт (81.6 MB),
   `FileVersion`/`ProductVersion` = `1.0.1.128`; `--list` и `--license-info --json`
   (`"proModules": true`) — успешно.
-- Linux single-file: `dist/linux-x64/Workspace1C` (ассет `Workspace1C-linux-x64`) —
-  54 002 028 байт (51.5 MB), версия `1.0.1.128`.
+- Linux single-file: ассет релиза `Workspace1C-linux-x64` — 53 895 207 байт (51.4 MB),
+  версия `1.0.1.128`.
 
 ## [1.0.1.127] — 2026-11-27
 
