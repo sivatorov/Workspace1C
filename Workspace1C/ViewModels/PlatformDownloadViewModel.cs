@@ -87,6 +87,12 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
     private IReadOnlyList<string> _availableSections = Array.Empty<string>();
     private string? _selectedSection;
     private bool _filterBySection = true;
+    // Issue #167 (1.0.1.128): сохранённый между сессиями выбор применяется ПОСЛЕ
+    // загрузки каталога и вычисления разделов. Раньше раздел восстанавливался до
+    // загрузки — RefreshSections с пустым списком файлов «терял» его, поэтому
+    // сохранялась только галочка. Теперь намерение хранится здесь и применяется
+    // в RefreshSections, когда разделы уже известны.
+    private SavedDownloadSelection? _pendingRestore;
     private PlatformDownloadType _downloadType;
     private IReadOnlyList<PlatformDownloadType> _availableDownloadTypes = new[] { PlatformDownloadType.Auto };
     private PlatformCatalogNode? _selectedVersionNode;
@@ -734,18 +740,77 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Применяет сохранённый между сессиями выбор (issue #167, 1.0.1.128): галочки
+    /// фильтров, выбранную разрядность, раздел страницы загрузок и тип дистрибутива.
+    /// Вызывается окном ДО загрузки каталога. Галочки/разрядность/тип выставляются
+    /// сразу (без пересчёта — каталог пуст, <see cref="RepickFile"/> обнулил бы выбор),
+    /// а раздел запоминается как намерение и применяется в <see cref="RefreshSections"/>
+    /// после того, как каталог загружен и разделы вычислены. Без этого раздел
+    /// восстанавливался до загрузки и сбрасывался (файлов ещё нет — раздел «исчезал»).
+    /// </summary>
+    public void RestoreSelection(
+        bool filterByArchitecture,
+        bool filterBySection,
+        string? selectedSection,
+        PlatformDownloadType downloadType,
+        bool is64Bit)
+    {
+        var normalizedSection = string.IsNullOrWhiteSpace(selectedSection)
+            ? null
+            : selectedSection!.Trim();
+
+        _pendingRestore = new SavedDownloadSelection(
+            filterByArchitecture, filterBySection, normalizedSection, downloadType, is64Bit);
+
+        // Немедленная часть — напрямую в поля, без RepickFile: раздел применится
+        // в RefreshSections, когда станут известны разделы страницы.
+        SetProperty(ref _filterByArchitecture, filterByArchitecture, nameof(FilterByArchitecture));
+        SetProperty(ref _filterBySection, filterBySection, nameof(FilterBySection));
+        SetProperty(ref _is64Bit, is64Bit, nameof(Is64Bit));
+        SetProperty(ref _downloadType, downloadType, nameof(DownloadType));
+        SetProperty(ref _selectedSection, normalizedSection, nameof(SelectedSection));
+    }
+
+    /// <summary>
     /// Пересчитывает список разделов страницы загрузок из сырых файлов релиза
     /// (issue #167). Если выбранный раздел исчез (сменилась версия/платформа),
     /// выбор сбрасывается и фильтр по разделу снимается — иначе список файлов
     /// остался бы пустым без видимой причины.
     /// 1.0.1.124: если фильтр включён, но раздел ещё не выбран (первая загрузка),
     /// автоматически выбирается первый раздел страницы.
+    /// 1.0.1.128: сохранённый выбор (<see cref="_pendingRestore"/>) применяется здесь,
+    /// когда разделы уже известны; если сохранённого раздела нет в новом каталоге —
+    /// фолбэк на первый раздел, старое значение не «залипает».
     /// </summary>
     private void RefreshSections(IReadOnlyList<PlatformReleaseFile> allFiles)
     {
         var sections = PlatformDistributionPicker.ExtractSections(allFiles);
         if (!sections.SequenceEqual(_availableSections, StringComparer.Ordinal))
             AvailableSections = sections;
+
+        // Issue #167 (1.0.1.128): сохранённый выбор применяется только после того,
+        // как разделы вычислены. Пока разделов нет (каталог ещё грузится или на
+        // странице их нет) — намерение сохраняется и НЕ сбрасывается.
+        if (_pendingRestore is { } pending)
+        {
+            if (sections.Count == 0)
+                return;
+
+            var restored = sections.FirstOrDefault(s =>
+                string.Equals(s, pending.SelectedSection, StringComparison.OrdinalIgnoreCase));
+            if (restored is not null)
+                SetSelectedSectionCore(restored);
+            else if (pending.FilterBySection)
+                SetSelectedSectionCore(sections[0]); // фолбэк: первый раздел
+            else
+                SetSelectedSectionCore(null);
+
+            // Галочка раздела восстанавливается как выбрал пользователь (даже если
+            // сохранённого раздела нет — тогда действует фолбэк на первый раздел).
+            SetFilterBySectionCore(pending.FilterBySection);
+            _pendingRestore = null;
+            return;
+        }
 
         if (_selectedSection is null)
         {
@@ -757,14 +822,18 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         var stillAvailable = sections.Any(s =>
             string.Equals(s, _selectedSection, StringComparison.OrdinalIgnoreCase));
         if (stillAvailable)
+        {
+            // Нормализуем написание под фактический раздел страницы.
+            var actual = sections.First(s =>
+                string.Equals(s, _selectedSection, StringComparison.OrdinalIgnoreCase));
+            if (!string.Equals(actual, _selectedSection, StringComparison.Ordinal))
+                SetSelectedSectionCore(actual);
             return;
+        }
 
         SetSelectedSectionCore(null);
         if (_filterBySection)
-        {
-            _filterBySection = false;
-            OnPropertyChanged(nameof(FilterBySection));
-        }
+            SetFilterBySectionCore(false);
     }
 
     /// <summary>Устанавливает выбранный раздел без запуска пересчёта (внутренние сбросы).</summary>
@@ -773,6 +842,20 @@ public sealed class PlatformDownloadViewModel : ViewModelBase
         var normalized = string.IsNullOrWhiteSpace(section) ? null : section!.Trim();
         SetProperty(ref _selectedSection, normalized, nameof(SelectedSection));
     }
+
+    /// <summary>Устанавливает галочку фильтра по разделу без запуска пересчёта
+    /// (внутренние сбросы/восстановление сохранённого выбора, issue #167, 1.0.1.128).</summary>
+    private void SetFilterBySectionCore(bool value)
+        => SetProperty(ref _filterBySection, value, nameof(FilterBySection));
+
+    /// <summary>Сохранённый между сессиями выбор окна «Скачивание версии платформы»
+    /// (issue #167, 1.0.1.128): намерение применяется после загрузки каталога.</summary>
+    private sealed record SavedDownloadSelection(
+        bool FilterByArchitecture,
+        bool FilterBySection,
+        string? SelectedSection,
+        PlatformDownloadType DownloadType,
+        bool Is64Bit);
 
     /// <summary>Пересчитывает варианты дистрибутива и выбранный файл
     /// (версия + разрядность + тип → файл, issue #330; фильтры issue #167).</summary>

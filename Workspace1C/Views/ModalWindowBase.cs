@@ -848,7 +848,14 @@ namespace Workspace1C
             // Прозрачная заливка обязательна: Border без Background не участвует
             // в проверке попадания, нажатие уходит мимо и окно не таскается
             // (issue #177). Внешний вид от неё не меняется.
-            var strip = new Border { Background = Brushes.Transparent };
+            // Высота полосы — общая метрика (issue #179): ровно как у главного окна
+            // (WPF MainWindow.xaml и Avalonia MainWindow.BuildTitleBar). Кнопки окна
+            // имеют ту же высоту, поэтому занимают полосу целиком и центрированы.
+            var strip = new Border
+            {
+                Background = Brushes.Transparent,
+                Height = UiMetrics.TitleBarHeight
+            };
             strip.PointerPressed += OnTitleStripPointerPressed;
 
             var grid = new Grid();
@@ -858,7 +865,8 @@ namespace Workspace1C
             var title = new TextBlock
             {
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(UiMetrics.Scaled(14), 0, 0, 0),
+                // Левый отступ — общая метрика полосы (issue #179), как в главном окне.
+                Margin = new Thickness(UiMetrics.Scaled(WindowChromeMetrics.TitleBarLeftInset), 0, 0, 0),
                 FontWeight = FontWeight.SemiBold,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 Height = UiMetrics.Scaled(30)
@@ -871,7 +879,10 @@ namespace Workspace1C
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 2,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Правый отступ группы кнопок — как у главного окна (issue #179):
+                // кнопки не «прилипают» к краю и не выглядят смещёнными вправо.
+                Margin = new Thickness(0, 0, UiMetrics.WindowButtonRightInset, 0)
             };
 
             if (SupportsMaximizeButton)
@@ -1674,9 +1685,10 @@ namespace Workspace1C
                 _kind = kind;
 
                 // Ширина далее переопределяется метриками темы (ApplyWindowButtonTheme);
-                // здесь — стартовый размер Fluent. Высота фиксирована высотой заголовка диалога.
+                // здесь — стартовый размер Fluent. Высота — общая метрика полосы
+                // заголовка (issue #179): как у кнопок главного окна, без смещения.
                 Width = UiMetrics.Scaled(40);
-                Height = UiMetrics.Scaled(30);
+                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
                 Padding = new Thickness(0);
                 HorizontalContentAlignment = HorizontalAlignment.Center;
                 VerticalContentAlignment = VerticalAlignment.Center;
@@ -1800,6 +1812,9 @@ namespace Workspace1C
                 _maximizeHoverBg = metrics.MaximizeHover;
                 _cornerRadius = metrics.CornerRadius;
                 Width = UiMetrics.Scaled(metrics.Size);
+                // Высота кнопки = высоте полосы (issue #179): кнопка занимает полосу
+                // целиком и центрирована по вертикали.
+                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
                 var radius = UiMetrics.Scaled(Math.Min(_cornerRadius, CircleDiameter / 2));
                 if (_circle is not null)
                     _circle.CornerRadius = new CornerRadius(radius);

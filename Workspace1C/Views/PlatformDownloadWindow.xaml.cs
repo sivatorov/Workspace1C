@@ -88,15 +88,20 @@ public partial class PlatformDownloadWindow : Window
         // платформы (AppSettings.PlatformIncludeTestVersions, по умолчанию выключена).
         _viewModel.IncludeTestVersions = _settings.PlatformIncludeTestVersions;
 
-        // Issue #167 (1.0.1.127): восстанавливаем последний выбор — галочки фильтров,
-        // раздел и тип дистрибутива запоминаются между сессиями.
-        _viewModel.FilterByArchitecture = _settings.PlatformDownloadFilterByArchitecture;
-        _viewModel.FilterBySection = _settings.PlatformDownloadFilterBySection;
-        if (!string.IsNullOrWhiteSpace(_settings.PlatformDownloadSelectedSection))
-            _viewModel.SelectedSection = _settings.PlatformDownloadSelectedSection;
-        if (Enum.TryParse<Services.PlatformDownloadType>(
-                _settings.PlatformDownloadType, ignoreCase: true, out var savedType))
-            _viewModel.DownloadType = savedType;
+        // Issue #167 (1.0.1.128): восстанавливаем последний выбор — галочки фильтров,
+        // разрядность, раздел и тип дистрибутива. Значения галочек/разрядности/типа
+        // применяются сразу, а раздел — после загрузки каталога и определения разделов
+        // (см. PlatformDownloadViewModel.RestoreSelection/RefreshSections): раньше раздел
+        // восстанавливался до загрузки и сбрасывался, поэтому сохранялась только галочка.
+        _viewModel.RestoreSelection(
+            _settings.PlatformDownloadFilterByArchitecture,
+            _settings.PlatformDownloadFilterBySection,
+            _settings.PlatformDownloadSelectedSection,
+            Enum.TryParse<Services.PlatformDownloadType>(
+                _settings.PlatformDownloadType, ignoreCase: true, out var savedType)
+                ? savedType
+                : Services.PlatformDownloadType.Auto,
+            _settings.PlatformDownloadIs64Bit ?? Environment.Is64BitOperatingSystem);
 
         // Сохранение каталога загрузок в настройки при изменении (после выбора папки/скачивания).
         _viewModel.PropertyChanged += OnViewModel_PropertyChanged;
@@ -170,19 +175,24 @@ public partial class PlatformDownloadWindow : Window
             }
         }
 
-        // Issue #167 (1.0.1.127): последний выбор фильтров, раздела и типа дистрибутива
-        // запоминается между сессиями.
+        // Issue #167 (1.0.1.127/1.0.1.128): последний выбор фильтров, разрядности, раздела
+        // и типа дистрибутива запоминается между сессиями.
         if (e.PropertyName is nameof(PlatformDownloadViewModel.FilterByArchitecture)
             or nameof(PlatformDownloadViewModel.FilterBySection)
             or nameof(PlatformDownloadViewModel.SelectedSection)
-            or nameof(PlatformDownloadViewModel.DownloadType))
+            or nameof(PlatformDownloadViewModel.DownloadType)
+            or nameof(PlatformDownloadViewModel.Is64Bit))
         {
             try
             {
                 _settings.PlatformDownloadFilterByArchitecture = _viewModel.FilterByArchitecture;
                 _settings.PlatformDownloadFilterBySection = _viewModel.FilterBySection;
-                _settings.PlatformDownloadSelectedSection = _viewModel.SelectedSection ?? string.Empty;
+                // Раздел не теряем в настройках, пока каталог не загружен / на странице
+                // нет разделов (issue #167, 1.0.1.128): пишем только при наличии разделов.
+                if (_viewModel.HasSections)
+                    _settings.PlatformDownloadSelectedSection = _viewModel.SelectedSection ?? string.Empty;
                 _settings.PlatformDownloadType = _viewModel.DownloadType.ToString();
+                _settings.PlatformDownloadIs64Bit = _viewModel.Is64Bit;
                 _repository.SaveSettings(_settings);
             }
             catch

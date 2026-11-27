@@ -211,12 +211,29 @@ namespace Workspace1C.Controls
         public static double RowMarginV => Compact ? 0.5 : 1;
 
         /// <summary>
-        /// Вертикальный внутренний отступ шапки окна (собственный заголовок вместо
-        /// системного): компактный режим уменьшает высоту заголовка окна (issue #296).
+        /// Высота полосы заголовка окна (issue #179): та же метрика, что у кнопок окна,
+        /// поэтому шапка главного окна и диалогов одинакова по высоте. В компактном
+        /// режиме сжимается вместе с кнопками (issue #296).
         /// </summary>
-        public static double TitleBarPadV => Compact ? 3 : 6;
-        /// <summary>Горизонтальный внутренний отступ шапки окна.</summary>
+        public static double TitleBarHeight => Scaled(Themes.WindowChromeMetrics.TitleBarHeight);
+
+        /// <summary>
+        /// Вертикальный внутренний отступ шапки окна. Ноль: высоту полосы задаёт
+        /// <see cref="TitleBarHeight"/>, а не отступы — иначе шапка главного окна
+        /// снова стала бы выше диалоговой (issue #179). В компактном режиме
+        /// высота уменьшается самой метрикой (issue #296).
+        /// </summary>
+        public static double TitleBarPadV => 0;
+
+        /// <summary>Горизонтальный внутренний отступ шапки окна (он же левый отступ заголовка).</summary>
         public static double TitleBarPadH => Compact ? 8 : 12;
+
+        /// <summary>
+        /// Правый отступ группы кнопок управления окном (issue #179): одинаков у
+        /// главного окна и диалогов, чтобы кнопки не выглядели смещёнными вправо.
+        /// </summary>
+        public static double WindowButtonRightInset =>
+            Scaled(Themes.WindowChromeMetrics.WindowButtonRightInset);
 
         /// <summary>Минимальная ширина правой панели сведений.</summary>
         public static double RightPanelMin => Compact ? 200 : 280;

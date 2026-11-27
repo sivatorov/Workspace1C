@@ -876,7 +876,11 @@ namespace Workspace1C
         {
             var bar = new Border
             {
-                Height = 34,
+                // Единая метрика полосы заголовка (issue #179): та же высота, что у
+                // главного окна (WindowChromeMetrics.TitleBarHeight), поэтому шапки
+                // всех окон одинаковы по высоте. Кнопки занимают её целиком и
+                // центрированы по вертикали — без смещения вверх.
+                Height = WindowChromeMetrics.TitleBarHeight,
                 // Полоса заголовка диалога заливается акцентным цветом темы на всю ширину.
                 // HorizontalAlignment=Stretch и нулевые Margin гарантируют, что полоса занимает
                 // всю ширину окна и не оставляет незалитых участков по краям (issue #135).
@@ -921,7 +925,8 @@ namespace Workspace1C
             {
                 Text = window.Title,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(14, 0, 0, 0),
+                // Левый отступ — та же метрика, что у полосы главного окна (issue #179).
+                Margin = new Thickness(WindowChromeMetrics.TitleBarLeftInset, 0, 0, 0),
                 FontWeight = FontWeights.SemiBold
             };
             // Текст заголовка читаемым цветом на акцентной полосе (AccentTextBrush,
@@ -932,7 +937,11 @@ namespace Workspace1C
             var buttons = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Правый отступ группы кнопок — как у главного окна (issue #179):
+                // кнопки больше не «прилипают» к правому краю и не выглядят
+                // смещёнными вправо относительно шапки главного окна.
+                Margin = new Thickness(0, 0, WindowChromeMetrics.WindowButtonRightInset, 0)
             };
             // В диалоговых окнах показываем только кнопку «закрыть». У больших
             // изменяемых окон (например «Серверы 1С», issue #324) добавляем кнопку

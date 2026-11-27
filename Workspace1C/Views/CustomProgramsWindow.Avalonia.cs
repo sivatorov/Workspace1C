@@ -264,6 +264,10 @@ public sealed class CustomProgramsWindow : ModalWindowBase
         // строка добавленной программы в редакторе не появлялась.
         _list.Bind(ItemsControl.ItemsSourceProperty, new Binding("Programs"));
         _list.Bind(ListBox.SelectedItemProperty, new Binding("SelectedProgram") { Mode = BindingMode.TwoWay });
+        // Issue #159 (1.0.1.128): список растягивается по своей колонке, горизонтальная
+        // прокрутка выключена — ширина списка не зависит от длины названий программ.
+        _list.HorizontalAlignment = HorizontalAlignment.Stretch;
+        ScrollViewer.SetHorizontalScrollBarVisibility(_list, ScrollBarVisibility.Disabled);
         // Issue #158 (1.0.1.123): ContentPresenter может построить строку и для
         // null-элемента (удаление/пересоздание контейнера). Раньше BuildListItem
         // обращался к program.Name и падал NullReferenceException прямо во время

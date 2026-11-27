@@ -14,8 +14,12 @@ namespace Workspace1C.Themes
     /// </summary>
     internal sealed class WindowButtonThemeMetrics
     {
-        /// <summary>Высота кнопок окна в обычном масштабе (совпадает с высотой полосы заголовка).</summary>
-        public const double ButtonHeight = 34;
+        /// <summary>
+        /// Высота кнопок окна в обычном масштабе (совпадает с высотой полосы заголовка).
+        /// Источник значения — общая метрика <see cref="WindowChromeMetrics.WindowButtonHeight"/>
+        /// (issue #179): WPF и Avalonia не могут разойтись по высоте кнопок/полосы.
+        /// </summary>
+        public const double ButtonHeight = WindowChromeMetrics.WindowButtonHeight;
 
         public IBrush Hover { get; private set; } = Brushes.Transparent;
         public IBrush CloseHover { get; private set; } = Brushes.Transparent;

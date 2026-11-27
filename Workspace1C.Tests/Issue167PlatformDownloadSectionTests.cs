@@ -725,6 +725,8 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.True(settings.PlatformDownloadFilterBySection);
         Assert.Equal(string.Empty, settings.PlatformDownloadSelectedSection);
         Assert.Equal("Auto", settings.PlatformDownloadType);
+        // 1.0.1.128: разрядность не задана — используется разрядность ОС.
+        Assert.Null(settings.PlatformDownloadIs64Bit);
     }
 
     [Theory]
@@ -739,8 +741,177 @@ public sealed class Issue167PlatformDownloadSectionTests
         Assert.Contains("PlatformDownloadFilterBySection", code);
         Assert.Contains("PlatformDownloadSelectedSection", code);
         Assert.Contains("PlatformDownloadType", code);
+        // Issue #167 (1.0.1.128): значения (а не только галочки) восстанавливаются через
+        // ViewModel, разрядность сохраняется; раздел не пишется, пока нет разделов.
+        Assert.Contains("RestoreSelection", code);
+        Assert.Contains("PlatformDownloadIs64Bit", code);
+        Assert.Contains("HasSections", code);
         // ...и сохраняется при изменении (паритет WPF/Avalonia).
         Assert.Contains("SaveSettings", code);
+    }
+
+    // ===================== Issue #167 (1.0.1.128): применение после загрузки каталога =====================
+
+    [Fact]
+    public async Task Vm_RestoreSelection_SectionAndArchitecture_AppliedAfterLoadCatalog()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("win_x64.zip", "x64", GroupPlatform),
+            File("win_x86.zip", "x86", GroupPlatform),
+            File("thin_x64.zip", "x64", GroupThin)));
+
+        vm.RestoreSelection(
+            filterByArchitecture: true,
+            filterBySection: true,
+            selectedSection: GroupThin,
+            downloadType: PlatformDownloadType.Auto,
+            is64Bit: true);
+
+        // До загрузки каталога намерение сохранено и не сбрасывается (раньше раздел
+        // «исчезал» здесь — RefreshSections с пустым списком файлов обнулял выбор).
+        Assert.Equal(GroupThin, vm.SelectedSection);
+        Assert.True(vm.FilterByArchitecture);
+
+        await vm.LoadCatalogAsync();
+
+        // После загрузки каталога и вычисления разделов сохранённые значения применены.
+        Assert.True(vm.FilterByArchitecture);
+        Assert.True(vm.FilterBySection);
+        Assert.True(vm.Is64Bit);
+        Assert.Equal(GroupThin, vm.SelectedSection);
+        var only = Assert.Single(vm.DistributionOptions);
+        Assert.Equal("thin_x64.zip", only.File.FileName);
+    }
+
+    [Fact]
+    public async Task Vm_RestoreSelection_ArchitectureCheckboxAndValue_Restored()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64"),
+            File("b_x86.zip", "x86")));
+
+        // Галочка включена, значение — x86 (в 1.0.1.127 сохранялась только галочка).
+        vm.RestoreSelection(
+            filterByArchitecture: true,
+            filterBySection: false,
+            selectedSection: null,
+            downloadType: PlatformDownloadType.Auto,
+            is64Bit: false);
+
+        await vm.LoadCatalogAsync();
+
+        Assert.True(vm.FilterByArchitecture);
+        Assert.False(vm.Is64Bit);
+        Assert.DoesNotContain(vm.DistributionOptions, o => o.File.FileName == "a_x64.zip");
+        Assert.Contains(vm.DistributionOptions, o => o.File.FileName == "b_x86.zip");
+        Assert.Equal("b_x86.zip", vm.PickedFile!.FileName);
+    }
+
+    [Fact]
+    public async Task Vm_RestoreSelection_SavedSectionMissing_FallsBackToFirstSection()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64", GroupPlatform),
+            File("b_x64.zip", "x64", GroupThin)));
+
+        // Сохранённого раздела в новом каталоге нет — загрузка не падает,
+        // фолбэк на первый раздел, старое значение не «залипает».
+        vm.RestoreSelection(
+            filterByArchitecture: false,
+            filterBySection: true,
+            selectedSection: "Windows (64-bit)",
+            downloadType: PlatformDownloadType.Auto,
+            is64Bit: true);
+
+        await vm.LoadCatalogAsync();
+
+        Assert.True(vm.HasSections);
+        Assert.True(vm.FilterBySection);
+        Assert.Equal(GroupPlatform, vm.SelectedSection);
+        Assert.Single(vm.DistributionOptions);
+        Assert.NotNull(vm.PickedFile);
+    }
+
+    [Fact]
+    public async Task Vm_RestoreSelection_NoSections_KeepsIntentAndLoads()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("a_x64.zip", "x64"),
+            File("b_x86.zip", "x86")));
+
+        // Разделов на странице нет: выбор раздела не применяется, но намерение
+        // не теряется (окно не перезапишет настройку пустым значением).
+        vm.RestoreSelection(
+            filterByArchitecture: false,
+            filterBySection: true,
+            selectedSection: "Linux (64-bit)",
+            downloadType: PlatformDownloadType.Auto,
+            is64Bit: false);
+
+        await vm.LoadCatalogAsync();
+
+        Assert.False(vm.HasSections);
+        Assert.False(vm.Is64Bit);
+        Assert.Equal("Linux (64-bit)", vm.SelectedSection);
+        Assert.Equal(2, vm.DistributionOptions.Count);
+        Assert.NotNull(vm.PickedFile);
+    }
+
+    [Fact]
+    public async Task Vm_RestoreSelection_TypeRestoredAfterLoad_WhenAvailable()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("setup_x64.zip", "x64", GroupPlatform),
+            File("thin_x64.zip", "x64", GroupPlatform)));
+
+        vm.RestoreSelection(
+            filterByArchitecture: false,
+            filterBySection: false,
+            selectedSection: null,
+            downloadType: PlatformDownloadType.ThinClient,
+            is64Bit: true);
+
+        await vm.LoadCatalogAsync();
+
+        Assert.Contains(PlatformDownloadType.ThinClient, vm.AvailableDownloadTypes);
+        Assert.Equal(PlatformDownloadType.ThinClient, vm.DownloadType);
+        Assert.Equal("thin_x64.zip", vm.PickedFile!.FileName);
+    }
+
+    [Fact]
+    public async Task Vm_Reopen_RestoresLastSelection()
+    {
+        var release = Release("8.3.27.2214",
+            File("a_x64.zip", "x64", GroupPlatform),
+            File("b_x86.zip", "x86", GroupThin),
+            File("c_x64.zip", "x64", GroupThin));
+
+        // Первое открытие: пользователь меняет выбор.
+        var first = CreateVm(release);
+        await first.LoadCatalogAsync();
+        first.FilterByArchitecture = true;
+        first.Is64Bit = false;
+        first.SelectedSection = GroupThin;
+        first.FilterBySection = true;
+
+        // Значения, которые окно сохраняет в AppSettings.
+        var savedArchitectureFilter = first.FilterByArchitecture;
+        var savedSectionFilter = first.FilterBySection;
+        var savedSection = first.SelectedSection;
+        var savedType = first.DownloadType;
+        var savedIs64Bit = first.Is64Bit;
+
+        // Повторное открытие: выбор восстанавливается после загрузки каталога.
+        var second = CreateVm(release);
+        second.RestoreSelection(
+            savedArchitectureFilter, savedSectionFilter, savedSection, savedType, savedIs64Bit);
+        await second.LoadCatalogAsync();
+
+        Assert.True(second.FilterByArchitecture);
+        Assert.False(second.Is64Bit);
+        Assert.True(second.FilterBySection);
+        Assert.Equal(GroupThin, second.SelectedSection);
+        Assert.Equal("b_x86.zip", second.PickedFile!.FileName);
     }
 
     // ===================== Вспомогательные методы =====================

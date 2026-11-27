@@ -72,4 +72,25 @@ public sealed class Issue174LinuxSettingsLayoutTests
         // Issue #175 п.6: «Логирование» идёт перед «Резервным копированием», как в Windows.
         Assert.True(logging < profile, "Порядок вкладок не совпадает с Windows");
     }
+
+    [Fact]
+    public void TabHeaders_HaveWidthAndPaddingToAvoidClipping()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #175 п.8 (1.0.1.128): заголовки вкладок не обрезаются.
+        Assert.Contains("tab.Width = UiMetrics.Scaled(260)", code);
+        Assert.Contains("tab.MinWidth = UiMetrics.Scaled(240)", code);
+        Assert.Contains("tab.Padding = new Thickness(12, 10)", code);
+    }
+
+    [Fact]
+    public void LoggingGroups_HaveInnerPaddingForCheckboxes()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.Logging.cs");
+
+        // Issue #175 п.7 (1.0.1.128): галочки не сливаются с краем карточки.
+        Assert.Contains("new Thickness(10, 8)", code);
+        Assert.DoesNotContain("new Thickness(8), 0", code);
+    }
 }

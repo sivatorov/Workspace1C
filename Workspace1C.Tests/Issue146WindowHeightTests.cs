@@ -26,10 +26,10 @@ public sealed class Issue146WindowHeightTests
     public void Policy_Profiles_MatchIssue146Values()
     {
         // План 1.0.1.118, раздел 2.4: MinHeight < DefaultHeight = ContentHeight.
-        // Issue #159 (1.0.1.127): «Утилиты» 640, «Контекстное меню» 600.
-        AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 640, 440);
+        // Issue #159 (1.0.1.128): «Утилиты» 660/340, «Контекстное меню» 570/320.
+        AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 660, 340);
         AssertProfile(DialogWorkAreaPolicy.TrayEditor, 680, 440);
-        AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 600, 400);
+        AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 570, 320);
         AssertProfile(DialogWorkAreaPolicy.CustomPrograms, 600, 440);
     }
 
@@ -41,8 +41,8 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, workArea);
 
-        Assert.Equal(640, size.Height, 3);
-        Assert.Equal(440, size.MinHeight, 3);
+        Assert.Equal(660, size.Height, 3);
+        Assert.Equal(340, size.MinHeight, 3);
         Assert.True(size.MinHeight < size.Height);
         Assert.False(size.RequiresScrolling,
             $"При рабочей области {workArea} DIP «Утилиты» помещаются без прокрутки.");
@@ -71,8 +71,8 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.ContextMenuEditor, workArea);
 
-        Assert.Equal(600, size.Height, 3);
-        Assert.Equal(400, size.MinHeight, 3);
+        Assert.Equal(570, size.Height, 3);
+        Assert.Equal(320, size.MinHeight, 3);
         Assert.True(size.MinHeight < size.Height);
         Assert.False(size.RequiresScrolling,
             $"При рабочей области {workArea} DIP «Контекстное меню» помещается без прокрутки.");
@@ -146,8 +146,8 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, 0);
 
-        Assert.Equal(640, size.Height, 3);
-        Assert.Equal(440, size.MinHeight, 3);
+        Assert.Equal(660, size.Height, 3);
+        Assert.Equal(340, size.MinHeight, 3);
         Assert.False(size.RequiresScrolling);
         // Issue #159 (1.0.1.123): у профилей редакторов появилась верхняя граница
         // авторазмера (800 DIP), поэтому при неизвестной рабочей области MaxHeight
@@ -157,9 +157,9 @@ public sealed class Issue146WindowHeightTests
     }
 
     [Theory]
-    [InlineData("UtilitiesMenuEditorWindow.xaml", 640, 440)]
+    [InlineData("UtilitiesMenuEditorWindow.xaml", 660, 340)]
     [InlineData("TrayMenuEditorWindow.xaml", 680, 440)]
-    [InlineData("ContextMenuEditorWindow.xaml", 600, 400)]
+    [InlineData("ContextMenuEditorWindow.xaml", 570, 320)]
     [InlineData("CustomProgramsWindow.xaml", 600, 440)]
     public void WpfWindows_MinHeightBelowHeight(string fileName, double height, double minHeight)
     {

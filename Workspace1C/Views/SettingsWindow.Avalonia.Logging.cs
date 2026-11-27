@@ -46,14 +46,16 @@ namespace Workspace1C
             // Issue #175 (1.0.1.127): группы вкладки — такие же карточки с видимой
             // рамкой, как остальные группы настроек (раньше были только заголовки
             // без границ, и группы визуально «слипались» с фоном).
-            var directions = new StackPanel { Spacing = 6 };
+            // Issue #175 (1.0.1.128): внутренний отступ карточки увеличен до 10×8,
+            // чтобы галочки не сливались с краем рамки.
+            var directions = new StackPanel { Spacing = 8 };
             AddLoggingCategories(directions, LogCategory.DirectionCategories);
             panel.Children.Add(SettingsGroup(
                 LocalizationManager.T("Settings.Logging.Directions"),
-                directions, new Thickness(8), 0));
+                directions, new Thickness(10, 8), 10));
 
             // Существовавшие до issue #80 диагностические флаги trace.json.
-            var diagnostics = new StackPanel { Spacing = 6 };
+            var diagnostics = new StackPanel { Spacing = 8 };
             AddLoggingCategories(diagnostics, LogCategory.DiagnosticCategories);
 
             // issue #143 (1.0.1.125): диагностика резервного копирования СУБД
@@ -66,7 +68,7 @@ namespace Workspace1C
 
             panel.Children.Add(SettingsGroup(
                 LocalizationManager.T("Settings.Logging.Diagnostics"),
-                diagnostics, new Thickness(8), 0));
+                diagnostics, new Thickness(10, 8), 0));
 
             return panel;
         }

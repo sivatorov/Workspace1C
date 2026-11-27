@@ -1399,9 +1399,14 @@ namespace Workspace1C
             {
                 Child = grid,
                 BorderThickness = new Thickness(0, 0, 0, 1),
-                // Отступы шапки из метрик: компактный режим уменьшает высоту заголовка
-                // окна вместе с кнопками управления (кнопки уже масштабируются через
-                // UiMetrics.Scaled), как на Windows (issue #296).
+                // Высота шапки — единая метрика (issue #179): как у диалогов
+                // (ModalWindowBase.BuildTitleStrip) и как у WPF-окон. Кнопки окна
+                // имеют ту же высоту, поэтому центрируются по полосе без смещения
+                // вверх. Компактный режим уменьшает высоту вместе с кнопками (issue #296).
+                Height = UiMetrics.TitleBarHeight,
+                // Вертикальных отступов нет (TitleBarPadV = 0): иначе шапка снова
+                // стала бы выше диалоговой. Горизонтальный отступ задаёт правый
+                // отступ группы кнопок и левый отступ заголовка.
                 Padding = new Thickness(UiMetrics.TitleBarPadH, UiMetrics.TitleBarPadV)
             };
             ThemeBrushes.Bind(_titleBarBorder, Border.BorderBrushProperty, "BorderColorBrush");

@@ -70,9 +70,11 @@ public sealed class Issue161GroupColorTintOrderTests
     {
         var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
 
-        var theme = IndexOf(code, "GroupTitle(LocalizationManager.T(\"Settings.Theme\"))");
-        var tint = IndexOf(code, "GroupTitle(LocalizationManager.T(\"Settings.GroupColorTintGroup\"))");
-        var colors = IndexOf(code, "GroupTitle(LocalizationManager.T(\"Settings.Colors\"))");
+        // Issue #175 (1.0.1.128): группы оформлены карточками через SettingsGroup,
+        // порядок «тема → доли цвета → цвета» сохранён.
+        var theme = IndexOf(code, "LocalizationManager.T(\"Settings.Theme\")");
+        var tint = IndexOf(code, "LocalizationManager.T(\"Settings.GroupColorTintGroup\")");
+        var colors = IndexOf(code, "LocalizationManager.T(\"Settings.Colors\")");
 
         Assert.True(tint < colors,
             "Avalonia: блок «Доля цвета папки» должен идти перед редактором цветов (issue #161).");
@@ -94,9 +96,9 @@ public sealed class Issue161GroupColorTintOrderTests
             xaml.IndexOf("Settings.GroupColorTintGroup", StringComparison.Ordinal),
             xaml.IndexOf("Header=\"{loc:Loc Settings.Colors}\"", StringComparison.Ordinal));
         var avaloniaOrder = Order(
-            code.IndexOf("GroupTitle(LocalizationManager.T(\"Settings.Theme\"))", StringComparison.Ordinal),
-            code.IndexOf("GroupTitle(LocalizationManager.T(\"Settings.GroupColorTintGroup\"))", StringComparison.Ordinal),
-            code.IndexOf("GroupTitle(LocalizationManager.T(\"Settings.Colors\"))", StringComparison.Ordinal));
+            code.IndexOf("LocalizationManager.T(\"Settings.Theme\")", StringComparison.Ordinal),
+            code.IndexOf("LocalizationManager.T(\"Settings.GroupColorTintGroup\")", StringComparison.Ordinal),
+            code.IndexOf("LocalizationManager.T(\"Settings.Colors\")", StringComparison.Ordinal));
 
         Assert.Equal("theme>tint>colors", wpfOrder);
         Assert.Equal(wpfOrder, avaloniaOrder);

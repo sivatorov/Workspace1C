@@ -150,9 +150,11 @@
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <!-- Размер кнопки (ширина) приходит из темы: 46 — Fluent, 40 — Minimal, 34 — Classic.
-                     Высота фиксирована высотой полосы заголовка (34). -->
+                     Высота — единая метрика полосы заголовка (issue #179): кнопка занимает
+                     полосу целиком, поэтому не смещается вверх/вниз ни в главном окне,
+                     ни в дочерних окнах. -->
                 <Setter Property="Width" Value="{DynamicResource WindowButtonSize}"/>
-                <Setter Property="Height" Value="34"/>
+                <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.WindowButtonHeight}"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                 <Setter Property="ToolTipService.InitialShowDelay" Value="400"/>

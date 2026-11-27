@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.127-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.128-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,29 +8,29 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.127**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.128**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 713 417 байт (81.7 MB) | `FileVersion` = `1.0.1.127` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 998 061 байт (51.5 MB) | `1.0.1.127` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 716 007 байт (81.7 MB) | `FileVersion` = `1.0.1.128` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 54 002 028 байт (51.5 MB) | `1.0.1.128` |
 
-> Размеры — локальные сборки, загруженные в релиз `v1.0.1.127` (`Workspace1C.exe` и
-> `Workspace1C-linux-x64`); `FileVersion`/`ProductVersion` Windows-файла — `1.0.1.127`.
+> Размеры — локальные сборки, загруженные в релиз `v1.0.1.128` (`Workspace1C.exe` и
+> `Workspace1C-linux-x64`); `FileVersion`/`ProductVersion` Windows-файла — `1.0.1.128`.
 > Побайтовое совпадение single-file сборок между запусками не гарантируется.
 
-В 1.0.1.127: подписи вынесенных пунктов подменю после смены темы (issue #177),
-фильтры и запоминание выбора при скачивании платформы (issue #167 — галочка
-разрядности по умолчанию снята), развёрнутое окно заполняет экран без белых полос
-(issue #171/#176), отступы и паритет вкладок Linux-настроек (issue #174/#175),
-выровненные высоты редакторов «Утилиты»/контекстного меню (issue #159), запуск
-«Моих программ» от администратора (issue #178) и диагностика резервного копирования
-СУБД с подсказкой при несовпадении версий pg_dump (issue #143).
+В 1.0.1.128: единая высота полосы заголовка главного и дочерних окон с центрированными
+системными кнопками и единым правым отступом (issue #179), сохранение фильтров диалога
+скачивания платформы после загрузки каталога — новый ключ `PlatformDownloadIs64Bit`
+(issue #167), размеры окон правки «Утилиты» 660/340 и «Контекстное меню» 570/320 без
+прокрутки (issue #159), паритет вкладок настроек Linux с Windows — «Учётные записи»,
+«ibases.v8i», карточки-группы, иконки и заголовки (issue #175); по issue #174 правок
+не потребовалось.
 
-Полный прогон тестов 1.0.1.127: **8463 теста, 0 падений, 0 пропущено** (2 m 41 s).
-Команды сборки, логи и проверки — в [`docs/_t_full_test_127b.log`](docs/_t_full_test_127b.log).
+Полный прогон тестов 1.0.1.128: **8496 тестов, 0 падений, 0 пропущено** (2 m 52 s).
+Команды сборки, логи и проверки — в [`docs/_t_full_test_128.log`](docs/_t_full_test_128.log).
 
 Windows-бинарь собирается штатным `build-windows-single-file.ps1 -Configuration Release`
 с модулями ПРО; после сборки выполняются smoke-проверки `Workspace1C.exe --list` и

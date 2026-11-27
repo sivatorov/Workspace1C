@@ -116,11 +116,15 @@ public sealed class Issue149TabItemOffsetTests
 
         var mainTab = Slice(code, "private static TabItem MainTab(", "private static ToggleButton SettingsSwitch(");
         // Компактный режим уменьшает ширину, кегль и значок вкладки...
-        Assert.Contains("UiMetrics.Scaled(235)", mainTab, StringComparison.Ordinal);
+        // Issue #175 (1.0.1.128): ширина вкладки увеличена до 260 DIP (MinWidth 240).
+        Assert.Contains("UiMetrics.Scaled(260)", mainTab, StringComparison.Ordinal);
         Assert.Contains("UiMetrics.ScaledFont(13)", mainTab, StringComparison.Ordinal);
         Assert.Contains("UiMetrics.Scaled(UiMetrics.IconToolbar)", mainTab, StringComparison.Ordinal);
-        // ...но не трогает отступ и рамку вкладки: смещения при выделении нет.
-        Assert.DoesNotContain("Padding", mainTab, StringComparison.Ordinal);
+        // ...но не трогает рамку вкладки: смещения при выделении нет. Паддинг
+        // заголовка задан фиксированным (не через UiMetrics.Scaled), поэтому
+        // компактный режим его не масштабирует.
+        Assert.Contains("tab.Padding = new Thickness(12, 10);", mainTab, StringComparison.Ordinal);
+        Assert.DoesNotContain("UiMetrics.Scaled(12), 10", mainTab, StringComparison.Ordinal);
         Assert.DoesNotContain("BorderThickness", mainTab, StringComparison.Ordinal);
 
         var subTab = Slice(code, "private static TabItem SubTab(", "private static Control SettingsGroup(");

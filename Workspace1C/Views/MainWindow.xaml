@@ -200,14 +200,19 @@
                 BorderBrush="{DynamicResource BorderBrushColor}" BorderThickness="0,0,0,1"
                 MouseLeftButtonDown="OnTopBar_MouseLeftButtonDown">
             <Border.Style>
-                <!-- Отступы шапки переехали в стиль: в компактном режиме DataTrigger
-                     уменьшает высоту заголовка окна вместе с кнопками управления
-                     (issue #296). Обычный режим сохраняет прежние 12,6. -->
+                <!-- Высота полосы и боковые отступы — из единого источника метрик
+                     (issue #179): шапка главного окна ровно такой же высоты, как у
+                     дочерних окон, кнопки занимают её целиком и центрируются по
+                     вертикали. Вертикальных отступов нет (0) — иначе полоса снова
+                     стала бы выше диалоговой. Компактный режим уменьшает высоту
+                     полосы вместе с кнопками (issue #296). -->
                 <Style TargetType="Border">
-                    <Setter Property="Padding" Value="12,6"/>
+                    <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.TitleBarHeight}"/>
+                    <Setter Property="Padding" Value="12,0"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                            <Setter Property="Padding" Value="8,3"/>
+                            <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactTitleBarHeight}"/>
+                            <Setter Property="Padding" Value="8,0"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -242,7 +247,7 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                         <Setter Property="Width" Value="44"/>
-                                        <Setter Property="Height" Value="30"/>
+                                        <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -262,7 +267,7 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                         <Setter Property="Width" Value="44"/>
-                                        <Setter Property="Height" Value="30"/>
+                                        <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
@@ -288,7 +293,7 @@
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                                         <Setter Property="Width" Value="44"/>
-                                        <Setter Property="Height" Value="30"/>
+                                        <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>

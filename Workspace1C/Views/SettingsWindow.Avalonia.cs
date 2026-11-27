@@ -979,7 +979,9 @@ namespace Workspace1C
                 var profiles = AppServices.GetRequiredService<IProfileService>();
                 new ProfilesWindow(profiles).ShowDialogSync(this);
             };
-            settingsFunctionality.Children.Add(manageProfilesButton);
+            // Issue #175 (1.0.1.128): «Учётные записи» — отдельная вкладка, как в
+            // Windows (раньше кнопка управления профилями жила в «Функциональности»).
+            // Кнопка добавляется в свою вкладку ниже, в BuildRoot.
 
             // ----- Общая авторизация для всех ИБ (issue #57) -----
             // Раздельная по режимам запуска: для «1С:Предприятия» и «Конфигуратора» свои
@@ -2159,9 +2161,12 @@ namespace Workspace1C
             // Две колонки: слева управление схемой и превью, справа список цветов
             // (превью — часть левой колонки под блоком схемы, по варианту 2 из #155).
             var schemeColumn = new StackPanel();
-            var colorsColumn = new StackPanel();
-            // Заголовок группы из разметки WPF (SettingsWindow.xaml:824).
-            schemeColumn.Children.Add(GroupTitle(LocalizationManager.T("Settings.Theme")));
+            // Issue #175 (1.0.1.128): группы «Цветового оформления» — такие же
+            // карточки с видимой рамкой, как в остальных вкладках (раньше это были
+            // только заголовки без границ, и группы сливались с фоном).
+            var themeGroupContent = new StackPanel();
+            var tintGroupContent = new StackPanel();
+            var colorsGroupContent = new StackPanel();
 
             // Правки идут по копии сохранённой схемы, а не применённой предпросмотром:
             // закрытие окна крестиком не должно оставлять редактор на непринятых цветах.
@@ -2278,8 +2283,8 @@ namespace Workspace1C
             ReloadSchemes();
             RefreshColors();
             refreshEditedScheme = () => { ReloadSchemes(editedScheme.Name); RefreshColors(); };
-            schemeColumn.Children.Add(schemeBox);
-            schemeColumn.Children.Add(Hint(LocalizationManager.T("Settings.Theme.Description"), bottom: 10));
+            themeGroupContent.Children.Add(schemeBox);
+            themeGroupContent.Children.Add(Hint(LocalizationManager.T("Settings.Theme.Description"), bottom: 10));
 
             var schemeButtons = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 0) };
 
@@ -2512,12 +2517,15 @@ namespace Workspace1C
             // для встроенной темы выставляется здесь, а не только по смене выбора.
             UpdateSchemeButtons();
 
-            schemeColumn.Children.Add(schemeButtons);
+            themeGroupContent.Children.Add(schemeButtons);
+            // Issue #175 (1.0.1.128): группа «Тема» — карточка с видимой рамкой.
+            schemeColumn.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.Theme"), themeGroupContent,
+                new Thickness(10, 8), 10));
 
             // Issue #145: доли цвета строки-папки (0–100 %).
             // 0 — цвет группы не подмешивается, 100 — чистый цвет группы.
-            schemeColumn.Children.Add(GroupTitle(LocalizationManager.T("Settings.GroupColorTintGroup")));
-            schemeColumn.Children.Add(Hint(LocalizationManager.T("Settings.GroupColorTintHint"), bottom: 6));
+            tintGroupContent.Children.Add(Hint(LocalizationManager.T("Settings.GroupColorTintHint"), bottom: 6));
             _originalGroupColorTintPercent = _viewModel.GroupColorTintPercent;
             _originalGroupColorHoverTintPercent = _viewModel.GroupColorHoverTintPercent;
 
@@ -2542,7 +2550,7 @@ namespace Workspace1C
                 tintHoverValue.Text = FormatTint(_viewModel.GroupColorHoverTintPercent);
             }
 
-            Slider AddTintSlider(string labelKey, int value, Action<int> apply, TextBlock valueText)
+            Slider AddTintSlider(StackPanel target, string labelKey, int value, Action<int> apply, TextBlock valueText)
             {
                 var row = new Grid { Margin = new Thickness(0, 2, 0, 2) };
                 row.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(220)));
@@ -2574,21 +2582,24 @@ namespace Workspace1C
                 row.Children.Add(label);
                 row.Children.Add(slider);
                 row.Children.Add(valueText);
-                schemeColumn.Children.Add(row);
+                target.Children.Add(row);
                 return slider;
             }
 
             suppressTint = true;
-            AddTintSlider("Settings.GroupColorTint", _viewModel.GroupColorTintPercent,
+            AddTintSlider(tintGroupContent, "Settings.GroupColorTint", _viewModel.GroupColorTintPercent,
                 v => { _viewModel.GroupColorTintPercent = v; UpdateTintLabels(); }, tintIdleValue);
-            AddTintSlider("Settings.GroupColorHoverTint", _viewModel.GroupColorHoverTintPercent,
+            AddTintSlider(tintGroupContent, "Settings.GroupColorHoverTint", _viewModel.GroupColorHoverTintPercent,
                 v => { _viewModel.GroupColorHoverTintPercent = v; UpdateTintLabels(); }, tintHoverValue);
             suppressTint = false;
             UpdateTintLabels();
+            // Issue #175 (1.0.1.128): группа «Доли цвета» — карточка с видимой рамкой.
+            schemeColumn.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.GroupColorTintGroup"), tintGroupContent,
+                new Thickness(10, 8), 10));
 
             // Редактор цветов выбранной палитры — в левой колонке, под блоком схемы.
-            schemeColumn.Children.Add(GroupTitle(LocalizationManager.T("Settings.Colors")));
-            schemeColumn.Children.Add(Hint(LocalizationManager.T("Settings.Colors.Description"), bottom: 8));
+            colorsGroupContent.Children.Add(Hint(LocalizationManager.T("Settings.Colors.Description"), bottom: 8));
 
             // Переключатель палитры: какая сейчас редактируется и показывается (светлая/тёмная).
             var lightPalette = new RadioButton { Content = LocalizationManager.T("Theme.Light"), GroupName = "Palette", IsChecked = !previewDark };
@@ -2607,9 +2618,12 @@ namespace Workspace1C
             var paletteSwitch = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 16, Margin = new Thickness(0, 4, 0, 0) };
             paletteSwitch.Children.Add(lightPalette);
             paletteSwitch.Children.Add(darkPalette);
-            schemeColumn.Children.Add(paletteSwitch);
-
-            schemeColumn.Children.Add(colorsPanel);
+            colorsGroupContent.Children.Add(paletteSwitch);
+            colorsGroupContent.Children.Add(colorsPanel);
+            // Issue #175 (1.0.1.128): группа «Цвета» — карточка с видимой рамкой.
+            schemeColumn.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.Colors"), colorsGroupContent,
+                new Thickness(10, 8), 10));
 
             // Единый живой предпросмотр текущей редактируемой палитры — в правой колонке.
             RepaintThemePreview(editedScheme, previewDark);
@@ -2832,7 +2846,13 @@ namespace Workspace1C
             // (поиск потерянных баз, очистка истории) уходили за край окна.
             var listButtons = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8 };
 
-            var exportList = new Button { Content = LocalizationManager.T("Settings.Bases.ExportList") };
+            // Issue #175 (1.0.1.128): кнопки «Списка баз» — со значками, как в Windows
+            // (SettingsWindow.xaml:2750 и далее). Геометрические ключи те же, что у
+            // остальных кнопок Avalonia: IconExport/IconImport и т. д.
+            var exportList = new Button
+            {
+                Content = IconTextContent("IconExport", "@TextPrimaryBrush", "Settings.Bases.ExportList")
+            };
             ToolTip.SetTip(exportList, LocalizationManager.T("Settings.Bases.ExportListTooltip"));
             // Значения передаются выгрузке прямо из полей, а на диск попадают
             // только по ОК: иначе отмена выгрузки или закрытие окна крестиком
@@ -2840,21 +2860,33 @@ namespace Workspace1C
             exportList.Click += (_, _) =>
                 _viewModel.ExportInfobases(timestampCheck.IsChecked == true, TimestampFormat());
 
-            var importList = new Button { Content = LocalizationManager.T("Settings.Bases.ImportList") };
+            var importList = new Button
+            {
+                Content = IconTextContent("IconImport", "@WarningBrush", "Settings.Bases.ImportList")
+            };
             ToolTip.SetTip(importList, LocalizationManager.T("Settings.Bases.ImportListTooltip"));
             importList.Click += (_, _) => _viewModel.ImportInfobases();
 
             // Выборочный экспорт: окно-чеклист баз (0.3.9.84).
-            var exportSelected = new Button { Content = LocalizationManager.T("ExportSelect.Title") };
+            var exportSelected = new Button
+            {
+                Content = IconTextContent("IconExport", "@InfoBrush", "ExportSelect.Title")
+            };
             ToolTip.SetTip(exportSelected, LocalizationManager.T("ExportSelect.ExportHint"));
             exportSelected.Click += (_, _) => _viewModel.ExportSelectedInfobasesCommand.Execute(null);
 
             // Добавляющий импорт: окно-чеклист, слияние по Id (0.3.9.84).
-            var importMerge = new Button { Content = LocalizationManager.T("ExportSelect.ImportTitle") };
+            var importMerge = new Button
+            {
+                Content = IconTextContent("IconImport", "@InfoBrush", "ExportSelect.ImportTitle")
+            };
             ToolTip.SetTip(importMerge, LocalizationManager.T("ExportSelect.ImportHint"));
             importMerge.Click += (_, _) => _viewModel.ImportMergeInfobasesCommand.Execute(null);
 
-            var importV8i = new Button { Content = LocalizationManager.T("Settings.Bases.ImportV8i") };
+            var importV8i = new Button
+            {
+                Content = IconTextContent("IconCloudDownload", "@InfoBrush", "Settings.Bases.ImportV8i")
+            };
             ToolTip.SetTip(importV8i, LocalizationManager.T("Settings.Bases.ImportV8iTooltip"));
             importV8i.Click += (_, _) => _viewModel.ImportFromIbasesV8i();
 
@@ -2863,13 +2895,19 @@ namespace Workspace1C
             // Сами операции не удалены — они доступны в меню раздела.
 
             // Импорт баз и настроек платформы из программы StartManager (issue #163).
-            var importStartManager = new Button { Content = LocalizationManager.T("Settings.Bases.ImportStartManager") };
+            var importStartManager = new Button
+            {
+                Content = IconTextContent("IconFolderOpen", "@PurpleAccentBrush", "Settings.Bases.ImportStartManager")
+            };
             ToolTip.SetTip(importStartManager, LocalizationManager.T("Settings.Bases.ImportStartManagerTooltip"));
             importStartManager.Click += (_, _) => _viewModel.ImportFromStartManager();
 
             // Определение/обновление конфигураций всех баз (issue #236). Правки вносятся
             // прямо в объекты Infobase, поэтому после закрытия сохраняем список.
-            var detectAll = new Button { Content = LocalizationManager.T("Settings.Bases.DetectAllConfigs") };
+            var detectAll = new Button
+            {
+                Content = IconTextContent("IconSearch", "@PurpleAccentBrush", "Settings.Bases.DetectAllConfigs")
+            };
             ToolTip.SetTip(detectAll, LocalizationManager.T("Settings.Bases.DetectAllConfigsTooltip"));
             detectAll.Click += (_, _) =>
             {
@@ -2883,7 +2921,10 @@ namespace Workspace1C
 
             // Поиск потерянных и забытых баз 1С на дисках (issue #247). Новые базы
             // добавляются в коллекцию приложения, поэтому после закрытия сохраняем список.
-            var findLostBases = new Button { Content = LocalizationManager.T("Settings.Bases.FindLostBases") };
+            var findLostBases = new Button
+            {
+                Content = IconTextContent("IconFolderMultiple", "@InfoBrush", "Settings.Bases.FindLostBases")
+            };
             ToolTip.SetTip(findLostBases, LocalizationManager.T("Settings.Bases.FindLostBasesTooltip"));
             findLostBases.Click += (_, _) =>
             {
@@ -2897,7 +2938,10 @@ namespace Workspace1C
 
             // Очистка истории запусков выбранных баз (issue #246). Правки вносятся прямо
             // в объекты Infobase (очищается LaunchHistory), поэтому после закрытия сохраняем.
-            var clearHistory = new Button { Content = LocalizationManager.T("Settings.Bases.ClearHistory") };
+            var clearHistory = new Button
+            {
+                Content = IconTextContent("IconHistory", "@ErrorBrush", "Settings.Bases.ClearHistory")
+            };
             ToolTip.SetTip(clearHistory, LocalizationManager.T("Settings.Bases.ClearHistoryTooltip"));
             clearHistory.Click += (_, _) =>
             {
@@ -3041,8 +3085,10 @@ namespace Workspace1C
                 .Subscribe(new SettingsObserver<string?>(_ => UpdateTimestampPreview()));
             UpdateTimestampPreview();
 
-            basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.Maintenance")));
-            basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.Bases.MaintenanceHint")));
+            // Issue #175 (1.0.1.128): группы «Обслуживания» — карточки с видимой
+            // рамкой, как в остальных вкладках (раньше были только заголовки).
+            var maintenanceActionsContent = new StackPanel();
+            maintenanceActionsContent.Children.Add(Hint(LocalizationManager.T("Settings.Bases.MaintenanceHint")));
 
             var maintenanceButtons = new StackPanel { Orientation = Orientation.Vertical, Spacing = 8, Margin = new Thickness(0, 0, 0, 8) };
 
@@ -3060,7 +3106,7 @@ namespace Workspace1C
             maintenanceButtons.Children.Add(killProcesses);
             foreach (var maintenanceButton in maintenanceButtons.Children.OfType<Button>())
                 maintenanceButton.HorizontalAlignment = HorizontalAlignment.Stretch;
-            basesMaintenancePanel.Children.Add(maintenanceButtons);
+            maintenanceActionsContent.Children.Add(maintenanceButtons);
 
             // Порог предупреждения «Свободно на диске» в Центре обслуживания (0.3.9.96):
             // база файловая, свободно меньше порога — строка попадает в «Только проблемы».
@@ -3090,12 +3136,12 @@ namespace Workspace1C
                 Opacity = 0.65
             };
             freeSpaceWarningRow.Children.Add(freeSpaceWarningUnit);
-            basesMaintenancePanel.Children.Add(freeSpaceWarningRow);
+            maintenanceActionsContent.Children.Add(freeSpaceWarningRow);
 
             // Общий тип СУБД по умолчанию (issue #106, v1.0.1.73): fallback для
             // профиля резервных копий СУБД. «Не задан» — тип не подставляется.
-            basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.DefaultDbms")));
-            basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.DefaultDbms.Hint")));
+            var defaultDbmsContent = new StackPanel();
+            defaultDbmsContent.Children.Add(Hint(LocalizationManager.T("Settings.DefaultDbms.Hint")));
             var dbmsSettingValues = new[]
             {
                 string.Empty,
@@ -3123,7 +3169,7 @@ namespace Workspace1C
                 if (defaultDbmsBox.SelectedIndex >= 0)
                     _viewModel.DefaultDbmsKind = dbmsSettingValues[defaultDbmsBox.SelectedIndex];
             };
-            basesMaintenancePanel.Children.Add(defaultDbmsBox);
+            defaultDbmsContent.Children.Add(defaultDbmsBox);
 
             // Интеграция с проводником Windows (функция №12): на Linux недоступна,
             // поэтому показываем заблокированный пункт с пояснением.
@@ -3134,7 +3180,7 @@ namespace Workspace1C
                 TextWrapping = TextWrapping.Wrap
             };
             Themes.ThemeBrushes.Bind(explorerIntegrationHint, TextBlock.ForegroundProperty, "TextSecondaryBrush");
-            basesMaintenancePanel.Children.Add(explorerIntegrationHint);
+            maintenanceActionsContent.Children.Add(explorerIntegrationHint);
 
             var explorerIntegrationCheck = new CheckBox
             {
@@ -3155,25 +3201,34 @@ namespace Workspace1C
                 HelpText = LocalizationManager.T("Settings.ExplorerIntegrationEnableTooltip"),
                 VerticalAlignment = VerticalAlignment.Center
             });
-            basesMaintenancePanel.Children.Add(explorerIntegrationRow);
+            maintenanceActionsContent.Children.Add(explorerIntegrationRow);
+            // Карточка «Обслуживание»: кнопки обслуживания, порог свободного места
+            // и недоступная в Linux интеграция с проводником.
+            basesMaintenancePanel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.Maintenance"), maintenanceActionsContent,
+                new Thickness(10, 8), 10));
+            // Карточка «СУБД по умолчанию» — после «Обслуживания», как в Windows.
+            basesMaintenancePanel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.DefaultDbms"), defaultDbmsContent,
+                new Thickness(10, 8), 10));
 
             // Автозапуск при старте ОС (функция №31, Этап 8) и каталог копий экрана (функция №30).
-            basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.AutoStart")));
-            basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.AutoStartHint")));
+            var autoStartContent = new StackPanel();
+            autoStartContent.Children.Add(Hint(LocalizationManager.T("Settings.AutoStartHint")));
             var autoStartCheck = new CheckBox
             {
                 Content = LocalizationManager.T("Settings.AutoStartEnable"),
                 IsChecked = _viewModel.AutoStartEnabled,
                 Margin = new Thickness(0, 0, 0, 8)
             };
-            basesMaintenancePanel.Children.Add(autoStartCheck);
+            autoStartContent.Children.Add(autoStartCheck);
 
             var screenshotDirLabel = new TextBlock
             {
                 Text = LocalizationManager.T("Settings.Screenshot.DirectoryLabel"),
                 Margin = new Thickness(0, 4, 0, 4)
             };
-            basesMaintenancePanel.Children.Add(screenshotDirLabel);
+            autoStartContent.Children.Add(screenshotDirLabel);
 
             var screenshotDirRow = new Grid();
             screenshotDirRow.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
@@ -3205,10 +3260,13 @@ namespace Workspace1C
             };
             Grid.SetColumn(screenshotBrowse, 1);
             screenshotDirRow.Children.Add(screenshotBrowse);
-            basesMaintenancePanel.Children.Add(screenshotDirRow);
+            autoStartContent.Children.Add(screenshotDirRow);
+            basesMaintenancePanel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.AutoStart"), autoStartContent,
+                new Thickness(10, 8), 10));
 
-            basesMaintenancePanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.DangerousOps")));
-            basesMaintenancePanel.Children.Add(Hint(LocalizationManager.T("Settings.Bases.DangerousHint")));
+            var dangerousOpsContent = new StackPanel();
+            dangerousOpsContent.Children.Add(Hint(LocalizationManager.T("Settings.Bases.DangerousHint")));
 
             // Очистка списка баз — необратимое действие: DangerButton (P2-1).
             var clearAll = new Button
@@ -3220,11 +3278,14 @@ namespace Workspace1C
             clearAll.Styled(ControlThemes.DangerButton);
             ToolTip.SetTip(clearAll, LocalizationManager.T("Settings.Bases.ClearAllTooltip"));
             clearAll.Click += (_, _) => _viewModel.ClearAllInfobases();
-            basesMaintenancePanel.Children.Add(clearAll);
+            dangerousOpsContent.Children.Add(clearAll);
+            basesMaintenancePanel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.DangerousOps"), dangerousOpsContent,
+                new Thickness(10, 8), 0));
 
             // Вложенные горизонтальные подвкладки раздела «Базы», как в разметке
             // WPF (SettingsWindow.xaml): «Список баз», «Каталоги шаблонов» и
-            // «Обслуживание». Секция ibases.v8i остаётся блоком ниже вкладок.
+            // «Обслуживание». Секция ibases.v8i с 1.0.1.128 — отдельная вкладка.
             var basesTabs = new TabControl { Margin = new Thickness(0, 4, 0, 0) };
             basesTabs.Styled(ControlThemes.SettingsSubTabControl);
             basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.List", "Settings.Bases.Subtab.ListTooltip", "IconDatabase", basesListPanel));
@@ -3232,15 +3293,14 @@ namespace Workspace1C
             basesTabs.Items.Add(SubTab("Settings.Bases.Subtab.Maintenance", "Settings.Bases.Subtab.MaintenanceTooltip", "IconWrench", basesMaintenancePanel));
             bases.Children.Add(basesTabs);
 
-            // Справка ставится к заголовку блока, а не отдельной строкой:
-            // в разметке WPF «ibases.v8i» это имя вкладки, а «Настройки
-            // синхронизации» заголовок группы внутри неё, и рядом они
-            // не стоят никогда. Здесь блок вложен во вкладку «Базы», поэтому
-            // два заголовка подряд означали бы одно и то же.
+            // Issue #175 (1.0.1.128): ibases.v8i — отдельная вкладка, как в Windows
+            // (раньше её содержимое лежало блоком внутри «Баз»). Ключи сохранения
+            // настроек не менялись: те же контролы и те же поля формы.
+            var ibasesPanel = new StackPanel { Spacing = 6 };
             var ibasesHeader = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 12, 0, 2)
+                Margin = new Thickness(0, 0, 0, 2)
             };
             ibasesHeader.Children.Add(new TextBlock
             {
@@ -3253,10 +3313,10 @@ namespace Workspace1C
                 HelpText = LocalizationManager.T("Settings.Ibases.HelpTextLinux"),
                 Margin = new Thickness(6, 0, 0, 0)
             });
-            bases.Children.Add(ibasesHeader);
-            bases.Children.Add(Hint(LocalizationManager.T("Settings.Ibases.Description")));
+            ibasesPanel.Children.Add(ibasesHeader);
+            ibasesPanel.Children.Add(Hint(LocalizationManager.T("Settings.Ibases.Description")));
 
-            bases.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.SyncMode")));
+            ibasesPanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.SyncMode")));
             var syncModes = new[]
             {
                 (Mode: IbasesSyncMode.None, Text: LocalizationManager.T("Settings.Ibases.SyncModeDisabled")),
@@ -3267,9 +3327,9 @@ namespace Workspace1C
             var syncModeBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             syncModeBox.ItemsSource = syncModes.Select(m => m.Text).ToList();
             syncModeBox.SelectedIndex = Array.FindIndex(syncModes, m => m.Mode == _viewModel.IbasesSyncMode);
-            bases.Children.Add(syncModeBox);
+            ibasesPanel.Children.Add(syncModeBox);
 
-            bases.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.File")));
+            ibasesPanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.File")));
             // Строка пути на Grid: поле растягивается на доступную ширину, а кнопка
             // обзора закреплена справа — в отличие от горизонтального StackPanel
             // с фиксированной MinWidth это не вызывает обрезания по горизонтали.
@@ -3291,9 +3351,9 @@ namespace Workspace1C
             Grid.SetColumn(browse, 1);
             fileGrid.Children.Add(fileBox);
             fileGrid.Children.Add(browse);
-            bases.Children.Add(fileGrid);
+            ibasesPanel.Children.Add(fileGrid);
 
-            bases.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.SyncTrigger")));
+            ibasesPanel.Children.Add(GroupTitle(LocalizationManager.T("Settings.Ibases.SyncTrigger")));
             var triggers = new[]
             {
                 (Trigger: IbasesSyncTrigger.OnStartup, Text: LocalizationManager.T("Settings.Ibases.TriggerStartup")),
@@ -3303,7 +3363,7 @@ namespace Workspace1C
             var triggerBox = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
             triggerBox.ItemsSource = triggers.Select(t => t.Text).ToList();
             triggerBox.SelectedIndex = Array.FindIndex(triggers, t => t.Trigger == _viewModel.IbasesSyncTrigger);
-            bases.Children.Add(triggerBox);
+            ibasesPanel.Children.Add(triggerBox);
 
             var intervalRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, Margin = new Thickness(0, 4, 0, 0) };
             // Подписи держатся в переменных: версия для Windows гасит их вместе
@@ -3319,7 +3379,7 @@ namespace Workspace1C
             intervalRow.Children.Add(scheduleLabel);
             var scheduleBox = new TextBox { Text = _viewModel.IbasesSyncScheduleTime, MinWidth = 80 }.Styled(ControlThemes.ModernTextBox);
             intervalRow.Children.Add(scheduleBox);
-            bases.Children.Add(intervalRow);
+            ibasesPanel.Children.Add(intervalRow);
 
             // Строка состояния и ручные операции, как в разметке WPF
             // (SettingsWindow.xaml:1258-1281): сначала статус, затем загрузка
@@ -3327,7 +3387,7 @@ namespace Workspace1C
             // в Linux-сборке есть, к ним и подключено.
             var syncStatus = Hint(string.Empty);
             syncStatus.Margin = new Thickness(0, 4, 0, 8);
-            bases.Children.Add(syncStatus);
+            ibasesPanel.Children.Add(syncStatus);
 
             var syncButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var importButton = new Button { Content = LocalizationManager.T("Settings.Ibases.Import") };
@@ -3338,7 +3398,7 @@ namespace Workspace1C
             exportButton.Click += (_, _) => _viewModel.ExportToIbasesFile(fileBox.Text);
             syncButtons.Children.Add(importButton);
             syncButtons.Children.Add(exportButton);
-            bases.Children.Add(syncButtons);
+            ibasesPanel.Children.Add(syncButtons);
 
             // «Сохранять после правки» (issue #269). Объявляем здесь, чтобы локальная функция
             // UpdateSyncControls могла управлять его доступностью (замыкание), а сам элемент
@@ -3388,7 +3448,7 @@ namespace Workspace1C
                 Content = LocalizationManager.T("Settings.BackupBeforeSync"),
                 IsChecked = _viewModel.IbasesBackupEnabled
             };
-            bases.Children.Add(backupCheck);
+            ibasesPanel.Children.Add(backupCheck);
 
             // «Сохранять после правки» (issue #269): записывать изменения в ibases.v8i сразу.
             saveAfterEditCheck = new CheckBox
@@ -3398,7 +3458,7 @@ namespace Workspace1C
                 Margin = new Thickness(0, 6, 0, 0)
             };
             ToolTip.SetTip(saveAfterEditCheck, LocalizationManager.T("Settings.Ibases.SaveAfterEditTooltip"));
-            bases.Children.Add(saveAfterEditCheck);
+            ibasesPanel.Children.Add(saveAfterEditCheck);
 
             var keepRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
             var keepLabel = new TextBlock { Text = LocalizationManager.T("Settings.Ibases.BackupKeepCount"), VerticalAlignment = VerticalAlignment.Center };
@@ -3406,8 +3466,8 @@ namespace Workspace1C
             keepRow.Children.Add(keepLabel);
             var keepBox = new TextBox { Text = _viewModel.IbasesBackupKeepCount.ToString(), MinWidth = 80 }.Styled(ControlThemes.ModernTextBox);
             keepRow.Children.Add(keepBox);
-            bases.Children.Add(keepRow);
-            bases.Children.Add(Hint(LocalizationManager.T("Settings.Ibases.BackupNote")));
+            ibasesPanel.Children.Add(keepRow);
+            ibasesPanel.Children.Add(Hint(LocalizationManager.T("Settings.Ibases.BackupNote")));
 
             var restoreButton = new Button
             {
@@ -3416,7 +3476,18 @@ namespace Workspace1C
             };
             ToolTip.SetTip(restoreButton, LocalizationManager.T("Settings.Ibases.RestoreTooltip"));
             restoreButton.Click += (_, _) => _viewModel.RestoreIbasesBackup(fileBox.Text);
-            bases.Children.Add(restoreButton);
+            ibasesPanel.Children.Add(restoreButton);
+
+            // Issue #175 (1.0.1.128): вкладка «ibases.v8i» идёт сразу после
+            // «Платформ» и перед «Базами», как в Windows (SettingsWindow.xaml:2551).
+            var tabIbases = MainTab("IconFileDocument", "Settings.TabIbases",
+                new ScrollViewer
+                {
+                    Content = ibasesPanel,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    Margin = new Thickness(12, 12, 12, 0)
+                });
 
             var tabBases = MainTab("IconDatabase", "Settings.TabBases",
                 new ScrollViewer
@@ -3549,6 +3620,23 @@ namespace Workspace1C
             // был самодельный контур.
             var tabProfile = MainTab("IconBackupRestore", "Settings.TabProfile",
                 new ScrollViewer { Content = profile, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled });
+
+            // ===== Учётные записи (issue #175, 1.0.1.128) =====
+            // Отдельная вкладка, как в Windows: управление профилями (создание,
+            // переименование, удаление, пароль) открывается тем же окном, что и
+            // раньше. Ключи сохранения настроек не меняются.
+            var accountsPanel = new StackPanel { Margin = new Thickness(12, 12, 12, 0) };
+            accountsPanel.Children.Add(Hint(LocalizationManager.T("Profiles.Hint"), bottom: 10));
+            manageProfilesButton.Margin = new Thickness(0);
+            manageProfilesButton.HorizontalAlignment = HorizontalAlignment.Left;
+            accountsPanel.Children.Add(manageProfilesButton);
+            var tabAccounts = MainTab("IconAccountMultiple", "Settings.TabAccounts",
+                new ScrollViewer
+                {
+                    Content = accountsPanel,
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                });
 
             // ===== Клавиши =====
             // Spacing не задаётся: в Avalonia он складывается с полями соседей,
@@ -3808,13 +3896,12 @@ namespace Workspace1C
                     Margin = new Thickness(12, 12, 12, 0)
                 });
 
-            // Порядок вкладок по разметке (SettingsWindow.xaml:293 и далее):
-            // платформы, отображение, оформление, клавиши, настройки, базы,
-            // резервное копирование профиля, логирование, о программе. Девятой
-            // вкладки «ibases.v8i» (xaml:1164) здесь нет: её содержимое лежит
-            // разделом внутри «Баз», это расхождение старше правки и не закрыто.
-            // issue #95: «Настройки» — первая вкладка; «Платформы» — перед блоком
-            // ibases.v8i, который вложен во вкладку «Базы».
+            // Порядок вкладок как в Windows (SettingsWindow.xaml:293 и далее,
+            // плюс динамические вкладки профиля и учётных записей): настройки,
+            // отображение, темы, цветовое оформление, клавиши, меню «Утилиты»,
+            // платформы, ibases.v8i, базы, логирование, резервное копирование,
+            // учётные записи, о программе. Issue #175 (1.0.1.128): добавлены
+            // отдельные вкладки «ibases.v8i» и «Учётные записи».
             tabs.Items.Add(tabGeneral);
             tabs.Items.Add(tabDisplay);
             tabs.Items.Add(tabThemes);
@@ -3822,20 +3909,26 @@ namespace Workspace1C
             tabs.Items.Add(tabHotkeys);
             tabs.Items.Add(tabUtilitiesMenu);
             tabs.Items.Add(tabPlatforms);
+            tabs.Items.Add(tabIbases);
             tabs.Items.Add(tabBases);
             // Issue #175 (1.0.1.127): порядок как в Windows — «Логирование» идёт
             // перед «Резервным копированием» (раньше они были переставлены).
             tabs.Items.Add(tabLogging);
             tabs.Items.Add(tabProfile);
+            tabs.Items.Add(tabAccounts);
             tabs.Items.Add(tabAbout);
 
             Grid.SetRow(tabs, 0);
+            // Issue #175 (1.0.1.128): нижний отступ вкладок отделяет прокручиваемое
+            // содержимое от кнопки «Синхронизация настроек» — края больше не
+            // наезжают на её границу.
+            tabs.Margin = new Thickness(0, 0, 0, 8);
             grid.Children.Add(tabs);
 
             // Подвал: верхний отступ 12 и зазор между кнопками 10
             // (SettingsWindow.xaml:1526-1527). Слева — вход в окно
             // «Синхронизация настроек» (п.9, 1.0.0.91).
-            var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+            var footer = new Grid { Margin = new Thickness(0, 16, 0, 0) };
             footer.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Star));
             footer.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
 
@@ -4973,7 +5066,13 @@ namespace Workspace1C
                 ? ControlThemes.SettingsGroupTabItem
                 : ControlThemes.SettingsTabItem);
             // Ширина, кегль и значок вкладки уменьшаются в компактном режиме.
-            tab.Width = UiMetrics.Scaled(235);
+            // Issue #175 (1.0.1.128): ширина увеличена с 235 до 260 DIP и задан
+            // MinWidth, чтобы заголовок «Резервное копирование» (и другие длинные
+            // подписи) не обрезался. Паддинг заголовка не даёт тексту липнуть
+            // к правой границе вкладки.
+            tab.Width = UiMetrics.Scaled(260);
+            tab.MinWidth = UiMetrics.Scaled(240);
+            tab.Padding = new Thickness(12, 10);
             tab.FontSize = UiMetrics.ScaledFont(13);
 
             var icon = IconHelper.MakeIcon(iconKey, UiMetrics.Scaled(UiMetrics.IconToolbar), out var path);
@@ -4987,7 +5086,7 @@ namespace Workspace1C
                 Children =
                 {
                     icon,
-                    new TextBlock { Text = LocalizationManager.T(titleKey), VerticalAlignment = VerticalAlignment.Center }
+                    new TextBlock { Text = LocalizationManager.T(titleKey), VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.NoWrap, Margin = new Thickness(0, 0, 4, 0) }
                 }
             };
             return tab;

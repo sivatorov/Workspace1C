@@ -120,7 +120,7 @@ namespace Workspace1C
 
         /// <summary>
         /// Issue #146 (1.0.1.118): рекомендованные размеры окна берутся из профиля
-        /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 680 DIP помещает
+        /// <see cref="DialogWorkAreaPolicy.UtilitiesEditor"/> — высота 660 DIP помещает
         /// пояснение без прокрутки, а на маленьком экране клампится по рабочей области
         /// (прокрутка остаётся аварийным вариантом).
         /// Issue #159: расчёт обёрнут в <c>try/catch</c> — у ещё не показанного окна
@@ -183,6 +183,16 @@ namespace Workspace1C
             DockPanel.SetDock(treeHeader, Dock.Top);
             dock.Children.Add(treeHeader);
 
+            // Issue #159 (1.0.1.128): дерево и панель операций — в Grid с фиксированными
+            // колонками. Раньше дерево было доковано влево (DockPanel по умолчанию
+            // Dock.Left), и его ширина равнялась желаемой ширине содержимого: при
+            // раскрытии группы список «прыгал» по ширине. В звёздной колонке ширина
+            // дерева определяется окном, а не раскрытыми узлами.
+            var grid = new Grid
+            {
+                ColumnDefinitions = new ColumnDefinitions("*,12,260")
+            };
+
             var treeBorder = new Border
             {
                 Background = TryBrush("CardBackgroundBrush"),
@@ -190,12 +200,13 @@ namespace Workspace1C
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(8),
                 Padding = new Thickness(4),
-                Margin = new Thickness(0, 0, 12, 0)
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                VerticalAlignment = VerticalAlignment.Stretch
             };
-            dock.Children.Add(treeBorder);
-
             BuildTree();
             treeBorder.Child = _tree;
+            Grid.SetColumn(treeBorder, 0);
+            grid.Children.Add(treeBorder);
 
             // Правая колонка (issue #146, 1.0.1.118): пояснение — последний элемент
             // прокручиваемого содержимого, сразу за панелью операций (см. BuildOperationsPanel).
@@ -206,7 +217,10 @@ namespace Workspace1C
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
             };
-            dock.Children.Add(right);
+            Grid.SetColumn(right, 2);
+            grid.Children.Add(right);
+
+            dock.Children.Add(grid);
 
             return dock;
         }
@@ -218,6 +232,9 @@ namespace Workspace1C
             // раскрытии групп список больше не «скачет» по ширине из-за появившейся
             // горизонтальной полосы; длинные подписи обрезаются внутри строки.
             ScrollViewer.SetHorizontalScrollBarVisibility(_tree, ScrollBarVisibility.Disabled);
+            // Issue #159 (1.0.1.128): дерево растягивается по родительской колонке —
+            // его ширина не зависит от раскрытых узлов.
+            _tree.HorizontalAlignment = HorizontalAlignment.Stretch;
             _tree.SelectionMode = SelectionMode.Single;
             _tree.ItemTemplate = new FuncTreeDataTemplate(
                 typeof(UtilitiesMenuNodeItem),
@@ -265,27 +282,44 @@ namespace Workspace1C
                 icon.Margin = new Thickness(4, 0, 0, 0);
                 icon.Bind(Control.IsVisibleProperty, new Binding("HasDisplayIcon"));
             }
-            var title = new TextBlock { Text = node.Title, Margin = new Thickness(6, 0, 0, 0) };
+            var title = new TextBlock
+            {
+                Text = node.Title,
+                Margin = new Thickness(6, 0, 0, 0),
+                // Issue #159 (1.0.1.128): длинная подпись обрезается многоточием,
+                // а не увеличивает измеренную ширину строки и дерева.
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
+            };
             title.Bind(TextBlock.TextProperty, new Binding("Title"));
             var kind = new TextBlock
             {
                 Text = node.KindLabel,
                 FontSize = 11,
-                Margin = new Thickness(8, 0, 0, 0)
+                Margin = new Thickness(8, 0, 0, 0),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                VerticalAlignment = VerticalAlignment.Center
             };
             // Issue #61: вторичный текст строки — вторичная кисть темы.
             ThemeBrushes.Bind(kind, TextBlock.ForegroundProperty, "TextSecondaryBrush");
             kind.Bind(TextBlock.TextProperty, new Binding("KindLabel"));
-            var content = new StackPanel
+            // Issue #159 (1.0.1.128): колонка заголовка — звёздная, поэтому
+            // TextTrimming работает, а ширина строки не зависит от длины подписи.
+            var content = new Grid
             {
-                Orientation = Orientation.Horizontal,
-                Spacing = 0,
+                ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*,Auto"),
                 VerticalAlignment = VerticalAlignment.Center
             };
+            Grid.SetColumn(check, 0);
             content.Children.Add(check);
             if (icon is not null)
+            {
+                Grid.SetColumn(icon, 1);
                 content.Children.Add(icon);
+            }
+            Grid.SetColumn(title, 2);
             content.Children.Add(title);
+            Grid.SetColumn(kind, 3);
             content.Children.Add(kind);
 
             // Issue #159 (1.0.1.121): кликабельна вся строка узла, а не только глиф.
