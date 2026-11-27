@@ -1183,7 +1183,9 @@ namespace Workspace1C
             // Три строки вместо пяти (issue #55): дерево тянется в своей строке,
             // а статус/пути/разрядность живут в нижней строке внутри ScrollViewer,
             // чтобы при уменьшении высоты окна контент прокручивался, а не обрезался.
-            var platforms = new Grid { Margin = new Thickness(4, 12, 4, 0) };
+            // Issue #174 (1.0.1.127): боковые отступы содержимого вкладок — как в
+            // Windows (12), иначе галочки и поля прилипали к краю окна.
+            var platforms = new Grid { Margin = new Thickness(12, 12, 12, 0) };
             platforms.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             platforms.RowDefinitions.Add(new RowDefinition(new GridLength(1, GridUnitType.Star)));
             platforms.RowDefinitions.Add(new RowDefinition(new GridLength(1, GridUnitType.Star)));
@@ -3430,7 +3432,7 @@ namespace Workspace1C
             // ===== Резервное копирование профиля =====
             // Отступы поштучно, как в коде за разметкой (SettingsWindow.Profile.cs:61-130),
             // а не общим зазором панели.
-            var profile = new StackPanel { Margin = new Thickness(4, 12, 4, 0) };
+            var profile = new StackPanel { Margin = new Thickness(12, 12, 12, 0) };
 
             var profileDescription = new TextBlock
             {
@@ -3762,8 +3764,9 @@ namespace Workspace1C
                     Content = hotkeys,
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                    // Отступы прокрутки из разметки (SettingsWindow.xaml:943).
-                    Margin = new Thickness(4, 12, 4, 0),
+                    // Отступы прокрутки из разметки (SettingsWindow.xaml:943);
+                    // боковые — 12, как в Windows (issue #174).
+                    Margin = new Thickness(12, 12, 12, 0),
                     Padding = new Thickness(0, 0, 4, 0)
                 });
 
@@ -3776,7 +3779,7 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(4, 12, 4, 0)
+                    Margin = new Thickness(12, 12, 12, 0)
                 });
             _utilitiesMenuTab = tabUtilitiesMenu;
 
@@ -3790,7 +3793,7 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(4, 12, 4, 0)
+                    Margin = new Thickness(12, 12, 12, 0)
                 });
 
             // ===== О программе =====
@@ -3802,7 +3805,7 @@ namespace Workspace1C
                     HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                     // Отступ прокрутки из разметки (SettingsWindow.xaml:1486).
-                    Margin = new Thickness(4, 12, 4, 0)
+                    Margin = new Thickness(12, 12, 12, 0)
                 });
 
             // Порядок вкладок по разметке (SettingsWindow.xaml:293 и далее):
@@ -3820,8 +3823,10 @@ namespace Workspace1C
             tabs.Items.Add(tabUtilitiesMenu);
             tabs.Items.Add(tabPlatforms);
             tabs.Items.Add(tabBases);
-            tabs.Items.Add(tabProfile);
+            // Issue #175 (1.0.1.127): порядок как в Windows — «Логирование» идёт
+            // перед «Резервным копированием» (раньше они были переставлены).
             tabs.Items.Add(tabLogging);
+            tabs.Items.Add(tabProfile);
             tabs.Items.Add(tabAbout);
 
             Grid.SetRow(tabs, 0);
@@ -3838,6 +3843,9 @@ namespace Workspace1C
             {
                 Content = LocalizationManager.T("SettingsSync.BottomButton"),
                 VerticalAlignment = VerticalAlignment.Center,
+                // Issue #175 (1.0.1.127): кнопка по содержимому у левого края,
+                // как в Windows, а не растянутая на всю ширину подвала.
+                HorizontalAlignment = HorizontalAlignment.Left,
                 Padding = new Thickness(12, 6)
             };
             syncButton.Styled(ControlThemes.DialogCancelButton);

@@ -1235,7 +1235,14 @@ namespace Workspace1C
                     VerticalAlignment = VerticalAlignment.Center
                 };
                 content.Children.Add(icon);
-                content.Children.Add(new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center });
+                // Issue #177 (паритет с WPF): подпись вынесенного на верхний уровень
+                // пункта привязывается к основному цвету текста темы через
+                // DynamicResource, чтобы после смены темы она перекрашивалась и
+                // не выглядела недоступной. Недоступные пункты по-прежнему гасятся
+                // триггером :disabled темы IconButton (Opacity 0.5).
+                var label = new TextBlock { Text = title, VerticalAlignment = VerticalAlignment.Center };
+                ThemeBrushes.Bind(label, TextBlock.ForegroundProperty, "TextPrimaryBrush");
+                content.Children.Add(label);
                 button.Content = content;
                 button.Padding = new Thickness(UiMetrics.Scaled(8), UiMetrics.Scaled(4));
             }

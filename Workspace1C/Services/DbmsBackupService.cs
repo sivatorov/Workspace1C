@@ -583,6 +583,10 @@ public static class DbmsBackupService
                 var env = new Dictionary<string, string>();
                 if (!string.IsNullOrEmpty(profile.Password))
                     env["PGPASSWORD"] = profile.Password;
+                // Issue #143 (1.0.1.127): версия pg_dump в журнал. Частая причина
+                // «pgAdmin копию делает, а стартер — нет» — несовпадение мажорной
+                // версии утилиты и сервера («server version mismatch»).
+                await LogToolVersionAsync(tool, log, ct).ConfigureAwait(false);
                 log?.Invoke(string.Format(LocalizationManager.T("Dbms.LogDumping"), profile.Database, target));
                 progress?.Report(new DbmsBackupProgress(DbmsBackupStage.Dump));
                 DbmsBackupTrace.Log("tool-start",
@@ -763,6 +767,51 @@ public static class DbmsBackupService
         }
     }
 
+    /// <summary>
+    /// Пишет версию утилиты (<c>pg_dump --version</c>) в журнал окна и в диагностику
+    /// (issue #143, 1.0.1.127). Неудача определения версии не влияет на копирование.
+    /// </summary>
+    private static async Task LogToolVersionAsync(string tool, Action<string>? log, CancellationToken ct)
+    {
+        // В тестах запуск утилиты подменён делегатом RunToolOverride — лишний вызов
+        // «--version» менял бы ожидаемое число запусков; версия нужна только для
+        // реального процесса.
+        if (RunToolOverride is not null)
+            return;
+        try
+        {
+            var version = await RunToolAsync(tool, new[] { "--version" },
+                TimeSpan.FromSeconds(10), null, ct).ConfigureAwait(false);
+            var text = OutputTail(version, 200);
+            DbmsBackupTrace.Log("tool-version",
+                $"{DbmsBackupTrace.DescribePath(tool)}; exit={version.ExitCode}; {text}");
+            if (version.Success && !string.IsNullOrWhiteSpace(text))
+                log?.Invoke(Path.GetFileName(tool) + ": " + text);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // Версия — только диагностика: сбой не должен мешать копированию.
+        }
+    }
+
+    /// <summary>
+    /// Признак несовпадения версий клиента и сервера PostgreSQL в выводе утилиты
+    /// (issue #143, 1.0.1.127): «server version mismatch», «aborting because of
+    /// server version mismatch» и т. п.
+    /// </summary>
+    internal static bool LooksLikeVersionMismatch(string? output)
+    {
+        if (string.IsNullOrWhiteSpace(output))
+            return false;
+        return output.Contains("version mismatch", StringComparison.OrdinalIgnoreCase)
+               || output.Contains("несовпадени", StringComparison.OrdinalIgnoreCase)
+               || output.Contains("не соответству", StringComparison.OrdinalIgnoreCase);
+    }
+
     /// <summary>Последние строки вывода утилиты (stderr/stdout) для причины ошибки.</summary>
     internal static string OutputTail(ProcessRunResult run, int maxLength = 600)
     {
@@ -790,9 +839,15 @@ public static class DbmsBackupService
     internal static string BuildToolFailureMessage(string tool, string target, int exitCode, string tail)
     {
         var template = LocalizationManager.T("Dbms.ToolFailed");
-        if (template.Contains("{0}", StringComparison.Ordinal))
-            return string.Format(CultureInfo.InvariantCulture, template, tool, exitCode, target, tail);
-        return LocalizationManager.T("Dbms.Failed") + $": {tool}; exit={exitCode}; {target}; {tail}";
+        var message = template.Contains("{0}", StringComparison.Ordinal)
+            ? string.Format(CultureInfo.InvariantCulture, template, tool, exitCode, target, tail)
+            : LocalizationManager.T("Dbms.Failed") + $": {tool}; exit={exitCode}; {target}; {tail}";
+
+        // Issue #143 (1.0.1.127): при несовпадении версий pg_dump и сервера —
+        // явная подсказка, что указывать нужно утилиту той же мажорной версии.
+        if (LooksLikeVersionMismatch(tail))
+            message += Environment.NewLine + LocalizationManager.T("Dbms.VersionMismatchHint");
+        return message;
     }
 
     /// <summary>Удаление недописанного файла на выделенном потоке (issue #143).</summary>

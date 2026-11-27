@@ -209,6 +209,20 @@
                             </Grid>
                         </DockPanel>
 
+                        <!-- Issue #178: запуск от имени администратора. Пароль в приложении
+                             не хранится — его сохраняет Windows при первом запуске
+                             (runas /savecred). -->
+                        <CheckBox Content="{loc:Loc Launch.CustomPrograms.RunAsAdministrator}"
+                                  IsChecked="{Binding SelectedProgram.RunAsAdministrator, Mode=TwoWay}"
+                                  ToolTip="{loc:Loc Launch.CustomPrograms.RunAsAdministratorTooltip}"
+                                  Margin="0,4,0,4"/>
+                        <TextBlock Text="{loc:Loc Launch.CustomPrograms.RunAsUserName}" Margin="0,0,0,4"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        <TextBox Text="{Binding SelectedProgram.RunAsUserName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 IsEnabled="{Binding SelectedProgram.RunAsAdministrator}"
+                                 ToolTip="{loc:Loc Launch.CustomPrograms.RunAsUserNameTooltip}"
+                                 Margin="0,0,0,10"/>
+
                         <CheckBox Content="{loc:Loc Launch.CustomPrograms.Enabled}"
                                   IsChecked="{Binding SelectedProgram.Enabled, Mode=TwoWay}"
                                   Margin="0,4,0,0"/>

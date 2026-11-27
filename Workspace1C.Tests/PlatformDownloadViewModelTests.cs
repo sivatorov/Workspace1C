@@ -276,6 +276,9 @@ public sealed class PlatformDownloadViewModelTests
         var vm = CreateVm(service, is64Bit: true);
 
         await vm.LoadCatalogAsync();
+        // Issue #167 (1.0.1.127): галочка разрядности по умолчанию снята —
+        // включаем фильтр явно, тест проверяет поведение фильтра.
+        vm.FilterByArchitecture = true;
         Assert.NotNull(vm.PickedFile);
         Assert.Equal("8.3.27.2214_x64.zip", vm.PickedFile!.FileName);
 
@@ -302,6 +305,7 @@ public sealed class PlatformDownloadViewModelTests
         var vm = CreateVm(service, is64Bit: true);
 
         await vm.LoadCatalogAsync();
+        vm.FilterByArchitecture = true;
 
         // x64: в вариантах только 64-битный клиент (файлы без разрядности — не для Windows).
         Assert.All(vm.DistributionOptions,
@@ -334,6 +338,7 @@ public sealed class PlatformDownloadViewModelTests
         var vm = CreateVm(service, is64Bit: true);
 
         await vm.LoadCatalogAsync();
+        vm.FilterByArchitecture = true;
         Assert.NotNull(vm.SelectedDistribution);
         Assert.Equal("8.3.27.2214_x64.zip", vm.SelectedDistribution!.File.FileName);
 

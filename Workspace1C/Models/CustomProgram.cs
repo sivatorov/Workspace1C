@@ -102,6 +102,23 @@ public class CustomProgram : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// Запускать программу от имени администратора (issue #178). На Windows:
+    /// без <see cref="RunAsUserName"/> — через UAC-запрос (Verb = "runas"),
+    /// с указанной учётной записью — через <c>runas /savecred</c> (пароль
+    /// запрашивается один раз и сохраняется в диспетчере учётных данных Windows).
+    /// На других платформах флаг игнорируется.
+    /// </summary>
+    public bool RunAsAdministrator { get; set; }
+
+    /// <summary>
+    /// Учётная запись для запуска от администратора (issue #178), например
+    /// <c>Administrator</c> или <c>DOMAIN\admin</c>. Пусто — обычный UAC-запрос
+    /// от текущего пользователя. Пароль в приложении не хранится: его сохраняет
+    /// сама Windows при первом запуске через <c>runas /savecred</c>.
+    /// </summary>
+    public string RunAsUserName { get; set; } = "";
+
     /// <summary>Показывать программу на панели запуска.</summary>
     public bool Enabled
     {

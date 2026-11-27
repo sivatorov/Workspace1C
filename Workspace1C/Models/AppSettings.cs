@@ -1242,6 +1242,34 @@ public class AppSettings
     /// </summary>
     public bool PlatformIncludeTestVersions { get; set; }
 
+    /// <summary>
+    /// Окно «Скачивание версии платформы 1С»: фильтровать список файлов по разрядности
+    /// x64/x86 (issue #167). По умолчанию выключено — с 1.0.1.127 показываются файлы
+    /// обеих разрядностей, а разделы уже фильтруются по разрядности. Значение
+    /// запоминается между сессиями.
+    /// </summary>
+    public bool PlatformDownloadFilterByArchitecture { get; set; }
+
+    /// <summary>
+    /// Окно «Скачивание версии платформы 1С»: фильтровать список файлов по выбранному
+    /// разделу страницы загрузок (issue #167). По умолчанию включено; запоминается
+    /// между сессиями.
+    /// </summary>
+    public bool PlatformDownloadFilterBySection { get; set; } = true;
+
+    /// <summary>
+    /// Последний выбранный раздел страницы загрузок в окне «Скачивание версии платформы»
+    /// (issue #167). Пусто — раздел не выбран (или на странице нет разделов).
+    /// </summary>
+    public string PlatformDownloadSelectedSection { get; set; } = "";
+
+    /// <summary>
+    /// Последний выбранный тип дистрибутива в окне «Скачивание версии платформы»
+    /// (issue #167): каноническое имя <c>PlatformDownloadType</c> («Auto», «Client», …).
+    /// Пусто/неизвестное — «Auto».
+    /// </summary>
+    public string PlatformDownloadType { get; set; } = "Auto";
+
     /// <summary>Дополнительные каталоги, сканируемые «Списком выгрузок» наряду с каталогами сценариев.</summary>
     public List<string> BackupTargetDirectories { get; set; } = new();
 
@@ -1427,6 +1455,10 @@ public class AppSettings
         ItsAccountId ??= string.Empty;
         SkippedUpdateVersion ??= string.Empty;
         PlatformDownloadDirectory ??= string.Empty;
+        // issue #167 (1.0.1.127): последний выбор в окне «Скачивание версии платформы».
+        PlatformDownloadSelectedSection ??= string.Empty;
+        if (string.IsNullOrWhiteSpace(PlatformDownloadType))
+            PlatformDownloadType = "Auto";
         UpdateChainFolder ??= string.Empty;
         UpdateDistributionFolder ??= string.Empty;
         AfterLaunchAction = string.IsNullOrWhiteSpace(AfterLaunchAction) ? "None" : AfterLaunchAction;

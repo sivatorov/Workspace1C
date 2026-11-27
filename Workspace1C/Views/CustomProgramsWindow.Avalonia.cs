@@ -306,6 +306,25 @@ public sealed class CustomProgramsWindow : ModalWindowBase
 
         form.Children.Add(BuildIconRow());
 
+        // Issue #178: запуск от имени администратора. Пароль в приложении не хранится —
+        // его сохраняет Windows при первом запуске (runas /savecred).
+        var runAs = new CheckBox
+        {
+            Content = T("Launch.CustomPrograms.RunAsAdministrator"),
+            Margin = new Thickness(0, 4, 0, 4)
+        };
+        runAs.Bind(ToggleButton.IsCheckedProperty,
+            new Binding("SelectedProgram.RunAsAdministrator") { Mode = BindingMode.TwoWay });
+        ToolTip.SetTip(runAs, T("Launch.CustomPrograms.RunAsAdministratorTooltip"));
+        form.Children.Add(runAs);
+
+        form.Children.Add(FieldLabel("Launch.CustomPrograms.RunAsUserName"));
+        var runAsUser = Field("SelectedProgram.RunAsUserName");
+        runAsUser.Bind(Control.IsEnabledProperty,
+            new Binding("SelectedProgram.RunAsAdministrator"));
+        ToolTip.SetTip(runAsUser, T("Launch.CustomPrograms.RunAsUserNameTooltip"));
+        form.Children.Add(runAsUser);
+
         var enabled = new CheckBox { Content = T("Launch.CustomPrograms.Enabled"), Margin = new Thickness(0, 6, 0, 0) };
         enabled.Bind(ToggleButton.IsCheckedProperty,
             new Binding("SelectedProgram.Enabled") { Mode = BindingMode.TwoWay });

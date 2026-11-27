@@ -598,13 +598,21 @@ public partial class MainWindow
             };
             if (icon is FrameworkElement element)
                 content.Children.Add(element);
-            content.Children.Add(new TextBlock
+            // Issue #177: подпись вынесенного на верхний уровень пункта следует теме.
+            // Раньше кисть бралась разово через TryFindResource("TextSecondaryBrush"):
+            // при запуске в тёмной теме это #CBD5E1, и после переключения на светлую
+            // подпись оставалась светлой — пункт выглядел недоступным. DynamicResource
+            // перекрашивает подпись при смене темы; для активного пункта берём цвет
+            // основного текста темы (как у значковых кнопок), недоступные пункты
+            // по-прежнему гасятся триггером IconButton (Opacity 0.4).
+            var label = new TextBlock
             {
                 Text = title,
                 Margin = new Thickness(6, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
-                Foreground = TryFindResource("TextSecondaryBrush") as Brush
-            });
+            };
+            label.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
+            content.Children.Add(label);
             button.Content = content;
         }
         else
@@ -728,6 +736,12 @@ public partial class MainWindow
     {
         // Глифы кнопок управления окном следуют набору иконок активной темы (Задача 2).
         UpdateWindowControlGlyphs();
+
+        // Issue #177: подписи и значки вынесенных на верхний уровень пунктов
+        // строятся кодом с кистями активной темы. Пересобираем кнопки разделов,
+        // чтобы после смены темы они не остались с цветами прежней темы
+        // (в частности, подпись «Утилиты» не выглядела серой/недоступной).
+        RebuildSectionButtons();
 
         // Issue #130: ресурс BorderBrushColor заменён вместе с темой — линии сетки
         // перерисовываем после применения ресурсов (иначе они остаются с прежней,

@@ -69,17 +69,61 @@ public static class CustomProgramLauncher
     }
 
     /// <summary>
+    /// Нужен ли повышенный уровень прав для запуска (issue #178): флаг программы
+    /// и только Windows — на других платформах повышение прав через UAC/runas
+    /// не поддерживается, флаг игнорируется.
+    /// </summary>
+    public static bool RequiresElevation(CustomProgram? program)
+        => program is not null
+           && program.RunAsAdministrator
+           && OperatingSystem.IsWindows();
+
+    /// <summary>
+    /// Аргументы <c>runas.exe</c> для запуска с сохранёнными учётными данными
+    /// (issue #178): <c>/savecred /user:<account> "<file>" <args></c>.
+    /// Пароль приложение не хранит — его сохраняет Windows при первом запуске.
+    /// </summary>
+    public static string BuildRunAsArguments(CustomProgram program)
+    {
+        var args = $"/savecred /user:{program.RunAsUserName} \"{program.FilePath}\"";
+        if (!string.IsNullOrWhiteSpace(program.Arguments))
+            args += " " + program.Arguments;
+        return args;
+    }
+
+    /// <summary>
     /// Формирует параметры запуска: исполняемый файл, аргументы, рабочая папка.
     /// <c>UseShellExecute = true</c> — как у родного стартера 1С (Windows).
+    /// Issue #178: при <see cref="CustomProgram.RunAsAdministrator"/> на Windows
+    /// запуск идёт с повышением прав — UAC-запрос (Verb = "runas") либо
+    /// <c>runas /savecred</c>, если задана учётная запись.
     /// </summary>
     public static ProcessStartInfo BuildStartInfo(CustomProgram program)
     {
+        if (RequiresElevation(program) && !string.IsNullOrWhiteSpace(program.RunAsUserName))
+        {
+            // runas /savecred: пароль запрашивается один раз и сохраняется Windows.
+            var elevated = new ProcessStartInfo
+            {
+                FileName = "runas.exe",
+                Arguments = BuildRunAsArguments(program),
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            var runAsDir = ResolveWorkingDirectory(program);
+            if (!string.IsNullOrWhiteSpace(runAsDir))
+                elevated.WorkingDirectory = runAsDir!;
+            return elevated;
+        }
+
         var startInfo = new ProcessStartInfo
         {
             FileName = program?.FilePath ?? string.Empty,
             Arguments = program?.Arguments ?? string.Empty,
             UseShellExecute = true
         };
+        if (RequiresElevation(program))
+            startInfo.Verb = "runas"; // UAC-запрос от текущего пользователя
         var workDir = ResolveWorkingDirectory(program!);
         if (!string.IsNullOrWhiteSpace(workDir))
             startInfo.WorkingDirectory = workDir!;

@@ -214,6 +214,10 @@ namespace Workspace1C
         private void BuildTree()
         {
             _tree.ItemsSource = _vm.Roots;
+            // Issue #159 (1.0.1.127): горизонтальная прокрутка выключена — при
+            // раскрытии групп список больше не «скачет» по ширине из-за появившейся
+            // горизонтальной полосы; длинные подписи обрезаются внутри строки.
+            ScrollViewer.SetHorizontalScrollBarVisibility(_tree, ScrollBarVisibility.Disabled);
             _tree.SelectionMode = SelectionMode.Single;
             _tree.ItemTemplate = new FuncTreeDataTemplate(
                 typeof(UtilitiesMenuNodeItem),

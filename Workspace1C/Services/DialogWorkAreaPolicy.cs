@@ -54,7 +54,9 @@ public static class DialogWorkAreaPolicy
     /// содержимому (<c>SizeToContent.Height</c>), а длинный список прокручивается
     /// внутри дерева, не растягивая окно на весь экран.
     /// </summary>
-    public static readonly DialogProfile UtilitiesEditor = new(680, 440, 680, 800);
+    // Issue #159 (1.0.1.127): высота уменьшена до 640 — окно правки «Утилит»
+    // было чуть выше необходимого, пояснение помещается без прокрутки.
+    public static readonly DialogProfile UtilitiesEditor = new(640, 440, 640, 800);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Настройка меню трея» — 680 DIP по содержимому,
@@ -68,7 +70,9 @@ public static class DialogWorkAreaPolicy
     /// минимальная высота 400 DIP (панель операций короче, чем у «Утилит»).
     /// Issue #159 (1.0.1.123): верхняя граница 720 DIP для авторазмера по содержимому.
     /// </summary>
-    public static readonly DialogProfile ContextMenuEditor = new(540, 400, 540, 720);
+    // Issue #159 (1.0.1.127): высота увеличена до 600 — панель операций и
+    // пояснение помещаются без прокрутки (раньше появлялся скролл).
+    public static readonly DialogProfile ContextMenuEditor = new(600, 400, 600, 760);
 
     /// <summary>
     /// Issue #146 (1.0.1.118): окно «Мои программы» — 600 DIP по содержимому,

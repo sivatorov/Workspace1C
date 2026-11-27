@@ -66,13 +66,61 @@ namespace Workspace1C
 
             window.Loaded += (_, _) => Apply(window);
             window.SourceInitialized += (_, _) => Apply(window);
+            // Issue #171/#176: ограничения стартового размера (рабочая область минус
+            // отступ) не должны действовать на развёрнутое окно. WPF учитывает
+            // MaxWidth/MaxHeight при максимизации, из-за чего окно разворачивалось
+            // «не до конца» — справа и снизу оставались белые полосы.
+            window.StateChanged += (_, _) => OnStateChanged(window);
             Apply(window);
+        }
+
+        /// <summary>
+        /// Реакция на смену состояния окна (issue #171/#176): при развороте снимаем
+        /// ограничения максимума, при возврате в обычное состояние — применяем снова.
+        /// </summary>
+        private static void OnStateChanged(Window window)
+        {
+            try
+            {
+                if (window.WindowState == WindowState.Maximized)
+                {
+                    ClearSizeConstraints(window);
+                    return;
+                }
+
+                if (window.WindowState == WindowState.Normal)
+                    Apply(window);
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность.
+            }
+        }
+
+        /// <summary>
+        /// Снимает ограничения максимума, наложенные по рабочей области
+        /// (<see cref="WindowBoundsPolicy"/> вычитает отступ). Без этого
+        /// максимизированное окно не заполняет экран (issue #171/#176).
+        /// </summary>
+        private static void ClearSizeConstraints(Window window)
+        {
+            window.MaxWidth = double.PositiveInfinity;
+            window.MaxHeight = double.PositiveInfinity;
         }
 
         private static void Apply(Window window)
         {
             try
             {
+                // Issue #171/#176: развёрнутое окно ограничивать максимумом нельзя —
+                // его границы задаёт оконный менеджер, а MaxWidth/MaxHeight (рабочая
+                // область минус отступ) оставляли полосы справа и снизу.
+                if (window.WindowState == WindowState.Maximized)
+                {
+                    ClearSizeConstraints(window);
+                    return;
+                }
+
                 if (window.WindowState != WindowState.Normal)
                     return;
 

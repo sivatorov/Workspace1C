@@ -26,9 +26,10 @@ public sealed class Issue146WindowHeightTests
     public void Policy_Profiles_MatchIssue146Values()
     {
         // План 1.0.1.118, раздел 2.4: MinHeight < DefaultHeight = ContentHeight.
-        AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 680, 440);
+        // Issue #159 (1.0.1.127): «Утилиты» 640, «Контекстное меню» 600.
+        AssertProfile(DialogWorkAreaPolicy.UtilitiesEditor, 640, 440);
         AssertProfile(DialogWorkAreaPolicy.TrayEditor, 680, 440);
-        AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 540, 400);
+        AssertProfile(DialogWorkAreaPolicy.ContextMenuEditor, 600, 400);
         AssertProfile(DialogWorkAreaPolicy.CustomPrograms, 600, 440);
     }
 
@@ -40,7 +41,7 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, workArea);
 
-        Assert.Equal(680, size.Height, 3);
+        Assert.Equal(640, size.Height, 3);
         Assert.Equal(440, size.MinHeight, 3);
         Assert.True(size.MinHeight < size.Height);
         Assert.False(size.RequiresScrolling,
@@ -70,7 +71,7 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.ContextMenuEditor, workArea);
 
-        Assert.Equal(540, size.Height, 3);
+        Assert.Equal(600, size.Height, 3);
         Assert.Equal(400, size.MinHeight, 3);
         Assert.True(size.MinHeight < size.Height);
         Assert.False(size.RequiresScrolling,
@@ -104,10 +105,9 @@ public sealed class Issue146WindowHeightTests
             ("Мои программы", DialogWorkAreaPolicy.CustomPrograms),
         };
 
-        // Экран 600 DIP: верхняя граница 600 − 48 = 552. Окна с содержимым выше 552
-        // («Утилиты», «Меню трея», «Мои программы») урезаются до 552 и включают
-        // прокрутку. «Контекстное меню» (540 DIP) в 552 помещается целиком — это
-        // ожидаемо по плану 1.0.1.118, прокрутка ему не нужна.
+        // Экран 600 DIP: верхняя граница 600 − 48 = 552. Все окна с содержимым выше
+        // 552 («Утилиты» 640, «Меню трея» 680, «Контекстное меню» 600,
+        // «Мои программы» 600) урезаются до 552 и включают прокрутку.
         foreach (var (name, profile) in profiles)
         {
             var size = DialogWorkAreaPolicy.Recommend(profile, 600);
@@ -124,7 +124,7 @@ public sealed class Issue146WindowHeightTests
         Assert.Equal(552, DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, 600).Height, 3);
         Assert.Equal(552, DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.TrayEditor, 600).Height, 3);
         Assert.Equal(552, DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.CustomPrograms, 600).Height, 3);
-        Assert.Equal(540, DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.ContextMenuEditor, 600).Height, 3);
+        Assert.Equal(552, DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.ContextMenuEditor, 600).Height, 3);
 
         // Экран 520 DIP (верхняя граница 472) урезает и «Контекстное меню»: кламп и
         // прокрутка включаются для всех четырёх окон.
@@ -146,7 +146,7 @@ public sealed class Issue146WindowHeightTests
     {
         var size = DialogWorkAreaPolicy.Recommend(DialogWorkAreaPolicy.UtilitiesEditor, 0);
 
-        Assert.Equal(680, size.Height, 3);
+        Assert.Equal(640, size.Height, 3);
         Assert.Equal(440, size.MinHeight, 3);
         Assert.False(size.RequiresScrolling);
         // Issue #159 (1.0.1.123): у профилей редакторов появилась верхняя граница
@@ -157,9 +157,9 @@ public sealed class Issue146WindowHeightTests
     }
 
     [Theory]
-    [InlineData("UtilitiesMenuEditorWindow.xaml", 680, 440)]
+    [InlineData("UtilitiesMenuEditorWindow.xaml", 640, 440)]
     [InlineData("TrayMenuEditorWindow.xaml", 680, 440)]
-    [InlineData("ContextMenuEditorWindow.xaml", 540, 400)]
+    [InlineData("ContextMenuEditorWindow.xaml", 600, 400)]
     [InlineData("CustomProgramsWindow.xaml", 600, 440)]
     public void WpfWindows_MinHeightBelowHeight(string fileName, double height, double minHeight)
     {

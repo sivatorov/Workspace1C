@@ -209,8 +209,42 @@ namespace Workspace1C
                 return;
 
             window.Opened += (_, _) => ApplyWorkAreaClamp(window);
+            // Issue #176: ограничения максимума по рабочей области (минус отступ)
+            // не должны действовать на развёрнутое окно — иначе оконный менеджер
+            // разворачивает окно не до конца (полосы справа и снизу). При развороте
+            // снимаем MaxWidth/MaxHeight, при возврате в Normal — применяем снова.
+            window.PropertyChanged += (_, e) =>
+            {
+                if (e.Property == Window.WindowStateProperty)
+                    OnWindowStateChangedForClamp(window);
+            };
             if (window.IsVisible)
                 ApplyWorkAreaClamp(window);
+        }
+
+        /// <summary>
+        /// Реакция на смену состояния окна для ограничения по рабочей области
+        /// (issue #176): снимает ограничения максимума при развороте и повторно
+        /// применяет их при возврате в обычное состояние.
+        /// </summary>
+        private static void OnWindowStateChangedForClamp(Window window)
+        {
+            try
+            {
+                if (window.WindowState == WindowState.Maximized)
+                {
+                    window.MaxWidth = double.PositiveInfinity;
+                    window.MaxHeight = double.PositiveInfinity;
+                    return;
+                }
+
+                if (window.WindowState == WindowState.Normal)
+                    ApplyWorkAreaClamp(window);
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность.
+            }
         }
 
         private static void ApplyWorkAreaClamp(Window window)
@@ -221,6 +255,16 @@ namespace Workspace1C
                 // его границы задаёт оконный менеджер. Присвоение Width/Height
                 // развёрнутому окну сбрасывало WindowState в Normal, и при старте
                 // окно открывалось «размером как развёрнутое», но обычным.
+                // Issue #176: развёрнутое окно не ограничиваем максимумом — его
+                // границы задаёт оконный менеджер, а MaxWidth/MaxHeight (рабочая
+                // область минус отступ) оставляли полосы справа и снизу.
+                if (window.WindowState == WindowState.Maximized)
+                {
+                    window.MaxWidth = double.PositiveInfinity;
+                    window.MaxHeight = double.PositiveInfinity;
+                    return;
+                }
+
                 if (window.WindowState != WindowState.Normal)
                     return;
 

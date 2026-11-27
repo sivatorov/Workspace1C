@@ -17,7 +17,7 @@ namespace Workspace1C.Tests;
 /// Тесты issue #167 «Скачивание платформы — разделы» (релиз 1.0.1.121):
 /// <list type="bullet">
 /// <item>галочка «Только моя разрядность»: список файлов фильтруется по x64/x86 только
-/// при установленной галочке (по умолчанию — включена, прежнее поведение);</item>
+/// при установленной галочке (с 1.0.1.127 по умолчанию — снята);</item>
 /// <item>выбор раздела страницы загрузок (сворачиваемые группы) с галочкой фильтрации;
 /// при отсутствии разделов строка скрыта (<c>HasSections</c> = false);</item>
 /// <item>чистые помощники <see cref="PlatformDistributionPicker.ExtractSections"/> и
@@ -103,11 +103,28 @@ public sealed class Issue167PlatformDownloadSectionTests
             File("8.3.27.2214_x86.zip", "x86")));
 
         await vm.LoadCatalogAsync();
+        vm.FilterByArchitecture = true;
 
-        // По умолчанию галочка включена — прежнее поведение: только выбранная битность.
-        Assert.True(vm.FilterByArchitecture);
+        // Установленная галочка — только выбранная битность.
         Assert.Contains(vm.DistributionOptions, o => o.File.FileName == "8.3.27.2214_x64.zip");
         Assert.DoesNotContain(vm.DistributionOptions, o => o.File.FileName == "8.3.27.2214_x86.zip");
+    }
+
+    [Fact]
+    public async Task Vm_Defaults_ArchitectureFilterOff_SectionFilterOn()
+    {
+        var vm = CreateVm(Release("8.3.27.2214",
+            File("8.3.27.2214_x64.zip", "x64"),
+            File("8.3.27.2214_x86.zip", "x86")));
+
+        await vm.LoadCatalogAsync();
+
+        // Issue #167 (1.0.1.127): по умолчанию галочка разрядности снята — видны файлы
+        // обеих разрядностей, а фильтр по разделу остаётся включённым.
+        Assert.False(vm.FilterByArchitecture);
+        Assert.True(vm.FilterBySection);
+        Assert.Contains(vm.DistributionOptions, o => o.File.FileName == "8.3.27.2214_x64.zip");
+        Assert.Contains(vm.DistributionOptions, o => o.File.FileName == "8.3.27.2214_x86.zip");
     }
 
     [Fact]
@@ -197,8 +214,9 @@ public sealed class Issue167PlatformDownloadSectionTests
 
         await vm.LoadCatalogAsync();
 
-        // Issue #167 (1.0.1.124): обе галочки включены по умолчанию, раздел — первый.
-        Assert.True(vm.FilterByArchitecture);
+        // Issue #167 (1.0.1.127): фильтр раздела включён по умолчанию, раздел — первый;
+        // галочка разрядности по умолчанию снята.
+        Assert.False(vm.FilterByArchitecture);
         Assert.True(vm.FilterBySection);
         Assert.Equal(GroupPlatform, vm.SelectedSection);
         Assert.Equal("a_x64.zip", Assert.Single(vm.DistributionOptions).File.FileName);
@@ -344,8 +362,9 @@ public sealed class Issue167PlatformDownloadSectionTests
 
         await vm.LoadCatalogAsync();
 
-        // Issue #167 (1.0.1.124): по умолчанию обе галочки включены (разрядность и
-        // раздел), выбран первый раздел; в подписи нет ни раздела, ни разрядности.
+        // Issue #167 (1.0.1.127): по умолчанию галочка разрядности снята — включаем
+        // её явно; фильтр раздела включён, выбран первый раздел.
+        vm.FilterByArchitecture = true;
         Assert.True(vm.FilterByArchitecture);
         Assert.True(vm.FilterBySection);
         Assert.Equal("Windows (64-bit)", vm.SelectedSection);
@@ -692,6 +711,36 @@ public sealed class Issue167PlatformDownloadSectionTests
             Assert.False(string.IsNullOrWhiteSpace(value), $"{fileName}: пустой ключ {key}");
             Assert.NotEqual(key, value);
         }
+    }
+
+    // ===================== Запоминание выбора (1.0.1.127) =====================
+
+    [Fact]
+    public void AppSettings_PlatformDownloadSelectionDefaults()
+    {
+        var settings = new AppSettings();
+
+        // Галочка разрядности по умолчанию снята, фильтр раздела включён.
+        Assert.False(settings.PlatformDownloadFilterByArchitecture);
+        Assert.True(settings.PlatformDownloadFilterBySection);
+        Assert.Equal(string.Empty, settings.PlatformDownloadSelectedSection);
+        Assert.Equal("Auto", settings.PlatformDownloadType);
+    }
+
+    [Theory]
+    [InlineData("PlatformDownloadWindow.xaml.cs")]
+    [InlineData("PlatformDownloadWindow.Avalonia.cs")]
+    public void Windows_RestoreAndPersistDownloadSelection(string fileName)
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", fileName);
+
+        // Issue #167 (1.0.1.127): выбор между сессиями восстанавливается...
+        Assert.Contains("PlatformDownloadFilterByArchitecture", code);
+        Assert.Contains("PlatformDownloadFilterBySection", code);
+        Assert.Contains("PlatformDownloadSelectedSection", code);
+        Assert.Contains("PlatformDownloadType", code);
+        // ...и сохраняется при изменении (паритет WPF/Avalonia).
+        Assert.Contains("SaveSettings", code);
     }
 
     // ===================== Вспомогательные методы =====================

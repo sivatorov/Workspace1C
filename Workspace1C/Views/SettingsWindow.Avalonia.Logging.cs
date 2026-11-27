@@ -32,9 +32,9 @@ namespace Workspace1C
         /// </summary>
         private Control BuildLoggingTab()
         {
-            var panel = new StackPanel { Spacing = 6 };
+            var panel = new StackPanel { Spacing = 10 };
 
-            panel.Children.Add(Hint(LocalizationManager.T("Settings.Logging.Description"), bottom: 10));
+            panel.Children.Add(Hint(LocalizationManager.T("Settings.Logging.Description"), bottom: 4));
 
             // Общий выключатель «CM_ON».
             _loggingMasterOnCheck = SettingsSwitch(
@@ -43,13 +43,18 @@ namespace Workspace1C
             _loggingMasterOnCheck.Margin = new Thickness(0, 0, 0, 6);
             panel.Children.Add(_loggingMasterOnCheck);
 
-            // Направления issue #80.
-            panel.Children.Add(GroupSectionHeader("Settings.Logging.Directions"));
-            AddLoggingCategories(panel, LogCategory.DirectionCategories);
+            // Issue #175 (1.0.1.127): группы вкладки — такие же карточки с видимой
+            // рамкой, как остальные группы настроек (раньше были только заголовки
+            // без границ, и группы визуально «слипались» с фоном).
+            var directions = new StackPanel { Spacing = 6 };
+            AddLoggingCategories(directions, LogCategory.DirectionCategories);
+            panel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.Logging.Directions"),
+                directions, new Thickness(8), 0));
 
             // Существовавшие до issue #80 диагностические флаги trace.json.
-            panel.Children.Add(GroupSectionHeader("Settings.Logging.Diagnostics"));
-            AddLoggingCategories(panel, LogCategory.DiagnosticCategories);
+            var diagnostics = new StackPanel { Spacing = 6 };
+            AddLoggingCategories(diagnostics, LogCategory.DiagnosticCategories);
 
             // issue #143 (1.0.1.125): диагностика резервного копирования СУБД
             // (CM_DEBUG_DBMS=1) — настройка приложения, а не trace.json.
@@ -57,7 +62,11 @@ namespace Workspace1C
                 "Settings.Logging.DbmsDiagnostics", _viewModel.DbmsBackupDiagnosticsEnabled,
                 helpTextKey: "Settings.Logging.DbmsDiagnosticsDesc");
             _dbmsBackupDiagnosticsCheck.Margin = new Thickness(0, 8, 0, 0);
-            panel.Children.Add(_dbmsBackupDiagnosticsCheck);
+            diagnostics.Children.Add(_dbmsBackupDiagnosticsCheck);
+
+            panel.Children.Add(SettingsGroup(
+                LocalizationManager.T("Settings.Logging.Diagnostics"),
+                diagnostics, new Thickness(8), 0));
 
             return panel;
         }

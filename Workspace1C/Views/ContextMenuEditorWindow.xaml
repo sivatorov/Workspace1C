@@ -9,7 +9,7 @@
         mc:Ignorable="d"
         Title="{loc:Loc ContextMenu.Editor.Title}"
         Icon="{StaticResource AppIcon}"
-        Height="540" Width="760"
+        Height="600" Width="760"
         MinWidth="640" MinHeight="400"
         WindowStartupLocation="CenterOwner"
         FontSize="13"

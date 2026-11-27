@@ -87,6 +87,16 @@ namespace Workspace1C
             // платформы (AppSettings.PlatformIncludeTestVersions, по умолчанию выключена).
             _viewModel.IncludeTestVersions = _settings.PlatformIncludeTestVersions;
 
+            // Issue #167 (1.0.1.127): восстанавливаем последний выбор — галочки фильтров,
+            // раздел и тип дистрибутива запоминаются между сессиями (паритет с WPF).
+            _viewModel.FilterByArchitecture = _settings.PlatformDownloadFilterByArchitecture;
+            _viewModel.FilterBySection = _settings.PlatformDownloadFilterBySection;
+            if (!string.IsNullOrWhiteSpace(_settings.PlatformDownloadSelectedSection))
+                _viewModel.SelectedSection = _settings.PlatformDownloadSelectedSection;
+            if (Enum.TryParse<Services.PlatformDownloadType>(
+                    _settings.PlatformDownloadType, ignoreCase: true, out var savedType))
+                _viewModel.DownloadType = savedType;
+
             Content = BuildRoot();
             _viewModel.PropertyChanged += OnViewModelPropertyChanged;
 
@@ -126,6 +136,29 @@ namespace Workspace1C
                 catch
                 {
                     // Несохранение флажка не критично.
+                }
+
+                return;
+            }
+
+            // Issue #167 (1.0.1.127): последний выбор фильтров, раздела и типа
+            // дистрибутива запоминается между сессиями (паритет с WPF).
+            if (e.PropertyName is nameof(PlatformDownloadViewModel.FilterByArchitecture)
+                or nameof(PlatformDownloadViewModel.FilterBySection)
+                or nameof(PlatformDownloadViewModel.SelectedSection)
+                or nameof(PlatformDownloadViewModel.DownloadType))
+            {
+                try
+                {
+                    _settings.PlatformDownloadFilterByArchitecture = _viewModel.FilterByArchitecture;
+                    _settings.PlatformDownloadFilterBySection = _viewModel.FilterBySection;
+                    _settings.PlatformDownloadSelectedSection = _viewModel.SelectedSection ?? string.Empty;
+                    _settings.PlatformDownloadType = _viewModel.DownloadType.ToString();
+                    _repository.SaveSettings(_settings);
+                }
+                catch
+                {
+                    // Несохранение выбора не критично.
                 }
 
                 return;
