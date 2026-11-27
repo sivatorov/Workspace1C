@@ -288,12 +288,34 @@ namespace Workspace1C.Controls
             ScaledFont(Themes.WindowChromeMetrics.TitleBarFontSize);
 
         /// <summary>
+        /// Ширина кнопки управления окном (issue #179, 1.0.1.130): единая метрика,
+        /// не зависящая от темы кнопок. Раньше ширина бралась из <c>ThemeFeatureMap.Size</c>
+        /// (34/40/46), а высота — из метрики полосы, из-за чего кнопки обрезались.
+        /// В компактном режиме берётся компактное значение.
+        /// </summary>
+        public static double WindowButtonWidth => Compact
+            ? Themes.WindowChromeMetrics.CompactWindowButtonWidth
+            : Themes.WindowChromeMetrics.WindowButtonWidth;
+
+        /// <summary>
+        /// Диаметр подложки кнопки управления окном (issue #179, 1.0.1.130): общий для
+        /// главного окна и диалогов. В компактном режиме — компактное значение, чтобы
+        /// круг оставался вписанным в кнопку и центрировался в полосе.
+        /// </summary>
+        public static double WindowButtonCircleDiameter => Compact
+            ? Themes.WindowChromeMetrics.CompactWindowButtonCircleDiameter
+            : Themes.WindowChromeMetrics.WindowButtonCircleDiameter;
+
+        /// <summary>Радиус подложки кнопки окна (половина диаметра) для скруглений.</summary>
+        public static double WindowButtonCircleRadius => WindowButtonCircleDiameter / 2;
+
+        /// <summary>
         /// Правый отступ группы кнопок управления окном (issue #179): одинаков у
         /// главного окна и диалогов, чтобы кнопки не выглядели смещёнными вправо.
-        /// В компактном режиме — компактный боковой отступ, как и слева.
+        /// В компактном режиме — компактное значение (равно боковому отступу полосы).
         /// </summary>
         public static double WindowButtonRightInset => Compact
-            ? Themes.WindowChromeMetrics.CompactTitleBarSideInset
+            ? Themes.WindowChromeMetrics.CompactWindowButtonRightInset
             : Themes.WindowChromeMetrics.WindowButtonRightInset;
 
         /// <summary>Минимальная ширина правой панели сведений.</summary>

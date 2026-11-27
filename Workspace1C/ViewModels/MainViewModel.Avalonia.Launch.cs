@@ -1,4 +1,5 @@
 #if LINUX
+using System.IO;
 using System.Windows.Input;
 using Avalonia.Threading;
 using Workspace1C.Localization;
@@ -336,12 +337,90 @@ public partial class MainViewModel : ViewModelBase
         if (string.IsNullOrWhiteSpace(path))
             return;
 
-        if (!OneCLauncher.RunDesignerBatch(ib, operation, path))
+        StartDesignerDump(ib, operation, path, startedKey, titleKey, allowRetry: true);
+    }
+
+    /// <summary>
+    /// Запускает выгрузку .dt/.cf и при отказе показывает причину (issue #181): открытый
+    /// конфигуратор или занятая база/файл — понятное предупреждение с просьбой закрыть
+    /// конфигуратор, предложение открыть папку и повторить выгрузку (не более одного раза).
+    /// </summary>
+    private void StartDesignerDump(Infobase ib, OneCLauncher.DesignerBatchOperation operation,
+        string path, string startedKey, string titleKey, bool allowRetry)
+    {
+        if (OneCLauncher.RunDesignerBatch(ib, operation, path, credential: null,
+                repositoryVersion: null, repositoryReportBegin: null, repositoryReportEnd: null,
+                permissionCode: null, out var startError))
+        {
+            ib.AddLaunchHistory(
+                operation == OneCLauncher.DesignerBatchOperation.DumpIB ? "DumpDT" : "DumpCF", path);
+            SaveSilently();
+            _dialog.ShowInfo(LocalizationManager.T(startedKey), LocalizationManager.T(titleKey));
+            return;
+        }
+
+        var kind = DesignerLockClassifier.Classify(startError);
+        if (!DesignerLockClassifier.IsLockRelated(kind))
+        {
+            _logger.Warn($"Выгрузка «{ib.Name}» не запущена: {startError}");
+            _dialog.ShowError(
+                string.IsNullOrWhiteSpace(startError)
+                    ? LocalizationManager.T("Main.OperationFailedDefault")
+                    : startError!,
+                LocalizationManager.T("Main.OperationErrorTitle"));
+            return;
+        }
+
+        _logger.Warn($"Выгрузка «{ib.Name}» заблокирована ({kind}): {startError}");
+        var warningTitle = LocalizationManager.T("Launcher.DumpBlockedWarningTitle");
+        var warningBody = string.Format(
+            LocalizationManager.T("Launcher.DumpBlockedWarningBody"), ib.Name,
+            startError?.Trim() ?? LocalizationManager.T("Main.OperationFailedDefault"));
+        if (!allowRetry)
+            warningBody += "\n\n" + LocalizationManager.T("Launcher.DumpStillBlocked");
+        _dialog.ShowWarning(warningBody, warningTitle);
+
+        var folder = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder) &&
+            _dialog.Confirm(LocalizationManager.T("Launcher.DumpOpenFolderPrompt"), warningTitle))
+            CacheFolderOpener.TryOpenDirectory(folder);
+
+        if (!allowRetry)
             return;
 
-        ib.AddLaunchHistory(operation == OneCLauncher.DesignerBatchOperation.DumpIB ? "DumpDT" : "DumpCF", path);
-        SaveSilently();
-        _dialog.ShowInfo(LocalizationManager.T(startedKey), LocalizationManager.T(titleKey));
+        if (_dialog.Confirm(LocalizationManager.T("Launcher.DumpRetryPrompt"), warningTitle))
+            StartDesignerDump(ib, operation, path, startedKey, titleKey, allowRetry: false);
+    }
+
+    /// <summary>
+    /// Завершение пакетной операции DESIGNER (issue #181): если 1С сообщила о монопольном
+    /// доступе/занятом файле уже после старта, показываем то же понятное предупреждение,
+    /// что и при отказе запуска, а не сырой текст ошибки.
+    /// </summary>
+    private void OnDesignerBatchCompletedLockAware(object? sender, OneCLauncher.DesignerBatchInfo e)
+    {
+        if (e.Success)
+            return;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            _logger.Error($"Ошибка пакетной операции: {e.ErrorMessage}");
+            var kind = DesignerLockClassifier.Classify(e.ErrorMessage);
+            if (DesignerLockClassifier.IsLockRelated(kind))
+            {
+                _dialog.ShowWarning(
+                    string.Format(LocalizationManager.T("Launcher.DumpBlockedWarningBody"),
+                        e.InfobaseName,
+                        e.ErrorMessage?.Trim() ?? LocalizationManager.T("Main.OperationFailedDefault")),
+                    LocalizationManager.T("Launcher.DumpBlockedWarningTitle"));
+            }
+            else
+            {
+                _dialog.ShowError(
+                    e.ErrorMessage ?? LocalizationManager.T("Main.OperationFailedDefault"),
+                    LocalizationManager.T("Main.OperationErrorTitle"));
+            }
+        });
     }
 
     private void RefreshConfigurationInfo(object? parameter)

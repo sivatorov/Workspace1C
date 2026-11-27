@@ -1619,8 +1619,10 @@ namespace Workspace1C
             // в базовом словаре Icons.axaml, поэтому в норме недостижимо (Задача 2).
             private const string MinimizeData = "M6,12 L18,12";
 
-            /// <summary>Диаметр подложки кнопки диалога (без учёта скругления).</summary>
-            private const double CircleDiameter = 26;
+            // Диаметр подложки, ширина и высота кнопки диалога — только из общих
+            // метрик (issue #179, 1.0.1.130), как у главного окна: локального числа
+            // 26 здесь больше нет, поэтому кнопки диалогов не расходятся с главным
+            // окном по геометрии.
 
             private readonly DialogWindowControlKind _kind;
             private readonly Avalonia.Controls.Shapes.Path _glyph;
@@ -1653,7 +1655,7 @@ namespace Workspace1C
             private bool _focused;
 
             /// <summary>Скругление подложки из темы (как в главном окне).</summary>
-            private double _cornerRadius = CircleDiameter / 2;
+            private double _cornerRadius = UiMetrics.WindowButtonCircleRadius;
 
             // Части шаблона: задаются при его применении, до этого null (ApplyState
             // вызывается и из конструктора, поэтому обращения защищены проверкой).
@@ -1687,10 +1689,10 @@ namespace Workspace1C
             {
                 _kind = kind;
 
-                // Ширина далее переопределяется метриками темы (ApplyWindowButtonTheme);
-                // здесь — стартовый размер Fluent. Высота — общая метрика полосы
-                // заголовка (issue #179): как у кнопок главного окна, без смещения.
-                Width = UiMetrics.Scaled(40);
+                // Ширина и высота — из общих метрик (issue #179, 1.0.1.130): как у
+                // кнопок главного окна. Ширина не зависит от темы, высота равна
+                // высоте полосы заголовка, поэтому кнопка не обрезается.
+                Width = UiMetrics.WindowButtonWidth;
                 Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
                 Padding = new Thickness(0);
                 HorizontalContentAlignment = HorizontalAlignment.Center;
@@ -1706,10 +1708,10 @@ namespace Workspace1C
                     {
                         new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<DialogWindowControlButton>((_, _) =>
                         {
-                            var diameter = UiMetrics.Scaled(CircleDiameter);
+                            var diameter = UiMetrics.WindowButtonCircleDiameter;
                             // Скругление из темы (как в главном окне), ограничено половиной
                             // диаметра, чтобы подложка не выходила за свои границы.
-                            var radius = UiMetrics.Scaled(Math.Min(_cornerRadius, CircleDiameter / 2));
+                            var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
 
                             _circle = new Border
                             {
@@ -1814,11 +1816,13 @@ namespace Workspace1C
                 _minimizeHoverBg = metrics.MinimizeHover;
                 _maximizeHoverBg = metrics.MaximizeHover;
                 _cornerRadius = metrics.CornerRadius;
-                Width = UiMetrics.Scaled(metrics.Size);
+                // Ширина — общая метрика (не из темы, issue #179/1.0.1.130), как у
+                // главного окна.
+                Width = UiMetrics.WindowButtonWidth;
                 // Высота кнопки = высоте полосы (issue #179): кнопка занимает полосу
                 // целиком и центрирована по вертикали.
                 Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
-                var radius = UiMetrics.Scaled(Math.Min(_cornerRadius, CircleDiameter / 2));
+                var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
                 if (_circle is not null)
                     _circle.CornerRadius = new CornerRadius(radius);
                 if (_focusRing is not null)

@@ -1423,9 +1423,11 @@ namespace Workspace1C
                 // вверх. Компактный режим уменьшает высоту вместе с кнопками (issue #296).
                 Height = UiMetrics.TitleBarHeight,
                 // Вертикальных отступов нет (TitleBarPadV = 0): иначе шапка снова
-                // стала бы выше диалоговой. Горизонтальный отступ задаёт правый
-                // отступ группы кнопок и левый отступ заголовка.
-                Padding = new Thickness(UiMetrics.TitleBarPadH, UiMetrics.TitleBarPadV)
+                // стала бы выше диалоговой. Горизонтальный Padding полосы задаёт
+                // ТОЛЬКО левый отступ заголовка (issue #179, 1.0.1.130); правый зазор
+                // кнопок больше не зависит от Padding — он задаётся Margin панели
+                // кнопок (BuildWindowControls), как у диалогов.
+                Padding = new Thickness(UiMetrics.TitleBarPadH, UiMetrics.TitleBarPadV, 0, 0)
             };
             ThemeBrushes.Bind(_titleBarBorder, Border.BorderBrushProperty, "BorderColorBrush");
 
@@ -1479,7 +1481,12 @@ namespace Workspace1C
             var panel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                // Единый правый отступ группы кнопок (issue #179, 1.0.1.130): тот же,
+                // что у диалогов (ModalWindowBase.BuildTitleStrip). Раньше главное окно
+                // задавало зазор через Padding полосы — при смене темы/компактного
+                // режима он «плыл» и кнопка закрытия уходила влево от края.
+                Margin = new Thickness(0, 0, UiMetrics.WindowButtonRightInset, 0)
             };
 
             // Список пересобирается вместе с шапкой: старые кнопки уже не в дереве.

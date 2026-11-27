@@ -149,11 +149,11 @@
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
                 <Setter Property="BorderThickness" Value="0"/>
-                <!-- Размер кнопки (ширина) приходит из темы: 46 — Fluent, 40 — Minimal, 34 — Classic.
-                     Высота — единая метрика полосы заголовка (issue #179): кнопка занимает
-                     полосу целиком, поэтому не смещается вверх/вниз ни в главном окне,
-                     ни в дочерних окнах. -->
-                <Setter Property="Width" Value="{DynamicResource WindowButtonSize}"/>
+                <!-- Ширина и высота кнопки — единые метрики (issue #179, 1.0.1.130):
+                     ширина больше не зависит от темы (46/40/34) и совпадает с Avalonia,
+                     высота равна высоте полосы заголовка. Поэтому кнопки главного окна и
+                     диалогов одинакового размера и не обрезаются по вертикали. -->
+                <Setter Property="Width" Value="{x:Static themes:WindowChromeMetrics.WindowButtonWidth}"/>
                 <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.WindowButtonHeight}"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -178,10 +178,14 @@
                                      Fluent — круг (15), Minimal — мягкий квадрат (4), Classic — прямоугольник (0).
                                      Прозрачность слоёв анимируется триггерами (плавная заливка),
                                      масштаб подложки даёт тактильный отклик нажатия. -->
-                                <Grid x:Name="circleRoot" Width="30" Height="30"
+                                <Grid x:Name="circleRoot"
+                                      Width="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
+                                      Height="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
                                       HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid.RenderTransform>
-                                        <ScaleTransform x:Name="circleScale" CenterX="15" CenterY="15"/>
+                                        <ScaleTransform x:Name="circleScale"
+                                                        CenterX="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"
+                                                        CenterY="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"/>
                                     </Grid.RenderTransform>
                                     <Border x:Name="hoverLayer" CornerRadius="{DynamicResource WindowButtonCornerRadius}"
                                             Background="{TemplateBinding local:WindowChromeHelper.HoverBrush}" Opacity="0"/>
@@ -289,10 +293,14 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Grid>
-                                <Grid x:Name="circleRoot" Width="30" Height="30"
+                                <Grid x:Name="circleRoot"
+                                      Width="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
+                                      Height="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
                                       HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid.RenderTransform>
-                                        <ScaleTransform x:Name="circleScale" CenterX="15" CenterY="15"/>
+                                        <ScaleTransform x:Name="circleScale"
+                                                        CenterX="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"
+                                                        CenterY="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"/>
                                     </Grid.RenderTransform>
                                     <Border x:Name="hoverLayer" CornerRadius="{DynamicResource WindowButtonCornerRadius}"
                                             Background="{TemplateBinding local:WindowChromeHelper.HoverBrush}" Opacity="0"/>
@@ -387,10 +395,14 @@
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
                             <Grid>
-                                <Grid x:Name="circleRoot" Width="30" Height="30"
+                                <Grid x:Name="circleRoot"
+                                      Width="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
+                                      Height="{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}"
                                       HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid.RenderTransform>
-                                        <ScaleTransform x:Name="circleScale" CenterX="15" CenterY="15"/>
+                                        <ScaleTransform x:Name="circleScale"
+                                                        CenterX="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"
+                                                        CenterY="{x:Static themes:WindowChromeMetrics.WindowButtonCircleRadius}"/>
                                     </Grid.RenderTransform>
                                     <!-- Цветной круг «светофора»: всегда видим (Opacity="1"). -->
                                     <Border x:Name="hoverLayer" CornerRadius="{DynamicResource WindowButtonCornerRadius}"

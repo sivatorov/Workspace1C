@@ -2116,12 +2116,26 @@ public partial class MainViewModel : ViewModelBase
             ExportIndicatorTooltip = string.Empty;
 
             // При неуспехе показываем реальную причину (лог 1С из /Out и код возврата).
+            // Issue #181: если причина — открытый конфигуратор или занятый файл базы,
+            // показываем понятное предупреждение вместо сырого текста ошибки 1С.
             if (!e.Success)
             {
                 _logger.Error($"Ошибка пакетной операции: {e.ErrorMessage}");
-                _dialogs.ShowError(
-                    e.ErrorMessage ?? LocalizationManager.T("Main.OperationFailedDefault"),
-                    LocalizationManager.T("Main.OperationErrorTitle"));
+                var kind = DesignerLockClassifier.Classify(e.ErrorMessage);
+                if (DesignerLockClassifier.IsLockRelated(kind))
+                {
+                    _dialogs.ShowWarning(
+                        string.Format(LocalizationManager.T("Launcher.DumpBlockedWarningBody"),
+                            e.InfobaseName,
+                            e.ErrorMessage?.Trim() ?? LocalizationManager.T("Main.OperationFailedDefault")),
+                        LocalizationManager.T("Launcher.DumpBlockedWarningTitle"));
+                }
+                else
+                {
+                    _dialogs.ShowError(
+                        e.ErrorMessage ?? LocalizationManager.T("Main.OperationFailedDefault"),
+                        LocalizationManager.T("Main.OperationErrorTitle"));
+                }
             }
         });
     }
@@ -2139,20 +2153,8 @@ public partial class MainViewModel : ViewModelBase
         };
         if (dlg.ShowDialog() != true) return;
 
-        if (OneCLauncher.RunDesignerBatch(ib, OneCLauncher.DesignerBatchOperation.DumpIB, dlg.FileName))
-        {
-            ib.AddLaunchHistory("DumpDT", dlg.FileName);
-            Save();
-            _dialogs.ShowInfo(
-                LocalizationManager.T("Main.DumpDtStarted"),
-                LocalizationManager.T("Main.DumpDtTitle"));
-        }
-        else
-        {
-            _dialogs.ShowError(
-                LocalizationManager.T("Main.OperationFailedDefault"),
-                LocalizationManager.T("Main.OperationErrorTitle"));
-        }
+        StartDesignerDump(ib, OneCLauncher.DesignerBatchOperation.DumpIB, dlg.FileName,
+            "DumpDT", "Main.DumpDtStarted", "Main.DumpDtTitle", allowRetry: true);
     }
 
     private void DumpConfigurationCf(object? parameter)
@@ -2168,20 +2170,63 @@ public partial class MainViewModel : ViewModelBase
         };
         if (dlg.ShowDialog() != true) return;
 
-        if (OneCLauncher.RunDesignerBatch(ib, OneCLauncher.DesignerBatchOperation.DumpCfg, dlg.FileName))
+        StartDesignerDump(ib, OneCLauncher.DesignerBatchOperation.DumpCfg, dlg.FileName,
+            "DumpCF", "Main.DumpCfStarted", "Main.DumpCfTitle", allowRetry: true);
+    }
+
+    /// <summary>
+    /// Запускает выгрузку .dt/.cf и при отказе показывает причину (issue #181):
+    /// если конфигуратор этой базы запущен или файл базы/назначения занят — понятное
+    /// предупреждение с просьбой закрыть конфигуратор, предложение открыть папку и
+    /// повторить выгрузку. Ретрай — только по подтверждению и не более одного раза.
+    /// </summary>
+    private void StartDesignerDump(Infobase ib, OneCLauncher.DesignerBatchOperation operation,
+        string path, string historyAction, string startedKey, string titleKey, bool allowRetry)
+    {
+        if (OneCLauncher.RunDesignerBatch(ib, operation, path, credential: null,
+                repositoryVersion: null, repositoryReportBegin: null, repositoryReportEnd: null,
+                permissionCode: null, out var startError))
         {
-            ib.AddLaunchHistory("DumpCF", dlg.FileName);
+            ib.AddLaunchHistory(historyAction, path);
             Save();
             _dialogs.ShowInfo(
-                LocalizationManager.T("Main.DumpCfStarted"),
-                LocalizationManager.T("Main.DumpCfTitle"));
+                LocalizationManager.T(startedKey),
+                LocalizationManager.T(titleKey));
+            return;
         }
-        else
+
+        var kind = DesignerLockClassifier.Classify(startError);
+        if (!DesignerLockClassifier.IsLockRelated(kind))
         {
+            _logger.Warn($"Выгрузка «{ib.Name}» не запущена: {startError}");
             _dialogs.ShowError(
-                LocalizationManager.T("Main.OperationFailedDefault"),
+                string.IsNullOrWhiteSpace(startError)
+                    ? LocalizationManager.T("Main.OperationFailedDefault")
+                    : startError!,
                 LocalizationManager.T("Main.OperationErrorTitle"));
+            return;
         }
+
+        _logger.Warn($"Выгрузка «{ib.Name}» заблокирована ({kind}): {startError}");
+        var warningTitle = LocalizationManager.T("Launcher.DumpBlockedWarningTitle");
+        var warningBody = string.Format(
+            LocalizationManager.T("Launcher.DumpBlockedWarningBody"), ib.Name,
+            startError?.Trim() ?? LocalizationManager.T("Main.OperationFailedDefault"));
+        if (!allowRetry)
+            warningBody += "\n\n" + LocalizationManager.T("Launcher.DumpStillBlocked");
+        _dialogs.ShowWarning(warningBody, warningTitle);
+
+        // Папка выгрузки уже могла быть создана — предлагаем открыть её.
+        var folder = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(folder) && Directory.Exists(folder) &&
+            _dialogs.Confirm(LocalizationManager.T("Launcher.DumpOpenFolderPrompt"), warningTitle))
+            CacheFolderOpener.TryOpenDirectory(folder);
+
+        if (!allowRetry)
+            return;
+
+        if (_dialogs.Confirm(LocalizationManager.T("Launcher.DumpRetryPrompt"), warningTitle))
+            StartDesignerDump(ib, operation, path, historyAction, startedKey, titleKey, allowRetry: false);
     }
 
     private void TestInfobase(object? parameter)

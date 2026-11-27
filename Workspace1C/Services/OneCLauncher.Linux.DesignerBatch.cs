@@ -180,6 +180,16 @@ namespace Workspace1C.Services
                         return false;
                     }
                 }
+
+                // Issue #181: файл назначения занят другим процессом — выгрузка не сможет
+                // его перезаписать. Понятное предупреждение до запуска конфигуратора.
+                if (operation is DesignerBatchOperation.DumpIB or DesignerBatchOperation.DumpCfg &&
+                    DesignerLockClassifier.IsFileLocked(outputPath))
+                {
+                    startError = string.Format(
+                        LocalizationManager.T("Launcher.OutputFileLockedFormat"), outputPath);
+                    return false;
+                }
             }
             else if (operation is DesignerBatchOperation.RepositoryLock or DesignerBatchOperation.RepositoryUnlock)
             {
@@ -469,6 +479,15 @@ namespace Workspace1C.Services
                 return true;
             }
 
+            // Issue #181: файл базы занят другим процессом (открыт конфигуратор/сеанс 1С),
+            // но командную строку процесса прочитать не удалось — выгрузка всё равно
+            // требует монопольного доступа. Паритет с Windows-веткой.
+            if (DesignerLockClassifier.IsInfobaseLocked(infobase))
+            {
+                reason = LocalizationManager.T("Launcher.BaseLockedFormat");
+                return true;
+            }
+
             return false;
         }
 
@@ -559,8 +578,10 @@ namespace Workspace1C.Services
                     if (!n.StartsWith("1cv8", StringComparison.OrdinalIgnoreCase))
                         continue;
                     var c = cmd ?? string.Empty;
+                    // Issue #181: сравнение токена базы терпимо к регистру, кавычкам,
+                    // префиксу File= и клиент-серверной форме Srvr/Ref.
                     if (c.Contains("DESIGNER", StringComparison.OrdinalIgnoreCase) &&
-                        c.Contains(baseToken, StringComparison.OrdinalIgnoreCase))
+                        DesignerLockClassifier.CommandLineMatchesBase(c, baseToken))
                         return true;
                 }
             }

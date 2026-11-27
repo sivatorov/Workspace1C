@@ -94,8 +94,11 @@ public sealed class Issue179WindowTitleBarTests
         Assert.Contains("{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}", xaml, StringComparison.Ordinal);
         // Прежние отступы 12,6 делали шапку главного окна выше диалоговой.
         Assert.DoesNotContain("Value=\"12,6\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Value=\"12,0\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Value=\"8,0\"", xaml, StringComparison.Ordinal);
+        // 1.0.1.130: правый Padding полосы больше не задаётся — правый зазор
+        // кнопок держит Margin панели кнопок (общая метрика WindowButtonRightInset).
+        Assert.Contains("Value=\"12,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("Value=\"8,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.WindowButtonRightInset", xaml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -295,5 +298,59 @@ public sealed class Issue179WindowTitleBarTests
         Assert.Equal(WindowChromeMetrics.CompactTitleBarHeight, WindowChromeMetrics.CompactWindowButtonHeight);
         // И полоса ниже обычной, а кнопки обычные — выше компактных (пропорциональность).
         Assert.True(WindowChromeMetrics.CompactWindowButtonHeight < WindowChromeMetrics.WindowButtonHeight);
+    }
+
+    // ===================== Геометрия кнопок (1.0.1.130) =====================
+
+    [Fact]
+    public void Metrics_ButtonWidthIsSharedAndCoversCircle()
+    {
+        // Причина «обрезано / разные размеры»: ширина кнопки бралась из темы
+        // (46/40/34), а высота — из метрики полосы. Теперь ширина и высота —
+        // из одного источника, подложка (круг) вписана в кнопку.
+        Assert.True(WindowChromeMetrics.WindowButtonWidth > 0);
+        Assert.True(WindowChromeMetrics.WindowButtonCircleDiameter <= WindowChromeMetrics.WindowButtonWidth);
+        Assert.True(WindowChromeMetrics.WindowButtonCircleDiameter <= WindowChromeMetrics.WindowButtonHeight);
+        Assert.Equal(WindowChromeMetrics.WindowButtonCircleDiameter / 2,
+            WindowChromeMetrics.WindowButtonCircleRadius);
+
+        // Компактный режим сохраняет инвариант: круг вписан в компактную кнопку.
+        Assert.True(WindowChromeMetrics.CompactWindowButtonWidth > 0);
+        Assert.True(WindowChromeMetrics.CompactWindowButtonCircleDiameter <= WindowChromeMetrics.CompactWindowButtonWidth);
+        Assert.True(WindowChromeMetrics.CompactWindowButtonCircleDiameter <= WindowChromeMetrics.CompactWindowButtonHeight);
+        Assert.Equal(WindowChromeMetrics.CompactTitleBarSideInset,
+            WindowChromeMetrics.CompactWindowButtonRightInset);
+    }
+
+    [Fact]
+    public void WpfWindowControlButtonWidth_ComesFromMetrics()
+    {
+        var appXaml = ReadProjectFile("Workspace1C", "App.xaml");
+
+        // Ширина — из общей метрики, а не из темы (иначе WPF и Avalonia расходятся).
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.WindowButtonWidth}",
+            appXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("{DynamicResource WindowButtonSize}", appXaml, StringComparison.Ordinal);
+        // Подложка кнопки — из общей метрики диаметра.
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.WindowButtonCircleDiameter}",
+            appXaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("x:Name=\"circleRoot\" Width=\"30\" Height=\"30\"",
+            appXaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaWindowButtons_ShareWidthAndCircle()
+    {
+        var main = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Controls.cs");
+        var dialog = ReadProjectFile("Workspace1C", "Views", "ModalWindowBase.cs");
+
+        foreach (var code in new[] { main, dialog })
+        {
+            Assert.Contains("UiMetrics.WindowButtonWidth", code, StringComparison.Ordinal);
+            Assert.Contains("UiMetrics.WindowButtonCircleDiameter", code, StringComparison.Ordinal);
+            // Локальных диаметров подложки больше нет — главное окно и диалоги
+            // не могут разойтись по геометрии кнопок.
+            Assert.DoesNotContain("private const double CircleDiameter", code, StringComparison.Ordinal);
+        }
     }
 }

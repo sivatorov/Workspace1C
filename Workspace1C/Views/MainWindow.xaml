@@ -207,11 +207,14 @@
                      полосы вместе с кнопками (issue #296). -->
                 <Style TargetType="Border">
                     <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.TitleBarHeight}"/>
-                    <Setter Property="Padding" Value="12,0"/>
+                    <!-- Padding полосы задаёт ТОЛЬКО левый отступ заголовка: правый зазор
+                         кнопок реализован Margin'ом панели кнопок (issue #179, 1.0.1.130),
+                         поэтому он не зависит от Padding и одинаков у всех окон. -->
+                    <Setter Property="Padding" Value="12,0,0,0"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                             <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactTitleBarHeight}"/>
-                            <Setter Property="Padding" Value="8,0"/>
+                            <Setter Property="Padding" Value="8,0,0,0"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -239,6 +242,28 @@
                      в координатном поле 14 на 14 (Segoe Fluent-стиль): толстая черта,
                      скруглённые квадраты и крест с округлёнными концами. -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Единый правый отступ группы кнопок (issue #179, 1.0.1.130): тот же,
+                         что у диалогов (WindowChromeHelper.BuildTitleBar). Задаётся Margin'ом
+                         панели, а не Padding'ом полосы — правый зазор не «плывёт» при смене
+                         темы и в компактном режиме. -->
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Margin">
+                                <Setter.Value>
+                                    <Thickness Right="{x:Static themes:WindowChromeMetrics.WindowButtonRightInset}"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                    <Setter Property="Margin">
+                                        <Setter.Value>
+                                            <Thickness Right="{x:Static themes:WindowChromeMetrics.CompactWindowButtonRightInset}"/>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <Button x:Name="MinimizeButton" Click="OnMinimizeButton_Click"
                             ToolTip="{loc:Loc Window.Minimize}">
                         <Button.Style>
@@ -247,7 +272,7 @@
                             <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Width" Value="44"/>
+                                        <Setter Property="Width" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonWidth}"/>
                                         <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -267,7 +292,7 @@
                             <Style TargetType="Button" BasedOn="{StaticResource WindowControlButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Width" Value="44"/>
+                                        <Setter Property="Width" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonWidth}"/>
                                         <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -293,7 +318,7 @@
                             <Style TargetType="Button" BasedOn="{StaticResource WindowControlCloseButton}">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
-                                        <Setter Property="Width" Value="44"/>
+                                        <Setter Property="Width" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonWidth}"/>
                                         <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}"/>
                                     </DataTrigger>
                                 </Style.Triggers>

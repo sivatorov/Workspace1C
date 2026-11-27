@@ -35,6 +35,25 @@ public static class WindowChromeMetrics
     public const double WindowButtonHeight = TitleBarHeight;
 
     /// <summary>
+    /// Ширина кнопки управления окном (DIP), единая для главного окна и диалогов
+    /// и не зависящая от темы (issue #179, 1.0.1.130). До этой правки ширина бралась
+    /// из темы (<c>ThemeFeatureMap.Size</c>: 34/40/46), а высота — из метрики полосы,
+    /// из-за чего кнопки выходили неквадратными и по-разному обрезались. Теперь
+    /// ширина, высота и диаметр подложки — из одного источника.
+    /// </summary>
+    public const double WindowButtonWidth = 46;
+
+    /// <summary>
+    /// Диаметр круглой подложки кнопки управления окном (DIP). Едина для главного
+    /// окна и диалогов (issue #179). Инвариант: не больше <see cref="WindowButtonWidth"/>
+    /// и <see cref="WindowButtonHeight"/> — подложка всегда вписана в кнопку.
+    /// </summary>
+    public const double WindowButtonCircleDiameter = 30;
+
+    /// <summary>Радиус подложки кнопки окна (половина диаметра) — для скруглений и масштаба.</summary>
+    public const double WindowButtonCircleRadius = WindowButtonCircleDiameter / 2;
+
+    /// <summary>
     /// Правый отступ группы кнопок управления окном от правого края полосы (DIP).
     /// Одинаков для главного окна и диалогов — кнопки не «прилипают» к краю.
     /// </summary>
@@ -62,6 +81,25 @@ public static class WindowChromeMetrics
     /// <summary>Высота кнопок управления окном в компактном режиме (DIP).</summary>
     public const double CompactWindowButtonHeight = CompactTitleBarHeight;
 
+    /// <summary>
+    /// Ширина кнопки управления окном в компактном режиме (DIP). Сжимается вместе
+    /// с полосой и высотой кнопки (issue #179/#296).
+    /// </summary>
+    public const double CompactWindowButtonWidth = 40;
+
+    /// <summary>
+    /// Диаметр подложки кнопки окна в компактном режиме (DIP). Инвариант:
+    /// не больше <see cref="CompactWindowButtonWidth"/> и <see cref="CompactWindowButtonHeight"/> —
+    /// круг остаётся вписанным в кнопку и центрируется в компактной полосе.
+    /// </summary>
+    public const double CompactWindowButtonCircleDiameter = 24;
+
     /// <summary>Боковой внутренний отступ полосы заголовка в компактном режиме (DIP).</summary>
     public const double CompactTitleBarSideInset = 8;
+
+    /// <summary>
+    /// Правый отступ группы кнопок окна в компактном режиме (DIP). Тот же боковой
+    /// отступ, что и у полосы, — правый зазор не «прыгает» при включении компактного режима.
+    /// </summary>
+    public const double CompactWindowButtonRightInset = CompactTitleBarSideInset;
 }

@@ -696,6 +696,11 @@ public partial class MainViewModel : ViewModelBase
         // Индикатор фоновых загрузок (issue #334, #360, #359): подписка на общий
         // менеджер загрузок, как в конструкторе MainViewModel.WPF.
         InitializeBackgroundDownloadsIndicator();
+
+        // Issue #181: асинхронная ошибка пакетной операции (1С сообщила о монопольном
+        // доступе/занятом файле уже после старта) показывается понятным предупреждением,
+        // а не сырым текстом лога. Подписка живёт вместе с главной ViewModel.
+        OneCLauncher.DesignerBatchCompleted += OnDesignerBatchCompletedLockAware;
     }
 
     // ======================= Коллекции =======================

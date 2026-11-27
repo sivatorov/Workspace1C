@@ -485,8 +485,10 @@ namespace Workspace1C
             private const double MinimizeStrokeThickness = 2.0;
             private const double CloseStrokeThickness = 1.7;
 
-            /// <summary>Диаметр подложки кнопки (без учёта скругления).</summary>
-            private const double CircleDiameter = 30;
+            // Диаметр подложки, ширина и высота кнопки — только из общих метрик
+            // (issue #179, 1.0.1.130): UiMetrics.WindowButtonCircleDiameter /
+            // WindowButtonWidth. Локальных «магических» чисел (30) здесь больше нет,
+            // поэтому главное окно и диалоги не могут разойтись по геометрии кнопок.
 
             private readonly MainWindow _window;
             private readonly WindowControlKind _kind;
@@ -517,7 +519,7 @@ namespace Workspace1C
             private bool _onAccent;
 
             /// <summary>Скругление подложки из темы: Fluent — круг, Minimal — мягкий квадрат, Classic — прямоугольник.</summary>
-            private double _cornerRadius = CircleDiameter / 2;
+            private double _cornerRadius = UiMetrics.WindowButtonCircleRadius;
 
             // Части шаблона: задаются при его применении, до этого null (ApplyState
             // вызывается и из конструктора, поэтому все обращения защищены проверкой).
@@ -552,10 +554,11 @@ namespace Workspace1C
                 _window = window;
                 _kind = kind;
 
-                // Ширина и высота далее переопределяются метриками темы
-                // (ApplyWindowButtonTheme); здесь — стартовый размер Fluent.
-                Width = UiMetrics.Scaled(46);
-                Height = UiMetrics.Scaled(34);
+                // Ширина и высота — из общих метрик (issue #179, 1.0.1.130):
+                // ширина не зависит от темы, высота равна высоте полосы заголовка,
+                // поэтому кнопка занимает полосу целиком и не обрезается.
+                Width = UiMetrics.WindowButtonWidth;
+                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
                 Padding = new Thickness(0);
                 HorizontalContentAlignment = HorizontalAlignment.Center;
                 VerticalContentAlignment = VerticalAlignment.Center;
@@ -570,11 +573,11 @@ namespace Workspace1C
                     {
                         new Setter(TemplatedControl.TemplateProperty, new FuncControlTemplate<WindowControlButton>((_, _) =>
                         {
-                            var diameter = UiMetrics.Scaled(CircleDiameter);
+                            var diameter = UiMetrics.WindowButtonCircleDiameter;
                             // Скругление из темы: Fluent — круг, Minimal — мягкий квадрат,
                             // Classic — прямоугольник. Радиус ограничен половиной диаметра,
                             // чтобы подложка не выходила за свои границы.
-                            var radius = UiMetrics.Scaled(Math.Min(_cornerRadius, CircleDiameter / 2));
+                            var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
 
                             _circle = new Border
                             {
@@ -700,9 +703,11 @@ namespace Workspace1C
                 _minimizeHoverBg = metrics.MinimizeHover;
                 _maximizeHoverBg = metrics.MaximizeHover;
                 _cornerRadius = metrics.CornerRadius;
-                Width = UiMetrics.Scaled(metrics.Size);
+                // Ширина — общая метрика (не из темы, issue #179/1.0.1.130), высота —
+                // высота полосы: кнопка вписана в полосу и не обрезается сверху/снизу.
+                Width = UiMetrics.WindowButtonWidth;
                 Height = UiMetrics.Scaled(WindowButtonThemeMetrics.ButtonHeight);
-                var radius = UiMetrics.Scaled(Math.Min(_cornerRadius, CircleDiameter / 2));
+                var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
                 if (_circle is not null)
                     _circle.CornerRadius = new CornerRadius(radius);
                 if (_focusRing is not null)

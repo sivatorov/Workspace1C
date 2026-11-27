@@ -172,6 +172,47 @@ public sealed class Issue174LinuxSettingsLayoutTests
         Assert.Contains("HorizontalAlignment = HorizontalAlignment.Stretch", block);
     }
 
+    [Fact]
+    public void SubTabs_DisableHorizontalScrollingSoLongLabelsWrap()
+    {
+        var code = ReadProjectFile("Workspace1C", "Views", "SettingsWindow.Avalonia.cs");
+
+        // Issue #174 (1.0.1.130): пока у ScrollViewer подвкладки горизонтальная
+        // прокрутка была Auto, содержимое мерилось бесконечной шириной, TextWrapping
+        // у длинной подписи переключателя не срабатывал, и дорожка уезжала за край.
+        var start = code.IndexOf("private static TabItem SubTab(", StringComparison.Ordinal);
+        Assert.True(start > 0, "Не найден метод SubTab");
+        var end = code.IndexOf("\n        }", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец метода SubTab");
+        var block = code[start..end];
+
+        Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled", block);
+
+        // Все прокрутки окна настроек ограничивают ширину — иначе перенос
+        // подписей снова отключится. Исключение одно: просмотр картинки
+        // donat.png в полном размере (ShowDonatImageFullAsync) — там
+        // горизонтальная прокрутка нужна намеренно.
+        var scrollViewers = CountOccurrences(code, "new ScrollViewer");
+        var disabled = CountOccurrences(
+            code, "HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled");
+        Assert.True(scrollViewers > 0);
+        Assert.True(disabled >= scrollViewers - 1,
+            $"Горизонтальная прокрутка выключена у {disabled} из {scrollViewers} ScrollViewer");
+        var donat = code.IndexOf("ShowDonatImageFullAsync", StringComparison.Ordinal);
+        Assert.True(donat > 0, "Не найден просмотр donat.png");
+        var donatBlock = code[donat..];
+        Assert.Contains("HorizontalScrollBarVisibility = ScrollBarVisibility.Auto",
+            donatBlock, StringComparison.Ordinal);
+
+        // Подписи переключателей переносятся по словам, а не обрезаются.
+        var switchStart = code.IndexOf("private static ToggleButton SettingsSwitch(", StringComparison.Ordinal);
+        Assert.True(switchStart > 0, "Не найден метод SettingsSwitch");
+        var switchEnd = code.IndexOf("\n        }", switchStart, StringComparison.Ordinal);
+        Assert.True(switchEnd > switchStart, "Не найден конец метода SettingsSwitch");
+        Assert.Contains("TextWrapping = TextWrapping.Wrap", code[switchStart..switchEnd],
+            StringComparison.Ordinal);
+    }
+
     private static int CountOccurrences(string text, string value)
     {
         var count = 0;

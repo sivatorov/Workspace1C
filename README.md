@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.129-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.130-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,23 +8,46 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.129**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.130**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 719 860 байт (81.7 МБ) | `FileVersion`/`ProductVersion` = `1.0.1.129` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 54 005 228 байт (51.5 МБ) | `1.0.1.129` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 723 475 байт (81.8 МБ) | `FileVersion` = `1.0.1.130` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 54 006 509 байт (51.5 МБ) | `1.0.1.130` |
 
-> Размеры ассетов релиза `v1.0.1.129` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
+> Размеры ассетов релиза `v1.0.1.130` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
 > зафиксированы по локальной сборке `build-windows-single-file.ps1` /
 > `build-linux-single-file.ps1 -Configuration Release` (логи —
-> [`docs/_t8_build_win_129.log`](docs/_t8_build_win_129.log),
-> [`docs/_t8_build_linux_129.log`](docs/_t8_build_linux_129.log)). Windows-файл:
-> `FileVersion` = `1.0.1.129`, `ProductVersion` = `1.0.1.129+21cb47cc`,
-> `"proModules": true`; Linux-файл — ELF x64 self-contained. Побайтовое совпадение
-> single-file сборок между запусками не гарантируется.
+> [`docs/_t5_build_win_130.log`](docs/_t5_build_win_130.log),
+> [`docs/_t6_build_linux_130.log`](docs/_t6_build_linux_130.log)). Windows-файл:
+> `FileVersion` = `1.0.1.130`, `"proModules": true`; Linux-файл — ELF x64
+> self-contained. Побайтовое совпадение single-file сборок между запусками
+> не гарантируется.
+
+### Что нового в 1.0.1.130
+
+- **#181 — предупреждение при выгрузке `.cf`/`.dt`, если открыт конфигуратор.**
+  Вместо общей ошибки (или молчания в Linux) показывается понятное предупреждение:
+  конфигуратор этой базы уже запущен / база или файл назначения заняты. Предлагается
+  открыть папку выгрузки и повторить операцию после закрытия конфигуратора
+  (Windows и Linux).
+  ([issue #181](https://github.com/sivatorov/Workspace1C/issues/181))
+- **#179 — одинаковые заголовки и системные кнопки у всех окон.** Ширина и высота
+  кнопок «свернуть/развернуть/закрыть» и диаметр подложки берутся из единой метрики,
+  правый зазор группы кнопок одинаков у главного и дочерних окон, кнопка закрытия
+  больше не «уходит влево» от края; компактный режим сохраняет инвариант
+  (Windows и Linux).
+  ([issue #179](https://github.com/sivatorov/Workspace1C/issues/179))
+- **#174 — длинная подпись в настройках Linux переносится на новую строку.**
+  Горизонтальная прокрутка подвкладок отключена, поэтому подпись переключателя
+  («Системные уведомления о завершении фоновых операций…») не выносит дорожку
+  за правый край окна, как в Windows (Linux/Avalonia).
+  ([issue #174](https://github.com/sivatorov/Workspace1C/issues/174))
+
+Полный прогон тестов 1.0.1.130: **8567 тестов, 0 падений, 0 пропущено** (3 m 48 s;
+лог — [`docs/_t7_full_test_130.log`](docs/_t7_full_test_130.log)).
 
 ### Что нового в 1.0.1.129
 

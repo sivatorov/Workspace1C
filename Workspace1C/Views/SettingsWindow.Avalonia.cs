@@ -4509,7 +4509,15 @@ namespace Workspace1C
                         ? new Thickness(0, 4, UiMetrics.SettingsContentRightPadding, 4)
                         : new Thickness(UiMetrics.SettingsSideInset, 4,
                             UiMetrics.SettingsContentTotalRightInset, 4),
-                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    // Issue #174 (1.0.1.130): горизонтальная прокрутка выключена.
+                    // Пока она была Auto, ScrollViewer мерил содержимое бесконечной
+                    // шириной, TextWrapping у длинных подписей переключателей
+                    // (например, «Системные уведомления о завершении фоновых
+                    // операций…») не срабатывал, и подпись выносила дорожку
+                    // переключателя за правый край окна. Как в WPF: ширина
+                    // ограничена контейнером, длинный текст переносится.
+                    HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
                 }
             };
             tab.Styled(ControlThemes.SettingsSubTabItem);

@@ -225,6 +225,18 @@ public static partial class OneCLauncher
                     return false;
                 }
             }
+
+            // Issue #181: файл назначения уже открыт другой программой (например, .cf
+            // открыт на чтение/запись) — выгрузка перезапишет его только после закрытия.
+            // Понятное предупреждение вместо ошибки платформы на середине операции.
+            if (operation is DesignerBatchOperation.DumpIB or DesignerBatchOperation.DumpCfg &&
+                DesignerLockClassifier.IsFileLocked(outputPath))
+            {
+                startError = string.Format(
+                    LocalizationManager.T("Launcher.OutputFileLockedFormat"), outputPath);
+                GetLogger()?.Warn(startError);
+                return false;
+            }
         }
         else if (operation is DesignerBatchOperation.RepositoryLock or DesignerBatchOperation.RepositoryUnlock)
         {
@@ -695,6 +707,15 @@ public static partial class OneCLauncher
             return true;
         }
 
+        // 3. Файл базы занят другим процессом (issue #181): открыт конфигуратор/сеанс 1С
+        // с базой, но командную строку процесса прочитать не удалось (другой пользователь,
+        // WMI недоступен, 1CEStart) — для пакетной выгрузки база всё равно недоступна.
+        if (DesignerLockClassifier.IsInfobaseLocked(infobase))
+        {
+            reason = LocalizationManager.T("Launcher.BaseLockedFormat");
+            return true;
+        }
+
         return false;
     }
 
@@ -709,8 +730,10 @@ public static partial class OneCLauncher
             foreach (var obj in searcher.Get())
             {
                 var cmd = obj["CommandLine"] as string ?? string.Empty;
+                // Issue #181: сравнение токена базы терпимо к регистру, кавычкам,
+                // префиксу File= и клиент-серверной форме Srvr/Ref.
                 if (cmd.Contains("DESIGNER", StringComparison.OrdinalIgnoreCase) &&
-                    cmd.Contains(baseToken, StringComparison.OrdinalIgnoreCase))
+                    DesignerLockClassifier.CommandLineMatchesBase(cmd, baseToken))
                     return true;
             }
         }
