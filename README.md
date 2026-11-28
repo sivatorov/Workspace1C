@@ -14,19 +14,18 @@
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 726 195 байт (81.8 МБ) | `FileVersion` = `1.0.1.132` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 54 008 557 байт (51.5 МБ) | `1.0.1.132` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 617 182 байт (81.7 МБ) | `FileVersion` = `1.0.1.132` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 53 903 079 байт (51.4 МБ) | `1.0.1.132` |
 
-> Размеры ассетов соответствуют локальным single-file сборкам версии `1.0.1.132`
-> (Configuration Release, self-contained). Сборки выполняются штатными
-> `build-windows-single-file.ps1` / `build-linux-single-file.ps1 -Configuration Release`;
-> логи — [`docs/_t5_build_win_132.log`](docs/_t5_build_win_132.log)
+> Размеры в таблице — фактические размеры ассетов опубликованного релиза
+> `v1.0.1.132` (`Workspace1C.exe` и `Workspace1C-linux-x64`), собранных CI из тега.
+> Локальные single-file сборки (Configuration Release, self-contained) дали
+> 85 726 195 и 54 008 557 байт соответственно; логи —
+> [`docs/_t5_build_win_132.log`](docs/_t5_build_win_132.log)
 > и [`docs/_t6_build_linux_132.log`](docs/_t6_build_linux_132.log). Windows-файл:
 > `FileVersion` = `1.0.1.132`, `"proModules": true`; Linux-файл — ELF x64
-> self-contained. Размеры ассетов релиза `v1.0.1.132` фиксируются по факту
-> публикации CI (CI пересобирает ассеты из тега `v1.0.1.132`), поэтому могут
-> незначительно отличаться; побайтовое совпадение single-file сборок между
-> запусками не гарантируется.
+> self-contained. Побайтовое совпадение single-file сборок между запусками
+> не гарантируется.
 
 ### Что нового в 1.0.1.132
 
