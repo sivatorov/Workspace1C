@@ -286,28 +286,45 @@ namespace Workspace1C
                 if (double.IsNaN(designHeight) || designHeight <= 0)
                     designHeight = window.Bounds.Height > 0 ? window.Bounds.Height : window.MinHeight;
 
+                // Дефект «серая область внизу программы» (1.0.1.131): главному окну
+                // отступ от рабочей области не нужен — пользователь пристёгивает его
+                // к краям, и размер задаёт оконный менеджер. Прежний отступ 48 DIP
+                // оставлял снизу незакрашенную полосу, когда окно занимало всю высоту
+                // рабочей области. Для диалогов отступ сохранён.
+                var margin = window is MainWindow
+                    ? 0
+                    : Services.WindowBoundsPolicy.DefaultMargin;
                 var bounds = Services.WindowBoundsPolicy.Recommend(
                     designWidth,
                     designHeight,
                     window.MinWidth,
                     window.MinHeight,
                     workWidth,
-                    workHeight);
+                    workHeight,
+                    margin);
 
-                if (!double.IsPositiveInfinity(bounds.MaxWidth) && bounds.MaxWidth > 0)
-                    window.MaxWidth = bounds.MaxWidth;
-                if (!double.IsPositiveInfinity(bounds.MaxHeight) && bounds.MaxHeight > 0)
-                    window.MaxHeight = bounds.MaxHeight;
+                // Предел не может быть меньше фактического размера уже показанного
+                // окна: иначе платформа ограничит разметку и часть клиентской области
+                // останется незакрашенной (полоса снизу или справа).
+                var maxWidth = Services.WindowBoundsPolicy.EffectiveMax(
+                    bounds.MaxWidth, window.Bounds.Width, window.IsVisible);
+                var maxHeight = Services.WindowBoundsPolicy.EffectiveMax(
+                    bounds.MaxHeight, window.Bounds.Height, window.IsVisible);
+
+                if (!double.IsPositiveInfinity(maxWidth) && maxWidth > 0)
+                    window.MaxWidth = maxWidth;
+                if (!double.IsPositiveInfinity(maxHeight) && maxHeight > 0)
+                    window.MaxHeight = maxHeight;
 
                 if (window.MinWidth > window.MaxWidth)
                     window.MinWidth = window.MaxWidth;
                 if (window.MinHeight > window.MaxHeight)
                     window.MinHeight = window.MaxHeight;
 
-                if (!double.IsNaN(window.Width) && window.Width > bounds.MaxWidth)
-                    window.Width = bounds.MaxWidth;
-                if (!double.IsNaN(window.Height) && window.Height > bounds.MaxHeight)
-                    window.Height = bounds.MaxHeight;
+                if (!double.IsNaN(window.Width) && window.Width > maxWidth)
+                    window.Width = maxWidth;
+                if (!double.IsNaN(window.Height) && window.Height > maxHeight)
+                    window.Height = maxHeight;
             }
             catch
             {

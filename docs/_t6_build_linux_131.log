@@ -1,0 +1,17 @@
+Сборка Linux single-file 1.0.1.131
+==================================
+
+Команда:
+  powershell -ExecutionPolicy Bypass -File .\build-linux-single-file.ps1 -Configuration Release
+
+Результат:
+  ==> Собран один исполняемый файл:
+      dist\linux-x64\Workspace1C (51.5 MB)
+  ==> Готово. Скопируйте на Linux и запустите: ./Workspace1C
+
+Фактические параметры файла:
+  Размер:        54 006 189 байт
+  Формат:        ELF x64 (magic 7F 45 4C 46), self-contained
+  Версия:        1.0.1.131
+
+Предупреждения компилятора — прежние (nullable/анализаторы), ошибок 0.

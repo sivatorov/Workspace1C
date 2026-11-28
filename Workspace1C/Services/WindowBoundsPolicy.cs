@@ -112,6 +112,39 @@ public static class WindowBoundsPolicy
         return Math.Max(0, workSize - effectiveMargin);
     }
 
+    /// <summary>
+    /// Итоговый предел <c>MaxWidth</c>/<c>MaxHeight</c> окна с защитой от
+    /// незакрашенной полосы — дефект «серая область внизу программы» (1.0.1.131).
+    /// <para>
+    /// WPF (и Avalonia) применяют <c>MaxWidth</c>/<c>MaxHeight</c> к разметке окна:
+    /// если оконный менеджер уже сделал окно больше рекомендованного предела
+    /// (пристёгивание Win+стрелками на всю высоту рабочей области, перенос окна на
+    /// монитор с другой рабочей областью), предел меньше фактического размера
+    /// оставляет часть клиентской области незакрашенной — снизу (или справа)
+    /// появляется полоса фона. Поэтому для уже показанного окна предел поднимается
+    /// до фактического размера; до показа действует рекомендация (защита issue #119
+    /// от «гигантских» окон).
+    /// </para>
+    /// </summary>
+    /// <param name="recommendedMax">Рекомендованный предел (рабочая область минус отступ), DIP.</param>
+    /// <param name="actualSize">Фактический размер окна по этой оси, DIP.</param>
+    /// <param name="windowShown">Окно уже показано (размер мог задать оконный менеджер).</param>
+    /// <returns>
+    /// Рекомендованный предел, если окно ещё не показано или его размер не больше
+    /// предела; иначе — фактический размер. Бесконечность (рабочая область
+    /// неизвестна) сохраняется.
+    /// </returns>
+    public static double EffectiveMax(double recommendedMax, double actualSize, bool windowShown)
+    {
+        if (double.IsPositiveInfinity(recommendedMax))
+            return recommendedMax;
+
+        if (windowShown && double.IsFinite(actualSize) && actualSize > recommendedMax)
+            return actualSize;
+
+        return recommendedMax;
+    }
+
     private static double NormalizeDesign(double value, double ceiling)
     {
         if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)

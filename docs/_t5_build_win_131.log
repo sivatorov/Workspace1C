@@ -1,0 +1,19 @@
+Сборка Windows single-file 1.0.1.131
+====================================
+
+Команда:
+  powershell -ExecutionPolicy Bypass -File .\build-windows-single-file.ps1 -Configuration Release
+
+Результат:
+  ==> Собран один исполняемый файл:
+      dist\win-x64\Workspace1C.exe (81.8 MB)
+  ==> proModules=true: функции 2.x в бинаре и открываются лицензией (major=1).
+  ==> Готово.
+
+Фактические параметры файла:
+  Размер:        85 723 548 байт
+  FileVersion:   1.0.1.131
+  ProductVersion 1.0.1.131+1bb95e6a
+  PRO-модули:    true (Workspace1C.Pro/src подключён)
+
+Предупреждения компилятора — прежние (nullable/анализаторы), ошибок 0.

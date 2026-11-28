@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.130-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.131-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,24 +8,39 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.130**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.131**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 614 938 байт (81.6 МБ) | `FileVersion` = `1.0.1.130` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 901 095 байт (51.4 МБ) | `1.0.1.130` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 723 548 байт (81.8 МБ) | `FileVersion` = `1.0.1.131` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 54 006 189 байт (51.5 МБ) | `1.0.1.131` |
 
-> Размеры ассетов релиза `v1.0.1.130` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
-> зафиксированы по факту публикации релиза (CI пересобирает ассеты из тега
-> `v1.0.1.130`). Локальные сборки `build-windows-single-file.ps1` /
+> Размеры ассетов релиза `v1.0.1.131` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
+> фиксируются по факту публикации (CI пересобирает ассеты из тега `v1.0.1.131`).
+> Локальные сборки `build-windows-single-file.ps1` /
 > `build-linux-single-file.ps1 -Configuration Release` — в логах
-> [`docs/_t5_build_win_130.log`](docs/_t5_build_win_130.log) и
-> [`docs/_t6_build_linux_130.log`](docs/_t6_build_linux_130.log). Windows-файл:
-> `FileVersion` = `1.0.1.130`, `"proModules": true`; Linux-файл — ELF x64
+> [`docs/_t5_build_win_131.log`](docs/_t5_build_win_131.log) и
+> [`docs/_t6_build_linux_131.log`](docs/_t6_build_linux_131.log). Windows-файл:
+> `FileVersion` = `1.0.1.131`, `"proModules": true`; Linux-файл — ELF x64
 > self-contained. Побайтовое совпадение single-file сборок между запусками
 > не гарантируется.
+
+### Что нового в 1.0.1.131
+
+- **Пустая серая область внизу главного окна (Windows).** Окно, пристёгнутое
+  к половине экрана на всю высоту рабочей области, больше не оставляет под строкой
+  состояния незакрашенную полосу высотой 48 DIP. Причина — отступ 48 DIP,
+  который ограничитель размеров (`WindowWorkAreaLimiter`) вычитал из рабочей
+  области и назначал как `MaxHeight`/`MaxWidth`; WPF ограничивал разметку, и низ
+  клиентской области не закрашивался. Теперь главному окну отступ не назначается,
+  а для уже показанного окна предел не может быть меньше фактического размера
+  (`WindowBoundsPolicy.EffectiveMax`); границы пересчитываются при изменении
+  размера окна. Та же политика применена в Linux/Avalonia-оболочке.
+
+Полный прогон тестов 1.0.1.131: **8580 тестов, 0 падений, 0 пропущено**
+(3 m 16 s; лог — [`docs/_t7_full_test_131.log`](docs/_t7_full_test_131.log)).
 
 ### Что нового в 1.0.1.130
 

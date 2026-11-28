@@ -71,6 +71,14 @@ namespace Workspace1C
             // MaxWidth/MaxHeight при максимизации, из-за чего окно разворачивалось
             // «не до конца» — справа и снизу оставались белые полосы.
             window.StateChanged += (_, _) => OnStateChanged(window);
+            // Дефект «серая область внизу программы» (1.0.1.131): размер окна может
+            // изменить оконный менеджер (пристёгивание Win+стрелками на всю высоту
+            // рабочей области, перенос на монитор с другой рабочей областью).
+            // Пересчитываем верхние границы, чтобы они не оказались меньше
+            // фактического размера: иначе WPF ограничит разметку, и часть клиентской
+            // области останется незакрашенной. Позицию здесь не трогаем — во время
+            // перетаскивания окно может законно выходить за рабочую область.
+            window.SizeChanged += (_, _) => RefreshSizeConstraints(window);
             Apply(window);
         }
 
@@ -124,56 +132,109 @@ namespace Workspace1C
                 if (window.WindowState != WindowState.Normal)
                     return;
 
-                var area = GetWorkAreaDip(window);
-                if (area is not { } work || work.Width <= 0 || work.Height <= 0)
+                var work = ApplySizeConstraints(window);
+                if (work is not { } area)
                     return;
-
-                var designWidth = window.Width;
-                if (double.IsNaN(designWidth) || designWidth <= 0)
-                    designWidth = window.ActualWidth > 0 ? window.ActualWidth : window.MinWidth;
-
-                var designHeight = window.Height;
-                if (double.IsNaN(designHeight) || designHeight <= 0)
-                    designHeight = window.ActualHeight > 0 ? window.ActualHeight : window.MinHeight;
-
-                var bounds = WindowBoundsPolicy.Recommend(
-                    designWidth,
-                    designHeight,
-                    window.MinWidth,
-                    window.MinHeight,
-                    work.Width,
-                    work.Height);
-
-                if (!double.IsPositiveInfinity(bounds.MaxWidth) && bounds.MaxWidth > 0)
-                    window.MaxWidth = bounds.MaxWidth;
-                if (!double.IsPositiveInfinity(bounds.MaxHeight) && bounds.MaxHeight > 0)
-                    window.MaxHeight = bounds.MaxHeight;
-
-                // Минимум не должен превышать максимум, иначе WPF отдаст приоритет
-                // минимуму и окно всё равно выйдет за экран.
-                if (window.MinWidth > window.MaxWidth)
-                    window.MinWidth = window.MaxWidth;
-                if (window.MinHeight > window.MaxHeight)
-                    window.MinHeight = window.MaxHeight;
-
-                if (!double.IsNaN(window.Width) && window.Width > bounds.MaxWidth)
-                    window.Width = bounds.MaxWidth;
-                if (!double.IsNaN(window.Height) && window.Height > bounds.MaxHeight)
-                    window.Height = bounds.MaxHeight;
 
                 var actualWidth = window.ActualWidth > 0 ? window.ActualWidth : window.Width;
                 var actualHeight = window.ActualHeight > 0 ? window.ActualHeight : window.Height;
 
                 if (!double.IsNaN(actualWidth) && actualWidth > 0)
-                    window.Left = WindowSizeMath.FitLeft(window.Left, actualWidth, work.Left, work.Right);
+                    window.Left = WindowSizeMath.FitLeft(window.Left, actualWidth, area.Left, area.Right);
                 if (!double.IsNaN(actualHeight) && actualHeight > 0)
-                    window.Top = WindowSizeMath.FitTop(window.Top, actualHeight, work.Top, work.Bottom);
+                    window.Top = WindowSizeMath.FitTop(window.Top, actualHeight, area.Top, area.Bottom);
             }
             catch
             {
                 // Геометрия окна — вспомогательная возможность: сбой определения
                 // монитора не должен мешать показу окна.
             }
+        }
+
+        /// <summary>
+        /// Пересчитывает только верхние границы окна после изменения его размера
+        /// (дефект «серая область внизу программы», 1.0.1.131). Позиция не трогается:
+        /// во время перетаскивания окно может законно выходить за рабочую область.
+        /// </summary>
+        private static void RefreshSizeConstraints(Window window)
+        {
+            try
+            {
+                if (window.WindowState != WindowState.Normal)
+                    return;
+
+                ApplySizeConstraints(window);
+            }
+            catch
+            {
+                // Геометрия окна — вспомогательная возможность.
+            }
+        }
+
+        /// <summary>
+        /// Применяет верхние границы (<c>MaxWidth</c>/<c>MaxHeight</c>) и при
+        /// необходимости уменьшает стартовый размер окна по рабочей области.
+        /// Возвращает рабочую область в DIP, если ограничение применимо, иначе
+        /// <c>null</c>.
+        /// <para>
+        /// Дефект «серая область внизу программы» (1.0.1.131): главному окну отступ
+        /// от рабочей области не нужен — пользователь пристёгивает окно к краям
+        /// (Win+стрелки), и размер задаёт оконный менеджер. Прежний отступ 48 DIP
+        /// (рабочая область минус отступ) оставлял снизу незакрашенную полосу, когда
+        /// окно занимало всю высоту рабочей области. Для диалогов отступ сохранён.
+        /// </para>
+        /// </summary>
+        private static Rect? ApplySizeConstraints(Window window)
+        {
+            var area = GetWorkAreaDip(window);
+            if (area is not { } work || work.Width <= 0 || work.Height <= 0)
+                return null;
+
+            var designWidth = window.Width;
+            if (double.IsNaN(designWidth) || designWidth <= 0)
+                designWidth = window.ActualWidth > 0 ? window.ActualWidth : window.MinWidth;
+
+            var designHeight = window.Height;
+            if (double.IsNaN(designHeight) || designHeight <= 0)
+                designHeight = window.ActualHeight > 0 ? window.ActualHeight : window.MinHeight;
+
+            // Главное окно пристёгивается к краям рабочей области — отступ не нужен.
+            var margin = window is MainWindow ? 0 : WindowBoundsPolicy.DefaultMargin;
+            var bounds = WindowBoundsPolicy.Recommend(
+                designWidth,
+                designHeight,
+                window.MinWidth,
+                window.MinHeight,
+                work.Width,
+                work.Height,
+                margin);
+
+            // Предел не может быть меньше фактического размера уже показанного окна:
+            // иначе WPF ограничит разметку, и часть клиентской области останется
+            // незакрашенной (полоса снизу или справа).
+            var maxWidth = WindowBoundsPolicy.EffectiveMax(
+                bounds.MaxWidth, window.ActualWidth, window.IsLoaded);
+            var maxHeight = WindowBoundsPolicy.EffectiveMax(
+                bounds.MaxHeight, window.ActualHeight, window.IsLoaded);
+
+            if (!double.IsPositiveInfinity(maxWidth) && maxWidth > 0)
+                window.MaxWidth = maxWidth;
+            if (!double.IsPositiveInfinity(maxHeight) && maxHeight > 0)
+                window.MaxHeight = maxHeight;
+
+            // Минимум не должен превышать максимум, иначе WPF отдаст приоритет
+            // минимуму и окно всё равно выйдет за экран.
+            if (window.MinWidth > window.MaxWidth)
+                window.MinWidth = window.MaxWidth;
+            if (window.MinHeight > window.MaxHeight)
+                window.MinHeight = window.MaxHeight;
+
+            if (!double.IsNaN(window.Width) && window.Width > maxWidth)
+                window.Width = maxWidth;
+            if (!double.IsNaN(window.Height) && window.Height > maxHeight)
+                window.Height = maxHeight;
+
+            return work;
         }
 
         /// <summary>

@@ -1,0 +1,15 @@
+Полный прогон тестов 1.0.1.131
+================================
+
+Команда:
+  dotnet test Workspace1C.Tests\Workspace1C.Tests.csproj -c Release --logger "console;verbosity=minimal"
+
+Результат:
+  Пройден! : не пройдено 0, пройдено 8580, пропущено 0, всего 8580
+  Длительность: 3 m 16 s
+  Сборка: Workspace1C.Tests.dll (net10.0-windows)
+
+Прирост к 1.0.1.130 (8567 тестов): +13 проверок — новый файл
+Workspace1C.Tests/BottomEmptyBand131Tests.cs (дефект «серая область внизу
+главного окна»: EffectiveMax, нулевой отступ для главного окна, пересчёт
+верхних границ на SizeChanged, стражи исходников WPF/Avalonia).
