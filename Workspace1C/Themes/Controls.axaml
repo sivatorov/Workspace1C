@@ -864,14 +864,28 @@
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
         <Setter Property="Template">
             <ControlTemplate TargetType="ToggleButton">
-                <Grid Background="{TemplateBinding Background}" ColumnDefinitions="*,Auto">
+                <!-- Issue #174 (1.0.1.132): колонки заданы явно. Звёздная колонка
+                     подписи имеет MinWidth=0 и может сжиматься до нуля, поэтому
+                     дорожка (Auto, фиксированные 40 DIP) никогда не выталкивается
+                     за правый край строки; ContentPresenter растягивается на всю
+                     колонку, чтобы TextWrapping у подписи получал конечную ширину. -->
+                <Grid Background="{TemplateBinding Background}" HorizontalAlignment="Stretch">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="0"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
                     <ContentPresenter Grid.Column="0"
                                       Name="PART_ContentPresenter"
                                       Content="{TemplateBinding Content}"
                                       ContentTemplate="{TemplateBinding ContentTemplate}"
                                       Foreground="{TemplateBinding Foreground}"
+                                      HorizontalAlignment="Stretch"
+                                      HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
                                       VerticalAlignment="Center"/>
-                    <Panel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                    <Panel Grid.Column="1"
+                           Margin="12,0,0,0"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center">
                         <Border Name="PART_Track"
                                 Width="40" Height="22"
                                 CornerRadius="999"

@@ -199,22 +199,20 @@
         <Border x:Name="TitleBarBorder" Grid.Row="0"
                 MouseLeftButtonDown="OnTopBar_MouseLeftButtonDown">
             <Border.Style>
-                <!-- Высота полосы и боковые отступы — из единого источника метрик
-                     (issue #179): шапка главного окна ровно такой же высоты, как у
-                     дочерних окон, кнопки занимают её целиком и центрируются по
-                     вертикали. Вертикальных отступов нет (0) — иначе полоса снова
-                     стала бы выше диалоговой. Компактный режим уменьшает высоту
-                     полосы вместе с кнопками (issue #296). -->
+                <!-- Высота полосы — из единого источника метрик (issue #179): шапка
+                     главного окна ровно такой же высоты, как у дочерних окон, кнопки
+                     занимают её целиком и центрируются по вертикали. Padding у полосы
+                     НЕ задаётся: он входит в Height и на части DPI оставлял кнопкам
+                     (высота кнопки = высоте полосы) меньше пикселей — кнопки
+                     «обрезались». Левый отступ заголовка задаётся Margin'ом ведущей
+                     панели, правый зазор кнопок — Margin'ом панели кнопок, как в
+                     WindowChromeHelper.BuildTitleBar. Компактный режим уменьшает
+                     высоту полосы вместе с кнопками (issue #296). -->
                 <Style TargetType="Border">
                     <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.TitleBarHeight}"/>
-                    <!-- Padding полосы задаёт ТОЛЬКО левый отступ заголовка: правый зазор
-                         кнопок реализован Margin'ом панели кнопок (issue #179, 1.0.1.130),
-                         поэтому он не зависит от Padding и одинаков у всех окон. -->
-                    <Setter Property="Padding" Value="12,0,0,0"/>
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
                             <Setter Property="Height" Value="{x:Static themes:WindowChromeMetrics.CompactTitleBarHeight}"/>
-                            <Setter Property="Padding" Value="8,0,0,0"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
@@ -225,8 +223,28 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Иконка и заголовок программы -->
+                <!-- Иконка и заголовок программы. Левый отступ — общая метрика шапки
+                     (issue #179), задаётся Margin'ом панели, а не Padding'ом полосы:
+                     так главное окно и диалоги строятся по одним правилам. -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel.Style>
+                        <Style TargetType="StackPanel">
+                            <Setter Property="Margin">
+                                <Setter.Value>
+                                    <Thickness Left="{x:Static themes:WindowChromeMetrics.TitleBarLeftInset}"/>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding DataContext.CompactMode, RelativeSource={RelativeSource AncestorType=Window}}" Value="True">
+                                    <Setter Property="Margin">
+                                        <Setter.Value>
+                                            <Thickness Left="{x:Static themes:WindowChromeMetrics.CompactTitleBarSideInset}"/>
+                                        </Setter.Value>
+                                    </Setter>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </StackPanel.Style>
                     <Image Width="18" Height="18" Margin="0,0,8,0">
                         <Image.Source>
                             <BitmapImage UriSource="pack://application:,,,/app.ico" DecodePixelWidth="18"/>

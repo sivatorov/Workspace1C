@@ -3677,6 +3677,10 @@ namespace Workspace1C
         {
             base.OnClosing(e);
             SaveWindowLayout();
+            // issue #182: принудительно сбрасываем отложенное сохранение настроек,
+            // чтобы последняя активная строка гарантированно попала в settings.json
+            // (как при уходе в трей, так и при полном выходе).
+            _vm?.FlushPendingSettingsSave();
             if (_allowCloseToTray && _vm is { CloseToTray: true } && CanRestoreHiddenWindow
                 && e.CloseReason == WindowCloseReason.WindowClosing)
             {

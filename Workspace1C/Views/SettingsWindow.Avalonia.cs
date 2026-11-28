@@ -4510,6 +4510,12 @@ namespace Workspace1C
                         : new Thickness(UiMetrics.SettingsSideInset, 4,
                             UiMetrics.SettingsContentTotalRightInset, 4),
                     VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                    // Issue #174 (1.0.1.132): вертикальная полоса — оверлей
+                    // (AllowAutoHide), поэтому её появление не отнимает ширину
+                    // у контента: правый отступ SettingsContentRightInset уже
+                    // включает ScrollBarWidth, и правый край строк не «скачет»
+                    // при прокрутке.
+                    AllowAutoHide = true,
                     // Issue #174 (1.0.1.130): горизонтальная прокрутка выключена.
                     // Пока она была Auto, ScrollViewer мерил содержимое бесконечной
                     // шириной, TextWrapping у длинных подписей переключателей
@@ -5190,6 +5196,11 @@ namespace Workspace1C
             {
                 Text = LocalizationManager.T(textKey),
                 VerticalAlignment = VerticalAlignment.Center,
+                // Issue #174 (1.0.1.132): подпись растягивается по звёздной колонке
+                // и может сжиматься до нуля — только так длинный текст переносится
+                // по словам при любой ширине окна, не выталкивая дорожку за край.
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                MinWidth = 0,
                 TextWrapping = TextWrapping.Wrap
             };
 
@@ -5209,6 +5220,9 @@ namespace Workspace1C
                 {
                     ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto")
                 };
+                // Issue #174 (1.0.1.132): звёздная колонка подписи не должна
+                // раздуваться содержимым — MinWidth=0 разрешает сжатие до нуля.
+                grid.ColumnDefinitions[1].MinWidth = 0;
                 var captionColumn = 0;
                 if (iconKey is not null)
                 {
@@ -5240,7 +5254,12 @@ namespace Workspace1C
             var toggle = new ToggleButton
             {
                 Content = content,
-                IsChecked = value
+                IsChecked = value,
+                // Issue #174 (1.0.1.132): строка переключателя занимает всю ширину
+                // контейнера, а содержимое растягивается по звёздной колонке.
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+                MinWidth = 0
             };
             toggle.Styled(ControlThemes.SettingsToggle);
             return toggle;

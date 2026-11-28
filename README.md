@@ -1,6 +1,6 @@
 # Workspace 1C
 
-![Версия](https://img.shields.io/badge/Версия-1.0.1.131-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
+![Версия](https://img.shields.io/badge/Версия-1.0.1.132-1F6FEB) ![.NET](https://img.shields.io/badge/.NET-10-512BD4) ![Windows/WPF](https://img.shields.io/badge/Windows-WPF-4B8BBE) ![Linux/Avalonia](https://img.shields.io/badge/Linux-Avalonia%2011-8B5CF6) ![Лицензия](https://img.shields.io/badge/Лицензия-Open%20Source-success) [![Telegram](https://img.shields.io/badge/Telegram-@Workspace1C-26A5E4?logo=telegram&logoColor=white)](https://t.me/Workspace1C)
 
 > **Кроссплатформенное десктопное приложение на .NET для управления информационными базами 1С:Предприятие 8.3**, заменяющее стандартный список баз 1С современным интерфейсом. Одна кодовая база собирается под обе ОС: **WPF** на Windows и **Avalonia 11** на Linux.
 
@@ -8,24 +8,50 @@
 
 **Workspace 1C** — новое название программы «Управление конфигурациями 1С». Возможности
 сохранены полностью, нумерация версий начата заново с **1.0.0.0** (последняя версия под
-прежним названием — 0.3.12.70); актуальная версия — **1.0.1.131**.
+прежним названием — 0.3.12.70); актуальная версия — **1.0.1.132**.
 
 Исполняемые файлы этой версии собираются как self-contained single-file:
 
 | Платформа | Файл сборки | Размер ассета релиза | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 615 044 байт (81.6 МБ) | `FileVersion` = `1.0.1.131` |
-| Linux x64 | `dist/linux-x64/Workspace1C` | 53 901 415 байт (51.4 МБ) | `1.0.1.131` |
+| Windows 10/11 x64 | `dist/win-x64/Workspace1C.exe` | 85 726 195 байт (81.8 МБ) | `FileVersion` = `1.0.1.132` |
+| Linux x64 | `dist/linux-x64/Workspace1C` | 54 008 557 байт (51.5 МБ) | `1.0.1.132` |
 
-> Размеры ассетов релиза `v1.0.1.131` (`Workspace1C.exe` и `Workspace1C-linux-x64`)
-> фиксируются по факту публикации (CI пересобирает ассеты из тега `v1.0.1.131`).
-> Локальные сборки `build-windows-single-file.ps1` /
-> `build-linux-single-file.ps1 -Configuration Release` — в логах
-> [`docs/_t5_build_win_131.log`](docs/_t5_build_win_131.log) и
-> [`docs/_t6_build_linux_131.log`](docs/_t6_build_linux_131.log). Windows-файл:
-> `FileVersion` = `1.0.1.131`, `"proModules": true`; Linux-файл — ELF x64
-> self-contained. Побайтовое совпадение single-file сборок между запусками
-> не гарантируется.
+> Размеры ассетов соответствуют локальным single-file сборкам версии `1.0.1.132`
+> (Configuration Release, self-contained). Сборки выполняются штатными
+> `build-windows-single-file.ps1` / `build-linux-single-file.ps1 -Configuration Release`;
+> логи — [`docs/_t5_build_win_132.log`](docs/_t5_build_win_132.log)
+> и [`docs/_t6_build_linux_132.log`](docs/_t6_build_linux_132.log). Windows-файл:
+> `FileVersion` = `1.0.1.132`, `"proModules": true`; Linux-файл — ELF x64
+> self-contained. Размеры ассетов релиза `v1.0.1.132` фиксируются по факту
+> публикации CI (CI пересобирает ассеты из тега `v1.0.1.132`), поэтому могут
+> незначительно отличаться; побайтовое совпадение single-file сборок между
+> запусками не гарантируется.
+
+### Что нового в 1.0.1.132
+
+- **#182 — последняя активная строка восстанавливается после перезапуска.**
+  Сохраняется выбранная база или группа, после старта дерево раскрывает нужные группы,
+  строка выделяется и прокручивается в видимую область; при закрытии окна отложенное
+  сохранение настроек сбрасывается, поэтому выбор не теряется. Восстановление теперь
+  работает и в Windows (WPF), и в Linux (Avalonia).
+  ([issue #182](https://github.com/sivatorov/Workspace1C/issues/182))
+- **#174 — в настройках Linux подпись переключателя переносится при любой ширине.**
+  Звёздная колонка подписи может сжиматься до нуля, дорожка зафиксирована 40 DIP
+  справа, а вертикальный скроллбар не отнимает ширину у контента — галочка больше
+  не уходит за правый край (Linux/Avalonia).
+  ([issue #174](https://github.com/sivatorov/Workspace1C/issues/174))
+- **#179 — одинаковая шапка и системные кнопки у главного и дочерних окон.**
+  Локальный `Padding` полосы заголовка главного окна убран, отступы и размеры кнопок
+  берутся из общих `ApplyTitleBarMetrics`/`ApplyWindowButtonMetrics`, диалоги учитывают
+  компактный режим, шрифт заголовка снова `SemiBold`; в Avalonia компактные константы
+  30/30 (Windows и Linux).
+  ([issue #179](https://github.com/sivatorov/Workspace1C/issues/179))
+
+Полный прогон тестов 1.0.1.132: **8606 тестов, 0 падений, 0 пропущено**
+(2 m 47 s; лог — [`docs/_t7_full_test_132.log`](docs/_t7_full_test_132.log)).
+Avalonia-ветка (`-p:BuildLinux=true`): **8493 теста, 0 падений, 0 пропущено**
+(2 m 35 s; лог — [`docs/_t8_full_test_132_linux.log`](docs/_t8_full_test_132_linux.log)).
 
 ### Что нового в 1.0.1.131
 

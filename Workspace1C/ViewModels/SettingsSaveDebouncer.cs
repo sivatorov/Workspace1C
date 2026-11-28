@@ -68,4 +68,31 @@ internal sealed class SettingsSaveDebouncer
     /// <param name="cts">CTS завершённой отложенной задачи.</param>
     public void Complete(CancellationTokenSource cts) =>
         Interlocked.CompareExchange(ref _cts, null, cts);
+
+    /// <summary>
+    /// Отменяет ещё не выполненное отложенное сохранение и забирает ссылку на CTS
+    /// (issue #182): вызывается при закрытии окна, когда последнее состояние нужно
+    /// записать немедленно, не дожидаясь debounce. Повторный <see cref="Complete"/>
+    /// завершённой задачи безопасен — ссылки в поле уже нет.
+    /// </summary>
+    /// <returns>true, если было что отменять (ожидалось отложенное сохранение).</returns>
+    public bool CancelPending()
+    {
+        var pending = Interlocked.Exchange(ref _cts, null);
+        if (pending is null)
+            return false;
+
+        try
+        {
+            // Отменяем ожидающий Task.Delay. Освобождённый CTS (issue #96)
+            // отменять нельзя — гасим, отменять уже нечего.
+            pending.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Предыдущее поколение CTS уже освобождено.
+        }
+
+        return true;
+    }
 }

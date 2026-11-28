@@ -216,7 +216,9 @@ namespace Workspace1C
 
             // Гарантированно сохраняем все настройки (включая компактный режим) при закрытии,
             // даже если переключатель не был задействован через сеттер.
-            _viewModel.SaveSettings();
+            // issue #182: сначала сбрасываем отложенное (debounce) сохранение — иначе
+            // последняя выбранная строка могла ещё не попасть в settings.json.
+            _viewModel.FlushPendingSettingsSave();
 
             if (!_viewModel.RememberWindowLayout)
             {

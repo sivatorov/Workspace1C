@@ -59,6 +59,22 @@ public partial class MainViewModel : ViewModelBase
 
     private AppSettings _settings = new();
 
+    /// <summary>Id последней выбранной базы (issue #182): восстанавливается при запуске.</summary>
+    private string _lastSelectedInfobaseId = string.Empty;
+
+    /// <summary>Полный путь последней выбранной группы (issue #182).</summary>
+    private string _lastSelectedGroupPath = string.Empty;
+
+    /// <summary>
+    /// Debounce-хранилище отложенного сохранения настроек (issue #182): выбор строки
+    /// сохраняется не на каждый клик, а через небольшую задержку; при закрытии окна
+    /// ожидающее сохранение принудительно сбрасывается (<see cref="FlushPendingSettingsSave"/>).
+    /// </summary>
+    private readonly SettingsSaveDebouncer _settingsSaveDebouncer = new();
+
+    /// <summary>Задержка debounce сохранения выбора строки (issue #182).</summary>
+    private static readonly TimeSpan SelectionSaveDebounceDelay = TimeSpan.FromMilliseconds(150);
+
     /// <summary>Пользовательские параметры запуска, добавленные в справочник параметров (issue #141).</summary>
     private List<string> _customLaunchParameters = new();
 
@@ -729,7 +745,14 @@ public partial class MainViewModel : ViewModelBase
                     nameof(ConfiguratorLaunchToolTip)))
             {
                 if (value is not null)
+                {
+                    // issue #182: запоминаем последнюю активную строку для восстановления
+                    // при следующем запуске (в Avalonia сохранение отсутствовало вовсе).
+                    _lastSelectedInfobaseId = value.Id ?? string.Empty;
+                    _lastSelectedGroupPath = string.Empty;
+                    ScheduleSaveSelection();
                     SelectedGroupNode = null;
+                }
                 // Состав блока «Информация о подключении» зависит от вида базы
                 // (issue #138, 1.0.1.84).
                 RebuildConnectionInfoFields();
@@ -773,6 +796,14 @@ public partial class MainViewModel : ViewModelBase
                     nameof(IsInfobaseSelected), nameof(ShowConnectionInfo), nameof(ShowRightPanelHint),
                     nameof(RightPanelIconKey), nameof(HasRightPanelIcon)))
             {
+                if (value?.Group is not null)
+                {
+                    // issue #182: запоминаем группу (по полному пути) как последнюю активную строку.
+                    _lastSelectedGroupPath = value.FullPath;
+                    _lastSelectedInfobaseId = string.Empty;
+                    ScheduleSaveSelection();
+                }
+
                 if (value is not null)
                     SelectedInfobase = null;
                 UpdateStatus();
@@ -781,6 +812,107 @@ public partial class MainViewModel : ViewModelBase
                 RaiseCommandCanExecuteChanged();
             }
         }
+    }
+
+    /// <summary>Id последней выбранной базы (issue #182) — для восстановления строки при запуске.</summary>
+    public string LastSelectedInfobaseId => _lastSelectedInfobaseId;
+
+    /// <summary>Полный путь последней выбранной группы (issue #182).</summary>
+    public string LastSelectedGroupPath => _lastSelectedGroupPath;
+
+    /// <summary>
+    /// Планирует отложенное сохранение выбора строки (issue #182): значения сразу
+    /// попадают в кэш <see cref="_settings"/>, запись файла — через debounce.
+    /// </summary>
+    private void ScheduleSaveSelection()
+    {
+        _settings.LastSelectedInfobaseId = _lastSelectedInfobaseId;
+        _settings.LastSelectedGroupPath = _lastSelectedGroupPath;
+
+        var cts = _settingsSaveDebouncer.Schedule();
+        _ = RunDelayedSaveSettingsAsync(cts);
+    }
+
+    /// <summary>
+    /// Отложенная запись настроек (issue #182): отменяется новым выбором строки,
+    /// выполняется на UI-потоке Avalonia (репозиторий не потокобезопасен).
+    /// </summary>
+    private async Task RunDelayedSaveSettingsAsync(System.Threading.CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(SelectionSaveDebounceDelay, cts.Token).ConfigureAwait(false);
+            Avalonia.Threading.Dispatcher.UIThread.Post(SaveSettingsSilently);
+        }
+        catch (OperationCanceledException)
+        {
+            // Отменено новым вызовом — штатный debounce.
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("Ошибка отложенного сохранения выбранной строки", ex);
+        }
+        finally
+        {
+            // issue #96/#182: CTS не освобождается; Complete лишь убирает ссылку,
+            // если не запланирован более новый вызов.
+            _settingsSaveDebouncer.Complete(cts);
+        }
+    }
+
+    /// <summary>
+    /// Принудительно сбрасывает отложенное сохранение и пишет настройки на диск
+    /// (issue #182): вызывается при закрытии окна, чтобы последняя активная строка
+    /// гарантированно попала в settings.json.
+    /// </summary>
+    public void FlushPendingSettingsSave()
+    {
+        _settingsSaveDebouncer.CancelPending();
+        _settings.LastSelectedInfobaseId = _lastSelectedInfobaseId;
+        _settings.LastSelectedGroupPath = _lastSelectedGroupPath;
+        SaveSettingsSilently();
+    }
+
+    /// <summary>
+    /// Принудительно раскрывает цепочку групп до указанного полного пути и убирает
+    /// их из набора свёрнутых (issue #182). Нужно перед восстановлением последней
+    /// активной строки: у свёрнутой группы дочерние строки не материализуются.
+    /// </summary>
+    /// <param name="fullPath">Полный путь группы-цели (для базы — путь её группы).</param>
+    public void ExpandGroupPathForRestore(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return;
+
+        var node = FindGroupNodeByPathForRestore(fullPath);
+        if (node is null)
+            return;
+
+        var chain = new List<GroupNodeViewModel>();
+        for (var n = node; n is not null; n = n.Parent)
+            chain.Add(n);
+        chain.Reverse();
+        foreach (var n in chain)
+        {
+            n.SetExpandedSilent(true);
+            n.NotifyIsExpanded();
+            // Ключ свёрнутой группы убираем: RebuildTree создаёт узлы заново по
+            // _collapsedGroups, иначе группа-предок осталась бы свёрнутой (issue #182).
+            if (!string.IsNullOrEmpty(n.NodeKey))
+                _collapsedGroups.Remove(n.NodeKey);
+        }
+    }
+
+    /// <summary>
+    /// Ищет узел группы по полному пути для восстановления последней активной строки
+    /// (issue #182). Возвращает null, если путь пуст или группа отсутствует в дереве.
+    /// </summary>
+    /// <param name="fullPath">Полный путь группы.</param>
+    public GroupNodeViewModel? FindGroupNodeByPathForRestore(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+            return null;
+        return FindNode(n => string.Equals(n.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
     }
 
     // ---- Текущая сессия ----
@@ -945,6 +1077,10 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             _settings = _repository.LoadSettings();
+            // issue #182: последняя активная строка (база или группа) — для восстановления
+            // выделения и прокрутки после запуска (в Avalonia не сохранялась вовсе).
+            _lastSelectedInfobaseId = _settings.LastSelectedInfobaseId ?? string.Empty;
+            _lastSelectedGroupPath = _settings.LastSelectedGroupPath ?? string.Empty;
             // issue #145: доли цвета строки-папки применяются к ThemeManager до
             // построения дерева, чтобы строки сразу получили правильные кисти.
             Themes.ThemeManager.ConfigureGroupRowTint(
@@ -2821,7 +2957,8 @@ public partial class MainViewModel : ViewModelBase
     {
         _settings.Language = Workspace1C.Localization.LocalizationManager.Instance.CurrentLanguage;
         Console.Error.WriteLine("[l10n-debug] PersistSettings language=" + _settings.Language);
-        SaveSettingsSilently();
+        // issue #182: при закрытии сбрасываем и отложенное сохранение выбранной строки.
+        FlushPendingSettingsSave();
     }
 
     private void ExitApplication()

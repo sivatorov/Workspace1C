@@ -166,6 +166,20 @@ public partial class MainViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Принудительно сбрасывает отложенное сохранение настроек и пишет их на диск
+    /// (issue #182): при закрытии окна debounce (150 мс) мог ещё не отработать, и
+    /// последняя выбранная строка не попадала в settings.json — после перезапуска
+    /// выделение не восстанавливалось. Вызывается из OnClosing WPF/Avalonia.
+    /// </summary>
+    public void FlushPendingSettingsSave()
+    {
+        // Отменяем ожидающий отложенный вызов: ниже сохраняем актуальное состояние
+        // синхронно, повторная запись устаревшего снимка не нужна.
+        _saveSettingsDebouncer.CancelPending();
+        SaveSettings();
+    }
+
+    /// <summary>
     /// Отложенное сохранение настроек (фильтр избранного, группировка и т.п.) без блокировки UI.
     /// </summary>
     private void ScheduleSaveSettings()
@@ -1899,13 +1913,17 @@ public partial class MainViewModel : ViewModelBase
             SyncFavoriteHotkeys();
             await System.Threading.Tasks.Task.Delay(1);
 
-            // Восстанавливаем ветку, содержащую последнюю выбранную строку.
-            PrepareLastSelectionExpansion();
-            await System.Threading.Tasks.Task.Delay(1);
-
             // Строим дерево групп — самая затратная операция при большом числе баз.
             LoadingMessage = LocalizationManager.T("Main.LoadingTree");
             RebuildGroupTree();
+            await System.Threading.Tasks.Task.Delay(1);
+
+            // Восстанавливаем ветку, содержащую последнюю выбранную строку (issue #182).
+            // Раскрытие выполняется ПОСЛЕ RebuildGroupTree: узлы дерева создаются именно
+            // здесь, и прежний вызов до пересборки не находил ни одной группы — ветка
+            // оставалась свёрнутой, контейнер строки не создавался, и после запуска
+            // список был прокручен в начало без выделения.
+            PrepareLastSelectionExpansion();
             await System.Threading.Tasks.Task.Delay(1);
 
             // Размеры файловых ИБ считаются в фоне с учётом кеша (не блокирует UI).

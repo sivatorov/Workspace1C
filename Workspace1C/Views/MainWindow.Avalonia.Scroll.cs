@@ -386,6 +386,92 @@ namespace Workspace1C
                     scroll.Offset = offset;
             }, Avalonia.Threading.DispatcherPriority.Background);
         }
+
+        /// <summary>
+        /// Восстанавливает последнюю активную строку (базу или группу) после запуска
+        /// (issue #182). В Avalonia-оболочке восстановления не было вовсе: после
+        /// перезапуска список прокручивался в начало и ни одна строка не выделялась.
+        /// Цель выбирает общий планировщик <see cref="LastSelectionRestorePlanner"/>,
+        /// ветка-предок принудительно раскрывается в модели, затем строка выделяется
+        /// и доводится до видимой области существующим механизмом reveal.
+        /// </summary>
+        private void RestoreLastSelectionOnStartup()
+        {
+            if (_vm is null || _tree is null)
+                return;
+
+            var plan = LastSelectionRestorePlanner.Plan(
+                _vm.LastSelectedInfobaseId,
+                _vm.LastSelectedGroupPath,
+                id => _vm.Infobases.Any(i => string.Equals(i.Id, id, StringComparison.Ordinal)));
+
+            object? target = plan.Kind switch
+            {
+                LastSelectionTargetKind.Infobase => _vm.Infobases.FirstOrDefault(
+                    i => string.Equals(i.Id, plan.Value, StringComparison.Ordinal)),
+                LastSelectionTargetKind.Group =>
+                    _vm.FindGroupNodeByPathForRestore(plan.Value),
+                _ => null
+            };
+            if (target is null)
+                return;
+
+            // issue #182: раскрываем ветку-предок в модели до выбора — у свёрнутой
+            // группы дочерние строки не материализуются. Для базы — путь её группы.
+            var groupPath = plan.Kind == LastSelectionTargetKind.Infobase
+                ? (target as Infobase)?.Group
+                : plan.Value;
+            _vm.ExpandGroupPathForRestore(groupPath);
+
+            // Выбор ставим в модель (правая панель и состояние команд), саму строку
+            // выделяем и прокручиваем к ней отложенно — после раскладки дерева.
+            if (target is Infobase infobase)
+                _vm.SelectedInfobase = infobase;
+            else if (target is GroupNodeViewModel group)
+                _vm.SelectedGroupNode = group;
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => RestoreLastSelectionAttempt(target, 0),
+                Avalonia.Threading.DispatcherPriority.Background);
+        }
+
+        /// <summary>
+        /// Доводит восстановленную строку до видимой области (issue #182). Контейнер
+        /// может появиться не сразу после раскрытия групп/раскладки — повторяем
+        /// отложенно ограниченное число раз, затем выделяем и прокручиваем.
+        /// </summary>
+        private void RestoreLastSelectionAttempt(object target, int attempt)
+        {
+            if (_vm is null || _tree is null)
+                return;
+
+            try
+            {
+                // «Домашняя» строка во «Все базы» предпочтительна, но при запуске
+                // список может быть в режиме «Избранное»/«Закреплённые» — тогда
+                // показываем сохранённую строку в текущем режиме (issue #182).
+                var row = FindFindInListRow(target) ?? _tree.ContainerForItem(target);
+                if (row is not null)
+                {
+                    SelectAndReveal(row);
+                    RevealTrace.Log($"Avalonia RestoreLastSelection: attempt={attempt}, " +
+                                    $"SELECTED target={DescribeAvaloniaTarget(target)}");
+                    return;
+                }
+            }
+            catch
+            {
+                // Контейнер мог отсоединиться во время пересборки — выходим.
+                return;
+            }
+
+            if (attempt < MaxRevealAttempts)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => RestoreLastSelectionAttempt(target, attempt + 1),
+                    Avalonia.Threading.DispatcherPriority.Background);
+            }
+        }
     }
 }
 #endif

@@ -567,6 +567,40 @@ namespace Workspace1C.Themes
                 ApplyFontProps(listRoot, Scope(FontList) ?? Scope(FontDefault) ?? new ElementFontSettings());
             ApplyFontToNamed(window, "RightPanelBorder", Scope(FontRightPanel));
             ApplyFontToNamed(window, "StatusBarBorder", Scope(FontStatusBar));
+
+            // Шапка окна (issue #179): проход «По умолчанию» выше принудительно ставит
+            // Normal через SetFontValueUnlessBound и затирает SemiBold из разметки,
+            // из-за чего заголовок главного окна выглядел тоньше, чем у дочерних окон
+            // (у диалогов начертание локальное и не перекрывается). Возвращаем общий
+            // с диалогами шрифт: семейство — из настроек, размер — из метрик шапки,
+            // начертание — полужирное.
+            RestoreTitleBarTypography(window);
+        }
+
+        /// <summary>
+        /// Восстанавливает типографику заголовка главного окна после применения
+        /// пользовательских шрифтов (issue #179). До этой правки обход «По умолчанию»
+        /// записывал в <c>AppTitleBlock</c> локальное значение <c>Normal</c>, и шапка
+        /// главного окна переставала быть полужирной, тогда как у дочерних окон
+        /// (WindowChromeHelper.BuildTitleBar / ModalWindowBase.BuildTitleStrip) она
+        /// оставалась <c>SemiBold</c> — шрифт заголовков визуально расходился.
+        /// </summary>
+        private static void RestoreTitleBarTypography(MainWindow window)
+        {
+            if (window.FindName("AppTitleBlock") is not TextBlock title)
+                return;
+
+            // Семейство — из настроек пользователя (как наследуют диалоги), но не
+            // перекрываем явную привязку, если она появится.
+            if (BindingOperations.GetBindingExpressionBase(title, TextBlock.FontFamilyProperty) is null)
+                title.SetValue(TextBlock.FontFamilyProperty, TextElement.GetFontFamily(window));
+            // Размер — общая метрика шапки, а не пользовательский размер интерфейса:
+            // так он совпадает с дочерними окнами.
+            if (BindingOperations.GetBindingExpressionBase(title, TextBlock.FontSizeProperty) is null)
+                title.SetValue(TextBlock.FontSizeProperty, WindowChromeMetrics.TitleBarFontSize);
+            // Начертание — полужирное, единое с диалогами.
+            if (BindingOperations.GetBindingExpressionBase(title, TextBlock.FontWeightProperty) is null)
+                title.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
         }
 
         private static void ApplyFontToNamed(MainWindow window, string name, ElementFontSettings? fs)
@@ -612,6 +646,13 @@ namespace Workspace1C.Themes
         private static readonly Workspace1C.Collections.WeakKeyTable<DependencyObject, double> _compactFont = new();
         private static readonly Workspace1C.Collections.WeakKeyTable<ColumnDefinition, double> _compactColumn = new();
 
+        /// <summary>
+        /// Действует ли сейчас компактный режим (issue #179). Нужен построителям шапки
+        /// дочерних окон: они создаются позже главного и не участвуют в обходе
+        /// <see cref="ApplyCompact"/>, поэтому иначе всегда рисовали бы обычную шапку.
+        /// </summary>
+        public static bool IsCompactMode { get; private set; }
+
         /// <summary>Число живых записей метрик компактного режима (диагностика issue #21).</summary>
         public static int CompactMetricEntries
             => _compactMargin.Count + _compactPadding.Count + _compactFont.Count + _compactColumn.Count;
@@ -633,6 +674,11 @@ namespace Workspace1C.Themes
         /// </summary>
         public static void ApplyCompact(bool compact)
         {
+            // Состояние компактного режима доступно и дочерним окнам (issue #179):
+            // WPF-диалоги строят шапку в WindowChromeHelper уже после старта и должны
+            // брать компактные метрики (30/30/40/24/8), а не обычные 34/46/12.
+            IsCompactMode = compact;
+
             var window = Application.Current?.MainWindow;
             if (window is null)
                 return;

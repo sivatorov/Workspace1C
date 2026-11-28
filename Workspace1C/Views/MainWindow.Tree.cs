@@ -40,6 +40,14 @@ namespace Workspace1C
         private bool _revealFindInListPending;
 
         /// <summary>
+        /// Вести reveal к «домашней» строке во «Все базы» (issue #31), а не к первому
+        /// вхождению (issue #182). Для восстановления последней активной строки при
+        /// запуске false: важнее показать сохранённую строку в текущем режиме списка,
+        /// даже если это копия в «Закреплённых»/«Избранном».
+        /// </summary>
+        private bool _revealToHomePending = true;
+
+        /// <summary>
         /// Липкая цель «перехода к строке» (issue #31): база, к которой идёт навигация,
         /// запоминается в момент RevealFindInListRequested и используется reveal'ом вместо
         /// SelectedInfobase. Поздняя пересборка (сброс поиска/тегов внутри Ctrl+T) сбрасывает
@@ -216,8 +224,9 @@ namespace Workspace1C
         }
 
         /// <summary>
-        /// Восстанавливает последнюю выбранную строку списка (базу или группу) после запуска.
-        /// Строка определяется по сохранённым значениям
+        /// Восстанавливает последнюю выбранную строку списка (базу или группу) после запуска
+        /// (issue #182). Строка определяется общим платформенно-независимым планировщиком
+        /// <see cref="LastSelectionRestorePlanner"/> по сохранённым значениям
         /// <see cref="ViewModels.MainViewModel.LastSelectedInfobaseId"/> и
         /// <see cref="ViewModels.MainViewModel.LastSelectedGroupPath"/>.
         /// </summary>
@@ -226,38 +235,52 @@ namespace Workspace1C
             if (MainTree is null || _viewModel is null)
                 return;
 
-            object? target = null;
+            // Приоритет базы над группой; если база из сохранённого Id уже отсутствует —
+            // используется путь группы (issue #182).
+            var plan = LastSelectionRestorePlanner.Plan(
+                _viewModel.LastSelectedInfobaseId,
+                _viewModel.LastSelectedGroupPath,
+                id => _viewModel.Infobases.Any(
+                    i => string.Equals(i.Id, id, StringComparison.Ordinal)));
 
-            var infobaseId = _viewModel.LastSelectedInfobaseId;
-            if (!string.IsNullOrEmpty(infobaseId))
+            object? target = plan.Kind switch
             {
-                var ib = _viewModel.Infobases.FirstOrDefault(
-                    i => string.Equals(i.Id, infobaseId, StringComparison.Ordinal));
-                if (ib is not null)
-                    target = ib;
-            }
-            else
-            {
-                var groupPath = _viewModel.LastSelectedGroupPath;
-                if (!string.IsNullOrEmpty(groupPath))
-                {
-                    var groupNode = _viewModel.FindGroupNodeByPath(groupPath);
-                    if (groupNode is not null)
-                        target = groupNode;
-                }
-            }
+                LastSelectionTargetKind.Infobase => _viewModel.Infobases.FirstOrDefault(
+                    i => string.Equals(i.Id, plan.Value, StringComparison.Ordinal)),
+                LastSelectionTargetKind.Group => _viewModel.FindGroupNodeByPath(plan.Value),
+                _ => null
+            };
 
             if (target is null)
                 return;
+
+            // issue #182: раскрываем ветку-предок в модели ДО выбора. У свёрнутой группы
+            // контейнеры дочерних строк не создаются, и выделение/прокрутка терялись.
+            // Для базы — путь её группы, для группы — её собственный путь.
+            var groupPath = plan.Kind == LastSelectionTargetKind.Infobase
+                ? (target as Infobase)?.Group
+                : plan.Value;
+            _viewModel.ExpandGroupPathForRestore(groupPath);
 
             // Отложенно, чтобы виртуализированное дерево успело сгенерировать
             // контейнер строки после первой отрисовки.
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                if (_viewModel is null)
+                    return;
+
+                // Выделение ставим в модель, затем используем общий reveal-механизм:
+                // он раскрывает/материализует строку при виртуализации и прокручивает
+                // к ней список (issue #182). Раньше SelectTreeNode лишь выделял
+                // найденный контейнер, а у свёрнутой/нереализованной строки его нет.
                 if (target is Infobase infobase)
-                    SelectTreeNode(infobase);
+                    _viewModel.SelectedInfobase = infobase;
                 else if (target is GroupNodeViewModel group)
-                    SelectTreeNode(group);
+                    _viewModel.SelectedGroupNode = group;
+
+                // Запускаем reveal к сохранённой строке в текущем режиме списка
+                // (не обязательно к «домашней» копии во «Все базы»).
+                RequestReveal(target, revealToHome: false);
             }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
@@ -293,9 +316,23 @@ namespace Workspace1C
         private void OnFindInListRequested()
         {
             // Липкая цель: запоминаем базу в момент запроса (см. _revealTargetOverride).
-            _revealTargetOverride = _viewModel?.SelectedInfobase;
+            RequestReveal(_viewModel?.SelectedInfobase, revealToHome: true);
+        }
+
+        /// <summary>
+        /// Планирует reveal указанной цели (issue #182): липкая цель, флаг режима
+        /// «домашней» строки и отложенный вызов <see cref="RevealAndSelectAfterRebuild"/>.
+        /// Используется и командой «Найти в списке» (revealToHome = true), и
+        /// восстановлением последней активной строки при запуске (false — показать
+        /// строку в текущем режиме списка).
+        /// </summary>
+        private void RequestReveal(object? target, bool revealToHome)
+        {
+            _revealTargetOverride = target as Infobase;
+            _revealToHomePending = revealToHome;
             _revealFindInListPending = true;
-            RevealTrace.Log($"WPF OnFindInListRequested: target={DescribeRevealTarget(_revealTargetOverride)}, pending=true");
+            RevealTrace.Log($"WPF RequestReveal: target={DescribeRevealTarget(target)}, " +
+                            $"revealToHome={revealToHome}, pending=true");
             // Reveal планируется здесь явно, а не только из TreeRebuilt через
             // RestoreTreeKeyboardFocus: во время целевой навигации
             // (IsRevealNavigationInProgress) промежуточное восстановление в TreeRebuilt
@@ -332,7 +369,9 @@ namespace Workspace1C
                 // Закреплённая база присутствует в дереве дважды, и общий поиск всегда отдавал
                 // закрепления (они идут первыми), из-за чего команда «переходила» туда, а не
                 // к строке в общем списке. Обычные пересборки дерева не трогаем.
-                var revealToHome = _revealFindInListPending;
+                // Для восстановления последней строки при запуске (issue #182) режим
+                // «домашней» строки отключён — показываем сохранённую строку в текущем режиме.
+                var revealToHome = _revealFindInListPending && _revealToHomePending;
 
                 // Планирование reveal (issue #31): домашний узел (leaf) и достижимость цели
                 // считаются ЧИСТОЙ логикой по данным дерева (RevealPlanner) без визуального

@@ -888,8 +888,10 @@ namespace Workspace1C
                 // стиль шрифта шапок больше не расходится.
                 FontSize = UiMetrics.TitleBarFontSize,
                 FontWeight = FontWeight.SemiBold,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Height = UiMetrics.Scaled(30)
+                // Высота текста не задаётся локально: подпись центрируется в полосе,
+                // как в главном окне (issue #179). Локальные 30 DIP расходились с
+                // метрикой полосы и обрезали заголовок в компактном режиме.
+                TextTrimming = TextTrimming.CharacterEllipsis
             };
             ThemeBrushes.Bind(title, TextBlock.ForegroundProperty, "TextPrimaryColorBrush");
             // Заголовок следует за свойством окна (в т.ч. за привязкой {loc:Loc ...}).
@@ -1710,7 +1712,7 @@ namespace Workspace1C
                 // кнопок главного окна. Ширина не зависит от темы, высота равна
                 // высоте полосы заголовка, поэтому кнопка не обрезается.
                 Width = UiMetrics.WindowButtonWidth;
-                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
+                Height = UiMetrics.WindowButtonHeight;
                 Padding = new Thickness(0);
                 HorizontalContentAlignment = HorizontalAlignment.Center;
                 VerticalContentAlignment = VerticalAlignment.Center;
@@ -1837,8 +1839,9 @@ namespace Workspace1C
                 // главного окна.
                 Width = UiMetrics.WindowButtonWidth;
                 // Высота кнопки = высоте полосы (issue #179): кнопка занимает полосу
-                // целиком и центрирована по вертикали.
-                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
+                // целиком и центрирована по вертикали; в компактном режиме — компактная
+                // константа, а не общий масштаб 0.8.
+                Height = UiMetrics.WindowButtonHeight;
                 var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
                 if (_circle is not null)
                     _circle.CornerRadius = new CornerRadius(radius);

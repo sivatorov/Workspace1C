@@ -1247,7 +1247,7 @@ public partial class MainViewModel : ViewModelBase
     /// Раскрывает (в модели) ветку дерева, содержащую последнюю выбранную строку,
     /// чтобы при запуске её контейнер был сгенерирован и выделение можно было восстановить.
     /// </summary>
-    private void PrepareLastSelectionExpansion()
+    public void PrepareLastSelectionExpansion()
     {
         string? groupPath = null;
         if (!string.IsNullOrEmpty(_lastSelectedInfobaseId))
@@ -1261,10 +1261,23 @@ public partial class MainViewModel : ViewModelBase
             groupPath = _lastSelectedGroupPath;
         }
 
-        if (string.IsNullOrEmpty(groupPath))
+        ExpandGroupPathForRestore(groupPath);
+    }
+
+    /// <summary>
+    /// Принудительно раскрывает (в модели) цепочку групп до указанного полного пути
+    /// и убирает их из набора свёрнутых (issue #182). Нужно перед восстановлением
+    /// последней активной строки: у свёрнутой группы контейнеры дочерних строк не
+    /// создаются, и выделение с прокруткой терялись (список оставался в начале,
+    /// ни одна строка не подсвечена).
+    /// </summary>
+    /// <param name="fullPath">Полный путь группы-цели (для базы — путь её группы).</param>
+    public void ExpandGroupPathForRestore(string? fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
             return;
 
-        var node = FindGroupNodeByPath(groupPath);
+        var node = FindGroupNodeByPath(fullPath);
         if (node is null)
             return;
 
@@ -1274,6 +1287,10 @@ public partial class MainViewModel : ViewModelBase
         chain.Reverse();
         foreach (var n in chain)
         {
+            // Ключ свёрнутой группы убираем: пересборка дерева создаёт узлы заново
+            // по _collapsedGroups, иначе группа-предок осталась бы свёрнутой (issue #182).
+            if (!string.IsNullOrEmpty(n.NodeKey))
+                _collapsedGroups.Remove(n.NodeKey);
             n.SetExpandedSilent(true);
             n.NotifyIsExpanded();
         }

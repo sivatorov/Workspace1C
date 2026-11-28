@@ -869,24 +869,93 @@ namespace Workspace1C
         }
 
         /// <summary>
+        /// Высота полосы заголовка с учётом компактного режима (issue #179). Одна и та же
+        /// функция используется и диалогами (<see cref="BuildTitleBar"/>), и главным окном,
+        /// поэтому шапки не могут разойтись по высоте.
+        /// </summary>
+        public static double ResolveTitleBarHeight(bool compact) => compact
+            ? WindowChromeMetrics.CompactTitleBarHeight
+            : WindowChromeMetrics.TitleBarHeight;
+
+        /// <summary>Левый отступ заголовка (он же боковой отступ полосы) с учётом компактного режима.</summary>
+        public static double ResolveTitleBarSideInset(bool compact) => compact
+            ? WindowChromeMetrics.CompactTitleBarSideInset
+            : WindowChromeMetrics.TitleBarLeftInset;
+
+        /// <summary>Правый зазор группы системных кнопок с учётом компактного режима.</summary>
+        public static double ResolveWindowButtonRightInset(bool compact) => compact
+            ? WindowChromeMetrics.CompactWindowButtonRightInset
+            : WindowChromeMetrics.WindowButtonRightInset;
+
+        /// <summary>
+        /// Приводит полосу заголовка к единым метрикам (issue #179): высота полосы, левый
+        /// отступ заголовка, правый зазор группы кнопок и шрифт подписи. Вынесено из
+        /// <see cref="BuildTitleBar"/>, чтобы главное окно и диалоги использовали один
+        /// набор правил. Отступы задаются <c>Margin</c> элементов, а не <c>Padding</c>
+        /// полосы: Padding входит в <c>Height</c> и на части DPI оставлял кнопкам
+        /// (высота кнопки = высоте полосы) меньше пикселей — кнопки «обрезались».
+        /// </summary>
+        public static void ApplyTitleBarMetrics(Border bar, FrameworkElement? leading, TextBlock? title,
+            FrameworkElement? buttons, bool compact)
+        {
+            bar.Height = ResolveTitleBarHeight(compact);
+            bar.Padding = new Thickness(0);
+            bar.Margin = new Thickness(0);
+            bar.BorderThickness = new Thickness(0);
+            bar.HorizontalAlignment = HorizontalAlignment.Stretch;
+            bar.VerticalAlignment = VerticalAlignment.Top;
+
+            double sideInset = ResolveTitleBarSideInset(compact);
+            if (leading is not null)
+            {
+                leading.Margin = new Thickness(sideInset, 0, 0, 0);
+                leading.VerticalAlignment = VerticalAlignment.Center;
+            }
+            if (title is not null)
+            {
+                // Если ведущей панели (иконка + заголовок) нет — отступ задаётся тексту.
+                if (leading is null)
+                    title.Margin = new Thickness(sideInset, 0, 0, 0);
+                title.VerticalAlignment = VerticalAlignment.Center;
+                title.FontSize = WindowChromeMetrics.TitleBarFontSize;
+                title.FontWeight = FontWeights.SemiBold;
+            }
+            if (buttons is not null)
+            {
+                buttons.Margin = new Thickness(0, 0, ResolveWindowButtonRightInset(compact), 0);
+                buttons.VerticalAlignment = VerticalAlignment.Center;
+            }
+        }
+
+        /// <summary>
+        /// Размер кнопки управления окном с учётом компактного режима (issue #179):
+        /// кнопка занимает полосу целиком, поэтому её высота равна высоте полосы.
+        /// </summary>
+        public static void ApplyWindowButtonMetrics(Button button, bool compact)
+        {
+            button.Width = compact
+                ? WindowChromeMetrics.CompactWindowButtonWidth
+                : WindowChromeMetrics.WindowButtonWidth;
+            button.Height = compact
+                ? WindowChromeMetrics.CompactWindowButtonHeight
+                : WindowChromeMetrics.WindowButtonHeight;
+        }
+
+        /// <summary>
         /// Полоса заголовка: слева заголовок окна, справа собственные кнопки управления
         /// (свернуть, закрыть с красным выделением). Пустое место полосы таскает окно.
+        /// Метрики (высота, отступы, шрифт) задаёт <see cref="ApplyTitleBarMetrics"/> —
+        /// тот же набор, что и у главного окна (issue #179).
         /// </summary>
         private static UIElement BuildTitleBar(Window window)
         {
+            // Компактный режим действует глобально (ThemeManager.IsCompactMode): диалоги
+            // создаются позже главного окна и не участвуют в обходе ApplyCompact, поэтому
+            // иначе всегда рисовали бы обычную шапку 34/46/12 (issue #179/#296).
+            bool compact = ThemeManager.IsCompactMode;
+
             var bar = new Border
             {
-                // Единая метрика полосы заголовка (issue #179): та же высота, что у
-                // главного окна (WindowChromeMetrics.TitleBarHeight), поэтому шапки
-                // всех окон одинаковы по высоте. Кнопки занимают её целиком и
-                // центрированы по вертикали — без смещения вверх.
-                Height = WindowChromeMetrics.TitleBarHeight,
-                // Полоса заголовка диалога заливается акцентным цветом темы на всю ширину.
-                // HorizontalAlignment=Stretch и нулевые Margin гарантируют, что полоса занимает
-                // всю ширину окна и не оставляет незалитых участков по краям (issue #135).
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0),
                 // Скругляем два верхних угла с тем же радиусом, что и окно (DWM, Windows 11).
                 // Иначе прямоугольная полоса не доходит до скруглённых углов окна и в углах
                 // шапки просвечивает стеклянная подложка/рабочий стол — «недозалитые» углы.
@@ -923,15 +992,7 @@ namespace Workspace1C
 
             var title = new TextBlock
             {
-                Text = window.Title,
-                VerticalAlignment = VerticalAlignment.Center,
-                // Левый отступ — та же метрика, что у полосы главного окна (issue #179).
-                Margin = new Thickness(WindowChromeMetrics.TitleBarLeftInset, 0, 0, 0),
-                // Размер и насыщенность подписи — общие с главным окном (issue #179):
-                // раньше стиль шрифта шапок расходился, теперь везде полужирный
-                // одного размера.
-                FontSize = WindowChromeMetrics.TitleBarFontSize,
-                FontWeight = FontWeights.SemiBold
+                Text = window.Title
             };
             // Текст заголовка читаемым цветом на акцентной полосе (AccentTextBrush,
             // выбирается по WCAG-контрасту с фактическим акцентом — issue #26):
@@ -940,12 +1001,7 @@ namespace Workspace1C
 
             var buttons = new StackPanel
             {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center,
-                // Правый отступ группы кнопок — как у главного окна (issue #179):
-                // кнопки больше не «прилипают» к правому краю и не выглядят
-                // смещёнными вправо относительно шапки главного окна.
-                Margin = new Thickness(0, 0, WindowChromeMetrics.WindowButtonRightInset, 0)
+                Orientation = Orientation.Horizontal
             };
             // В диалоговых окнах показываем только кнопку «закрыть». У больших
             // изменяемых окон (например «Серверы 1С», issue #324) добавляем кнопку
@@ -954,8 +1010,14 @@ namespace Workspace1C
             // при этом сохраняется.
             if (window.ResizeMode is ResizeMode.CanResize or ResizeMode.CanResizeWithGrip &&
                 !GetSuppressMaximizeButton(window))
-                buttons.Children.Add(BuildMaximizeButton(window));
-            buttons.Children.Add(BuildButton(window));
+            {
+                var maximizeButton = BuildMaximizeButton(window);
+                ApplyWindowButtonMetrics(maximizeButton, compact);
+                buttons.Children.Add(maximizeButton);
+            }
+            var closeButton = BuildButton(window);
+            ApplyWindowButtonMetrics(closeButton, compact);
+            buttons.Children.Add(closeButton);
 
             Grid.SetColumn(title, 0);
             Grid.SetColumn(buttons, 1);
@@ -963,6 +1025,9 @@ namespace Workspace1C
             grid.Children.Add(buttons);
 
             bar.Child = grid;
+            // Единые метрики: высота полосы = высоте кнопок, левый отступ заголовка
+            // и правый зазор кнопок — те же, что у главного окна (issue #179).
+            ApplyTitleBarMetrics(bar, null, title, buttons, compact);
             return bar;
         }
 

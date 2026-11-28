@@ -75,8 +75,9 @@ public sealed class Issue179WindowTitleBarTests
     {
         var code = ReadProjectFile("Workspace1C", "Views", "WindowChromeHelper.cs");
 
-        // Высота полосы диалога — из общей метрики, без локального 34.
-        Assert.Contains("Height = WindowChromeMetrics.TitleBarHeight", code, StringComparison.Ordinal);
+        // Высота полосы диалога — через общий построитель метрик, без локального 34.
+        Assert.Contains("bar.Height = ResolveTitleBarHeight(compact);", code, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.CompactTitleBarHeight", code, StringComparison.Ordinal);
         Assert.DoesNotContain("Height = 34", code, StringComparison.Ordinal);
         // Правый отступ группы кнопок и левый отступ заголовка — из метрик.
         Assert.Contains("WindowChromeMetrics.WindowButtonRightInset", code, StringComparison.Ordinal);
@@ -94,10 +95,13 @@ public sealed class Issue179WindowTitleBarTests
         Assert.Contains("{x:Static themes:WindowChromeMetrics.CompactWindowButtonHeight}", xaml, StringComparison.Ordinal);
         // Прежние отступы 12,6 делали шапку главного окна выше диалоговой.
         Assert.DoesNotContain("Value=\"12,6\"", xaml, StringComparison.Ordinal);
-        // 1.0.1.130: правый Padding полосы больше не задаётся — правый зазор
-        // кнопок держит Margin панели кнопок (общая метрика WindowButtonRightInset).
-        Assert.Contains("Value=\"12,0,0,0\"", xaml, StringComparison.Ordinal);
-        Assert.Contains("Value=\"8,0,0,0\"", xaml, StringComparison.Ordinal);
+        // 1.0.1.132: Padding полосы убран — он входил в Height и обрезал кнопки.
+        // Левый отступ заголовка теперь Margin ведущей панели из тех же метрик,
+        // что у диалогов, правый зазор кнопок — Margin панели кнопок.
+        Assert.DoesNotContain("Value=\"12,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("Value=\"8,0,0,0\"", xaml, StringComparison.Ordinal);
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.TitleBarLeftInset}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.CompactTitleBarSideInset}", xaml, StringComparison.Ordinal);
         Assert.Contains("WindowChromeMetrics.WindowButtonRightInset", xaml, StringComparison.Ordinal);
     }
 
@@ -164,8 +168,8 @@ public sealed class Issue179WindowTitleBarTests
         // и с правым отступом, как в главном окне.
         Assert.Contains("Height = UiMetrics.TitleBarHeight", code, StringComparison.Ordinal);
         Assert.Contains("UiMetrics.WindowButtonRightInset", code, StringComparison.Ordinal);
-        Assert.Contains("Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight)",
-            code, StringComparison.Ordinal);
+        // Высота кнопки — общая метрика (в компактном режиме — компактная константа).
+        Assert.Contains("Height = UiMetrics.WindowButtonHeight", code, StringComparison.Ordinal);
         // Левый отступ берётся из UiMetrics (компактный режим пропорционален), а сама
         // метрика ссылается на общий WindowChromeMetrics.TitleBarLeftInset.
         Assert.Contains("UiMetrics.TitleBarLeftInset", code, StringComparison.Ordinal);
@@ -352,5 +356,119 @@ public sealed class Issue179WindowTitleBarTests
             // не могут разойтись по геометрии кнопок.
             Assert.DoesNotContain("private const double CircleDiameter", code, StringComparison.Ordinal);
         }
+    }
+
+    // ============ 1.0.1.132: причины остаточного расхождения шапок ============
+
+    [Fact]
+    public void WpfMainTitleBar_HasNoLocalPaddingOrBorderThickness()
+    {
+        var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
+
+        var start = xaml.IndexOf("x:Name=\"TitleBarBorder\"", StringComparison.Ordinal);
+        Assert.True(start >= 0, "TitleBarBorder не найден");
+        var end = xaml.IndexOf("</Border>", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец блока TitleBarBorder");
+        var block = xaml[start..end];
+
+        // Полоса не задаёт Padding/BorderThickness/MinHeight: всё это входило в Height
+        // и уменьшало доступную высоту кнопок (высота кнопки = высоте полосы), из-за
+        // чего кнопки «обрезались», а шапка главного окна выглядела иначе диалоговой.
+        Assert.DoesNotContain("Property=\"Padding\"", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("BorderThickness", block, StringComparison.Ordinal);
+        Assert.DoesNotContain("MinHeight", block, StringComparison.Ordinal);
+        // Левый отступ — Margin ведущей панели из общих метрик, высота — из метрики.
+        Assert.Contains("WindowChromeMetrics.TitleBarLeftInset", block, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.TitleBarHeight", block, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfTitleBarMetrics_ShareOneBuilderForMainAndDialogs()
+    {
+        var helper = ReadProjectFile("Workspace1C", "Views", "WindowChromeHelper.cs");
+        var xaml = ReadProjectFile("Workspace1C", "Views", "MainWindow.xaml");
+
+        // Общий метод метрик шапки (высота/отступы/шрифт) и его использование диалогами.
+        Assert.Contains("public static void ApplyTitleBarMetrics(", helper, StringComparison.Ordinal);
+        Assert.Contains("ApplyTitleBarMetrics(bar, null, title, buttons, compact)", helper, StringComparison.Ordinal);
+        Assert.Contains("public static void ApplyWindowButtonMetrics(", helper, StringComparison.Ordinal);
+        Assert.Contains("ResolveWindowButtonRightInset(compact)", helper, StringComparison.Ordinal);
+
+        // Главное окно берёт те же метрики (высота, отступы), не дублируя числа.
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.TitleBarHeight}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.TitleBarLeftInset}", xaml, StringComparison.Ordinal);
+        Assert.Contains("{x:Static themes:WindowChromeMetrics.WindowButtonRightInset}", xaml, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfDialogs_FollowCompactMode()
+    {
+        var helper = ReadProjectFile("Workspace1C", "Views", "WindowChromeHelper.cs");
+        var theme = ReadProjectFile("Workspace1C", "Themes", "ThemeManager.cs");
+
+        // Диалоги создаются после главного окна и не попадают в обход ApplyCompact —
+        // поэтому берут состояние из ThemeManager.IsCompactMode.
+        Assert.Contains("ThemeManager.IsCompactMode", helper, StringComparison.Ordinal);
+        Assert.Contains("public static bool IsCompactMode", theme, StringComparison.Ordinal);
+        Assert.Contains("IsCompactMode = compact;", theme, StringComparison.Ordinal);
+
+        // Компактные константы полосы, кнопок и правого зазора реально используются.
+        Assert.Contains("WindowChromeMetrics.CompactTitleBarHeight", helper, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.CompactWindowButtonHeight", helper, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.CompactWindowButtonRightInset", helper, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WpfTitleFontWeight_IsRestoredAfterElementFonts()
+    {
+        var theme = ReadProjectFile("Workspace1C", "Themes", "ThemeManager.cs");
+
+        // Проход «По умолчанию» ставил Normal и затирал SemiBold шапки главного окна
+        // (у диалогов начертание локальное и не перетиралось) — теперь восстанавливается.
+        Assert.Contains("RestoreTitleBarTypography(window);", theme, StringComparison.Ordinal);
+        Assert.Contains("TextBlock.FontWeightProperty", theme, StringComparison.Ordinal);
+        Assert.Contains("FontWeights.SemiBold", theme, StringComparison.Ordinal);
+        Assert.Contains("WindowChromeMetrics.TitleBarFontSize", theme, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaTitleBar_UsesDedicatedCompactConstants()
+    {
+        var uiMetrics = ReadProjectFile("Workspace1C", "Controls", "UiMetrics.Avalonia.cs");
+
+        // В компактном режиме — константы 30/30, а не общий масштаб 0.8 (27.2):
+        // иначе полоса, кнопки и подложка расходились бы с WPF и метриками.
+        Assert.Contains("Themes.WindowChromeMetrics.CompactTitleBarHeight", uiMetrics, StringComparison.Ordinal);
+        Assert.Contains("Themes.WindowChromeMetrics.CompactWindowButtonHeight", uiMetrics, StringComparison.Ordinal);
+        Assert.Contains("public static double WindowButtonHeight", uiMetrics, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AvaloniaMainAndDialog_UseSameButtonHeight()
+    {
+        var main = ReadProjectFile("Workspace1C", "Views", "MainWindow.Avalonia.Controls.cs");
+        var dialog = ReadProjectFile("Workspace1C", "Views", "ModalWindowBase.cs");
+
+        foreach (var code in new[] { main, dialog })
+        {
+            Assert.Contains("Height = UiMetrics.WindowButtonHeight", code, StringComparison.Ordinal);
+            Assert.DoesNotContain("UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight)",
+                code, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void AvaloniaDialogTitle_HasNoLocalHeightOverride()
+    {
+        var dialog = ReadProjectFile("Workspace1C", "Views", "ModalWindowBase.cs");
+
+        var start = dialog.IndexOf("var title = new TextBlock", StringComparison.Ordinal);
+        Assert.True(start >= 0, "Заголовок диалога не найден");
+        var end = dialog.IndexOf("_titleSub = title.Bind", start, StringComparison.Ordinal);
+        Assert.True(end > start, "Не найден конец блока заголовка диалога");
+        var block = dialog[start..end];
+
+        // Локальная высота 30 DIP расходилась с полосой (34/30) и обрезала текст.
+        Assert.DoesNotContain("Height =", block, StringComparison.Ordinal);
     }
 }

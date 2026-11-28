@@ -254,9 +254,22 @@ namespace Workspace1C.Controls
         /// <summary>
         /// Высота полосы заголовка окна (issue #179): та же метрика, что у кнопок окна,
         /// поэтому шапка главного окна и диалогов одинакова по высоте. В компактном
-        /// режиме сжимается вместе с кнопками (issue #296).
+        /// режиме берётся отдельная компактная константа (30), а не результат общего
+        /// масштабирования 0.8 (27.2): иначе полоса, кнопки и подложка расходились бы
+        /// с WPF и с документированными метриками (issue #296).
         /// </summary>
-        public static double TitleBarHeight => Scaled(Themes.WindowChromeMetrics.TitleBarHeight);
+        public static double TitleBarHeight => Compact
+            ? Themes.WindowChromeMetrics.CompactTitleBarHeight
+            : Themes.WindowChromeMetrics.TitleBarHeight;
+
+        /// <summary>
+        /// Высота кнопок управления окном (issue #179): равна высоте полосы заголовка,
+        /// поэтому кнопка занимает полосу целиком и центрируется без смещения.
+        /// В компактном режиме — компактная константа (30).
+        /// </summary>
+        public static double WindowButtonHeight => Compact
+            ? Themes.WindowChromeMetrics.CompactWindowButtonHeight
+            : Themes.WindowChromeMetrics.WindowButtonHeight;
 
         /// <summary>
         /// Вертикальный внутренний отступ шапки окна. Ноль: высоту полосы задаёт

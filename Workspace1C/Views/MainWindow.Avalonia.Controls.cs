@@ -558,7 +558,7 @@ namespace Workspace1C
                 // ширина не зависит от темы, высота равна высоте полосы заголовка,
                 // поэтому кнопка занимает полосу целиком и не обрезается.
                 Width = UiMetrics.WindowButtonWidth;
-                Height = UiMetrics.Scaled(WindowChromeMetrics.WindowButtonHeight);
+                Height = UiMetrics.WindowButtonHeight;
                 Padding = new Thickness(0);
                 HorizontalContentAlignment = HorizontalAlignment.Center;
                 VerticalContentAlignment = VerticalAlignment.Center;
@@ -706,7 +706,7 @@ namespace Workspace1C
                 // Ширина — общая метрика (не из темы, issue #179/1.0.1.130), высота —
                 // высота полосы: кнопка вписана в полосу и не обрезается сверху/снизу.
                 Width = UiMetrics.WindowButtonWidth;
-                Height = UiMetrics.Scaled(WindowButtonThemeMetrics.ButtonHeight);
+                Height = UiMetrics.WindowButtonHeight;
                 var radius = Math.Min(_cornerRadius, UiMetrics.WindowButtonCircleRadius);
                 if (_circle is not null)
                     _circle.CornerRadius = new CornerRadius(radius);
