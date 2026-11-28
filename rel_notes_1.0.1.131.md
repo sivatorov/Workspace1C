@@ -26,7 +26,7 @@
 
 | Платформа | Файл | Размер | Версия |
 |---|---|---|---|
-| Windows 10/11 x64 | `Workspace1C.exe` (self-contained single-file, PRO-модули) | 85 723 548 байт | `1.0.1.131` |
-| Linux x64 | `Workspace1C-linux-x64` (ELF x64, self-contained) | 54 006 189 байт | `1.0.1.131` |
+| Windows 10/11 x64 | `Workspace1C.exe` (self-contained single-file, PRO-модули) | 85 615 044 байт | `1.0.1.131` |
+| Linux x64 | `Workspace1C-linux-x64` (ELF x64, self-contained) | 53 901 415 байт | `1.0.1.131` |
 
 Полный прогон тестов: см. `docs/_t7_full_test_131.log` (все тесты зелёные).
